@@ -1,3 +1,3 @@
-# Optimized Compute Kernels
+# Heterogeneous Data Kernels
 
-A low-level execution library for data processing. 
+A low-level execution library for analytic data processing. 
