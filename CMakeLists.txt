@@ -23,10 +23,38 @@ endif()
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
+# Google log
+add_subdirectory(third_party/glog-0.5.0)
+find_package (glog 0.5.0 REQUIRED)
+
 # Arrow
 find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
 include_directories(${Arrow_INCLUDE_DIRS})
+
+# Boost, required for OmniSciDB
+add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
+find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
+
+# OmniSciDB submodule
+include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
+
+add_subdirectory(omniscidb/Shared)
+
+find_package(GDAL REQUIRED)
+find_package(GDALExtra REQUIRED)
+list(APPEND GDAL_LIBRARIES ${PNG_LIBRARIES} ${GDALExtra_LIBRARIES})
+add_subdirectory(omniscidb/Geospatial)
+
+add_subdirectory(omniscidb/OSDependent)
+
+# TODO: replace with glog
+include_directories(omniscidb/ThirdParty/rapidjson)
+add_definitions(-DRAPIDJSON_HAS_STDSTRING)
+
+add_subdirectory(omniscidb/Logger)
+
 
 # Source
 add_subdirectory(src)
@@ -34,6 +62,6 @@ add_subdirectory(src)
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Geospatial Logger ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)

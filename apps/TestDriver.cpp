@@ -4,11 +4,10 @@
 #include <memory>
 
 int main(void) {
-  auto input_data_type = std::make_unique<hdk::Int>();
-  auto input_data = std::make_unique<hdk::Column>(std::move(input_data_type));
-  auto output_type = std::make_unique<hdk::Int>();
-  auto agg_expr = std::make_unique<hdk::Aggregate>(
-      std::move(output_type), hdk::Aggregate::AggType::kCOUNT, std::move(input_data));
+  int table_id = 0;
+  SQLTypeInfo sql_type(SQLTypes::kINT);
 
-  std::cout << "Test program worked: " << agg_expr->toString() << std::endl;
+  const auto col_expr =
+      makeExpr<Analyzer::ColumnVar>(sql_type, table_id, /*column_id=*/0, 0);
+  std::cout << "Test program worked: " << col_expr->toString() << std::endl;
 }
