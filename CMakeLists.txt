@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18.2)
+cmake_minimum_required(VERSION 3.16.3)
 
 project(
     HeterogeneousDataKernels
@@ -25,6 +25,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
 # Google log
 add_subdirectory(third_party/glog-0.5.0)
+cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
 find_package (glog 0.5.0 REQUIRED)
 
 # Arrow
@@ -45,6 +46,7 @@ add_subdirectory(omniscidb/Shared)
 find_package(GDAL REQUIRED)
 find_package(GDALExtra REQUIRED)
 list(APPEND GDAL_LIBRARIES ${PNG_LIBRARIES} ${GDALExtra_LIBRARIES})
+include_directories(${GDAL_INCLUDE_DIRS})
 add_subdirectory(omniscidb/Geospatial)
 
 add_subdirectory(omniscidb/OSDependent)
