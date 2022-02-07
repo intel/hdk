@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16.3)
 
 project(
-    HeterogeneousDataKernels
-    VERSION 0.1
-    LANGUAGES CXX
+        HeterogeneousDataKernels
+        VERSION 0.1
+        LANGUAGES CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,22 +11,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set default build type to "Release w/ Debug Info" 
 set(default_build_type "RelWithDebInfo")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
-  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
-      STRING "Choose the type of build." FORCE)
-  # Set the possible values of build type for cmake-gui
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
 
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
 # Google log
 add_subdirectory(third_party/glog-0.5.0)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/glog-0.5.0/cmake")
 cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
-find_package (glog 0.5.0 REQUIRED)
+find_package(glog REQUIRED)
 
 # Arrow
 find_package(Arrow REQUIRED)
