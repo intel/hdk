@@ -33,68 +33,57 @@
 #      target_link_libraries(<YourTarget> ${Arrow_LIBRARIES})
 #    endif()
 
-if(Arrow_USE_STATIC_LIBS)
-  set(_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-endif()
+if (Arrow_USE_STATIC_LIBS)
+    set(_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif ()
 
 
 find_library(Arrow_LIBRARY
-  NAMES arrow
-  HINTS
-  ENV LD_LIBRARY_PATH
-  ENV DYLD_LIBRARY_PATH
-  PATHS
-  /usr/lib
-  /usr/local/lib
-  /usr/local/homebrew/lib
-  /opt/local/lib)
-
-find_library(Arrow_DC_LIBRARY
-  NAMES double-conversion
-  HINTS
-  ENV LD_LIBRARY_PATH
-  ENV DYLD_LIBRARY_PATH
-  PATHS
-  /usr/lib
-  /usr/local/lib
-  /usr/local/homebrew/lib
-  /opt/local/lib)
+        NAMES arrow
+        HINTS
+        ENV LD_LIBRARY_PATH
+        ENV DYLD_LIBRARY_PATH
+        PATHS
+        /usr/lib
+        /usr/local/lib
+        /usr/local/homebrew/lib
+        /opt/local/lib)
 
 find_library(Arrow_GPU_CUDA_LIBRARY
-  NAMES arrow_cuda
-  HINTS
-  ENV LD_LIBRARY_PATH
-  ENV DYLD_LIBRARY_PATH
-  PATHS
-  /usr/lib
-  /usr/local/lib
-  /usr/local/homebrew/lib
-  /opt/local/lib)
+        NAMES arrow_cuda
+        HINTS
+        ENV LD_LIBRARY_PATH
+        ENV DYLD_LIBRARY_PATH
+        PATHS
+        /usr/lib
+        /usr/local/lib
+        /usr/local/homebrew/lib
+        /opt/local/lib)
 
-if(Arrow_USE_STATIC_LIBS)
-  find_library(Arrow_DEPS_LIBRARY
-    NAMES arrow_bundled_dependencies
-    HINTS
-    ENV LD_LIBRARY_PATH
-    ENV DYLD_LIBRARY_PATH
-    PATHS
-    /usr/lib
-    /usr/local/lib
-    /usr/local/homebrew/lib
-    /opt/local/lib)
-else()
-  set(Arrow_DEPS_LIBRARY "")
-endif()
+if (Arrow_USE_STATIC_LIBS)
+    find_library(Arrow_DEPS_LIBRARY
+            NAMES arrow_bundled_dependencies
+            HINTS
+            ENV LD_LIBRARY_PATH
+            ENV DYLD_LIBRARY_PATH
+            PATHS
+            /usr/lib
+            /usr/local/lib
+            /usr/local/homebrew/lib
+            /opt/local/lib)
+else ()
+    set(Arrow_DEPS_LIBRARY "")
+endif ()
 
 get_filename_component(Arrow_LIBRARY_DIR ${Arrow_LIBRARY} DIRECTORY)
 
-if(Arrow_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES})
-endif()
+if (Arrow_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES})
+endif ()
 
 # Set standard CMake FindPackage variables if found.
-set(Arrow_LIBRARIES ${Arrow_LIBRARY} ${Arrow_DC_LIBRARY} ${Arrow_DEPS_LIBRARY})
+set(Arrow_LIBRARIES ${Arrow_LIBRARY} ${Arrow_DEPS_LIBRARY})
 set(Arrow_GPU_CUDA_LIBRARIES ${Arrow_GPU_CUDA_LIBRARY})
 set(Arrow_LIBRARY_DIRS ${Arrow_LIBRARY_DIR})
 set(Arrow_INCLUDE_DIRS ${Arrow_LIBRARY_DIR}/../include)
