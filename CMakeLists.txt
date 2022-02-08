@@ -44,6 +44,12 @@ add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
+# LLVM
+find_package(LLVM CONFIG REQUIRED)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
