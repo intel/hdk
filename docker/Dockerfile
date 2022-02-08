@@ -27,6 +27,9 @@ RUN apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename 
 RUN apt update
 RUN apt install -y -V libarrow-dev 
 
+# LLVM
+RUN apt install -y llvm-12 llvm-12-dev
+
 # Gflags (for Glog)
 RUN apt install -y libgflags-dev
 
@@ -48,3 +51,5 @@ RUN apt install -y libgtest-dev
 
 # Unwind (glog)
 RUN apt install -y libunwind-dev
+
+RUN apt-get clean
