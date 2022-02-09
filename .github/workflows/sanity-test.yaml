@@ -5,5 +5,9 @@ jobs:
     runs-on: [ self-hosted, linux, x64 ]
     steps:
       - run: mkdir build && cd build
-      - run: cmake ..
-      - run: make -j 4
+      - name: cmake
+          run: cmake ..
+          working-directory: build
+      - name: make
+          run: make -j 4
+          working-directory: build
