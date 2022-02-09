@@ -1,0 +1,17 @@
+name: sanity-tests
+on: [ push ]
+jobs:
+  build:
+    runs-on: [ self-hosted, linux, x64 ]
+    steps:
+      - name: update submodule
+        run: |
+          git submodule init
+          git submodule update
+      - run: rm -r build && mkdir build && cd build
+      - name: cmake
+        run: cmake ..
+        working-directory: build
+      - name: make
+        run: make -j 4
+        working-directory: build
