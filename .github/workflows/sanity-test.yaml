@@ -4,11 +4,12 @@ jobs:
   build:
     runs-on: [ self-hosted, linux, x64 ]
     steps:
+      - uses: actions/checkout@v2
       - name: update submodule
         run: |
           git submodule init
           git submodule update
-      - run: rm -r build && mkdir build && cd build
+      - run: mkdir build && cd build
       - name: cmake
         run: cmake ..
         working-directory: build
