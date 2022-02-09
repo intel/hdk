@@ -9,7 +9,7 @@ jobs:
         run: |
           git submodule init
           git submodule update
-      - run: rm -r build && mkdir build && cd build
+      - run: mkdir build && cd build
       - name: cmake
         run: cmake ..
         working-directory: build
