@@ -3,6 +3,7 @@ on: [ push ]
 jobs:
   build:
     runs-on: [ self-hosted, linux, x64 ]
+    uses: actions/checkout@v2
     steps:
       - name: update submodule
         run: |
