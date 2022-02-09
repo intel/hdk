@@ -3,8 +3,8 @@ on: [ push ]
 jobs:
   build:
     runs-on: [ self-hosted, linux, x64 ]
-    uses: actions/checkout@v2
     steps:
+      - uses: actions/checkout@v2
       - name: update submodule
         run: |
           git submodule init
