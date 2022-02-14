@@ -20,6 +20,11 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
+# Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
+file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
+file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/geo_samples" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
+file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/gdal-data" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
+
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
