@@ -46,9 +46,14 @@ include_directories(${Boost_INCLUDE_DIR})
 
 # LLVM
 find_package(LLVM CONFIG REQUIRED)
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
+
+find_library(CLANG_LIB clang-cpp)
+find_library(LLVM_LIB LLVM)
 
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
@@ -56,6 +61,10 @@ include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 add_subdirectory(omniscidb/Shared)
 
 add_subdirectory(omniscidb/OSDependent)
+
+set(MAPD_EDITION "OS")
+string(TOLOWER "${MAPD_EDITION}" MAPD_EDITION_LOWER)
+add_subdirectory(omniscidb/QueryEngine)
 
 # TODO: replace with glog
 include_directories(omniscidb/ThirdParty/rapidjson)
@@ -70,6 +79,6 @@ add_subdirectory(src)
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES} QueryEngine)
 
 target_include_directories(TestDriver PRIVATE src/)
