@@ -55,8 +55,18 @@ add_definitions(${LLVM_DEFINITIONS})
 find_library(CLANG_LIB clang-cpp)
 find_library(LLVM_LIB LLVM)
 
+# TBB
+find_package(TBB REQUIRED)
+message(STATUS "TBB library is found with ${TBB_DIR}")
+add_definitions("-DHAVE_TBB")
+add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
+set(ENABLE_TBB ON)
+add_definitions("-DENABLE_TBB")
+
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
+# Add OmniSciDB distributed subfolder for headers only
+include_directories(omniscidb/Distributed/os)
 
 add_subdirectory(omniscidb/Shared)
 
@@ -72,13 +82,12 @@ add_definitions(-DRAPIDJSON_HAS_STDSTRING)
 
 add_subdirectory(omniscidb/Logger)
 
-
 # Source
 add_subdirectory(src)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES} QueryEngine)
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES} QueryEngine ${TBB_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
