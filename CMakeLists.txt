@@ -54,6 +54,50 @@ add_definitions(${LLVM_DEFINITIONS})
 
 find_library(CLANG_LIB clang-cpp)
 find_library(LLVM_LIB LLVM)
+# Deps builds use separate libs for each clang component, while some distros now bundle into a single lib
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" OR NOT LLVM_LIB)
+    set(LLVM_COMPONENTS support mcjit core irreader option linker)
+
+    if (ENABLE_INTEL_JIT_LISTENER)
+        list(APPEND LLVM_COMPONENTS inteljitevents)
+    endif ()
+
+    llvm_map_components_to_libnames(llvm_libs ${LLVM_TARGETS_TO_BUILD} ${LLVM_COMPONENTS})
+    set(clang_libs
+            clangFrontend
+            clangSerialization
+            clangDriver
+            clangTooling
+            clangParse
+            clangSema
+            clangAnalysis
+            clangEdit
+            clangAST
+            clangLex
+            clangBasic
+            clangRewrite
+            clangRewriteFrontend)
+
+    # LLVMSupport explicitly lists tinfo in its INTERFACE_LINK_LIBRARIES, even
+    # though we provide it in our build of ncurses. Since LLVMSupport is listed
+    # as a requirement for other llvm libs, we need to walk through the entire
+    # list in order to remove all instances of tinfo.
+    foreach (lib ${llvm_libs})
+        #get_target_property(interface_libs ${lib} INTERFACE_LINK_LIBRARIES)
+        #list(REMOVE_ITEM interface_libs tinfo z rt pthread -lpthread m dl)
+        #set_target_properties(${lib} PROPERTIES INTERFACE_LINK_LIBRARIES "${interface_libs}")
+    endforeach ()
+
+    #list(APPEND llvm_libs ${CURSES_NCURSES_LIBRARY})
+else ()
+    if (NOT CLANG_LIB)
+        message(FATAL_ERROR "Could not find CLANG library.")
+    endif ()
+
+    set(clang_libs ${CLANG_LIB})
+    set(llvm_libs ${LLVM_LIB})
+endif ()
+
 
 # TBB
 find_package(TBB REQUIRED)
@@ -64,6 +108,8 @@ set(ENABLE_TBB ON)
 add_definitions("-DENABLE_TBB")
 
 # OmniSciDB submodule
+add_definitions("-DENABLE_ARROW_4")
+
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 # Add OmniSciDB distributed subfolder for headers only
 include_directories(omniscidb/Distributed/os)
@@ -82,12 +128,19 @@ add_definitions(-DRAPIDJSON_HAS_STDSTRING)
 
 add_subdirectory(omniscidb/Logger)
 
+add_subdirectory(omniscidb/SchemaMgr)
+add_subdirectory(omniscidb/ArrowStorage)
+add_subdirectory(omniscidb/CudaMgr)
+add_subdirectory(omniscidb/DataMgr)
+
+set(OMNISCI_LIBS Shared OSDependent Geospatial Logger QueryEngine DataMgr CudaMgr)
+
 # Source
 add_subdirectory(src)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES} QueryEngine ${TBB_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${OMNISCI_LIBS} ${llvm_libs} ${Arrow_LIBRARIES} ${Boost_LIBRARIES} TBB::tbb)
 
 target_include_directories(TestDriver PRIVATE src/)
