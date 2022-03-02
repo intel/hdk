@@ -47,13 +47,19 @@ include_directories(${Boost_INCLUDE_DIR})
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
+# Add OmniSciDB os subfolders for headers only
+include_directories(omniscidb/Catalog/os)
+include_directories(omniscidb/Distributed/os)
+
+set(MAPD_EDITION "OS")
+string(TOLOWER "${MAPD_EDITION}" MAPD_EDITION_LOWER)
+
 add_subdirectory(omniscidb/Shared)
 
 find_package(GDAL REQUIRED)
 find_package(GDALExtra REQUIRED)
 list(APPEND GDAL_LIBRARIES ${PNG_LIBRARIES} ${GDALExtra_LIBRARIES})
 include_directories(${GDAL_INCLUDE_DIRS})
-add_subdirectory(omniscidb/Geospatial)
 
 add_subdirectory(omniscidb/OSDependent)
 
@@ -63,13 +69,12 @@ add_definitions(-DRAPIDJSON_HAS_STDSTRING)
 
 add_subdirectory(omniscidb/Logger)
 
-
 # Source
 add_subdirectory(src)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Geospatial Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
