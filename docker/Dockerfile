@@ -52,4 +52,7 @@ RUN apt install -y libgtest-dev
 # Unwind (glog)
 RUN apt install -y libunwind-dev
 
+# libarchive
+RUN apt install -y libarchive-dev
+
 RUN apt-get clean
