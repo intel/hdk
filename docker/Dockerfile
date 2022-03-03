@@ -29,6 +29,9 @@ RUN apt install -y -V libarrow-dev
 
 # LLVM
 RUN apt install -y llvm-12 llvm-12-dev
+RUN apt install -y llvm-12 llvm-12-dev clang-12 libclang-12-dev
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-12
+
 
 # Gflags (for Glog)
 RUN apt install -y libgflags-dev
@@ -54,5 +57,8 @@ RUN apt install -y libunwind-dev
 
 # libarchive
 RUN apt install -y libarchive-dev
+
+# TBB
+RUN apt install -y libtbb2 libtbb-dev
 
 RUN apt-get clean
