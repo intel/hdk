@@ -43,11 +43,40 @@ set(ANALYZER_FILES ../omniscidb/Analyzer/Analyzer.cpp ../omniscidb/QueryEngine/D
 
 set(EXECUTION_ENGINE_FILES ExecutionEngine/ExecutionEngine.cpp
         ../omniscidb/Fragmenter/InsertOrderFragmenter.cpp
+        ../omniscidb/QueryEngine/AggregatedColRange.cpp
         ../omniscidb/QueryEngine/CgenState.cpp
+        ../omniscidb/QueryEngine/ColumnFetcher.cpp
+        ../omniscidb/QueryEngine/ArithmeticIR.cpp
+        ../omniscidb/QueryEngine/ArrayIR.cpp
+        ../omniscidb/QueryEngine/CaseIR.cpp
+        ../omniscidb/QueryEngine/CastIR.cpp
+        ../omniscidb/QueryEngine/ColumnIR.cpp
+        ../omniscidb/QueryEngine/CompareIR.cpp
+        ../omniscidb/QueryEngine/ConstantIR.cpp
+        ../omniscidb/QueryEngine/DataRecycler/HashingSchemeRecycler.cpp
+        ../omniscidb/QueryEngine/DataRecycler/HashtableRecycler.cpp
+        ../omniscidb/QueryEngine/DataRecycler/OverlapsTuningParamRecycler.cpp
+        ../omniscidb/QueryEngine/DateTimeIR.cpp
+        ../omniscidb/QueryEngine/ExtensionsIR.cpp
+        ../omniscidb/QueryEngine/InValuesIR.cpp
+        ../omniscidb/QueryEngine/IRCodegen.cpp
+        ../omniscidb/QueryEngine/LogicalIR.cpp
+        ../omniscidb/QueryEngine/MurmurHash.cpp
+        ../omniscidb/QueryEngine/StringOpsIR.cpp
+        ../omniscidb/QueryEngine/WindowFunctionIR.cpp
+        ../omniscidb/QueryEngine/Codec.cpp
+        ../omniscidb/QueryEngine/ColumnarResults.cpp
         ../omniscidb/QueryEngine/Descriptors/ColSlotContext.cpp
+        ../omniscidb/QueryEngine/Descriptors/QueryCompilationDescriptor.cpp
+        ../omniscidb/QueryEngine/Descriptors/QueryFragmentDescriptor.cpp
         ../omniscidb/QueryEngine/Descriptors/QueryMemoryDescriptor.cpp
         ../omniscidb/QueryEngine/Execute.cpp
+        ../omniscidb/QueryEngine/ExecutionKernel.cpp
         ../omniscidb/QueryEngine/ExpressionRange.cpp
+        ../omniscidb/QueryEngine/GpuMemUtils.cpp
+        ../omniscidb/QueryEngine/GpuSharedMemoryUtils.cpp
+        ../omniscidb/QueryEngine/GroupByAndAggregate.cpp
+        ../omniscidb/QueryEngine/InPlaceSort.cpp
         ../omniscidb/QueryEngine/InputMetadata.cpp
         ../omniscidb/QueryEngine/InValuesBitmap.cpp
         ../omniscidb/QueryEngine/JoinHashTable/BaselineJoinHashTable.cpp
@@ -57,17 +86,34 @@ set(EXECUTION_ENGINE_FILES ExecutionEngine/ExecutionEngine.cpp
         ../omniscidb/QueryEngine/JoinHashTable/PerfectJoinHashTable.cpp
         ../omniscidb/QueryEngine/JoinHashTable/Runtime/HashJoinRuntime.cpp
         ../omniscidb/QueryEngine/JoinHashTable/RangeJoinHashTable.cpp
+        ../omniscidb/QueryEngine/LLVMFunctionAttributesUtil.cpp
         ../omniscidb/QueryEngine/LoopControlFlow/JoinLoop.cpp
+        ../omniscidb/QueryEngine/MaxwellCodegenPatch.cpp
         ../omniscidb/QueryEngine/NativeCodegen.cpp
+        ../omniscidb/QueryEngine/OutputBufferInitialization.cpp
         ../omniscidb/QueryEngine/PlanState.cpp
+        ../omniscidb/QueryEngine/QueryExecutionContext.cpp
+        ../omniscidb/QueryEngine/QueryMemoryInitializer.cpp
+        ../omniscidb/QueryEngine/QueryPlanDagCache.cpp
+        ../omniscidb/QueryEngine/QueryTemplateGenerator.cpp
         ../omniscidb/QueryEngine/ResultSet.cpp
         ../omniscidb/QueryEngine/ResultSetIteration.cpp
         ../omniscidb/QueryEngine/ResultSetReduction.cpp
         ../omniscidb/QueryEngine/ResultSetReductionCodegen.cpp
+        ../omniscidb/QueryEngine/ResultSetReductionInterpreter.cpp
+        ../omniscidb/QueryEngine/ResultSetReductionInterpreterStubs.cpp
         ../omniscidb/QueryEngine/ResultSetReductionJIT.cpp
         ../omniscidb/QueryEngine/ResultSetStorage.cpp
+        ../omniscidb/QueryEngine/RuntimeFunctions.cpp
+        ../omniscidb/QueryEngine/SpeculativeTopN.cpp
+        ../omniscidb/QueryEngine/StreamingTopN.cpp
         ../omniscidb/QueryEngine/StringDictionaryGenerations.cpp
+        ../omniscidb/QueryEngine/TableFunctions/TableFunctionCompilationContext.cpp
+        ../omniscidb/QueryEngine/TableFunctions/TableFunctionExecutionContext.cpp
         ../omniscidb/QueryEngine/TableGenerations.cpp
+        ../omniscidb/QueryEngine/Utils/DiamondCodegen.cpp
+        ../omniscidb/QueryEngine/WindowContext.cpp
+        ../omniscidb/QueryEngine/WindowExpressionRewrite.cpp
         ../omniscidb/StringDictionary/StringDictionary.cpp
         ../omniscidb/StringDictionary/StringDictionaryProxy.cpp
         )

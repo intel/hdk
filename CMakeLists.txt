@@ -44,6 +44,10 @@ add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
+# RapidJSON
+include_directories(omniscidb/ThirdParty/rapidjson)
+add_definitions(-DRAPIDJSON_HAS_STDSTRING)
+
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
@@ -54,7 +58,16 @@ include_directories(omniscidb/Distributed/os)
 set(MAPD_EDITION "OS")
 string(TOLOWER "${MAPD_EDITION}" MAPD_EDITION_LOWER)
 
+set(ENABLE_ARROW_4 ON)
+add_definitions("-DENABLE_ARROW_4")
+
 add_subdirectory(omniscidb/Shared)
+add_subdirectory(omniscidb/Utils)
+
+# libarchive
+#find_package(LibArchive REQUIRED)
+#include_directories(${LibArchive_INCLUDE_DIRS})
+#add_subdirectory(omniscidb/DataMgr)
 
 find_package(GDAL REQUIRED)
 find_package(GDALExtra REQUIRED)
@@ -64,9 +77,6 @@ include_directories(${GDAL_INCLUDE_DIRS})
 add_subdirectory(omniscidb/OSDependent)
 
 # TODO: replace with glog
-include_directories(omniscidb/ThirdParty/rapidjson)
-add_definitions(-DRAPIDJSON_HAS_STDSTRING)
-
 add_subdirectory(omniscidb/Logger)
 
 # Source
@@ -75,6 +85,6 @@ add_subdirectory(src)
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Utils Logger ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
