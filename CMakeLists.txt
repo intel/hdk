@@ -49,12 +49,6 @@ include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
 add_subdirectory(omniscidb/Shared)
 
-find_package(GDAL REQUIRED)
-find_package(GDALExtra REQUIRED)
-list(APPEND GDAL_LIBRARIES ${PNG_LIBRARIES} ${GDALExtra_LIBRARIES})
-include_directories(${GDAL_INCLUDE_DIRS})
-add_subdirectory(omniscidb/Geospatial)
-
 add_subdirectory(omniscidb/OSDependent)
 
 # TODO: replace with glog
@@ -70,6 +64,6 @@ add_subdirectory(src)
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Geospatial Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
