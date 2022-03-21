@@ -74,13 +74,30 @@ add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
-# LLVM
+# LLVM / MLIR
 find_package(LLVM CONFIG REQUIRED)
+find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+
+set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
+set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
+set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
+
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+include(TableGen)
+include(AddLLVM)
+include(AddMLIR)
+include(HandleLLVMOptions)
 
 include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_BINARY_DIR}/include)
+link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 find_library(CLANG_LIB clang-cpp)
