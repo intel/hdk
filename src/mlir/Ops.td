@@ -7,12 +7,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 
-// Provide a definition of the 'HDK' dialect in the ODS framework so that we
-// can define our operations.
-def HDK_Dialect : Dialect {
-  let name = "hdk";
-  let cppNamespace = "hdk";
-}
+include "HDKBase.td"
+include "Types.td"
 
 // Base class for HDK dialect operations. This operation inherits from the base
 // `Op` class in OpBase.td, and provides:
@@ -21,6 +17,48 @@ def HDK_Dialect : Dialect {
 //   * A list of traits for the operation.
 class HDK_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<HDK_Dialect, mnemonic, traits>;
+
+def HDK_KernelOp : HDK_Op<"kernel"> {
+    let summary = "kernel operation";
+    let description = [{
+        Kernels represent an individual invocation of a row-wise analytic function over some set of input columns.
+        A kernel has a set layout consisting of:
+            * Projected Targets
+            * Groupby Targets (can we combine with above?)
+            * Filter Expressions
+            * Simple Filter Expressions (maybe we can determine these automagically w/ an attribute)
+            * Join Expressions
+            * Aggregate Expressions
+            * Sort Information
+    }];
+
+    let arguments = (ins); // TODO: this could be the column / kernel arguments
+
+    let results = (outs HDK_KernelType : $result);
+    // TODO: define blocks / regions as appropriate
+}
+
+def HDK_ExprOp : HDK_Op<"expr", [HasParent<"::hdk::KernelOp">] > {
+    let summary = "Defines an expression within a HDK kernel.";
+
+    let description = [{
+        Expressions are individual operators inside a kernel. Expressions must exist within one of the pre-defined
+        kernel slots.
+    }];
+
+      let arguments = (ins StrAttr:$name, AnyType:$value); // TODO: consider constraining
+      let results = (outs);
+}
+
+def HDK_ColumnOp : HDK_Op<"column", [NoSideEffect]> {
+    let summary = "column";
+    let description = [{
+        Column operations provide containers and types for input/output data columns.
+    }];
+
+    let arguments = (ins AnyType: $type, AnyType: $values);
+    let results = (outs); // TODO: should this mirror inputs?
+}
 
 def HDK_ConstantOp : HDK_Op<"constant", [NoSideEffect]> {
     let summary = "constant";
