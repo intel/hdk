@@ -58,7 +58,28 @@ def HDK_Date : HDK_Type<"Date", "date"> {
 def HDK_Array : HDK_Type<"Array", "array"> {
     let summary = "HDK Array Type";
 
-      let parameters = (ins "::mlir::Type":$elementType);
+    let parameters = (ins "::mlir::Type":$elementType);
+
+    let printer = [{
+        $_printer << "<" << getImpl()->elementType << ">";
+      }];
+
+      let parser = [{
+        if ($_parser.parseLess())
+            return Type();
+        Type elementType;
+        if ($_parser.parseType(elementType))
+            return Type();
+        if ($_parser.parseGreater())
+          return Type();
+        return get($_ctxt, elementType);
+      }];
+
+      let builders = [
+        TypeBuilderWithInferredContext<(ins "::mlir::Type":$elementType), [{
+          return Base::get(elementType.getContext(), elementType);
+        }]>
+      ];
 }
 
 #endif
