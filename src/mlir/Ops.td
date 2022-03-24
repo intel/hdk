@@ -38,6 +38,47 @@ def HDK_KernelOp : HDK_Op<"kernel"> {
     // TODO: define blocks / regions as appropriate
 }
 
+def HDK_ReturnOp : HDK_Op<"return", [NoSideEffect, HasParent<"KernelOp">,
+                                 Terminator]> {
+  let summary = "return operation";
+  let description = [{
+    The "return" operation represents a return operation within a function.
+    The operation takes an optional tensor operand and produces no results.
+    The operand type must match the signature of the function that contains
+    the operation. For example:
+
+    ```mlir
+      func @foo() -> tensor<2xf64> {
+        ...
+        hdk.return %0 : tensor<2xf64>
+      }
+    ```
+  }];
+
+  // The return operation takes an optional input operand to return. This
+  // value must match the return type of the enclosing function.
+  // TODO: for now just return nothing
+  //  let arguments = (ins Variadic<F64Tensor>:$input);
+  let arguments = (ins);
+
+  // The return operation only emits the input in the format if it is present.
+  // let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
+
+  // Allow building a ReturnOp with no return operand.
+  // TODO: re-enable once/if we take a return operand
+  //let builders = [
+  //  OpBuilder<(ins), [{ build($_builder, $_state, llvm::None); }]>
+  //];
+
+  // Provide extra utility definitions on the c++ operation class definition.
+  let extraClassDeclaration = [{
+    bool hasOperand() { return false; /*getNumOperands() != 0;*/ }
+  }];
+
+  // Invoke a static verify method to verify this return operation.
+  // let verifier = [{ return ::verify(*this); }];
+}
+
 def HDK_ExprOp : HDK_Op<"expr", [HasParent<"::hdk::KernelOp">] > {
     let summary = "Defines an expression within a HDK kernel.";
 
