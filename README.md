@@ -1,6 +1,6 @@
 # Heterogeneous Data Kernels
 
-A low-level execution library for analytic data processing. 
+A low-level execution library for analytic data processing.
 
 ## Clone
 
@@ -19,3 +19,9 @@ cd build
 cmake ..
 make -j
 ```
+
+## MLIR
+
+Install notes:
+
+* Set `LLVM_ENABLE_RTTI=ON`
