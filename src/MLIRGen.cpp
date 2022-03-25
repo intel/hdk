@@ -87,7 +87,9 @@ class MLIRGenImpl {
       returnOp = llvm::dyn_cast<hdk::ReturnOp>(entryBlock.back());
     if (!returnOp) {
       //      builder.create<hdk::ReturnOp>(loc(funcAST.getProto()->loc()));
-      llvm_unreachable("oops");
+      auto location =
+          mlir::FileLineColLoc::get(builder.getContext(), "kernel_sequence", 0, 0);
+      builder.create<hdk::ReturnOp>(location);
     } else if (returnOp.hasOperand()) {
       // Otherwise, if this return operation has an operand then add a result to
       // the function.
@@ -100,8 +102,32 @@ class MLIRGenImpl {
   }
 
   mlir::LogicalResult generateKernelBody(AST::Kernel& kernel) {
-    // TODO
-    return mlir::failure();
+    llvm::ScopedHashTableScope<llvm::StringRef, mlir::Value> var_scope(symbolTable);
+
+    // Generate + add projected expressions
+    for (auto& expr : kernel.projected_expressions) {
+      if (!mlirGen(expr)) {
+        return mlir::failure();
+      }
+    }
+
+    return mlir::success();
+  }
+
+  mlir::Value mlirGen(AST::Expr* expr) {
+    auto constant_expr = dynamic_cast<AST::Constant*>(expr);
+    if (constant_expr) {
+      if (!mlirGen(constant_expr)) {
+        return nullptr;
+      }
+    }
+    CHECK(false);
+    return nullptr;
+  }
+
+  mlir::Value mlirGen(AST::Constant* constant) {
+    CHECK(false);
+    return nullptr;
   }
 
   /// Create the prototype for an MLIR function with as many arguments as the

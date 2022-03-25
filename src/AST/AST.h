@@ -19,6 +19,8 @@ struct Kernel {
   std::vector<Expr*> projected_expressions;
 };
 
+using Constant = Analyzer::Constant;
+
 using KernelSequence = std::vector<Kernel>;
 
 }  // namespace AST
