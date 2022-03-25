@@ -15,5 +15,5 @@ add_custom_target(MLIRTableGenCppWrappers SOURCES ${DIALECT_FILES} DEPENDS ON HD
 add_library(HDK HDK.h HDK.cpp MLIRGen.cpp AST/AST.cpp ${DIALECT_FILES} ${ANALYZER_FILES})
 add_dependencies(HDK HDKOpsIncGen HDKTypesIncGen)
 
-target_link_libraries(HDK Logger Shared MLIRIR)
+target_link_libraries(HDK Logger Shared MLIRIR MLIRPass)
 

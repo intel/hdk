@@ -27,6 +27,7 @@ class MLIRGenImpl {
 
     for (auto& kernel : kernels) {
       auto val = mlirGen(kernel);
+      CHECK(val);
       theModule.push_back(val);
     }
 
