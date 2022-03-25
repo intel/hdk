@@ -34,7 +34,7 @@ def HDK_KernelOp : HDK_Op<"kernel"> {
 
     let arguments = (ins); // TODO: this could be the column / kernel arguments
 
-    let results = (outs HDK_KernelType : $result);
+    let results = (outs); // TODO: type as appropriate
     // TODO: define blocks / regions as appropriate
 }
 
