@@ -46,7 +46,20 @@ class MLIRGenImpl {
   // each kernel will be created as a MLIR function
   // TODO: we probably want this function nesting, so maybe our KernelOp should inherit
   // from FunctionOp?
-  mlir::FuncOp mlirGen(AST::Kernel& kernel) {
+  hdk::KernelOp mlirGen(AST::Kernel& kernel) {
+    // Generate + add projected expressions
+    for (auto& expr : kernel.projected_expressions) {
+      if (!mlirGen(expr)) {
+        CHECK(false);
+        return nullptr;
+      }
+    }
+
+    static int kernel_ctr = 0;
+    builder.create<hdk::KernelOp>(mlir::NameLoc::get(
+        mlir::Identifier::get("kernel_" + kernel_ctr++, builder.getContext())));
+
+#if 0
     // Create a scope in the symbol table to hold variable declarations.
     llvm::ScopedHashTableScope<llvm::StringRef, mlir::Value> var_scope(symbolTable);
 
@@ -99,8 +112,10 @@ class MLIRGenImpl {
     }
 
     return function;
+#endif
   }
 
+#if 0
   mlir::LogicalResult generateKernelBody(AST::Kernel& kernel) {
     llvm::ScopedHashTableScope<llvm::StringRef, mlir::Value> var_scope(symbolTable);
 
@@ -113,6 +128,7 @@ class MLIRGenImpl {
 
     return mlir::success();
   }
+#endif
 
   mlir::Value mlirGen(AST::Expr* expr) {
     auto constant_expr = dynamic_cast<AST::Constant*>(expr);
