@@ -77,9 +77,29 @@ def HDK_Array : HDK_Type<"Array", "array"> {
 
       let builders = [
         TypeBuilderWithInferredContext<(ins "::mlir::Type":$elementType), [{
-          return Base::get(elementType.getContext(), elementType);
+         return Base::get(elementType.getContext(), elementType);
         }]>
       ];
 }
+
+def HDK_Datum : HDK_Type<"Datum", "datum"> {
+    let summary = "HDK Datum Type";
+    let description = "Container for Datum C++ union.";
+
+    //let parameters = (
+}
+
+def HDK_AnySQLType : AnyTypeOf<[
+    HDK_NullType,
+    HDK_Boolean,
+    HDK_Decimal,
+    HDK_Int,
+    HDK_TinyInt,
+    HDK_SmallInt,
+    HDK_BigInt,
+    HDK_String,
+    HDK_Date,
+    HDK_Array
+], "Any SQL Operator type.">;
 
 #endif
