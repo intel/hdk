@@ -16,7 +16,7 @@ using Expr = Analyzer::Expr;
 struct Kernel {
   Kernel() {}
 
-  std::vector<Expr*> projected_expressions;
+  std::vector<std::unique_ptr<Expr>> projected_expressions;
 };
 
 using Constant = Analyzer::Constant;

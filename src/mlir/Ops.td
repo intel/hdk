@@ -6,6 +6,7 @@
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
+include "mlir/IR/BuiltinTypes.td"
 
 include "HDKBase.td"
 include "Types.td"
@@ -36,6 +37,10 @@ def HDK_KernelOp : HDK_Op<"kernel"> {
 
     let results = (outs); // TODO: type as appropriate
     // TODO: define blocks / regions as appropriate
+
+    let regions = (region
+      AnyRegion:$projections
+    );
 }
 
 def HDK_ReturnOp : HDK_Op<"return", [NoSideEffect, HasParent<"KernelOp">,
@@ -113,11 +118,15 @@ def HDK_ConstantOp : HDK_Op<"constant", [NoSideEffect]> {
             ```
     }];
 
-    // The constant operation takes an attribute as the only input.
-    let arguments = (ins F64ElementsAttr:$value);
+    // The constant operation takes data and a type
+   // TODO: need to define the type as an attribute
+   // https://mlir.llvm.org/docs/AttributesAndTypes/
+    // let arguments = (ins HDK_AnySQLType: $sql_type, F64ElementsAttr: $value);
+    // for now just take an attribute with no type
+    let arguments = (ins ElementsAttr: $value);
 
-    // The constant operation returns a single value of TensorType.
-    let results = (outs F64Tensor);
+    // The constant operation returns a single value.
+    let results = (outs I64Tensor);
 
 // Specify a parser and printer method.
 // TODO
@@ -127,19 +136,11 @@ def HDK_ConstantOp : HDK_Op<"constant", [NoSideEffect]> {
   // Add custom build methods for the constant operation. These method populates
   // the `state` that MLIR uses to create operations, i.e. these are used when
   // using `builder.create<ConstantOp>(...)`.
-  let builders = [
-    // Build a constant with a given constant tensor value.
-    OpBuilder<(ins "mlir::DenseElementsAttr":$value), [{
-      build($_builder, $_state, value.getType(), value);
-    }]>,
-
-    // Build a constant with a given constant floating-point value.
-    OpBuilder<(ins "double":$value)>
-  ];
-
-  // Invoke a static verify method to verify this constant operation.
-  // TODO
-  //let verifier = [{ return ::verify(*this); }];
+  //let builders = [
+  //  OpBuilder<(ins "mlir::DenseIntElementsAttr":$value), [{
+  //    build($_builder, $_state, value.getType(), value);
+  //  }]>,
+  //];
 }
 
 #endif

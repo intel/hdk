@@ -22,7 +22,9 @@ void mlir_test() {
 
   hdk::AST::KernelSequence sequence;
   auto kernel = hdk::AST::Kernel();
-  sequence.emplace_back(kernel);
+  kernel.projected_expressions.emplace_back(
+      std::make_unique<hdk::AST::Constant>(SQLTypes::kINT, /*notnull=*/false));
+  sequence.emplace_back(std::move(kernel));
 
   mlir::MLIRContext context(registry);
   // Load our Dialect in this MLIR Context.
