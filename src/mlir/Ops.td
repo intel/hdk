@@ -99,7 +99,8 @@ def HDK_ExprOp : HDK_Op<"expr", [HasParent<"::hdk::KernelOp">] > {
 def HDK_ColumnOp : HDK_Op<"column", [NoSideEffect]> {
     let summary = "column";
     let description = [{
-        Column operations provide containers and types for input/output data columns.
+        Column operations provide containers and types for input/output
+        data columns.
     }];
 
     let arguments = (ins AnyType: $type, AnyType: $values);
@@ -118,15 +119,16 @@ def HDK_ConstantOp : HDK_Op<"constant", [NoSideEffect]> {
             ```
     }];
 
-    // The constant operation takes data and a type
-   // TODO: need to define the type as an attribute
    // https://mlir.llvm.org/docs/AttributesAndTypes/
-    // let arguments = (ins HDK_AnySQLType: $sql_type, F64ElementsAttr: $value);
-    // for now just take an attribute with no type
-    let arguments = (ins ElementsAttr: $value);
+   // do we take any inputs?
+   let arguments = (ins);
 
     // The constant operation returns a single value.
-    let results = (outs I64Tensor);
+    let results = (outs HDK_AnySQLType);
+
+    let builders = [
+     OpBuilder<(ins "mlir::Type" : $sql_type, "hdk::Datum":$value)>
+    ];
 
 // Specify a parser and printer method.
 // TODO

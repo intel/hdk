@@ -82,11 +82,9 @@ def HDK_Array : HDK_Type<"Array", "array"> {
       ];
 }
 
-def HDK_Datum : HDK_Type<"Datum", "datum"> {
+def HDK_DatumType : HDK_Type<"Datum", "datum"> {
     let summary = "HDK Datum Type";
     let description = "Container for Datum C++ union.";
-
-    //let parameters = (
 }
 
 def HDK_AnySQLType : AnyTypeOf<[

@@ -12,6 +12,8 @@
 
 #include "mlir/Ops.h"
 
+#include "Shared/Datum.h"
+
 namespace hdk {
 
 class MLIRGenImpl {
@@ -84,12 +86,12 @@ class MLIRGenImpl {
 
   mlir::LogicalResult mlirGen(AST::Constant* constant) {
     auto data_type = mlir::RankedTensorType::get({}, builder.getI64Type());
-    //        mlir::IntegerType::get(builder.getContext(), 64);
-    auto payload = mlir::DenseElementsAttr::get(data_type, int64_t(10));
+    //    auto payload = mlir::DenseElementsAttr::get(data_type, int64_t(10));
     auto sql_type = builder.getType<hdk::BigIntType>();
+    auto payload = hdk::Datum::get();
     builder.create<hdk::ConstantOp>(mlir::NameLoc::get(mlir::Identifier::get(
                                         constant->toString(), builder.getContext())),
-                                    payload.getType(),
+                                    sql_type,
                                     payload);
     return mlir::success();
   }
