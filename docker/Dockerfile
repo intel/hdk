@@ -20,12 +20,18 @@ RUN apt-get install -y \
   python \
   python-dev 
 
+RUN apt-get install -y \
+    default-jre \
+    default-jre-headless \
+    default-jdk \
+    default-jdk-headless
+
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
 RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 RUN apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 RUN apt update
-RUN apt install -y -V libarrow-dev 
+RUN apt install -y -V libarrow-dev libparquet-dev
 
 # LLVM
 RUN apt install -y llvm-12 llvm-12-dev
