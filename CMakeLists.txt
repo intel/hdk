@@ -136,8 +136,10 @@ add_subdirectory(omniscidb/ArrowStorage)
 add_subdirectory(omniscidb/CudaMgr)
 add_subdirectory(omniscidb/DataMgr)
 add_subdirectory(omniscidb/Utils)
+add_subdirectory(omniscidb/SqliteConnector)
+add_subdirectory(omniscidb/ThriftHandler) # Query State
 
-set(OMNISCI_LIBS Calcite Shared OSDependent Utils Logger QueryEngine DataMgr CudaMgr ArrowStorage)
+set(OMNISCI_LIBS Calcite Shared OSDependent Utils Logger QueryEngine DataMgr CudaMgr ArrowStorage SqliteConnector QueryState)
 
 # Source
 add_subdirectory(src)
