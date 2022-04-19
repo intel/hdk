@@ -135,8 +135,9 @@ add_subdirectory(omniscidb/SchemaMgr)
 add_subdirectory(omniscidb/ArrowStorage)
 add_subdirectory(omniscidb/CudaMgr)
 add_subdirectory(omniscidb/DataMgr)
+add_subdirectory(omniscidb/Utils)
 
-set(OMNISCI_LIBS Calcite Shared OSDependent Logger QueryEngine DataMgr CudaMgr ArrowStorage)
+set(OMNISCI_LIBS Calcite Shared OSDependent Utils Logger QueryEngine DataMgr CudaMgr ArrowStorage)
 
 # Source
 add_subdirectory(src)
