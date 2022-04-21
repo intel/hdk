@@ -20,11 +20,6 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-# Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
-file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
-file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/geo_samples" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
-file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/gdal-data" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
-
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
@@ -128,6 +123,7 @@ add_subdirectory(omniscidb/QueryEngine)
 include_directories(omniscidb/ThirdParty/rapidjson)
 add_definitions(-DRAPIDJSON_HAS_STDSTRING)
 
+add_subdirectory(omniscidb/Analyzer)
 add_subdirectory(omniscidb/Logger)
 add_subdirectory(omniscidb/StringDictionary)
 add_subdirectory(omniscidb/Calcite)
@@ -139,7 +135,7 @@ add_subdirectory(omniscidb/Utils)
 add_subdirectory(omniscidb/SqliteConnector)
 add_subdirectory(omniscidb/ThriftHandler) # Query State
 
-set(OMNISCI_LIBS Calcite Shared OSDependent Utils Logger QueryEngine DataMgr CudaMgr ArrowStorage SqliteConnector QueryState)
+set(OMNISCI_LIBS Calcite Shared OSDependent Utils Logger QueryEngine DataMgr CudaMgr ArrowStorage SqliteConnector QueryState Analyzer)
 
 # Source
 add_subdirectory(src)
