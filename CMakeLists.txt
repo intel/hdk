@@ -20,10 +20,26 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
+set(ENABLE_CONDA OFF)
+if(DEFINED ENV{CONDA_PREFIX})
+  set(ENABLE_CONDA ON)
+  set(CMAKE_SYSROOT "$ENV{CONDA_BUILD_SYSROOT}")
+  list(APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}")
+  set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
+endif()
+
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+option(ENABLE_PYTHON "Build Python libraries" ON)
+
+if(BUILD_SHARED_LIBS)
+  add_definitions("-DENABLE_SHARED_LIBS")
+  # With no this option all installed shared objects would get an empty
+  # rpath that would break a link with libjvm.so.
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+endif()
+
 # Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
 file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
-file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/geo_samples" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
-file(COPY "${CMAKE_SOURCE_DIR}/omniscidb/ThirdParty/gdal-data" DESTINATION "${CMAKE_SOURCE_DIR}/ThirdParty")
 
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
@@ -57,9 +73,17 @@ add_definitions(-DRAPIDJSON_HAS_STDSTRING)
 
 add_subdirectory(omniscidb/Logger)
 
+add_subdirectory(omniscidb/Utils)
+add_subdirectory(omniscidb/Calcite)
 
 # Source
 add_subdirectory(src)
+
+if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
+  add_subdirectory(python)
+endif()
+
+install(TARGETS OSDependent Logger Shared Utils Calcite RUNTIME)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 

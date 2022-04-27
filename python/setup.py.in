@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+#
+# Copyright 2022 Intel Corporation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from Cython.Build import cythonize
+from distutils.core import setup, Extension
+
+import os
+import numpy as np
+import pyarrow as pa
+
+# conda-forge packages hdk and pyhdk should be built separately.
+# HDK_ROOT_PATH is defined by the hdk activate script that
+# determines the location of HDK shared libraries required for
+# pyhdk.
+extra_library_dirs = []
+if 'HDK_ROOT_PATH' in os.environ:
+    extra_library_dirs.append(os.path.join(os.environ['HDK_ROOT_PATH'], 'lib'))
+
+sql = Extension(
+    "pyhdk._sql",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/calcite.pyx"],
+    language="c++",
+    include_dirs=[
+        "@CMAKE_CURRENT_SOURCE_DIR@",
+        "@CMAKE_SOURCE_DIR@",
+        "@CMAKE_SOURCE_DIR@/omniscidb",
+    ],
+    library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."],
+    libraries=["Calcite"],
+    extra_compile_args=["-std=c++17"],
+)
+
+setup(
+    name="pyhdk",
+    version="0.1",
+    packages=["pyhdk"],
+    package_dir={"pyhdk" : "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
+    ext_modules=cythonize(
+        sql,
+        compiler_directives={
+            "c_string_type": "str",
+            "c_string_encoding": "utf8",
+            "language_level": "3",
+        },
+        include_path=[
+            "@CMAKE_CURRENT_SOURCE_DIR@",
+        ],
+    ),
+)
