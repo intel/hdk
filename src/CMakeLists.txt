@@ -1,6 +1,7 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/)
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
+add_definitions("-DEXCLUDE_NORMALIZERS")
 set(ANALYZER_FILES ../omniscidb/Analyzer/Analyzer.cpp ../omniscidb/QueryEngine/DateTruncate.cpp)
 
 add_subdirectory(mlir)
@@ -15,5 +16,4 @@ add_custom_target(MLIRTableGenCppWrappers SOURCES ${DIALECT_FILES} DEPENDS ON HD
 add_library(HDK HDK.h HDK.cpp MLIRGen.cpp AST/AST.cpp ${DIALECT_FILES} ${ANALYZER_FILES})
 add_dependencies(HDK HDKOpsIncGen HDKTypesIncGen)
 
-target_link_libraries(HDK Logger Shared MLIRIR MLIRPass)
-
+target_link_libraries(HDK Logger Shared  MLIRIR MLIRPass)

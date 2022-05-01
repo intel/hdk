@@ -9,7 +9,9 @@ class Datum {
  public:
   Datum() {}
 
-  static Datum get() {}
+  static Datum get() {
+    return Datum();
+  }
 
   ::Datum datum_;
 };
