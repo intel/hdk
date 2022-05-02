@@ -1,4 +1,7 @@
 #include "Ops.h"
+
+#include "Attributes.h"
+
 #include "mlir/IR/OpImplementation.h"
 
 namespace hdk {
@@ -8,7 +11,8 @@ void ConstantOp::build(::mlir::OpBuilder& builder,
                        mlir::Type sql_type,
                        hdk::Datum value) {
   state.addTypes(sql_type);
-  //  state.addAttribute("datum", value);
+  auto attr = hdk::DatumAttr::get(sql_type, value);
+  state.addAttribute("datum", attr);
 }
 
 }  // namespace hdk

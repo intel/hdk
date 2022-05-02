@@ -9,11 +9,12 @@ include_directories(${CMAKE_BINARY_DIR}/src/mlir)
 
 # may need to add explicit depends here on tablegen
 set(TABLEGEN_FILES mlir/Ops.td mlir/Types.td mlir/HDKBase.td)
-set(DIALECT_FILES mlir/Dialect.cpp mlir/Ops.cpp mlir/Types.cpp)
-add_custom_target(MLIRTableGenCppWrappers SOURCES ${DIALECT_FILES} DEPENDS ON HDKOpsIncGen HDKTypesIncGen)
+set(DIALECT_FILES mlir/Dialect.cpp mlir/Ops.cpp mlir/Types.cpp mlir/Attributes.cpp)
+# TODO: this line might not be doing anything
+add_custom_target(MLIRTableGenCppWrappers SOURCES ${DIALECT_FILES} DEPENDS ON HDKOpsIncGen HDKTypesIncGen HDKAttributesIncGen)
 
 add_library(HDK HDK.h HDK.cpp MLIRGen.cpp AST/AST.cpp ${DIALECT_FILES} ${ANALYZER_FILES})
-add_dependencies(HDK HDKOpsIncGen HDKTypesIncGen)
+add_dependencies(HDK HDKOpsIncGen HDKTypesIncGen HDKAttributesIncGen)
 
 target_link_libraries(HDK Logger Shared MLIRIR MLIRPass)
 
