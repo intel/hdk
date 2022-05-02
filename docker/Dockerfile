@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM  --platform=linux/amd64 ubuntu:20.04
 
 RUN apt-get update
 RUN apt-get upgrade -y
@@ -25,6 +25,9 @@ RUN apt-get install -y \
 # Maven (after openjdk)
 RUN apt-get install -y maven 
 
+# convenient utilities
+RUN apt-get install -y zsh curl git vim
+
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
 RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
@@ -33,7 +36,23 @@ RUN apt update
 RUN apt install -y -V libarrow-dev libparquet-dev
 
 # LLVM
-RUN apt install -y llvm-12 llvm-12-dev clang-12
+ARG LLVM_SHA='1f9140064dfbfb0bbda8e51306ea51080b2f7aac' # 14.0.3
+RUN mkdir -p /usr/local/src
+WORKDIR /usr/local/src
+RUN git clone https://github.com/llvm/llvm-project.git
+WORKDIR /usr/local/src/llvm-project
+RUN git checkout ${LLVM_SHA}
+RUN cmake ../llvm-project/llvm \
+  -DLLVM_ENABLE_PROJECTS="mlir;clang" \
+  -DLLVM_BUILD_EXAMPLES=ON \
+  -DLLVM_TARGETS_TO_BUILD="host" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_ENABLE_ASSERTIONS=ON \
+  -DLLVM_ENABLE_RTTI=ON \
+  -DCMAKE_INSTALL_PREFIX=../mlir-llvm \
+  -DLLVM_USE_INTEL_JITEVENTS=on
+RUN make -j$(nproc --all) all
+RUN cmake --install .
 
 # Gflags (for Glog)
 RUN apt install -y libgflags-dev

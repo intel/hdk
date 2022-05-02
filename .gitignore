@@ -1,5 +1,7 @@
 build/*
 .vscode
+cmake-build-*/*
+.idea
 
 # Geospatial Artifacts copied to make Geospatial module build
 ThirdParty/geo_samples
