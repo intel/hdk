@@ -14,8 +14,11 @@
 # limitations under the License.
 
 from libcpp cimport bool
+from libcpp.memory cimport shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
+
+from pyhdk._storage cimport CSchemaProvider
 
 cdef extern from "omniscidb/Calcite/CalciteJNI.h":
   cdef cppclass FilterPushDownInfo:
@@ -24,5 +27,5 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
     int input_next;
 
   cdef cppclass CalciteJNI:
-    CalciteJNI(string, size_t);
-    string process(string, string, string, string, vector[FilterPushDownInfo], bool, bool, bool)
+    CalciteJNI(shared_ptr[CSchemaProvider], string, size_t);
+    string process(string, string, string, vector[FilterPushDownInfo], bool, bool, bool)

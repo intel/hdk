@@ -43,6 +43,7 @@ file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
 
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
 
 # Google log
 add_subdirectory(third_party/glog-0.5.0)
@@ -55,10 +56,19 @@ find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
 include_directories(${Arrow_INCLUDE_DIRS})
 
+# Parquet
+find_package(Parquet REQUIRED)
+
 # Boost, required for OmniSciDB
 add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+
+# TBB
+find_package(TBB REQUIRED)
+add_definitions("-DENABLE_TBB")
+add_definitions("-DHAVE_TBB")
+add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
@@ -75,6 +85,11 @@ add_subdirectory(omniscidb/Logger)
 
 add_subdirectory(omniscidb/Utils)
 add_subdirectory(omniscidb/Calcite)
+add_subdirectory(omniscidb/SchemaMgr)
+add_subdirectory(omniscidb/StringDictionary)
+add_subdirectory(omniscidb/CudaMgr)
+add_subdirectory(omniscidb/DataMgr)
+add_subdirectory(omniscidb/ArrowStorage)
 
 # Source
 add_subdirectory(src)
@@ -83,7 +98,7 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-install(TARGETS OSDependent Logger Shared Utils Calcite RUNTIME)
+install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr RUNTIME)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 

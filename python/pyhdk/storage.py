@@ -13,6 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pyhdk._common import TypeInfo, SQLType
-import pyhdk.sql as sql
-import pyhdk.storage as storage
+from pyhdk._storage import ArrowStorage, TableOptions

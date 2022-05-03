@@ -27,20 +27,46 @@ import pyarrow as pa
 # determines the location of HDK shared libraries required for
 # pyhdk.
 extra_library_dirs = []
-if 'HDK_ROOT_PATH' in os.environ:
-    extra_library_dirs.append(os.path.join(os.environ['HDK_ROOT_PATH'], 'lib'))
+if "HDK_ROOT_PATH" in os.environ:
+    extra_library_dirs.append(os.path.join(os.environ["HDK_ROOT_PATH"], "lib"))
+
+include_dirs = [
+    np.get_include(),
+    pa.get_include(),
+    "@CMAKE_CURRENT_SOURCE_DIR@",
+    "@CMAKE_SOURCE_DIR@",
+    "@CMAKE_SOURCE_DIR@/omniscidb",
+]
+
+common = Extension(
+    "pyhdk._common",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_common.pyx"],
+    language="c++",
+    include_dirs=include_dirs,
+    library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
+    runtime_library_dirs=pa.get_library_dirs(),
+    libraries=pa.get_libraries() + ["Shared"],
+    extra_compile_args=["-std=c++17"],
+)
 
 sql = Extension(
     "pyhdk._sql",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/calcite.pyx"],
     language="c++",
-    include_dirs=[
-        "@CMAKE_CURRENT_SOURCE_DIR@",
-        "@CMAKE_SOURCE_DIR@",
-        "@CMAKE_SOURCE_DIR@/omniscidb",
-    ],
+    include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."],
     libraries=["Calcite"],
+    extra_compile_args=["-std=c++17"],
+)
+
+storage = Extension(
+    "pyhdk._storage",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_storage.pyx"],
+    language="c++",
+    include_dirs=include_dirs,
+    library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
+    runtime_library_dirs=pa.get_library_dirs(),
+    libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr"],
     extra_compile_args=["-std=c++17"],
 )
 
@@ -48,16 +74,14 @@ setup(
     name="pyhdk",
     version="0.1",
     packages=["pyhdk"],
-    package_dir={"pyhdk" : "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
+    package_dir={"pyhdk": "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
     ext_modules=cythonize(
-        sql,
+        [common, sql, storage],
         compiler_directives={
             "c_string_type": "str",
             "c_string_encoding": "utf8",
             "language_level": "3",
         },
-        include_path=[
-            "@CMAKE_CURRENT_SOURCE_DIR@",
-        ],
+        include_path=["@CMAKE_CURRENT_SOURCE_DIR@"],
     ),
 )
