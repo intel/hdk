@@ -24,13 +24,13 @@ void HDKDialect::initialize() {
       >();
 }
 
-::mlir::Type HDKDialect::parseType(::mlir::DialectAsmParser& parser) const {
+// ::mlir::Type HDKDialect::parseType(::mlir::DialectAsmParser& parser) const {
   // TODO
-}
+// }
 
 /// Print a type registered to this dialect.
-void HDKDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter& os) const {
+// void HDKDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter& os) const {
   // TODO
-}
+// }
 
 }  // namespace hdk

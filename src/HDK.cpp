@@ -29,10 +29,10 @@ void mlir_test() {
   mlir::MLIRContext context(registry);
   // Load our Dialect in this MLIR Context.
   context.getOrLoadDialect<hdk::HDKDialect>();
-  auto module = hdk::mlirGen(context, sequence);
-  if (!module) {
+  auto mlir_module = hdk::mlirGen(context, sequence);
+  if (!mlir_module) {
     std::cerr << "Failed to generate MLIR module!" << std::endl;
   } else {
-    module->dump();
+    mlir_module->dump();
   }
 }

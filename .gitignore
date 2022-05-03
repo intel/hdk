@@ -2,10 +2,3 @@ build/*
 .vscode
 cmake-build-*/*
 .idea
-
-# Geospatial Artifacts copied to make Geospatial module build
-ThirdParty/geo_samples
-ThirdParty/gdal-data
-
-# Cython generated files
-python/pyhdk/*.cpp

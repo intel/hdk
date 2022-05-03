@@ -16,7 +16,7 @@ include "Types.td"
 //   * The parent dialect of the operation.
 //   * The mnemonic for the operation, or the name without the dialect prefix.
 //   * A list of traits for the operation.
-class HDK_Op<string mnemonic, list<OpTrait> traits = []> :
+class HDK_Op<string mnemonic, list<Trait> traits = []> :
     Op<HDK_Dialect, mnemonic, traits>;
 
 def HDK_KernelOp : HDK_Op<"kernel"> {

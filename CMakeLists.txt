@@ -20,7 +20,6 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-<<<<<<< HEAD
 set(ENABLE_CONDA OFF)
 if(DEFINED ENV{CONDA_PREFIX})
   set(ENABLE_CONDA ON)
@@ -46,8 +45,6 @@ endif()
 # Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
 file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
 
-=======
->>>>>>> misc fixes
 # External Dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
@@ -76,6 +73,14 @@ find_package(TBB REQUIRED)
 add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
+
+# TBB
+find_package(TBB REQUIRED)
+message(STATUS "TBB library is found with ${TBB_DIR}")
+add_definitions("-DHAVE_TBB")
+add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
+set(ENABLE_TBB ON)
+add_definitions("-DENABLE_TBB")
 
 # LLVM / MLIR
 find_package(LLVM CONFIG REQUIRED)

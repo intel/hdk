@@ -49,7 +49,7 @@ class MLIRGenImpl {
   hdk::KernelOp mlirGen(AST::Kernel& kernel) {
     static int kernel_ctr = 0;
     auto kernel_op = builder.create<hdk::KernelOp>(mlir::NameLoc::get(
-        mlir::Identifier::get("kernel_" + kernel_ctr++, builder.getContext())));
+        mlir::StringAttr::get(builder.getContext(), "kernel_" + kernel_ctr++)));
 
     // Generate + add projected expressions
     for (auto& expr : kernel.projected_expressions) {
@@ -67,7 +67,7 @@ class MLIRGenImpl {
     // add a terminator
 
     builder.create<hdk::ReturnOp>(mlir::NameLoc::get(
-        mlir::Identifier::get("projection_returns", builder.getContext())));
+        mlir::StringAttr::get(builder.getContext(), "projection_returns")));
 
     return kernel_op;
   }
@@ -89,8 +89,8 @@ class MLIRGenImpl {
     //    auto payload = mlir::DenseElementsAttr::get(data_type, int64_t(10));
     auto sql_type = builder.getType<hdk::BigIntType>();
     auto payload = hdk::Datum::get();
-    builder.create<hdk::ConstantOp>(mlir::NameLoc::get(mlir::Identifier::get(
-                                        constant->toString(), builder.getContext())),
+    builder.create<hdk::ConstantOp>(mlir::NameLoc::get(mlir::StringAttr::get(builder.getContext(), 
+                                        constant->toString())),
                                     sql_type,
                                     payload);
     return mlir::success();
@@ -136,7 +136,7 @@ class MLIRGenImpl {
   //  llvm::ScopedHashTable<llvm::StringRef, mlir::Value> symbolTable;
 };
 
-mlir::OwningModuleRef mlirGen(mlir::MLIRContext& context, AST::KernelSequence& kernels) {
+mlir::ModuleOp mlirGen(mlir::MLIRContext& context, AST::KernelSequence& kernels) {
   return MLIRGenImpl(context).mlirGen(kernels);
 }
 

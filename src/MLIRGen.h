@@ -6,6 +6,6 @@
 
 namespace hdk {
 
-mlir::OwningModuleRef mlirGen(mlir::MLIRContext& context, AST::KernelSequence& moduleAST);
+mlir::ModuleOp mlirGen(mlir::MLIRContext& context, AST::KernelSequence& moduleAST);
 
 }
