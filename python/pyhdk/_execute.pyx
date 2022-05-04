@@ -13,19 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from libcpp cimport bool
-from libcpp.memory cimport shared_ptr
-from libcpp.string cimport string
-from libcpp.vector cimport vector
+from pyhdk._storage cimport DataMgr
 
-from pyhdk._storage cimport CSchemaProvider
-
-cdef extern from "omniscidb/Calcite/CalciteJNI.h":
-  cdef cppclass FilterPushDownInfo:
-    int input_prev;
-    int input_start;
-    int input_next;
-
-  cdef cppclass CalciteJNI:
-    CalciteJNI(shared_ptr[CSchemaProvider], string, size_t);
-    string process(string, string, string, vector[FilterPushDownInfo], bool, bool, bool)
+cdef class Executor:
+  def __cinit__(self, DataMgr data_mgr, int id = 0):
+    cdef CSystemParameters params = CSystemParameters()
+    cdef string debug_dir = "".encode('UTF-8')
+    cdef string debug_file = "".encode('UTF-8')
+    cdef CBufferProvider *buffer_provider = data_mgr.c_data_mgr.get().getBufferProvider()
+    self.c_executor = CExecutor.getExecutor(id, data_mgr.c_data_mgr.get(), buffer_provider, debug_dir, debug_file, params)
