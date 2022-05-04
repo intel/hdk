@@ -81,3 +81,7 @@ cdef extern from "omniscidb/Shared/sqltypes.h":
 
 cdef class TypeInfo:
   cdef CSQLTypeInfo c_type_info
+
+cdef extern from "omniscidb/Shared/SystemParameters.h":
+  cdef cppclass CSystemParameters "SystemParameters":
+    CSystemParameters()

@@ -36,6 +36,8 @@ include_dirs = [
     "@CMAKE_CURRENT_SOURCE_DIR@",
     "@CMAKE_SOURCE_DIR@",
     "@CMAKE_SOURCE_DIR@/omniscidb",
+    "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty",
+    "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty/rapidjson",
 ]
 
 common = Extension(
@@ -49,13 +51,24 @@ common = Extension(
     extra_compile_args=["-std=c++17"],
 )
 
+execute = Extension(
+    "pyhdk._execute",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_execute.pyx"],
+    language="c++",
+    include_dirs=include_dirs,
+    library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
+    runtime_library_dirs=pa.get_library_dirs(),
+    libraries=pa.get_libraries() + ["QueryEngine"],
+    extra_compile_args=["-std=c++17"],
+)
+
 sql = Extension(
     "pyhdk._sql",
-    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/calcite.pyx"],
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_sql.pyx"],
     language="c++",
     include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."],
-    libraries=["Calcite"],
+    libraries=["Calcite", "QueryEngine"],
     extra_compile_args=["-std=c++17"],
 )
 
@@ -66,7 +79,7 @@ storage = Extension(
     include_dirs=include_dirs,
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
     runtime_library_dirs=pa.get_library_dirs(),
-    libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr"],
+    libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr", "DataMgr"],
     extra_compile_args=["-std=c++17"],
 )
 
@@ -76,7 +89,7 @@ setup(
     packages=["pyhdk"],
     package_dir={"pyhdk": "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
     ext_modules=cythonize(
-        [common, sql, storage],
+        [common, execute, sql, storage],
         compiler_directives={
             "c_string_type": "str",
             "c_string_encoding": "utf8",
