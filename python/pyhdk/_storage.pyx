@@ -17,6 +17,7 @@ from libcpp cimport bool
 from libcpp.memory cimport shared_ptr, make_shared, static_pointer_cast
 from libcpp.string cimport string
 from libcpp.vector cimport vector
+from libcpp.utility cimport move
 from cython.operator cimport dereference, preincrement
 
 from pyarrow.lib cimport pyarrow_unwrap_table
@@ -182,7 +183,7 @@ cdef class TableOptions:
   def __cinit__(self, int fragment_size):
     self.c_options.fragment_size = fragment_size
 
-cdef class ArrowStorage(SchemaProvider):
+cdef class ArrowStorage(Storage):
   cdef shared_ptr[CArrowStorage] c_storage
 
   def __cinit__(self, int schema_id):
@@ -190,7 +191,20 @@ cdef class ArrowStorage(SchemaProvider):
     cdef int db_id = (schema_id << 24) + 1
     self.c_storage = make_shared[CArrowStorage](schema_id, schema_name, db_id)
     self.c_schema_provider = static_pointer_cast[CSchemaProvider, CArrowStorage](self.c_storage)
+    self.c_abstract_buffer_mgr = static_pointer_cast[CAbstractBufferMgr, CArrowStorage](self.c_storage)
 
   def importArrowTable(self, table, name, TableOptions options):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().importArrowTable(at, name, options.c_options)
+
+cdef class DataMgr:
+  def __cinit__(self):
+    cdef CSystemParameters sys_params
+    cdef string dat_dir = "".encode('UTF-8')
+    cdef map[CGpuMgrName, unique_ptr[CGpuMgr]] gpuMgrs = move(map[CGpuMgrName, unique_ptr[CGpuMgr]]())
+    self.c_data_mgr = make_shared[CDataMgr](dat_dir, sys_params, move(gpuMgrs), 1 << 27, 0)
+
+  cpdef registerDataProvider(self, Storage storage):
+    cdef schema_id = storage.getId()
+    cdef shared_ptr[CAbstractBufferMgr] buffer_mgr = storage.c_abstract_buffer_mgr
+    self.c_data_mgr.get().getPersistentStorageMgr().registerDataProvider(schema_id, buffer_mgr)
