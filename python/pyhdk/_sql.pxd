@@ -30,14 +30,14 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
 
   cdef cppclass CalciteJNI:
     CalciteJNI(CSchemaProviderPtr, string, size_t);
-    string process(string, string, string, vector[FilterPushDownInfo], bool, bool, bool)
+    string process(string, string, string, vector[FilterPushDownInfo], bool, bool, bool) except +
 
 cdef extern from "omniscidb/QueryEngine/RelAlgDagBuilder.h":
   cdef cppclass CRelAlgDag "RelAlgDag":
     pass
 
   cdef cppclass CRelAlgDagBuilder "RelAlgDagBuilder"(CRelAlgDag):
-    CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr)
+    CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr) except +
 
 cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h":
   cdef cppclass CExecutionResult "ExecutionResult":
@@ -52,4 +52,4 @@ cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
   cdef cppclass CRelAlgExecutor "RelAlgExecutor":
     CRelAlgExecutor(CExecutor*, int, CSchemaProviderPtr, CDataProvider*, unique_ptr[CRelAlgDag])
 
-    CExecutionResult executeRelAlgQuery(const CCompilationOptions&, const CExecutionOptions&, const bool)
+    CExecutionResult executeRelAlgQuery(const CCompilationOptions&, const CExecutionOptions&, const bool) except +
