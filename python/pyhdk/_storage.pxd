@@ -132,6 +132,7 @@ cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
     CArrowStorage(int, string, int);
 
     CTableInfoPtr importArrowTable(shared_ptr[CArrowTable], string&, CTableOptions&);
+    void dropTable(const string&, bool)
 
 cdef extern from "omniscidb/BufferProvider/BufferProvider.h" namespace "Data_Namespace":
   cdef cppclass CBufferProvider "BufferProvider":
