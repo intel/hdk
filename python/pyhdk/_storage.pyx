@@ -197,6 +197,9 @@ cdef class ArrowStorage(Storage):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().importArrowTable(at, name, options.c_options)
 
+  def dropTable(self, string name, bool throw_if_not_exist = False):
+    self.c_storage.get().dropTable(name, throw_if_not_exist)
+
 cdef class DataMgr:
   def __cinit__(self):
     cdef CSystemParameters sys_params
