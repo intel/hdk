@@ -29,7 +29,17 @@ cdef class Calcite:
   def __cinit__(self, SchemaProvider schema_provider, **kwargs):
     cdef string udf_filename = kwargs.get("udf_filename", "")
     cdef size_t calcite_max_mem_mb = kwargs.get("calcite_max_mem_mb", 1024)
+
     self.calcite = make_shared[CalciteJNI](schema_provider.c_schema_provider, udf_filename, calcite_max_mem_mb)
+
+    CExtensionFunctionsWhitelist.add(self.calcite.get().getExtensionFunctionWhitelist())
+    if not udf_filename.empty():
+      CExtensionFunctionsWhitelist.addUdfs(self.calcite.get().getUserDefinedFunctionWhitelist())
+
+    CTableFunctionsFactory.init();
+    cdef vector[CTableFunction] udtfs = move(CTableFunctionsFactory.get_table_funcs(False))
+    cdef vector[CExtensionFunction] udfs = move(vector[CExtensionFunction]())
+    self.calcite.get().setRuntimeExtensionFunctions(udfs, udtfs, False)
 
   def process(self, string sql, **kwargs):
     cdef string user = kwargs.get("user", "admin")
