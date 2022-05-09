@@ -47,7 +47,7 @@ common = Extension(
     include_dirs=include_dirs,
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
     runtime_library_dirs=pa.get_library_dirs(),
-    libraries=pa.get_libraries() + ["Shared"],
+    libraries=pa.get_libraries() + ["QueryEngine", "Shared"],
     extra_compile_args=["-std=c++17"],
 )
 
