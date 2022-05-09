@@ -85,3 +85,10 @@ cdef class TypeInfo:
 cdef extern from "omniscidb/Shared/SystemParameters.h":
   cdef cppclass CSystemParameters "SystemParameters":
     CSystemParameters()
+
+cdef extern from "omniscidb/ThriftHandler/CommandLineOptions.h":
+  cdef bool g_enable_columnar_output
+  cdef bool g_enable_union
+  cdef bool g_enable_lazy_fetch
+  cdef bool g_null_div_by_zero
+  cdef bool g_enable_dynamic_watchdog

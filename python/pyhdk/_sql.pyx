@@ -20,6 +20,9 @@ from cython.operator cimport dereference, preincrement
 from pyarrow.lib cimport pyarrow_wrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
+from pyhdk._common cimport g_enable_columnar_output
+from pyhdk._common cimport g_enable_dynamic_watchdog
+from pyhdk._common cimport g_enable_lazy_fetch
 from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
 from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter
 
@@ -92,9 +95,16 @@ cdef class RelAlgExecutor:
     self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, db_id, c_schema_provider, c_data_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
-  def execute(self):
+  def execute(self, **kwargs):
+    global g_enable_columnar_output
+    global g_enable_dynamic_watchdog
+    global g_enable_lazy_fetch
     cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
+    c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", g_enable_lazy_fetch)
+    c_co.with_dynamic_watchdog = kwargs.get("enable_watchdog", g_enable_dynamic_watchdog)
     cdef CExecutionOptions c_eo = CExecutionOptions.defaults()
+    c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", g_enable_columnar_output)
+    c_eo.with_dynamic_watchdog = kwargs.get("enable_watchdog", g_enable_dynamic_watchdog)
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, c_eo, False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)
