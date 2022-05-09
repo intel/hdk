@@ -112,3 +112,11 @@ cdef class TypeInfo:
 
   def __repr__(self):
     return self.c_type_info.toString()
+
+def setGlobalConfig(*, enable_union=None, null_div_by_zero=None, **kwargs):
+  global g_enable_union
+  global g_null_div_by_zero
+  if enable_union is not None:
+    g_enable_union = enable_union
+  if null_div_by_zero is not None:
+    g_null_div_by_zero = null_div_by_zero
