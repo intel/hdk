@@ -46,7 +46,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
 
 # Google log
-add_subdirectory(third_party/glog-0.5.0)
+add_subdirectory(third_party/glog-0.5.0 EXCLUDE_FROM_ALL)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/glog-0.5.0/cmake")
 cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
 find_package(glog REQUIRED)
