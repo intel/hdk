@@ -15,7 +15,7 @@ set(pydeps
     ${PXD_SOURCES}
     Calcite)
 
-set(SETUP_LDFLAGS "-L$<TARGET_FILE_DIR:Calcite> -L$<TARGET_FILE_DIR:ArrowStorage> -L$<TARGET_FILE_DIR:QueryEngine> -L$<TARGET_FILE_DIR:SchemaMgr>")
+set(SETUP_LDFLAGS "-L$<TARGET_FILE_DIR:Calcite> -L$<TARGET_FILE_DIR:ArrowStorage> -L$<TARGET_FILE_DIR:QueryEngine> -L$<TARGET_FILE_DIR:SchemaMgr> -L$<TARGET_FILE_DIR:Shared> -L$<TARGET_FILE_DIR:DataMgr>")
 set(SETUP_FLAGS -g -f -I ${CMAKE_CURRENT_SOURCE_DIR})
 add_custom_target(pyhdk ALL
     COMMAND cd ${CMAKE_CURRENT_BINARY_DIR} && LDFLAGS=${SETUP_LDFLAGS} ${PYTHON_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
