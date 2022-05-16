@@ -46,7 +46,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
 
 # Google log
-add_subdirectory(third_party/glog-0.5.0)
+add_subdirectory(third_party/glog-0.5.0 EXCLUDE_FROM_ALL)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/glog-0.5.0/cmake")
 cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
 find_package(glog REQUIRED)
@@ -156,6 +156,6 @@ install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDicti
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${llvm_libs} ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
