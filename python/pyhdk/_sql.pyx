@@ -74,6 +74,9 @@ cdef class ExecutionResult:
     cdef shared_ptr[CArrowTable] at = converter.get().convertToArrowTable()
     return pyarrow_wrap_table(at)
 
+  def to_explain_str(self):
+    return self.c_result.getExplanation()
+
 cdef class RelAlgExecutor:
   cdef shared_ptr[CRelAlgExecutor] c_rel_alg_executor
   # DataMgr is used only to pass it to each produced ExecutionResult
@@ -108,6 +111,7 @@ cdef class RelAlgExecutor:
     c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", g_enable_columnar_output)
     c_eo.with_watchdog = kwargs.get("enable_watchdog", g_enable_watchdog)
     c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", g_enable_dynamic_watchdog)
+    c_eo.just_explain = kwargs.get("just_explain", False)
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, c_eo, False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)
