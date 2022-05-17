@@ -73,6 +73,7 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 
     const CResultSetPtr& getRows()
     const vector[CTargetMetaInfo]& getTargetsMeta()
+    string getExplanation()
 
 cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
   cdef cppclass CRelAlgExecutor "RelAlgExecutor":
