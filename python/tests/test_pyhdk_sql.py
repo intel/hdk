@@ -29,12 +29,12 @@ class TestSql:
         del cls.storage
 
     @classmethod
-    def execute_sql(cls, sql):
+    def execute_sql(cls, sql, **kwargs):
         ra = cls.calcite.process(sql)
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(
             cls.executor, cls.storage, cls.data_mgr, ra
         )
-        return rel_alg_executor.execute()
+        return rel_alg_executor.execute(**kwargs)
 
     def test_simple_projection(self):
         res = self.execute_sql("SELECT * FROM test;")
@@ -42,3 +42,8 @@ class TestSql:
         assert df.shape == (3, 2)
         assert df["a"].tolist() == [1, 2, 3]
         assert df["b"].tolist() == [10, 20, 30]
+
+    def test_explain(self):
+        res = self.execute_sql("SELECT * FROM test;", just_explain = True)
+        explain_str = res.to_explain_str()
+        assert (explain_str[:15] == "IR for the CPU:")
