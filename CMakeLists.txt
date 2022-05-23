@@ -151,7 +151,7 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-#install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer SqliteConnector RUNTIME)
+install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer SqliteConnector RUNTIME)
 
 #add_executable(TestDriver apps/TestDriver.cpp)
 
