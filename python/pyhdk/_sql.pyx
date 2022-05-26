@@ -92,7 +92,7 @@ cdef class RelAlgExecutor:
 
     c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider))
 
-    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, db_id, c_schema_provider, c_data_provider, move(c_dag))
+    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, c_data_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
   def execute(self, **kwargs):
