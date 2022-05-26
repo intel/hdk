@@ -76,6 +76,6 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 
 cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
   cdef cppclass CRelAlgExecutor "RelAlgExecutor":
-    CRelAlgExecutor(CExecutor*, int, CSchemaProviderPtr, CDataProvider*, unique_ptr[CRelAlgDag])
+    CRelAlgExecutor(CExecutor*, CSchemaProviderPtr, CDataProvider*, unique_ptr[CRelAlgDag])
 
     CExecutionResult executeRelAlgQuery(const CCompilationOptions&, const CExecutionOptions&, const bool) except +
