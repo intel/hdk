@@ -18,17 +18,20 @@ RUN apt-get install -y \
   tar \
   wget \
   python \
-  python-dev 
+  python-dev \
+  libtbb-dev \
+  openjdk-11-jdk \
+  mvn
 
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
 RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 RUN apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 RUN apt update
-RUN apt install -y -V libarrow-dev 
+RUN apt install -y -V libarrow-dev libparquet-dev
 
 # LLVM
-RUN apt install -y llvm-12 llvm-12-dev
+RUN apt install -y llvm-12 llvm-12-dev clang-12
 
 # Gflags (for Glog)
 RUN apt install -y libgflags-dev
