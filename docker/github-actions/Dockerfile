@@ -23,6 +23,11 @@ RUN chown -R docker:docker /home/docker
 
 USER docker
 
+# Maven Config (for proxy if required)
+ARG MAVEN_CONFIG=""
+RUN mkdir -p /home/docker/.m2 
+RUN echo $MAVEN_CONFIG > /home/docker/.m2/settings.xml
+
 ARG REPO=''
 ARG TOKEN=''
 
