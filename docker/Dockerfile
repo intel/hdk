@@ -20,8 +20,10 @@ RUN apt-get install -y \
   python \
   python-dev \
   libtbb-dev \
-  openjdk-11-jdk \
-  mvn
+  openjdk-11-jdk 
+
+# Maven (after openjdk)
+RUN apt-get install -y maven 
 
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
@@ -54,5 +56,14 @@ RUN apt install -y libgtest-dev
 
 # Unwind (glog)
 RUN apt install -y libunwind-dev
+
+# Python
+RUN apt install -y python3-pip
+ADD requirements.txt /requirements.txt
+RUN pip3 install -r /requirements.txt 
+RUN rm /requirements.txt
+
+# symlink pyarrow, dropping the library suffix 
+RUN python3 -c "import pyarrow;print(pyarrow.create_library_symlinks())"
 
 RUN apt-get clean
