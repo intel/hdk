@@ -156,6 +156,6 @@ install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDicti
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} Shared OSDependent Logger ${llvm_libs} ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
