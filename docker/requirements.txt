@@ -1,0 +1,5 @@
+Cython==0.29.30
+numpy==1.22.4
+pyarrow==8.0.0
+Pygments==2.3.1
+PyYAML==5.3.1
