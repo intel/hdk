@@ -38,6 +38,7 @@ include_dirs = [
     "@CMAKE_SOURCE_DIR@/omniscidb",
     "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty",
     "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty/rapidjson",
+    "@LLVM_INCLUDE_DIRS@"
 ]
 
 common = Extension(
