@@ -101,10 +101,11 @@ cdef class RelAlgExecutor:
     global g_enable_lazy_fetch
     cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", g_enable_lazy_fetch)
-    c_co.with_dynamic_watchdog = kwargs.get("enable_watchdog", g_enable_dynamic_watchdog)
+    c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", g_enable_dynamic_watchdog)
     cdef CExecutionOptions c_eo = CExecutionOptions.defaults()
     c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", g_enable_columnar_output)
-    c_eo.with_dynamic_watchdog = kwargs.get("enable_watchdog", g_enable_dynamic_watchdog)
+    c_eo.with_watchdog = kwargs.get("enable_watchdog", g_enable_watchdog)
+    c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", g_enable_dynamic_watchdog)
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, c_eo, False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)
