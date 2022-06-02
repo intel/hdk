@@ -21,6 +21,7 @@ from pyarrow.lib cimport pyarrow_wrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport g_enable_columnar_output
+from pyhdk._common cimport g_enable_watchdog
 from pyhdk._common cimport g_enable_dynamic_watchdog
 from pyhdk._common cimport g_enable_lazy_fetch
 from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
