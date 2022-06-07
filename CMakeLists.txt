@@ -20,6 +20,23 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
+if(MSVC)
+  option(ENABLE_NO_WINWARNINGS "disable most windows warnings" ON)
+  add_compile_definitions("NOMINMAX")
+  if(ENABLE_NO_WINWARNINGS)
+    add_compile_definitions("_STL_EXTRA_DISABLED_WARNINGS=4146 4242 4244 4267 4355 4365 4458 4624 4820 4996 5204 5219" "NOMINMAX")
+    # disable 4702 unreachable code warning
+    # with /Qspectre set, disable the warning C5045
+    add_compile_options(/W0 /wd4702 /wd5045)
+  else()
+    add_compile_options(/W4 /permisive-)
+  endif()
+  add_compile_options(/EHsc /std:c++17 /Qspectre)
+
+  # https://github.com/microsoft/STL/issues/1155
+  add_definitions("-D_HAS_CONDITIONAL_EXPLICIT=0")
+endif()
+
 set(ENABLE_CONDA OFF)
 if(DEFINED ENV{CONDA_PREFIX})
   set(ENABLE_CONDA ON)
@@ -60,7 +77,9 @@ include_directories(${Arrow_INCLUDE_DIRS})
 find_package(Parquet REQUIRED)
 
 # Boost, required for OmniSciDB
-add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
+if(NOT MSVC)
+  add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
+endif()
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
@@ -164,6 +183,6 @@ install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDicti
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs} ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Boost_LIBRARIES} ${Arrow_LIBRARIES} QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs})
 
 target_include_directories(TestDriver PRIVATE src/)

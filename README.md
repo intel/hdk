@@ -19,3 +19,24 @@ cd build
 cmake ..
 make -j
 ```
+
+## Windows Build
+
+This guide assumes Windows C++ build tools have been installed. Ensure the MSVC spectre-mitigated libraries are installed as well. See https://code.visualstudio.com/docs/cpp/config-msvc for more information. 
+
+1. Install dependencies using conda:
+```
+conda env create -f omniscidb/scripts/mapd-deps-conda-windows-env.yml
+```
+2. Enter build dir.
+```
+cd build
+```
+3. Initialize cmake. 
+```
+cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_CONDA=on -DBUILD_SHARED_LIBS=off -G "Visual Studio 17 2022"  -A x64 ..
+```
+4. Build.
+```
+cmake --build . --config Debug
+```
