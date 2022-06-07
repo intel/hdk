@@ -93,3 +93,10 @@ cdef extern from "omniscidb/ThriftHandler/CommandLineOptions.h":
   cdef bool g_null_div_by_zero
   cdef bool g_enable_watchdog
   cdef bool g_enable_dynamic_watchdog
+  cdef bool g_enable_debug_timer
+
+cdef extern from "omniscidb/Logger/Logger.h" namespace "logger":
+  cdef cppclass CLogOptions "logger::LogOptions":
+    CLogOptions(const char*)
+
+  cdef void CInitLogger "logger::init"(const CLogOptions &)
