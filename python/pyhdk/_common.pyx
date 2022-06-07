@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from libcpp.memory cimport unique_ptr, make_unique
+from cython.operator cimport dereference
+
 cdef class SQLType:
   cdef CSQLTypes c_val
 
@@ -113,10 +116,19 @@ cdef class TypeInfo:
   def __repr__(self):
     return self.c_type_info.toString()
 
-def setGlobalConfig(*, enable_union=None, null_div_by_zero=None, **kwargs):
+def setGlobalConfig(*, enable_union=None, null_div_by_zero=None, enable_debug_timer=None, **kwargs):
   global g_enable_union
   global g_null_div_by_zero
+  global g_enable_debug_timer
   if enable_union is not None:
     g_enable_union = enable_union
   if null_div_by_zero is not None:
     g_null_div_by_zero = null_div_by_zero
+  if enable_debug_timer is not None:
+    g_enable_debug_timer = enable_debug_timer
+
+def initLogger(*, **kwargs):
+  argv0 = "PyHDK".encode('UTF-8')
+  cdef char *cargv0 = argv0
+  cdef unique_ptr[CLogOptions] opts = make_unique[CLogOptions](cargv0)
+  CInitLogger(dereference(opts))
