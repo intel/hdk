@@ -1,0 +1,64 @@
+name: Reusable Modin test action
+on:
+  workflow_call:
+    inputs:
+      cuda_compiler_version:
+        type: string
+        default: None
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      cuda_compiler_version: ${{ inputs.cuda_compiler_version }}
+      PREFIX: distr
+      CONDA_ENV: omnisci-dev
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Set env context
+        run: |
+          echo CONDA_PATH=$CONDA >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'CPU' }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
+
+      - name: Update Conda
+        run: |
+          conda update conda
+          conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+          conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.8 binutils
+
+      - name: Restore Maven cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2
+          key: ${{ env.RUN_STAMP }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ env.RUN_STAMP }}-maven
+
+      - name: Build
+        env:
+          CPU_COUNT: 4
+          RUN_TESTS: 1
+        run: |
+          mkdir -p ${{ env.PREFIX }}
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  . -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2"
+
+      - uses: actions/checkout@v3
+        with:
+          path: modin
+          repository: intel-ai/modin
+          ref: ienkovich/pyhdk
+
+      - name: Install pip dependencies
+        run: |
+          cd modin && pip install -e .
+
+      - name: Run tests
+        run: |
+          python -c "import pyhdk"
+
