@@ -11,30 +11,6 @@ on:
       - 'docs/**'
 
 jobs:
-#  clang-format:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#        with:
-#          submodules: true
-#
-#      - name: Set the environment
-#        run: |
-#          conda update conda
-#          $CONDA/bin/conda env create -f omniscidb/scripts/mapd-deps-conda-dev-env.yml --force
-#
-#      - name: Check stlye
-#        run: |
-#          $CONDA/bin/conda run -n omnisci-dev bash -c "find . -name ThirdParty -prune -or \( -name '*.cpp' -or -name '*.h' \) -print | xargs clang-format --dry-run --Werror -style=file"
-
   build:
-    uses: ./.github/workflows/build.yml
-
-  test:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      is_conda_updated: ${{ needs.build.outputs.is_conda_updated }}
-
-
+    uses: ./.github/workflows/modin.yml
 
