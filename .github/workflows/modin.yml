@@ -54,8 +54,9 @@ jobs:
           repository: intel-ai/modin
           ref: ienkovich/pyhdk
 
-      - name: Install pip dependencies
+      - name: Install python dependencies
         run: |
+          make install
           cd modin && pip install -e .
 
       - name: Run tests
