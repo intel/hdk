@@ -167,3 +167,15 @@ target_link_libraries(TestDriver PRIVATE HDK)
 target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs} ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
+
+add_custom_target(clean-all
+  COMMAND ${CMAKE_BUILD_TOOL} clean
+ )
+
+file(GLOB_RECURSE GENERATED_PYTHON_CPP ${CMAKE_SOURCE_DIR}/python/**/*.cpp)
+add_custom_target(hdk_python_clean
+  COMMAND  ${CMAKE_COMMAND} -E remove ${GENERATED_PYTHON_CPP}
+)
+
+add_dependencies(clean-all hdk_python_clean)
+add_dependencies(clean-all calcite_java_clean)
