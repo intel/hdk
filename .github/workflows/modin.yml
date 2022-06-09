@@ -47,7 +47,7 @@ jobs:
         run: |
           mkdir -p ${{ env.PREFIX }} build
           cd build
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  . -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
 
       - uses: actions/checkout@v3
         with:
