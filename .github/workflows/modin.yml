@@ -45,8 +45,9 @@ jobs:
           CPU_COUNT: 4
           RUN_TESTS: 1
         run: |
-          mkdir -p ${{ env.PREFIX }}
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  . -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2"
+          mkdir -p ${{ env.PREFIX }} build
+          cd build
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  . -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
 
       - uses: actions/checkout@v3
         with:
@@ -56,10 +57,8 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          make install
-          cd modin && pip install -e .
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cd modin && pip install -e ."
 
       - name: Run tests
         run: |
-          python -c "import pyhdk"
-
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "python -c 'import pyhdk'"
