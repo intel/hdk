@@ -49,7 +49,7 @@ RUN git clone https://github.com/llvm/llvm-project.git
 WORKDIR /usr/local/src/llvm-project
 RUN git checkout ${LLVM_SHA}
 RUN cmake ../llvm-project/llvm \
-  -DLLVM_ENABLE_PROJECTS="mlir;clang" \
+  -DLLVM_ENABLE_PROJECTS="llvm;mlir;clang" \
   -DLLVM_BUILD_EXAMPLES=ON \
   -DLLVM_TARGETS_TO_BUILD="host" \
   -DCMAKE_BUILD_TYPE=Release \
