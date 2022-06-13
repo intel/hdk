@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16.3)
 project(
         HeterogeneousDataKernels
         VERSION 0.1
-        LANGUAGES CXX
+        LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -27,6 +27,10 @@ if(DEFINED ENV{CONDA_PREFIX})
   list(APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}")
   set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
+
+# SQLite
+include_directories(omniscidb/ThirdParty/sqlite3)
+add_subdirectory(omniscidb/ThirdParty/sqlite3)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(ENABLE_PYTHON "Build Python libraries" ON)
