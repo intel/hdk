@@ -10,6 +10,7 @@ RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
 RUN apt-get install -y \
   build-essential \
   cmake \
+  cmake-curses-gui \
   gdb \
   make \
   autoconf \
@@ -25,8 +26,13 @@ RUN apt-get install -y \
 # Maven (after openjdk)
 RUN apt-get install -y maven 
 
+<<<<<<< HEAD
 # convenient utilities
 RUN apt-get install -y zsh curl git vim
+=======
+# convenient utilities
+RUN apt-get install -y curl git vim
+>>>>>>> 656903c (Additional changes for ubuntu 20.04)
 
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
@@ -57,6 +63,9 @@ RUN cmake --install .
 # Gflags (for Glog)
 RUN apt install -y libgflags-dev
 
+# Unwind (glog)
+RUN apt install -y libunwind-dev
+
 # Boost
 RUN apt install -y libboost-all-dev
 
@@ -69,9 +78,6 @@ RUN apt-get clean
 
 # Gtest
 RUN apt install -y libgtest-dev
-
-# Unwind (glog)
-RUN apt install -y libunwind-dev
 
 # Python
 RUN apt install -y python3-pip
