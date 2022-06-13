@@ -55,6 +55,10 @@ if(BUILD_SHARED_LIBS)
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 endif()
 
+if(MSVC)
+  add_definitions("-DBOOST_LOG_DYN_LINK")
+endif()
+
 # Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
 file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
 
@@ -82,6 +86,9 @@ if(NOT MSVC)
 endif()
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+
+# SQLite
+find_package(sqlite3 REQUIRED)
 
 # TBB
 find_package(TBB REQUIRED)
