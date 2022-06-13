@@ -41,11 +41,8 @@ RUN apt install -y libgflags-dev
 # Boost
 RUN apt install -y libboost-all-dev
 
-# GDAL
-RUN apt-get install -y libgdal-dev
-
 # convenient utilities
-RUN apt-get install -y zsh curl git vim
+RUN apt-get install -y curl git vim
 
 RUN apt-get upgrade -y
 
