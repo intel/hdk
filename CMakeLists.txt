@@ -68,11 +68,9 @@ add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-# TBB
-find_package(TBB REQUIRED)
-add_definitions("-DENABLE_TBB")
-add_definitions("-DHAVE_TBB")
-add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
+# sqlite
+include_directories(omniscidb/ThirdParty/sqlite3)
+add_subdirectory(omniscidb/ThirdParty/sqlite3)
 
 # TBB
 find_package(TBB REQUIRED)
