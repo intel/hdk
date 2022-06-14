@@ -34,7 +34,7 @@ cd build
 ```
 3. Initialize cmake. 
 ```
-cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_CONDA=on -DBUILD_SHARED_LIBS=off -G "Visual Studio 17 2022"  -A x64 ..
+cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_CONDA=on -DBUILD_SHARED_LIBS=off -DENABLE_PYTHON=on -G "Visual Studio 16 2019"  -A x64 ..
 ```
 4. Build.
 ```

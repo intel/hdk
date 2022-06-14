@@ -55,10 +55,6 @@ if(BUILD_SHARED_LIBS)
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 endif()
 
-if(MSVC)
-  add_definitions("-DBOOST_LOG_DYN_LINK")
-endif()
-
 # Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
 file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
 
@@ -70,7 +66,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
 add_subdirectory(third_party/glog-0.5.0)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/glog-0.5.0/cmake")
 cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
-find_package(glog REQUIRED)
+find_package(Glog REQUIRED)
 
 # Arrow
 find_package(Arrow REQUIRED)
@@ -81,14 +77,12 @@ include_directories(${Arrow_INCLUDE_DIRS})
 find_package(Parquet REQUIRED)
 
 # Boost, required for OmniSciDB
-if(NOT MSVC)
-  add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
-endif()
+add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 # SQLite
-find_package(sqlite3 REQUIRED)
+find_package(SQLite3 REQUIRED)
 
 # TBB
 find_package(TBB REQUIRED)
@@ -185,11 +179,15 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
+if(ENABLE_PYTHON AND MSVC)
+  add_subdirectory(python)
+endif()
+
 install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer SqliteConnector RUNTIME)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Boost_LIBRARIES} ${Arrow_LIBRARIES} QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs})
+target_link_libraries(TestDriver PRIVATE ${Boost_LIBRARIES} ${Arrow_LIBRARIES} TBB::tbb QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs})
 
 target_include_directories(TestDriver PRIVATE src/)
