@@ -22,6 +22,8 @@ import os
 import numpy as np
 import pyarrow as pa
 
+from sys import platform
+
 # conda-forge packages hdk and pyhdk should be built separately.
 # HDK_ROOT_PATH is defined by the hdk activate script that
 # determines the location of HDK shared libraries required for
@@ -41,15 +43,18 @@ include_dirs = [
     "@LLVM_INCLUDE_DIRS@"
 ]
 
+cpp_compile_flag = "/std:c++17" if platform == "win32" else "-std=c++17"
+runtime_library_dirs = [] if platform == "win32" else pa.get_library_dirs()
+
 common = Extension(
     "pyhdk._common",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_common.pyx"],
     language="c++",
     include_dirs=include_dirs,
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
-    runtime_library_dirs=pa.get_library_dirs(),
+    runtime_library_dirs=runtime_library_dirs,
     libraries=pa.get_libraries() + ["QueryEngine", "Shared"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=[cpp_compile_flag],
 )
 
 execute = Extension(
@@ -58,9 +63,9 @@ execute = Extension(
     language="c++",
     include_dirs=include_dirs,
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
-    runtime_library_dirs=pa.get_library_dirs(),
+    runtime_library_dirs=runtime_library_dirs,
     libraries=pa.get_libraries() + ["QueryEngine"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=[cpp_compile_flag],
 )
 
 sql = Extension(
@@ -70,7 +75,7 @@ sql = Extension(
     include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."],
     libraries=["Calcite", "QueryEngine"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=[cpp_compile_flag],
 )
 
 storage = Extension(
@@ -79,9 +84,9 @@ storage = Extension(
     language="c++",
     include_dirs=include_dirs,
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
-    runtime_library_dirs=pa.get_library_dirs(),
+    runtime_library_dirs=runtime_library_dirs,
     libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr", "DataMgr"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=[cpp_compile_flag],
 )
 
 setup(
