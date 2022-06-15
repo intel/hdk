@@ -49,7 +49,7 @@ common = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
     runtime_library_dirs=pa.get_library_dirs(),
     libraries=pa.get_libraries() + ["QueryEngine", "Logger", "Shared"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
 )
 
 execute = Extension(
@@ -60,7 +60,7 @@ execute = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
     runtime_library_dirs=pa.get_library_dirs(),
     libraries=pa.get_libraries() + ["QueryEngine"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
 )
 
 sql = Extension(
@@ -70,7 +70,7 @@ sql = Extension(
     include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."],
     libraries=["Calcite", "QueryEngine"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
 )
 
 storage = Extension(
@@ -81,7 +81,7 @@ storage = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."],
     runtime_library_dirs=pa.get_library_dirs(),
     libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr", "DataMgr"],
-    extra_compile_args=["-std=c++17"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
 )
 
 setup(
