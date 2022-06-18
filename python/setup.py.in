@@ -16,7 +16,10 @@
 # limitations under the License.
 
 from Cython.Build import cythonize
-from distutils.core import setup, Extension
+from setuptools import setup
+from setuptools.extension import Extension
+
+#from distutils.core import setup, Extension
 
 import os
 import numpy as np
