@@ -26,13 +26,8 @@ RUN apt-get install -y \
 # Maven (after openjdk)
 RUN apt-get install -y maven 
 
-<<<<<<< HEAD
-# convenient utilities
-RUN apt-get install -y zsh curl git vim
-=======
 # convenient utilities
 RUN apt-get install -y curl git vim
->>>>>>> 656903c (Additional changes for ubuntu 20.04)
 
 # Apache Arrow
 RUN apt install -y -V ca-certificates lsb-release wget
