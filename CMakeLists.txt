@@ -28,10 +28,6 @@ if(DEFINED ENV{CONDA_PREFIX})
   set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
 
-# SQLite
-include_directories(omniscidb/ThirdParty/sqlite3)
-add_subdirectory(omniscidb/ThirdParty/sqlite3)
-
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(ENABLE_PYTHON "Build Python libraries" ON)
 
@@ -110,7 +106,7 @@ find_library(CLANG_LIB clang-cpp)
 find_library(LLVM_LIB LLVM)
 # Deps builds use separate libs for each clang component, while some distros now bundle into a single lib
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" OR NOT LLVM_LIB)
-  set(LLVM_COMPONENTS support mcjit core irreader option linker)
+  set(LLVM_COMPONENTS support mcjit orcjit core irreader option linker)
 
   if(ENABLE_INTEL_JIT_LISTENER)
     list(APPEND LLVM_COMPONENTS inteljitevents)
