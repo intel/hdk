@@ -95,7 +95,12 @@ make install
 
 ### Dependencies 
 
-Conda environments are used for HDK development. 
+Conda environments are used for HDK development. Use the yaml file in `scripts/conda`:
+
+```
+     conda env create -f scripts/conda/hdk-conda-dev-env.yml
+     conda activate hdk-dev
+```
 
 ## Test
 
