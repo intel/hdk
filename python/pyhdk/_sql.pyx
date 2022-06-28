@@ -20,21 +20,18 @@ from cython.operator cimport dereference, preincrement
 from pyarrow.lib cimport pyarrow_wrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport g_enable_columnar_output
-from pyhdk._common cimport g_enable_watchdog
-from pyhdk._common cimport g_enable_dynamic_watchdog
-from pyhdk._common cimport g_enable_lazy_fetch
+from pyhdk._common cimport CConfig, Config
 from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
 from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter
 
 cdef class Calcite:
   cdef shared_ptr[CalciteJNI] calcite
 
-  def __cinit__(self, SchemaProvider schema_provider, **kwargs):
+  def __cinit__(self, SchemaProvider schema_provider, Config config, **kwargs):
     cdef string udf_filename = kwargs.get("udf_filename", "")
     cdef size_t calcite_max_mem_mb = kwargs.get("calcite_max_mem_mb", 1024)
 
-    self.calcite = make_shared[CalciteJNI](schema_provider.c_schema_provider, udf_filename, calcite_max_mem_mb)
+    self.calcite = make_shared[CalciteJNI](schema_provider.c_schema_provider, config.c_config, udf_filename, calcite_max_mem_mb)
 
     CExtensionFunctionsWhitelist.add(self.calcite.get().getExtensionFunctionWhitelist())
     if not udf_filename.empty():
@@ -46,13 +43,12 @@ cdef class Calcite:
     self.calcite.get().setRuntimeExtensionFunctions(udfs, udtfs, False)
 
   def process(self, string sql, **kwargs):
-    cdef string user = kwargs.get("user", "admin")
     cdef string db_name = kwargs.get("db_name", "test-db")
     cdef vector[FilterPushDownInfo] filter_push_down_info = vector[FilterPushDownInfo]()
     cdef bool legacy_syntax = kwargs.get("legacy_syntax", False)
     cdef bool is_explain = kwargs.get("is_explain", False)
     cdef bool is_view_optimize = kwargs.get("is_view_optimize", False)
-    return self.calcite.get().process(user, db_name, sql, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
+    return self.calcite.get().process(db_name, sql, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
 
 cdef class ExecutionResult:
   cdef CExecutionResult c_result
@@ -94,23 +90,20 @@ cdef class RelAlgExecutor:
     if len(db_ids) == 1:
       db_id = db_ids[0]
 
-    c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider))
+    c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider, c_executor.getConfigPtr()))
 
     self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, c_data_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
   def execute(self, **kwargs):
-    global g_enable_columnar_output
-    global g_enable_watchdog
-    global g_enable_dynamic_watchdog
-    global g_enable_lazy_fetch
+    cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
     cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
-    c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", g_enable_lazy_fetch)
-    c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", g_enable_dynamic_watchdog)
+    c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
+    c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef CExecutionOptions c_eo = CExecutionOptions.defaults()
-    c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", g_enable_columnar_output)
-    c_eo.with_watchdog = kwargs.get("enable_watchdog", g_enable_watchdog)
-    c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", g_enable_dynamic_watchdog)
+    c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", config.rs.enable_columnar_output)
+    c_eo.with_watchdog = kwargs.get("enable_watchdog", config.exec.watchdog.enable)
+    c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     c_eo.just_explain = kwargs.get("just_explain", False)
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, c_eo, False)
     cdef ExecutionResult res = ExecutionResult()

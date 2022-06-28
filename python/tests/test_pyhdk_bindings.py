@@ -58,8 +58,9 @@ class TestArrowStorage:
 class TestCalcite:
     @classmethod
     def setup_class(cls):
+        cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
-        cls.calcite = pyhdk.sql.Calcite(cls.storage)
+        cls.calcite = pyhdk.sql.Calcite(cls.storage, cls.config)
 
         at = pyarrow.Table.from_pandas(
             pandas.DataFrame({"a": [1, 2, 3], "b": [10, 20, 30]})
@@ -71,6 +72,7 @@ class TestCalcite:
     def teardown_class(cls):
         del cls.calcite
         del cls.storage
+        del cls.config
 
     def test_sql_parsing(self):
         json_ra = self.calcite.process("SELECT a, b FROM test;")

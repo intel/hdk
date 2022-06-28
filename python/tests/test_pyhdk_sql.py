@@ -10,12 +10,13 @@ import pyhdk
 class TestSql:
     @classmethod
     def setup_class(cls):
+        cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
-        cls.data_mgr = pyhdk.storage.DataMgr()
+        cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
         cls.data_mgr.registerDataProvider(cls.storage)
 
-        cls.calcite = pyhdk.sql.Calcite(cls.storage)
-        cls.executor = pyhdk.Executor(cls.data_mgr)
+        cls.calcite = pyhdk.sql.Calcite(cls.storage, cls.config)
+        cls.executor = pyhdk.Executor(cls.data_mgr, cls.config)
 
         at = pyarrow.Table.from_pandas(
             pandas.DataFrame({"a": [1, 2, 3], "b": [10, 20, 30]})
@@ -27,6 +28,7 @@ class TestSql:
     def teardown_class(cls):
         del cls.calcite
         del cls.storage
+        del cls.config
 
     @classmethod
     def execute_sql(cls, sql, **kwargs):
@@ -44,6 +46,6 @@ class TestSql:
         assert df["b"].tolist() == [10, 20, 30]
 
     def test_explain(self):
-        res = self.execute_sql("SELECT * FROM test;", just_explain = True)
+        res = self.execute_sql("SELECT * FROM test;", just_explain=True)
         explain_str = res.to_explain_str()
-        assert (explain_str[:15] == "IR for the CPU:")
+        assert explain_str[:15] == "IR for the CPU:"

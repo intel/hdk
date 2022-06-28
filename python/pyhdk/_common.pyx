@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from libcpp.memory cimport unique_ptr, make_unique
+from libcpp.memory cimport unique_ptr, make_unique, shared_ptr
 from cython.operator cimport dereference
 
 cdef class SQLType:
@@ -116,16 +116,23 @@ cdef class TypeInfo:
   def __repr__(self):
     return self.c_type_info.toString()
 
-def setGlobalConfig(*, enable_union=None, null_div_by_zero=None, enable_debug_timer=None, **kwargs):
-  global g_enable_union
-  global g_null_div_by_zero
+def buildConfig(*, enable_debug_timer=None, enable_union=False, **kwargs):
   global g_enable_debug_timer
-  if enable_union is not None:
-    g_enable_union = enable_union
-  if null_div_by_zero is not None:
-    g_null_div_by_zero = null_div_by_zero
   if enable_debug_timer is not None:
     g_enable_debug_timer = enable_debug_timer
+
+  # Remove legacy params to provide better compatibility with PyOmniSciDbe
+  kwargs.pop("enable_union", None)
+  kwargs.pop("enable_thrift_logs", None)
+
+  cmd_str = "".join(' --%s %r' % arg for arg in kwargs.iteritems())
+  cmd_str = cmd_str.replace("_", "-")
+  cdef string app = "modin".encode('UTF-8')
+  cdef CConfigBuilder builder
+  builder.parseCommandLineArgs(app, cmd_str, False)
+  cdef Config config = Config()
+  config.c_config = builder.config()
+  return config
 
 def initLogger(*, **kwargs):
   argv0 = "PyHDK".encode('UTF-8')
