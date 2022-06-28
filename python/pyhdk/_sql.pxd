@@ -18,7 +18,7 @@ from libcpp.memory cimport shared_ptr, unique_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
-from pyhdk._common cimport CSystemParameters
+from pyhdk._common cimport CSystemParameters, CConfig
 from pyhdk._storage cimport CSchemaProviderPtr, CDataProvider, CDataMgr, CBufferProvider
 from pyhdk._execute cimport CExecutor, CResultSetPtr, CCompilationOptions, CExecutionOptions, CTargetMetaInfo
 
@@ -51,8 +51,8 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
     int input_next;
 
   cdef cppclass CalciteJNI:
-    CalciteJNI(CSchemaProviderPtr, string, size_t);
-    string process(string, string, string, vector[FilterPushDownInfo], bool, bool, bool) except +
+    CalciteJNI(CSchemaProviderPtr, shared_ptr[CConfig], const string&, size_t);
+    string process(const string&, const string&, const vector[FilterPushDownInfo]&, bool, bool, bool) except +
 
     string getExtensionFunctionWhitelist()
     string getUserDefinedFunctionWhitelist()
@@ -63,7 +63,7 @@ cdef extern from "omniscidb/QueryEngine/RelAlgDagBuilder.h":
     pass
 
   cdef cppclass CRelAlgDagBuilder "RelAlgDagBuilder"(CRelAlgDag):
-    CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr) except +
+    CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr, shared_ptr[CConfig]) except +
 
 cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h":
   cdef cppclass CExecutionResult "ExecutionResult":
@@ -80,3 +80,4 @@ cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
     CRelAlgExecutor(CExecutor*, CSchemaProviderPtr, CDataProvider*, unique_ptr[CRelAlgDag])
 
     CExecutionResult executeRelAlgQuery(const CCompilationOptions&, const CExecutionOptions&, const bool) except +
+    CExecutor *getExecutor()

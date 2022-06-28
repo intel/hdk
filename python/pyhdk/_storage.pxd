@@ -21,7 +21,7 @@ from libcpp.map cimport map
 
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport CSQLTypeInfo, CSystemParameters
+from pyhdk._common cimport CSQLTypeInfo, CSystemParameters, CConfig
 
 cdef extern from "omniscidb/DataMgr/MemoryLevel.h" namespace "Data_Namespace":
   enum MemoryLevel:
@@ -156,7 +156,7 @@ cdef extern from "omniscidb/DataMgr/PersistentStorageMgr/PersistentStorageMgr.h"
 
 cdef extern from "omniscidb/DataMgr/DataMgr.h" namespace "Data_Namespace":
   cdef cppclass CDataMgr "DataMgr":
-    CDataMgr(const string&, const CSystemParameters&, map[CGpuMgrName, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads)
+    CDataMgr(const CConfig&, const CSystemParameters&, map[CGpuMgrName, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads)
 
     CPersistentStorageMgr* getPersistentStorageMgr()
     CBufferProvider* getBufferProvider()

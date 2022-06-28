@@ -24,7 +24,7 @@ if sys.platform == "linux":
     prev = sys.getdlopenflags()
     sys.setdlopenflags(os.RTLD_LAZY | os.RTLD_GLOBAL)
 
-from pyhdk._common import TypeInfo, SQLType, setGlobalConfig, initLogger
+from pyhdk._common import TypeInfo, SQLType, buildConfig, initLogger
 from pyhdk._execute import Executor
 import pyhdk.sql as sql
 import pyhdk.storage as storage

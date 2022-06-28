@@ -146,6 +146,7 @@ add_subdirectory(omniscidb/Logger)
 
 add_subdirectory(omniscidb/Utils)
 add_subdirectory(omniscidb/Calcite)
+add_subdirectory(omniscidb/ConfigBuilder)
 add_subdirectory(omniscidb/SchemaMgr)
 add_subdirectory(omniscidb/StringDictionary)
 add_subdirectory(omniscidb/L0Mgr)
@@ -163,7 +164,7 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer SqliteConnector RUNTIME)
+install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer ConfigBuilder SqliteConnector RUNTIME)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 

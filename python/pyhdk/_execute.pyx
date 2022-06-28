@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pyhdk._common cimport Config
 from pyhdk._storage cimport DataMgr
 
 cdef class Executor:
-  def __cinit__(self, DataMgr data_mgr, int id = 0):
+  def __cinit__(self, DataMgr data_mgr, Config config, int id = 0):
     cdef CSystemParameters params = CSystemParameters()
     cdef string debug_dir = "".encode('UTF-8')
     cdef string debug_file = "".encode('UTF-8')
     cdef CBufferProvider *buffer_provider = data_mgr.c_data_mgr.get().getBufferProvider()
-    self.c_executor = CExecutor.getExecutor(id, data_mgr.c_data_mgr.get(), buffer_provider, debug_dir, debug_file, params)
+    self.c_executor = CExecutor.getExecutor(id, data_mgr.c_data_mgr.get(), buffer_provider, config.c_config, debug_dir, debug_file, params)

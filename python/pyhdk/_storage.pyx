@@ -23,7 +23,7 @@ from cython.operator cimport dereference, preincrement
 from pyarrow.lib cimport pyarrow_unwrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport TypeInfo
+from pyhdk._common cimport TypeInfo, Config, CConfig
 
 cdef class TableInfo:
   @property
@@ -201,11 +201,10 @@ cdef class ArrowStorage(Storage):
     self.c_storage.get().dropTable(name, throw_if_not_exist)
 
 cdef class DataMgr:
-  def __cinit__(self):
+  def __cinit__(self, Config config):
     cdef CSystemParameters sys_params
-    cdef string dat_dir = "".encode('UTF-8')
     cdef map[CGpuMgrName, unique_ptr[CGpuMgr]] gpuMgrs = move(map[CGpuMgrName, unique_ptr[CGpuMgr]]())
-    self.c_data_mgr = make_shared[CDataMgr](dat_dir, sys_params, move(gpuMgrs), 1 << 27, 0)
+    self.c_data_mgr = make_shared[CDataMgr](dereference(config.c_config), sys_params, move(gpuMgrs), 1 << 27, 0)
 
   cpdef registerDataProvider(self, Storage storage):
     cdef schema_id = storage.getId()
