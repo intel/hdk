@@ -19,3 +19,6 @@ jobs:
       - name: install
         run: make install
         working-directory: build
+      - name: tests
+        run: pytest
+        working-directory: python/tests
