@@ -62,3 +62,4 @@ jobs:
       - name: Run tests
         run: |
           $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "python -c 'import pyhdk'"
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "pwd && python python/tests/modin/modin_smoke_test.py"
