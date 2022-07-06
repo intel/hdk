@@ -1,4 +1,4 @@
-name: sanity-tests
+name: pyhdk tests
 on: [ push ]
 jobs:
   build:
@@ -11,8 +11,11 @@ jobs:
           git submodule update
       - run: mkdir build && cd build
       - name: cmake
-        run: cmake ..
+        run: cmake -DENABLE_PYTHON=on -DBUILD_SHARED_LIBS=on -DENABLE_CONDA=off ..
         working-directory: build
       - name: make
         run: make -j 4
+        working-directory: build
+      - name: install
+        run: make install
         working-directory: build
