@@ -11,7 +11,7 @@ jobs:
           git submodule update
       - run: mkdir build && cd build
       - name: cmake
-        run: cmake -DENABLE_PYTHON=on -DBUILD_SHARED_LIBS=on -DENABLE_CONDA=off ..
+        run: cmake -DCMAKE_INSTALL_PREFIX=../install -DENABLE_PYTHON=on -DBUILD_SHARED_LIBS=on -DENABLE_CONDA=off ..
         working-directory: build
       - name: make
         run: make -j 4
