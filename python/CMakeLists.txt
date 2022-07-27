@@ -22,8 +22,13 @@ add_custom_target(pyhdk ALL
     DEPENDS Calcite ${pydeps}
 )
 
+set(INSTALL_USERFLAGS "")
+if(PYTHON_USER_INSTALL)
+  set(INSTALL_USERFLAGS "--user")
+endif()
+
 add_custom_target(pyhdk-install
-    COMMAND cd ${CMAKE_CURRENT_BINARY_DIR} && LDFLAGS=${SETUP_LDFLAGS} ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install
+    COMMAND cd ${CMAKE_CURRENT_BINARY_DIR} && LDFLAGS=${SETUP_LDFLAGS} ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${INSTALL_USERFLAGS}
     DEPENDS Calcite ${pydeps}
 )
 

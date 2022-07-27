@@ -34,6 +34,7 @@ add_subdirectory(omniscidb/ThirdParty/sqlite3)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(ENABLE_PYTHON "Build Python libraries" ON)
+option(PYTHON_USER_INSTALL "Install Python libraries only for the current user" OFF)
 
 if(BUILD_SHARED_LIBS)
   add_definitions("-DENABLE_SHARED_LIBS")
