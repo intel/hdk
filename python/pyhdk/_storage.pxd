@@ -133,7 +133,7 @@ cdef extern from "omniscidb/DataProvider/DataProvider.h":
     pass
 
 cdef extern from "omniscidb/DataMgr/GpuMgr.h":
-  cdef enum CGpuMgrName "GpuMgrName":
+  cdef enum CGpuMgrPlatform "GpuMgrPlatform":
     CUDA,
     L0,
 
@@ -146,7 +146,7 @@ cdef extern from "omniscidb/DataMgr/PersistentStorageMgr/PersistentStorageMgr.h"
 
 cdef extern from "omniscidb/DataMgr/DataMgr.h" namespace "Data_Namespace":
   cdef cppclass CDataMgr "DataMgr":
-    CDataMgr(const CConfig&, const CSystemParameters&, map[CGpuMgrName, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads)
+    CDataMgr(const CConfig&, const CSystemParameters&, map[CGpuMgrPlatform, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads)
 
     CPersistentStorageMgr* getPersistentStorageMgr()
     CBufferProvider* getBufferProvider()
