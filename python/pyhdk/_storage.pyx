@@ -193,7 +193,7 @@ cdef class ArrowStorage(Storage):
 cdef class DataMgr:
   def __cinit__(self, Config config):
     cdef CSystemParameters sys_params
-    cdef map[CGpuMgrName, unique_ptr[CGpuMgr]] gpuMgrs = move(map[CGpuMgrName, unique_ptr[CGpuMgr]]())
+    cdef map[CGpuMgrPlatform, unique_ptr[CGpuMgr]] gpuMgrs = move(map[CGpuMgrPlatform, unique_ptr[CGpuMgr]]())
     self.c_data_mgr = make_shared[CDataMgr](dereference(config.c_config), sys_params, move(gpuMgrs), 1 << 27, 0)
 
   cpdef registerDataProvider(self, Storage storage):
