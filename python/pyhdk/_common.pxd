@@ -77,12 +77,24 @@ cdef extern from "omniscidb/Shared/SystemParameters.h":
   cdef cppclass CSystemParameters "SystemParameters":
     CSystemParameters()
 
-cdef extern from "omniscidb/ThriftHandler/CommandLineOptions.h":
+cdef extern from "omniscidb/Utils/CommandLineOptions.h":
   cdef bool g_enable_debug_timer
 
 cdef extern from "omniscidb/Logger/Logger.h" namespace "logger":
+  enum CSeverity "Severity":
+    DEBUG4 = 0,
+    DEBUG3 = 1,
+    DEBUG2 = 2,
+    DEBUG1 = 3,
+    INFO = 4,
+    WARNING = 5,
+    ERROR = 6,
+    FATAL = 7,
+    _NSEVERITIES = 8
+
   cdef cppclass CLogOptions "logger::LogOptions":
     CLogOptions(const char*)
+    CSeverity severity_
 
   cdef void CInitLogger "logger::init"(const CLogOptions &)
 

@@ -28,6 +28,37 @@ if(DEFINED ENV{CONDA_PREFIX})
   set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
 
+set(HDK_VERSION_MAJOR "0")
+set(HDK_VERSION_MINOR "2")
+set(HDK_VERSION_PATCH "0")
+set(HDK_VERSION_EXTRA "")
+set(HDK_VERSION_RAW "${HDK_VERSION_MAJOR}.${HDK_VERSION_MINOR}.${HDK_VERSION_PATCH}${HDK_VERSION_EXTRA}")
+string(TIMESTAMP HDK_BUILD_DATE "%Y%m%d")
+find_package(Git)
+execute_process(
+  COMMAND ${GIT_EXECUTABLE} rev-parse --short=10 HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE HDK_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+file(WRITE ${CMAKE_BINARY_DIR}/HDK_GIT_HASH.txt "${HDK_GIT_HASH}\n")
+file(STRINGS ${CMAKE_BINARY_DIR}/HDK_GIT_HASH.txt HDK_GIT_HASH)
+
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/release.h"
+  "${CMAKE_BINARY_DIR}/MapDRelease.h"
+  @ONLY
+  )
+  list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_BINARY_DIR}/HDK_GIT_HASH.txt)
+  list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_BINARY_DIR}/MapDRelease.h)
+  # required to force regen of HDK_GIT_HASH.txt, MapDRelease.h
+  add_custom_target(rerun_cmake ALL
+    COMMAND cmake .
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+include_directories(${CMAKE_BINARY_DIR})
+
 # SQLite
 include_directories(omniscidb/ThirdParty/sqlite3)
 add_subdirectory(omniscidb/ThirdParty/sqlite3)
@@ -154,6 +185,7 @@ add_subdirectory(omniscidb/CudaMgr)
 add_subdirectory(omniscidb/DataMgr)
 add_subdirectory(omniscidb/ArrowStorage)
 add_subdirectory(omniscidb/Analyzer)
+add_subdirectory(omniscidb/IR)
 add_subdirectory(omniscidb/SqliteConnector)
 add_subdirectory(omniscidb/QueryEngine)
 
@@ -164,12 +196,12 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer ConfigBuilder SqliteConnector RUNTIME)
+install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer IR ConfigBuilder SqliteConnector RUNTIME)
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
 target_link_libraries(TestDriver PRIVATE HDK)
-target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs} ${Boost_LIBRARIES})
+target_link_libraries(TestDriver PRIVATE ${Arrow_LIBRARIES} IR QueryEngine StringDictionary Analyzer Shared OSDependent Logger ${llvm_libs} ${Boost_LIBRARIES})
 
 target_include_directories(TestDriver PRIVATE src/)
 
