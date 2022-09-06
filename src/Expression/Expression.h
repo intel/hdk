@@ -6,7 +6,8 @@
  
 #include <glog/logging.h>
 
-#include "Analyzer/Analyzer.h"
+#include "IR/Expr.h"
+#include "Shared/sqltypes.h"
 
 #include <memory>
 #include <string>
