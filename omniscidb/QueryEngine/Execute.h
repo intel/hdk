@@ -1120,6 +1120,21 @@ inline std::string get_null_check_suffix(const SQLTypeInfo& lhs_ti,
   return null_check_suffix;
 }
 
+inline std::string get_null_check_suffix(const hdk::ir::Type* lhs_type,
+                                         const hdk::ir::Type* rhs_type) {
+  if (!lhs_type->nullable() && !rhs_type->nullable()) {
+    return "";
+  }
+  std::string null_check_suffix{"_nullable"};
+  if (!lhs_type->nullable()) {
+    CHECK(rhs_type->nullable());
+    null_check_suffix += "_rhs";
+  } else if (!rhs_type->nullable()) {
+    null_check_suffix += "_lhs";
+  }
+  return null_check_suffix;
+}
+
 inline bool is_unnest(const hdk::ir::Expr* expr) {
   return dynamic_cast<const hdk::ir::UOper*>(expr) &&
          static_cast<const hdk::ir::UOper*>(expr)->get_optype() == kUNNEST;

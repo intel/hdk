@@ -28,6 +28,14 @@ std::string numeric_or_time_interval_type_name(const SQLTypeInfo& ti1,
   return numeric_type_name(ti1);
 }
 
+std::string numeric_or_time_interval_type_name(const hdk::ir::Type* type1,
+                                               const hdk::ir::Type* type2) {
+  if (type2->isInterval()) {
+    return numeric_type_name(type2);
+  }
+  return numeric_type_name(type1);
+}
+
 }  // namespace
 
 llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
@@ -341,10 +349,18 @@ void CodeGenerator::codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
                                                     llvm::Value* rhs_lv,
                                                     llvm::BasicBlock* no_overflow_bb,
                                                     const SQLTypeInfo& ti) {
-  const auto lhs_is_null_lv = codegenIsNullNumber(lhs_lv, ti);
+  codegenSkipOverflowCheckForNull(
+      lhs_lv, rhs_lv, no_overflow_bb, hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
+}
+
+void CodeGenerator::codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
+                                                    llvm::Value* rhs_lv,
+                                                    llvm::BasicBlock* no_overflow_bb,
+                                                    const hdk::ir::Type* type) {
+  const auto lhs_is_null_lv = codegenIsNullNumber(lhs_lv, type);
   const auto has_null_operand_lv =
       rhs_lv ? cgen_state_->ir_builder_.CreateOr(lhs_is_null_lv,
-                                                 codegenIsNullNumber(rhs_lv, ti))
+                                                 codegenIsNullNumber(rhs_lv, type))
              : lhs_is_null_lv;
   auto operands_not_null = llvm::BasicBlock::Create(
       cgen_state_->context_, "operands_not_null", cgen_state_->current_func_);
@@ -431,13 +447,28 @@ llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
                                        const std::string& null_check_suffix,
                                        const SQLTypeInfo& ti,
                                        bool upscale) {
+  return codegenDiv(lhs_lv,
+                    rhs_lv,
+                    null_typename,
+                    null_check_suffix,
+                    hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
+                    upscale);
+}
+
+llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
+                                       llvm::Value* rhs_lv,
+                                       const std::string& null_typename,
+                                       const std::string& null_check_suffix,
+                                       const hdk::ir::Type* type,
+                                       bool upscale) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(lhs_lv->getType(), rhs_lv->getType());
-  if (ti.is_decimal()) {
+  if (type->isDecimal()) {
+    auto scale = type->as<hdk::ir::DecimalType>()->scale();
     if (upscale) {
       CHECK(lhs_lv->getType()->isIntegerTy());
       const auto scale_lv =
-          llvm::ConstantInt::get(lhs_lv->getType(), exp_to_scale(ti.get_scale()));
+          llvm::ConstantInt::get(lhs_lv->getType(), exp_to_scale(scale));
 
       lhs_lv = cgen_state_->ir_builder_.CreateSExt(
           lhs_lv, get_int_type(64, cgen_state_->context_));
@@ -447,24 +478,24 @@ llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
       auto decimal_div_ok = llvm::BasicBlock::Create(
           cgen_state_->context_, "decimal_div_ok", cgen_state_->current_func_);
       if (!null_check_suffix.empty()) {
-        codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, decimal_div_ok, ti);
+        codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, decimal_div_ok, type);
       }
       auto decimal_div_fail = llvm::BasicBlock::Create(
           cgen_state_->context_, "decimal_div_fail", cgen_state_->current_func_);
       auto lhs_max = static_cast<llvm::ConstantInt*>(chosen_max)->getSExtValue() /
-                     exp_to_scale(ti.get_scale());
+                     exp_to_scale(scale);
       auto lhs_max_lv =
           llvm::ConstantInt::get(get_int_type(64, cgen_state_->context_), lhs_max);
       llvm::Value* detected{nullptr};
-      if (ti.get_notnull()) {
+      if (!type->nullable()) {
         detected = cgen_state_->ir_builder_.CreateICmpSGT(lhs_lv, lhs_max_lv);
       } else {
-        detected = toBool(cgen_state_->emitCall(
-            "gt_" + numeric_type_name(ti) + "_nullable",
-            {lhs_lv,
-             lhs_max_lv,
-             cgen_state_->llInt(inline_int_null_val(ti)),
-             cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false))}));
+        detected = toBool(
+            cgen_state_->emitCall("gt_" + numeric_type_name(type) + "_nullable",
+                                  {lhs_lv,
+                                   lhs_max_lv,
+                                   cgen_state_->llInt(inline_int_null_value(type)),
+                                   cgen_state_->inlineIntNull(type->ctx().boolean())}));
       }
       cgen_state_->ir_builder_.CreateCondBr(detected, decimal_div_fail, decimal_div_ok);
 
@@ -474,37 +505,38 @@ llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
 
       cgen_state_->ir_builder_.SetInsertPoint(decimal_div_ok);
 
-      lhs_lv = null_typename.empty()
-                   ? cgen_state_->ir_builder_.CreateMul(lhs_lv, scale_lv)
-                   : cgen_state_->emitCall(
-                         "mul_" + numeric_type_name(ti) + null_check_suffix,
-                         {lhs_lv, scale_lv, cgen_state_->llInt(inline_int_null_val(ti))});
+      lhs_lv =
+          null_typename.empty()
+              ? cgen_state_->ir_builder_.CreateMul(lhs_lv, scale_lv)
+              : cgen_state_->emitCall(
+                    "mul_" + numeric_type_name(type) + null_check_suffix,
+                    {lhs_lv, scale_lv, cgen_state_->llInt(inline_int_null_value(type))});
     }
   }
-  if (config_.exec.codegen.inf_div_by_zero && ti.is_fp()) {
-    llvm::Value* inf_lv = ti.get_type() == kFLOAT ? cgen_state_->llFp(INF_FLOAT)
-                                                  : cgen_state_->llFp(INF_DOUBLE);
-    llvm::Value* null_lv = ti.get_type() == kFLOAT ? cgen_state_->llFp(NULL_FLOAT)
-                                                   : cgen_state_->llFp(NULL_DOUBLE);
-    return cgen_state_->emitCall("safe_inf_div_" + numeric_type_name(ti),
+  if (config_.exec.codegen.inf_div_by_zero && type->isFloatingPoint()) {
+    llvm::Value* inf_lv =
+        type->size() == 4 ? cgen_state_->llFp(INF_FLOAT) : cgen_state_->llFp(INF_DOUBLE);
+    llvm::Value* null_lv = type->size() == 4 ? cgen_state_->llFp(NULL_FLOAT)
+                                             : cgen_state_->llFp(NULL_DOUBLE);
+    return cgen_state_->emitCall("safe_inf_div_" + numeric_type_name(type),
                                  {lhs_lv, rhs_lv, inf_lv, null_lv});
   }
   if (config_.exec.codegen.null_div_by_zero) {
     llvm::Value* null_lv{nullptr};
-    if (ti.is_fp()) {
-      null_lv = ti.get_type() == kFLOAT ? cgen_state_->llFp(NULL_FLOAT)
-                                        : cgen_state_->llFp(NULL_DOUBLE);
+    if (type->isFloatingPoint()) {
+      null_lv = type->size() == 4 ? cgen_state_->llFp(NULL_FLOAT)
+                                  : cgen_state_->llFp(NULL_DOUBLE);
     } else {
-      null_lv = cgen_state_->llInt(inline_int_null_val(ti));
+      null_lv = cgen_state_->llInt(inline_int_null_value(type));
     }
-    return cgen_state_->emitCall("safe_div_" + numeric_type_name(ti),
+    return cgen_state_->emitCall("safe_div_" + numeric_type_name(type),
                                  {lhs_lv, rhs_lv, null_lv});
   }
   cgen_state_->needs_error_check_ = true;
   auto div_ok = llvm::BasicBlock::Create(
       cgen_state_->context_, "div_ok", cgen_state_->current_func_);
   if (!null_check_suffix.empty()) {
-    codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, div_ok, ti);
+    codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, div_ok, type);
   }
   auto div_zero = llvm::BasicBlock::Create(
       cgen_state_->context_, "div_zero", cgen_state_->current_func_);
@@ -526,15 +558,15 @@ llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
                  ? cgen_state_->ir_builder_.CreateSDiv(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall(
                        "div_" + null_typename + null_check_suffix,
-                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_val(ti))}))
+                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))}))
           : (null_typename.empty()
                  ? cgen_state_->ir_builder_.CreateFDiv(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall(
                        "div_" + null_typename + null_check_suffix,
                        {lhs_lv,
                         rhs_lv,
-                        ti.get_type() == kFLOAT ? cgen_state_->llFp(NULL_FLOAT)
-                                                : cgen_state_->llFp(NULL_DOUBLE)}));
+                        type->size() == 4 ? cgen_state_->llFp(NULL_FLOAT)
+                                          : cgen_state_->llFp(NULL_DOUBLE)}));
   cgen_state_->ir_builder_.SetInsertPoint(div_zero);
   cgen_state_->ir_builder_.CreateRet(cgen_state_->llInt(Executor::ERR_DIV_BY_ZERO));
   cgen_state_->ir_builder_.SetInsertPoint(div_ok);
@@ -551,20 +583,20 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto lhs = bin_oper->get_left_operand();
   auto rhs = bin_oper->get_right_operand();
-  const auto& lhs_type = lhs->get_type_info();
-  const auto& rhs_type = rhs->get_type_info();
-  CHECK(lhs_type.is_decimal() && rhs_type.is_decimal() &&
-        lhs_type.get_scale() == rhs_type.get_scale());
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
+  CHECK(lhs_type->isDecimal() && rhs_type->isDecimal());
+  auto scale = lhs_type->as<hdk::ir::DecimalType>()->scale();
+  CHECK_EQ(scale, rhs_type->as<hdk::ir::DecimalType>()->scale());
 
   auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
   auto rhs_cast = dynamic_cast<const hdk::ir::UOper*>(rhs);
   if (rhs_constant && !rhs_constant->get_is_null() &&
       rhs_constant->get_constval().bigintval != 0LL &&
-      (rhs_constant->get_constval().bigintval % exp_to_scale(rhs_type.get_scale())) ==
-          0LL) {
+      (rhs_constant->get_constval().bigintval % exp_to_scale(scale)) == 0LL) {
     // can safely downscale a scaled constant
   } else if (rhs_cast && rhs_cast->get_optype() == kCAST &&
-             rhs_cast->get_operand()->get_type_info().is_integer()) {
+             rhs_cast->get_operand()->type()->isInteger()) {
     // can skip upscale in the int to dec cast
   } else {
     return nullptr;
@@ -574,17 +606,17 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
   llvm::Value* rhs_lv{nullptr};
   if (rhs_constant) {
     const auto rhs_lit = Analyzer::analyzeIntValue(
-        rhs_constant->get_constval().bigintval / exp_to_scale(rhs_type.get_scale()));
+        rhs_constant->get_constval().bigintval / exp_to_scale(scale));
     auto rhs_lit_lv = CodeGenerator::codegenIntConst(
         dynamic_cast<const hdk::ir::Constant*>(rhs_lit.get()), cgen_state_);
     rhs_lv = codegenCastBetweenIntTypes(
-        rhs_lit_lv, rhs_lit->get_type_info(), lhs_type, /*upscale*/ false);
+        rhs_lit_lv, rhs_lit->type(), lhs_type, /*upscale*/ false);
   } else if (rhs_cast) {
     auto rhs_cast_oper = rhs_cast->get_operand();
-    const auto& rhs_cast_oper_ti = rhs_cast_oper->get_type_info();
+    const auto& rhs_cast_oper_type = rhs_cast_oper->type();
     auto rhs_cast_oper_lv = codegen(rhs_cast_oper, true, co).front();
     rhs_lv = codegenCastBetweenIntTypes(
-        rhs_cast_oper_lv, rhs_cast_oper_ti, lhs_type, /*upscale*/ false);
+        rhs_cast_oper_lv, rhs_cast_oper_type, lhs_type, /*upscale*/ false);
   } else {
     CHECK(false);
   }

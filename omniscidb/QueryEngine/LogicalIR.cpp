@@ -413,3 +413,17 @@ llvm::Value* CodeGenerator::codegenIsNullNumber(llvm::Value* operand_lv,
   return cgen_state_->ir_builder_.CreateICmp(
       llvm::ICmpInst::ICMP_EQ, operand_lv, cgen_state_->inlineIntNull(ti));
 }
+
+llvm::Value* CodeGenerator::codegenIsNullNumber(llvm::Value* operand_lv,
+                                                const hdk::ir::Type* type) {
+  AUTOMATIC_IR_METADATA(cgen_state_);
+  if (type->isFloatingPoint()) {
+    return cgen_state_->ir_builder_.CreateFCmp(llvm::FCmpInst::FCMP_OEQ,
+                                               operand_lv,
+                                               type->size() == 4
+                                                   ? cgen_state_->llFp(NULL_FLOAT)
+                                                   : cgen_state_->llFp(NULL_DOUBLE));
+  }
+  return cgen_state_->ir_builder_.CreateICmp(
+      llvm::ICmpInst::ICMP_EQ, operand_lv, cgen_state_->inlineIntNull(type));
+}

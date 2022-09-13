@@ -143,6 +143,7 @@ class CodeGenerator {
   llvm::Value* codegenIsNull(const hdk::ir::UOper*, const CompilationOptions&);
 
   llvm::Value* codegenIsNullNumber(llvm::Value*, const SQLTypeInfo&);
+  llvm::Value* codegenIsNullNumber(llvm::Value*, const hdk::ir::Type*);
 
   llvm::Value* codegenLogical(const hdk::ir::BinOper*, const CompilationOptions&);
 
@@ -305,6 +306,10 @@ class CodeGenerator {
                                        llvm::Value* rhs_lv,
                                        llvm::BasicBlock* no_overflow_bb,
                                        const SQLTypeInfo& ti);
+  void codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
+                                       llvm::Value* rhs_lv,
+                                       llvm::BasicBlock* no_overflow_bb,
+                                       const hdk::ir::Type* type);
 
   llvm::Value* codegenMul(const hdk::ir::BinOper*,
                           llvm::Value*,
@@ -320,6 +325,12 @@ class CodeGenerator {
                           const std::string& null_typename,
                           const std::string& null_check_suffix,
                           const SQLTypeInfo&,
+                          bool upscale = true);
+  llvm::Value* codegenDiv(llvm::Value* lhs_lv,
+                          llvm::Value* rhs_lv,
+                          const std::string& null_typename,
+                          const std::string& null_check_suffix,
+                          const hdk::ir::Type* type,
                           bool upscale = true);
 
   llvm::Value* codegenDeciDiv(const hdk::ir::BinOper*, const CompilationOptions&);
