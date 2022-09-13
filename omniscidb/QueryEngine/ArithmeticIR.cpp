@@ -665,7 +665,7 @@ llvm::Value* CodeGenerator::codegenMod(llvm::Value* lhs_lv,
 bool CodeGenerator::checkExpressionRanges(const hdk::ir::UOper* uoper,
                                           int64_t min,
                                           int64_t max) {
-  if (uoper->get_type_info().is_decimal()) {
+  if (uoper->type()->isDecimal()) {
     return false;
   }
 
