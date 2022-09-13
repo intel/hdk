@@ -141,6 +141,21 @@ inline std::string numeric_type_name(const SQLTypeInfo& ti) {
   return ti.get_type() == kDOUBLE ? "double" : "float";
 }
 
+inline std::string numeric_type_name(const hdk::ir::Type* type) {
+  if (type->isInteger() || type->isDecimal() || type->isBoolean()) {
+    return "int" + std::to_string(type->size() * 8) + "_t";
+  }
+  if (type->isFloatingPoint()) {
+    return type->isFp64() ? "double" : "float";
+  }
+  if (type->isExtDictionary()) {
+    return "int32_t";
+  }
+  CHECK(type->isDateTime() || type->isInterval())
+      << "Unexpected type: " << type->toString();
+  return "int64_t";
+}
+
 inline const TemporaryTable& get_temporary_table(const TemporaryTables* temporary_tables,
                                                  const int table_id) {
   CHECK_LT(table_id, 0);

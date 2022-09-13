@@ -20,4 +20,10 @@ namespace hdk::ir {
  */
 const Type* logicalType(const Type* type);
 
+/**
+ * Logical size of a type is a size of its logical type except for
+ * fixed length arrays whose logical size is their original size.
+ */
+const int logicalSize(const Type* type);
+
 }  // namespace hdk::ir

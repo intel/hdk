@@ -209,6 +209,15 @@ inline size_t get_bit_width(const SQLTypeInfo& ti) {
   }
 }
 
+inline size_t get_bit_width(const hdk::ir::Type* type) {
+  int res = hdk::ir::logicalSize(type) * 8;
+  if (res < 0) {
+    throw std::runtime_error("Unexpected type: " + type->toString());
+  }
+  CHECK((size_t)res == get_bit_width(type->toTypeInfo()));
+  return static_cast<size_t>(res);
+}
+
 inline bool is_unsigned_type(const SQLTypeInfo& ti) {
   return ti.get_compression() == kENCODING_DICT && ti.get_size() < ti.get_logical_size();
 }

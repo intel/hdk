@@ -58,10 +58,18 @@ class CodeGenerator {
                                           const SQLTypeInfo& operand_ti,
                                           const SQLTypeInfo& ti,
                                           bool upscale = true);
+  llvm::Value* codegenCastBetweenIntTypes(llvm::Value* operand_lv,
+                                          const hdk::ir::Type* operand_type,
+                                          const hdk::ir::Type* type,
+                                          bool upscale = true);
 
   void codegenCastBetweenIntTypesOverflowChecks(llvm::Value* operand_lv,
                                                 const SQLTypeInfo& operand_ti,
                                                 const SQLTypeInfo& ti,
+                                                const int64_t scale);
+  void codegenCastBetweenIntTypesOverflowChecks(llvm::Value* operand_lv,
+                                                const hdk::ir::Type* operand_type,
+                                                const hdk::ir::Type* type,
                                                 const int64_t scale);
 
   // Generates the index of the current row in the context of query execution.

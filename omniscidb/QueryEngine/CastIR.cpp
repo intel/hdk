@@ -344,6 +344,81 @@ llvm::Value* CodeGenerator::codegenCastBetweenIntTypes(llvm::Value* operand_lv,
                                 cgen_state_->inlineIntNull(ti)});
 }
 
+llvm::Value* CodeGenerator::codegenCastBetweenIntTypes(llvm::Value* operand_lv,
+                                                       const hdk::ir::Type* operand_type,
+                                                       const hdk::ir::Type* type,
+                                                       bool upscale) {
+  AUTOMATIC_IR_METADATA(cgen_state_);
+  auto target_scale = type->isDecimal() ? type->as<hdk::ir::DecimalType>()->scale() : 0;
+  auto op_scale =
+      operand_type->isDecimal() ? operand_type->as<hdk::ir::DecimalType>()->scale() : 0;
+  if (type->isDecimal() && (!operand_type->isDecimal() || op_scale <= target_scale)) {
+    if (upscale) {
+      if (op_scale < target_scale) {  // scale only if needed
+        auto scale = exp_to_scale(target_scale - op_scale);
+        const auto scale_lv =
+            llvm::ConstantInt::get(get_int_type(64, cgen_state_->context_), scale);
+        operand_lv = cgen_state_->ir_builder_.CreateSExt(
+            operand_lv, get_int_type(64, cgen_state_->context_));
+
+        codegenCastBetweenIntTypesOverflowChecks(operand_lv, operand_type, type, scale);
+
+        if (operand_type->nullable()) {
+          operand_lv = cgen_state_->emitCall(
+              "scale_decimal_up",
+              {operand_lv,
+               scale_lv,
+               cgen_state_->llInt(inline_int_null_value(operand_type)),
+               cgen_state_->inlineIntNull(SQLTypeInfo(kBIGINT, false))});
+        } else {
+          operand_lv = cgen_state_->ir_builder_.CreateMul(operand_lv, scale_lv);
+        }
+      }
+    }
+  } else if (operand_type->isDecimal()) {
+    // rounded scale down
+    auto scale = (int64_t)exp_to_scale(op_scale - target_scale);
+    const auto scale_lv =
+        llvm::ConstantInt::get(get_int_type(64, cgen_state_->context_), scale);
+
+    const auto operand_width =
+        static_cast<llvm::IntegerType*>(operand_lv->getType())->getBitWidth();
+
+    std::string method_name = "scale_decimal_down_nullable";
+    if (!operand_type->nullable()) {
+      method_name = "scale_decimal_down_not_nullable";
+    }
+
+    CHECK(operand_width == 64);
+    operand_lv = cgen_state_->emitCall(
+        method_name,
+        {operand_lv, scale_lv, cgen_state_->llInt(inline_int_null_value(operand_type))});
+  }
+  if (type->isInteger() && operand_type->isInteger() &&
+      operand_type->size() > type->size()) {
+    codegenCastBetweenIntTypesOverflowChecks(operand_lv, operand_type, type, 1);
+  }
+
+  const auto operand_width =
+      static_cast<llvm::IntegerType*>(operand_lv->getType())->getBitWidth();
+  const auto target_width = get_bit_width(type);
+  if (target_width == operand_width) {
+    return operand_lv;
+  }
+  if (!operand_type->nullable()) {
+    return cgen_state_->ir_builder_.CreateCast(
+        target_width > operand_width ? llvm::Instruction::CastOps::SExt
+                                     : llvm::Instruction::CastOps::Trunc,
+        operand_lv,
+        get_int_type(target_width, cgen_state_->context_));
+  }
+  return cgen_state_->emitCall("cast_" + numeric_type_name(operand_type) + "_to_" +
+                                   numeric_type_name(type) + "_nullable",
+                               {operand_lv,
+                                cgen_state_->inlineIntNull(operand_type),
+                                cgen_state_->inlineIntNull(type)});
+}
+
 void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
     llvm::Value* operand_lv,
     const SQLTypeInfo& operand_ti,
@@ -384,6 +459,65 @@ void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
     const auto type_name =
         is_narrowing ? numeric_type_name(operand_ti) : numeric_type_name(ti);
     const auto null_operand_val = cgen_state_->llInt(inline_int_null_val(operand_ti));
+    const auto null_bool_val = cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false));
+    over = toBool(cgen_state_->emitCall(
+        "gt_" + type_name + "_nullable_lhs",
+        {operand_lv, operand_max_lv, null_operand_val, null_bool_val}));
+    under = toBool(cgen_state_->emitCall(
+        "le_" + type_name + "_nullable_lhs",
+        {operand_lv, operand_min_lv, null_operand_val, null_bool_val}));
+  }
+  const auto detected = cgen_state_->ir_builder_.CreateOr(over, under, "overflow");
+  cgen_state_->ir_builder_.CreateCondBr(detected, cast_fail, cast_ok);
+
+  cgen_state_->ir_builder_.SetInsertPoint(cast_fail);
+  cgen_state_->ir_builder_.CreateRet(
+      cgen_state_->llInt(Executor::ERR_OVERFLOW_OR_UNDERFLOW));
+
+  cgen_state_->ir_builder_.SetInsertPoint(cast_ok);
+}
+
+void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
+    llvm::Value* operand_lv,
+    const hdk::ir::Type* operand_type,
+    const hdk::ir::Type* type,
+    const int64_t scale) {
+  AUTOMATIC_IR_METADATA(cgen_state_);
+  llvm::Value* chosen_max{nullptr};
+  llvm::Value* chosen_min{nullptr};
+  std::tie(chosen_max, chosen_min) =
+      cgen_state_->inlineIntMaxMin(hdk::ir::logicalSize(type), true);
+
+  cgen_state_->needs_error_check_ = true;
+  auto cast_ok = llvm::BasicBlock::Create(
+      cgen_state_->context_, "cast_ok", cgen_state_->current_func_);
+  auto cast_fail = llvm::BasicBlock::Create(
+      cgen_state_->context_, "cast_fail", cgen_state_->current_func_);
+  auto operand_max = static_cast<llvm::ConstantInt*>(chosen_max)->getSExtValue() / scale;
+  auto operand_min = static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue() / scale;
+  const auto ti_llvm_type =
+      get_int_type(8 * hdk::ir::logicalSize(type), cgen_state_->context_);
+  llvm::Value* operand_max_lv = llvm::ConstantInt::get(ti_llvm_type, operand_max);
+  llvm::Value* operand_min_lv = llvm::ConstantInt::get(ti_llvm_type, operand_min);
+  const bool is_narrowing =
+      hdk::ir::logicalSize(operand_type) > hdk::ir::logicalSize(type);
+  if (is_narrowing) {
+    const auto operand_ti_llvm_type =
+        get_int_type(8 * hdk::ir::logicalSize(operand_type), cgen_state_->context_);
+    operand_max_lv =
+        cgen_state_->ir_builder_.CreateSExt(operand_max_lv, operand_ti_llvm_type);
+    operand_min_lv =
+        cgen_state_->ir_builder_.CreateSExt(operand_min_lv, operand_ti_llvm_type);
+  }
+  llvm::Value* over{nullptr};
+  llvm::Value* under{nullptr};
+  if (!operand_type->nullable()) {
+    over = cgen_state_->ir_builder_.CreateICmpSGT(operand_lv, operand_max_lv);
+    under = cgen_state_->ir_builder_.CreateICmpSLE(operand_lv, operand_min_lv);
+  } else {
+    const auto type_name =
+        is_narrowing ? numeric_type_name(operand_type) : numeric_type_name(type);
+    const auto null_operand_val = cgen_state_->llInt(inline_int_null_value(operand_type));
     const auto null_bool_val = cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false));
     over = toBool(cgen_state_->emitCall(
         "gt_" + type_name + "_nullable_lhs",

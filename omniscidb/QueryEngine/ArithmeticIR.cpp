@@ -37,10 +37,10 @@ llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
   CHECK(IS_ARITHMETIC(optype));
   const auto lhs = bin_oper->get_left_operand();
   const auto rhs = bin_oper->get_right_operand();
-  const auto& lhs_type = lhs->get_type_info();
-  const auto& rhs_type = rhs->get_type_info();
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
 
-  if (lhs_type.is_decimal() && rhs_type.is_decimal() && optype == kDIVIDE) {
+  if (lhs_type->isDecimal() && rhs_type->isDecimal() && optype == kDIVIDE) {
     const auto ret = codegenDeciDiv(bin_oper, co);
     if (ret) {
       return ret;
@@ -51,17 +51,17 @@ llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
   auto rhs_lv = codegen(rhs, true, co).front();
   // Handle operations when a time interval operand is involved, an operation
   // between an integer and a time interval isn't normalized by the analyzer.
-  if (lhs_type.is_timeinterval()) {
+  if (lhs_type->isInterval()) {
     rhs_lv = codegenCastBetweenIntTypes(rhs_lv, rhs_type, lhs_type);
-  } else if (rhs_type.is_timeinterval()) {
+  } else if (rhs_type->isInterval()) {
     lhs_lv = codegenCastBetweenIntTypes(lhs_lv, lhs_type, rhs_type);
   } else {
-    CHECK_EQ(lhs_type.get_type(), rhs_type.get_type());
+    CHECK_EQ(lhs_type->id(), rhs_type->id());
   }
-  if (lhs_type.is_integer() || lhs_type.is_decimal() || lhs_type.is_timeinterval()) {
+  if (lhs_type->isInteger() || lhs_type->isDecimal() || lhs_type->isInterval()) {
     return codegenIntArith(bin_oper, lhs_lv, rhs_lv, co);
   }
-  if (lhs_type.is_fp()) {
+  if (lhs_type->isFloatingPoint()) {
     return codegenFpArith(bin_oper, lhs_lv, rhs_lv);
   }
   CHECK(false);

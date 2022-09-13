@@ -113,6 +113,57 @@ llvm::Constant* CgenState::inlineNull(const SQLTypeInfo& ti) {
                     : static_cast<llvm::Constant*>(inlineIntNull(ti));
 }
 
+llvm::ConstantInt* CgenState::inlineIntNull(const hdk::ir::Type* type) {
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+      switch (type->size()) {
+        case 1:
+          return llInt(static_cast<int8_t>(inline_int_null_value<int8_t>()));
+        case 2:
+          return llInt(static_cast<int16_t>(inline_int_null_value<int16_t>()));
+        case 4:
+          return llInt(static_cast<int32_t>(inline_int_null_value<int32_t>()));
+        case 8:
+          return llInt(inline_int_null_value<int64_t>());
+        default:
+          abort();
+      }
+    case hdk::ir::Type::kExtDictionary:
+      return llInt(static_cast<int32_t>(inline_int_null_value(type)));
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
+      return llInt(inline_int_null_value<int64_t>());
+    case hdk::ir::Type::kFixedLenArray:
+    case hdk::ir::Type::kVarLenArray:
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
+      return llInt(int64_t(0));
+    default:
+      abort();
+  }
+}
+
+llvm::ConstantFP* CgenState::inlineFpNull(const hdk::ir::Type* type) {
+  CHECK(type->isFloatingPoint());
+  switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+    case hdk::ir::FloatingPointType::kFloat:
+      return llFp(NULL_FLOAT);
+    case hdk::ir::FloatingPointType::kDouble:
+      return llFp(NULL_DOUBLE);
+    default:
+      abort();
+  }
+}
+
+llvm::Constant* CgenState::inlineNull(const hdk::ir::Type* type) {
+  return type->isFloatingPoint() ? static_cast<llvm::Constant*>(inlineFpNull(type))
+                                 : static_cast<llvm::Constant*>(inlineIntNull(type));
+}
+
 std::pair<llvm::ConstantInt*, llvm::ConstantInt*> CgenState::inlineIntMaxMin(
     const size_t byte_width,
     const bool is_signed) {

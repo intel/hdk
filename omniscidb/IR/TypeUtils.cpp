@@ -34,4 +34,30 @@ const Type* logicalType(const Type* type) {
   return type;
 }
 
+const int logicalSize(const Type* type) {
+  switch (type->id()) {
+    case hdk::ir::Type::kNull:
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kFloatingPoint:
+    case hdk::ir::Type::kFixedLenArray:
+    case hdk::ir::Type::kColumn:
+    case hdk::ir::Type::kColumnList:
+    case hdk::ir::Type::kVarLenArray:
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
+      return type->size();
+    case hdk::ir::Type::kExtDictionary:
+      return 4;
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
+      return 8;
+    default:
+      abort();
+  }
+}
+
 }  // namespace hdk::ir

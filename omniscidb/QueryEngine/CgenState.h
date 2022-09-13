@@ -280,6 +280,10 @@ struct CgenState {
   llvm::ConstantFP* inlineFpNull(const SQLTypeInfo&);
   llvm::Constant* inlineNull(const SQLTypeInfo&);
 
+  llvm::ConstantInt* inlineIntNull(const hdk::ir::Type*);
+  llvm::ConstantFP* inlineFpNull(const hdk::ir::Type*);
+  llvm::Constant* inlineNull(const hdk::ir::Type*);
+
   template <class T>
   llvm::ConstantInt* llInt(const T v) const {
     return ::ll_int(v, context_);
