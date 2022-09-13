@@ -291,6 +291,84 @@ SQLTypeInfo ext_arg_type_to_type_info(const ExtArgumentType ext_arg_type) {
   return SQLTypeInfo(kNULLT, false);
 }
 
+const hdk::ir::Type* ext_arg_type_to_type(hdk::ir::Context& ctx,
+                                          const ExtArgumentType ext_arg_type) {
+  /* This function is mostly used for scalar types.
+     For non-scalar types, NULL is returned as a placeholder.
+   */
+
+  switch (ext_arg_type) {
+    case ExtArgumentType::Bool:
+      return ctx.boolean();
+    case ExtArgumentType::Int8:
+      return ctx.int8();
+    case ExtArgumentType::Int16:
+      return ctx.int16();
+    case ExtArgumentType::Int32:
+      return ctx.int32();
+    case ExtArgumentType::Int64:
+      return ctx.int64();
+    case ExtArgumentType::Float:
+      return ctx.fp32();
+    case ExtArgumentType::Double:
+      return ctx.fp64();
+    case ExtArgumentType::ArrayInt8:
+      return ctx.arrayVarLen(ctx.int8());
+    case ExtArgumentType::ArrayInt16:
+      return ctx.arrayVarLen(ctx.int16());
+    case ExtArgumentType::ArrayInt32:
+      return ctx.arrayVarLen(ctx.int32());
+    case ExtArgumentType::ArrayInt64:
+      return ctx.arrayVarLen(ctx.int64());
+    case ExtArgumentType::ArrayFloat:
+      return ctx.arrayVarLen(ctx.fp32());
+    case ExtArgumentType::ArrayDouble:
+      return ctx.arrayVarLen(ctx.fp64());
+    case ExtArgumentType::ArrayBool:
+      return ctx.arrayVarLen(ctx.boolean());
+    case ExtArgumentType::ColumnInt8:
+      return ctx.column(ctx.int8());
+    case ExtArgumentType::ColumnInt16:
+      return ctx.column(ctx.int16());
+    case ExtArgumentType::ColumnInt32:
+      return ctx.column(ctx.int32());
+    case ExtArgumentType::ColumnInt64:
+      return ctx.column(ctx.int64());
+    case ExtArgumentType::ColumnFloat:
+      return ctx.column(ctx.fp32());
+    case ExtArgumentType::ColumnDouble:
+      return ctx.column(ctx.fp64());
+    case ExtArgumentType::ColumnBool:
+      return ctx.column(ctx.boolean());
+    case ExtArgumentType::ColumnTextEncodingDict:
+      return ctx.column(ctx.extDict(ctx.text(), 0));
+    case ExtArgumentType::TextEncodingNone:
+      return ctx.text();
+    case ExtArgumentType::TextEncodingDict:
+      return ctx.extDict(ctx.text(), 0);
+    case ExtArgumentType::ColumnListInt8:
+      return ctx.column(ctx.int8());
+    case ExtArgumentType::ColumnListInt16:
+      return ctx.column(ctx.int16());
+    case ExtArgumentType::ColumnListInt32:
+      return ctx.column(ctx.int32());
+    case ExtArgumentType::ColumnListInt64:
+      return ctx.column(ctx.int64());
+    case ExtArgumentType::ColumnListFloat:
+      return ctx.column(ctx.fp32());
+    case ExtArgumentType::ColumnListDouble:
+      return ctx.column(ctx.fp64());
+    case ExtArgumentType::ColumnListBool:
+      return ctx.column(ctx.boolean());
+    case ExtArgumentType::ColumnListTextEncodingDict:
+      return ctx.column(ctx.extDict(ctx.text(), 0));
+    default:
+      LOG(FATAL) << "ExtArgumentType `" << serialize_type(ext_arg_type)
+                 << "` cannot be converted to Type.";
+  }
+  return ctx.null();
+}
+
 std::string ExtensionFunctionsWhitelist::toString(
     const std::vector<ExtensionFunction>& ext_funcs,
     std::string tab) {

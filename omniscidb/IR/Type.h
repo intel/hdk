@@ -360,6 +360,8 @@ class ArrayBaseType : public Type {
  public:
   const Type* elemType() const { return elem_type_; }
 
+  virtual const ArrayBaseType* withElemType(const Type* elem_type) const = 0;
+
   bool equal(const Type& other) const override;
 
  protected:
@@ -382,6 +384,8 @@ class FixedLenArrayType : public ArrayBaseType {
   int numElems() const { return num_elems_; }
 
   const Type* withNullable(bool nullable) const override;
+
+  const ArrayBaseType* withElemType(const Type* elem_type) const override;
 
   bool equal(const Type& other) const override;
 
@@ -407,6 +411,8 @@ class VarLenArrayType : public ArrayBaseType {
   int offsetSize() const { return offs_size_; }
 
   const Type* withNullable(bool nullable) const override;
+
+  const ArrayBaseType* withElemType(const Type* elem_type) const override;
 
   bool equal(const Type& other) const override;
 

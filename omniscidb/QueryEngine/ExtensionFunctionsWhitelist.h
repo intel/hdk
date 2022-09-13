@@ -30,6 +30,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "IR/Type.h"
 #include "Logger/Logger.h"
 #include "Shared/sqltypes.h"
 #include "Shared/toString.h"
@@ -79,6 +80,8 @@ enum class ExtArgumentType {
 };
 
 SQLTypeInfo ext_arg_type_to_type_info(const ExtArgumentType ext_arg_type);
+const hdk::ir::Type* ext_arg_type_to_type(hdk::ir::Context& ctx,
+                                          const ExtArgumentType ext_arg_type);
 
 class ExtensionFunction {
  public:

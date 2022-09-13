@@ -1313,7 +1313,7 @@ inline InputColDescriptor column_var_to_descriptor(const hdk::ir::ColumnVar* var
   return InputColDescriptor(var->get_column_info(), var->get_rte_idx());
 }
 
-SQLTypeInfo getColumnType(const RelAlgNode* node, size_t col_idx);
+const hdk::ir::Type* getColumnType(const RelAlgNode* node, size_t col_idx);
 
 hdk::ir::ExprPtr getNodeColumnRef(const RelAlgNode* node, unsigned index);
 hdk::ir::ExprPtrVector getNodeColumnRefs(const RelAlgNode* node);

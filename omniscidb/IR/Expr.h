@@ -193,6 +193,8 @@ class Expr : public std::enable_shared_from_this<Expr> {
  */
 class ColumnRef : public Expr {
  public:
+  ColumnRef(const Type* type, const RelAlgNode* node, unsigned idx)
+      : Expr(type), node_(node), idx_(idx) {}
   ColumnRef(const SQLTypeInfo& ti, const RelAlgNode* node, unsigned idx)
       : Expr(ti), node_(node), idx_(idx) {}
 
@@ -224,6 +226,7 @@ class ColumnRef : public Expr {
  */
 class GroupColumnRef : public Expr {
  public:
+  GroupColumnRef(const Type* type, unsigned idx) : Expr(type), idx_(idx) {}
   GroupColumnRef(const SQLTypeInfo& ti, unsigned idx) : Expr(ti), idx_(idx) {}
 
   ExprPtr deep_copy() const override { return makeExpr<GroupColumnRef>(type_info, idx_); }
@@ -451,6 +454,7 @@ class Constant : public Expr {
   size_t hash() const override;
 
   static ExprPtr make(const SQLTypeInfo& ti, int64_t val, bool cacheable = true);
+  static ExprPtr make(const hdk::ir::Type* type, int64_t val, bool cacheable = true);
 
  protected:
   // Constant is NULL
@@ -477,6 +481,8 @@ class UOper : public Expr {
  public:
   UOper(const Type* type, bool has_agg, SQLOps o, ExprPtr p)
       : Expr(type, has_agg), optype(o), operand(p), is_dict_intersection_(false) {}
+  UOper(const Type* type, SQLOps o, ExprPtr p)
+      : Expr(type), optype(o), operand(p), is_dict_intersection_(false) {}
   UOper(const SQLTypeInfo& ti,
         bool has_agg,
         SQLOps o,
@@ -555,6 +561,8 @@ class BinOper : public Expr {
       : Expr(ti, has_agg), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
   BinOper(const Type* type, bool has_agg, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type, has_agg), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
+  BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
+      : Expr(type), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
   BinOper(SQLTypes t, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(t, l->get_type_info().get_notnull() && r->get_type_info().get_notnull())
       , optype(o)
@@ -677,6 +685,8 @@ class RangeOper : public Expr {
 
 class ScalarSubquery : public Expr {
  public:
+  ScalarSubquery(const hdk::ir::Type* type, std::shared_ptr<const RelAlgNode> node)
+      : Expr(type), node_(node) {}
   ScalarSubquery(const SQLTypeInfo& ti, std::shared_ptr<const RelAlgNode> node)
       : Expr(ti), node_(node) {}
 
@@ -774,6 +784,10 @@ class InIntegerSet : public Expr {
 
 class InSubquery : public Expr {
  public:
+  InSubquery(const hdk::ir::Type* type,
+             hdk::ir::ExprPtr arg,
+             std::shared_ptr<const RelAlgNode> node)
+      : Expr(type), arg_(std::move(arg)), node_(std::move(node)) {}
   InSubquery(const SQLTypeInfo& ti,
              hdk::ir::ExprPtr arg,
              std::shared_ptr<const RelAlgNode> node)
@@ -1499,6 +1513,11 @@ class ExtractExpr : public Expr {
  */
 class DateaddExpr : public Expr {
  public:
+  DateaddExpr(const hdk::ir::Type* type,
+              const DateaddField f,
+              const ExprPtr number,
+              const ExprPtr datetime)
+      : Expr(type, false), field_(f), number_(number), datetime_(datetime) {}
   DateaddExpr(const SQLTypeInfo& ti,
               const DateaddField f,
               const ExprPtr number,
@@ -1542,6 +1561,11 @@ class DateaddExpr : public Expr {
  */
 class DatediffExpr : public Expr {
  public:
+  DatediffExpr(const hdk::ir::Type* type,
+               const DatetruncField f,
+               const ExprPtr start,
+               const ExprPtr end)
+      : Expr(type, false), field_(f), start_(start), end_(end) {}
   DatediffExpr(const SQLTypeInfo& ti,
                const DatetruncField f,
                const ExprPtr start,
@@ -1622,6 +1646,10 @@ class DatetruncExpr : public Expr {
 
 class FunctionOper : public Expr {
  public:
+  FunctionOper(const hdk::ir::Type* type,
+               const std::string& name,
+               const ExprPtrVector& args)
+      : Expr(type, false), name_(name), args_(args) {}
   FunctionOper(const SQLTypeInfo& ti, const std::string& name, const ExprPtrVector& args)
       : Expr(ti, false), name_(name), args_(args) {}
 
@@ -1658,6 +1686,10 @@ class FunctionOper : public Expr {
 
 class FunctionOperWithCustomTypeHandling : public FunctionOper {
  public:
+  FunctionOperWithCustomTypeHandling(const hdk::ir::Type* type,
+                                     const std::string& name,
+                                     const ExprPtrVector& args)
+      : FunctionOper(type, name, args) {}
   FunctionOperWithCustomTypeHandling(const SQLTypeInfo& ti,
                                      const std::string& name,
                                      const ExprPtrVector& args)
@@ -1712,6 +1744,18 @@ struct OrderEntry {
  */
 class WindowFunction : public Expr {
  public:
+  WindowFunction(const hdk::ir::Type* type,
+                 const SqlWindowFunctionKind kind,
+                 const ExprPtrVector& args,
+                 const ExprPtrVector& partition_keys,
+                 const ExprPtrVector& order_keys,
+                 const std::vector<OrderEntry>& collation)
+      : Expr(type)
+      , kind_(kind)
+      , args_(args)
+      , partition_keys_(partition_keys)
+      , order_keys_(order_keys)
+      , collation_(collation){};
   WindowFunction(const SQLTypeInfo& ti,
                  const SqlWindowFunctionKind kind,
                  const ExprPtrVector& args,
@@ -1757,6 +1801,14 @@ class WindowFunction : public Expr {
 
 class ArrayExpr : public Expr {
  public:
+  ArrayExpr(const hdk::ir::Type* array_type,
+            ExprPtrVector const& array_exprs,
+            bool is_null = false,
+            bool local_alloc = false)
+      : Expr(array_type)
+      , contained_expressions_(array_exprs)
+      , local_alloc_(local_alloc)
+      , is_null_(is_null) {}
   ArrayExpr(SQLTypeInfo const& array_ti,
             ExprPtrVector const& array_exprs,
             bool is_null = false,

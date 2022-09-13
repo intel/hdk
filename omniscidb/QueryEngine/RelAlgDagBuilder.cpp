@@ -65,7 +65,7 @@ class RebindInputsVisitor : public DeepCopyVisitor {
         return rebind_inputs_from_left_deep_join(col_ref, left_deep_join);
       }
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->get_type_info(), new_input_, col_ref->getIndex());
+          col_ref->type(), new_input_, col_ref->getIndex());
     }
     return col_ref->deep_copy();
   }
@@ -91,7 +91,7 @@ class RebindReindexInputsVisitor : public RebindInputsVisitor {
       auto it = mapping_->find(new_col_ref->getIndex());
       CHECK(it != mapping_->end());
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          new_col_ref->get_type_info(), new_col_ref->getNode(), it->second);
+          new_col_ref->type(), new_col_ref->getNode(), it->second);
     }
     return res;
   }
@@ -578,14 +578,15 @@ void RelLogicalUnion::checkForMatchingMetaInfoTypes() const {
     throw std::runtime_error("Subqueries of a UNION must have matching data types.");
   }
   for (size_t i = 0; i < tmis0.size(); ++i) {
-    if (tmis0[i].get_type_info() != tmis1[i].get_type_info()) {
-      SQLTypeInfo const& ti0 = tmis0[i].get_type_info();
-      SQLTypeInfo const& ti1 = tmis1[i].get_type_info();
+    if (!tmis0[i].type()->equal(tmis1[i].type())) {
+      auto ti0 = tmis0[i].type();
+      auto ti1 = tmis1[i].type();
       VLOG(2) << "Types do not match for UNION:\n  tmis0[" << i
-              << "].get_type_info().to_string() = " << ti0.to_string() << "\n  tmis1["
-              << i << "].get_type_info().to_string() = " << ti1.to_string();
-      if (ti0.is_dict_encoded_string() && ti1.is_dict_encoded_string() &&
-          ti0.get_comp_param() != ti1.get_comp_param()) {
+              << "].type()->toString() = " << ti0->toString() << "\n  tmis1[" << i
+              << "].type()->toString() = " << ti1->toString();
+      if (ti0->isExtDictionary() && ti1->isExtDictionary() &&
+          (ti0->as<hdk::ir::ExtDictionaryType>()->dictId() !=
+           ti1->as<hdk::ir::ExtDictionaryType>()->dictId())) {
         throw std::runtime_error(
             "Taking the UNION of different text-encoded dictionaries is not yet "
             "supported. This may be resolved by using shared dictionaries. For example, "
@@ -875,57 +876,49 @@ hdk::ir::ExprPtr parseInput(const rapidjson::Value& expr,
   return ra_output[json_i64(input)];
 }
 
-SQLTypeInfo build_type_info(const SQLTypes sql_type,
-                            const int scale,
-                            const int precision) {
-  SQLTypeInfo ti(sql_type, 0, 0, true);
-  if (ti.is_decimal()) {
-    ti.set_scale(scale);
-    ti.set_precision(precision);
-  }
-  return ti;
-}
-
 hdk::ir::ExprPtr parseLiteral(const rapidjson::Value& expr) {
   CHECK(expr.IsObject());
   const auto& literal = field(expr, "literal");
-  const auto type = to_sql_type(json_str(field(expr, "type")));
-  const auto target_type = to_sql_type(json_str(field(expr, "target_type")));
+  const auto type_name = json_str(field(expr, "type"));
+  const auto target_type_name = json_str(field(expr, "target_type"));
   const auto scale = json_i64(field(expr, "scale"));
   const auto precision = json_i64(field(expr, "precision"));
   const auto type_scale = json_i64(field(expr, "type_scale"));
   const auto type_precision = json_i64(field(expr, "type_precision"));
+
+  auto& ctx = hdk::ir::Context::defaultCtx();
+  auto lit_type = buildType(ctx, type_name, false, precision, scale);
+  auto target_type = buildType(ctx, target_type_name, false, type_precision, type_scale);
+
   if (literal.IsNull()) {
-    return hdk::ir::makeExpr<hdk::ir::Constant>(target_type, true, Datum{0});
+    return hdk::ir::makeExpr<hdk::ir::Constant>(
+        target_type->withNullable(true), true, Datum{0});
   }
 
-  auto lit_ti = build_type_info(type, scale, precision);
-  auto target_ti = build_type_info(target_type, type_scale, type_precision);
-  switch (type) {
-    case kINT:
-    case kBIGINT: {
+  switch (lit_type->id()) {
+    case hdk::ir::Type::kInteger: {
       Datum d;
       d.bigintval = json_i64(literal);
-      return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
-    case kDECIMAL: {
+    case hdk::ir::Type::kDecimal: {
       int64_t val = json_i64(literal);
-      if (target_ti.is_fp() && !scale) {
-        return make_fp_constant(val, target_ti);
+      if (target_type->isFloatingPoint() && !scale) {
+        return make_fp_constant(val, target_type);
       }
       auto lit_expr = scale ? Analyzer::analyzeFixedPtValue(val, scale, precision)
                             : Analyzer::analyzeIntValue(val);
-      return lit_ti != target_ti ? lit_expr->add_cast(target_ti) : lit_expr;
+      return lit_type->equal(target_type) ? lit_expr : lit_expr->add_cast(target_type);
     }
-    case kTEXT: {
+    case hdk::ir::Type::kText: {
       return Analyzer::analyzeStringValue(json_str(literal));
     }
-    case kBOOLEAN: {
+    case hdk::ir::Type::kBoolean: {
       Datum d;
       d.boolval = json_bool(literal);
-      return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
-    case kDOUBLE: {
+    case hdk::ir::Type::kFloatingPoint: {
       Datum d;
       if (literal.IsDouble()) {
         d.doubleval = json_double(literal);
@@ -936,39 +929,38 @@ hdk::ir::ExprPtr parseLiteral(const rapidjson::Value& expr) {
       } else {
         UNREACHABLE() << "Unhandled type: " << literal.GetType();
       }
-      auto lit_expr = hdk::ir::makeExpr<hdk::ir::Constant>(kDOUBLE, false, d);
-      return lit_ti != target_ti ? lit_expr->add_cast(target_ti) : lit_expr;
+      auto lit_expr = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.fp64(false), false, d);
+      return lit_type->equal(target_type) ? lit_expr : lit_expr->add_cast(target_type);
     }
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH: {
+    case hdk::ir::Type::kInterval: {
       Datum d;
       d.bigintval = json_i64(literal);
-      return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
-    case kTIME:
-    case kTIMESTAMP: {
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp: {
       Datum d;
-      d.bigintval = type == kTIMESTAMP && precision > 0 ? json_i64(literal)
-                                                        : json_i64(literal) / 1000;
-      return hdk::ir::makeExpr<hdk::ir::Constant>(
-          SQLTypeInfo(type, precision, 0, false), false, d);
+      d.bigintval = lit_type->isTimestamp() && precision > 0 ? json_i64(literal)
+                                                             : json_i64(literal) / 1000;
+      return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
-    case kDATE: {
+    case hdk::ir::Type::kDate: {
       Datum d;
       d.bigintval = json_i64(literal) * 24 * 3600;
-      return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
-    case kNULLT: {
-      if (target_ti.is_array()) {
+    case hdk::ir::Type::kNull: {
+      if (target_type->isArray()) {
         hdk::ir::ExprPtrVector args;
         // defaulting to valid sub-type for convenience
-        target_ti.set_subtype(kBOOLEAN);
-        return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(target_ti, args, true);
+        target_type =
+            target_type->as<hdk::ir::ArrayBaseType>()->withElemType(ctx.boolean());
+        return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(target_type, args, true);
       }
       return hdk::ir::makeExpr<hdk::ir::Constant>(target_type, true, Datum{0});
     }
     default: {
-      LOG(FATAL) << "Unexpected literal type " << lit_ti.get_type_name();
+      LOG(FATAL) << "Unexpected literal type " << lit_type->toString();
     }
   }
   return nullptr;
@@ -1024,41 +1016,47 @@ hdk::ir::ExprPtrVector parseWindowOrderExprs(const rapidjson::Value& arr,
   return exprs;
 }
 
-hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const SQLTypeInfo& ti) {
+hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type* type) {
+  auto& ctx = type->ctx();
   switch (op) {
     case kCAST: {
-      CHECK_NE(kNULLT, ti.get_type());
-      const auto& arg_ti = arg->get_type_info();
-      if (arg_ti.is_string() && ti.is_string()) {
+      CHECK(!type->isNull());
+      const auto& arg_type = arg->type();
+      if ((arg_type->isString() || arg_type->isExtDictionary()) &&
+          (type->isString() || type->isExtDictionary())) {
         return arg;
       }
-      if (ti.is_time() || arg_ti.is_string()) {
+      if (type->isDateTime() || arg_type->isString() || arg_type->isExtDictionary()) {
         // TODO(alex): check and unify with the rest of the cases
         // Do not propogate encoding on small dates
-        return ti.is_date_in_days() ? arg->add_cast(SQLTypeInfo(kDATE, false))
-                                    : arg->add_cast(ti);
+        if (type->isDate() &&
+            type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) {
+          return arg->add_cast(ctx.time64(hdk::ir::TimeUnit::kSecond));
+        }
+        return arg->add_cast(type);
       }
-      if (!arg_ti.is_string() && ti.is_string()) {
-        return arg->add_cast(ti);
+      if (!(arg_type->isString() || arg_type->isExtDictionary()) &&
+          (type->isString() || type->isExtDictionary())) {
+        return arg->add_cast(type);
       }
-      return std::make_shared<hdk::ir::UOper>(ti, false, op, arg);
+      return std::make_shared<hdk::ir::UOper>(type, false, op, arg);
     }
     case kNOT:
     case kISNULL: {
-      return std::make_shared<hdk::ir::UOper>(kBOOLEAN, op, arg);
+      return std::make_shared<hdk::ir::UOper>(ctx.boolean(), op, arg);
     }
     case kISNOTNULL: {
-      auto is_null = std::make_shared<hdk::ir::UOper>(kBOOLEAN, kISNULL, arg);
-      return std::make_shared<hdk::ir::UOper>(kBOOLEAN, kNOT, is_null);
+      auto is_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kISNULL, arg);
+      return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kNOT, is_null);
     }
     case kMINUS: {
-      return std::make_shared<hdk::ir::UOper>(arg->get_type_info(), false, kUMINUS, arg);
+      return std::make_shared<hdk::ir::UOper>(arg->type(), false, kUMINUS, arg);
     }
     case kUNNEST: {
-      const auto& arg_ti = arg->get_type_info();
-      CHECK(arg_ti.is_array());
+      const auto& arg_type = arg->type();
+      CHECK(arg_type->isArray());
       return hdk::ir::makeExpr<hdk::ir::UOper>(
-          arg_ti.get_elem_type(), false, kUNNEST, arg);
+          arg_type->as<hdk::ir::ArrayBaseType>()->elemType(), false, kUNNEST, arg);
     }
     default:
       CHECK(false);
@@ -1068,7 +1066,7 @@ hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const SQLTypeInfo& t
 
 hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
                                    const hdk::ir::ExprPtrVector& operands,
-                                   const SQLTypeInfo& ti) {
+                                   const hdk::ir::Type* type) {
   if (op != kPLUS && op != kMINUS) {
     return nullptr;
   }
@@ -1078,77 +1076,85 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
 
   auto& lhs = operands[0];
   auto& rhs = operands[1];
-  auto& lhs_ti = lhs->get_type_info();
-  auto& rhs_ti = rhs->get_type_info();
-  if (!lhs_ti.is_timestamp() && !lhs_ti.is_date()) {
-    if (lhs_ti.get_type() == kTIME) {
+  auto lhs_type = lhs->type();
+  auto rhs_type = rhs->type();
+  if (!lhs_type->isTimestamp() && !lhs_type->isDate()) {
+    if (lhs_type->isTime()) {
       throw std::runtime_error("DateTime addition/subtraction not supported for TIME.");
     }
     return nullptr;
   }
-  if (rhs_ti.get_type() == kTIMESTAMP || rhs_ti.get_type() == kDATE) {
-    if (lhs_ti.is_high_precision_timestamp() || rhs_ti.is_high_precision_timestamp()) {
+  if (rhs_type->isTimestamp() || rhs_type->isDate()) {
+    if (lhs_type->as<hdk::ir::DateTimeBaseType>()->unit() > hdk::ir::TimeUnit::kSecond ||
+        rhs_type->as<hdk::ir::DateTimeBaseType>()->unit() > hdk::ir::TimeUnit::kSecond) {
       throw std::runtime_error(
           "High Precision timestamps are not supported for TIMESTAMPDIFF operation. "
           "Use "
           "DATEDIFF.");
     }
-    auto bigint_ti = SQLTypeInfo(kBIGINT, false);
-    const auto datediff_field =
-        (ti.get_type() == kINTERVAL_DAY_TIME) ? dtSECOND : dtMONTH;
-    auto result =
-        hdk::ir::makeExpr<hdk::ir::DatediffExpr>(bigint_ti, datediff_field, rhs, lhs);
-    // multiply 1000 to result since expected result should be in millisecond precision.
-    if (ti.get_type() == kINTERVAL_DAY_TIME) {
+    auto bigint_type = type->ctx().int64(false);
+
+    CHECK(op == kMINUS);
+    CHECK(type->isInterval());
+    auto res_unit = type->as<hdk::ir::IntervalType>()->unit();
+    if (res_unit == hdk::ir::TimeUnit::kMilli) {
+      auto result =
+          hdk::ir::makeExpr<hdk::ir::DatediffExpr>(bigint_type, dtSECOND, rhs, lhs);
+      // multiply 1000 to result since expected result should be in millisecond precision.
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
-          bigint_ti.get_type(),
+          bigint_type,
           kMULTIPLY,
           kONE,
           result,
-          hdk::ir::Constant::make(bigint_ti, 1000));
+          hdk::ir::Constant::make(bigint_type, 1000));
+
+    } else if (res_unit == hdk::ir::TimeUnit::kMilli) {
+      return hdk::ir::makeExpr<hdk::ir::DatediffExpr>(bigint_type, dtMONTH, rhs, lhs);
+
     } else {
-      return result;
+      throw std::runtime_error("Unexpected DATEDIFF result type" + type->toString());
     }
   }
   if (op == kPLUS) {
     auto dt_plus =
-        hdk::ir::makeExpr<hdk::ir::FunctionOper>(lhs_ti, "DATETIME_PLUS", operands);
+        hdk::ir::makeExpr<hdk::ir::FunctionOper>(lhs_type, "DATETIME_PLUS", operands);
     const auto date_trunc = rewrite_to_date_trunc(dt_plus.get());
     if (date_trunc) {
       return date_trunc;
     }
   }
   const auto interval = fold_expr(rhs.get());
-  auto interval_ti = interval->get_type_info();
-  auto bigint_ti = SQLTypeInfo(kBIGINT, false);
+  auto interval_type = interval->type()->as<hdk::ir::IntervalType>();
+  CHECK(interval_type);
+  auto bigint_type = type->ctx().int64(false);
   const auto interval_lit = std::dynamic_pointer_cast<hdk::ir::Constant>(interval);
-  if (interval_ti.get_type() == kINTERVAL_DAY_TIME) {
+  if (interval_type->unit() == hdk::ir::TimeUnit::kMilli) {
     hdk::ir::ExprPtr interval_sec;
     if (interval_lit) {
       interval_sec = hdk::ir::Constant::make(
-          bigint_ti,
+          bigint_type,
           (op == kMINUS ? -interval_lit->get_constval().bigintval
                         : interval_lit->get_constval().bigintval) /
               1000);
     } else {
       interval_sec =
-          hdk::ir::makeExpr<hdk::ir::BinOper>(bigint_ti.get_type(),
+          hdk::ir::makeExpr<hdk::ir::BinOper>(bigint_type,
                                               kDIVIDE,
                                               kONE,
                                               interval,
-                                              hdk::ir::Constant::make(bigint_ti, 1000));
+                                              hdk::ir::Constant::make(bigint_type, 1000));
       if (op == kMINUS) {
         interval_sec =
-            std::make_shared<hdk::ir::UOper>(bigint_ti, false, kUMINUS, interval_sec);
+            std::make_shared<hdk::ir::UOper>(bigint_type, false, kUMINUS, interval_sec);
       }
     }
-    return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_ti, daSECOND, interval_sec, lhs);
+    return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_type, daSECOND, interval_sec, lhs);
   }
-  CHECK(interval_ti.get_type() == kINTERVAL_YEAR_MONTH);
-  const auto interval_months =
-      op == kMINUS ? std::make_shared<hdk::ir::UOper>(bigint_ti, false, kUMINUS, interval)
-                   : interval;
-  return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_ti, daMONTH, interval_months, lhs);
+  CHECK(interval_type->unit() == hdk::ir::TimeUnit::kMonth);
+  const auto interval_months = op == kMINUS ? std::make_shared<hdk::ir::UOper>(
+                                                  bigint_type, false, kUMINUS, interval)
+                                            : interval;
+  return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_type, daMONTH, interval_months, lhs);
 }
 
 std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
@@ -1206,7 +1212,7 @@ bool supportedUpperBound(const WindowBound& window_bound,
 hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
                                      const std::string& op_name,
                                      const hdk::ir::ExprPtrVector& operands,
-                                     SQLTypeInfo ti,
+                                     const hdk::ir::Type* type,
                                      int db_id,
                                      SchemaProviderPtr schema_provider,
                                      RelAlgDagBuilder& root_dag_builder,
@@ -1220,8 +1226,8 @@ hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
   const auto collation = parseWindowOrderCollation(order_keys_arr);
   const auto kind = parse_window_function_kind(op_name);
   // Adjust type for SUM window function.
-  if (kind == SqlWindowFunctionKind::SUM_INTERNAL && ti.is_integer()) {
-    ti = SQLTypeInfo(kBIGINT, ti.get_notnull());
+  if (kind == SqlWindowFunctionKind::SUM_INTERNAL && type->isInteger()) {
+    type = type->ctx().int64(type->nullable());
   }
   const auto lower_bound = parse_window_bound(field(json_expr, "lower_bound"),
                                               db_id,
@@ -1234,7 +1240,7 @@ hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
                                               root_dag_builder,
                                               ra_output);
   bool is_rows = json_bool(field(json_expr, "is_rows"));
-  ti.set_notnull(false);
+  type = type->withNullable(true);
 
   if (!supportedLowerBound(lower_bound) ||
       !supportedUpperBound(upper_bound, kind, order_keys) ||
@@ -1244,11 +1250,11 @@ hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
 
   if (window_function_is_value(kind)) {
     CHECK_GE(operands.size(), 1u);
-    ti = operands[0]->get_type_info();
+    type = operands[0]->type();
   }
 
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(
-      ti, kind, operands, partition_keys, order_keys, collation);
+      type, kind, operands, partition_keys, order_keys, collation);
 }
 
 hdk::ir::ExprPtr parseLike(const std::string& fn_name,
@@ -1308,6 +1314,7 @@ hdk::ir::ExprPtr parseExtract(const std::string& fn_name,
 
 hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(3));
+  auto& ctx = operands[0]->type()->ctx();
   auto& timeunit = operands[0];
   auto timeunit_lit = dynamic_cast<const hdk::ir::Constant*>(timeunit.get());
   validateDatetimeDatepartArgument(timeunit_lit);
@@ -1316,16 +1323,18 @@ hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   if (number_units_const && number_units_const->get_is_null()) {
     throw std::runtime_error("The 'Interval' argument literal must not be 'null'.");
   }
-  auto cast_number_units = number_units->add_cast(SQLTypeInfo(kBIGINT, false));
+  auto cast_number_units = number_units->add_cast(ctx.int64());
   auto& datetime = operands[2];
-  auto& datetime_ti = datetime->get_type_info();
-  if (datetime_ti.get_type() == kTIME) {
+  auto datetime_type = datetime->type();
+  if (datetime_type->isTime()) {
     throw std::runtime_error("DateAdd operation not supported for TIME.");
   }
   auto field = to_dateadd_field(*timeunit_lit->get_constval().stringval);
-  int dim = datetime_ti.get_dimension();
+  auto unit = datetime_type->isTimestamp()
+                  ? datetime_type->as<hdk::ir::TimestampType>()->unit()
+                  : hdk::ir::TimeUnit::kSecond;
   return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(
-      SQLTypeInfo(kTIMESTAMP, dim, 0, false), field, cast_number_units, datetime);
+      ctx.timestamp(unit), field, cast_number_units, datetime);
 }
 
 hdk::ir::ExprPtr parseDatediff(const hdk::ir::ExprPtrVector& operands) {
@@ -1337,7 +1346,7 @@ hdk::ir::ExprPtr parseDatediff(const hdk::ir::ExprPtrVector& operands) {
   auto& end = operands[2];
   auto field = to_datediff_field(*timeunit_lit->get_constval().stringval);
   return hdk::ir::makeExpr<hdk::ir::DatediffExpr>(
-      SQLTypeInfo(kBIGINT, false), field, start, end);
+      start->type()->ctx().int64(), field, start, end);
 }
 
 hdk::ir::ExprPtr parseDatepart(const hdk::ir::ExprPtrVector& operands) {
@@ -1360,8 +1369,8 @@ hdk::ir::ExprPtr parseLength(const std::string& fn_name,
 
 hdk::ir::ExprPtr parseKeyForString(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(1));
-  auto& arg_ti = operands[0]->get_type_info();
-  if (!arg_ti.is_string() || arg_ti.is_varlen()) {
+  auto arg_type = operands[0]->type();
+  if (!arg_type->isExtDictionary()) {
     throw std::runtime_error("KEY_FOR_STRING expects a dictionary encoded text column.");
   }
   return hdk::ir::makeExpr<hdk::ir::KeyForStringExpr>(operands[0]);
@@ -1373,20 +1382,20 @@ hdk::ir::ExprPtr parseWidthBucket(const hdk::ir::ExprPtrVector& operands) {
   auto lower_bound = operands[1];
   auto upper_bound = operands[2];
   auto partition_count = operands[3];
-  if (!partition_count->get_type_info().is_integer()) {
+  if (!partition_count->type()->isInteger()) {
     throw std::runtime_error(
         "PARTITION_COUNT expression of width_bucket function expects an integer type.");
   }
   auto check_numeric_type =
       [](const std::string& col_name, const hdk::ir::Expr* expr, bool allow_null_type) {
-        if (expr->get_type_info().get_type() == kNULLT) {
+        if (expr->type()->isNull()) {
           if (!allow_null_type) {
             throw std::runtime_error(
                 col_name + " expression of width_bucket function expects non-null type.");
           }
           return;
         }
-        if (!expr->get_type_info().is_number()) {
+        if (!expr->type()->isNumber()) {
           throw std::runtime_error(
               col_name + " expression of width_bucket function expects a numeric type.");
         }
@@ -1397,10 +1406,9 @@ hdk::ir::ExprPtr parseWidthBucket(const hdk::ir::ExprPtrVector& operands) {
   check_numeric_type("UPPER_BOUND", upper_bound.get(), false);
 
   auto cast_to_double_if_necessary = [](hdk::ir::ExprPtr arg) {
-    const auto& arg_ti = arg->get_type_info();
-    if (arg_ti.get_type() != kDOUBLE) {
-      const auto& double_ti = SQLTypeInfo(kDOUBLE, arg_ti.get_notnull());
-      return arg->add_cast(double_ti);
+    const auto& arg_type = arg->type();
+    if (!arg_type->isFp64()) {
+      return arg->add_cast(arg_type->ctx().fp64(arg_type->nullable()));
     }
     return arg;
   };
@@ -1414,10 +1422,9 @@ hdk::ir::ExprPtr parseWidthBucket(const hdk::ir::ExprPtrVector& operands) {
 hdk::ir::ExprPtr parseSampleRatio(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(1));
   auto arg = operands[0];
-  auto& arg_ti = operands[0]->get_type_info();
-  if (arg_ti.get_type() != kDOUBLE) {
-    const auto& double_ti = SQLTypeInfo(kDOUBLE, arg_ti.get_notnull());
-    arg = arg->add_cast(double_ti);
+  auto arg_type = operands[0]->type();
+  if (!arg_type->isFp64()) {
+    arg = arg->add_cast(arg_type->ctx().fp64(arg_type->nullable()));
   }
   return hdk::ir::makeExpr<hdk::ir::SampleRatioExpr>(arg);
 }
@@ -1429,7 +1436,7 @@ hdk::ir::ExprPtr parseCurrentUser() {
 
 hdk::ir::ExprPtr parseLower(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(1));
-  if (operands[0]->get_type_info().is_dict_encoded_string() ||
+  if (operands[0]->type()->isExtDictionary() ||
       dynamic_cast<const hdk::ir::Constant*>(operands[0].get())) {
     return hdk::ir::makeExpr<hdk::ir::LowerExpr>(operands[0]);
   }
@@ -1440,25 +1447,26 @@ hdk::ir::ExprPtr parseLower(const hdk::ir::ExprPtrVector& operands) {
 
 hdk::ir::ExprPtr parseCardinality(const std::string& fn_name,
                                   const hdk::ir::ExprPtrVector& operands,
-                                  const SQLTypeInfo& ti) {
+                                  const hdk::ir::Type* type) {
   CHECK_EQ(operands.size(), size_t(1));
   auto& arg = operands[0];
-  auto& arg_ti = arg->get_type_info();
-  if (!arg_ti.is_array()) {
+  auto arg_type = arg->type();
+  if (!arg_type->isArray()) {
     throw std::runtime_error(fn_name + " expects an array expression.");
   }
-  if (arg_ti.get_subtype() == kARRAY) {
+  auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  if (elem_type->isArray()) {
     throw std::runtime_error(fn_name + " expects one-dimension array expression.");
   }
-  auto array_size = arg_ti.get_size();
-  auto array_elem_size = arg_ti.get_elem_type().get_array_context_logical_size();
+  auto array_size = arg_type->size();
+  auto array_elem_size = elem_type->isString() ? 4 : hdk::ir::logicalSize(elem_type);
 
   if (array_size > 0) {
     if (array_elem_size <= 0) {
       throw std::runtime_error(fn_name + ": unexpected array element type.");
     }
     // Return cardinality of a fixed length array
-    return hdk::ir::Constant::make(ti, array_size / array_elem_size);
+    return hdk::ir::Constant::make(type, array_size / array_elem_size);
   }
   // Variable length array cardinality will be calculated at runtime
   return hdk::ir::makeExpr<hdk::ir::CardinalityExpr>(arg);
@@ -1468,28 +1476,42 @@ hdk::ir::ExprPtr parseItem(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(2));
   auto& base = operands[0];
   auto& index = operands[1];
+  CHECK(base->type()->isArray());
   return hdk::ir::makeExpr<hdk::ir::BinOper>(
-      base->get_type_info().get_elem_type(), false, kARRAY_AT, kONE, base, index);
+      base->type()->as<hdk::ir::ArrayBaseType>()->elemType(),
+      false,
+      kARRAY_AT,
+      kONE,
+      base,
+      index);
 }
 
 hdk::ir::ExprPtr parseCurrentDate(time_t now) {
-  constexpr bool is_null = false;
   Datum datum;
   datum.bigintval = now - now % (24 * 60 * 60);  // Assumes 0 < now.
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kDATE, is_null, datum);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().date64(hdk::ir::TimeUnit::kSecond, false),
+      false,
+      datum);
 }
 
 hdk::ir::ExprPtr parseCurrentTime(time_t now) {
-  constexpr bool is_null = false;
   Datum datum;
   datum.bigintval = now % (24 * 60 * 60);  // Assumes 0 < now.
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kTIME, is_null, datum);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().time64(hdk::ir::TimeUnit::kSecond, false),
+      false,
+      datum);
 }
 
 hdk::ir::ExprPtr parseCurrentTimestamp(time_t now) {
   Datum d;
   d.bigintval = now;
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kTIMESTAMP, false, d, false);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().timestamp(hdk::ir::TimeUnit::kSecond, false),
+      false,
+      d,
+      false);
 }
 
 hdk::ir::ExprPtr parseDatetime(const hdk::ir::ExprPtrVector& operands, time_t now) {
@@ -1499,7 +1521,7 @@ hdk::ir::ExprPtr parseDatetime(const hdk::ir::ExprPtrVector& operands, time_t no
   if (!arg_lit || arg_lit->get_is_null()) {
     throw std::runtime_error(datetime_err);
   }
-  CHECK(arg_lit->get_type_info().is_string());
+  CHECK(arg_lit->type()->isString() || arg_lit->type()->isExtDictionary());
   if (*arg_lit->get_constval().stringval != "NOW"sv) {
     throw std::runtime_error(datetime_err);
   }
@@ -1507,7 +1529,7 @@ hdk::ir::ExprPtr parseDatetime(const hdk::ir::ExprPtrVector& operands, time_t no
 }
 
 hdk::ir::ExprPtr parseHPTLiteral(const hdk::ir::ExprPtrVector& operands,
-                                 const SQLTypeInfo& ti) {
+                                 const hdk::ir::Type* type) {
   /* since calcite uses Avatica package called DateTimeUtils to parse timestamp strings.
      Therefore any string having fractional seconds more 3 places after the decimal
      (milliseconds) will get truncated to 3 decimal places, therefore we lose precision
@@ -1516,33 +1538,32 @@ hdk::ir::ExprPtr parseHPTLiteral(const hdk::ir::ExprPtrVector& operands,
   */
   CHECK_EQ(operands.size(), size_t(1));
   auto& arg = operands[0];
-  auto& arg_ti = arg->get_type_info();
-  if (!arg_ti.is_string()) {
+  auto arg_type = arg->type();
+  if (!arg_type->isString() && !arg_type->isExtDictionary()) {
     throw std::runtime_error(
         "High precision timestamp cast argument must be a string. Input type is: " +
-        arg_ti.get_type_name());
-  } else if (!ti.is_high_precision_timestamp()) {
+        arg_type->toString());
+  } else if (!type->isTimestamp()) {
     throw std::runtime_error(
         "Cast target type should be high precision timestamp. Input type is: " +
-        ti.get_type_name());
-  } else if (ti.get_dimension() != 6 && ti.get_dimension() != 9) {
+        type->toString());
+  } else if (type->as<hdk::ir::TimestampType>()->unit() < hdk::ir::TimeUnit::kMicro) {
     throw std::runtime_error(
-        "Cast target type should be TIMESTAMP(6|9). Input type is: TIMESTAMP(" +
-        std::to_string(ti.get_dimension()) + ")");
+        "Cast target type should be TIMESTAMP(6|9). Input type is: " + type->toString());
   }
 
-  return arg->add_cast(ti);
+  return arg->add_cast(type);
 }
 
 hdk::ir::ExprPtr parseAbs(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(1));
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> expr_list;
   auto& arg = operands[0];
-  auto& arg_ti = arg->get_type_info();
-  CHECK(arg_ti.is_number());
-  auto zero = hdk::ir::Constant::make(arg_ti, 0);
+  auto arg_type = arg->type();
+  CHECK(arg_type->isNumber());
+  auto zero = hdk::ir::Constant::make(arg_type, 0);
   auto lt_zero = Analyzer::normalizeOperExpr(kLT, kONE, arg, zero);
-  auto uminus_operand = hdk::ir::makeExpr<hdk::ir::UOper>(arg_ti, false, kUMINUS, arg);
+  auto uminus_operand = hdk::ir::makeExpr<hdk::ir::UOper>(arg_type, false, kUMINUS, arg);
   expr_list.emplace_back(lt_zero, uminus_operand);
   return Analyzer::normalizeCaseExpr(expr_list, arg, nullptr);
 }
@@ -1551,28 +1572,29 @@ hdk::ir::ExprPtr parseSign(const hdk::ir::ExprPtrVector& operands) {
   CHECK_EQ(operands.size(), size_t(1));
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> expr_list;
   auto& arg = operands[0];
-  auto& arg_ti = arg->get_type_info();
-  CHECK(arg_ti.is_number());
+  auto arg_type = arg->type();
+  CHECK(arg_type->isNumber());
   // For some reason, Rex based DAG checker marks SIGN as non-cacheable.
   // To duplicate this behavior with no Rex, non-cacheable zero constant
   // is used here.
   // TODO: revise this part in checker and probably remove this flag here.
-  const auto zero = hdk::ir::Constant::make(arg_ti, 0, false);
+  const auto zero = hdk::ir::Constant::make(arg_type, 0, false);
+  auto bool_type = arg_type->ctx().boolean(arg_type->nullable());
   const auto lt_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(kBOOLEAN, kLT, kONE, arg, zero);
-  expr_list.emplace_back(lt_zero, hdk::ir::Constant::make(arg_ti, -1));
+      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kLT, kONE, arg, zero);
+  expr_list.emplace_back(lt_zero, hdk::ir::Constant::make(arg_type, -1));
   const auto eq_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(kBOOLEAN, kEQ, kONE, arg, zero);
-  expr_list.emplace_back(eq_zero, hdk::ir::Constant::make(arg_ti, 0));
+      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kEQ, kONE, arg, zero);
+  expr_list.emplace_back(eq_zero, hdk::ir::Constant::make(arg_type, 0));
   const auto gt_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(kBOOLEAN, kGT, kONE, arg, zero);
-  expr_list.emplace_back(gt_zero, hdk::ir::Constant::make(arg_ti, 1));
+      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kGT, kONE, arg, zero);
+  expr_list.emplace_back(gt_zero, hdk::ir::Constant::make(arg_type, 1));
   return Analyzer::normalizeCaseExpr(expr_list, nullptr, nullptr);
 }
 
 hdk::ir::ExprPtr parseRound(const std::string& fn_name,
                             const hdk::ir::ExprPtrVector& operands,
-                            const SQLTypeInfo& ti) {
+                            const hdk::ir::Type* type) {
   auto args = operands;
 
   if (args.size() == 1) {
@@ -1580,93 +1602,80 @@ hdk::ir::ExprPtr parseRound(const std::string& fn_name,
     // this needs to be done as calcite returns
     // only the 1st operand without defaulting the 2nd one
     // when the user did not specify the 2nd operand.
-    SQLTypes t = kSMALLINT;
     Datum d;
     d.smallintval = 0;
-    args.push_back(hdk::ir::makeExpr<hdk::ir::Constant>(t, false, d));
+    args.push_back(
+        hdk::ir::makeExpr<hdk::ir::Constant>(type->ctx().int16(false), false, d));
   }
 
   // make sure we have only 2 operands
   CHECK(args.size() == 2);
 
-  if (!args[0]->get_type_info().is_number()) {
+  if (!args[0]->type()->isNumber()) {
     throw std::runtime_error("Only numeric 1st operands are supported");
   }
 
   // the 2nd operand does not need to be a constant
   // it can happily reference another integer column
-  if (!args[1]->get_type_info().is_integer()) {
+  if (!args[1]->type()->isInteger()) {
     throw std::runtime_error("Only integer 2nd operands are supported");
   }
 
   // Calcite may upcast decimals in a way that is
   // incompatible with the extension function input. Play it safe and stick with the
   // argument type instead.
-  const SQLTypeInfo ret_ti =
-      args[0]->get_type_info().is_decimal() ? args[0]->get_type_info() : ti;
+  auto ret_type = args[0]->type()->isDecimal() ? args[0]->type() : type;
 
   return hdk::ir::makeExpr<hdk::ir::FunctionOperWithCustomTypeHandling>(
-      ret_ti, fn_name, args);
+      ret_type, fn_name, args);
 }
 
 hdk::ir::ExprPtr parseArrayFunction(const hdk::ir::ExprPtrVector& operands,
-                                    const SQLTypeInfo& ti) {
-  if (ti.get_subtype() == kNULLT) {
-    auto res_type = ti;
-    CHECK(res_type.get_type() == kARRAY);
-
+                                    const hdk::ir::Type* type) {
+  if (type->isArray()) {
     // FIX-ME:  Deal with NULL arrays
     if (operands.size() > 0) {
       const auto first_element_logical_type =
-          get_nullable_logical_type_info(operands[0]->get_type_info());
+          hdk::ir::logicalType(operands[0]->type())->withNullable(true);
 
       auto diff_elem_itr =
           std::find_if(operands.begin(),
                        operands.end(),
                        [first_element_logical_type](const auto expr) {
-                         return first_element_logical_type !=
-                                get_nullable_logical_type_info(expr->get_type_info());
+                         return !first_element_logical_type->equal(
+                             hdk::ir::logicalType(expr->type())->withNullable(true));
                        });
       if (diff_elem_itr != operands.end()) {
         throw std::runtime_error(
             "Element " + std::to_string(diff_elem_itr - operands.begin()) +
             " is not of the same type as other elements of the array. Consider casting "
             "to force this condition.\nElement Type: " +
-            get_nullable_logical_type_info((*diff_elem_itr)->get_type_info())
-                .to_string() +
-            "\nArray type: " + first_element_logical_type.to_string());
+            hdk::ir::logicalType((*diff_elem_itr)->type())
+                ->withNullable(true)
+                ->toString() +
+            "\nArray type: " + first_element_logical_type->toString());
       }
 
-      if (first_element_logical_type.is_string() &&
-          !first_element_logical_type.is_dict_encoded_string()) {
-        res_type.set_subtype(first_element_logical_type.get_type());
-        res_type.set_compression(kENCODING_FIXED);
-      } else if (first_element_logical_type.is_dict_encoded_string()) {
-        res_type.set_subtype(first_element_logical_type.get_type());
-        res_type.set_comp_param(TRANSIENT_DICT_ID);
-      } else {
-        res_type.set_subtype(first_element_logical_type.get_type());
-        res_type.set_scale(first_element_logical_type.get_scale());
-        res_type.set_precision(first_element_logical_type.get_precision());
-      }
-
+      auto res_type =
+          type->as<hdk::ir::ArrayBaseType>()->withElemType(first_element_logical_type);
       return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(res_type, operands);
     } else {
       // defaulting to valid sub-type for convenience
-      res_type.set_subtype(kBOOLEAN);
+      auto res_type =
+          type->as<hdk::ir::ArrayBaseType>()->withElemType(type->ctx().boolean());
       return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(res_type, operands);
     }
   } else {
-    return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(ti, operands);
+    return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(type, operands);
   }
 }
 
 hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
                                        const hdk::ir::ExprPtrVector operands,
-                                       const SQLTypeInfo& ti,
+                                       const hdk::ir::Type* type,
                                        RelAlgDagBuilder& root_dag_builder) {
   if (fn_name == "PG_ANY"sv || fn_name == "PG_ALL"sv) {
-    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ti, fn_name, operands);
+    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(type, fn_name, operands);
   }
   if (fn_name == "LIKE"sv || fn_name == "PG_ILIKE"sv) {
     return parseLike(fn_name, operands);
@@ -1712,7 +1721,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
     return parseLower(operands);
   }
   if (fn_name == "CARDINALITY"sv || fn_name == "ARRAY_LENGTH"sv) {
-    return parseCardinality(fn_name, operands, ti);
+    return parseCardinality(fn_name, operands, type);
   }
   if (fn_name == "ITEM"sv) {
     return parseItem(operands);
@@ -1733,7 +1742,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
     return parseDatetime(operands, root_dag_builder.now());
   }
   if (fn_name == "usTIMESTAMP"sv || fn_name == "nsTIMESTAMP"sv) {
-    return parseHPTLiteral(operands, ti);
+    return parseHPTLiteral(operands, type);
   }
   if (fn_name == "ABS"sv) {
     return parseAbs(operands);
@@ -1743,13 +1752,13 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   }
   if (fn_name == "CEIL"sv || fn_name == "FLOOR"sv) {
     return hdk::ir::makeExpr<hdk::ir::FunctionOperWithCustomTypeHandling>(
-        ti, fn_name, operands);
+        type, fn_name, operands);
   }
   if (fn_name == "ROUND"sv) {
-    return parseRound(fn_name, operands, ti);
+    return parseRound(fn_name, operands, type);
   }
   if (fn_name == "DATETIME_PLUS"sv) {
-    auto dt_plus = hdk::ir::makeExpr<hdk::ir::FunctionOper>(ti, fn_name, operands);
+    auto dt_plus = hdk::ir::makeExpr<hdk::ir::FunctionOper>(type, fn_name, operands);
     const auto date_trunc = rewrite_to_date_trunc(dt_plus.get());
     if (date_trunc) {
       return date_trunc;
@@ -1770,12 +1779,12 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   }
   if (fn_name == "ARRAY"sv) {
     // Var args; currently no check.  Possible fix-me -- can array have 0 elements?
-    return parseArrayFunction(operands, ti);
+    return parseArrayFunction(operands, type);
   }
 
   if (fn_name == "||"sv || fn_name == "SUBSTRING"sv) {
-    SQLTypeInfo ret_ti(kTEXT, false);
-    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ret_ti, fn_name, operands);
+    auto ret_type = type->ctx().text();
+    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ret_type, fn_name, operands);
   }
   // Reset possibly wrong return type of rex_function to the return
   // type of the optimal valid implementation. The return type can be
@@ -1783,7 +1792,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   // that have different return types but Calcite specifies the return
   // type according to the first implementation.
   auto args = operands;
-  SQLTypeInfo ret_ti;
+  const hdk::ir::Type* ret_type;
   try {
     auto ext_func_sig = bind_function(fn_name, args);
 
@@ -1792,14 +1801,14 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
     for (size_t i = 0; i < args.size(); i++) {
       // fold casts on constants
       if (auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(args[i])) {
-        auto ext_func_arg_ti = ext_arg_type_to_type_info(ext_func_args[i]);
-        if (ext_func_arg_ti != args[i]->get_type_info()) {
-          args[i] = constant->add_cast(ext_func_arg_ti);
+        auto ext_func_arg_type = ext_arg_type_to_type(type->ctx(), ext_func_args[i]);
+        if (!ext_func_arg_type->equal(args[i]->type())) {
+          args[i] = constant->add_cast(ext_func_arg_type);
         }
       }
     }
 
-    ret_ti = ext_arg_type_to_type_info(ext_func_sig.getRet());
+    ret_type = ext_arg_type_to_type(type->ctx(), ext_func_sig.getRet());
   } catch (ExtensionFunctionBindingError& e) {
     LOG(WARNING) << "RelAlgTranslator::translateFunction: " << e.what();
     throw;
@@ -1807,21 +1816,21 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
 
   // By default, the extension function type will not allow nulls. If one of the arguments
   // is nullable, the extension function must also explicitly allow nulls.
-  bool arguments_not_null = true;
+  bool nullable = false;
   for (const auto& arg_expr : args) {
-    if (!arg_expr->get_type_info().get_notnull()) {
-      arguments_not_null = false;
+    if (arg_expr->type()->nullable()) {
+      nullable = true;
       break;
     }
   }
-  ret_ti.set_notnull(arguments_not_null);
+  ret_type = ret_type->withNullable(nullable);
 
-  return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ret_ti, fn_name, std::move(args));
+  return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ret_type, fn_name, std::move(args));
 }
 
-bool isAggSupportedForType(const SQLAgg& agg_kind, const SQLTypeInfo& arg_ti) {
+bool isAggSupportedForType(const SQLAgg& agg_kind, const hdk::ir::Type* arg_type) {
   if ((agg_kind == kMIN || agg_kind == kMAX || agg_kind == kSUM || agg_kind == kAVG) &&
-      !(arg_ti.is_number() || arg_ti.is_boolean() || arg_ti.is_time())) {
+      !(arg_type->isNumber() || arg_type->isBoolean() || arg_type->isDateTime())) {
     return false;
   }
 
@@ -1831,6 +1840,7 @@ bool isAggSupportedForType(const SQLAgg& agg_kind, const SQLTypeInfo& arg_ti) {
 hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
                                     RelAlgDagBuilder& root_dag_builder,
                                     const hdk::ir::ExprPtrVector& sources) {
+  auto& ctx = hdk::ir::Context::defaultCtx();
   auto agg_str = json_str(field(json_expr, "agg"));
   if (agg_str == "APPROX_QUANTILE") {
     LOG(INFO) << "APPROX_QUANTILE is deprecated. Please use APPROX_PERCENTILE instead.";
@@ -1854,8 +1864,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
 
     if (agg_kind == kAPPROX_COUNT_DISTINCT && operands.size() == 2) {
       arg1 = std::dynamic_pointer_cast<hdk::ir::Constant>(sources[operands[1]]);
-      if (!arg1 || arg1->get_type_info().get_type() != kINT ||
-          arg1->get_constval().intval < 1 || arg1->get_constval().intval > 100) {
+      if (!arg1 || !arg1->type()->isInt32() || arg1->get_constval().intval < 1 ||
+          arg1->get_constval().intval > 100) {
         throw std::runtime_error(
             "APPROX_COUNT_DISTINCT's second parameter should be SMALLINT literal between "
             "1 and 100");
@@ -1865,23 +1875,23 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
       if (operands.size() == 2) {
         arg1 = std::dynamic_pointer_cast<hdk::ir::Constant>(
             std::dynamic_pointer_cast<hdk::ir::Constant>(sources[operands[1]])
-                ->add_cast(SQLTypeInfo(kDOUBLE)));
+                ->add_cast(ctx.fp64()));
       } else {
         Datum median;
         median.doubleval = 0.5;
-        arg1 = std::make_shared<hdk::ir::Constant>(kDOUBLE, false, median);
+        arg1 = std::make_shared<hdk::ir::Constant>(ctx.fp64(), false, median);
       }
     }
-    auto& arg_ti = arg_expr->get_type_info();
-    if (!isAggSupportedForType(agg_kind, arg_ti)) {
-      throw std::runtime_error("Aggregate on " + arg_ti.get_type_name() +
+    auto arg_type = arg_expr->type();
+    if (!isAggSupportedForType(agg_kind, arg_type)) {
+      throw std::runtime_error("Aggregate on " + arg_type->toString() +
                                " is not supported yet.");
     }
   }
-  auto agg_ti = get_agg_type(
+  auto agg_type = get_agg_type(
       agg_kind, arg_expr.get(), root_dag_builder.config().exec.group_by.bigint_count);
   return hdk::ir::makeExpr<hdk::ir::AggExpr>(
-      agg_ti, agg_kind, arg_expr, is_distinct, arg1);
+      agg_type, agg_kind, arg_expr, is_distinct, arg1);
 }
 
 hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
@@ -1900,37 +1910,35 @@ hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
   const auto type_it = json_expr.FindMember("type");
   CHECK(type_it != json_expr.MemberEnd());
   auto type = parseType(type_it->value);
-  auto ti = type->toTypeInfo();
 
   if (op == kIN && json_expr.HasMember("subquery")) {
     CHECK_EQ(operands.size(), (size_t)1);
     auto subquery =
         parse_subquery_expr(json_expr, db_id, schema_provider, root_dag_builder);
-    SQLTypeInfo ti(kBOOLEAN);
     return hdk::ir::makeExpr<hdk::ir::InSubquery>(
-        ti,
+        type->ctx().boolean(),
         operands[0],
         dynamic_cast<const hdk::ir::ScalarSubquery*>(subquery.get())->getNodeShared());
   } else if (json_expr.FindMember("partition_keys") != json_expr.MemberEnd()) {
     return parseWindowFunction(json_expr,
                                op_name,
                                operands,
-                               ti,
+                               type,
                                db_id,
                                schema_provider,
                                root_dag_builder,
                                ra_output);
 
   } else if (op == kFUNCTION) {
-    return parseFunctionOperator(op_name, operands, ti, root_dag_builder);
+    return parseFunctionOperator(op_name, operands, type, root_dag_builder);
   } else {
     CHECK_GE(operands.size(), (size_t)1);
 
     if (operands.size() == 1) {
-      return makeUOper(op, operands[0], ti);
+      return makeUOper(op, operands[0], type);
     }
 
-    if (auto res = maybeMakeDateExpr(op, operands, ti)) {
+    if (auto res = maybeMakeDateExpr(op, operands, type)) {
       return res;
     }
 
@@ -2170,7 +2178,7 @@ void create_compound(
       InputReplacementVisitor visitor(last_node, groupby_exprs);
       for (size_t group_idx = 0; group_idx < groupby_count; ++group_idx) {
         exprs.push_back(hdk::ir::makeExpr<hdk::ir::GroupColumnRef>(
-            groupby_exprs[group_idx]->get_type_info(), group_idx + 1));
+            groupby_exprs[group_idx]->type(), group_idx + 1));
       }
       for (auto& expr : ra_aggregate->getAggs()) {
         exprs.push_back(visitor.visit(expr.get()));
@@ -2641,7 +2649,7 @@ void separate_window_function_expressions(
             embedded_window_function_exprs.find(rex_idx);
         if (embedded_window_func_expr_pair == embedded_window_function_exprs.end()) {
           new_exprs.emplace_back(hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-              window_func_project_node->getExpr(rex_idx)->get_type_info(),
+              window_func_project_node->getExpr(rex_idx)->type(),
               window_func_project_node.get(),
               rex_idx));
         } else {
@@ -2653,7 +2661,7 @@ void separate_window_function_expressions(
 
           // Replace window func expr with ColumnRef
           auto window_func_result_input_expr =
-              hdk::ir::makeExpr<hdk::ir::ColumnRef>(window_func_expr->get_type_info(),
+              hdk::ir::makeExpr<hdk::ir::ColumnRef>(window_func_expr->type(),
                                                     window_func_project_node.get(),
                                                     window_func_expr_idx);
           std::unordered_map<const hdk::ir::Expr*, hdk::ir::ExprPtr> replacements;
@@ -2838,7 +2846,7 @@ int64_t get_int_literal_field(const rapidjson::Value& obj,
     return default_val;
   }
   auto expr = parseLiteral(it->value);
-  CHECK(expr->get_type_info().is_integer());
+  CHECK(expr->type()->isInteger());
   return dynamic_cast<const hdk::ir::Constant*>(expr.get())->intVal();
 }
 
@@ -3146,7 +3154,8 @@ class RelAlgDispatcher {
           TargetMetaInfo(tuple_type[0].get_resname(), table_func_input_exprs[0]->type());
     } else if (op_name.GetString() == "ct_binding_column2"s) {
       CHECK_EQ(tuple_type.size(), 1);
-      if (col_input_exprs[0]->get_type_info().is_string()) {
+      if (col_input_exprs[0]->type()->isString() ||
+          col_input_exprs[0]->type()->isExtDictionary()) {
         tuple_type[0] =
             TargetMetaInfo(tuple_type[0].get_resname(), col_input_exprs[0]->type());
       }
@@ -3543,17 +3552,17 @@ size_t RelCompound::toHash() const {
   return *hash_;
 }
 
-SQLTypeInfo getColumnType(const RelAlgNode* node, size_t col_idx) {
+const hdk::ir::Type* getColumnType(const RelAlgNode* node, size_t col_idx) {
   // By default use metainfo.
   const auto& metainfo = node->getOutputMetainfo();
   if (metainfo.size() > col_idx) {
-    return metainfo[col_idx].get_type_info();
+    return metainfo[col_idx].type();
   }
 
   // For scans we can use embedded column info.
   const auto scan = dynamic_cast<const RelScan*>(node);
   if (scan) {
-    return scan->getColumnType(col_idx)->toTypeInfo();
+    return scan->getColumnType(col_idx);
   }
 
   // For filter, sort and union we can propagate column type of
@@ -3569,7 +3578,7 @@ SQLTypeInfo getColumnType(const RelAlgNode* node, size_t col_idx) {
     if (col_idx < agg->getGroupByCount()) {
       return getColumnType(agg->getInput(0), col_idx);
     } else {
-      return agg->getAggs()[col_idx - agg->getGroupByCount()]->get_type_info();
+      return agg->getAggs()[col_idx - agg->getGroupByCount()]->type();
     }
   }
 
@@ -3577,25 +3586,26 @@ SQLTypeInfo getColumnType(const RelAlgNode* node, size_t col_idx) {
   const auto values = dynamic_cast<const RelLogicalValues*>(node);
   if (values) {
     CHECK_GT(values->size(), col_idx);
-    if (values->getTupleType()[col_idx].get_type_info().get_type() == kNULLT) {
+    auto type = values->getTupleType()[col_idx].type();
+    if (type->isNull()) {
       // replace w/ bigint
-      return SQLTypeInfo(kBIGINT, false);
+      return type->ctx().int64();
     }
-    return values->getTupleType()[col_idx].get_type_info();
+    return values->getTupleType()[col_idx].type();
   }
 
   // For table functions we can use its tuple type.
   const auto table_fn = dynamic_cast<const RelTableFunction*>(node);
   if (table_fn) {
     CHECK_GT(table_fn->size(), col_idx);
-    return table_fn->getTupleType()[col_idx].get_type_info();
+    return table_fn->getTupleType()[col_idx].type();
   }
 
   // For projections type can be extracted from Exprs.
   const auto proj = dynamic_cast<const RelProject*>(node);
   if (proj) {
     CHECK_GT(proj->getExprs().size(), col_idx);
-    return proj->getExprs()[col_idx]->get_type_info();
+    return proj->getExprs()[col_idx]->type();
   }
 
   // For joins we can propagate type from one of its sources.
@@ -3626,7 +3636,7 @@ SQLTypeInfo getColumnType(const RelAlgNode* node, size_t col_idx) {
   const auto compound = dynamic_cast<const RelCompound*>(node);
   if (compound) {
     CHECK_GT(compound->size(), col_idx);
-    return compound->getExprs()[col_idx]->get_type_info();
+    return compound->getExprs()[col_idx]->type();
   }
 
   CHECK(false) << "Missing output metainfo for node " + node->toString() +
@@ -3647,7 +3657,7 @@ hdk::ir::ExprPtrVector getInputExprsForAgg(const RelAlgNode* node) {
         res.emplace_back(expr);
       } else {
         res.emplace_back(
-            hdk::ir::makeExpr<hdk::ir::ColumnRef>(expr->get_type_info(), node, col_idx));
+            hdk::ir::makeExpr<hdk::ir::ColumnRef>(expr->type(), node, col_idx));
       }
     }
   } else if (is_one_of<RelLogicalValues, RelAggregate, RelLogicalUnion, RelTableFunction>(

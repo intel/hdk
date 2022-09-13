@@ -482,6 +482,10 @@ const Type* FixedLenArrayType::withNullable(bool nullable) const {
   return make(ctx_, num_elems_, elem_type_, nullable);
 }
 
+const ArrayBaseType* FixedLenArrayType::withElemType(const Type* elem_type) const {
+  return make(ctx_, num_elems_, elem_type, nullable_);
+}
+
 bool FixedLenArrayType::equal(const Type& other) const {
   if (!ArrayBaseType::equal(other)) {
     return false;
@@ -529,6 +533,10 @@ const VarLenArrayType* VarLenArrayType::make(Context& ctx,
 
 const Type* VarLenArrayType::withNullable(bool nullable) const {
   return make(ctx_, elem_type_, offs_size_, nullable);
+}
+
+const ArrayBaseType* VarLenArrayType::withElemType(const Type* elem_type) const {
+  return make(ctx_, elem_type, offs_size_, nullable_);
 }
 
 bool VarLenArrayType::equal(const Type& other) const {

@@ -194,12 +194,13 @@ namespace hdk::ir {
 
 class Constant;
 class Expr;
+class Type;
 
 }  // namespace hdk::ir
 
-SQLTypeInfo get_agg_type(const SQLAgg agg_kind,
-                         const hdk::ir::Expr* arg_expr,
-                         bool bigint_count);
+const hdk::ir::Type* get_agg_type(const SQLAgg agg_kind,
+                                  const hdk::ir::Expr* arg_expr,
+                                  bool bigint_count);
 
 ExtractField to_datepart_field(const std::string&);
 
@@ -208,6 +209,6 @@ DateaddField to_dateadd_field(const std::string&);
 DatetruncField to_datediff_field(const std::string&);
 
 std::shared_ptr<hdk::ir::Constant> make_fp_constant(const int64_t val,
-                                                    const SQLTypeInfo& ti);
+                                                    const hdk::ir::Type* type);
 
 #endif  // QUERYENGINE_CALCITEDESERIALIZERUTILS_H

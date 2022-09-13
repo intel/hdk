@@ -17,40 +17,42 @@
 #include "CalciteDeserializerUtils.h"
 
 #include "../Analyzer/Analyzer.h"
+#include "IR/Context.h"
+#include "IR/Type.h"
 #include "Logger/Logger.h"
 
 #include <boost/algorithm/string.hpp>
 
-SQLTypeInfo get_agg_type(const SQLAgg agg_kind,
-                         const hdk::ir::Expr* arg_expr,
-                         bool bigint_count) {
+const hdk::ir::Type* get_agg_type(const SQLAgg agg_kind,
+                                  const hdk::ir::Expr* arg_expr,
+                                  bool bigint_count) {
+  auto& ctx = arg_expr ? arg_expr->type()->ctx() : hdk::ir::Context::defaultCtx();
   switch (agg_kind) {
     case kCOUNT:
-      return SQLTypeInfo(bigint_count ? kBIGINT : kINT, false);
+      return ctx.integer(bigint_count ? 8 : 4);
     case kMIN:
     case kMAX:
-      return arg_expr->get_type_info();
+      return arg_expr->type();
     case kSUM:
-      return arg_expr->get_type_info().is_integer() ? SQLTypeInfo(kBIGINT, false)
-                                                    : arg_expr->get_type_info();
+      return arg_expr->type()->isInteger() ? ctx.int64() : arg_expr->type();
     case kAVG:
-      return SQLTypeInfo(kDOUBLE, false);
+      return ctx.fp64();
     case kAPPROX_COUNT_DISTINCT:
-      return SQLTypeInfo(kBIGINT, false);
+      return ctx.int64();
     case kAPPROX_QUANTILE:
-      return SQLTypeInfo(kDOUBLE, false);
+      return ctx.fp64();
     case kSINGLE_VALUE:
-      if (arg_expr->get_type_info().is_varlen()) {
+      if (arg_expr->type()->isVarLen()) {
         throw std::runtime_error("SINGLE_VALUE not supported on '" +
-                                 arg_expr->get_type_info().get_type_name() + "' input.");
+                                 arg_expr->type()->toString() + "' input.");
       }
     case kSAMPLE:
-      return arg_expr->get_type_info();
+      return arg_expr->type();
     default:
       CHECK(false);
   }
   CHECK(false);
-  return SQLTypeInfo();
+  return nullptr;
 }
 
 ExtractField to_datepart_field(const std::string& field) {
@@ -208,17 +210,13 @@ DatetruncField to_datediff_field(const std::string& field) {
 }
 
 std::shared_ptr<hdk::ir::Constant> make_fp_constant(const int64_t val,
-                                                    const SQLTypeInfo& ti) {
+                                                    const hdk::ir::Type* type) {
   Datum d;
-  switch (ti.get_type()) {
-    case kFLOAT:
-      d.floatval = val;
-      break;
-    case kDOUBLE:
-      d.doubleval = val;
-      break;
-    default:
-      CHECK(false);
+  if (type->isFp32()) {
+    d.floatval = val;
+  } else {
+    CHECK(type->isFp64());
+    d.doubleval = val;
   }
-  return hdk::ir::makeExpr<hdk::ir::Constant>(ti, false, d);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
 }

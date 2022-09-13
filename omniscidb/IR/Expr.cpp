@@ -402,46 +402,53 @@ Constant::~Constant() {
 }
 
 ExprPtr Constant::make(const SQLTypeInfo& ti, int64_t val, bool cacheable) {
-  CHECK(ti.is_number() || ti.is_boolean());
+  return make(Context::defaultCtx().fromTypeInfo(ti), val, cacheable);
+}
+
+ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
+  CHECK(type->isNumber() || type->isBoolean());
   Datum datum{0};
-  switch (ti.get_type()) {
-    case kBOOLEAN: {
+  switch (type->id()) {
+    case Type::kBoolean:
       datum.boolval = !!val;
       break;
-    }
-    case kTINYINT: {
-      datum.tinyintval = static_cast<int8_t>(val);
+    case Type::kInteger:
+      switch (type->size()) {
+        case 1:
+          datum.tinyintval = static_cast<int8_t>(val);
+          break;
+        case 2:
+          datum.smallintval = static_cast<int16_t>(val);
+          break;
+        case 4:
+          datum.intval = static_cast<int32_t>(val);
+          break;
+        case 8:
+          datum.bigintval = val;
+          break;
+        default:
+          CHECK(false);
+      }
       break;
-    }
-    case kSMALLINT: {
-      datum.smallintval = static_cast<int16_t>(val);
+    case Type::kDecimal:
+      datum.bigintval = val * exp_to_scale(type->as<DecimalType>()->scale());
       break;
-    }
-    case kINT: {
-      datum.intval = static_cast<int32_t>(val);
+    case Type::kFloatingPoint:
+      switch (type->as<FloatingPointType>()->precision()) {
+        case FloatingPointType::kFloat:
+          datum.floatval = static_cast<float>(val);
+          break;
+        case FloatingPointType::kDouble:
+          datum.doubleval = static_cast<double>(val);
+          break;
+        default:
+          CHECK(false);
+      }
       break;
-    }
-    case kBIGINT: {
-      datum.bigintval = val;
-      break;
-    }
-    case kDECIMAL:
-    case kNUMERIC: {
-      datum.bigintval = val * exp_to_scale(ti.get_scale());
-      break;
-    }
-    case kFLOAT: {
-      datum.floatval = static_cast<float>(val);
-      break;
-    }
-    case kDOUBLE: {
-      datum.doubleval = static_cast<double>(val);
-      break;
-    }
     default:
       CHECK(false);
   }
-  return makeExpr<Constant>(ti, false, datum, cacheable);
+  return makeExpr<Constant>(type, false, datum, cacheable);
 }
 
 ExprPtr ColumnVar::deep_copy() const {
