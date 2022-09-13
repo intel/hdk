@@ -84,11 +84,11 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto lhs = bin_oper->get_left_operand();
   const auto rhs = bin_oper->get_right_operand();
-  const auto& lhs_type = lhs->get_type_info();
-  const auto& rhs_type = rhs->get_type_info();
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
   const auto int_typename = numeric_or_time_interval_type_name(lhs_type, rhs_type);
   const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
-  const auto& oper_type = rhs_type.is_timeinterval() ? rhs_type : lhs_type;
+  const auto& oper_type = rhs_type->isInterval() ? rhs_type : lhs_type;
   switch (bin_oper->get_optype()) {
     case kMINUS:
       return codegenSub(bin_oper,
@@ -96,7 +96,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type,
+                        oper_type->toTypeInfo(),
                         co);
     case kPLUS:
       return codegenAdd(bin_oper,
@@ -104,7 +104,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type,
+                        oper_type->toTypeInfo(),
                         co);
     case kMULTIPLY:
       return codegenMul(bin_oper,
@@ -112,7 +112,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type,
+                        oper_type->toTypeInfo(),
                         co);
     case kDIVIDE:
       return codegenDiv(lhs_lv,
@@ -634,10 +634,10 @@ llvm::Value* CodeGenerator::codegenMod(llvm::Value* lhs_lv,
                                        llvm::Value* rhs_lv,
                                        const std::string& null_typename,
                                        const std::string& null_check_suffix,
-                                       const SQLTypeInfo& ti) {
+                                       const hdk::ir::Type* type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(lhs_lv->getType(), rhs_lv->getType());
-  CHECK(ti.is_integer());
+  CHECK(type->isInteger());
   cgen_state_->needs_error_check_ = true;
   // Generate control flow for division by zero error handling.
   auto mod_ok = llvm::BasicBlock::Create(
@@ -654,7 +654,7 @@ llvm::Value* CodeGenerator::codegenMod(llvm::Value* lhs_lv,
                  ? cgen_state_->ir_builder_.CreateSRem(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall(
                        "mod_" + null_typename + null_check_suffix,
-                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_val(ti))});
+                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))});
   cgen_state_->ir_builder_.SetInsertPoint(mod_zero);
   cgen_state_->ir_builder_.CreateRet(cgen_state_->llInt(Executor::ERR_DIV_BY_ZERO));
   cgen_state_->ir_builder_.SetInsertPoint(mod_ok);

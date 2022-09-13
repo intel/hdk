@@ -339,7 +339,7 @@ class CodeGenerator {
                           llvm::Value*,
                           const std::string& null_typename,
                           const std::string& null_check_suffix,
-                          const SQLTypeInfo&);
+                          const hdk::ir::Type*);
 
   llvm::Value* codegenCase(const hdk::ir::CaseExpr*,
                            llvm::Type* case_llvm_type,
