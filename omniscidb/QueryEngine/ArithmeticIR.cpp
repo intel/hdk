@@ -691,12 +691,12 @@ llvm::Value* CodeGenerator::codegenUMinus(const hdk::ir::UOper* uoper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(uoper->get_optype(), kUMINUS);
   const auto operand_lv = codegen(uoper->get_operand(), true, co).front();
-  const auto& ti = uoper->get_type_info();
+  const auto& type = uoper->type();
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};
   bool need_overflow_check = false;
-  if (ti.is_integer() || ti.is_decimal() || ti.is_timeinterval()) {
-    std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(ti.get_size(), true);
+  if (type->isInteger() || type->isDecimal() || type->isInterval()) {
+    std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(type->size(), true);
     need_overflow_check = !checkExpressionRanges(
         uoper,
         static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue(),
@@ -708,8 +708,8 @@ llvm::Value* CodeGenerator::codegenUMinus(const hdk::ir::UOper* uoper,
     cgen_state_->needs_error_check_ = true;
     uminus_ok = llvm::BasicBlock::Create(
         cgen_state_->context_, "uminus_ok", cgen_state_->current_func_);
-    if (!ti.get_notnull()) {
-      codegenSkipOverflowCheckForNull(operand_lv, nullptr, uminus_ok, ti);
+    if (type->nullable()) {
+      codegenSkipOverflowCheckForNull(operand_lv, nullptr, uminus_ok, type);
     }
     uminus_fail = llvm::BasicBlock::Create(
         cgen_state_->context_, "uminus_fail", cgen_state_->current_func_);
@@ -722,14 +722,12 @@ llvm::Value* CodeGenerator::codegenUMinus(const hdk::ir::UOper* uoper,
     cgen_state_->ir_builder_.SetInsertPoint(uminus_ok);
   }
   auto ret =
-      ti.get_notnull()
-          ? (ti.is_fp() ? cgen_state_->ir_builder_.CreateFNeg(operand_lv)
-                        : cgen_state_->ir_builder_.CreateNeg(operand_lv))
+      !type->nullable()
+          ? (type->isFloatingPoint() ? cgen_state_->ir_builder_.CreateFNeg(operand_lv)
+                                     : cgen_state_->ir_builder_.CreateNeg(operand_lv))
           : cgen_state_->emitCall(
-                "uminus_" + numeric_type_name(ti) + "_nullable",
-                {operand_lv,
-                 ti.is_fp() ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(ti))
-                            : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(ti))});
+                "uminus_" + numeric_type_name(type) + "_nullable",
+                {operand_lv, static_cast<llvm::Value*>(cgen_state_->inlineNull(type))});
   if (need_overflow_check) {
     cgen_state_->ir_builder_.SetInsertPoint(uminus_fail);
     cgen_state_->ir_builder_.CreateRet(
