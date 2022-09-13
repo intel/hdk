@@ -140,13 +140,12 @@ llvm::Value* CodeGenerator::codegenFpArith(const hdk::ir::BinOper* bin_oper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto lhs = bin_oper->get_left_operand();
   const auto rhs = bin_oper->get_right_operand();
-  const auto& lhs_type = lhs->get_type_info();
-  const auto& rhs_type = rhs->get_type_info();
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
   const auto fp_typename = numeric_type_name(lhs_type);
   const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
-  llvm::ConstantFP* fp_null{lhs_type.get_type() == kFLOAT
-                                ? cgen_state_->llFp(NULL_FLOAT)
-                                : cgen_state_->llFp(NULL_DOUBLE)};
+  llvm::ConstantFP* fp_null{lhs_type->isFp32() ? cgen_state_->llFp(NULL_FLOAT)
+                                               : cgen_state_->llFp(NULL_DOUBLE)};
   switch (bin_oper->get_optype()) {
     case kMINUS:
       return null_check_suffix.empty()
