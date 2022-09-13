@@ -20,14 +20,6 @@
 // Code generation routines and helpers for basic arithmetic and unary minus.
 namespace {
 
-std::string numeric_or_time_interval_type_name(const SQLTypeInfo& ti1,
-                                               const SQLTypeInfo& ti2) {
-  if (ti2.is_timeinterval()) {
-    return numeric_type_name(ti2);
-  }
-  return numeric_type_name(ti1);
-}
-
 std::string numeric_or_time_interval_type_name(const hdk::ir::Type* type1,
                                                const hdk::ir::Type* type2) {
   if (type2->isInterval()) {
@@ -96,7 +88,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type->toTypeInfo(),
+                        oper_type,
                         co);
     case kPLUS:
       return codegenAdd(bin_oper,
@@ -104,7 +96,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type->toTypeInfo(),
+                        oper_type,
                         co);
     case kMULTIPLY:
       return codegenMul(bin_oper,
@@ -112,7 +104,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
-                        oper_type->toTypeInfo(),
+                        oper_type,
                         co);
     case kDIVIDE:
       return codegenDiv(lhs_lv,
@@ -197,7 +189,7 @@ bool CodeGenerator::checkExpressionRanges(const hdk::ir::BinOper* bin_oper,
     // check.
     return false;
   }
-  if (bin_oper->get_type_info().is_decimal()) {
+  if (bin_oper->type()->isDecimal()) {
     return false;
   }
 
@@ -223,14 +215,14 @@ llvm::Value* CodeGenerator::codegenAdd(const hdk::ir::BinOper* bin_oper,
                                        llvm::Value* rhs_lv,
                                        const std::string& null_typename,
                                        const std::string& null_check_suffix,
-                                       const SQLTypeInfo& ti,
+                                       const hdk::ir::Type* type,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(lhs_lv->getType(), rhs_lv->getType());
-  CHECK(ti.is_integer() || ti.is_decimal() || ti.is_timeinterval());
+  CHECK(type->isInteger() || type->isDecimal() || type->isInterval());
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};
-  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(ti.get_size(), true);
+  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(type->size(), true);
   auto need_overflow_check =
       !checkExpressionRanges(bin_oper,
                              static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue(),
@@ -238,7 +230,7 @@ llvm::Value* CodeGenerator::codegenAdd(const hdk::ir::BinOper* bin_oper,
 
   if (need_overflow_check && co.device_type == ExecutorDeviceType::CPU) {
     return codegenBinOpWithOverflowForCPU(
-        bin_oper, lhs_lv, rhs_lv, null_check_suffix, ti);
+        bin_oper, lhs_lv, rhs_lv, null_check_suffix, type);
   }
 
   llvm::BasicBlock* add_ok{nullptr};
@@ -248,7 +240,7 @@ llvm::Value* CodeGenerator::codegenAdd(const hdk::ir::BinOper* bin_oper,
     add_ok = llvm::BasicBlock::Create(
         cgen_state_->context_, "add_ok", cgen_state_->current_func_);
     if (!null_check_suffix.empty()) {
-      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, add_ok, ti);
+      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, add_ok, type);
     }
     add_fail = llvm::BasicBlock::Create(
         cgen_state_->context_, "add_fail", cgen_state_->current_func_);
@@ -270,7 +262,7 @@ llvm::Value* CodeGenerator::codegenAdd(const hdk::ir::BinOper* bin_oper,
                  ? cgen_state_->ir_builder_.CreateAdd(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall(
                        "add_" + null_typename + null_check_suffix,
-                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_val(ti))});
+                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))});
   if (need_overflow_check) {
     cgen_state_->ir_builder_.SetInsertPoint(add_fail);
     cgen_state_->ir_builder_.CreateRet(
@@ -285,14 +277,14 @@ llvm::Value* CodeGenerator::codegenSub(const hdk::ir::BinOper* bin_oper,
                                        llvm::Value* rhs_lv,
                                        const std::string& null_typename,
                                        const std::string& null_check_suffix,
-                                       const SQLTypeInfo& ti,
+                                       const hdk::ir::Type* type,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(lhs_lv->getType(), rhs_lv->getType());
-  CHECK(ti.is_integer() || ti.is_decimal() || ti.is_timeinterval());
+  CHECK(type->isInteger() || type->isDecimal() || type->isInterval());
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};
-  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(ti.get_size(), true);
+  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(type->size(), true);
   auto need_overflow_check =
       !checkExpressionRanges(bin_oper,
                              static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue(),
@@ -300,7 +292,7 @@ llvm::Value* CodeGenerator::codegenSub(const hdk::ir::BinOper* bin_oper,
 
   if (need_overflow_check && co.device_type == ExecutorDeviceType::CPU) {
     return codegenBinOpWithOverflowForCPU(
-        bin_oper, lhs_lv, rhs_lv, null_check_suffix, ti);
+        bin_oper, lhs_lv, rhs_lv, null_check_suffix, type);
   }
 
   llvm::BasicBlock* sub_ok{nullptr};
@@ -310,7 +302,7 @@ llvm::Value* CodeGenerator::codegenSub(const hdk::ir::BinOper* bin_oper,
     sub_ok = llvm::BasicBlock::Create(
         cgen_state_->context_, "sub_ok", cgen_state_->current_func_);
     if (!null_check_suffix.empty()) {
-      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, sub_ok, ti);
+      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, sub_ok, type);
     }
     sub_fail = llvm::BasicBlock::Create(
         cgen_state_->context_, "sub_fail", cgen_state_->current_func_);
@@ -334,7 +326,7 @@ llvm::Value* CodeGenerator::codegenSub(const hdk::ir::BinOper* bin_oper,
                  ? cgen_state_->ir_builder_.CreateSub(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall(
                        "sub_" + null_typename + null_check_suffix,
-                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_val(ti))});
+                       {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))});
   if (need_overflow_check) {
     cgen_state_->ir_builder_.SetInsertPoint(sub_fail);
     cgen_state_->ir_builder_.CreateRet(
@@ -342,14 +334,6 @@ llvm::Value* CodeGenerator::codegenSub(const hdk::ir::BinOper* bin_oper,
     cgen_state_->ir_builder_.SetInsertPoint(sub_ok);
   }
   return ret;
-}
-
-void CodeGenerator::codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
-                                                    llvm::Value* rhs_lv,
-                                                    llvm::BasicBlock* no_overflow_bb,
-                                                    const SQLTypeInfo& ti) {
-  codegenSkipOverflowCheckForNull(
-      lhs_lv, rhs_lv, no_overflow_bb, hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
 }
 
 void CodeGenerator::codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
@@ -373,15 +357,15 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
                                        llvm::Value* rhs_lv,
                                        const std::string& null_typename,
                                        const std::string& null_check_suffix,
-                                       const SQLTypeInfo& ti,
+                                       const hdk::ir::Type* type,
                                        const CompilationOptions& co,
                                        bool downscale) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(lhs_lv->getType(), rhs_lv->getType());
-  CHECK(ti.is_integer() || ti.is_decimal() || ti.is_timeinterval());
+  CHECK(type->isInteger() || type->isDecimal() || type->isInterval());
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};
-  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(ti.get_size(), true);
+  std::tie(chosen_max, chosen_min) = cgen_state_->inlineIntMaxMin(type->size(), true);
   auto need_overflow_check =
       !checkExpressionRanges(bin_oper,
                              static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue(),
@@ -389,7 +373,7 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
 
   if (need_overflow_check && co.device_type == ExecutorDeviceType::CPU) {
     return codegenBinOpWithOverflowForCPU(
-        bin_oper, lhs_lv, rhs_lv, null_check_suffix, ti);
+        bin_oper, lhs_lv, rhs_lv, null_check_suffix, type);
   }
 
   llvm::BasicBlock* mul_ok{nullptr};
@@ -399,7 +383,7 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
     mul_ok = llvm::BasicBlock::Create(
         cgen_state_->context_, "mul_ok", cgen_state_->current_func_);
     if (!null_check_suffix.empty()) {
-      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, mul_ok, ti);
+      codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, mul_ok, type);
     }
     mul_fail = llvm::BasicBlock::Create(
         cgen_state_->context_, "mul_fail", cgen_state_->current_func_);
@@ -430,7 +414,7 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
           ? cgen_state_->ir_builder_.CreateMul(lhs_lv, rhs_lv)
           : cgen_state_->emitCall(
                 "mul_" + null_typename + null_check_suffix,
-                {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_val(ti))});
+                {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))});
   if (need_overflow_check) {
     cgen_state_->ir_builder_.SetInsertPoint(mul_fail);
     cgen_state_->ir_builder_.CreateRet(
@@ -438,20 +422,6 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
     cgen_state_->ir_builder_.SetInsertPoint(mul_ok);
   }
   return ret;
-}
-
-llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
-                                       llvm::Value* rhs_lv,
-                                       const std::string& null_typename,
-                                       const std::string& null_check_suffix,
-                                       const SQLTypeInfo& ti,
-                                       bool upscale) {
-  return codegenDiv(lhs_lv,
-                    rhs_lv,
-                    null_typename,
-                    null_check_suffix,
-                    hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
-                    upscale);
 }
 
 llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
@@ -762,7 +732,7 @@ llvm::Value* CodeGenerator::codegenBinOpWithOverflowForCPU(
     llvm::Value* lhs_lv,
     llvm::Value* rhs_lv,
     const std::string& null_check_suffix,
-    const SQLTypeInfo& ti) {
+    const hdk::ir::Type* type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   cgen_state_->needs_error_check_ = true;
 
@@ -774,7 +744,7 @@ llvm::Value* CodeGenerator::codegenBinOpWithOverflowForCPU(
 
   if (!null_check_suffix.empty()) {
     null_check = cgen_state_->ir_builder_.GetInsertBlock();
-    codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, check_ok, ti);
+    codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, check_ok, type);
   }
 
   // Compute result and overflow flag
@@ -798,7 +768,7 @@ llvm::Value* CodeGenerator::codegenBinOpWithOverflowForCPU(
   // In case of null check we have to use NULL result on check fail
   if (null_check) {
     auto phi = cgen_state_->ir_builder_.CreatePHI(ret->getType(), 2);
-    phi->addIncoming(llvm::ConstantInt::get(ret->getType(), inline_int_null_val(ti)),
+    phi->addIncoming(llvm::ConstantInt::get(ret->getType(), inline_int_null_value(type)),
                      null_check);
     phi->addIncoming(ret, val_bb);
     ret = phi;

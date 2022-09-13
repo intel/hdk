@@ -291,7 +291,7 @@ class CodeGenerator {
                           llvm::Value*,
                           const std::string& null_typename,
                           const std::string& null_check_suffix,
-                          const SQLTypeInfo&,
+                          const hdk::ir::Type*,
                           const CompilationOptions&);
 
   llvm::Value* codegenSub(const hdk::ir::BinOper*,
@@ -299,13 +299,9 @@ class CodeGenerator {
                           llvm::Value*,
                           const std::string& null_typename,
                           const std::string& null_check_suffix,
-                          const SQLTypeInfo&,
+                          const hdk::ir::Type*,
                           const CompilationOptions&);
 
-  void codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
-                                       llvm::Value* rhs_lv,
-                                       llvm::BasicBlock* no_overflow_bb,
-                                       const SQLTypeInfo& ti);
   void codegenSkipOverflowCheckForNull(llvm::Value* lhs_lv,
                                        llvm::Value* rhs_lv,
                                        llvm::BasicBlock* no_overflow_bb,
@@ -316,16 +312,10 @@ class CodeGenerator {
                           llvm::Value*,
                           const std::string& null_typename,
                           const std::string& null_check_suffix,
-                          const SQLTypeInfo&,
+                          const hdk::ir::Type*,
                           const CompilationOptions&,
                           bool downscale = true);
 
-  llvm::Value* codegenDiv(llvm::Value*,
-                          llvm::Value*,
-                          const std::string& null_typename,
-                          const std::string& null_check_suffix,
-                          const SQLTypeInfo&,
-                          bool upscale = true);
   llvm::Value* codegenDiv(llvm::Value* lhs_lv,
                           llvm::Value* rhs_lv,
                           const std::string& null_typename,
@@ -467,7 +457,7 @@ class CodeGenerator {
                                               llvm::Value* lhs_lv,
                                               llvm::Value* rhs_lv,
                                               const std::string& null_check_suffix,
-                                              const SQLTypeInfo& ti);
+                                              const hdk::ir::Type* type);
 
   Executor* executor_;
 
