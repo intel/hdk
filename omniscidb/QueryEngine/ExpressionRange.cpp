@@ -21,6 +21,7 @@
 #include "Descriptors/InputDescriptors.h"
 #include "Execute.h"
 #include "ExtractFromTime.h"
+#include "IR/TypeUtils.h"
 #include "QueryPhysicalInputsCollector.h"
 
 #include <algorithm>
@@ -71,10 +72,10 @@ DEF_OPERATOR(ExpressionRange::operator-, -)
 DEF_OPERATOR(ExpressionRange::operator*, *)
 
 void apply_fp_qual(const Datum const_datum,
-                   const SQLTypes const_type,
+                   const hdk::ir::Type* const_type,
                    const SQLOps sql_op,
                    ExpressionRange& qual_range) {
-  double const_val = get_value_from_datum<double>(const_datum, const_type);
+  double const_val = extract_fp_type_from_datum(const_datum, const_type);
   switch (sql_op) {
     case kGT:
     case kGE:
@@ -94,10 +95,10 @@ void apply_fp_qual(const Datum const_datum,
 }
 
 void apply_int_qual(const Datum const_datum,
-                    const SQLTypes const_type,
+                    const hdk::ir::Type* const_type,
                     const SQLOps sql_op,
                     ExpressionRange& qual_range) {
-  int64_t const_val = get_value_from_datum<int64_t>(const_datum, const_type);
+  int64_t const_val = extract_int_type_from_datum(const_datum, const_type);
   switch (sql_op) {
     case kGT:
       qual_range.setIntMin(std::max(qual_range.getIntMin(), const_val + 1));
@@ -121,22 +122,18 @@ void apply_int_qual(const Datum const_datum,
 }
 
 void apply_hpt_qual(const Datum const_datum,
-                    const SQLTypes const_type,
-                    const int32_t const_dimen,
-                    const int32_t col_dimen,
+                    const hdk::ir::Type* const_type,
+                    const hdk::ir::Type* col_type,
                     const SQLOps sql_op,
                     ExpressionRange& qual_range) {
-  CHECK(const_dimen != col_dimen);
+  auto const_unit = const_type->isTimestamp()
+                        ? const_type->as<hdk::ir::TimestampType>()->unit()
+                        : hdk::ir::TimeUnit::kSecond;
+  auto col_unit = col_type->isTimestamp() ? col_type->as<hdk::ir::TimestampType>()->unit()
+                                          : hdk::ir::TimeUnit::kSecond;
   Datum datum{0};
-  if (const_dimen > col_dimen) {
-    datum.bigintval =
-        get_value_from_datum<int64_t>(const_datum, const_type) /
-        DateTimeUtils::get_timestamp_precision_scale(const_dimen - col_dimen);
-  } else {
-    datum.bigintval =
-        get_value_from_datum<int64_t>(const_datum, const_type) *
-        DateTimeUtils::get_timestamp_precision_scale(col_dimen - const_dimen);
-  }
+  datum.bigintval = get_datetime_scaled_epoch(
+      extract_int_type_from_datum(const_datum, const_type), const_unit, col_unit);
   apply_int_qual(datum, const_type, sql_op, qual_range);
 }
 
@@ -180,22 +177,20 @@ ExpressionRange apply_simple_quals(
     if (qual_range.getType() == ExpressionRangeType::Float ||
         qual_range.getType() == ExpressionRangeType::Double) {
       apply_fp_qual(qual_const->get_constval(),
-                    qual_const->get_type_info().get_type(),
+                    qual_const->type(),
                     qual_bin_oper->get_optype(),
                     qual_range);
-    } else if ((qual_col->get_type_info().is_timestamp() ||
-                qual_const->get_type_info().is_timestamp()) &&
-               (qual_col->get_type_info().get_dimension() !=
-                qual_const->get_type_info().get_dimension())) {
+    } else if (qual_col->type()->isTimestamp() || qual_const->type()->isTimestamp()) {
+      CHECK(qual_const->type()->isDateTime());
+      CHECK(qual_col->type()->isDateTime());
       apply_hpt_qual(qual_const->get_constval(),
-                     qual_const->get_type_info().get_type(),
-                     qual_const->get_type_info().get_dimension(),
-                     qual_col->get_type_info().get_dimension(),
+                     qual_const->type(),
+                     qual_col->type(),
                      qual_bin_oper->get_optype(),
                      qual_range);
     } else {
       apply_int_qual(qual_const->get_constval(),
-                     qual_const->get_type_info().get_type(),
+                     qual_const->type(),
                      qual_bin_oper->get_optype(),
                      qual_range);
     }
@@ -276,15 +271,6 @@ bool ExpressionRange::operator==(const ExpressionRange& other) const {
   return false;
 }
 
-bool ExpressionRange::typeSupportsRange(const SQLTypeInfo& ti) {
-  if (ti.is_array()) {
-    return typeSupportsRange(ti.get_elem_type());
-  } else {
-    return (ti.is_number() || ti.is_boolean() || ti.is_time() ||
-            (ti.is_string() && ti.get_compression() == kENCODING_DICT));
-  }
-}
-
 bool ExpressionRange::typeSupportsRange(const hdk::ir::Type* type) {
   if (type->isArray()) {
     return typeSupportsRange(type->as<hdk::ir::ArrayBaseType>()->elemType());
@@ -343,8 +329,7 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  const auto& expr_ti = expr->get_type_info();
-  if (!ExpressionRange::typeSupportsRange(expr_ti)) {
+  if (!ExpressionRange::typeSupportsRange(expr->type())) {
     return ExpressionRange::makeInvalidRange();
   }
   auto bin_oper_expr = dynamic_cast<const hdk::ir::BinOper*>(expr);
@@ -388,8 +373,9 @@ ExpressionRange getExpressionRange(
 
 namespace {
 
-int64_t scale_up_interval_endpoint(const int64_t endpoint, const SQLTypeInfo& ti) {
-  return endpoint * static_cast<int64_t>(exp_to_scale(ti.get_scale()));
+int64_t scale_up_interval_endpoint(const int64_t endpoint,
+                                   const hdk::ir::DecimalType* type) {
+  return endpoint * static_cast<int64_t>(exp_to_scale(type->scale()));
 }
 
 }  // namespace
@@ -412,12 +398,13 @@ ExpressionRange getExpressionRange(
       return lhs * rhs;
     case kDIVIDE: {
       bool null_div_by_zero = executor->getConfig().exec.codegen.null_div_by_zero;
-      const auto& lhs_type = expr->get_left_operand()->get_type_info();
-      if (lhs_type.is_decimal() && lhs.getType() != ExpressionRangeType::Invalid) {
+      auto lhs_type = expr->get_left_operand()->type();
+      if (lhs_type->isDecimal() && lhs.getType() != ExpressionRangeType::Invalid) {
         CHECK(lhs.getType() == ExpressionRangeType::Integer);
+        auto dec_type = lhs_type->as<hdk::ir::DecimalType>();
         const auto adjusted_lhs = ExpressionRange::makeIntRange(
-            scale_up_interval_endpoint(lhs.getIntMin(), lhs_type),
-            scale_up_interval_endpoint(lhs.getIntMax(), lhs_type),
+            scale_up_interval_endpoint(lhs.getIntMin(), dec_type),
+            scale_up_interval_endpoint(lhs.getIntMax(), dec_type),
             0,
             lhs.hasNulls());
         return adjusted_lhs.div(rhs, null_div_by_zero);
@@ -434,39 +421,27 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
   if (constant_expr->get_is_null()) {
     return ExpressionRange::makeInvalidRange();
   }
-  const auto constant_type = constant_expr->get_type_info().get_type();
+  const auto constant_type = constant_expr->type();
   const auto datum = constant_expr->get_constval();
-  switch (constant_type) {
-    case kTINYINT: {
-      const int64_t v = datum.tinyintval;
+  switch (constant_type->id()) {
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate: {
+      int64_t v = extract_int_type_from_datum(datum, constant_type);
       return ExpressionRange::makeIntRange(v, v, 0, false);
     }
-    case kSMALLINT: {
-      const int64_t v = datum.smallintval;
-      return ExpressionRange::makeIntRange(v, v, 0, false);
-    }
-    case kINT: {
-      const int64_t v = datum.intval;
-      return ExpressionRange::makeIntRange(v, v, 0, false);
-    }
-    case kBIGINT:
-    case kNUMERIC:
-    case kDECIMAL: {
-      const int64_t v = datum.bigintval;
-      return ExpressionRange::makeIntRange(v, v, 0, false);
-    }
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE: {
-      const int64_t v = datum.bigintval;
-      return ExpressionRange::makeIntRange(v, v, 0, false);
-    }
-    case kFLOAT: {
-      return ExpressionRange::makeFloatRange(datum.floatval, datum.floatval, false);
-    }
-    case kDOUBLE: {
-      return ExpressionRange::makeDoubleRange(datum.doubleval, datum.doubleval, false);
-    }
+    case hdk::ir::Type::kFloatingPoint:
+      switch (constant_type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          return ExpressionRange::makeFloatRange(datum.floatval, datum.floatval, false);
+        case hdk::ir::FloatingPointType::kDouble:
+          return ExpressionRange::makeDoubleRange(
+              datum.doubleval, datum.doubleval, false);
+        default:
+          break;
+      }
     default:
       break;
   }
@@ -477,8 +452,8 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
   const auto stat_name##_frag_index = std::stat_name##_element(                      \
       nonempty_fragment_indices.begin(),                                             \
       nonempty_fragment_indices.end(),                                               \
-      [&fragments, &has_nulls, col_id, col_ti](const size_t lhs_idx,                 \
-                                               const size_t rhs_idx) {               \
+      [&fragments, &has_nulls, col_id, col_type](const size_t lhs_idx,               \
+                                                 const size_t rhs_idx) {             \
         const auto& lhs = fragments[lhs_idx];                                        \
         const auto& rhs = fragments[rhs_idx];                                        \
         auto lhs_meta_it = lhs.getChunkMetadataMap().find(col_id);                   \
@@ -491,16 +466,16 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
             rhs_meta_it->second->chunkStats.has_nulls) {                             \
           has_nulls = true;                                                          \
         }                                                                            \
-        if (col_ti.is_fp()) {                                                        \
+        if (col_type->isFloatingPoint()) {                                           \
           return extract_##stat_name##_stat_fp_type(lhs_meta_it->second->chunkStats, \
-                                                    col_ti) <                        \
+                                                    col_type) <                      \
                  extract_##stat_name##_stat_fp_type(rhs_meta_it->second->chunkStats, \
-                                                    col_ti);                         \
+                                                    col_type);                       \
         }                                                                            \
         return extract_##stat_name##_stat_int_type(lhs_meta_it->second->chunkStats,  \
-                                                   col_ti) <                         \
+                                                   col_type) <                       \
                extract_##stat_name##_stat_int_type(rhs_meta_it->second->chunkStats,  \
-                                                   col_ti);                          \
+                                                   col_type);                        \
       });                                                                            \
   if (stat_name##_frag_index == nonempty_fragment_indices.end()) {                   \
     return ExpressionRange::makeInvalidRange();                                      \
@@ -549,27 +524,20 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
                                    const bool is_outer_join_proj) {
   bool has_nulls = is_outer_join_proj;
   int col_id = col_expr->get_column_id();
-  const auto& col_phys_ti = col_expr->get_type_info().is_array()
-                                ? col_expr->get_type_info().get_elem_type()
-                                : col_expr->get_type_info();
-  const auto col_ti = get_logical_type_info(col_phys_ti);
-  switch (col_ti.get_type()) {
-    case kTEXT:
-    case kCHAR:
-    case kVARCHAR:
-      CHECK_EQ(kENCODING_DICT, col_ti.get_compression());
-    case kBOOLEAN:
-    case kTINYINT:
-    case kSMALLINT:
-    case kINT:
-    case kBIGINT:
-    case kDECIMAL:
-    case kNUMERIC:
-    case kDATE:
-    case kTIMESTAMP:
-    case kTIME:
-    case kFLOAT:
-    case kDOUBLE: {
+  const auto& col_phys_type =
+      col_expr->type()->isArray()
+          ? col_expr->type()->as<hdk::ir::ArrayBaseType>()->elemType()
+          : col_expr->type();
+  const auto col_type = logicalType(col_phys_type);
+  switch (col_type->id()) {
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kExtDictionary:
+    case hdk::ir::Type::kFloatingPoint: {
       std::optional<size_t> ti_idx;
       for (size_t i = 0; i < query_infos.size(); ++i) {
         if (col_expr->get_table_id() == query_infos[i].table_id) {
@@ -581,17 +549,16 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       const auto& query_info = query_infos[*ti_idx].info;
       const auto& fragments = query_info.fragments;
       if (col_expr->is_virtual()) {
-        CHECK_EQ(kBIGINT, col_ti.get_type());
+        CHECK(col_type->isInt64());
         const int64_t num_tuples = query_info.getNumTuples();
         return ExpressionRange::makeIntRange(
             0, std::max(num_tuples - 1, int64_t(0)), 0, has_nulls);
       }
       if (query_info.getNumTuples() == 0) {
         // The column doesn't contain any values, synthesize an empty range.
-        if (col_ti.is_fp()) {
-          return col_ti.get_type() == kFLOAT
-                     ? ExpressionRange::makeFloatRange(0, -1, false)
-                     : ExpressionRange::makeDoubleRange(0, -1, false);
+        if (col_type->isFloatingPoint()) {
+          return col_type->size() == 4 ? ExpressionRange::makeFloatRange(0, -1, false)
+                                       : ExpressionRange::makeDoubleRange(0, -1, false);
         }
         return ExpressionRange::makeIntRange(0, -1, 0, false);
       }
@@ -621,22 +588,26 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
           }
         }
       }
-      if (col_ti.is_fp()) {
-        const auto min_val = extract_min_stat_fp_type(min_it->second->chunkStats, col_ti);
-        const auto max_val = extract_max_stat_fp_type(max_it->second->chunkStats, col_ti);
-        return col_ti.get_type() == kFLOAT
+      if (col_type->isFloatingPoint()) {
+        const auto min_val =
+            extract_min_stat_fp_type(min_it->second->chunkStats, col_type);
+        const auto max_val =
+            extract_max_stat_fp_type(max_it->second->chunkStats, col_type);
+        return col_type->size() == 4
                    ? ExpressionRange::makeFloatRange(min_val, max_val, has_nulls)
                    : ExpressionRange::makeDoubleRange(min_val, max_val, has_nulls);
       }
-      const auto min_val = extract_min_stat_int_type(min_it->second->chunkStats, col_ti);
-      const auto max_val = extract_max_stat_int_type(max_it->second->chunkStats, col_ti);
+      const auto min_val =
+          extract_min_stat_int_type(min_it->second->chunkStats, col_type);
+      const auto max_val =
+          extract_max_stat_int_type(max_it->second->chunkStats, col_type);
       if (max_val < min_val) {
         // The column doesn't contain any non-null values, synthesize an empty range.
         CHECK_GT(min_val, 0);
         return ExpressionRange::makeIntRange(0, -1, 0, has_nulls);
       }
       const int64_t bucket =
-          col_ti.get_type() == kDATE ? get_conservative_datetrunc_bucket(dtDAY) : 0;
+          col_type->isDate() ? get_conservative_datetrunc_bucket(dtDAY) : 0;
       return ExpressionRange::makeIntRange(min_val, max_val, bucket, has_nulls);
     }
     default:
@@ -668,11 +639,11 @@ ExpressionRange getExpressionRange(
 }
 
 ExpressionRange getExpressionRange(const hdk::ir::LikeExpr* like_expr) {
-  const auto& ti = like_expr->get_type_info();
-  CHECK(ti.is_boolean());
-  const auto& arg_ti = like_expr->get_arg()->get_type_info();
+  const auto& type = like_expr->type();
+  CHECK(type->isBoolean());
+  const auto& arg_type = like_expr->get_arg()->type();
   return ExpressionRange::makeIntRange(
-      arg_ti.get_notnull() ? 0 : inline_int_null_val(ti), 1, 0, false);
+      arg_type->nullable() ? inline_null_value<bool>() : 0, 1, 0, false);
 }
 
 ExpressionRange getExpressionRange(const hdk::ir::CaseExpr* case_expr,
@@ -682,7 +653,7 @@ ExpressionRange getExpressionRange(const hdk::ir::CaseExpr* case_expr,
   auto expr_range = ExpressionRange::makeInvalidRange();
   bool has_nulls = false;
   for (const auto& expr_pair : expr_pair_list) {
-    CHECK_EQ(expr_pair.first->get_type_info().get_type(), kBOOLEAN);
+    CHECK(expr_pair.first->type()->isBoolean());
     const auto crt_range =
         getExpressionRange(expr_pair.second.get(), query_infos, executor);
     if (crt_range.getType() == ExpressionRangeType::Null) {
@@ -713,9 +684,9 @@ namespace {
 
 ExpressionRange fpRangeFromDecimal(const ExpressionRange& arg_range,
                                    const int64_t scale,
-                                   const SQLTypeInfo& target_ti) {
-  CHECK(target_ti.is_fp());
-  if (target_ti.get_type() == kFLOAT) {
+                                   const hdk::ir::Type* target_type) {
+  CHECK(target_type->isFloatingPoint());
+  if (target_type->size() == 4) {
     return ExpressionRange::makeFloatRange(
         static_cast<float>(arg_range.getIntMin()) / scale,
         static_cast<float>(arg_range.getIntMax()) / scale,
@@ -728,46 +699,36 @@ ExpressionRange fpRangeFromDecimal(const ExpressionRange& arg_range,
 }
 
 ExpressionRange getDateTimePrecisionCastRange(const ExpressionRange& arg_range,
-                                              const SQLTypeInfo& oper_ti,
-                                              const SQLTypeInfo& target_ti) {
-  if (oper_ti.is_timestamp() && target_ti.is_date()) {
+                                              const hdk::ir::Type* oper_type,
+                                              const hdk::ir::Type* target_type) {
+  if (oper_type->isTimestamp() && target_type->isDate()) {
     const auto field = dtDAY;
+    auto oper_unit = oper_type->as<hdk::ir::TimestampType>()->unit();
+    bool is_hpt = oper_unit > hdk::ir::TimeUnit::kSecond;
     const int64_t scale =
-        oper_ti.is_high_precision_timestamp()
-            ? DateTimeUtils::get_timestamp_precision_scale(oper_ti.get_dimension())
-            : 1;
-    const int64_t min_ts = oper_ti.is_high_precision_timestamp()
-                               ? DateTruncate(field, arg_range.getIntMin() / scale)
-                               : DateTruncate(field, arg_range.getIntMin());
-    const int64_t max_ts = oper_ti.is_high_precision_timestamp()
-                               ? DateTruncate(field, arg_range.getIntMax() / scale)
-                               : DateTruncate(field, arg_range.getIntMax());
+        hdk::ir::unitsPerSecond(oper_type->as<hdk::ir::TimestampType>()->unit());
+    const int64_t min_ts = is_hpt ? DateTruncate(field, arg_range.getIntMin() / scale)
+                                  : DateTruncate(field, arg_range.getIntMin());
+    const int64_t max_ts = is_hpt ? DateTruncate(field, arg_range.getIntMax() / scale)
+                                  : DateTruncate(field, arg_range.getIntMax());
     const int64_t bucket = get_conservative_datetrunc_bucket(field);
 
     return ExpressionRange::makeIntRange(min_ts, max_ts, bucket, arg_range.hasNulls());
   }
 
-  const int32_t ti_dimen = target_ti.get_dimension();
-  const int32_t oper_dimen = oper_ti.get_dimension();
-  CHECK(oper_dimen != ti_dimen);
-  const int64_t min_ts =
-      ti_dimen > oper_dimen
-          ? DateTimeUtils::get_datetime_scaled_epoch(DateTimeUtils::ScalingType::ScaleUp,
-                                                     arg_range.getIntMin(),
-                                                     abs(oper_dimen - ti_dimen))
-          : DateTimeUtils::get_datetime_scaled_epoch(
-                DateTimeUtils::ScalingType::ScaleDown,
-                arg_range.getIntMin(),
-                abs(oper_dimen - ti_dimen));
-  const int64_t max_ts =
-      ti_dimen > oper_dimen
-          ? DateTimeUtils::get_datetime_scaled_epoch(DateTimeUtils::ScalingType::ScaleUp,
-                                                     arg_range.getIntMax(),
-                                                     abs(oper_dimen - ti_dimen))
-          : DateTimeUtils::get_datetime_scaled_epoch(
-                DateTimeUtils::ScalingType::ScaleDown,
-                arg_range.getIntMax(),
-                abs(oper_dimen - ti_dimen));
+  CHECK(oper_type->isDateTime());
+  CHECK(target_type->isDateTime());
+  auto oper_unit = oper_type->isTimestamp()
+                       ? oper_type->as<hdk::ir::TimestampType>()->unit()
+                       : hdk::ir::TimeUnit::kSecond;
+  auto target_unit = target_type->isTimestamp()
+                         ? target_type->as<hdk::ir::TimestampType>()->unit()
+                         : hdk::ir::TimeUnit::kSecond;
+  CHECK(oper_unit != target_unit);
+  int64_t min_ts = DateTimeUtils::get_datetime_scaled_epoch(
+      arg_range.getIntMin(), oper_unit, target_unit);
+  int64_t max_ts = DateTimeUtils::get_datetime_scaled_epoch(
+      arg_range.getIntMax(), oper_unit, target_unit);
 
   return ExpressionRange::makeIntRange(min_ts, max_ts, 0, arg_range.hasNulls());
 }
@@ -785,10 +746,12 @@ ExpressionRange getExpressionRange(
   if (u_expr->get_optype() != kCAST) {
     return ExpressionRange::makeInvalidRange();
   }
-  const auto& ti = u_expr->get_type_info();
-  if (ti.is_string() && ti.get_compression() == kENCODING_DICT) {
+  const auto& type = u_expr->type();
+  if (type->isExtDictionary()) {
     const auto sdp = executor->getStringDictionaryProxy(
-        ti.get_comp_param(), executor->getRowSetMemoryOwner(), true);
+        type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+        executor->getRowSetMemoryOwner(),
+        true);
     CHECK(sdp);
     const auto const_operand =
         dynamic_cast<const hdk::ir::Constant*>(u_expr->get_operand());
@@ -810,24 +773,29 @@ ExpressionRange getExpressionRange(
   }
   const auto arg_range =
       getExpressionRange(u_expr->get_operand(), query_infos, executor, simple_quals);
-  const auto& arg_ti = u_expr->get_operand()->get_type_info();
+  const auto& arg_type = u_expr->get_operand()->type();
   // Timestamp to Date OR Date/Timestamp casts with different precision
-  if ((ti.is_timestamp() && (arg_ti.get_dimension() != ti.get_dimension())) ||
-      ((arg_ti.is_timestamp() && ti.is_date()))) {
-    return getDateTimePrecisionCastRange(arg_range, arg_ti, ti);
+  auto arg_unit = arg_type->isTimestamp()
+                      ? arg_type->as<hdk::ir::DateTimeBaseType>()->unit()
+                      : hdk::ir::TimeUnit::kSecond;
+  auto type_unit = type->isTimestamp() ? type->as<hdk::ir::DateTimeBaseType>()->unit()
+                                       : hdk::ir::TimeUnit::kSecond;
+  if ((type->isTimestamp() && (type_unit != arg_unit)) ||
+      (arg_type->isTimestamp() && type->isDate())) {
+    return getDateTimePrecisionCastRange(arg_range, arg_type, type);
   }
   switch (arg_range.getType()) {
     case ExpressionRangeType::Float:
     case ExpressionRangeType::Double: {
-      if (ti.is_fp()) {
-        return ti.get_type() == kDOUBLE
+      if (type->isFloatingPoint()) {
+        return type->size() == 8
                    ? ExpressionRange::makeDoubleRange(
                          arg_range.getFpMin(), arg_range.getFpMax(), arg_range.hasNulls())
                    : ExpressionRange::makeFloatRange(arg_range.getFpMin(),
                                                      arg_range.getFpMax(),
                                                      arg_range.hasNulls());
       }
-      if (ti.is_integer()) {
+      if (type->isInteger()) {
         return ExpressionRange::makeIntRange(std::floor(arg_range.getFpMin()),
                                              std::ceil(arg_range.getFpMax()),
                                              0,
@@ -836,34 +804,37 @@ ExpressionRange getExpressionRange(
       break;
     }
     case ExpressionRangeType::Integer: {
-      if (ti.is_decimal()) {
+      if (type->isDecimal()) {
         CHECK_EQ(int64_t(0), arg_range.getBucket());
-        const int64_t scale = exp_to_scale(ti.get_scale() - arg_ti.get_scale());
+        auto type_scale = type->as<hdk::ir::DecimalType>()->scale();
+        auto arg_scale =
+            arg_type->isDecimal() ? arg_type->as<hdk::ir::DecimalType>()->scale() : 0;
+        const int64_t scale = exp_to_scale(type_scale - arg_scale);
         return ExpressionRange::makeIntRange(arg_range.getIntMin() * scale,
                                              arg_range.getIntMax() * scale,
                                              0,
                                              arg_range.hasNulls());
       }
-      if (arg_ti.is_decimal()) {
+      if (arg_type->isDecimal()) {
         CHECK_EQ(int64_t(0), arg_range.getBucket());
-        const int64_t scale = exp_to_scale(arg_ti.get_scale());
+        const int64_t scale = exp_to_scale(arg_type->as<hdk::ir::DecimalType>()->scale());
         const int64_t scale_half = scale / 2;
-        if (ti.is_fp()) {
-          return fpRangeFromDecimal(arg_range, scale, ti);
+        if (type->isFloatingPoint()) {
+          return fpRangeFromDecimal(arg_range, scale, type);
         }
         return ExpressionRange::makeIntRange((arg_range.getIntMin() - scale_half) / scale,
                                              (arg_range.getIntMax() + scale_half) / scale,
                                              0,
                                              arg_range.hasNulls());
       }
-      if (ti.is_integer() || ti.is_time()) {
+      if (type->isInteger() || type->isDateTime()) {
         return arg_range;
       }
-      if (ti.get_type() == kFLOAT) {
+      if (type->isFp32()) {
         return ExpressionRange::makeFloatRange(
             arg_range.getIntMin(), arg_range.getIntMax(), arg_range.hasNulls());
       }
-      if (ti.get_type() == kDOUBLE) {
+      if (type->isFp64()) {
         return ExpressionRange::makeDoubleRange(
             arg_range.getIntMin(), arg_range.getIntMax(), arg_range.hasNulls());
       }
@@ -887,7 +858,11 @@ ExpressionRange getExpressionRange(
       extract_expr->get_from_expr(), query_infos, executor, simple_quals);
   const bool has_nulls =
       arg_range.getType() == ExpressionRangeType::Invalid || arg_range.hasNulls();
-  const auto& extract_expr_ti = extract_expr->get_from_expr()->get_type_info();
+  const auto& extract_expr_type = extract_expr->get_from_expr()->type();
+  auto unit = extract_expr_type->isTimestamp()
+                  ? extract_expr_type->as<hdk::ir::TimestampType>()->unit()
+                  : hdk::ir::TimeUnit::kSecond;
+  bool is_hpt = extract_expr_type->isTimestamp() && (unit > hdk::ir::TimeUnit::kSecond);
   switch (extract_field) {
     case kYEAR: {
       if (arg_range.getType() == ExpressionRangeType::Invalid) {
@@ -895,19 +870,13 @@ ExpressionRange getExpressionRange(
       }
       CHECK(arg_range.getType() == ExpressionRangeType::Integer);
       const int64_t year_range_min =
-          extract_expr_ti.is_high_precision_timestamp()
-              ? ExtractFromTime(
-                    kYEAR,
-                    arg_range.getIntMin() /
-                        get_timestamp_precision_scale(extract_expr_ti.get_dimension()))
-              : ExtractFromTime(kYEAR, arg_range.getIntMin());
+          is_hpt ? ExtractFromTime(kYEAR,
+                                   arg_range.getIntMin() / hdk::ir::unitsPerSecond(unit))
+                 : ExtractFromTime(kYEAR, arg_range.getIntMin());
       const int64_t year_range_max =
-          extract_expr_ti.is_high_precision_timestamp()
-              ? ExtractFromTime(
-                    kYEAR,
-                    arg_range.getIntMax() /
-                        get_timestamp_precision_scale(extract_expr_ti.get_dimension()))
-              : ExtractFromTime(kYEAR, arg_range.getIntMax());
+          is_hpt ? ExtractFromTime(kYEAR,
+                                   arg_range.getIntMax() / hdk::ir::unitsPerSecond(unit))
+                 : ExtractFromTime(kYEAR, arg_range.getIntMax());
       return ExpressionRange::makeIntRange(
           year_range_min, year_range_max, 0, arg_range.hasNulls());
     }
@@ -959,17 +928,16 @@ ExpressionRange getExpressionRange(
   if (arg_range.getType() == ExpressionRangeType::Invalid) {
     return ExpressionRange::makeInvalidRange();
   }
-  const auto& datetrunc_expr_ti = datetrunc_expr->get_from_expr()->get_type_info();
+  auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
+  auto unit = datetrunc_expr_type->isTimestamp()
+                  ? datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit()
+                  : hdk::ir::TimeUnit::kSecond;
   const int64_t min_ts = DateTimeTranslator::getDateTruncConstantValue(
-      arg_range.getIntMin(), datetrunc_expr->get_field(), datetrunc_expr_ti);
+      arg_range.getIntMin(), datetrunc_expr->get_field(), datetrunc_expr_type);
   const int64_t max_ts = DateTimeTranslator::getDateTruncConstantValue(
-      arg_range.getIntMax(), datetrunc_expr->get_field(), datetrunc_expr_ti);
-  const int64_t bucket =
-      datetrunc_expr_ti.is_high_precision_timestamp()
-          ? get_conservative_datetrunc_bucket(datetrunc_expr->get_field()) *
-                DateTimeUtils::get_timestamp_precision_scale(
-                    datetrunc_expr_ti.get_dimension())
-          : get_conservative_datetrunc_bucket(datetrunc_expr->get_field());
+      arg_range.getIntMax(), datetrunc_expr->get_field(), datetrunc_expr_type);
+  const int64_t bucket = get_conservative_datetrunc_bucket(datetrunc_expr->get_field()) *
+                         hdk::ir::unitsPerSecond(unit);
 
   return ExpressionRange::makeIntRange(min_ts, max_ts, bucket, arg_range.hasNulls());
 }
@@ -981,7 +949,7 @@ ExpressionRange getExpressionRange(
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
   auto target_value_expr = width_bucket_expr->get_target_value();
   auto target_value_range = getExpressionRange(target_value_expr, query_infos, executor);
-  auto target_ti = target_value_expr->get_type_info();
+  auto target_type = target_value_expr->type();
   if (width_bucket_expr->is_constant_expr() &&
       target_value_range.getType() != ExpressionRangeType::Invalid) {
     auto const_target_value = dynamic_cast<const hdk::ir::Constant*>(target_value_expr);
@@ -993,7 +961,7 @@ ExpressionRange getExpressionRange(
       } else {
         CHECK(target_value_range.getFpMax() == target_value_range.getFpMin());
         auto target_value_bucket =
-            width_bucket_expr->compute_bucket(target_value_range.getFpMax(), target_ti);
+            width_bucket_expr->compute_bucket(target_value_range.getFpMax(), target_type);
         return ExpressionRange::makeIntRange(
             target_value_bucket, target_value_bucket, 0, target_value_range.hasNulls());
       }
@@ -1003,16 +971,16 @@ ExpressionRange getExpressionRange(
     const auto target_value_range_with_qual =
         getExpressionRange(target_value_expr, query_infos, executor, simple_quals);
     auto compute_bucket_range = [&width_bucket_expr](const ExpressionRange& target_range,
-                                                     SQLTypeInfo ti) {
+                                                     const hdk::ir::Type* type) {
       // we casted bucket bound exprs to double
       auto lower_bound_bucket =
-          width_bucket_expr->compute_bucket<double>(target_range.getFpMin(), ti);
+          width_bucket_expr->compute_bucket<double>(target_range.getFpMin(), type);
       auto upper_bound_bucket =
-          width_bucket_expr->compute_bucket<double>(target_range.getFpMax(), ti);
+          width_bucket_expr->compute_bucket<double>(target_range.getFpMax(), type);
       return ExpressionRange::makeIntRange(
           lower_bound_bucket, upper_bound_bucket, 0, target_range.hasNulls());
     };
-    auto res_range = compute_bucket_range(target_value_range_with_qual, target_ti);
+    auto res_range = compute_bucket_range(target_value_range_with_qual, target_type);
     // check target_value expression's col range to be not nullable iff it has its filter
     // expression i.e., in simple_quals
     // todo (yoonmin) : need to search simple_quals to cover more cases?

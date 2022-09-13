@@ -1240,10 +1240,11 @@ class WidthBucketExpr : public Expr {
   double get_bound_val(const Expr* bound_expr) const;
   int32_t get_partition_count_val() const;
   template <typename T>
-  int32_t compute_bucket(T target_const_val, SQLTypeInfo& ti) const {
+  int32_t compute_bucket(T target_const_val, const hdk::ir::Type* type) const {
     // this utility function is useful for optimizing expression range decision
     // for an expression depending on width_bucket expr
-    T null_val = ti.is_integer() ? inline_int_null_val(ti) : inline_fp_null_val(ti);
+    T null_val =
+        type->isInteger() ? inline_int_null_value(type) : inline_fp_null_value(type);
     double lower_bound_val = get_bound_val(lower_bound_.get());
     double upper_bound_val = get_bound_val(upper_bound_.get());
     auto partition_count_val = get_partition_count_val();
@@ -1586,6 +1587,8 @@ class DatetruncExpr : public Expr {
  public:
   DatetruncExpr(const SQLTypeInfo& ti, bool has_agg, DatetruncField f, ExprPtr e)
       : Expr(ti, has_agg), field_(f), from_expr_(e) {}
+  DatetruncExpr(const hdk::ir::Type* type, bool has_agg, DatetruncField f, ExprPtr e)
+      : Expr(type, has_agg), field_(f), from_expr_(e) {}
   DatetruncField get_field() const { return field_; }
   const Expr* get_from_expr() const { return from_expr_.get(); }
   const ExprPtr get_own_from_expr() const { return from_expr_; }

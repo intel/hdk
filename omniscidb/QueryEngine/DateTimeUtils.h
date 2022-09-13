@@ -38,10 +38,11 @@ static const std::map<std::pair<int32_t, ExtractField>, std::pair<SQLOps, int64_
                                 {{9, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
                                 {{9, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
 
-static const std::map<std::pair<int32_t, DatetruncField>, int64_t>
-    datetrunc_precision_lookup = {{{6, dtMILLISECOND}, kMilliSecsPerSec},
-                                  {{9, dtMICROSECOND}, kMilliSecsPerSec},
-                                  {{9, dtMILLISECOND}, kMicroSecsPerSec}};
+static const std::map<std::pair<hdk::ir::TimeUnit, DatetruncField>, int64_t>
+    datetrunc_precision_lookup = {
+        {{hdk::ir::TimeUnit::kMicro, dtMILLISECOND}, kMilliSecsPerSec},
+        {{hdk::ir::TimeUnit::kNano, dtMICROSECOND}, kMilliSecsPerSec},
+        {{hdk::ir::TimeUnit::kNano, dtMILLISECOND}, kMicroSecsPerSec}};
 
 }  // namespace
 
@@ -160,8 +161,8 @@ const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scal
 }
 
 const inline int64_t get_datetrunc_high_precision_scale(const DatetruncField& field,
-                                                        const int32_t dimen) {
-  const auto result = datetrunc_precision_lookup.find(std::make_pair(dimen, field));
+                                                        const hdk::ir::TimeUnit unit) {
+  const auto result = datetrunc_precision_lookup.find(std::make_pair(unit, field));
   if (result != datetrunc_precision_lookup.end()) {
     return result->second;
   }
@@ -212,7 +213,12 @@ constexpr inline int64_t get_datetime_scaled_epoch(int64_t epoch,
   auto old_scale = get_nanosecs_in_unit(old_unit);
   auto new_scale = get_nanosecs_in_unit(new_unit);
   if (old_scale > new_scale) {
-    return epoch * (old_scale / new_scale);
+    auto scaled_epoch = epoch * (old_scale / new_scale);
+    if (epoch && epoch != scaled_epoch / (old_scale / new_scale)) {
+      throw std::runtime_error(
+          "Value Overflow/underflow detected while scaling DateTime precision.");
+    }
+    return scaled_epoch;
   } else {
     return epoch / (new_scale / old_scale);
   }

@@ -53,17 +53,19 @@ class DateTimeTranslator {
 
   static inline int64_t getDateTruncConstantValue(const int64_t& timeval,
                                                   const DatetruncField& field,
-                                                  const SQLTypeInfo& ti) {
-    if (ti.is_high_precision_timestamp()) {
+                                                  const hdk::ir::Type* type) {
+    CHECK(type->isDateTime());
+    auto unit = type->as<hdk::ir::DateTimeBaseType>()->unit();
+    if (type->isTimestamp() && unit > hdk::ir::TimeUnit::kSecond) {
       if (is_subsecond_datetrunc_field(field)) {
         int64_t date_truncate = DateTruncate(field, timeval);
-        const auto result = get_datetrunc_high_precision_scale(field, ti.get_dimension());
+        const auto result = get_datetrunc_high_precision_scale(field, unit);
         if (result != -1) {
           date_truncate -= unsigned_mod(date_truncate, result);
         }
         return date_truncate;
       } else {
-        const int64_t scale = get_timestamp_precision_scale(ti.get_dimension());
+        const int64_t scale = hdk::ir::unitsPerSecond(unit);
         return DateTruncate(field, floor_div(timeval, scale)) * scale;
       }
     }

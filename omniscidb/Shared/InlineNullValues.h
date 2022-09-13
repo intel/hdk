@@ -150,6 +150,35 @@ inline int64_t inline_int_null_val(const SQL_TYPE_INFO& ti) {
   }
 }
 
+template <typename TYPE>
+inline int64_t inline_int_null_value(const TYPE* type) {
+  switch (type->id()) {
+    case TYPE::kBoolean:
+    case TYPE::kInteger:
+    case TYPE::kDecimal:
+    case TYPE::kExtDictionary:
+      switch (type->size()) {
+        case 1:
+          return inline_int_null_value<int8_t>();
+        case 2:
+          return inline_int_null_value<int16_t>();
+        case 4:
+          return inline_int_null_value<int32_t>();
+        case 8:
+          return inline_int_null_value<int64_t>();
+        default:
+          abort();
+      }
+    case TYPE::kTimestamp:
+    case TYPE::kTime:
+    case TYPE::kDate:
+    case TYPE::kInterval:
+      return inline_int_null_value<int64_t>();
+    default:
+      abort();
+  }
+}
+
 template <typename SQL_TYPE_INFO>
 inline int64_t inline_fixed_encoding_null_val(const SQL_TYPE_INFO& ti) {
   if (ti.get_compression() == kENCODING_NONE) {
@@ -206,6 +235,16 @@ inline double inline_fp_null_val(const SQL_TYPE_INFO& ti) {
     default:
       abort();
   }
+}
+
+template <typename TYPE>
+inline double inline_fp_null_value(const TYPE* type) {
+  if (type->isFp32()) {
+    return inline_fp_null_value<float>();
+  } else if (type->isFp64()) {
+    return inline_fp_null_value<double>();
+  }
+  abort();
 }
 
 // NULL_ARRAY sentinels

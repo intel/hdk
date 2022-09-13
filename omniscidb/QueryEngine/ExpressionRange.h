@@ -151,7 +151,6 @@ class ExpressionRange {
 
   bool operator==(const ExpressionRange& other) const;
 
-  static bool typeSupportsRange(const SQLTypeInfo& ti);
   static bool typeSupportsRange(const hdk::ir::Type* type);
 
   std::string toString() const {

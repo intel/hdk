@@ -242,26 +242,27 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
 
 hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
                                          const DatetruncField& field) {
-  const auto& expr_ti = from_expr->get_type_info();
-  if (!expr_ti.is_time()) {
+  auto expr_type = from_expr->type();
+  if (!expr_type->isDateTime()) {
     throw std::runtime_error(
         "Only TIME, TIMESTAMP and DATE types can be in DATE_TRUNC function.");
   }
-  if (from_expr->get_type_info().get_type() == kTIME && field != dtHOUR &&
-      field != dtMINUTE && field != dtSECOND) {
+  if (expr_type->isTime() && field != dtHOUR && field != dtMINUTE && field != dtSECOND) {
     throw std::runtime_error("Cannot DATE_TRUNC " + from_datetrunc_field(field) +
                              " from TIME.");
   }
-  SQLTypeInfo ti(kTIMESTAMP, expr_ti.get_dimension(), 0, expr_ti.get_notnull());
+  auto unit = expr_type->isTimestamp() ? expr_type->as<hdk::ir::TimestampType>()->unit()
+                                       : hdk::ir::TimeUnit::kSecond;
+  auto type = expr_type->ctx().timestamp(unit, expr_type->nullable());
   auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(from_expr);
   if (constant) {
     Datum d{0};
     d.bigintval =
-        getDateTruncConstantValue(constant->get_constval().bigintval, field, expr_ti);
+        getDateTruncConstantValue(constant->get_constval().bigintval, field, expr_type);
     constant->set_constval(d);
-    constant->set_type_info(ti);
+    constant->set_type_info(type);
     return constant;
   }
   return hdk::ir::makeExpr<hdk::ir::DatetruncExpr>(
-      ti, from_expr->get_contains_agg(), field, from_expr->decompress());
+      type, from_expr->get_contains_agg(), field, from_expr->decompress());
 }
