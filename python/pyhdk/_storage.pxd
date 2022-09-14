@@ -50,7 +50,7 @@ cdef extern from "omniscidb/SchemaMgr/ColumnInfo.h":
 
   cdef cppclass CColumnInfo "ColumnInfo"(CColumnRef):
     string name
-    CSQLTypeInfo type
+    CSQLTypeInfo type_info
     bool is_rowid
 
     CColumnInfo(int, int, int, string, CSQLTypeInfo, bool)
