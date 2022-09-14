@@ -108,6 +108,13 @@ void StringDictionaryTranslationMgr::createKernelBuffers() {
 llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_id_lv,
                                                          const SQLTypeInfo& input_ti,
                                                          const bool add_nullcheck) const {
+  auto input_type = hdk::ir::Context::defaultCtx().fromTypeInfo(input_ti);
+  return codegenCast(input_str_id_lv, input_type, add_nullcheck);
+}
+
+llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_id_lv,
+                                                         const hdk::ir::Type* input_type,
+                                                         const bool add_nullcheck) const {
   auto cgen_state_ptr = executor_->getCgenStatePtr();
   AUTOMATIC_IR_METADATA(cgen_state_ptr);
   std::vector<std::shared_ptr<const hdk::ir::Constant>> constants_owned;
@@ -131,14 +138,14 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
   CHECK_EQ(size_t(1), translation_map_handle_lvs.size());
 
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
-  const bool is_nullable = !input_ti.get_notnull();
-  const auto decoded_input_ti = SQLTypeInfo(kTEXT, is_nullable, kENCODING_DICT);
+  const bool is_nullable = input_type->nullable();
+  const auto decoded_input_type = SQLTypeInfo(kTEXT, is_nullable, kENCODING_DICT);
   if (add_nullcheck && is_nullable) {
     nullcheck_codegen = std::make_unique<CodeGenerator::NullCheckCodegen>(
         cgen_state_ptr,
         executor_,
         input_str_id_lv,
-        decoded_input_ti,
+        decoded_input_type,
         "dict_encoded_str_cast_nullcheck");
   }
   llvm::Value* ret = cgen_state_ptr->emitCall(
@@ -148,8 +155,8 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
        cgen_state_ptr->llInt(minSourceStringId())});
 
   if (nullcheck_codegen) {
-    ret =
-        nullcheck_codegen->finalize(cgen_state_ptr->inlineIntNull(decoded_input_ti), ret);
+    ret = nullcheck_codegen->finalize(cgen_state_ptr->inlineIntNull(decoded_input_type),
+                                      ret);
   }
   return ret;
 }
