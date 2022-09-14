@@ -194,25 +194,37 @@ llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
                                                   const bool operand_is_const,
                                                   bool is_dict_intersection,
                                                   const CompilationOptions& co) {
+  auto operand_type = hdk::ir::Context::defaultCtx().fromTypeInfo(operand_ti);
+  auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(ti);
+  return codegenCastFromString(
+      operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
+}
+
+llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
+                                                  const hdk::ir::Type* operand_type,
+                                                  const hdk::ir::Type* type,
+                                                  const bool operand_is_const,
+                                                  bool is_dict_intersection,
+                                                  const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (!ti.is_string()) {
-    throw std::runtime_error("Cast from " + operand_ti.get_type_name() + " to " +
-                             ti.get_type_name() + " not supported");
+  if (!type->isString() && !type->isExtDictionary()) {
+    throw std::runtime_error("Cast from " + operand_type->toString() + " to " +
+                             type->toString() + " not supported");
   }
-  if (operand_ti.get_compression() == kENCODING_NONE &&
-      ti.get_compression() == kENCODING_NONE) {
+  if (operand_type->isString() && type->isString()) {
     return operand_lv;
   }
-  if (ti.get_compression() == kENCODING_DICT &&
-      operand_ti.get_compression() == kENCODING_DICT) {
-    if (ti.get_comp_param() == operand_ti.get_comp_param()) {
+  if (type->isExtDictionary() && operand_type->isExtDictionary()) {
+    auto dict_id = type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto operand_dict_id = operand_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    if (dict_id == operand_dict_id) {
       return operand_lv;
     }
 
     auto string_dictionary_translation_mgr =
         std::make_unique<StringDictionaryTranslationMgr>(
-            operand_ti.get_comp_param(),
-            ti.get_comp_param(),
+            operand_dict_id,
+            dict_id,
             is_dict_intersection,
             co.device_type == ExecutorDeviceType::GPU ? Data_Namespace::GPU_LEVEL
                                                       : Data_Namespace::CPU_LEVEL,
@@ -224,16 +236,15 @@ llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
 
     return cgen_state_
         ->moveStringDictionaryTranslationMgr(std::move(string_dictionary_translation_mgr))
-        ->codegenCast(operand_lv, operand_ti, true /* add_nullcheck */);
+        ->codegenCast(operand_lv, operand_type, true /* add_nullcheck */);
   }
   // dictionary encode non-constant
-  if (operand_ti.get_compression() != kENCODING_DICT && !operand_is_const) {
+  if (operand_type->isString() && !operand_is_const) {
     if (config_.exec.watchdog.enable) {
       throw WatchdogException(
           "Cast from none-encoded string to dictionary-encoded would be slow");
     }
-    CHECK_EQ(kENCODING_NONE, operand_ti.get_compression());
-    CHECK_EQ(kENCODING_DICT, ti.get_compression());
+    CHECK(type->isExtDictionary());
     CHECK(operand_lv->getType()->isIntegerTy(64));
     if (co.device_type == ExecutorDeviceType::GPU) {
       throw QueryMustRunOnCpu();
@@ -243,31 +254,34 @@ llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
         get_int_type(32, cgen_state_->context_),
         {operand_lv,
          cgen_state_->llInt(int64_t(executor()->getStringDictionaryProxy(
-             ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true)))});
+             type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+             executor()->getRowSetMemoryOwner(),
+             true)))});
   }
   CHECK(operand_lv->getType()->isIntegerTy(32));
-  if (ti.get_compression() == kENCODING_NONE) {
+  if (type->isString()) {
     if (config_.exec.watchdog.enable) {
       throw WatchdogException(
           "Cast from dictionary-encoded string to none-encoded would be slow");
     }
-    CHECK_EQ(kENCODING_DICT, operand_ti.get_compression());
+    CHECK(operand_type->isExtDictionary());
     if (co.device_type == ExecutorDeviceType::GPU) {
       throw QueryMustRunOnCpu();
     }
+    auto operand_dict_id = operand_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     const int64_t string_dictionary_ptr =
-        operand_ti.get_comp_param() == 0
+        operand_dict_id == 0
             ? reinterpret_cast<int64_t>(
                   executor()->getRowSetMemoryOwner()->getLiteralStringDictProxy())
             : reinterpret_cast<int64_t>(executor()->getStringDictionaryProxy(
-                  operand_ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true));
+                  operand_dict_id, executor()->getRowSetMemoryOwner(), true));
     return cgen_state_->emitExternalCall(
         "string_decompress",
         get_int_type(64, cgen_state_->context_),
         {operand_lv, cgen_state_->llInt(string_dictionary_ptr)});
   }
   CHECK(operand_is_const);
-  CHECK_EQ(kENCODING_DICT, ti.get_compression());
+  CHECK(type->isExtDictionary());
   return operand_lv;
 }
 

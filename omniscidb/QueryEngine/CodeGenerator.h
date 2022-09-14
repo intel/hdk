@@ -282,6 +282,12 @@ class CodeGenerator {
                                      const bool operand_is_const,
                                      bool is_dict_intersection,
                                      const CompilationOptions& co);
+  llvm::Value* codegenCastFromString(llvm::Value* operand_lv,
+                                     const hdk::ir::Type* operand_type,
+                                     const hdk::ir::Type* type,
+                                     const bool operand_is_const,
+                                     bool is_dict_intersection,
+                                     const CompilationOptions& co);
 
   llvm::Value* codegenCastToFp(llvm::Value* operand_lv,
                                const SQLTypeInfo& operand_ti,
