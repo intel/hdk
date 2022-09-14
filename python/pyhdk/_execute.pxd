@@ -79,7 +79,7 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
 
 cdef extern from "omniscidb/QueryEngine/ResultSet.h":
   cdef cppclass CResultSet "ResultSet":
-    pass
+    size_t rowCount()
 
 ctypedef shared_ptr[CResultSet] CResultSetPtr
 
@@ -98,7 +98,7 @@ cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
 cdef extern from "omniscidb/QueryEngine/Execute.h":
   cdef cppclass CExecutor "Executor":
     @staticmethod
-    shared_ptr[CExecutor] getExecutor(size_t, CDataMgr*, CBufferProvider*, shared_ptr[CConfig], const string&, const string&, const CSystemParameters&)
+    shared_ptr[CExecutor] getExecutor(CDataMgr*, CBufferProvider*, shared_ptr[CConfig], const string&, const string&, const CSystemParameters&)
 
     const CConfig &getConfig()
     shared_ptr[CConfig] getConfigPtr()
