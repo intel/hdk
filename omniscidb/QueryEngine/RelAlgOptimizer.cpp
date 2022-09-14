@@ -68,14 +68,14 @@ class InputSimpleRenumberVisitor : public DeepCopyVisitor {
     if constexpr (bAllowMissing) {
       if (renum_it != old_to_new_idx_.end()) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-            col_ref->get_type_info(), col_ref->getNode(), renum_it->second);
+            col_ref->type(), col_ref->getNode(), renum_it->second);
       } else {
         return col_ref->deep_copy();
       }
     } else {
       CHECK(renum_it != old_to_new_idx_.end());
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->get_type_info(), col_ref->getNode(), renum_it->second);
+          col_ref->type(), col_ref->getNode(), renum_it->second);
     }
   }
 
@@ -91,7 +91,7 @@ class RebindInputsVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     if (col_ref->getNode() == old_input_) {
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->get_type_info(), new_input_, col_ref->getIndex());
+          col_ref->type(), new_input_, col_ref->getIndex());
     }
     return col_ref->deep_copy();
   }
@@ -906,7 +906,7 @@ class InputRenumberVisitor : public DeepCopyVisitor {
       auto idx_it = node_it->second.find(col_ref->getIndex());
       if (idx_it != node_it->second.end()) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-            col_ref->get_type_info(), col_ref->getNode(), idx_it->second);
+            col_ref->type(), col_ref->getNode(), idx_it->second);
       }
     }
     return col_ref->deep_copy();
@@ -1348,9 +1348,8 @@ void sink_projected_boolean_expr_to_join(
     bool discarded = false;
     for (size_t i = 0; i < project->size(); ++i) {
       auto expr = project->getExpr(i);
-      if (expr->get_type_info().is_boolean() &&
-          (hdk::ir::expr_is<hdk::ir::UOper>(expr) ||
-           hdk::ir::expr_is<hdk::ir::BinOper>(expr))) {
+      if (expr->type()->isBoolean() && (hdk::ir::expr_is<hdk::ir::UOper>(expr) ||
+                                        hdk::ir::expr_is<hdk::ir::BinOper>(expr))) {
         boolean_expr_indicies.insert(i);
       } else {
         // TODO(miyu): relax?
@@ -1498,10 +1497,9 @@ void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
       InputRedirector visitor(folded_filter.get(), folded_filter->getInput(0));
       hdk::ir::ExprPtr lhs = folded_filter->getConditionExprShared();
       hdk::ir::ExprPtr rhs = visitor.visit(filter->getConditionExpr());
-      bool notnull =
-          lhs->get_type_info().get_notnull() && rhs->get_type_info().get_notnull();
+      bool nullable = lhs->type()->nullable() || rhs->type()->nullable();
       auto new_condition = hdk::ir::makeExpr<hdk::ir::BinOper>(
-          SQLTypeInfo(kBOOLEAN, notnull), false, kAND, kONE, lhs, rhs);
+          lhs->type()->ctx().boolean(nullable), false, kAND, kONE, lhs, rhs);
       folded_filter->setCondition(std::move(new_condition));
       replace_all_usages(filter, folded_filter, deconst_mapping, web);
       deconst_mapping.erase(filter.get());
@@ -1604,7 +1602,8 @@ class JoinTargetRebaseVisitor : public DeepCopyVisitor {
 hdk::ir::ExprPtr makeConstantExpr(bool val) {
   Datum d;
   d.boolval = val;
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().boolean(false), false, d);
 }
 
 class SubConditionRemoveVisitor : public DeepCopyVisitor {
@@ -1647,7 +1646,7 @@ void hoist_filter_cond_to_cross_join(
       if (auto literal = dynamic_cast<const hdk::ir::Constant*>(join->getCondition())) {
         // Assume Calcite always generates an inner join on constant boolean true for
         // cross join.
-        CHECK(literal->get_type_info().is_boolean() && literal->intVal());
+        CHECK(literal->type()->isBoolean() && literal->intVal());
         size_t first_col_idx = 0;
         const RelFilter* filter = nullptr;
         std::vector<const RelJoin*> join_seq{join};
@@ -1707,8 +1706,10 @@ void hoist_filter_cond_to_cross_join(
           auto new_join_condition = visitor.visit(join_conditions[0]);
           for (size_t i = 1; i < join_conditions.size(); ++i) {
             auto rhs = visitor.visit(join_conditions[i]);
+            auto res_type = rhs->type()->ctx().boolean(
+                rhs->type()->nullable() || new_join_condition->type()->nullable());
             new_join_condition = hdk::ir::makeExpr<hdk::ir::BinOper>(
-                kBOOLEAN, kAND, kONE, new_join_condition, rhs);
+                res_type, kAND, kONE, new_join_condition, rhs);
           }
           join->setCondition(new_join_condition);
         }
