@@ -20,29 +20,27 @@
 std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::CaseExpr* case_expr,
                                                  const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto case_ti = case_expr->get_type_info();
+  const auto case_type = case_expr->type();
   llvm::Type* case_llvm_type = nullptr;
   bool is_real_str = false;
-  if (case_ti.is_integer() || case_ti.is_time() || case_ti.is_decimal()) {
-    case_llvm_type = get_int_type(get_bit_width(case_ti), cgen_state_->context_);
-  } else if (case_ti.is_fp()) {
-    case_llvm_type = case_ti.get_type() == kFLOAT
-                         ? llvm::Type::getFloatTy(cgen_state_->context_)
-                         : llvm::Type::getDoubleTy(cgen_state_->context_);
-  } else if (case_ti.is_string()) {
-    if (case_ti.get_compression() == kENCODING_DICT) {
-      case_llvm_type =
-          get_int_type(8 * case_ti.get_logical_size(), cgen_state_->context_);
-    } else {
-      is_real_str = true;
-      case_llvm_type = get_int_type(64, cgen_state_->context_);
-    }
-  } else if (case_ti.is_boolean()) {
-    case_llvm_type = get_int_type(8 * case_ti.get_logical_size(), cgen_state_->context_);
+  if (case_type->isInteger() || case_type->isDateTime() || case_type->isDecimal()) {
+    case_llvm_type = get_int_type(get_bit_width(case_type), cgen_state_->context_);
+  } else if (case_type->isFloatingPoint()) {
+    case_llvm_type = case_type->isFp32() ? llvm::Type::getFloatTy(cgen_state_->context_)
+                                         : llvm::Type::getDoubleTy(cgen_state_->context_);
+  } else if (case_type->isExtDictionary()) {
+    case_llvm_type =
+        get_int_type(8 * hdk::ir::logicalSize(case_type), cgen_state_->context_);
+  } else if (case_type->isString()) {
+    is_real_str = true;
+    case_llvm_type = get_int_type(64, cgen_state_->context_);
+  } else if (case_type->isBoolean()) {
+    case_llvm_type =
+        get_int_type(8 * hdk::ir::logicalSize(case_type), cgen_state_->context_);
   }
   CHECK(case_llvm_type);
-  const auto& else_ti = case_expr->get_else_expr()->get_type_info();
-  CHECK_EQ(else_ti.get_type(), case_ti.get_type());
+  const auto& else_type = case_expr->get_else_expr()->type();
+  CHECK_EQ(else_type->id(), case_type->id());
   llvm::Value* case_val = codegenCase(case_expr, case_llvm_type, is_real_str, co);
   std::vector<llvm::Value*> ret_vals{case_val};
   if (is_real_str) {
