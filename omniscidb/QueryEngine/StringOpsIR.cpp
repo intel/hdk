@@ -84,10 +84,10 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
   if (expr->get_calc_encoded_length()) {
     fn_name += "_encoded";
   }
-  const bool is_nullable{!expr->get_arg()->get_type_info().get_notnull()};
+  const bool is_nullable{expr->get_arg()->type()->nullable()};
   if (is_nullable) {
     fn_name += "_nullable";
-    charlength_args.push_back(cgen_state_->inlineIntNull(expr->get_type_info()));
+    charlength_args.push_back(cgen_state_->inlineIntNull(expr->type()));
   }
   return expr->get_calc_encoded_length()
              ? cgen_state_->emitExternalCall(
@@ -113,8 +113,11 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LowerExpr* expr,
   auto str_id_lv = codegen(expr->get_arg(), true, co);
   CHECK_EQ(size_t(1), str_id_lv.size());
 
+  CHECK(expr->type()->isExtDictionary());
   const auto string_dictionary_proxy = executor()->getStringDictionaryProxy(
-      expr->get_type_info().get_comp_param(), executor()->getRowSetMemoryOwner(), true);
+      expr->type()->as<hdk::ir::ExtDictionaryType>()->dictId(),
+      executor()->getRowSetMemoryOwner(),
+      true);
   CHECK(string_dictionary_proxy);
 
   std::vector<llvm::Value*> args{
@@ -136,7 +139,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
     auto escape_char_expr =
         dynamic_cast<const hdk::ir::Constant*>(expr->get_escape_expr());
     CHECK(escape_char_expr);
-    CHECK(escape_char_expr->get_type_info().is_string());
+    CHECK(escape_char_expr->type()->isString());
     CHECK_EQ(size_t(1), escape_char_expr->get_constval().stringval->size());
     escape_char = (*escape_char_expr->get_constval().stringval)[0];
   }
@@ -151,9 +154,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   if (fast_dict_like_lv) {
     return fast_dict_like_lv;
   }
-  const auto& ti = expr->get_arg()->get_type_info();
-  CHECK(ti.is_string());
-  if (config_.exec.watchdog.enable && ti.get_compression() != kENCODING_NONE) {
+  const auto& type = expr->get_arg()->type();
+  CHECK(type->isString() || type->isExtDictionary());
+  if (config_.exec.watchdog.enable && type->isExtDictionary()) {
     throw WatchdogException(
         "Cannot do LIKE / ILIKE on this dictionary encoded column, its cardinality is "
         "too high");
@@ -169,7 +172,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   }
   auto like_expr_arg_lvs = codegen(expr->get_like_expr(), true, co);
   CHECK_EQ(size_t(3), like_expr_arg_lvs.size());
-  const bool is_nullable{!expr->get_arg()->get_type_info().get_notnull()};
+  const bool is_nullable{expr->get_arg()->type()->nullable()};
   std::vector<llvm::Value*> str_like_args{
       str_lv[1], str_lv[2], like_expr_arg_lvs[1], like_expr_arg_lvs[2]};
   std::string fn_name{expr->get_is_ilike() ? "string_ilike" : "string_like"};
@@ -180,7 +183,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   }
   if (is_nullable) {
     fn_name += "_nullable";
-    str_like_args.push_back(cgen_state_->inlineIntNull(expr->get_type_info()));
+    str_like_args.push_back(cgen_state_->inlineIntNull(expr->type()));
   }
   return cgen_state_->emitCall(fn_name, str_like_args);
 }
@@ -199,21 +202,20 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
   CHECK(cast_oper);
   CHECK_EQ(kCAST, cast_oper->get_optype());
   const auto dict_like_arg = cast_oper->get_own_operand();
-  const auto& dict_like_arg_ti = dict_like_arg->get_type_info();
-  if (!dict_like_arg_ti.is_string()) {
-    throw(std::runtime_error("Cast from " + dict_like_arg_ti.get_type_name() + " to " +
-                             cast_oper->get_type_info().get_type_name() +
-                             " not supported"));
+  const auto& dict_like_arg_type = dict_like_arg->type();
+  if (!dict_like_arg_type->isExtDictionary()) {
+    throw(std::runtime_error("Cast from " + dict_like_arg_type->toString() + " to " +
+                             cast_oper->type()->toString() + " not supported"));
   }
-  CHECK_EQ(kENCODING_DICT, dict_like_arg_ti.get_compression());
   const auto sdp = executor()->getStringDictionaryProxy(
-      dict_like_arg_ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true);
+      dict_like_arg_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+      executor()->getRowSetMemoryOwner(),
+      true);
   if (sdp->storageEntryCount() > 200000000) {
     return nullptr;
   }
-  const auto& pattern_ti = pattern->get_type_info();
-  CHECK(pattern_ti.is_string());
-  CHECK_EQ(kENCODING_NONE, pattern_ti.get_compression());
+  const auto& pattern_type = pattern->type();
+  CHECK(pattern_type->isString());
   const auto& pattern_datum = pattern->get_constval();
   const auto& pattern_str = *pattern_datum.stringval;
   const auto matching_ids = sdp->getLike(pattern_str, ilike, is_simple, escape_char);
@@ -221,7 +223,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
   std::vector<int64_t> matching_ids_64(matching_ids.size());
   std::copy(matching_ids.begin(), matching_ids.end(), matching_ids_64.begin());
   const auto in_values = std::make_shared<hdk::ir::InIntegerSet>(
-      dict_like_arg, matching_ids_64, dict_like_arg_ti.get_notnull());
+      dict_like_arg, matching_ids_64, !dict_like_arg_type->nullable());
   return codegen(in_values.get(), co);
 }
 
@@ -271,8 +273,10 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   std::shared_ptr<const hdk::ir::ColumnVar> col_var;
   auto compare_opr = compare_operator;
   if (lhs_col_var && rhs_col_var) {
-    if (lhs_col_var->get_type_info().get_comp_param() ==
-        rhs_col_var->get_type_info().get_comp_param()) {
+    CHECK(lhs_col_var->type()->isExtDictionary());
+    CHECK(rhs_col_var->type()->isExtDictionary());
+    if (lhs_col_var->type()->as<hdk::ir::ExtDictionaryType>()->dictId() ==
+        rhs_col_var->type()->as<hdk::ir::ExtDictionaryType>()->dictId()) {
       if (compare_operator == kEQ || compare_operator == kNE) {
         // TODO (vraj): implement compare between two dictionary encoded columns which
         // share a dictionary
@@ -318,11 +322,12 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   }
   const auto& const_val = const_expr->get_constval();
 
-  const auto col_ti = col_var->get_type_info();
-  CHECK(col_ti.is_string());
-  CHECK_EQ(kENCODING_DICT, col_ti.get_compression());
+  const auto col_type = col_var->type();
+  CHECK(col_type->isExtDictionary());
   const auto sdp = executor()->getStringDictionaryProxy(
-      col_ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true);
+      col_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+      executor()->getRowSetMemoryOwner(),
+      true);
 
   if (sdp->storageEntryCount() > 200000000) {
     std::runtime_error("Cardinality for string dictionary is too high");
@@ -337,7 +342,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   std::copy(matching_ids.begin(), matching_ids.end(), matching_ids_64.begin());
 
   const auto in_values = std::make_shared<hdk::ir::InIntegerSet>(
-      col_var, matching_ids_64, col_ti.get_notnull());
+      col_var, matching_ids_64, !col_type->nullable());
   return codegen(in_values.get(), co);
 }
 
@@ -352,7 +357,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
     auto escape_char_expr =
         dynamic_cast<const hdk::ir::Constant*>(expr->get_escape_expr());
     CHECK(escape_char_expr);
-    CHECK(escape_char_expr->get_type_info().is_string());
+    CHECK(escape_char_expr->type()->isString());
     CHECK_EQ(size_t(1), escape_char_expr->get_constval().stringval->size());
     escape_char = (*escape_char_expr->get_constval().stringval)[0];
   }
@@ -363,9 +368,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
   if (fast_dict_pattern_lv) {
     return fast_dict_pattern_lv;
   }
-  const auto& ti = expr->get_arg()->get_type_info();
-  CHECK(ti.is_string());
-  if (config_.exec.watchdog.enable && ti.get_compression() != kENCODING_NONE) {
+  const auto& type = expr->get_arg()->type();
+  CHECK(type->isString() || type->isExtDictionary());
+  if (config_.exec.watchdog.enable && type->isExtDictionary()) {
     throw WatchdogException(
         "Cannot do REGEXP_LIKE on this dictionary encoded column, its cardinality is too "
         "high");
@@ -382,14 +387,14 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
   }
   auto regexp_expr_arg_lvs = codegen(expr->get_pattern_expr(), true, co);
   CHECK_EQ(size_t(3), regexp_expr_arg_lvs.size());
-  const bool is_nullable{!expr->get_arg()->get_type_info().get_notnull()};
+  const bool is_nullable{expr->get_arg()->type()->nullable()};
   std::vector<llvm::Value*> regexp_args{
       str_lv[1], str_lv[2], regexp_expr_arg_lvs[1], regexp_expr_arg_lvs[2]};
   std::string fn_name("regexp_like");
   regexp_args.push_back(cgen_state_->llInt(int8_t(escape_char)));
   if (is_nullable) {
     fn_name += "_nullable";
-    regexp_args.push_back(cgen_state_->inlineIntNull(expr->get_type_info()));
+    regexp_args.push_back(cgen_state_->inlineIntNull(expr->type()));
     return cgen_state_->emitExternalCall(
         fn_name, get_int_type(8, cgen_state_->context_), regexp_args);
   }
@@ -409,18 +414,16 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
   CHECK(cast_oper);
   CHECK_EQ(kCAST, cast_oper->get_optype());
   const auto dict_regexp_arg = cast_oper->get_own_operand();
-  const auto& dict_regexp_arg_ti = dict_regexp_arg->get_type_info();
-  CHECK(dict_regexp_arg_ti.is_string());
-  CHECK_EQ(kENCODING_DICT, dict_regexp_arg_ti.get_compression());
-  const auto comp_param = dict_regexp_arg_ti.get_comp_param();
+  const auto& dict_regexp_arg_type = dict_regexp_arg->type();
+  CHECK(dict_regexp_arg_type->isExtDictionary());
+  const auto dict_id = dict_regexp_arg_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   const auto sdp = executor()->getStringDictionaryProxy(
-      comp_param, executor()->getRowSetMemoryOwner(), true);
+      dict_id, executor()->getRowSetMemoryOwner(), true);
   if (sdp->storageEntryCount() > 15000000) {
     return nullptr;
   }
-  const auto& pattern_ti = pattern->get_type_info();
-  CHECK(pattern_ti.is_string());
-  CHECK_EQ(kENCODING_NONE, pattern_ti.get_compression());
+  const auto& pattern_type = pattern->type();
+  CHECK(pattern_type->isString());
   const auto& pattern_datum = pattern->get_constval();
   const auto& pattern_str = *pattern_datum.stringval;
   const auto matching_ids = sdp->getRegexpLike(pattern_str, escape_char);
@@ -428,6 +431,6 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
   std::vector<int64_t> matching_ids_64(matching_ids.size());
   std::copy(matching_ids.begin(), matching_ids.end(), matching_ids_64.begin());
   const auto in_values = std::make_shared<hdk::ir::InIntegerSet>(
-      dict_regexp_arg, matching_ids_64, dict_regexp_arg_ti.get_notnull());
+      dict_regexp_arg, matching_ids_64, !dict_regexp_arg_type->nullable());
   return codegen(in_values.get(), co);
 }
