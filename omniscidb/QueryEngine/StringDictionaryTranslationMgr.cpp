@@ -106,13 +106,6 @@ void StringDictionaryTranslationMgr::createKernelBuffers() {
 }
 
 llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_id_lv,
-                                                         const SQLTypeInfo& input_ti,
-                                                         const bool add_nullcheck) const {
-  auto input_type = hdk::ir::Context::defaultCtx().fromTypeInfo(input_ti);
-  return codegenCast(input_str_id_lv, input_type, add_nullcheck);
-}
-
-llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_id_lv,
                                                          const hdk::ir::Type* input_type,
                                                          const bool add_nullcheck) const {
   auto cgen_state_ptr = executor_->getCgenStatePtr();

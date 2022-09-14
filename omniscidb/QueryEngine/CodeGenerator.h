@@ -127,6 +127,9 @@ class CodeGenerator {
                                     const EncodingType enc_type,
                                     const int dict_id,
                                     const CompilationOptions&);
+  std::vector<llvm::Value*> codegen(const hdk::ir::Constant*,
+                                    const hdk::ir::Type* type,
+                                    const CompilationOptions&);
 
   virtual std::vector<llvm::Value*> codegenColumn(const hdk::ir::ColumnVar*,
                                                   const bool fetch_column,
@@ -159,6 +162,12 @@ class CodeGenerator {
   llvm::Value* codegenCast(llvm::Value* operand_lv,
                            const SQLTypeInfo& operand_ti,
                            const SQLTypeInfo& ti,
+                           const bool operand_is_const,
+                           bool is_dict_intersection,
+                           const CompilationOptions& co);
+  llvm::Value* codegenCast(llvm::Value* operand_lv,
+                           const hdk::ir::Type* operand_type,
+                           const hdk::ir::Type* type,
                            const bool operand_is_const,
                            bool is_dict_intersection,
                            const CompilationOptions& co);
@@ -268,20 +277,14 @@ class CodeGenerator {
   llvm::Value* codegenFpArith(const hdk::ir::BinOper*, llvm::Value*, llvm::Value*);
 
   llvm::Value* codegenCastTimestampToDate(llvm::Value* ts_lv,
-                                          const int dimen,
+                                          const hdk::ir::TimeUnit unit,
                                           const bool nullable);
 
   llvm::Value* codegenCastBetweenTimestamps(llvm::Value* ts_lv,
-                                            const SQLTypeInfo& operand_dimen,
-                                            const SQLTypeInfo& target_dimen,
+                                            const hdk::ir::Type* operand_type,
+                                            const hdk::ir::Type* target_type,
                                             const bool nullable);
 
-  llvm::Value* codegenCastFromString(llvm::Value* operand_lv,
-                                     const SQLTypeInfo& operand_ti,
-                                     const SQLTypeInfo& ti,
-                                     const bool operand_is_const,
-                                     bool is_dict_intersection,
-                                     const CompilationOptions& co);
   llvm::Value* codegenCastFromString(llvm::Value* operand_lv,
                                      const hdk::ir::Type* operand_type,
                                      const hdk::ir::Type* type,
@@ -290,12 +293,12 @@ class CodeGenerator {
                                      const CompilationOptions& co);
 
   llvm::Value* codegenCastToFp(llvm::Value* operand_lv,
-                               const SQLTypeInfo& operand_ti,
-                               const SQLTypeInfo& ti);
+                               const hdk::ir::Type* operand_type,
+                               const hdk::ir::Type* type);
 
   llvm::Value* codegenCastFromFp(llvm::Value* operand_lv,
-                                 const SQLTypeInfo& operand_ti,
-                                 const SQLTypeInfo& ti);
+                                 const hdk::ir::Type* operand_type,
+                                 const hdk::ir::Type* type);
 
   llvm::Value* codegenAdd(const hdk::ir::BinOper*,
                           llvm::Value*,

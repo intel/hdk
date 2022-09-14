@@ -22,15 +22,14 @@ llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
                                         const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK_EQ(uoper->get_optype(), kCAST);
-  const auto& ti = uoper->get_type_info();
+  const auto& type = uoper->type();
   const auto operand = uoper->get_operand();
   const auto operand_as_const = dynamic_cast<const hdk::ir::Constant*>(operand);
   // For dictionary encoded constants, the cast holds the dictionary id
   // information as the compression parameter; handle this case separately.
   llvm::Value* operand_lv{nullptr};
   if (operand_as_const) {
-    const auto operand_lvs =
-        codegen(operand_as_const, ti.get_compression(), ti.get_comp_param(), co);
+    const auto operand_lvs = codegen(operand_as_const, type, co);
     if (operand_lvs.size() == 3) {
       operand_lv = cgen_state_->emitCall("string_pack", {operand_lvs[1], operand_lvs[2]});
     } else {
@@ -39,16 +38,25 @@ llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
   } else {
     operand_lv = codegen(operand, true, co).front();
   }
-  const auto& operand_ti = operand->get_type_info();
-  return codegenCast(
-      operand_lv, operand_ti, ti, operand_as_const, uoper->is_dict_intersection(), co);
+  const auto& operand_type = operand->type();
+  return codegenCast(operand_lv,
+                     operand_type,
+                     type,
+                     operand_as_const,
+                     uoper->is_dict_intersection(),
+                     co);
 }
 
 namespace {
 
-bool byte_array_cast(const SQLTypeInfo& operand_ti, const SQLTypeInfo& ti) {
-  return (operand_ti.is_array() && ti.is_array() && ti.get_subtype() == kTINYINT &&
-          operand_ti.get_size() > 0 && operand_ti.get_size() == ti.get_size());
+bool byte_array_cast(const hdk::ir::Type* operand_type, const hdk::ir::Type* type) {
+  if (!operand_type->isArray() || !type->isArray()) {
+    return false;
+  }
+
+  auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
+  return (elem_type->isInt8() && operand_type->size() > 0 &&
+          operand_type->size() == type->size());
 }
 
 }  // namespace
@@ -59,36 +67,48 @@ llvm::Value* CodeGenerator::codegenCast(llvm::Value* operand_lv,
                                         const bool operand_is_const,
                                         bool is_dict_intersection,
                                         const CompilationOptions& co) {
+  auto operand_type = hdk::ir::Context::defaultCtx().fromTypeInfo(operand_ti);
+  auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(ti);
+  return codegenCast(
+      operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
+}
+
+llvm::Value* CodeGenerator::codegenCast(llvm::Value* operand_lv,
+                                        const hdk::ir::Type* operand_type,
+                                        const hdk::ir::Type* type,
+                                        const bool operand_is_const,
+                                        bool is_dict_intersection,
+                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (byte_array_cast(operand_ti, ti)) {
-    auto* byte_array_type = get_int_array_type(8, ti.get_size(), cgen_state_->context_);
+  if (byte_array_cast(operand_type, type)) {
+    auto* byte_array_type = get_int_array_type(8, type->size(), cgen_state_->context_);
     return cgen_state_->ir_builder_.CreatePointerCast(operand_lv,
                                                       byte_array_type->getPointerTo());
   }
   if (operand_lv->getType()->isIntegerTy()) {
-    if (operand_ti.is_string()) {
+    if (operand_type->isString() || operand_type->isExtDictionary()) {
       return codegenCastFromString(
-          operand_lv, operand_ti, ti, operand_is_const, is_dict_intersection, co);
+          operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
     }
-    CHECK(operand_ti.is_integer() || operand_ti.is_decimal() || operand_ti.is_time() ||
-          operand_ti.is_boolean());
-    if (operand_ti.is_boolean()) {
+    CHECK(operand_type->isInteger() || operand_type->isDecimal() ||
+          operand_type->isDateTime() || operand_type->isBoolean());
+    if (operand_type->isBoolean()) {
       // cast boolean to int8
       CHECK(operand_lv->getType()->isIntegerTy(1) ||
             operand_lv->getType()->isIntegerTy(8));
       if (operand_lv->getType()->isIntegerTy(1)) {
         operand_lv = cgen_state_->castToTypeIn(operand_lv, 8);
       }
-      if (ti.is_boolean()) {
+      if (type->isBoolean()) {
         return operand_lv;
       }
     }
-    if (operand_ti.is_integer() && operand_lv->getType()->isIntegerTy(8) &&
-        ti.is_boolean()) {
+    if (operand_type->isInteger() && operand_lv->getType()->isIntegerTy(8) &&
+        type->isBoolean()) {
       // cast int8 to boolean
-      return codegenCastBetweenIntTypes(operand_lv, operand_ti, ti);
+      return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
     }
-    if (operand_ti.get_type() == kTIMESTAMP && ti.get_type() == kDATE) {
+    if (operand_type->isTimestamp() && type->isDate()) {
       // Maybe we should instead generate DatetruncExpr directly from RelAlgTranslator
       // for this pattern. However, DatetruncExpr is supposed to return a timestamp,
       // whereas this cast returns a date. The underlying type for both is still the same,
@@ -96,57 +116,55 @@ llvm::Value* CodeGenerator::codegenCast(llvm::Value* operand_lv,
       // Date will have default precision of day, but TIMESTAMP dimension would
       // matter but while converting date through seconds
       return codegenCastTimestampToDate(
-          operand_lv, operand_ti.get_dimension(), !ti.get_notnull());
+          operand_lv,
+          operand_type->as<hdk::ir::TimestampType>()->unit(),
+          type->nullable());
     }
-    if ((operand_ti.get_type() == kTIMESTAMP || operand_ti.get_type() == kDATE) &&
-        ti.get_type() == kTIMESTAMP) {
-      const auto operand_dimen =
-          (operand_ti.is_timestamp()) ? operand_ti.get_dimension() : 0;
-      if (operand_dimen != ti.get_dimension()) {
+    if ((operand_type->isTimestamp() || operand_type->isDate()) && type->isTimestamp()) {
+      const auto operand_unit = (operand_type->isTimestamp())
+                                    ? operand_type->as<hdk::ir::TimestampType>()->unit()
+                                    : hdk::ir::TimeUnit::kSecond;
+      if (operand_unit != type->as<hdk::ir::TimestampType>()->unit()) {
         return codegenCastBetweenTimestamps(
-            operand_lv, operand_ti, ti, !ti.get_notnull());
+            operand_lv, operand_type, type, type->nullable());
       }
     }
-    if (ti.is_integer() || ti.is_decimal() || ti.is_time()) {
-      return codegenCastBetweenIntTypes(operand_lv, operand_ti, ti);
+    if (type->isInteger() || type->isDecimal() || type->isDateTime()) {
+      return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
     } else {
-      return codegenCastToFp(operand_lv, operand_ti, ti);
+      return codegenCastToFp(operand_lv, operand_type, type);
     }
   } else {
-    return codegenCastFromFp(operand_lv, operand_ti, ti);
+    return codegenCastFromFp(operand_lv, operand_type, type);
   }
   CHECK(false);
   return nullptr;
 }
 
 llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
-                                                       const int dimen,
+                                                       const hdk::ir::TimeUnit unit,
                                                        const bool nullable) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(ts_lv->getType()->isIntegerTy(64));
-  if (dimen > 0) {
+  if (unit > hdk::ir::TimeUnit::kSecond) {
     if (nullable) {
       return cgen_state_->emitExternalCall(
           "DateTruncateHighPrecisionToDateNullable",
           get_int_type(64, cgen_state_->context_),
           {{ts_lv,
-            cgen_state_->llInt(DateTimeUtils::get_timestamp_precision_scale(dimen)),
+            cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)),
             cgen_state_->inlineIntNull(SQLTypeInfo(kBIGINT, false))}});
     }
     return cgen_state_->emitExternalCall(
         "DateTruncateHighPrecisionToDate",
         get_int_type(64, cgen_state_->context_),
-        {{ts_lv,
-          cgen_state_->llInt(DateTimeUtils::get_timestamp_precision_scale(dimen))}});
+        {{ts_lv, cgen_state_->llInt(hdk::ir::unitsPerSecond(unit))}});
   }
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
   if (nullable) {
-    nullcheck_codegen =
-        std::make_unique<NullCheckCodegen>(cgen_state_,
-                                           executor(),
-                                           ts_lv,
-                                           SQLTypeInfo(kTIMESTAMP, dimen, 0, !nullable),
-                                           "cast_timestamp_nullcheck");
+    auto type = hdk::ir::Context::defaultCtx().timestamp(unit, nullable);
+    nullcheck_codegen = std::make_unique<NullCheckCodegen>(
+        cgen_state_, executor(), ts_lv, type, "cast_timestamp_nullcheck");
   }
   auto ret = cgen_state_->emitExternalCall(
       "datetrunc_day", get_int_type(64, cgen_state_->context_), {ts_lv});
@@ -156,48 +174,43 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
   return ret;
 }
 
-llvm::Value* CodeGenerator::codegenCastBetweenTimestamps(llvm::Value* ts_lv,
-                                                         const SQLTypeInfo& operand_ti,
-                                                         const SQLTypeInfo& target_ti,
-                                                         const bool nullable) {
+llvm::Value* CodeGenerator::codegenCastBetweenTimestamps(
+    llvm::Value* ts_lv,
+    const hdk::ir::Type* operand_type,
+    const hdk::ir::Type* target_type,
+    const bool nullable) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto operand_dimen = operand_ti.get_dimension();
-  const auto target_dimen = target_ti.get_dimension();
-  if (operand_dimen == target_dimen) {
+  const auto operand_unit = operand_type->isTimestamp()
+                                ? operand_type->as<hdk::ir::TimestampType>()->unit()
+                                : hdk::ir::TimeUnit::kSecond;
+  const auto target_unit = target_type->isTimestamp()
+                               ? target_type->as<hdk::ir::TimestampType>()->unit()
+                               : hdk::ir::TimeUnit::kSecond;
+  if (operand_unit == target_unit) {
     return ts_lv;
   }
   CHECK(ts_lv->getType()->isIntegerTy(64));
-  const auto scale =
-      DateTimeUtils::get_timestamp_precision_scale(abs(operand_dimen - target_dimen));
-  if (operand_dimen < target_dimen) {
-    codegenCastBetweenIntTypesOverflowChecks(ts_lv, operand_ti, target_ti, scale);
+  if (operand_unit < target_unit) {
+    const auto scale =
+        hdk::ir::unitsPerSecond(target_unit) / hdk::ir::unitsPerSecond(operand_unit);
+    codegenCastBetweenIntTypesOverflowChecks(ts_lv, operand_type, target_type, scale);
     return nullable
                ? cgen_state_->emitCall("mul_int64_t_nullable_lhs",
                                        {ts_lv,
                                         cgen_state_->llInt(static_cast<int64_t>(scale)),
-                                        cgen_state_->inlineIntNull(operand_ti)})
+                                        cgen_state_->inlineIntNull(operand_type)})
                : cgen_state_->ir_builder_.CreateMul(
                      ts_lv, cgen_state_->llInt(static_cast<int64_t>(scale)));
   }
+  const auto scale =
+      hdk::ir::unitsPerSecond(operand_unit) / hdk::ir::unitsPerSecond(target_unit);
   return nullable
              ? cgen_state_->emitCall("floor_div_nullable_lhs",
                                      {ts_lv,
                                       cgen_state_->llInt(static_cast<int64_t>(scale)),
-                                      cgen_state_->inlineIntNull(operand_ti)})
+                                      cgen_state_->inlineIntNull(operand_type)})
              : cgen_state_->ir_builder_.CreateSDiv(
                    ts_lv, cgen_state_->llInt(static_cast<int64_t>(scale)));
-}
-
-llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
-                                                  const SQLTypeInfo& operand_ti,
-                                                  const SQLTypeInfo& ti,
-                                                  const bool operand_is_const,
-                                                  bool is_dict_intersection,
-                                                  const CompilationOptions& co) {
-  auto operand_type = hdk::ir::Context::defaultCtx().fromTypeInfo(operand_ti);
-  auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(ti);
-  return codegenCastFromString(
-      operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
 }
 
 llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
@@ -551,42 +564,45 @@ void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
 }
 
 llvm::Value* CodeGenerator::codegenCastToFp(llvm::Value* operand_lv,
-                                            const SQLTypeInfo& operand_ti,
-                                            const SQLTypeInfo& ti) {
+                                            const hdk::ir::Type* operand_type,
+                                            const hdk::ir::Type* type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (!ti.is_fp()) {
-    throw std::runtime_error("Cast from " + operand_ti.get_type_name() + " to " +
-                             ti.get_type_name() + " not supported");
+  if (!type->isFloatingPoint()) {
+    throw std::runtime_error("Cast from " + operand_type->toString() + " to " +
+                             type->toString() + " not supported");
   }
+  auto scale =
+      operand_type->isDecimal() ? operand_type->as<hdk::ir::DecimalType>()->scale() : 0;
   llvm::Value* result_lv;
-  if (operand_ti.get_notnull()) {
-    auto const fp_type = ti.get_type() == kFLOAT
-                             ? llvm::Type::getFloatTy(cgen_state_->context_)
-                             : llvm::Type::getDoubleTy(cgen_state_->context_);
+  if (!operand_type->nullable()) {
+    auto const fp_type = type->isFp32() ? llvm::Type::getFloatTy(cgen_state_->context_)
+                                        : llvm::Type::getDoubleTy(cgen_state_->context_);
     result_lv = cgen_state_->ir_builder_.CreateSIToFP(operand_lv, fp_type);
-    if (auto const scale = static_cast<unsigned>(operand_ti.get_scale())) {
+    if (scale) {
       double const multiplier = shared::power10inv(scale);
       result_lv = cgen_state_->ir_builder_.CreateFMul(
           result_lv, llvm::ConstantFP::get(result_lv->getType(), multiplier));
     }
   } else {
-    if (auto const scale = static_cast<unsigned>(operand_ti.get_scale())) {
+    if (scale) {
       double const multiplier = shared::power10inv(scale);
-      auto const fp_type = ti.get_type() == kFLOAT
+      auto const fp_type = type->isFp32()
                                ? llvm::Type::getFloatTy(cgen_state_->context_)
                                : llvm::Type::getDoubleTy(cgen_state_->context_);
-      result_lv = cgen_state_->emitCall("cast_" + numeric_type_name(operand_ti) + "_to_" +
-                                            numeric_type_name(ti) + "_scaled_nullable",
-                                        {operand_lv,
-                                         cgen_state_->inlineIntNull(operand_ti),
-                                         cgen_state_->inlineFpNull(ti),
-                                         llvm::ConstantFP::get(fp_type, multiplier)});
+      result_lv =
+          cgen_state_->emitCall("cast_" + numeric_type_name(operand_type) + "_to_" +
+                                    numeric_type_name(type) + "_scaled_nullable",
+                                {operand_lv,
+                                 cgen_state_->inlineIntNull(operand_type),
+                                 cgen_state_->inlineFpNull(type),
+                                 llvm::ConstantFP::get(fp_type, multiplier)});
     } else {
-      result_lv = cgen_state_->emitCall("cast_" + numeric_type_name(operand_ti) + "_to_" +
-                                            numeric_type_name(ti) + "_nullable",
-                                        {operand_lv,
-                                         cgen_state_->inlineIntNull(operand_ti),
-                                         cgen_state_->inlineFpNull(ti)});
+      result_lv =
+          cgen_state_->emitCall("cast_" + numeric_type_name(operand_type) + "_to_" +
+                                    numeric_type_name(type) + "_nullable",
+                                {operand_lv,
+                                 cgen_state_->inlineIntNull(operand_type),
+                                 cgen_state_->inlineFpNull(type)});
     }
   }
   CHECK(result_lv);
@@ -594,26 +610,26 @@ llvm::Value* CodeGenerator::codegenCastToFp(llvm::Value* operand_lv,
 }
 
 llvm::Value* CodeGenerator::codegenCastFromFp(llvm::Value* operand_lv,
-                                              const SQLTypeInfo& operand_ti,
-                                              const SQLTypeInfo& ti) {
+                                              const hdk::ir::Type* operand_type,
+                                              const hdk::ir::Type* type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (!operand_ti.is_fp() || !ti.is_number() || ti.is_decimal()) {
-    throw std::runtime_error("Cast from " + operand_ti.get_type_name() + " to " +
-                             ti.get_type_name() + " not supported");
+  if (!operand_type->isFloatingPoint() || !type->isNumber() || type->isDecimal()) {
+    throw std::runtime_error("Cast from " + operand_type->toString() + " to " +
+                             type->toString() + " not supported");
   }
-  if (operand_ti.get_type() == ti.get_type()) {
+  if (operand_type->id() == type->id() && operand_type->size() == type->size()) {
     // Should not have been called when both dimensions are same.
     return operand_lv;
   }
   CHECK(operand_lv->getType()->isFloatTy() || operand_lv->getType()->isDoubleTy());
-  if (operand_ti.get_notnull()) {
-    if (ti.get_type() == kDOUBLE) {
+  if (!operand_type->nullable()) {
+    if (type->isFp64()) {
       return cgen_state_->ir_builder_.CreateFPExt(
           operand_lv, llvm::Type::getDoubleTy(cgen_state_->context_));
-    } else if (ti.get_type() == kFLOAT) {
+    } else if (type->isFp32()) {
       return cgen_state_->ir_builder_.CreateFPTrunc(
           operand_lv, llvm::Type::getFloatTy(cgen_state_->context_));
-    } else if (ti.is_integer()) {
+    } else if (type->isInteger()) {
       // Round by adding/subtracting 0.5 before fptosi.
       auto* fp_type = operand_lv->getType()->isFloatTy()
                           ? llvm::Type::getFloatTy(cgen_state_->context_)
@@ -625,23 +641,23 @@ llvm::Value* CodeGenerator::codegenCastFromFp(llvm::Value* operand_lv,
       auto* offset = cgen_state_->ir_builder_.CreateSelect(is_negative, mhalf, phalf);
       operand_lv = cgen_state_->ir_builder_.CreateFAdd(operand_lv, offset);
       return cgen_state_->ir_builder_.CreateFPToSI(
-          operand_lv, get_int_type(get_bit_width(ti), cgen_state_->context_));
+          operand_lv, get_int_type(get_bit_width(type), cgen_state_->context_));
     } else {
       CHECK(false);
     }
   } else {
-    const auto from_tname = numeric_type_name(operand_ti);
-    const auto to_tname = numeric_type_name(ti);
-    if (ti.is_fp()) {
+    const auto from_tname = numeric_type_name(operand_type);
+    const auto to_tname = numeric_type_name(type);
+    if (type->isFloatingPoint()) {
       return cgen_state_->emitCall("cast_" + from_tname + "_to_" + to_tname + "_nullable",
                                    {operand_lv,
-                                    cgen_state_->inlineFpNull(operand_ti),
-                                    cgen_state_->inlineFpNull(ti)});
-    } else if (ti.is_integer()) {
+                                    cgen_state_->inlineFpNull(operand_type),
+                                    cgen_state_->inlineFpNull(type)});
+    } else if (type->isInteger()) {
       return cgen_state_->emitCall("cast_" + from_tname + "_to_" + to_tname + "_nullable",
                                    {operand_lv,
-                                    cgen_state_->inlineFpNull(operand_ti),
-                                    cgen_state_->inlineIntNull(ti)});
+                                    cgen_state_->inlineFpNull(operand_type),
+                                    cgen_state_->inlineIntNull(type)});
     } else {
       CHECK(false);
     }

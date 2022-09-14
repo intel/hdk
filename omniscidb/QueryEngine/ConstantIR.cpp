@@ -82,6 +82,69 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
   abort();
 }
 
+std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* constant,
+                                                 const hdk::ir::Type* type,
+                                                 const CompilationOptions& co) {
+  AUTOMATIC_IR_METADATA(cgen_state_);
+  if (co.hoist_literals) {
+    std::vector<const hdk::ir::Constant*> constants(
+        executor()->deviceCount(co.device_type), constant);
+    auto ti = type->toTypeInfo();
+    return codegenHoistedConstants(constants, ti.get_compression(), ti.get_comp_param());
+  }
+  const auto& cst_type = constant->type();
+  switch (cst_type->id()) {
+    case hdk::ir::Type::kBoolean:
+      return {llvm::ConstantInt::get(get_int_type(8, cgen_state_->context_),
+                                     constant->get_constval().boolval)};
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
+      return {CodeGenerator::codegenIntConst(constant, cgen_state_)};
+    case hdk::ir::Type::kFloatingPoint:
+      if (cst_type->isFp32()) {
+        return {llvm::ConstantFP::get(llvm::Type::getFloatTy(cgen_state_->context_),
+                                      constant->get_constval().floatval)};
+      } else {
+        CHECK(cst_type->isFp64());
+        return {llvm::ConstantFP::get(llvm::Type::getDoubleTy(cgen_state_->context_),
+                                      constant->get_constval().doubleval)};
+      }
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText: {
+      CHECK(constant->get_constval().stringval || constant->get_is_null());
+      if (constant->get_is_null()) {
+        if (type->isExtDictionary()) {
+          return {cgen_state_->llInt(static_cast<int32_t>(inline_int_null_value(type)))};
+        }
+        return {cgen_state_->llInt(int64_t(0)),
+                llvm::Constant::getNullValue(
+                    llvm::PointerType::get(get_int_type(8, cgen_state_->context_), 0)),
+                cgen_state_->llInt(int32_t(0))};
+      }
+      const auto& str_const = *constant->get_constval().stringval;
+      if (type->isExtDictionary()) {
+        return {
+            cgen_state_->llInt(executor()
+                                   ->getStringDictionaryProxy(
+                                       type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+                                       executor()->getRowSetMemoryOwner(),
+                                       true)
+                                   ->getIdOfString(str_const))};
+      }
+      return {cgen_state_->llInt(int64_t(0)),
+              cgen_state_->addStringConstant(str_const),
+              cgen_state_->llInt(static_cast<int32_t>(str_const.size()))};
+    }
+    default:
+      CHECK(false);
+  }
+  abort();
+}
+
 llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* constant,
                                                   CgenState* cgen_state) {
   const auto& type_info = constant->get_type_info();

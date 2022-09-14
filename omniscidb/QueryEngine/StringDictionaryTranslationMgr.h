@@ -59,9 +59,6 @@ class StringDictionaryTranslationMgr {
   void buildTranslationMap();
   void createKernelBuffers();
   llvm::Value* codegenCast(llvm::Value* str_id_input,
-                           const SQLTypeInfo& input_ti,
-                           const bool add_nullcheck) const;
-  llvm::Value* codegenCast(llvm::Value* str_id_input,
                            const hdk::ir::Type* input_type,
                            const bool add_nullcheck) const;
   bool isMapValid() const;
