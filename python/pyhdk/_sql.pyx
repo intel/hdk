@@ -12,7 +12,7 @@ from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CConfig, Config
 from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
-from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter
+from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter, CResultSet
 
 cdef class Calcite:
   cdef shared_ptr[CalciteJNI] calcite
@@ -47,6 +47,11 @@ cdef class ExecutionResult:
   # obects lifetime control. In Python we achieve it by holding DataMgr in
   # each ExecutionResult object.
   cdef shared_ptr[CDataMgr] c_data_mgr
+
+  def row_count(self):
+    cdef shared_ptr[CResultSet] c_res
+    c_res = self.c_result.getRows()
+    return int(c_res.get().rowCount())
 
   def to_arrow(self):
     cdef vector[string] col_names
