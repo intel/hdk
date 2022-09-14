@@ -124,8 +124,10 @@ def buildConfig(*, enable_debug_timer=None, enable_union=False, **kwargs):
   config.c_config = builder.config()
   return config
 
-def initLogger(*, **kwargs):
+def initLogger(*, debug_logs=False, **kwargs):
   argv0 = "PyHDK".encode('UTF-8')
   cdef char *cargv0 = argv0
   cdef unique_ptr[CLogOptions] opts = make_unique[CLogOptions](cargv0)
+  if debug_logs:
+    opts.get().severity_ = CSeverity.DEBUG3
   CInitLogger(dereference(opts))
