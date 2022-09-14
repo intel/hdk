@@ -16,6 +16,7 @@ import pyhdk
 class TestSql:
     @classmethod
     def setup_class(cls):
+        #pyhdk.initLogger(debug_logs=False)
         cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
@@ -43,6 +44,12 @@ class TestSql:
             cls.executor, cls.storage, cls.data_mgr, ra
         )
         return rel_alg_executor.execute(**kwargs)
+
+    def test_simple_count(self):
+        res = self.execute_sql("SELECT COUNT(*) FROM test;")
+        df = res.to_arrow().to_pandas()
+        assert df.shape == (1,1)
+        assert df["EXPR$0"].tolist()[0] == 3
 
     def test_simple_projection(self):
         res = self.execute_sql("SELECT * FROM test;")
