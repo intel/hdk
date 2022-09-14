@@ -105,6 +105,11 @@ class CodeGenerator {
     NullCheckCodegen(CgenState* cgen_state,
                      Executor* executor,
                      llvm::Value* nullable_lv,
+                     const hdk::ir::Type* nullable_type,
+                     const std::string& name = "");
+    NullCheckCodegen(CgenState* cgen_state,
+                     Executor* executor,
+                     llvm::Value* nullable_lv,
                      const SQLTypeInfo& nullable_ti,
                      const std::string& name = "");
 

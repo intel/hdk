@@ -1308,21 +1308,32 @@ CodeGenerator::NullCheckCodegen::NullCheckCodegen(CgenState* cgen_state,
                                                   llvm::Value* nullable_lv,
                                                   const SQLTypeInfo& nullable_ti,
                                                   const std::string& name)
+    : NullCheckCodegen(cgen_state,
+                       executor,
+                       nullable_lv,
+                       hdk::ir::Context::defaultCtx().fromTypeInfo(nullable_ti),
+                       name) {}
+
+CodeGenerator::NullCheckCodegen::NullCheckCodegen(CgenState* cgen_state,
+                                                  Executor* executor,
+                                                  llvm::Value* nullable_lv,
+                                                  const hdk::ir::Type* nullable_type,
+                                                  const std::string& name)
     : cgen_state(cgen_state), name(name) {
   AUTOMATIC_IR_METADATA(cgen_state);
-  CHECK(nullable_ti.is_number() || nullable_ti.is_time() || nullable_ti.is_boolean() ||
-        nullable_ti.is_dict_encoded_string());
+  CHECK(nullable_type->isNumber() || nullable_type->isDateTime() ||
+        nullable_type->isBoolean() || nullable_type->isExtDictionary());
 
   llvm::Value* is_null_lv{nullptr};
-  if (nullable_ti.is_fp()) {
+  if (nullable_type->isFloatingPoint()) {
     is_null_lv = cgen_state->ir_builder_.CreateFCmp(
-        llvm::FCmpInst::FCMP_OEQ, nullable_lv, cgen_state->inlineFpNull(nullable_ti));
-  } else if (nullable_ti.is_boolean()) {
+        llvm::FCmpInst::FCMP_OEQ, nullable_lv, cgen_state->inlineFpNull(nullable_type));
+  } else if (nullable_type->isBoolean()) {
     is_null_lv = cgen_state->ir_builder_.CreateICmp(
         llvm::ICmpInst::ICMP_EQ, nullable_lv, cgen_state->llBool(true));
   } else {
     is_null_lv = cgen_state->ir_builder_.CreateICmp(
-        llvm::ICmpInst::ICMP_EQ, nullable_lv, cgen_state->inlineIntNull(nullable_ti));
+        llvm::ICmpInst::ICMP_EQ, nullable_lv, cgen_state->inlineIntNull(nullable_type));
   }
   CHECK(is_null_lv);
   null_check =
