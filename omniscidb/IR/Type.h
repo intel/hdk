@@ -82,6 +82,9 @@ class Type {
   HOST DEVICE bool isDateTime() const { return isDate() || isTime() || isTimestamp(); }
   HOST DEVICE bool isArray() const { return isFixedLenArray() || isVarLenArray(); }
   HOST DEVICE bool isVarLen() const { return isString() || isVarLenArray(); }
+  HOST DEVICE bool isBuffer() const {
+    return isArray() || isColumn() || isColumnList() || isText();
+  }
 
   // Return the same type created in a specified context.
   const Type* copyTo(Context& ctx) const;

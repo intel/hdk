@@ -128,16 +128,17 @@ llvm::Type* ext_arg_type_to_llvm_type(const ExtArgumentType ext_arg_type,
   return nullptr;
 }
 
-inline SQLTypeInfo get_sql_type_from_llvm_type(const llvm::Type* ll_type) {
+inline const hdk::ir::Type* get_type_from_llvm_type(const llvm::Type* ll_type) {
   CHECK(ll_type);
+  auto& ctx = hdk::ir::Context::defaultCtx();
   const auto bits = ll_type->getPrimitiveSizeInBits();
 
   if (ll_type->isFloatingPointTy()) {
     switch (bits) {
       case 32:
-        return SQLTypeInfo(kFLOAT, false);
+        return ctx.fp32();
       case 64:
-        return SQLTypeInfo(kDOUBLE, false);
+        return ctx.fp64();
       default:
         LOG(FATAL) << "Unsupported llvm floating point type: " << bits
                    << ", only 32 and 64 bit floating point is supported.";
@@ -145,34 +146,37 @@ inline SQLTypeInfo get_sql_type_from_llvm_type(const llvm::Type* ll_type) {
   } else {
     switch (bits) {
       case 1:
-        return SQLTypeInfo(kBOOLEAN, false);
+        return ctx.boolean();
       case 8:
-        return SQLTypeInfo(kTINYINT, false);
+        return ctx.int8();
       case 16:
-        return SQLTypeInfo(kSMALLINT, false);
+        return ctx.int16();
       case 32:
-        return SQLTypeInfo(kINT, false);
+        return ctx.int32();
       case 64:
-        return SQLTypeInfo(kBIGINT, false);
+        return ctx.int64();
       default:
         LOG(FATAL) << "Unrecognized llvm type for SQL type: "
                    << bits;  // TODO let's get the real name here
     }
   }
   UNREACHABLE();
-  return SQLTypeInfo();
+  return nullptr;
 }
 
-inline llvm::Type* get_llvm_type_from_sql_array_type(const SQLTypeInfo ti,
-                                                     llvm::LLVMContext& ctx) {
-  CHECK(ti.is_buffer());
-  if (ti.is_bytes()) {
+inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
+                                                 llvm::LLVMContext& ctx) {
+  CHECK(type->isBuffer());
+  if (type->isText()) {
     return llvm::Type::getInt8PtrTy(ctx);
   }
 
-  const auto& elem_ti = ti.get_elem_type();
-  if (elem_ti.is_fp()) {
-    switch (elem_ti.get_size()) {
+  const auto& elem_type = type->isArray() ? type->as<hdk::ir::ArrayBaseType>()->elemType()
+                          : type->isColumn()
+                              ? type->as<hdk::ir::ColumnType>()->columnType()
+                              : type->as<hdk::ir::ColumnListType>()->columnType();
+  if (elem_type->isFloatingPoint()) {
+    switch (elem_type->size()) {
       case 4:
         return llvm::Type::getFloatPtrTy(ctx);
       case 8:
@@ -180,12 +184,12 @@ inline llvm::Type* get_llvm_type_from_sql_array_type(const SQLTypeInfo ti,
     }
   }
 
-  if (elem_ti.is_boolean()) {
+  if (elem_type->isBoolean()) {
     return llvm::Type::getInt8PtrTy(ctx);
   }
 
-  CHECK(elem_ti.is_integer());
-  switch (elem_ti.get_size()) {
+  CHECK(elem_type->isInteger());
+  switch (elem_type->size()) {
     case 1:
       return llvm::Type::getInt8PtrTy(ctx);
     case 2:
@@ -201,18 +205,18 @@ inline llvm::Type* get_llvm_type_from_sql_array_type(const SQLTypeInfo ti,
 }
 
 bool ext_func_call_requires_nullcheck(const hdk::ir::FunctionOper* function_oper) {
-  const auto& func_ti = function_oper->get_type_info();
+  const auto& func_type = function_oper->type();
   for (size_t i = 0; i < function_oper->getArity(); ++i) {
     const auto arg = function_oper->getArg(i);
-    const auto& arg_ti = arg->get_type_info();
-    if ((func_ti.is_array() && arg_ti.is_array()) ||
-        (func_ti.is_bytes() && arg_ti.is_bytes())) {
+    const auto& arg_type = arg->type();
+    if ((func_type->isArray() && arg_type->isArray()) ||
+        (func_type->isText() && arg_type->isText())) {
       // If the function returns an array and any of the arguments are arrays, allow NULL
       // scalars.
       // TODO: Make this a property of the FunctionOper following `RETURN NULL ON NULL`
       // semantics.
       return false;
-    } else if (!arg_ti.get_notnull() && !arg_ti.is_buffer()) {
+    } else if (arg_type->nullable() && !arg_type->isBuffer()) {
       return true;
     } else {
       continue;
@@ -254,10 +258,10 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
     }
   }();
 
-  const auto& ret_ti = function_oper->get_type_info();
-  CHECK(ret_ti.is_integer() || ret_ti.is_fp() || ret_ti.is_boolean() ||
-        ret_ti.is_buffer());
-  if (ret_ti.is_buffer() && co.device_type == ExecutorDeviceType::GPU) {
+  const auto& ret_type = function_oper->type();
+  CHECK(ret_type->isInteger() || ret_type->isFloatingPoint() || ret_type->isBoolean() ||
+        ret_type->isBuffer());
+  if (ret_type->isBuffer() && co.device_type == ExecutorDeviceType::GPU) {
     // TODO: This is not necessary for runtime UDFs because RBC does
     // not generated GPU LLVM IR when the UDF is using Buffer objects.
     // However, we cannot remove it until C++ UDFs can be defined for
@@ -287,10 +291,10 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         (arg_cast && arg_cast->get_optype() == kCAST) ? arg_cast->get_operand() : arg;
     const auto array_expr_arg = dynamic_cast<const hdk::ir::ArrayExpr*>(arg0);
     auto is_local_alloc =
-        ret_ti.is_buffer() || (array_expr_arg && array_expr_arg->isLocalAlloc());
-    const auto& arg_ti = arg->get_type_info();
+        ret_type->isBuffer() || (array_expr_arg && array_expr_arg->isLocalAlloc());
+    const auto& arg_type = arg->type();
     const auto arg_lvs = codegen(arg, true, co);
-    if (arg_ti.is_bytes()) {
+    if (arg_type->isText()) {
       CHECK_EQ(size_t(3), arg_lvs.size());
       /* arg_lvs contains:
          c = string_decode(&col_buf0, pos)
@@ -302,7 +306,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
       }
     } else {
       if (arg_lvs.size() > 1) {
-        CHECK(arg_ti.is_array());
+        CHECK(arg_type->isArray());
         CHECK_EQ(size_t(2), arg_lvs.size());
         const_arr_size[arg_lvs.front()] = arg_lvs.back();
       } else {
@@ -310,8 +314,8 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         /* arg_lvs contains:
              &col_buf1
          */
-        if (is_local_alloc && arg_ti.get_size() > 0) {
-          const_arr_size[arg_lvs.front()] = cgen_state_->llInt(arg_ti.get_size());
+        if (is_local_alloc && arg_type->size() > 0) {
+          const_arr_size[arg_lvs.front()] = cgen_state_->llInt(arg_type->size());
         }
       }
       orig_arg_lvs.push_back(arg_lvs.front());
@@ -328,30 +332,31 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
       function_oper, &ext_func_sig, orig_arg_lvs, orig_arg_lvs_index, const_arr_size, co);
 
   llvm::Value* buffer_ret{nullptr};
-  if (ret_ti.is_buffer()) {
+  if (ret_type->isBuffer()) {
     // codegen buffer return as first arg
-    CHECK(ret_ti.is_array() || ret_ti.is_bytes());
+    CHECK(ret_type->isArray() || ret_type->isText());
     ret_ty = llvm::Type::getVoidTy(cgen_state_->context_);
     const auto struct_ty = get_buffer_struct_type(
         cgen_state_,
         function_oper->getName(),
         0,
-        get_llvm_type_from_sql_array_type(ret_ti, cgen_state_->context_),
-        /* has_is_null = */ ret_ti.is_array() || ret_ti.is_bytes());
+        get_llvm_type_from_array_type(ret_type, cgen_state_->context_),
+        /* has_is_null = */ ret_type->isArray() || ret_type->isText());
     buffer_ret = cgen_state_->ir_builder_.CreateAlloca(struct_ty);
     args.insert(args.begin(), buffer_ret);
   }
 
   const auto ext_call = cgen_state_->emitExternalCall(
-      ext_func_sig.getName(), ret_ty, args, {}, ret_ti.is_buffer());
+      ext_func_sig.getName(), ret_ty, args, {}, ret_type->isBuffer());
   auto ext_call_nullcheck = endArgsNullcheck(
-      bbs, ret_ti.is_buffer() ? buffer_ret : ext_call, null_buffer_ptr, function_oper);
+      bbs, ret_type->isBuffer() ? buffer_ret : ext_call, null_buffer_ptr, function_oper);
 
   // Cast the return of the extension function to match the FunctionOper
-  if (!(ret_ti.is_buffer())) {
-    const auto extension_ret_ti = get_sql_type_from_llvm_type(ret_ty);
+  if (!(ret_type->isBuffer())) {
+    const auto extension_ret_type = get_type_from_llvm_type(ret_ty);
     if (bbs.args_null_bb &&
-        extension_ret_ti.get_type() != function_oper->get_type_info().get_type() &&
+        ((extension_ret_type->id() != function_oper->type()->id()) ||
+         (extension_ret_type->size() != function_oper->type()->size())) &&
         // Skip i1-->i8 casts for ST_ functions.
         // function_oper ret type is i1, extension ret type is 'upgraded' to i8
         // during type deserialization to 'handle' NULL returns, hence i1-->i8.
@@ -359,8 +364,8 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         // and if any args are NULL then ST_ function is not called
         function_oper->getName().substr(0, 3) != std::string("ST_")) {
       ext_call_nullcheck = codegenCast(ext_call_nullcheck,
-                                       extension_ret_ti,
-                                       function_oper->get_type_info(),
+                                       extension_ret_type,
+                                       function_oper->type(),
                                        false,
                                        false,
                                        co);
@@ -382,14 +387,14 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
   llvm::Value* null_array_alloca{nullptr};
   // Only generate the check if required (at least one argument must be nullable).
   if (ext_func_call_requires_nullcheck(function_oper)) {
-    const auto func_ti = function_oper->get_type_info();
-    if (func_ti.is_buffer()) {
+    const auto func_type = function_oper->type();
+    if (func_type->isBuffer()) {
       const auto arr_struct_ty = get_buffer_struct_type(
           cgen_state_,
           function_oper->getName(),
           0,
-          get_llvm_type_from_sql_array_type(func_ti, cgen_state_->context_),
-          func_ti.is_array() || func_ti.is_bytes());
+          get_llvm_type_from_array_type(func_type, cgen_state_->context_),
+          func_type->isArray() || func_type->isText());
       null_array_alloca = cgen_state_->ir_builder_.CreateAlloca(arr_struct_ty);
     }
     const auto args_notnull_lv = cgen_state_->ir_builder_.CreateNot(
@@ -419,27 +424,27 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
 
     llvm::PHINode* ext_call_phi{nullptr};
     llvm::Value* null_lv{nullptr};
-    const auto func_ti = function_oper->get_type_info();
-    if (!func_ti.is_buffer()) {
+    const auto func_type = function_oper->type();
+    if (!func_type->isBuffer()) {
       // The pre-cast SQL equivalent of the type returned by the extension function.
-      const auto extension_ret_ti = get_sql_type_from_llvm_type(fn_ret_lv->getType());
+      const auto extension_ret_type = get_type_from_llvm_type(fn_ret_lv->getType());
 
       ext_call_phi = cgen_state_->ir_builder_.CreatePHI(
-          extension_ret_ti.is_fp()
-              ? get_fp_type(extension_ret_ti.get_size() * 8, cgen_state_->context_)
-              : get_int_type(extension_ret_ti.get_size() * 8, cgen_state_->context_),
+          extension_ret_type->isFloatingPoint()
+              ? get_fp_type(extension_ret_type->size() * 8, cgen_state_->context_)
+              : get_int_type(extension_ret_type->size() * 8, cgen_state_->context_),
           2);
 
       null_lv =
-          extension_ret_ti.is_fp()
-              ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(extension_ret_ti))
-              : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(extension_ret_ti));
+          extension_ret_type->isFloatingPoint()
+              ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(extension_ret_type))
+              : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(extension_ret_type));
     } else {
       const auto arr_struct_ty = get_buffer_struct_type(
           cgen_state_,
           function_oper->getName(),
           0,
-          get_llvm_type_from_sql_array_type(func_ti, cgen_state_->context_),
+          get_llvm_type_from_array_type(func_type, cgen_state_->context_),
           true);
       ext_call_phi =
           cgen_state_->ir_builder_.CreatePHI(llvm::PointerType::get(arr_struct_ty, 0), 2);
@@ -458,7 +463,7 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
           arr_null_size);
     }
     ext_call_phi->addIncoming(fn_ret_lv, bbs.args_notnull_bb);
-    ext_call_phi->addIncoming(func_ti.is_buffer() ? null_array_ptr : null_lv,
+    ext_call_phi->addIncoming(func_type->isBuffer() ? null_array_ptr : null_lv,
                               bbs.orig_bb);
 
     return ext_call_phi;
@@ -469,14 +474,14 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
 namespace {
 
 bool call_requires_custom_type_handling(const hdk::ir::FunctionOper* function_oper) {
-  const auto& ret_ti = function_oper->get_type_info();
-  if (!ret_ti.is_integer() && !ret_ti.is_fp()) {
+  const auto& ret_type = function_oper->type();
+  if (!ret_type->isInteger() && !ret_type->isFloatingPoint()) {
     return true;
   }
   for (size_t i = 0; i < function_oper->getArity(); ++i) {
     const auto arg = function_oper->getArg(i);
-    const auto& arg_ti = arg->get_type_info();
-    if (!arg_ti.is_integer() && !arg_ti.is_fp()) {
+    const auto& arg_type = arg->type();
+    if (!arg_type->isInteger() && !arg_type->isFloatingPoint()) {
       return true;
     }
   }
@@ -494,8 +499,9 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
     if (function_oper->getName() == "FLOOR" || function_oper->getName() == "CEIL") {
       CHECK_EQ(size_t(1), function_oper->getArity());
       const auto arg = function_oper->getArg(0);
-      const auto& arg_ti = arg->get_type_info();
-      CHECK(arg_ti.is_decimal());
+      auto arg_type = arg->type();
+      CHECK(arg_type->isDecimal());
+      auto arg_scale = arg_type->as<hdk::ir::DecimalType>()->scale();
       const auto arg_lvs = codegen(arg, true, co);
       CHECK_EQ(size_t(1), arg_lvs.size());
       const auto arg_lv = arg_lvs.front();
@@ -505,32 +511,34 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       const std::string func_name =
           (function_oper->getName() == "FLOOR") ? "decimal_floor" : "decimal_ceil";
       const auto covar_result_lv = cgen_state_->emitCall(
-          func_name, {arg_lv, cgen_state_->llInt(exp_to_scale(arg_ti.get_scale()))});
-      const auto ret_ti = function_oper->get_type_info();
-      CHECK(ret_ti.is_decimal());
-      CHECK_EQ(0, ret_ti.get_scale());
+          func_name, {arg_lv, cgen_state_->llInt(exp_to_scale(arg_scale))});
+      auto ret_type = function_oper->type();
+      CHECK(ret_type->isDecimal());
+      CHECK_EQ(0, ret_type->as<hdk::ir::DecimalType>()->scale());
       const auto result_lv = cgen_state_->ir_builder_.CreateSDiv(
-          covar_result_lv, cgen_state_->llInt(exp_to_scale(arg_ti.get_scale())));
+          covar_result_lv, cgen_state_->llInt(exp_to_scale(arg_scale)));
       return endArgsNullcheck(bbs, result_lv, nullptr, function_oper);
     } else if (function_oper->getName() == "ROUND" &&
-               function_oper->getArg(0)->get_type_info().is_decimal()) {
+               function_oper->getArg(0)->type()->isDecimal()) {
       CHECK_EQ(size_t(2), function_oper->getArity());
 
       const auto arg0 = function_oper->getArg(0);
-      const auto& arg0_ti = arg0->get_type_info();
+      auto arg0_type = arg0->type();
+      auto arg0_scale =
+          arg0_type->isDecimal() ? arg0_type->as<hdk::ir::DecimalType>()->scale() : 0;
       const auto arg0_lvs = codegen(arg0, true, co);
       CHECK_EQ(size_t(1), arg0_lvs.size());
       const auto arg0_lv = arg0_lvs.front();
       CHECK(arg0_lv->getType()->isIntegerTy(64));
 
       const auto arg1 = function_oper->getArg(1);
-      const auto& arg1_ti = arg1->get_type_info();
-      CHECK(arg1_ti.is_integer());
+      auto arg1_type = arg1->type();
+      CHECK(arg1_type->isInteger());
       const auto arg1_lvs = codegen(arg1, true, co);
       auto arg1_lv = arg1_lvs.front();
-      if (arg1_ti.get_type() != kINT) {
-        arg1_lv =
-            codegenCast(arg1_lv, arg1_ti, SQLTypeInfo(kINT, true), false, false, co);
+      if (!arg1_type->isInt32()) {
+        arg1_lv = codegenCast(
+            arg1_lv, arg1_type, arg1_type->ctx().int32(false), false, false, co);
       }
 
       CodeGenerator::ArgNullcheckBBs bbs0;
@@ -538,12 +546,12 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
           beginArgsNullcheck(function_oper, {arg0_lv, arg1_lvs.front()});
 
       const std::string func_name = "Round__4";
-      const auto ret_ti = function_oper->get_type_info();
-      CHECK(ret_ti.is_decimal());
+      auto ret_type = function_oper->type();
+      CHECK(ret_type->isDecimal());
       const auto result_lv = cgen_state_->emitExternalCall(
           func_name,
           get_int_type(64, cgen_state_->context_),
-          {arg0_lv, arg1_lv, cgen_state_->llInt(arg0_ti.get_scale())});
+          {arg0_lv, arg1_lv, cgen_state_->llInt(arg0_scale)});
 
       return endArgsNullcheck(bbs0, result_lv, nullptr, function_oper);
     }
@@ -560,55 +568,24 @@ llvm::Value* CodeGenerator::codegenFunctionOperNullArg(
   AUTOMATIC_IR_METADATA(cgen_state_);
   llvm::Value* one_arg_null =
       llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(cgen_state_->context_), false);
-  size_t physical_coord_cols = 0;
-  for (size_t i = 0, j = 0; i < function_oper->getArity();
-       ++i, j += std::max(size_t(1), physical_coord_cols)) {
+  for (size_t i = 0; i < function_oper->getArity(); ++i) {
     const auto arg = function_oper->getArg(i);
-    const auto& arg_ti = arg->get_type_info();
-    physical_coord_cols = arg_ti.get_physical_coord_cols();
-    if (arg_ti.get_notnull()) {
+    auto arg_type = arg->type();
+    if (!arg_type->nullable()) {
       continue;
     }
-    if (arg_ti.is_buffer()) {
+    if (arg_type->isBuffer()) {
       auto fname = "array_is_null";
       auto is_null_lv = cgen_state_->emitExternalCall(
-          fname, get_int_type(1, cgen_state_->context_), {orig_arg_lvs[j], posArg(arg)});
+          fname, get_int_type(1, cgen_state_->context_), {orig_arg_lvs[i], posArg(arg)});
       one_arg_null = cgen_state_->ir_builder_.CreateOr(one_arg_null, is_null_lv);
       continue;
     }
-    CHECK(arg_ti.is_number() or arg_ti.is_boolean());
+    CHECK(arg_type->isNumber() || arg_type->isBoolean());
     one_arg_null = cgen_state_->ir_builder_.CreateOr(
-        one_arg_null, codegenIsNullNumber(orig_arg_lvs[j], arg_ti));
+        one_arg_null, codegenIsNullNumber(orig_arg_lvs[i], arg_type));
   }
   return one_arg_null;
-}
-
-std::pair<llvm::Value*, llvm::Value*> CodeGenerator::codegenArrayBuff(
-    llvm::Value* chunk,
-    llvm::Value* row_pos,
-    SQLTypes array_type,
-    bool cast_and_extend) {
-  AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto elem_ti =
-      SQLTypeInfo(
-          SQLTypes::kARRAY, 0, 0, false, EncodingType::kENCODING_NONE, 0, array_type)
-          .get_elem_type();
-
-  auto buff = cgen_state_->emitExternalCall(
-      "array_buff", llvm::Type::getInt32PtrTy(cgen_state_->context_), {chunk, row_pos});
-
-  auto len = cgen_state_->emitExternalCall(
-      "array_size",
-      get_int_type(32, cgen_state_->context_),
-      {chunk, row_pos, cgen_state_->llInt(log2_bytes(elem_ti.get_logical_size()))});
-
-  if (cast_and_extend) {
-    buff = castArrayPointer(buff, elem_ti);
-    len =
-        cgen_state_->ir_builder_.CreateZExt(len, get_int_type(64, cgen_state_->context_));
-  }
-
-  return std::make_pair(buff, len);
 }
 
 void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
@@ -657,7 +634,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
   CHECK(ext_func_sig);
   const auto& ext_func_args = ext_func_sig->getArgs();
   CHECK_LE(function_oper->getArity(), ext_func_args.size());
-  const auto func_ti = function_oper->get_type_info();
+  auto func_type = function_oper->type();
   std::vector<llvm::Value*> args;
   /*
     i: argument in RA for the function operand
@@ -666,16 +643,16 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
     ij: ext_func_args counter, equal to i + j
     dj: offset when UDF implementation first argument corresponds to return value
    */
-  for (size_t i = 0, j = 0, dj = (func_ti.is_buffer() ? 1 : 0);
+  for (size_t i = 0, j = 0, dj = (func_type->isBuffer() ? 1 : 0);
        i < function_oper->getArity();
        ++i) {
     size_t k = orig_arg_lvs_index[i];
     size_t ij = i + j;
     const auto arg = function_oper->getArg(i);
     const auto ext_func_arg = ext_func_args[ij];
-    const auto& arg_ti = arg->get_type_info();
+    auto arg_type = arg->type();
     llvm::Value* arg_lv{nullptr};
-    if (arg_ti.is_bytes()) {
+    if (arg_type->isText()) {
       CHECK(ext_func_arg == ExtArgumentType::TextEncodingNone)
           << ::toString(ext_func_arg);
       const auto ptr_lv = orig_arg_lvs[k + 1];
@@ -691,9 +668,9 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
                         string_size_arg,
                         nullptr,
                         args);
-    } else if (arg_ti.is_array()) {
+    } else if (arg_type->isArray()) {
       bool const_arr = (const_arr_size.count(orig_arg_lvs[k]) > 0);
-      const auto elem_ti = arg_ti.get_elem_type();
+      auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
       // TODO: switch to fast fixlen variants
       const auto ptr_lv = (const_arr)
                               ? orig_arg_lvs[k]
@@ -702,21 +679,22 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
                                     llvm::Type::getInt8PtrTy(cgen_state_->context_),
                                     {orig_arg_lvs[k], posArg(arg)});
       const auto len_lv =
-          (const_arr) ? const_arr_size.at(orig_arg_lvs[k])
-                      : cgen_state_->emitExternalCall(
-                            "array_size",
-                            get_int_type(32, cgen_state_->context_),
-                            {orig_arg_lvs[k],
-                             posArg(arg),
-                             cgen_state_->llInt(log2_bytes(elem_ti.get_logical_size()))});
+          (const_arr)
+              ? const_arr_size.at(orig_arg_lvs[k])
+              : cgen_state_->emitExternalCall(
+                    "array_size",
+                    get_int_type(32, cgen_state_->context_),
+                    {orig_arg_lvs[k],
+                     posArg(arg),
+                     cgen_state_->llInt(log2_bytes(hdk::ir::logicalSize(elem_type)))});
 
       if (is_ext_arg_type_pointer(ext_func_arg)) {
-        args.push_back(castArrayPointer(ptr_lv, elem_ti));
+        args.push_back(castArrayPointer(ptr_lv, elem_type));
         args.push_back(cgen_state_->ir_builder_.CreateZExt(
             len_lv, get_int_type(64, cgen_state_->context_)));
         j++;
       } else if (is_ext_arg_type_array(ext_func_arg)) {
-        auto array_buf_arg = castArrayPointer(ptr_lv, elem_ti);
+        auto array_buf_arg = castArrayPointer(ptr_lv, elem_type);
         auto& builder = cgen_state_->ir_builder_;
         auto array_size_arg =
             builder.CreateZExt(len_lv, get_int_type(64, cgen_state_->context_));
@@ -735,9 +713,11 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
       }
     } else {
       CHECK(is_ext_arg_type_scalar(ext_func_arg));
-      const auto arg_target_ti = ext_arg_type_to_type_info(ext_func_arg);
-      if (arg_ti.get_type() != arg_target_ti.get_type()) {
-        arg_lv = codegenCast(orig_arg_lvs[k], arg_ti, arg_target_ti, false, false, co);
+      const auto arg_target_type = ext_arg_type_to_type(arg_type->ctx(), ext_func_arg);
+      if ((arg_type->id() != arg_target_type->id()) ||
+          (arg_type->size() != arg_target_type->size())) {
+        arg_lv =
+            codegenCast(orig_arg_lvs[k], arg_type, arg_target_type, false, false, co);
       } else {
         arg_lv = orig_arg_lvs[k];
       }
@@ -750,19 +730,18 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
 }
 
 llvm::Value* CodeGenerator::castArrayPointer(llvm::Value* ptr,
-                                             const SQLTypeInfo& elem_ti) {
+                                             const hdk::ir::Type* elem_type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (elem_ti.get_type() == kFLOAT) {
+  if (elem_type->isFp32()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
         ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_));
   }
-  if (elem_ti.get_type() == kDOUBLE) {
+  if (elem_type->isFp64()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
         ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_));
   }
-  CHECK(elem_ti.is_integer() || elem_ti.is_boolean() ||
-        (elem_ti.is_string() && elem_ti.get_compression() == kENCODING_DICT));
-  switch (elem_ti.get_size()) {
+  CHECK(elem_type->isInteger() || elem_type->isBoolean() || elem_type->isExtDictionary());
+  switch (elem_type->size()) {
     case 1:
       return cgen_state_->ir_builder_.CreatePointerCast(
           ptr, llvm::Type::getInt8PtrTy(cgen_state_->context_));

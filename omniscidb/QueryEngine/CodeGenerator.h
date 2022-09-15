@@ -77,7 +77,7 @@ class CodeGenerator {
 
   llvm::Value* toBool(llvm::Value*);
 
-  llvm::Value* castArrayPointer(llvm::Value* ptr, const SQLTypeInfo& elem_ti);
+  llvm::Value* castArrayPointer(llvm::Value* ptr, const hdk::ir::Type* elem_type);
 
   static std::unordered_set<llvm::Function*> markDeadRuntimeFuncs(
       llvm::Module& module,
@@ -437,11 +437,6 @@ class CodeGenerator {
 
   llvm::Value* codegenFunctionOperNullArg(const hdk::ir::FunctionOper*,
                                           const std::vector<llvm::Value*>&);
-
-  std::pair<llvm::Value*, llvm::Value*> codegenArrayBuff(llvm::Value* chunk,
-                                                         llvm::Value* row_pos,
-                                                         SQLTypes array_type,
-                                                         bool cast_and_extend);
 
   void codegenBufferArgs(const std::string& udf_func_name,
                          size_t param_num,
