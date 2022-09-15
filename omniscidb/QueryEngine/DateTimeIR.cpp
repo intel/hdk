@@ -75,10 +75,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto from_expr = codegen(extract_expr->get_from_expr(), true, co).front();
   const int32_t extract_field{extract_expr->get_field()};
-  const auto& extract_expr_ti = extract_expr->get_from_expr()->get_type_info();
+  auto extract_expr_type = extract_expr->get_from_expr()->type();
   if (extract_field == kEPOCH) {
-    CHECK(extract_expr_ti.get_type() == kTIMESTAMP ||
-          extract_expr_ti.get_type() == kDATE);
+    CHECK(extract_expr_type->isTimestamp() || extract_expr_type->isDate());
     if (from_expr->getType()->isIntegerTy(32)) {
       from_expr =
           cgen_state_->ir_builder_.CreateCast(llvm::Instruction::CastOps::SExt,
@@ -88,14 +87,16 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
     }
   }
   CHECK(from_expr->getType()->isIntegerTy(64));
-  if (extract_expr_ti.is_high_precision_timestamp()) {
+  bool is_hpt = extract_expr_type->isTimestamp() &&
+                extract_expr_type->as<hdk::ir::TimestampType>()->unit() >
+                    hdk::ir::TimeUnit::kSecond;
+  if (is_hpt) {
     from_expr = codegenExtractHighPrecisionTimestamps(
-        from_expr, extract_expr_ti, extract_expr->get_field());
+        from_expr, extract_expr_type, extract_expr->get_field());
   }
-  if (!extract_expr_ti.is_high_precision_timestamp() &&
-      is_subsecond_extract_field(extract_expr->get_field())) {
+  if (!is_hpt && is_subsecond_extract_field(extract_expr->get_field())) {
     from_expr =
-        extract_expr_ti.get_notnull()
+        !extract_expr_type->nullable()
             ? cgen_state_->ir_builder_.CreateMul(
                   from_expr,
                   cgen_state_->llInt(
@@ -105,17 +106,17 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
                   {from_expr,
                    cgen_state_->llInt(
                        get_extract_timestamp_precision_scale(extract_expr->get_field())),
-                   cgen_state_->inlineIntNull(extract_expr_ti)});
+                   cgen_state_->inlineIntNull(extract_expr_type)});
   }
   const auto extract_fname = get_extract_function_name(extract_expr->get_field());
-  if (!extract_expr_ti.get_notnull()) {
+  if (extract_expr_type->nullable()) {
     llvm::BasicBlock* extract_nullcheck_bb{nullptr};
     llvm::PHINode* extract_nullcheck_value{nullptr};
     {
       DiamondCodegen null_check(cgen_state_->ir_builder_.CreateICmp(
                                     llvm::ICmpInst::ICMP_EQ,
                                     from_expr,
-                                    cgen_state_->inlineIntNull(extract_expr_ti)),
+                                    cgen_state_->inlineIntNull(extract_expr_type)),
                                 executor(),
                                 false,
                                 "extract_nullcheck",
@@ -140,7 +141,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
       extract_nullcheck_value = cgen_state_->ir_builder_.CreatePHI(
           get_int_type(64, cgen_state_->context_), 2, "extract_value");
       extract_nullcheck_value->addIncoming(extract_call, null_check.cond_false_);
-      extract_nullcheck_value->addIncoming(cgen_state_->inlineIntNull(extract_expr_ti),
+      extract_nullcheck_value->addIncoming(cgen_state_->inlineIntNull(extract_expr_type),
                                            null_check.cond_true_);
     }
 
@@ -157,29 +158,54 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
   }
 }
 
+namespace {
+
+int32_t unitToDimension(hdk::ir::TimeUnit unit) {
+  switch (unit) {
+    case hdk::ir::TimeUnit::kSecond:
+      return 0;
+    case hdk::ir::TimeUnit::kMilli:
+      return 3;
+    case hdk::ir::TimeUnit::kMicro:
+      return 6;
+    case hdk::ir::TimeUnit::kNano:
+      return 9;
+    default:
+      CHECK(false);
+  }
+  return 0;
+}
+
+}  // namespace
+
 llvm::Value* CodeGenerator::codegen(const hdk::ir::DateaddExpr* dateadd_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto& dateadd_expr_ti = dateadd_expr->get_type_info();
-  CHECK(dateadd_expr_ti.get_type() == kTIMESTAMP || dateadd_expr_ti.get_type() == kDATE);
+  auto dateadd_expr_type = dateadd_expr->type();
+  CHECK(dateadd_expr_type->isTimestamp() || dateadd_expr_type->isDate());
+  auto dateadd_unit = dateadd_expr_type->isTimestamp()
+                          ? dateadd_expr_type->as<hdk::ir::TimestampType>()->unit()
+                          : hdk::ir::TimeUnit::kSecond;
   auto datetime = codegen(dateadd_expr->get_datetime_expr(), true, co).front();
   CHECK(datetime->getType()->isIntegerTy(64));
   auto number = codegen(dateadd_expr->get_number_expr(), true, co).front();
 
-  const auto& datetime_ti = dateadd_expr->get_datetime_expr()->get_type_info();
+  auto datetime_type = dateadd_expr->get_datetime_expr()->type();
+  auto datetime_unit = datetime_type->isTimestamp()
+                           ? datetime_type->as<hdk::ir::TimestampType>()->unit()
+                           : hdk::ir::TimeUnit::kSecond;
   std::vector<llvm::Value*> dateadd_args{
       cgen_state_->llInt(static_cast<int32_t>(dateadd_expr->get_field())),
       number,
       datetime};
   std::string dateadd_fname{"DateAdd"};
   if (is_subsecond_dateadd_field(dateadd_expr->get_field()) ||
-      dateadd_expr_ti.is_high_precision_timestamp()) {
+      dateadd_unit > hdk::ir::TimeUnit::kSecond) {
     dateadd_fname += "HighPrecision";
-    dateadd_args.push_back(
-        cgen_state_->llInt(static_cast<int32_t>(datetime_ti.get_dimension())));
+    dateadd_args.push_back(cgen_state_->llInt(unitToDimension(datetime_unit)));
   }
-  if (!datetime_ti.get_notnull()) {
-    dateadd_args.push_back(cgen_state_->inlineIntNull(datetime_ti));
+  if (datetime_type->nullable()) {
+    dateadd_args.push_back(cgen_state_->inlineIntNull(datetime_type));
     dateadd_fname += "Nullable";
   }
   return cgen_state_->emitExternalCall(dateadd_fname,
@@ -197,21 +223,24 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DatediffExpr* datediff_expr,
   CHECK(start->getType()->isIntegerTy(64));
   auto end = codegen(datediff_expr->get_end_expr(), true, co).front();
   CHECK(end->getType()->isIntegerTy(32) || end->getType()->isIntegerTy(64));
-  const auto& start_ti = datediff_expr->get_start_expr()->get_type_info();
-  const auto& end_ti = datediff_expr->get_end_expr()->get_type_info();
+  auto start_type = datediff_expr->get_start_expr()->type();
+  auto end_type = datediff_expr->get_end_expr()->type();
   std::vector<llvm::Value*> datediff_args{
       cgen_state_->llInt(static_cast<int32_t>(datediff_expr->get_field())), start, end};
   std::string datediff_fname{"DateDiff"};
-  if (start_ti.is_high_precision_timestamp() || end_ti.is_high_precision_timestamp()) {
+  auto start_unit = start_type->isTimestamp()
+                        ? start_type->as<hdk::ir::TimestampType>()->unit()
+                        : hdk::ir::TimeUnit::kSecond;
+  auto end_unit = end_type->isTimestamp() ? end_type->as<hdk::ir::TimestampType>()->unit()
+                                          : hdk::ir::TimeUnit::kSecond;
+  if (start_unit > hdk::ir::TimeUnit::kSecond || end_unit > hdk::ir::TimeUnit::kSecond) {
     datediff_fname += "HighPrecision";
-    datediff_args.push_back(
-        cgen_state_->llInt(static_cast<int32_t>(start_ti.get_dimension())));
-    datediff_args.push_back(
-        cgen_state_->llInt(static_cast<int32_t>(end_ti.get_dimension())));
+    datediff_args.push_back(cgen_state_->llInt(unitToDimension(start_unit)));
+    datediff_args.push_back(cgen_state_->llInt(unitToDimension(end_unit)));
   }
-  const auto& ret_ti = datediff_expr->get_type_info();
-  if (!start_ti.get_notnull() || !end_ti.get_notnull()) {
-    datediff_args.push_back(cgen_state_->inlineIntNull(ret_ti));
+  auto ret_type = datediff_expr->type();
+  if (start_type->nullable() || end_type->nullable()) {
+    datediff_args.push_back(cgen_state_->inlineIntNull(ret_type));
     datediff_fname += "Nullable";
   }
   return cgen_state_->emitExternalCall(
@@ -222,11 +251,13 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DatetruncExpr* datetrunc_expr
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto from_expr = codegen(datetrunc_expr->get_from_expr(), true, co).front();
-  const auto& datetrunc_expr_ti = datetrunc_expr->get_from_expr()->get_type_info();
+  auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
   CHECK(from_expr->getType()->isIntegerTy(64));
   DatetruncField const field = datetrunc_expr->get_field();
-  if (datetrunc_expr_ti.is_high_precision_timestamp()) {
-    return codegenDateTruncHighPrecisionTimestamps(from_expr, datetrunc_expr_ti, field);
+  if (datetrunc_expr_type->isTimestamp() &&
+      datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit() >
+          hdk::ir::TimeUnit::kSecond) {
+    return codegenDateTruncHighPrecisionTimestamps(from_expr, datetrunc_expr_type, field);
   }
   static_assert(dtSECOND + 1 == dtMILLISECOND, "Please keep these consecutive.");
   static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
@@ -237,10 +268,10 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DatetruncExpr* datetrunc_expr
                                                get_int_type(64, cgen_state_->context_));
   }
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
-  const bool is_nullable = !datetrunc_expr_ti.get_notnull();
+  const bool is_nullable = datetrunc_expr_type->nullable();
   if (is_nullable) {
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
-        cgen_state_, executor(), from_expr, datetrunc_expr_ti, "date_trunc_nullcheck");
+        cgen_state_, executor(), from_expr, datetrunc_expr_type, "date_trunc_nullcheck");
   }
   char const* const fname = datetrunc_fname_lookup.at(field);
   auto ret = cgen_state_->emitExternalCall(
@@ -253,63 +284,63 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DatetruncExpr* datetrunc_expr
 
 llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
     llvm::Value* ts_lv,
-    const SQLTypeInfo& ti,
+    const hdk::ir::Type* type,
     const ExtractField& field) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK(ti.is_high_precision_timestamp());
+  CHECK(type->isTimestamp());
+  auto unit = type->as<hdk::ir::TimestampType>()->unit();
+  CHECK(unit > hdk::ir::TimeUnit::kSecond);
   CHECK(ts_lv->getType()->isIntegerTy(64));
   if (is_subsecond_extract_field(field)) {
-    const auto result =
-        get_extract_high_precision_adjusted_scale(field, ti.get_dimension());
+    const auto result = get_extract_high_precision_adjusted_scale(field, unit);
     if (result.first == kMULTIPLY) {
-      return ti.get_notnull()
+      return !type->nullable()
                  ? cgen_state_->ir_builder_.CreateMul(
                        ts_lv, cgen_state_->llInt(static_cast<int64_t>(result.second)))
                  : cgen_state_->emitCall(
                        "mul_int64_t_nullable_lhs",
                        {ts_lv,
                         cgen_state_->llInt(static_cast<int64_t>(result.second)),
-                        cgen_state_->inlineIntNull(ti)});
+                        cgen_state_->inlineIntNull(type)});
     } else if (result.first == kDIVIDE) {
-      return ti.get_notnull()
+      return !type->nullable()
                  ? cgen_state_->ir_builder_.CreateSDiv(
                        ts_lv, cgen_state_->llInt(static_cast<int64_t>(result.second)))
                  : cgen_state_->emitCall(
                        "floor_div_nullable_lhs",
                        {ts_lv,
                         cgen_state_->llInt(static_cast<int64_t>(result.second)),
-                        cgen_state_->inlineIntNull(ti)});
+                        cgen_state_->inlineIntNull(type)});
     } else {
       return ts_lv;
     }
   }
-  return ti.get_notnull()
+  return !type->nullable()
              ? cgen_state_->ir_builder_.CreateSDiv(
-                   ts_lv,
-                   cgen_state_->llInt(static_cast<int64_t>(
-                       get_timestamp_precision_scale(ti.get_dimension()))))
-             : cgen_state_->emitCall(
-                   "floor_div_nullable_lhs",
-                   {ts_lv,
-                    cgen_state_->llInt(get_timestamp_precision_scale(ti.get_dimension())),
-                    cgen_state_->inlineIntNull(ti)});
+                   ts_lv, cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)))
+             : cgen_state_->emitCall("floor_div_nullable_lhs",
+                                     {ts_lv,
+                                      cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)),
+                                      cgen_state_->inlineIntNull(type)});
 }
 
 llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
     llvm::Value* ts_lv,
-    const SQLTypeInfo& ti,
+    const hdk::ir::Type* type,
     const DatetruncField& field) {
   // Only needed for i in { 0, 3, 6, 9 }.
   constexpr int64_t pow10[10]{1, 0, 0, 1000, 0, 0, 1000000, 0, 0, 1000000000};
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK(ti.is_high_precision_timestamp());
+  CHECK(type->isTimestamp());
+  auto unit = type->as<hdk::ir::TimestampType>()->unit();
+  CHECK(unit > hdk::ir::TimeUnit::kSecond);
   CHECK(ts_lv->getType()->isIntegerTy(64));
-  bool const is_nullable = !ti.get_notnull();
+  bool const is_nullable = type->nullable();
   static_assert(dtSECOND + 1 == dtMILLISECOND, "Please keep these consecutive.");
   static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
   static_assert(dtMICROSECOND + 1 == dtNANOSECOND, "Please keep these consecutive.");
   if (dtSECOND <= field && field <= dtNANOSECOND) {
-    unsigned const start_dim = ti.get_dimension();      // 0, 3, 6, 9
+    unsigned const start_dim = unitToDimension(unit);   // 0, 3, 6, 9
     unsigned const trunc_dim = (field - dtSECOND) * 3;  // 0, 3, 6, 9
     if (start_dim <= trunc_dim) {
       return ts_lv;  // Truncating to an equal or higher precision has no effect.
@@ -318,26 +349,26 @@ llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
     if (is_nullable) {
       ts_lv = cgen_state_->emitCall(
           "floor_div_nullable_lhs",
-          {ts_lv, cgen_state_->llInt(dscale), cgen_state_->inlineIntNull(ti)});
+          {ts_lv, cgen_state_->llInt(dscale), cgen_state_->inlineIntNull(type)});
       return cgen_state_->emitCall(
           "mul_int64_t_nullable_lhs",
-          {ts_lv, cgen_state_->llInt(dscale), cgen_state_->inlineIntNull(ti)});
+          {ts_lv, cgen_state_->llInt(dscale), cgen_state_->inlineIntNull(type)});
     } else {
       ts_lv = cgen_state_->ir_builder_.CreateSDiv(ts_lv, cgen_state_->llInt(dscale));
       return cgen_state_->ir_builder_.CreateMul(ts_lv, cgen_state_->llInt(dscale));
     }
   }
-  int64_t const scale = pow10[ti.get_dimension()];
+  int64_t const scale = hdk::ir::unitsPerSecond(unit);
   ts_lv = is_nullable
               ? cgen_state_->emitCall(
                     "floor_div_nullable_lhs",
-                    {ts_lv, cgen_state_->llInt(scale), cgen_state_->inlineIntNull(ti)})
+                    {ts_lv, cgen_state_->llInt(scale), cgen_state_->inlineIntNull(type)})
               : cgen_state_->ir_builder_.CreateSDiv(ts_lv, cgen_state_->llInt(scale));
 
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
   if (is_nullable) {
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
-        cgen_state_, executor(), ts_lv, ti, "date_trunc_hp_nullcheck");
+        cgen_state_, executor(), ts_lv, type, "date_trunc_hp_nullcheck");
   }
   char const* const fname = datetrunc_fname_lookup.at(field);
   ts_lv = cgen_state_->emitExternalCall(
@@ -350,6 +381,6 @@ llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
   return is_nullable
              ? cgen_state_->emitCall(
                    "mul_int64_t_nullable_lhs",
-                   {ts_lv, cgen_state_->llInt(scale), cgen_state_->inlineIntNull(ti)})
+                   {ts_lv, cgen_state_->llInt(scale), cgen_state_->inlineIntNull(type)})
              : cgen_state_->ir_builder_.CreateMul(ts_lv, cgen_state_->llInt(scale));
 }

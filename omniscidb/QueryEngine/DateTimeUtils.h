@@ -31,12 +31,22 @@
 namespace {
 
 static const std::map<std::pair<int32_t, ExtractField>, std::pair<SQLOps, int64_t>>
-    extract_precision_lookup = {{{3, kMICROSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-                                {{3, kNANOSECOND}, {kMULTIPLY, kMicroSecsPerSec}},
-                                {{6, kMILLISECOND}, {kDIVIDE, kMilliSecsPerSec}},
-                                {{6, kNANOSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-                                {{9, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
-                                {{9, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
+    orig_extract_precision_lookup = {{{3, kMICROSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
+                                     {{3, kNANOSECOND}, {kMULTIPLY, kMicroSecsPerSec}},
+                                     {{6, kMILLISECOND}, {kDIVIDE, kMilliSecsPerSec}},
+                                     {{6, kNANOSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
+                                     {{9, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
+                                     {{9, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
+
+static const std::map<std::pair<hdk::ir::TimeUnit, ExtractField>,
+                      std::pair<SQLOps, int64_t>>
+    extract_precision_lookup = {
+        {{hdk::ir::TimeUnit::kMilli, kMICROSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMilli, kNANOSECOND}, {kMULTIPLY, kMicroSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMicro, kMILLISECOND}, {kDIVIDE, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMicro, kNANOSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kNano, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
+        {{hdk::ir::TimeUnit::kNano, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
 
 static const std::map<std::pair<hdk::ir::TimeUnit, DatetruncField>, int64_t>
     datetrunc_precision_lookup = {
@@ -153,7 +163,17 @@ const inline std::pair<SQLOps, int64_t> get_dateadd_high_precision_adjusted_scal
 const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scale(
     const ExtractField& field,
     const int32_t dimen) {
-  const auto result = extract_precision_lookup.find(std::make_pair(dimen, field));
+  const auto result = orig_extract_precision_lookup.find(std::make_pair(dimen, field));
+  if (result != orig_extract_precision_lookup.end()) {
+    return result->second;
+  }
+  return {};
+}
+
+const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scale(
+    const ExtractField& field,
+    const hdk::ir::TimeUnit unit) {
+  const auto result = extract_precision_lookup.find(std::make_pair(unit, field));
   if (result != extract_precision_lookup.end()) {
     return result->second;
   }

@@ -350,11 +350,11 @@ class CodeGenerator {
                            const CompilationOptions&);
 
   llvm::Value* codegenExtractHighPrecisionTimestamps(llvm::Value*,
-                                                     const SQLTypeInfo&,
+                                                     const hdk::ir::Type*,
                                                      const ExtractField&);
 
   llvm::Value* codegenDateTruncHighPrecisionTimestamps(llvm::Value*,
-                                                       const SQLTypeInfo&,
+                                                       const hdk::ir::Type*,
                                                        const DatetruncField&);
 
   llvm::Value* codegenCmpDecimalConst(const SQLOps,
