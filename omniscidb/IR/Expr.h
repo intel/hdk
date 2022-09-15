@@ -1474,6 +1474,8 @@ class CaseExpr : public Expr {
  */
 class ExtractExpr : public Expr {
  public:
+  ExtractExpr(const hdk::ir::Type* type, bool has_agg, ExtractField f, ExprPtr e)
+      : Expr(type, has_agg), field_(f), from_expr_(e) {}
   ExtractExpr(const SQLTypeInfo& ti, bool has_agg, ExtractField f, ExprPtr e)
       : Expr(ti, has_agg), field_(f), from_expr_(e) {}
   ExtractField get_field() const { return field_; }
