@@ -262,7 +262,7 @@ class CodeGenerator {
   llvm::Value* codegenRowId(const hdk::ir::ColumnVar* col_var,
                             const CompilationOptions& co);
 
-  llvm::Value* codgenAdjustFixedEncNull(llvm::Value*, const SQLTypeInfo&);
+  llvm::Value* codgenAdjustFixedEncNull(llvm::Value*, const hdk::ir::Type*);
 
   std::vector<llvm::Value*> codegenOuterJoinNullPlaceholder(
       const hdk::ir::ColumnVar* col_var,

@@ -156,7 +156,6 @@ inline int64_t inline_int_null_value(const TYPE* type) {
     case TYPE::kBoolean:
     case TYPE::kInteger:
     case TYPE::kDecimal:
-    case TYPE::kExtDictionary:
       switch (type->size()) {
         case 1:
           return inline_int_null_value<int8_t>();
@@ -169,6 +168,8 @@ inline int64_t inline_int_null_value(const TYPE* type) {
         default:
           abort();
       }
+    case TYPE::kExtDictionary:
+      return inline_int_null_value<int32_t>();
     case TYPE::kTimestamp:
     case TYPE::kTime:
     case TYPE::kDate:

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "IR/TypeUtils.h"
+
 #include "CodeGenerator.h"
 #include "Codec.h"
 #include "Execute.h"
@@ -26,61 +28,33 @@ namespace {
 // Return the right decoder for a given column expression. Doesn't handle
 // variable length data. The decoder encapsulates the code generation logic.
 std::shared_ptr<Decoder> get_col_decoder(const hdk::ir::ColumnVar* col_var) {
-  const auto enc_type = col_var->get_compression();
-  const auto& ti = col_var->get_type_info();
-  switch (enc_type) {
-    case kENCODING_NONE: {
-      const auto int_type = ti.is_decimal() ? decimal_to_int_type(ti) : ti.get_type();
-      switch (int_type) {
-        case kBOOLEAN:
-          return std::make_shared<FixedWidthInt>(1);
-        case kTINYINT:
-          return std::make_shared<FixedWidthInt>(1);
-        case kSMALLINT:
-          return std::make_shared<FixedWidthInt>(2);
-        case kINT:
-          return std::make_shared<FixedWidthInt>(4);
-        case kBIGINT:
-          return std::make_shared<FixedWidthInt>(8);
-        case kFLOAT:
-          return std::make_shared<FixedWidthReal>(false);
-        case kDOUBLE:
-          return std::make_shared<FixedWidthReal>(true);
-        case kTIME:
-        case kTIMESTAMP:
-        case kDATE:
-          return std::make_shared<FixedWidthInt>(8);
-        default:
-          CHECK(false);
+  const auto& type = col_var->type();
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+      return std::make_shared<FixedWidthInt>(type->size());
+    case hdk::ir::Type::kFloatingPoint:
+      return std::make_shared<FixedWidthReal>(type->isFp64());
+    case hdk::ir::Type::kExtDictionary:
+      if (type->size() < hdk::ir::logicalSize(type)) {
+        return std::make_shared<FixedWidthUnsigned>(type->size());
       }
-    }
-    case kENCODING_DICT:
-      CHECK(ti.is_string());
-      // For dictionary-encoded columns encoded on less than 4 bytes, we can use
-      // unsigned representation for double the maximum cardinality. The inline
-      // null value is going to be the maximum value of the underlying type.
-      if (ti.get_size() < ti.get_logical_size()) {
-        return std::make_shared<FixedWidthUnsigned>(ti.get_size());
+      return std::make_shared<FixedWidthInt>(type->size());
+    case hdk::ir::Type::kDate:
+      if (type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) {
+        return std::make_shared<FixedWidthSmallDate>(type->size());
       }
-      return std::make_shared<FixedWidthInt>(ti.get_size());
-    case kENCODING_FIXED: {
-      const auto bit_width = col_var->get_comp_param();
-      CHECK_EQ(0, bit_width % 8);
-      return std::make_shared<FixedWidthInt>(bit_width / 8);
-    }
-    case kENCODING_DATE_IN_DAYS: {
-      CHECK(ti.is_date_in_days());
-      return col_var->get_comp_param() == 16 ? std::make_shared<FixedWidthSmallDate>(2)
-                                             : std::make_shared<FixedWidthSmallDate>(4);
-    }
+      return std::make_shared<FixedWidthInt>(type->size());
     default:
       abort();
   }
 }
 
 size_t get_col_bit_width(const hdk::ir::ColumnVar* col_var) {
-  const auto& type_info = col_var->get_type_info();
-  return get_bit_width(type_info);
+  return get_bit_width(col_var->type());
 }
 
 int adjusted_range_table_index(const hdk::ir::ColumnVar* col_var) {
@@ -113,8 +87,6 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
     if (col_var->is_virtual()) {
       return {codegenRowId(col_var, co)};
     }
-    auto col_ti = col_var->get_type_info();
-    CHECK_EQ(col_ti.get_physical_coord_cols(), 0);
   }
   const auto grouped_col_lv = resolveGroupedColumnReference(col_var);
   if (grouped_col_lv) {
@@ -138,7 +110,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
 
   // Use the already fetched left-hand side of an equi-join if the types are identical.
   // Currently, types can only be different because of different underlying dictionaries.
-  if (hash_join_lhs && hash_join_lhs->get_type_info() == col_var->get_type_info()) {
+  if (hash_join_lhs && hash_join_lhs->type()->equal(col_var->type())) {
     if (plan_state_->isLazyFetchColumn(col_var)) {
       plan_state_->columns_to_fetch_.insert(column_var_to_descriptor(col_var));
     }
@@ -163,8 +135,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
     }
     return {pos_arg};
   }
-  const auto& col_ti = col_var->get_type_info();
-  if (col_ti.is_string() && col_ti.get_compression() == kENCODING_NONE) {
+  const auto& col_type = col_var->type();
+  if (col_type->isString()) {
     const auto varlen_str_column_lvs =
         codegenVariableLengthStringColVar(col_byte_stream, pos_arg);
     if (!window_func_context) {
@@ -174,7 +146,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
     }
     return varlen_str_column_lvs;
   }
-  if (col_ti.is_array()) {
+  if (col_type->isArray()) {
     return {col_byte_stream};
   }
   if (window_func_context) {
@@ -209,7 +181,7 @@ llvm::Value* CodeGenerator::codegenFixedLengthColVar(const hdk::ir::ColumnVar* c
   cgen_state_->ir_builder_.Insert(dec_val);
   auto dec_type = dec_val->getType();
   llvm::Value* dec_val_cast{nullptr};
-  const auto& col_ti = col_var->get_type_info();
+  auto col_type = col_var->type();
   if (dec_type->isIntegerTy()) {
     auto dec_width = static_cast<llvm::IntegerType*>(dec_type)->getBitWidth();
     auto col_width = get_col_bit_width(col_var);
@@ -218,18 +190,17 @@ llvm::Value* CodeGenerator::codegenFixedLengthColVar(const hdk::ir::ColumnVar* c
                                                    : llvm::Instruction::CastOps::Trunc,
         dec_val,
         get_int_type(col_width, cgen_state_->context_));
-    if ((col_ti.get_compression() == kENCODING_FIXED ||
-         (col_ti.get_compression() == kENCODING_DICT && col_ti.get_size() < 4)) &&
-        !col_ti.get_notnull()) {
-      dec_val_cast = codgenAdjustFixedEncNull(dec_val_cast, col_ti);
+    if (col_type->size() < hdk::ir::logicalSize(col_type) && !col_type->isDate() &&
+        col_type->nullable()) {
+      dec_val_cast = codgenAdjustFixedEncNull(dec_val_cast, col_type);
     }
   } else {
-    CHECK_EQ(kENCODING_NONE, col_ti.get_compression());
+    CHECK(col_type->size() == hdk::ir::logicalSize(col_type));
     CHECK(dec_type->isFloatTy() || dec_type->isDoubleTy());
     if (dec_type->isDoubleTy()) {
-      CHECK(col_ti.get_type() == kDOUBLE);
+      CHECK(col_type->isFp64());
     } else if (dec_type->isFloatTy()) {
-      CHECK(col_ti.get_type() == kFLOAT);
+      CHECK(col_type->isFp32());
     }
     dec_val_cast = dec_val;
   }
@@ -258,10 +229,11 @@ llvm::Value* CodeGenerator::codegenFixedLengthColVarInWindow(
   const auto window_func_call_phi =
       cgen_state_->ir_builder_.CreatePHI(fixed_length_column_lv->getType(), 2);
   window_func_call_phi->addIncoming(fixed_length_column_lv, pos_valid_bb);
-  const auto& col_ti = col_var->get_type_info();
+  auto col_type = col_var->type();
   const auto null_lv =
-      col_ti.is_fp() ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(col_ti))
-                     : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(col_ti));
+      col_type->isFloatingPoint()
+          ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(col_type))
+          : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(col_type));
   window_func_call_phi->addIncoming(null_lv, orig_bb);
   return window_func_call_phi;
 }
@@ -292,8 +264,9 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
     // to offset the local rowid and generate a cluster-wide unique rowid.
     Datum d;
     d.bigintval = table_generation.start_rowid;
-    const auto start_rowid = hdk::ir::makeExpr<hdk::ir::Constant>(kBIGINT, false, d);
-    const auto start_rowid_lvs = codegen(start_rowid.get(), kENCODING_NONE, -1, co);
+    const auto start_rowid =
+        hdk::ir::makeExpr<hdk::ir::Constant>(col_var->type(), false, d);
+    const auto start_rowid_lvs = codegen(start_rowid.get(), col_var->type(), co);
     CHECK_EQ(size_t(1), start_rowid_lvs.size());
     start_rowid_lv = start_rowid_lvs.front();
   }
@@ -317,41 +290,20 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
   return rowid_lv;
 }
 
-namespace {
-
-SQLTypes get_phys_int_type(const size_t byte_sz) {
-  switch (byte_sz) {
-    case 1:
-      return kBOOLEAN;
-    // TODO: kTINYINT
-    case 2:
-      return kSMALLINT;
-    case 4:
-      return kINT;
-    case 8:
-      return kBIGINT;
-    default:
-      CHECK(false);
-  }
-  return kNULLT;
-}
-
-}  // namespace
-
 llvm::Value* CodeGenerator::codgenAdjustFixedEncNull(llvm::Value* val,
-                                                     const SQLTypeInfo& col_ti) {
+                                                     const hdk::ir::Type* col_type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK_LT(col_ti.get_size(), col_ti.get_logical_size());
-  const auto col_phys_width = col_ti.get_size() * 8;
+  CHECK_LT(col_type->size(), hdk::ir::logicalSize(col_type));
+  const auto col_phys_width = col_type->size() * 8;
   auto from_typename = "int" + std::to_string(col_phys_width) + "_t";
   auto adjusted = cgen_state_->ir_builder_.CreateCast(
       llvm::Instruction::CastOps::Trunc,
       val,
       get_int_type(col_phys_width, cgen_state_->context_));
-  if (col_ti.get_compression() == kENCODING_DICT) {
+  if (col_type->isExtDictionary()) {
     from_typename = "u" + from_typename;
     llvm::Value* from_null{nullptr};
-    switch (col_ti.get_size()) {
+    switch (col_type->size()) {
       case 1:
         from_null = cgen_state_->llInt(std::numeric_limits<uint8_t>::max());
         break;
@@ -362,21 +314,15 @@ llvm::Value* CodeGenerator::codgenAdjustFixedEncNull(llvm::Value* val,
         CHECK(false);
     }
     return cgen_state_->emitCall(
-        "cast_" + from_typename + "_to_" + numeric_type_name(col_ti) + "_nullable",
-        {adjusted, from_null, cgen_state_->inlineIntNull(col_ti)});
+        "cast_" + from_typename + "_to_" + numeric_type_name(col_type) + "_nullable",
+        {adjusted, from_null, cgen_state_->inlineIntNull(col_type)});
   }
-  SQLTypeInfo col_phys_ti(get_phys_int_type(col_ti.get_size()),
-                          col_ti.get_dimension(),
-                          col_ti.get_scale(),
-                          false,
-                          kENCODING_NONE,
-                          0,
-                          col_ti.get_subtype());
+  auto col_phys_type = col_type->ctx().integer(col_type->size());
   return cgen_state_->emitCall(
-      "cast_" + from_typename + "_to_" + numeric_type_name(col_ti) + "_nullable",
+      "cast_" + from_typename + "_to_" + numeric_type_name(col_type) + "_nullable",
       {adjusted,
-       cgen_state_->inlineIntNull(col_phys_ti),
-       cgen_state_->inlineIntNull(col_ti)});
+       cgen_state_->inlineIntNull(col_phys_type),
+       cgen_state_->inlineIntNull(col_type)});
 }
 
 llvm::Value* CodeGenerator::foundOuterJoinMatch(const size_t nesting_level) const {
@@ -412,14 +358,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenOuterJoinNullPlaceholder(
   const auto orig_lvs = codegenColVar(col_var, fetch_column, true, co);
   cgen_state_->ir_builder_.CreateBr(phi_bb);
   cgen_state_->ir_builder_.SetInsertPoint(outer_join_nulls_bb);
-  const auto& null_ti = col_var->get_type_info();
-  if ((null_ti.is_string() && null_ti.get_compression() == kENCODING_NONE) ||
-      null_ti.is_array()) {
-    throw std::runtime_error("Projection type " + null_ti.get_type_name() +
+  auto null_type = col_var->type();
+  if ((null_type->isString()) || null_type->isArray()) {
+    throw std::runtime_error("Projection type " + null_type->toString() +
                              " not supported for outer joins yet");
   }
   const auto null_constant =
-      hdk::ir::makeExpr<hdk::ir::Constant>(null_ti, true, Datum{0});
+      hdk::ir::makeExpr<hdk::ir::Constant>(null_type, true, Datum{0});
   const auto null_target_lvs =
       codegen(null_constant.get(),
               false,
@@ -508,8 +453,8 @@ const hdk::ir::Expr* remove_cast_to_int(const hdk::ir::Expr* expr) {
   if (!uoper || uoper->get_optype() != kCAST) {
     return nullptr;
   }
-  const auto& target_ti = uoper->get_type_info();
-  if (!target_ti.is_integer()) {
+  const auto& target_type = uoper->type();
+  if (!target_type->isInteger()) {
     return nullptr;
   }
   return uoper->get_operand();
@@ -526,7 +471,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
       }
     } else {
       auto eq_right_op = tautological_eq->get_right_operand();
-      if (!rhs->get_type_info().is_string()) {
+      if (!(rhs->type()->isString() || rhs->type()->isExtDictionary())) {
         eq_right_op = remove_cast_to_int(eq_right_op);
       }
       if (!eq_right_op) {
@@ -534,7 +479,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
       }
       if (*eq_right_op == *rhs) {
         auto eq_left_op = tautological_eq->get_left_operand();
-        if (!eq_left_op->get_type_info().is_string()) {
+        if (!(eq_left_op->type()->isString() || eq_left_op->type()->isExtDictionary())) {
           eq_left_op = remove_cast_to_int(eq_left_op);
         }
         if (!eq_left_op) {
@@ -545,10 +490,10 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
         if (eq_left_op_col->get_rte_idx() != 0) {
           return nullptr;
         }
-        if (rhs->get_type_info().is_string()) {
+        if (rhs->type()->isString() || rhs->type()->isExtDictionary()) {
           return eq_left_op->deep_copy();
         }
-        if (rhs->get_type_info().is_array()) {
+        if (rhs->type()->isArray()) {
           // Note(jclay): Can this be restored from copy as above?
           // If we fall through to the below return statement,
           // a superfulous cast from DOUBLE[] to DOUBLE[] is made and
@@ -556,7 +501,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
           return nullptr;
         }
         return hdk::ir::makeExpr<hdk::ir::UOper>(
-            rhs->get_type_info(), false, kCAST, eq_left_op->deep_copy());
+            rhs->type(), false, kCAST, eq_left_op->deep_copy());
       }
     }
   }
