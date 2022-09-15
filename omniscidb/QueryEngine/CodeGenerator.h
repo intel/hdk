@@ -150,7 +150,6 @@ class CodeGenerator {
 
   llvm::Value* codegenIsNull(const hdk::ir::UOper*, const CompilationOptions&);
 
-  llvm::Value* codegenIsNullNumber(llvm::Value*, const SQLTypeInfo&);
   llvm::Value* codegenIsNullNumber(llvm::Value*, const hdk::ir::Type*);
 
   llvm::Value* codegenLogical(const hdk::ir::BinOper*, const CompilationOptions&);

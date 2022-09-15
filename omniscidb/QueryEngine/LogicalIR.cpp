@@ -32,15 +32,15 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
         return true;
       }
       const auto& datum = rhs_constant->get_constval();
-      const auto& ti = rhs_constant->get_type_info();
-      const auto type = ti.is_decimal() ? decimal_to_int_type(ti) : ti.get_type();
-      if ((type == kBOOLEAN && datum.boolval == 0) ||
-          (type == kTINYINT && datum.tinyintval == 0) ||
-          (type == kSMALLINT && datum.smallintval == 0) ||
-          (type == kINT && datum.intval == 0) ||
-          (type == kBIGINT && datum.bigintval == 0LL) ||
-          (type == kFLOAT && datum.floatval == 0.0) ||
-          (type == kDOUBLE && datum.doubleval == 0.0)) {
+      auto type = rhs_constant->type();
+      if ((type->isBoolean() && datum.boolval == 0) ||
+          (type->isInt8() && datum.tinyintval == 0) ||
+          (type->isInt16() && datum.smallintval == 0) ||
+          (type->isInt32() && datum.intval == 0) ||
+          (type->isInt64() && datum.bigintval == 0LL) ||
+          (type->isDecimal() && datum.bigintval == 0LL) ||
+          (type->isFp32() && datum.floatval == 0.0) ||
+          (type->isFp64() && datum.doubleval == 0.0)) {
         return true;
       }
     }
@@ -69,7 +69,7 @@ bool should_defer_eval(const hdk::ir::ExprPtr expr) {
     return true;
   }
   const auto rhs = bin_expr->get_right_operand();
-  return rhs->get_type_info().is_array();
+  return rhs->type()->isArray();
 }
 
 Likelihood get_likelihood(const hdk::ir::Expr* expr) {
@@ -134,7 +134,7 @@ Weight get_weight(const hdk::ir::Expr* expr, int depth = 0) {
     auto rhs = bin_oper->get_right_operand();
     auto lhs_weight = get_weight(lhs, depth + 1);
     auto rhs_weight = get_weight(rhs, depth + 1);
-    if (rhs->get_type_info().is_array()) {
+    if (rhs->type()->isArray()) {
       // heavy weight expr, start valid weight propagation
       rhs_weight = rhs_weight + Weight(100);
     }
@@ -217,7 +217,7 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
     return nullptr;
   }
 
-  const auto& ti = bin_oper->get_type_info();
+  auto type = bin_oper->type();
   auto lhs_lv = codegen(lhs, true, co).front();
 
   // Here the linear control flow will diverge and expressions cached during the
@@ -234,7 +234,7 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
   llvm::BasicBlock* nullcheck_ok_bb{nullptr};
   llvm::BasicBlock* nullcheck_fail_bb{nullptr};
 
-  if (!ti.get_notnull()) {
+  if (type->nullable()) {
     // need lhs nullcheck before short circuiting
     nullcheck_ok_bb = llvm::BasicBlock::Create(
         cgen_state_->context_, "nullcheck_ok_bb", cgen_state_->current_func_);
@@ -244,7 +244,7 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
       lhs_lv = cgen_state_->castToTypeIn(lhs_lv, 8);
     }
     auto lhs_nullcheck =
-        cgen_state_->ir_builder_.CreateICmpEQ(lhs_lv, cgen_state_->inlineIntNull(ti));
+        cgen_state_->ir_builder_.CreateICmpEQ(lhs_lv, cgen_state_->inlineIntNull(type));
     cgen_state_->ir_builder_.CreateCondBr(
         lhs_nullcheck, nullcheck_fail_bb, nullcheck_ok_bb);
     cgen_state_->ir_builder_.SetInsertPoint(nullcheck_ok_bb);
@@ -263,29 +263,29 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
   // Codegen rhs when unable to short circuit.
   cgen_state_->ir_builder_.SetInsertPoint(rhs_bb);
   auto rhs_lv = codegen(rhs, true, co).front();
-  if (!ti.get_notnull()) {
+  if (type->nullable()) {
     // need rhs nullcheck as well
     if (rhs_lv->getType()->isIntegerTy(1)) {
       rhs_lv = cgen_state_->castToTypeIn(rhs_lv, 8);
     }
     auto rhs_nullcheck =
-        cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, cgen_state_->inlineIntNull(ti));
+        cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, cgen_state_->inlineIntNull(type));
     cgen_state_->ir_builder_.CreateCondBr(rhs_nullcheck, nullcheck_fail_bb, ret_bb);
   } else {
     cgen_state_->ir_builder_.CreateBr(ret_bb);
   }
   auto rhs_codegen_bb = cgen_state_->ir_builder_.GetInsertBlock();
 
-  if (!ti.get_notnull()) {
+  if (type->nullable()) {
     cgen_state_->ir_builder_.SetInsertPoint(nullcheck_fail_bb);
     cgen_state_->ir_builder_.CreateBr(ret_bb);
   }
 
   cgen_state_->ir_builder_.SetInsertPoint(ret_bb);
   auto result_phi =
-      cgen_state_->ir_builder_.CreatePHI(lhs_lv->getType(), (!ti.get_notnull()) ? 3 : 2);
-  if (!ti.get_notnull()) {
-    result_phi->addIncoming(cgen_state_->inlineIntNull(ti), nullcheck_fail_bb);
+      cgen_state_->ir_builder_.CreatePHI(lhs_lv->getType(), type->nullable() ? 3 : 2);
+  if (type->nullable()) {
+    result_phi->addIncoming(cgen_state_->inlineIntNull(type), nullcheck_fail_bb);
   }
   result_phi->addIncoming(cnst_lv, sc_check_bb);
   result_phi->addIncoming(rhs_lv, rhs_codegen_bb);
@@ -306,8 +306,8 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
   const auto rhs = bin_oper->get_right_operand();
   auto lhs_lv = codegen(lhs, true, co).front();
   auto rhs_lv = codegen(rhs, true, co).front();
-  const auto& ti = bin_oper->get_type_info();
-  if (ti.get_notnull()) {
+  auto type = bin_oper->type();
+  if (!type->nullable()) {
     switch (optype) {
       case kAND:
         return cgen_state_->ir_builder_.CreateAnd(toBool(lhs_lv), toBool(rhs_lv));
@@ -328,10 +328,10 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
   switch (optype) {
     case kAND:
       return cgen_state_->emitCall("logical_and",
-                                   {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(ti)});
+                                   {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(type)});
     case kOR:
       return cgen_state_->emitCall("logical_or",
-                                   {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(ti)});
+                                   {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(type)});
     default:
       abort();
   }
@@ -362,16 +362,16 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::UOper* uoper,
   const auto optype = uoper->get_optype();
   CHECK_EQ(kNOT, optype);
   const auto operand = uoper->get_operand();
-  const auto& operand_ti = operand->get_type_info();
-  CHECK(operand_ti.is_boolean());
+  auto operand_type = operand->type();
+  CHECK(operand_type->isBoolean());
   const auto operand_lv = codegen(operand, true, co).front();
   CHECK(operand_lv->getType()->isIntegerTy());
-  const bool not_null = (operand_ti.get_notnull() || is_qualified_bin_oper(operand));
+  const bool not_null = (!operand_type->nullable() || is_qualified_bin_oper(operand));
   CHECK(not_null || operand_lv->getType()->isIntegerTy(8));
   return not_null
              ? cgen_state_->ir_builder_.CreateNot(toBool(operand_lv))
              : cgen_state_->emitCall(
-                   "logical_not", {operand_lv, cgen_state_->inlineIntNull(operand_ti)});
+                   "logical_not", {operand_lv, cgen_state_->inlineIntNull(operand_type)});
 }
 
 llvm::Value* CodeGenerator::codegenIsNull(const hdk::ir::UOper* uoper,
@@ -383,35 +383,21 @@ llvm::Value* CodeGenerator::codegenIsNull(const hdk::ir::UOper* uoper,
     // for null constants, short-circuit to true
     return llvm::ConstantInt::get(get_int_type(1, cgen_state_->context_), 1);
   }
-  const auto& ti = operand->get_type_info();
-  CHECK(ti.is_integer() || ti.is_boolean() || ti.is_decimal() || ti.is_time() ||
-        ti.is_string() || ti.is_fp() || ti.is_array());
+  auto type = operand->type();
+  CHECK(type->isNumber() || type->isBoolean() || type->isDateTime() || type->isString() ||
+        type->isExtDictionary() || type->isArray());
   // if the type is inferred as non null, short-circuit to false
-  if (ti.get_notnull()) {
+  if (!type->nullable()) {
     return llvm::ConstantInt::get(get_int_type(1, cgen_state_->context_), 0);
   }
   const auto operand_lv = codegen(operand, true, co).front();
   // NULL-check array
-  if (ti.is_array()) {
+  if (type->isArray()) {
     auto fname = "array_is_null";
     return cgen_state_->emitExternalCall(
         fname, get_int_type(1, cgen_state_->context_), {operand_lv, posArg(operand)});
   }
-  return codegenIsNullNumber(operand_lv, ti);
-}
-
-llvm::Value* CodeGenerator::codegenIsNullNumber(llvm::Value* operand_lv,
-                                                const SQLTypeInfo& ti) {
-  AUTOMATIC_IR_METADATA(cgen_state_);
-  if (ti.is_fp()) {
-    return cgen_state_->ir_builder_.CreateFCmp(llvm::FCmpInst::FCMP_OEQ,
-                                               operand_lv,
-                                               ti.get_type() == kFLOAT
-                                                   ? cgen_state_->llFp(NULL_FLOAT)
-                                                   : cgen_state_->llFp(NULL_DOUBLE));
-  }
-  return cgen_state_->ir_builder_.CreateICmp(
-      llvm::ICmpInst::ICMP_EQ, operand_lv, cgen_state_->inlineIntNull(ti));
+  return codegenIsNullNumber(operand_lv, type);
 }
 
 llvm::Value* CodeGenerator::codegenIsNullNumber(llvm::Value* operand_lv,
