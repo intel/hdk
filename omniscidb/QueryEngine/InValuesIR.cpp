@@ -27,15 +27,15 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
   if (is_unnest(in_arg)) {
     throw std::runtime_error("IN not supported for unnested expressions");
   }
-  const auto& expr_ti = expr->get_type_info();
-  CHECK(expr_ti.is_boolean());
+  auto expr_type = expr->type();
+  CHECK(expr_type->isBoolean());
   const auto lhs_lvs = codegen(in_arg, true, co);
   llvm::Value* result{nullptr};
-  if (expr_ti.get_notnull()) {
+  if (expr_type->nullable()) {
+    result = cgen_state_->llInt(int8_t(0));
+  } else {
     result = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(cgen_state_->context_),
                                     false);
-  } else {
-    result = cgen_state_->llInt(int8_t(0));
   }
   CHECK(result);
   if (co.hoist_literals) {  // TODO(alex): remove this constraint
@@ -43,7 +43,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
     if (in_vals_bitmap) {
       if (in_vals_bitmap->isEmpty()) {
         return in_vals_bitmap->hasNull()
-                   ? cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false))
+                   ? cgen_state_->inlineIntNull(expr_type->ctx().boolean())
                    : result;
       }
       CHECK_EQ(size_t(1), lhs_lvs.size());
@@ -51,7 +51,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
           ->codegen(lhs_lvs.front(), executor());
     }
   }
-  if (expr_ti.get_notnull()) {
+  if (!expr_type->nullable()) {
     for (auto in_val : expr->get_value_list()) {
       result = cgen_state_->ir_builder_.CreateOr(
           result,
@@ -60,8 +60,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
   } else {
     for (auto in_val : expr->get_value_list()) {
       const auto crt = codegenCmp(kEQ, kONE, lhs_lvs, in_arg->type(), in_val.get(), co);
-      result = cgen_state_->emitCall("logical_or",
-                                     {result, crt, cgen_state_->inlineIntNull(expr_ti)});
+      result = cgen_state_->emitCall(
+          "logical_or", {result, crt, cgen_state_->inlineIntNull(expr_type)});
     }
   }
   return result;
@@ -74,8 +74,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InIntegerSet* in_integer_set,
   if (is_unnest(in_arg)) {
     throw std::runtime_error("IN not supported for unnested expressions");
   }
-  const auto& ti = in_integer_set->get_arg()->get_type_info();
-  const auto needle_null_val = inline_int_null_val(ti);
+  auto type = in_integer_set->get_arg()->type();
+  const auto needle_null_val = inline_int_null_value(type);
   if (!co.hoist_literals) {
     // We never run without literal hoisting in real world scenarios, this avoids a crash
     // when testing.
@@ -90,15 +90,15 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InIntegerSet* in_integer_set,
                                                 : Data_Namespace::CPU_LEVEL,
       executor()->deviceCount(co.device_type),
       executor()->getBufferProvider());
-  const auto& in_integer_set_ti = in_integer_set->get_type_info();
-  CHECK(in_integer_set_ti.is_boolean());
+  auto in_integer_set_type = in_integer_set->type();
+  CHECK(in_integer_set_type->isBoolean());
   const auto lhs_lvs = codegen(in_arg, true, co);
   llvm::Value* result{nullptr};
-  if (in_integer_set_ti.get_notnull()) {
+  if (in_integer_set_type->nullable()) {
+    result = cgen_state_->llInt(int8_t(0));
+  } else {
     result = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(cgen_state_->context_),
                                     false);
-  } else {
-    result = cgen_state_->llInt(int8_t(0));
   }
   CHECK(result);
   CHECK_EQ(size_t(1), lhs_lvs.size());
@@ -112,18 +112,20 @@ std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto& value_list = in_values->get_value_list();
   const auto val_count = value_list.size();
-  const auto& ti = in_values->get_arg()->get_type_info();
-  if (!(ti.is_integer() || (ti.is_string() && ti.get_compression() == kENCODING_DICT))) {
+  auto type = in_values->get_arg()->type();
+  if (!(type->isInteger() || type->isExtDictionary())) {
     return nullptr;
   }
-  const auto sdp =
-      ti.is_string() ? executor()->getStringDictionaryProxy(
-                           ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true)
-                     : nullptr;
+  const auto sdp = type->isExtDictionary()
+                       ? executor()->getStringDictionaryProxy(
+                             type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+                             executor()->getRowSetMemoryOwner(),
+                             true)
+                       : nullptr;
   if (val_count > 3) {
     using ListIterator = decltype(value_list.begin());
     std::vector<int64_t> values;
-    const auto needle_null_val = inline_int_null_val(ti);
+    const auto needle_null_val = inline_int_null_value(type);
     const int worker_count = val_count > 10000 ? cpu_threads() : int(1);
     std::vector<std::vector<int64_t>> values_set(worker_count, std::vector<int64_t>());
     std::vector<std::future<bool>> worker_threads;
@@ -145,9 +147,9 @@ std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(
           if (!in_val_const) {
             return false;
           }
-          const auto& in_val_ti = in_val->get_type_info();
-          CHECK(in_val_ti == ti || get_nullable_type_info(in_val_ti) == ti);
-          if (ti.is_string()) {
+          auto in_val_type = in_val->type();
+          CHECK(in_val_type->equal(type) || in_val_type->withNullable(true)->equal(type));
+          if (type->isExtDictionary()) {
             CHECK(sdp);
             const auto string_id =
                 in_val_const->get_is_null()
