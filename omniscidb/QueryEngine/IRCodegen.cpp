@@ -453,7 +453,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
   auto reversed_expr = toBool(codegenCmp(SQLOps::kGT,
                                          kONE,
                                          lower_bound_expr_lvs,
-                                         lower_bound_expr->get_type_info(),
+                                         lower_bound_expr->type(),
                                          upper_bound_expr,
                                          co));
   auto lower_bound_expr_lv = lower_bound_expr_lvs[0];

@@ -121,7 +121,7 @@ std::string string_cmp_func(const SQLOps optype) {
 }
 
 std::shared_ptr<hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_eq) {
-  const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->get_type_info(),
+  const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->type(),
                                                           bw_eq->get_contains_agg(),
                                                           kEQ,
                                                           bw_eq->get_qualifier(),
@@ -168,10 +168,9 @@ std::shared_ptr<hdk::ir::BinOper> lower_multicol_compare(
       make_eq(left_tuple.front(), right_tuple.front(), multicol_compare->get_optype());
   for (size_t i = 1; i < left_tuple.size(); ++i) {
     auto crt = make_eq(left_tuple[i], right_tuple[i], multicol_compare->get_optype());
-    const bool not_null =
-        acc->get_type_info().get_notnull() && crt->get_type_info().get_notnull();
+    const bool nullable = acc->type()->nullable() || crt->type()->nullable();
     acc = hdk::ir::makeExpr<hdk::ir::BinOper>(
-        SQLTypeInfo(kBOOLEAN, not_null), false, kAND, kONE, acc, crt);
+        acc->type()->ctx().boolean(nullable), false, kAND, kONE, acc, crt);
   }
   return acc;
 }
@@ -181,9 +180,9 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
   auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
   auto comp_op = IS_COMPARISON(bin_oper->get_optype());
   if (lhs_cv && rhs_cv && comp_op) {
-    auto lhs_ti = lhs_cv->get_type_info();
-    auto rhs_ti = rhs_cv->get_type_info();
-    if (lhs_ti.is_array() && rhs_ti.is_array()) {
+    auto lhs_type = lhs_cv->type();
+    auto rhs_type = rhs_cv->type();
+    if (lhs_type->isArray() && rhs_type->isArray()) {
       throw std::runtime_error(
           "Comparing two full array columns is not supported yet. Please consider "
           "rewriting the full array comparison to a comparison between indexed array "
@@ -211,10 +210,10 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
     auto rhs_arr_idx =
         dynamic_cast<const hdk::ir::Constant*>(rhs_bin_oper->get_right_operand());
     if (lhs_arr_cv && rhs_arr_cv && lhs_arr_idx && rhs_arr_idx &&
-        ((lhs_arr_cv->get_type_info().is_array() &&
-          lhs_arr_cv->get_type_info().get_subtype() == SQLTypes::kTEXT) ||
-         (rhs_arr_cv->get_type_info().is_string() &&
-          rhs_arr_cv->get_type_info().get_subtype() == SQLTypes::kTEXT))) {
+        ((lhs_arr_cv->type()->isArray() &&
+          lhs_arr_cv->type()->as<hdk::ir::ArrayBaseType>()->elemType()->isText()) ||
+         (rhs_arr_cv->type()->isArray() &&
+          rhs_arr_cv->type()->as<hdk::ir::ArrayBaseType>()->elemType()->isText()))) {
       throw std::runtime_error(
           "Comparison between string array columns is not supported yet.");
     }
@@ -245,10 +244,11 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
     throw std::runtime_error("Unnest not supported in comparisons");
   }
   check_array_comp_cond(bin_oper);
-  const auto& lhs_ti = lhs->get_type_info();
-  const auto& rhs_ti = rhs->get_type_info();
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
 
-  if (lhs_ti.is_string() && rhs_ti.is_string() &&
+  if ((lhs_type->isString() || lhs_type->isExtDictionary()) &&
+      (rhs_type->isString() || rhs_type->isExtDictionary()) &&
       !(IS_EQUIVALENCE(optype) || optype == kNE)) {
     auto cmp_str = codegenStrCmp(optype,
                                  qualifier,
@@ -260,15 +260,15 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
     }
   }
 
-  if (lhs_ti.is_decimal()) {
+  if (lhs_type->isDecimal()) {
     auto cmp_decimal_const =
-        codegenCmpDecimalConst(optype, qualifier, lhs, lhs_ti, rhs, co);
+        codegenCmpDecimalConst(optype, qualifier, lhs, lhs_type, rhs, co);
     if (cmp_decimal_const) {
       return cmp_decimal_const;
     }
   }
   auto lhs_lvs = codegen(lhs, true, co);
-  return codegenCmp(optype, qualifier, lhs_lvs, lhs_ti, rhs, co);
+  return codegenCmp(optype, qualifier, lhs_lvs, lhs_type, rhs, co);
 }
 
 llvm::Value* CodeGenerator::codegenStrCmp(const SQLOps optype,
@@ -277,16 +277,16 @@ llvm::Value* CodeGenerator::codegenStrCmp(const SQLOps optype,
                                           const hdk::ir::ExprPtr rhs,
                                           const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto lhs_ti = lhs->get_type_info();
-  const auto rhs_ti = rhs->get_type_info();
+  const auto lhs_type = lhs->type();
+  const auto rhs_type = rhs->type();
 
-  CHECK(lhs_ti.is_string());
-  CHECK(rhs_ti.is_string());
+  CHECK(lhs_type->isString() || lhs_type->isExtDictionary());
+  CHECK(rhs_type->isString() || rhs_type->isExtDictionary());
 
-  const auto null_check_suffix = get_null_check_suffix(lhs_ti, rhs_ti);
-  if (lhs_ti.get_compression() == kENCODING_DICT &&
-      rhs_ti.get_compression() == kENCODING_DICT) {
-    if (lhs_ti.get_comp_param() == rhs_ti.get_comp_param()) {
+  if (lhs_type->isExtDictionary() && rhs_type->isExtDictionary()) {
+    auto lhs_dict_id = lhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto rhs_dict_id = rhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    if (lhs_dict_id == rhs_dict_id) {
       // Both operands share a dictionary
 
       // check if query is trying to compare a columnt against literal
@@ -306,7 +306,7 @@ llvm::Value* CodeGenerator::codegenStrCmp(const SQLOps optype,
 llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
                                                    const SQLQualifier qualifier,
                                                    const hdk::ir::Expr* lhs,
-                                                   const SQLTypeInfo& lhs_ti,
+                                                   const hdk::ir::Type* lhs_type,
                                                    const hdk::ir::Expr* rhs,
                                                    const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
@@ -319,16 +319,20 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
     return nullptr;
   }
   const auto operand = u_oper->get_operand();
-  const auto& operand_ti = operand->get_type_info();
-  if (operand_ti.is_decimal() && operand_ti.get_scale() < lhs_ti.get_scale()) {
+  const auto& operand_type = operand->type();
+  CHECK(lhs_type->isDecimal());
+  auto lhs_scale = lhs_type->as<hdk::ir::DecimalType>()->scale();
+  auto operand_scale =
+      operand_type->isDecimal() ? operand_type->as<hdk::ir::DecimalType>()->scale() : 0;
+  if (operand_type->isDecimal() && operand_scale < lhs_scale) {
     // lhs decimal type has smaller scale
-  } else if (operand_ti.is_integer() && 0 < lhs_ti.get_scale()) {
+  } else if (operand_type->isInteger() && 0 < lhs_scale) {
     // lhs is integer, no need to scale it all the way up to the cmp expr scale
   } else {
     return nullptr;
   }
 
-  auto scale_diff = lhs_ti.get_scale() - operand_ti.get_scale() - 1;
+  auto scale_diff = lhs_scale - operand_scale - 1;
   int64_t bigintval = rhs_constant->get_constval().bigintval;
   bool negative = false;
   if (bigintval < 0) {
@@ -340,43 +344,45 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
   if (truncated_decimal % 10 == 0 && decimal_tail > 0) {
     truncated_decimal += 1;
   }
-  SQLTypeInfo new_ti = SQLTypeInfo(
-      kDECIMAL, 19, lhs_ti.get_scale() - scale_diff, operand_ti.get_notnull());
+  auto new_type =
+      lhs_type->ctx().decimal64(19, lhs_scale - scale_diff, operand_type->nullable());
   if (negative) {
     truncated_decimal = -truncated_decimal;
   }
   Datum d;
   d.bigintval = truncated_decimal;
   const auto new_rhs_lit =
-      hdk::ir::makeExpr<hdk::ir::Constant>(new_ti, rhs_constant->get_is_null(), d);
+      hdk::ir::makeExpr<hdk::ir::Constant>(new_type, rhs_constant->get_is_null(), d);
   const auto operand_lv = codegen(operand, true, co).front();
-  const auto lhs_lv = codegenCast(operand_lv, operand_ti, new_ti, false, false, co);
-  return codegenCmp(optype, qualifier, {lhs_lv}, new_ti, new_rhs_lit.get(), co);
+  const auto lhs_lv = codegenCast(operand_lv, operand_type, new_type, false, false, co);
+  return codegenCmp(optype, qualifier, {lhs_lv}, new_type, new_rhs_lit.get(), co);
 }
 
 llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
                                        const SQLQualifier qualifier,
                                        std::vector<llvm::Value*> lhs_lvs,
-                                       const SQLTypeInfo& lhs_ti,
+                                       const hdk::ir::Type* lhs_type,
                                        const hdk::ir::Expr* rhs,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(IS_COMPARISON(optype));
-  const auto& rhs_ti = rhs->get_type_info();
-  if (rhs_ti.is_array()) {
+  const auto& rhs_type = rhs->type();
+  if (rhs_type->isArray()) {
     return codegenQualifierCmp(optype, qualifier, lhs_lvs, rhs, co);
   }
   auto rhs_lvs = codegen(rhs, true, co);
   CHECK_EQ(kONE, qualifier);
-  CHECK((lhs_ti.get_type() == rhs_ti.get_type()) ||
-        (lhs_ti.is_string() && rhs_ti.is_string()));
-  const auto null_check_suffix = get_null_check_suffix(lhs_ti, rhs_ti);
-  if (lhs_ti.is_integer() || lhs_ti.is_decimal() || lhs_ti.is_time() ||
-      lhs_ti.is_boolean() || lhs_ti.is_string() || lhs_ti.is_timeinterval()) {
-    if (lhs_ti.is_string()) {
-      CHECK(rhs_ti.is_string());
-      CHECK_EQ(lhs_ti.get_compression(), rhs_ti.get_compression());
-      if (lhs_ti.get_compression() == kENCODING_NONE) {
+  CHECK((lhs_type->isString() && rhs_type->isString()) ||
+        (lhs_type->id() == rhs_type->id()))
+      << lhs_type->toString() << " " << rhs_type->toString();
+  const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
+  if (lhs_type->isInteger() || lhs_type->isDecimal() || lhs_type->isDateTime() ||
+      lhs_type->isBoolean() || lhs_type->isString() || lhs_type->isExtDictionary() ||
+      lhs_type->isInterval()) {
+    if (lhs_type->isString() || lhs_type->isExtDictionary()) {
+      CHECK_EQ(lhs_type->isString(), rhs_type->isString())
+          << lhs_type->toString() << " " << rhs_type->toString();
+      if (!lhs_type->isExtDictionary()) {
         // unpack pointer + length if necessary
         if (lhs_lvs.size() != 3) {
           CHECK_EQ(size_t(1), lhs_lvs.size());
@@ -391,8 +397,7 @@ llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
         std::vector<llvm::Value*> str_cmp_args{
             lhs_lvs[1], lhs_lvs[2], rhs_lvs[1], rhs_lvs[2]};
         if (!null_check_suffix.empty()) {
-          str_cmp_args.push_back(
-              cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false)));
+          str_cmp_args.push_back(cgen_state_->inlineIntNull(lhs_type->ctx().boolean()));
         }
         return cgen_state_->emitCall(
             string_cmp_func(optype) + (null_check_suffix.empty() ? "" : "_nullable"),
@@ -402,7 +407,7 @@ llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
       }
     }
 
-    if (lhs_ti.is_boolean() && rhs_ti.is_boolean()) {
+    if (lhs_type->isBoolean() && rhs_type->isBoolean()) {
       auto& lhs_lv = lhs_lvs.front();
       auto& rhs_lv = rhs_lvs.front();
       CHECK(lhs_lv->getType()->isIntegerTy());
@@ -421,25 +426,26 @@ llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
                ? cgen_state_->ir_builder_.CreateICmp(
                      llvm_icmp_pred(optype), lhs_lvs.front(), rhs_lvs.front())
                : cgen_state_->emitCall(
-                     icmp_name(optype) + "_" + numeric_type_name(lhs_ti) +
+                     icmp_name(optype) + "_" + numeric_type_name(lhs_type) +
                          null_check_suffix,
                      {lhs_lvs.front(),
                       rhs_lvs.front(),
-                      cgen_state_->llInt(inline_int_null_val(lhs_ti)),
-                      cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false))});
+                      cgen_state_->llInt(inline_int_null_value(lhs_type)),
+                      cgen_state_->inlineIntNull(lhs_type->ctx().boolean())});
   }
-  if (lhs_ti.get_type() == kFLOAT || lhs_ti.get_type() == kDOUBLE) {
+
+  if (lhs_type->isFloatingPoint()) {
     return null_check_suffix.empty()
                ? cgen_state_->ir_builder_.CreateFCmp(
                      llvm_fcmp_pred(optype), lhs_lvs.front(), rhs_lvs.front())
                : cgen_state_->emitCall(
-                     icmp_name(optype) + "_" + numeric_type_name(lhs_ti) +
+                     icmp_name(optype) + "_" + numeric_type_name(lhs_type) +
                          null_check_suffix,
                      {lhs_lvs.front(),
                       rhs_lvs.front(),
-                      lhs_ti.get_type() == kFLOAT ? cgen_state_->llFp(NULL_FLOAT)
-                                                  : cgen_state_->llFp(NULL_DOUBLE),
-                      cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false))});
+                      lhs_type->isFp32() ? cgen_state_->llFp(NULL_FLOAT)
+                                         : cgen_state_->llFp(NULL_DOUBLE),
+                      cgen_state_->inlineIntNull(lhs_type->ctx().boolean())});
   }
   CHECK(false);
   return nullptr;
@@ -451,23 +457,23 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
                                                 const hdk::ir::Expr* rhs,
                                                 const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto& rhs_ti = rhs->get_type_info();
+  auto rhs_type = rhs->type();
+  CHECK(rhs_type->isArray());
+  auto target_type = rhs_type->as<hdk::ir::ArrayBaseType>()->elemType();
   const hdk::ir::Expr* arr_expr{rhs};
   if (dynamic_cast<const hdk::ir::UOper*>(rhs)) {
     const auto cast_arr = static_cast<const hdk::ir::UOper*>(rhs);
     CHECK_EQ(kCAST, cast_arr->get_optype());
     arr_expr = cast_arr->get_operand();
   }
-  const auto& arr_ti = arr_expr->get_type_info();
-  const auto& elem_ti = arr_ti.get_elem_type();
+  auto arr_type = arr_expr->type();
+  CHECK(arr_type->isArray());
+  auto elem_type = arr_type->as<hdk::ir::ArrayBaseType>()->elemType();
   auto rhs_lvs = codegen(arr_expr, true, co);
   CHECK_NE(kONE, qualifier);
   std::string fname{std::string("array_") + (qualifier == kANY ? "any" : "all") + "_" +
                     icmp_arr_name(optype)};
-  const auto& target_ti = rhs_ti.get_elem_type();
-  const bool is_real_string{target_ti.is_string() &&
-                            target_ti.get_compression() != kENCODING_DICT};
-  if (is_real_string) {
+  if (target_type->isString()) {
     if (config_.exec.watchdog.enable) {
       throw WatchdogException(
           "Comparison between a dictionary-encoded and a none-encoded string would be "
@@ -476,18 +482,18 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
     if (co.device_type == ExecutorDeviceType::GPU) {
       throw QueryMustRunOnCpu();
     }
-    CHECK_EQ(kENCODING_NONE, target_ti.get_compression());
     fname += "_str";
   }
-  if (elem_ti.is_integer() || elem_ti.is_boolean() || elem_ti.is_string() ||
-      elem_ti.is_decimal()) {
-    fname += ("_" + numeric_type_name(elem_ti));
+  if (elem_type->isInteger() || elem_type->isBoolean() || elem_type->isString() ||
+      elem_type->isExtDictionary() || elem_type->isDecimal()) {
+    fname += ("_" + numeric_type_name(elem_type));
   } else {
-    CHECK(elem_ti.is_fp());
-    fname += elem_ti.get_type() == kDOUBLE ? "_double" : "_float";
+    CHECK(elem_type->isFloatingPoint());
+    fname += elem_type->isFp64() ? "_double" : "_float";
   }
-  if (is_real_string) {
+  if (target_type->isString()) {
     CHECK_EQ(size_t(3), lhs_lvs.size());
+    CHECK(elem_type->isExtDictionary());
     return cgen_state_->emitExternalCall(
         fname,
         get_int_type(1, cgen_state_->context_),
@@ -496,15 +502,17 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
          lhs_lvs[1],
          lhs_lvs[2],
          cgen_state_->llInt(int64_t(executor()->getStringDictionaryProxy(
-             elem_ti.get_comp_param(), executor()->getRowSetMemoryOwner(), true))),
-         cgen_state_->inlineIntNull(elem_ti)});
+             elem_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+             executor()->getRowSetMemoryOwner(),
+             true))),
+         cgen_state_->inlineIntNull(elem_type)});
   }
-  if (target_ti.is_integer() || target_ti.is_boolean() || target_ti.is_string() ||
-      target_ti.is_decimal()) {
-    fname += ("_" + numeric_type_name(target_ti));
+  if (target_type->isInteger() || target_type->isBoolean() || target_type->isString() ||
+      target_type->isExtDictionary() || target_type->isDecimal()) {
+    fname += ("_" + numeric_type_name(target_type));
   } else {
-    CHECK(target_ti.is_fp());
-    fname += target_ti.get_type() == kDOUBLE ? "_double" : "_float";
+    CHECK(target_type->isFloatingPoint());
+    fname += target_type->isFp64() ? "_double" : "_float";
   }
   return cgen_state_->emitExternalCall(
       fname,
@@ -512,6 +520,7 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
       {rhs_lvs.front(),
        posArg(arr_expr),
        lhs_lvs.front(),
-       elem_ti.is_fp() ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(elem_ti))
-                       : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(elem_ti))});
+       elem_type->isFloatingPoint()
+           ? static_cast<llvm::Value*>(cgen_state_->inlineFpNull(elem_type))
+           : static_cast<llvm::Value*>(cgen_state_->inlineIntNull(elem_type))});
 }

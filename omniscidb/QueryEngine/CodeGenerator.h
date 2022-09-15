@@ -144,7 +144,7 @@ class CodeGenerator {
   llvm::Value* codegenCmp(const SQLOps,
                           const SQLQualifier,
                           std::vector<llvm::Value*>,
-                          const SQLTypeInfo&,
+                          const hdk::ir::Type*,
                           const hdk::ir::Expr*,
                           const CompilationOptions&);
 
@@ -361,7 +361,7 @@ class CodeGenerator {
   llvm::Value* codegenCmpDecimalConst(const SQLOps,
                                       const SQLQualifier,
                                       const hdk::ir::Expr*,
-                                      const SQLTypeInfo&,
+                                      const hdk::ir::Type*,
                                       const hdk::ir::Expr*,
                                       const CompilationOptions&);
 
