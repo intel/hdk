@@ -222,13 +222,13 @@ class CodeGenerator {
 
   llvm::Value* codegen(const hdk::ir::UOper*, const CompilationOptions&);
 
-  std::vector<llvm::Value*> codegenHoistedConstantsLoads(const SQLTypeInfo& type_info,
+  std::vector<llvm::Value*> codegenHoistedConstantsLoads(const hdk::ir::Type* type,
                                                          const bool use_dict_encoding,
                                                          const int dict_id,
                                                          const int16_t lit_off);
 
   std::vector<llvm::Value*> codegenHoistedConstantsPlaceholders(
-      const SQLTypeInfo& type_info,
+      const hdk::ir::Type* type,
       const bool use_dict_encoding,
       const int16_t lit_off,
       const std::vector<llvm::Value*>& literal_loads);

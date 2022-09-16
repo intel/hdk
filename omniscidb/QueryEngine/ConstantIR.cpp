@@ -81,26 +81,29 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
 
 llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* constant,
                                                   CgenState* cgen_state) {
-  const auto& type_info = constant->get_type_info();
+  auto type = constant->type();
   if (constant->get_is_null()) {
-    return cgen_state->inlineIntNull(type_info);
+    return cgen_state->inlineIntNull(type);
   }
-  const auto type =
-      type_info.is_decimal() ? decimal_to_int_type(type_info) : type_info.get_type();
-  switch (type) {
-    case kTINYINT:
-      return cgen_state->llInt(constant->get_constval().tinyintval);
-    case kSMALLINT:
-      return cgen_state->llInt(constant->get_constval().smallintval);
-    case kINT:
-      return cgen_state->llInt(constant->get_constval().intval);
-    case kBIGINT:
-      return cgen_state->llInt(constant->get_constval().bigintval);
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
+  switch (type->id()) {
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+      switch (type->size()) {
+        case 1:
+          return cgen_state->llInt(constant->get_constval().tinyintval);
+        case 2:
+          return cgen_state->llInt(constant->get_constval().smallintval);
+        case 4:
+          return cgen_state->llInt(constant->get_constval().intval);
+        case 8:
+          return cgen_state->llInt(constant->get_constval().bigintval);
+        default:
+          UNREACHABLE();
+      }
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
       return cgen_state->llInt(constant->get_constval().bigintval);
     default:
       UNREACHABLE();
@@ -110,7 +113,7 @@ llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* const
 }
 
 std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
-    const SQLTypeInfo& type_info,
+    const hdk::ir::Type* type,
     const bool use_dict_encoding,
     const int dict_id,
     const int16_t lit_off) {
@@ -119,8 +122,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
   auto lit_buff_query_func_lv = get_arg_by_name(cgen_state_->query_func_, "literals");
   const auto lit_buf_start = cgen_state_->query_func_entry_ir_builder_.CreateGEP(
       lit_buff_query_func_lv, cgen_state_->llInt(lit_off));
-  if (type_info.is_string() && !use_dict_encoding) {
-    CHECK_EQ(kENCODING_NONE, type_info.get_compression());
+  if (type->isString() && !use_dict_encoding) {
     CHECK_EQ(size_t(4),
              CgenState::literalBytes(CgenState::LiteralValue(std::string(""))));
     auto off_and_len_ptr = cgen_state_->query_func_entry_ir_builder_.CreateBitCast(
@@ -148,9 +150,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
     var_length->setName(literal_name + "_length");
 
     return {var_start, var_start_address, var_length};
-  } else if (type_info.is_array() && !use_dict_encoding) {
-    CHECK_EQ(kENCODING_NONE, type_info.get_compression());
-
+  } else if (type->isArray() && !use_dict_encoding) {
     auto off_and_len_ptr = cgen_state_->query_func_entry_ir_builder_.CreateBitCast(
         lit_buf_start,
         llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0));
@@ -177,17 +177,16 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
   }
 
   llvm::Type* val_ptr_type{nullptr};
-  const auto val_bits = get_bit_width(type_info);
+  const auto val_bits = get_bit_width(type);
   CHECK_EQ(size_t(0), val_bits % 8);
-  if (type_info.is_integer() || type_info.is_decimal() || type_info.is_time() ||
-      type_info.is_timeinterval() || type_info.is_string() || type_info.is_boolean()) {
+  if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
+      type->isInterval() || type->isString() || type->isBoolean()) {
     val_ptr_type = llvm::PointerType::get(
         llvm::IntegerType::get(cgen_state_->context_, val_bits), 0);
   } else {
-    CHECK(type_info.get_type() == kFLOAT || type_info.get_type() == kDOUBLE);
-    val_ptr_type = (type_info.get_type() == kFLOAT)
-                       ? llvm::Type::getFloatPtrTy(cgen_state_->context_)
-                       : llvm::Type::getDoublePtrTy(cgen_state_->context_);
+    CHECK(type->isFloatingPoint());
+    val_ptr_type = (type->isFp32()) ? llvm::Type::getFloatPtrTy(cgen_state_->context_)
+                                    : llvm::Type::getDoublePtrTy(cgen_state_->context_);
   }
   auto* bit_cast = cgen_state_->query_func_entry_ir_builder_.CreateBitCast(lit_buf_start,
                                                                            val_ptr_type);
@@ -198,14 +197,14 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
 }
 
 std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
-    const SQLTypeInfo& type_info,
+    const hdk::ir::Type* type,
     const bool use_dict_encoding,
     const int16_t lit_off,
     const std::vector<llvm::Value*>& literal_loads) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   std::string literal_name = "literal_" + std::to_string(lit_off);
 
-  if (type_info.is_string() && !use_dict_encoding) {
+  if (type->isString() && !use_dict_encoding) {
     CHECK_EQ(literal_loads.size(), 3u);
 
     llvm::Value* var_start = literal_loads[0];
@@ -244,7 +243,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     return {placeholder0, placeholder1, placeholder2};
   }
 
-  if (type_info.is_array() && !use_dict_encoding) {
+  if (type->isArray() && !use_dict_encoding) {
     CHECK_EQ(literal_loads.size(), 2u);
 
     llvm::Value* var_start_address = literal_loads[0];
@@ -294,14 +293,14 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
     int dict_id) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(!constants.empty());
-  const auto& type_info = constants.front()->get_type_info();
+  auto type = constants.front()->type();
   checked_int16_t checked_lit_off{0};
   int16_t lit_off{-1};
   try {
     for (size_t device_id = 0; device_id < constants.size(); ++device_id) {
       const auto constant = constants[device_id];
-      const auto& crt_type_info = constant->get_type_info();
-      CHECK(type_info == crt_type_info);
+      auto crt_type = constant->type();
+      CHECK(type->equal(crt_type));
       checked_lit_off =
           cgen_state_->getOrAddLiteral(constant, use_dict_encoding, dict_id, device_id);
       if (device_id) {
@@ -321,13 +320,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
 
   if (entry == cgen_state_->query_func_literal_loads_.end()) {
     hoisted_literal_loads =
-        codegenHoistedConstantsLoads(type_info, use_dict_encoding, dict_id, lit_off);
+        codegenHoistedConstantsLoads(type, use_dict_encoding, dict_id, lit_off);
     cgen_state_->query_func_literal_loads_[lit_off] = hoisted_literal_loads;
   } else {
     hoisted_literal_loads = entry->second;
   }
 
   std::vector<llvm::Value*> literal_placeholders = codegenHoistedConstantsPlaceholders(
-      type_info, use_dict_encoding, lit_off, hoisted_literal_loads);
+      type, use_dict_encoding, lit_off, hoisted_literal_loads);
   return literal_placeholders;
 }

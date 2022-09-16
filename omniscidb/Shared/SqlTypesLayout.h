@@ -210,7 +210,7 @@ inline size_t get_bit_width(const SQLTypeInfo& ti) {
 }
 
 inline size_t get_bit_width(const hdk::ir::Type* type) {
-  int res = hdk::ir::logicalSize(type) * 8;
+  size_t res = type->isString() ? 32 : hdk::ir::logicalSize(type) * 8;
   if (res < 0) {
     throw std::runtime_error("Unexpected type: " + type->toString());
   }
