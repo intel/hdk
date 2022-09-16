@@ -29,7 +29,11 @@ llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
   // information as the compression parameter; handle this case separately.
   llvm::Value* operand_lv{nullptr};
   if (operand_as_const) {
-    const auto operand_lvs = codegen(operand_as_const, type, co);
+    const auto operand_lvs = codegen(
+        operand_as_const,
+        type->isExtDictionary(),
+        type->isExtDictionary() ? type->as<hdk::ir::ExtDictionaryType>()->dictId() : 0,
+        co);
     if (operand_lvs.size() == 3) {
       operand_lv = cgen_state_->emitCall("string_pack", {operand_lvs[1], operand_lvs[2]});
     } else {

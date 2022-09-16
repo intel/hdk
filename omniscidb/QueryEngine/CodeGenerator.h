@@ -48,8 +48,8 @@ class CodeGenerator {
   // Generates constant values in the literal buffer of a query.
   std::vector<llvm::Value*> codegenHoistedConstants(
       const std::vector<const hdk::ir::Constant*>& constants,
-      const EncodingType enc_type,
-      const int dict_id);
+      bool use_dict_encoding,
+      int dict_id);
 
   static llvm::ConstantInt* codegenIntConst(const hdk::ir::Constant* constant,
                                             CgenState* cgen_state);
@@ -124,11 +124,8 @@ class CodeGenerator {
 
  private:
   std::vector<llvm::Value*> codegen(const hdk::ir::Constant*,
-                                    const EncodingType enc_type,
-                                    const int dict_id,
-                                    const CompilationOptions&);
-  std::vector<llvm::Value*> codegen(const hdk::ir::Constant*,
-                                    const hdk::ir::Type* type,
+                                    bool use_dict_encoding,
+                                    int dict_id,
                                     const CompilationOptions&);
 
   virtual std::vector<llvm::Value*> codegenColumn(const hdk::ir::ColumnVar*,
@@ -226,13 +223,13 @@ class CodeGenerator {
   llvm::Value* codegen(const hdk::ir::UOper*, const CompilationOptions&);
 
   std::vector<llvm::Value*> codegenHoistedConstantsLoads(const SQLTypeInfo& type_info,
-                                                         const EncodingType enc_type,
+                                                         const bool use_dict_encoding,
                                                          const int dict_id,
                                                          const int16_t lit_off);
 
   std::vector<llvm::Value*> codegenHoistedConstantsPlaceholders(
       const SQLTypeInfo& type_info,
-      const EncodingType enc_type,
+      const bool use_dict_encoding,
       const int16_t lit_off,
       const std::vector<llvm::Value*>& literal_loads);
 

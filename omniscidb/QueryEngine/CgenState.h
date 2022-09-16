@@ -47,7 +47,7 @@ struct CgenState {
   CgenState(const Config& config, llvm::LLVMContext& context);
 
   size_t getOrAddLiteral(const hdk::ir::Constant* constant,
-                         const EncodingType enc_type,
+                         const bool use_dict_encoding,
                          const int dict_id,
                          const int device_id) {
     const auto& ti = constant->get_type_info();
@@ -90,14 +90,13 @@ struct CgenState {
       case kCHAR:
       case kTEXT:
       case kVARCHAR:
-        if (enc_type == kENCODING_DICT) {
+        if (use_dict_encoding) {
           if (constant->get_is_null()) {
             return getOrAddLiteral((int32_t)inline_int_null_value<int32_t>(), device_id);
           }
           return getOrAddLiteral(
               std::make_pair(*constant->get_constval().stringval, dict_id), device_id);
         }
-        CHECK_EQ(kENCODING_NONE, enc_type);
         if (constant->get_is_null()) {
           throw std::runtime_error(
               "CHAR / VARCHAR NULL literal not supported in this context");  // TODO(alex):
@@ -113,7 +112,7 @@ struct CgenState {
         // TODO(alex): support null
         return getOrAddLiteral(constant->get_constval().bigintval, device_id);
       case kARRAY: {
-        if (enc_type == kENCODING_NONE) {
+        if (!use_dict_encoding) {
           if (ti.get_subtype() == kDOUBLE) {
             std::vector<double> double_array_literal;
             for (const auto& value : constant->get_value_list()) {

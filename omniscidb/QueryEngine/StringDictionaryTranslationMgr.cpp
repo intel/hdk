@@ -127,7 +127,7 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
 
   CodeGenerator code_generator(executor_);
   const auto translation_map_handle_lvs =
-      code_generator.codegenHoistedConstants(constants, kENCODING_NONE, 0);
+      code_generator.codegenHoistedConstants(constants, false, 0);
   CHECK_EQ(size_t(1), translation_map_handle_lvs.size());
 
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;

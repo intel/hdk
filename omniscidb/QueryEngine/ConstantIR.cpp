@@ -18,79 +18,14 @@
 #include "Execute.h"
 
 std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* constant,
-                                                 const EncodingType enc_type,
-                                                 const int dict_id,
+                                                 bool use_dict_encoding,
+                                                 int dict_id,
                                                  const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   if (co.hoist_literals) {
     std::vector<const hdk::ir::Constant*> constants(
         executor()->deviceCount(co.device_type), constant);
-    return codegenHoistedConstants(constants, enc_type, dict_id);
-  }
-  const auto& type_info = constant->get_type_info();
-  const auto type =
-      type_info.is_decimal() ? decimal_to_int_type(type_info) : type_info.get_type();
-  switch (type) {
-    case kBOOLEAN:
-      return {llvm::ConstantInt::get(get_int_type(8, cgen_state_->context_),
-                                     constant->get_constval().boolval)};
-    case kTINYINT:
-    case kSMALLINT:
-    case kINT:
-    case kBIGINT:
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return {CodeGenerator::codegenIntConst(constant, cgen_state_)};
-    case kFLOAT:
-      return {llvm::ConstantFP::get(llvm::Type::getFloatTy(cgen_state_->context_),
-                                    constant->get_constval().floatval)};
-    case kDOUBLE:
-      return {llvm::ConstantFP::get(llvm::Type::getDoubleTy(cgen_state_->context_),
-                                    constant->get_constval().doubleval)};
-    case kVARCHAR:
-    case kCHAR:
-    case kTEXT: {
-      CHECK(constant->get_constval().stringval || constant->get_is_null());
-      if (constant->get_is_null()) {
-        if (enc_type == kENCODING_DICT) {
-          return {
-              cgen_state_->llInt(static_cast<int32_t>(inline_int_null_val(type_info)))};
-        }
-        return {cgen_state_->llInt(int64_t(0)),
-                llvm::Constant::getNullValue(
-                    llvm::PointerType::get(get_int_type(8, cgen_state_->context_), 0)),
-                cgen_state_->llInt(int32_t(0))};
-      }
-      const auto& str_const = *constant->get_constval().stringval;
-      if (enc_type == kENCODING_DICT) {
-        return {
-            cgen_state_->llInt(executor()
-                                   ->getStringDictionaryProxy(
-                                       dict_id, executor()->getRowSetMemoryOwner(), true)
-                                   ->getIdOfString(str_const))};
-      }
-      return {cgen_state_->llInt(int64_t(0)),
-              cgen_state_->addStringConstant(str_const),
-              cgen_state_->llInt(static_cast<int32_t>(str_const.size()))};
-    }
-    default:
-      CHECK(false);
-  }
-  abort();
-}
-
-std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* constant,
-                                                 const hdk::ir::Type* type,
-                                                 const CompilationOptions& co) {
-  AUTOMATIC_IR_METADATA(cgen_state_);
-  if (co.hoist_literals) {
-    std::vector<const hdk::ir::Constant*> constants(
-        executor()->deviceCount(co.device_type), constant);
-    auto ti = type->toTypeInfo();
-    return codegenHoistedConstants(constants, ti.get_compression(), ti.get_comp_param());
+    return codegenHoistedConstants(constants, use_dict_encoding, dict_id);
   }
   const auto& cst_type = constant->type();
   switch (cst_type->id()) {
@@ -117,8 +52,9 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
     case hdk::ir::Type::kText: {
       CHECK(constant->get_constval().stringval || constant->get_is_null());
       if (constant->get_is_null()) {
-        if (type->isExtDictionary()) {
-          return {cgen_state_->llInt(static_cast<int32_t>(inline_int_null_value(type)))};
+        if (use_dict_encoding) {
+          return {
+              cgen_state_->llInt(static_cast<int32_t>(inline_int_null_value(cst_type)))};
         }
         return {cgen_state_->llInt(int64_t(0)),
                 llvm::Constant::getNullValue(
@@ -126,13 +62,11 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
                 cgen_state_->llInt(int32_t(0))};
       }
       const auto& str_const = *constant->get_constval().stringval;
-      if (type->isExtDictionary()) {
+      if (use_dict_encoding) {
         return {
             cgen_state_->llInt(executor()
                                    ->getStringDictionaryProxy(
-                                       type->as<hdk::ir::ExtDictionaryType>()->dictId(),
-                                       executor()->getRowSetMemoryOwner(),
-                                       true)
+                                       dict_id, executor()->getRowSetMemoryOwner(), true)
                                    ->getIdOfString(str_const))};
       }
       return {cgen_state_->llInt(int64_t(0)),
@@ -177,7 +111,7 @@ llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* const
 
 std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
     const SQLTypeInfo& type_info,
-    const EncodingType enc_type,
+    const bool use_dict_encoding,
     const int dict_id,
     const int16_t lit_off) {
   AUTOMATIC_IR_METADATA(cgen_state_);
@@ -185,7 +119,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
   auto lit_buff_query_func_lv = get_arg_by_name(cgen_state_->query_func_, "literals");
   const auto lit_buf_start = cgen_state_->query_func_entry_ir_builder_.CreateGEP(
       lit_buff_query_func_lv, cgen_state_->llInt(lit_off));
-  if (type_info.is_string() && enc_type != kENCODING_DICT) {
+  if (type_info.is_string() && !use_dict_encoding) {
     CHECK_EQ(kENCODING_NONE, type_info.get_compression());
     CHECK_EQ(size_t(4),
              CgenState::literalBytes(CgenState::LiteralValue(std::string(""))));
@@ -214,7 +148,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
     var_length->setName(literal_name + "_length");
 
     return {var_start, var_start_address, var_length};
-  } else if (type_info.is_array() && enc_type == kENCODING_NONE) {
+  } else if (type_info.is_array() && !use_dict_encoding) {
     CHECK_EQ(kENCODING_NONE, type_info.get_compression());
 
     auto off_and_len_ptr = cgen_state_->query_func_entry_ir_builder_.CreateBitCast(
@@ -265,13 +199,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
 
 std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     const SQLTypeInfo& type_info,
-    const EncodingType enc_type,
+    const bool use_dict_encoding,
     const int16_t lit_off,
     const std::vector<llvm::Value*>& literal_loads) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   std::string literal_name = "literal_" + std::to_string(lit_off);
 
-  if (type_info.is_string() && enc_type != kENCODING_DICT) {
+  if (type_info.is_string() && !use_dict_encoding) {
     CHECK_EQ(literal_loads.size(), 3u);
 
     llvm::Value* var_start = literal_loads[0];
@@ -310,7 +244,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     return {placeholder0, placeholder1, placeholder2};
   }
 
-  if (type_info.is_array() && enc_type == kENCODING_NONE) {
+  if (type_info.is_array() && !use_dict_encoding) {
     CHECK_EQ(literal_loads.size(), 2u);
 
     llvm::Value* var_start_address = literal_loads[0];
@@ -356,8 +290,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
 
 std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
     const std::vector<const hdk::ir::Constant*>& constants,
-    const EncodingType enc_type,
-    const int dict_id) {
+    bool use_dict_encoding,
+    int dict_id) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(!constants.empty());
   const auto& type_info = constants.front()->get_type_info();
@@ -369,7 +303,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
       const auto& crt_type_info = constant->get_type_info();
       CHECK(type_info == crt_type_info);
       checked_lit_off =
-          cgen_state_->getOrAddLiteral(constant, enc_type, dict_id, device_id);
+          cgen_state_->getOrAddLiteral(constant, use_dict_encoding, dict_id, device_id);
       if (device_id) {
         CHECK_EQ(lit_off, checked_lit_off);
       } else {
@@ -387,13 +321,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
 
   if (entry == cgen_state_->query_func_literal_loads_.end()) {
     hoisted_literal_loads =
-        codegenHoistedConstantsLoads(type_info, enc_type, dict_id, lit_off);
+        codegenHoistedConstantsLoads(type_info, use_dict_encoding, dict_id, lit_off);
     cgen_state_->query_func_literal_loads_[lit_off] = hoisted_literal_loads;
   } else {
     hoisted_literal_loads = entry->second;
   }
 
   std::vector<llvm::Value*> literal_placeholders = codegenHoistedConstantsPlaceholders(
-      type_info, enc_type, lit_off, hoisted_literal_loads);
+      type_info, use_dict_encoding, lit_off, hoisted_literal_loads);
   return literal_placeholders;
 }

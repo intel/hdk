@@ -43,23 +43,26 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
   }
   auto constant = dynamic_cast<const hdk::ir::Constant*>(expr);
   if (constant) {
-    const auto& ti = constant->get_type_info();
-    if (ti.get_type() == kNULLT) {
+    auto type = constant->type();
+    if (type->isNull()) {
       throw std::runtime_error(
           "NULL type literals are not currently supported in this context.");
     }
     if (constant->get_is_null()) {
-      return {ti.is_fp()
-                  ? static_cast<llvm::Value*>(executor_->cgen_state_->inlineFpNull(ti))
-                  : static_cast<llvm::Value*>(executor_->cgen_state_->inlineIntNull(ti))};
+      return {
+          type->isFloatingPoint()
+              ? static_cast<llvm::Value*>(executor_->cgen_state_->inlineFpNull(type))
+              : static_cast<llvm::Value*>(executor_->cgen_state_->inlineIntNull(type))};
     }
-    if (ti.get_compression() == kENCODING_DICT) {
+    if (type->isExtDictionary()) {
       // The dictionary encoding case should be handled by the parent expression
       // (cast, for now), here is too late to know the dictionary id if not already set
-      CHECK_NE(ti.get_comp_param(), 0);
-      return {codegen(constant, ti.get_compression(), ti.get_comp_param(), co)};
+      auto dict_id = type->as<hdk::ir::ExtDictionaryType>()->dictId();
+      CHECK_NE(dict_id, 0);
+      return {codegen(constant, true, dict_id, co)};
     }
-    return {codegen(constant, ti.get_compression(), 0, co)};
+    CHECK(constant->get_type_info().get_compression() == kENCODING_NONE);
+    return {codegen(constant, false, 0, co)};
   }
   auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
   if (case_expr) {
