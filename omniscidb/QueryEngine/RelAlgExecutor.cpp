@@ -72,7 +72,7 @@ bool should_output_columnar(const RelAlgExecutionUnit& ra_exe_unit) {
   for (const auto& target_expr : ra_exe_unit.target_exprs) {
     // We don't currently support varlen columnar projections, so
     // return false if we find one
-    if (target_expr->get_type_info().is_varlen()) {
+    if (target_expr->type()->isString() || target_expr->type()->isArray()) {
       return false;
     }
   }
@@ -1121,15 +1121,12 @@ get_input_desc(const RA* ra_node,
 }
 
 hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr) {
-  const auto& ti = expr->get_type_info();
-  if (!ti.is_string() || ti.get_compression() != kENCODING_NONE) {
+  auto type = expr->type();
+  if (!type->isString()) {
     return expr;
   }
-  auto transient_dict_ti = ti;
-  transient_dict_ti.set_compression(kENCODING_DICT);
-  transient_dict_ti.set_comp_param(TRANSIENT_DICT_ID);
-  transient_dict_ti.set_fixed_size();
-  return expr->add_cast(transient_dict_ti);
+  auto transient_dict_type = type->ctx().extDict(type, TRANSIENT_DICT_ID);
+  return expr->add_cast(transient_dict_type);
 }
 
 hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
@@ -1141,9 +1138,9 @@ hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
 }
 
 hdk::ir::ExprPtr cast_dict_to_none(const hdk::ir::ExprPtr& input) {
-  const auto& input_ti = input->get_type_info();
-  if (input_ti.is_string() && input_ti.get_compression() == kENCODING_DICT) {
-    return input->add_cast(SQLTypeInfo(kTEXT, input_ti.get_notnull()));
+  auto input_type = input->type();
+  if (input_type->isExtDictionary()) {
+    return input->add_cast(input_type->ctx().text(input_type->nullable()));
   }
   return input;
 }
@@ -1162,7 +1159,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
       if (agg->get_arg()) {
         auto new_arg = set_transient_dict_maybe(agg->get_own_arg());
-        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->get_type_info(),
+        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
                                                   agg->get_aggtype(),
                                                   new_arg,
                                                   agg->get_is_distinct(),
@@ -1281,15 +1278,6 @@ bool is_agg(const hdk::ir::Expr* expr) {
     }
   }
   return false;
-}
-
-inline SQLTypeInfo get_logical_type_for_expr(const hdk::ir::Expr& expr) {
-  if (is_count_distinct(&expr)) {
-    return SQLTypeInfo(kBIGINT, false);
-  } else if (is_agg(&expr)) {
-    return get_nullable_logical_type_info(expr.get_type_info());
-  }
-  return get_logical_type_info(expr.get_type_info());
 }
 
 inline const hdk::ir::Type* logicalTypeForExpr(const hdk::ir::Expr& expr) {
@@ -1611,19 +1599,6 @@ ExecutionResult RelAlgExecutor::executeFilter(const RelFilter* filter,
       work_unit, filter->getOutputMetainfo(), false, co, eo, queue_time_ms);
 }
 
-bool sameTypeInfo(std::vector<TargetMetaInfo> const& lhs,
-                  std::vector<TargetMetaInfo> const& rhs) {
-  if (lhs.size() == rhs.size()) {
-    for (size_t i = 0; i < lhs.size(); ++i) {
-      if (lhs[i].get_type_info() != rhs[i].get_type_info()) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
 ExecutionResult RelAlgExecutor::executeUnion(const RelLogicalUnion* logical_union,
                                              const RaExecutionSequence& seq,
                                              const CompilationOptions& co,
@@ -1667,16 +1642,15 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
   auto tuple_type = logical_values->getTupleType();
   for (size_t i = 0; i < tuple_type.size(); ++i) {
     auto& target_meta_info = tuple_type[i];
-    if (target_meta_info.get_type_info().is_varlen()) {
+    if (target_meta_info.type()->isString() || target_meta_info.type()->isArray()) {
       throw std::runtime_error("Variable length types not supported in VALUES yet.");
     }
-    if (target_meta_info.get_type_info().get_type() == kNULLT) {
+    if (target_meta_info.type()->isNull()) {
       // replace w/ bigint
       tuple_type[i] = TargetMetaInfo(target_meta_info.get_resname(),
                                      hdk::ir::Context::defaultCtx().int64());
     }
-    query_mem_desc.addColSlotInfo(
-        {std::make_tuple(tuple_type[i].get_type_info().get_size(), 8)});
+    query_mem_desc.addColSlotInfo({std::make_tuple(tuple_type[i].type()->size(), 8)});
   }
   logical_values->setOutputMetainfo(tuple_type);
 
@@ -1944,14 +1918,14 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     CHECK(dynamic_cast<const hdk::ir::AggExpr*>(target_expr));
     const auto arg = static_cast<hdk::ir::AggExpr*>(target_expr)->get_own_arg();
     CHECK(arg);
-    const auto& arg_ti = arg->get_type_info();
+    auto arg_type = arg->type();
     // Avoid calling getExpressionRange for variable length types (string and array),
     // it'd trigger an assertion since that API expects to be called only for types
     // for which the notion of range is well-defined. A bit of a kludge, but the
     // logic to reject these types anyway is at lower levels in the stack and not
     // really worth pulling into a separate function for now.
-    if (!(arg_ti.is_number() || arg_ti.is_boolean() || arg_ti.is_time() ||
-          (arg_ti.is_string() && arg_ti.get_compression() == kENCODING_DICT))) {
+    if (!(arg_type->isNumber() || arg_type->isBoolean() || arg_type->isDateTime() ||
+          (arg_type->isExtDictionary()))) {
       continue;
     }
     const auto arg_range = getExpressionRange(arg.get(), table_infos, executor);
@@ -1968,7 +1942,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     int64_t approx_bitmap_sz_bits{0};
     const auto error_rate = static_cast<hdk::ir::AggExpr*>(target_expr)->get_arg1();
     if (error_rate) {
-      CHECK(error_rate->get_type_info().get_type() == kINT);
+      CHECK(error_rate->type()->isInt32());
       CHECK_GE(error_rate->get_constval().intval, 1);
       approx_bitmap_sz_bits = hll_size_for_rate(error_rate->get_constval().intval);
     } else {
@@ -2180,7 +2154,7 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
                                                           const CompilationOptions& co,
                                                           const ExecutionOptions& eo) {
   const auto count = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-      SQLTypeInfo(config_.exec.group_by.bigint_count ? kBIGINT : kINT, false),
+      hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
       kCOUNT,
       nullptr,
       false,
@@ -2920,7 +2894,7 @@ std::vector<hdk::ir::ExprPtr> synthesize_inputs(
   int input_idx = 0;
   for (const auto& input_meta : in_metainfo) {
     inputs.push_back(std::make_shared<hdk::ir::ColumnVar>(
-        input_meta.get_type_info(),
+        input_meta.type(),
         table_id,
         scan_ra ? input_idx + 1 : input_idx,
         rte_idx,
@@ -3104,8 +3078,8 @@ std::vector<hdk::ir::ExprPtr> target_exprs_for_union(RelAlgNode const* input_nod
   std::vector<hdk::ir::ExprPtr> target_exprs;
   target_exprs.reserve(tmis.size());
   for (size_t i = 0; i < tmis.size(); ++i) {
-    target_exprs.push_back(std::make_shared<hdk::ir::ColumnVar>(
-        tmis[i].get_type_info(), negative_node_id, i, 0));
+    target_exprs.push_back(
+        std::make_shared<hdk::ir::ColumnVar>(tmis[i].type(), negative_node_id, i, 0));
   }
   return target_exprs;
 }
@@ -3269,7 +3243,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
             "values are supported with output buffer sizing configured table "
             "functions.");
       }
-      if (!param_const->get_type_info().is_integer()) {
+      if (!param_const->type()->isInteger()) {
         throw std::runtime_error(
             "Output buffer sizing parameter should have integer type.");
       }
@@ -3310,11 +3284,9 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
 
         // avoid setting type info to ti here since ti doesn't have all the
         // properties correctly set
-        auto type_info = input_expr->get_type_info();
-        type_info.set_subtype(type_info.get_type());  // set type to be subtype
-        type_info.set_type(ti.get_type());            // set type to column list
-        type_info.set_dimension(ti.get_dimension());
-        input_expr->set_type_info(type_info);
+        auto type = input_expr->type();
+        type = type->ctx().columnList(type, ti.get_dimension());
+        input_expr->set_type_info(type);
 
         input_col_exprs.push_back(col_var);
         input_index++;
@@ -3326,18 +3298,18 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
 
       // same here! avoid setting type info to ti since it doesn't have all the
       // properties correctly set
-      auto type_info = input_expr->get_type_info();
-      type_info.set_subtype(type_info.get_type());  // set type to be subtype
-      type_info.set_type(ti.get_type());            // set type to column
-      input_expr->set_type_info(type_info);
+      auto type = input_expr->type();
+      type = type->ctx().column(type);
+      input_expr->set_type_info(type);
 
       input_col_exprs.push_back(col_var);
       input_index++;
     } else {
       auto input_expr = input_exprs[input_index];
-      auto ext_func_arg_ti = ext_arg_type_to_type_info(table_func_args[arg_index]);
-      if (ext_func_arg_ti != input_expr->get_type_info()) {
-        input_exprs[input_index] = input_expr->add_cast(ext_func_arg_ti).get();
+      auto ext_func_arg_type =
+          ext_arg_type_to_type(input_expr->ctx(), table_func_args[arg_index]);
+      if (!ext_func_arg_type->equal(input_expr->type())) {
+        input_exprs[input_index] = input_expr->add_cast(ext_func_arg_type).get();
       }
       input_index++;
     }
@@ -3361,7 +3333,12 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       input_pos = offset + p.second;
 
       CHECK_LT(input_pos, input_exprs.size());
-      int32_t comp_param = input_exprs_owned[input_pos]->get_type_info().get_comp_param();
+      auto input_type = input_exprs_owned[input_pos]->type();
+      CHECK(input_type->isColumn()) << input_type->toString();
+      int32_t comp_param = input_type->as<hdk::ir::ColumnType>()
+                               ->columnType()
+                               ->as<hdk::ir::ExtDictionaryType>()
+                               ->dictId();
       ti.set_comp_param(comp_param);
     }
     target_exprs_owned_.push_back(std::make_shared<hdk::ir::ColumnVar>(ti, 0, i, -1));

@@ -84,6 +84,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual void set_type_info(const SQLTypeInfo& ti);
   virtual void set_type_info(const hdk::ir::Type* new_type);
   const Type* type() const { return type_; }
+  Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
   void set_contains_agg(bool a) { contains_agg = a; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false);
@@ -262,6 +263,15 @@ class ColumnVar : public Expr {
       : Expr(ti)
       , rte_idx(-1)
       , col_info_(std::make_shared<ColumnInfo>(-1, 0, 0, "", type_, false)) {}
+  ColumnVar(const hdk::ir::Type* type,
+            int table_id,
+            int col_id,
+            int nest_level,
+            bool is_virtual = false)
+      : Expr(type)
+      , rte_idx(nest_level)
+      , col_info_(
+            std::make_shared<ColumnInfo>(-1, table_id, col_id, "", type_, is_virtual)) {}
   ColumnVar(const SQLTypeInfo& ti,
             int table_id,
             int col_id,
