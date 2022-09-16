@@ -111,9 +111,9 @@ int64_t result_set::lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
                                 const int8_t* byte_stream,
                                 const int64_t pos) {
   CHECK(col_lazy_fetch.is_lazily_fetched);
-  const auto& type_info = col_lazy_fetch.type;
-  if (type_info.is_fp()) {
-    if (type_info.get_type() == kFLOAT) {
+  auto type = col_lazy_fetch.type;
+  if (type->isFloatingPoint()) {
+    if (type->isFp32()) {
       double fval = fixed_width_float_decode_noinline(byte_stream, pos);
       return *reinterpret_cast<const int64_t*>(may_alias_ptr(&fval));
     } else {
@@ -121,47 +121,35 @@ int64_t result_set::lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
       return *reinterpret_cast<const int64_t*>(may_alias_ptr(&fval));
     }
   }
-  CHECK(type_info.is_integer() || type_info.is_decimal() || type_info.is_time() ||
-        type_info.is_timeinterval() || type_info.is_boolean() || type_info.is_string() ||
-        type_info.is_array());
-  size_t type_bitwidth = get_bit_width(type_info);
-  if (type_info.get_compression() == kENCODING_FIXED) {
-    type_bitwidth = type_info.get_comp_param();
-  } else if (type_info.get_compression() == kENCODING_DICT) {
-    type_bitwidth = 8 * type_info.get_size();
+  CHECK(type->isInteger() || type->isDecimal() || type->isDateTime() ||
+        type->isInterval() || type->isBoolean() || type->isString() ||
+        type->isExtDictionary() || type->isArray());
+  size_t type_bitwidth = get_bit_width(type);
+  if (type->isTime() || type->isInterval() || type->isExtDictionary()) {
+    type_bitwidth = type->size() * 8;
+    ;
   }
   CHECK_EQ(size_t(0), type_bitwidth % 8);
   int64_t val;
-  if (type_info.is_date_in_days()) {
-    val = type_info.get_comp_param() == 16
-              ? fixed_width_small_date_decode_noinline(
-                    byte_stream, 2, NULL_SMALLINT, NULL_BIGINT, pos)
-              : fixed_width_small_date_decode_noinline(
-                    byte_stream, 4, NULL_INT, NULL_BIGINT, pos);
+  bool date_in_days =
+      type->isDate() && type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay;
+  if (date_in_days) {
+    val = type->size() == 2 ? fixed_width_small_date_decode_noinline(
+                                  byte_stream, 2, NULL_SMALLINT, NULL_BIGINT, pos)
+                            : fixed_width_small_date_decode_noinline(
+                                  byte_stream, 4, NULL_INT, NULL_BIGINT, pos);
   } else {
-    val = (type_info.get_compression() == kENCODING_DICT &&
-           type_info.get_size() < type_info.get_logical_size() &&
-           type_info.get_comp_param())
+    val = (type->isExtDictionary() && type->size() < hdk::ir::logicalSize(type) &&
+           type->as<hdk::ir::ExtDictionaryType>()->dictId())
               ? fixed_width_unsigned_decode_noinline(byte_stream, type_bitwidth / 8, pos)
               : fixed_width_int_decode_noinline(byte_stream, type_bitwidth / 8, pos);
   }
-  if (type_info.get_compression() != kENCODING_NONE &&
-      type_info.get_compression() != kENCODING_DATE_IN_DAYS) {
-    CHECK(type_info.get_compression() == kENCODING_FIXED ||
-          type_info.get_compression() == kENCODING_DICT);
-    auto encoding = type_info.get_compression();
-    if (encoding == kENCODING_FIXED) {
-      encoding = kENCODING_NONE;
-    }
-    SQLTypeInfo col_logical_ti(type_info.get_type(),
-                               type_info.get_dimension(),
-                               type_info.get_scale(),
-                               false,
-                               encoding,
-                               0,
-                               type_info.get_subtype());
-    if (val == inline_fixed_encoding_null_val(type_info)) {
-      return inline_int_null_val(col_logical_ti);
+  if (!date_in_days &&
+      ((type->size() < hdk::ir::logicalSize(type)) || type->isExtDictionary())) {
+    auto col_logical_type = hdk::ir::logicalType(type);
+
+    if (val == inline_fixed_encoding_null_value(type)) {
+      return inline_int_null_value(col_logical_type);
     }
   }
   return val;

@@ -588,14 +588,13 @@ std::vector<ColumnLazyFetchInfo> Executor::getColLazyFetchInfo(
   std::vector<ColumnLazyFetchInfo> col_lazy_fetch_info;
   for (const auto target_expr : target_exprs) {
     if (!plan_state_->isLazyFetchColumn(target_expr)) {
-      col_lazy_fetch_info.emplace_back(
-          ColumnLazyFetchInfo{false, -1, SQLTypeInfo(kNULLT, false)});
+      col_lazy_fetch_info.emplace_back(ColumnLazyFetchInfo{false, -1, nullptr});
     } else {
       const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target_expr);
       CHECK(col_var);
       auto local_col_id = plan_state_->getLocalColumnId(col_var, false);
-      const auto& col_ti = col_var->get_type_info();
-      col_lazy_fetch_info.emplace_back(ColumnLazyFetchInfo{true, local_col_id, col_ti});
+      auto col_type = col_var->type();
+      col_lazy_fetch_info.emplace_back(ColumnLazyFetchInfo{true, local_col_id, col_type});
     }
   }
   return col_lazy_fetch_info;

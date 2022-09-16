@@ -81,7 +81,7 @@ struct ReductionCode;
 struct ColumnLazyFetchInfo {
   const bool is_lazily_fetched;
   const int local_col_id;
-  const SQLTypeInfo type;
+  const hdk::ir::Type* type;
 };
 
 struct OneIntegerColumnRow {

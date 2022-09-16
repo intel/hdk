@@ -224,6 +224,48 @@ inline int64_t inline_fixed_encoding_null_val(const SQL_TYPE_INFO& ti) {
   return -(1LL << (ti.get_comp_param() - 1));
 }
 
+template <typename TYPE>
+inline int64_t inline_fixed_encoding_null_value(const TYPE* type) {
+  CHECK(type->isBoolean() || type->isInteger() || type->isDecimal() ||
+        type->isDateTime() || type->isExtDictionary());
+
+  if (type->isExtDictionary()) {
+    switch (type->size()) {
+      case 1:
+        return inline_int_null_value<uint8_t>();
+      case 2:
+        return inline_int_null_value<uint16_t>();
+      case 4:
+        return inline_int_null_value<int32_t>();
+      default:
+#ifndef __CUDACC__
+        CHECK(false) << "Unexpected type size: " << type->toString() << " "
+                     << type->size();
+#else
+        CHECK(false);
+#endif
+    }
+  }
+
+  switch (type->size()) {
+    case 1:
+      return inline_int_null_value<int8_t>();
+    case 2:
+      return inline_int_null_value<int16_t>();
+    case 4:
+      return inline_int_null_value<int32_t>();
+    case 8:
+      return inline_int_null_value<int64_t>();
+    default:
+#ifndef __CUDACC__
+      CHECK(false) << "Unexpected type size: " << type->toString() << " " << type->size();
+#else
+      CHECK(false);
+#endif
+  }
+  return 0;
+}
+
 template <typename SQL_TYPE_INFO>
 inline double inline_fp_null_val(const SQL_TYPE_INFO& ti) {
   CHECK(ti.is_fp());
