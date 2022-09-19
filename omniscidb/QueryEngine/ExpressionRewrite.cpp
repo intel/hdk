@@ -43,8 +43,8 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<hdk::ir::InValues
           return nullptr;
         }
         const auto arg = bin_oper->get_own_left_operand();
-        const auto& arg_ti = arg->get_type_info();
-        auto rhs = rhs_no_cast->deep_copy()->add_cast(arg_ti);
+        auto arg_type = arg->type();
+        auto rhs = rhs_no_cast->deep_copy()->add_cast(arg_type);
         return hdk::ir::makeExpr<hdk::ir::InValues>(arg,
                                                     std::list<hdk::ir::ExprPtr>{rhs});
       }
@@ -145,7 +145,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<hdk::ir::InValues
       return nullptr;
     }
 
-    if (lhs->get_arg()->get_type_info() == rhs->get_arg()->get_type_info() &&
+    if (lhs->get_arg()->type()->equal(rhs->get_arg()->type()) &&
         (*lhs->get_arg() == *rhs->get_arg())) {
       auto union_values = lhs->get_value_list();
       const auto& rhs_values = rhs->get_value_list();
@@ -170,7 +170,7 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
     auto rhs = bin_oper->get_own_right_operand();
     auto rewritten_lhs = visit(lhs.get());
     auto rewritten_rhs = visit(rhs.get());
-    return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->get_type_info(),
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->get_contains_agg(),
                                                bin_oper->get_optype(),
                                                bin_oper->get_qualifier(),
@@ -187,24 +187,20 @@ class ArrayElementStringLiteralEncodingVisitor : public DeepCopyVisitor {
     std::vector<hdk::ir::ExprPtr> args_copy;
     for (size_t i = 0; i < array_expr->getElementCount(); ++i) {
       auto const element_expr_ptr = visit(array_expr->getElement(i));
-      auto const& element_expr_type_info = element_expr_ptr->get_type_info();
+      auto element_expr_type = element_expr_ptr->type();
 
-      if (!element_expr_type_info.is_string() ||
-          element_expr_type_info.get_compression() != kENCODING_NONE) {
+      if (!element_expr_type->isString()) {
         args_copy.push_back(element_expr_ptr);
       } else {
-        auto transient_dict_type_info = element_expr_type_info;
-
-        transient_dict_type_info.set_compression(kENCODING_DICT);
-        transient_dict_type_info.set_comp_param(TRANSIENT_DICT_ID);
-        transient_dict_type_info.set_fixed_size();
-        args_copy.push_back(element_expr_ptr->add_cast(transient_dict_type_info));
+        auto transient_dict_type =
+            element_expr_type->ctx().extDict(element_expr_type, TRANSIENT_DICT_ID);
+        args_copy.push_back(element_expr_ptr->add_cast(transient_dict_type));
       }
     }
 
-    const auto& type_info = array_expr->get_type_info();
+    auto type = array_expr->type();
     return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(
-        type_info, args_copy, array_expr->isNull(), array_expr->isLocalAlloc());
+        type, args_copy, array_expr->isNull(), array_expr->isLocalAlloc());
   }
 };
 
@@ -308,112 +304,129 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
   }
 
   bool foldOper(SQLOps optype,
-                SQLTypes type,
+                const hdk::ir::Type* type,
                 Datum lhs,
                 Datum rhs,
                 Datum& result,
-                SQLTypes& result_type) const {
+                const hdk::ir::Type*& result_type) const {
+    auto& ctx = type->ctx();
     result_type = type;
 
     try {
-      switch (type) {
-        case kBOOLEAN:
+      switch (type->id()) {
+        case hdk::ir::Type::kBoolean:
           if (IS_COMPARISON(optype)) {
             result.boolval = foldComparison<bool>(optype, lhs.boolval, rhs.boolval);
-            result_type = kBOOLEAN;
+            result_type = ctx.boolean();
             return true;
           }
           if (IS_LOGIC(optype)) {
             result.boolval = foldLogic<bool>(optype, lhs.boolval, rhs.boolval);
-            result_type = kBOOLEAN;
+            result_type = ctx.boolean();
             return true;
           }
           CHECK(!IS_ARITHMETIC(optype));
           break;
-        case kTINYINT:
-          if (IS_COMPARISON(optype)) {
-            result.boolval =
-                foldComparison<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
-            result_type = kBOOLEAN;
-            return true;
+        case hdk::ir::Type::kInteger:
+        case hdk::ir::Type::kDecimal:
+          switch (type->size()) {
+            case 1:
+              if (IS_COMPARISON(optype)) {
+                result.boolval =
+                    foldComparison<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.tinyintval =
+                    foldArithmetic<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
+                result_type = ctx.int8();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            case 2:
+              if (IS_COMPARISON(optype)) {
+                result.boolval =
+                    foldComparison<int16_t>(optype, lhs.smallintval, rhs.smallintval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.smallintval =
+                    foldArithmetic<int16_t>(optype, lhs.smallintval, rhs.smallintval);
+                result_type = ctx.int16();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            case 4:
+              if (IS_COMPARISON(optype)) {
+                result.boolval = foldComparison<int32_t>(optype, lhs.intval, rhs.intval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.intval = foldArithmetic<int32_t>(optype, lhs.intval, rhs.intval);
+                result_type = ctx.int32();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            case 8:
+              if (IS_COMPARISON(optype)) {
+                result.boolval =
+                    foldComparison<int64_t>(optype, lhs.bigintval, rhs.bigintval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.bigintval =
+                    foldArithmetic<int64_t>(optype, lhs.bigintval, rhs.bigintval);
+                result_type = ctx.int64();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            default:
+              break;
           }
-          if (IS_ARITHMETIC(optype)) {
-            result.tinyintval =
-                foldArithmetic<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
-            result_type = kTINYINT;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
           break;
-        case kSMALLINT:
-          if (IS_COMPARISON(optype)) {
-            result.boolval =
-                foldComparison<int16_t>(optype, lhs.smallintval, rhs.smallintval);
-            result_type = kBOOLEAN;
-            return true;
+        case hdk::ir::Type::kFloatingPoint:
+          switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+            case hdk::ir::FloatingPointType::kFloat:
+              if (IS_COMPARISON(optype)) {
+                result.boolval =
+                    foldComparison<float>(optype, lhs.floatval, rhs.floatval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.floatval =
+                    foldArithmetic<float>(optype, lhs.floatval, rhs.floatval);
+                result_type = ctx.fp32();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            case hdk::ir::FloatingPointType::kDouble:
+              if (IS_COMPARISON(optype)) {
+                result.boolval =
+                    foldComparison<double>(optype, lhs.doubleval, rhs.doubleval);
+                result_type = ctx.boolean();
+                return true;
+              }
+              if (IS_ARITHMETIC(optype)) {
+                result.doubleval =
+                    foldArithmetic<double>(optype, lhs.doubleval, rhs.doubleval);
+                result_type = ctx.fp64();
+                return true;
+              }
+              CHECK(!IS_LOGIC(optype));
+              break;
+            default:
+              break;
           }
-          if (IS_ARITHMETIC(optype)) {
-            result.smallintval =
-                foldArithmetic<int16_t>(optype, lhs.smallintval, rhs.smallintval);
-            result_type = kSMALLINT;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
-          break;
-        case kINT:
-          if (IS_COMPARISON(optype)) {
-            result.boolval = foldComparison<int32_t>(optype, lhs.intval, rhs.intval);
-            result_type = kBOOLEAN;
-            return true;
-          }
-          if (IS_ARITHMETIC(optype)) {
-            result.intval = foldArithmetic<int32_t>(optype, lhs.intval, rhs.intval);
-            result_type = kINT;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
-          break;
-        case kBIGINT:
-          if (IS_COMPARISON(optype)) {
-            result.boolval =
-                foldComparison<int64_t>(optype, lhs.bigintval, rhs.bigintval);
-            result_type = kBOOLEAN;
-            return true;
-          }
-          if (IS_ARITHMETIC(optype)) {
-            result.bigintval =
-                foldArithmetic<int64_t>(optype, lhs.bigintval, rhs.bigintval);
-            result_type = kBIGINT;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
-          break;
-        case kFLOAT:
-          if (IS_COMPARISON(optype)) {
-            result.boolval = foldComparison<float>(optype, lhs.floatval, rhs.floatval);
-            result_type = kBOOLEAN;
-            return true;
-          }
-          if (IS_ARITHMETIC(optype)) {
-            result.floatval = foldArithmetic<float>(optype, lhs.floatval, rhs.floatval);
-            result_type = kFLOAT;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
-          break;
-        case kDOUBLE:
-          if (IS_COMPARISON(optype)) {
-            result.boolval = foldComparison<double>(optype, lhs.doubleval, rhs.doubleval);
-            result_type = kBOOLEAN;
-            return true;
-          }
-          if (IS_ARITHMETIC(optype)) {
-            result.doubleval =
-                foldArithmetic<double>(optype, lhs.doubleval, rhs.doubleval);
-            result_type = kDOUBLE;
-            return true;
-          }
-          CHECK(!IS_LOGIC(optype));
           break;
         default:
           break;
@@ -427,16 +440,14 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
     const auto unvisited_operand = uoper->get_operand();
     const auto optype = uoper->get_optype();
-    const auto& ti = uoper->get_type_info();
+    auto type = uoper->type();
     if (optype == kCAST) {
       // Cache the cast type so it could be used in operand rewriting/folding
-      casts_.insert({unvisited_operand, ti});
+      casts_.insert({unvisited_operand, type});
     }
     const auto operand = visit(unvisited_operand);
 
-    const auto& operand_ti = operand->get_type_info();
-    const auto operand_type =
-        operand_ti.is_decimal() ? decimal_to_int_type(operand_ti) : operand_ti.get_type();
+    auto operand_type = operand->type();
     const auto const_operand =
         std::dynamic_pointer_cast<const hdk::ir::Constant>(operand);
 
@@ -444,7 +455,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       const auto operand_datum = const_operand->get_constval();
       Datum zero_datum = {};
       Datum result_datum = {};
-      SQLTypes result_type;
+      const hdk::ir::Type* result_type;
       switch (optype) {
         case kNOT: {
           if (foldOper(kEQ,
@@ -453,7 +464,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
                        operand_datum,
                        result_datum,
                        result_type)) {
-            CHECK_EQ(result_type, kBOOLEAN);
+            CHECK(result_type->isBoolean());
             return hdk::ir::makeExpr<hdk::ir::Constant>(result_type, false, result_datum);
           }
           break;
@@ -465,17 +476,17 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
                        operand_datum,
                        result_datum,
                        result_type)) {
-            if (!operand_ti.is_decimal()) {
+            if (!operand_type->isDecimal()) {
               return hdk::ir::makeExpr<hdk::ir::Constant>(
                   result_type, false, result_datum);
             }
-            return hdk::ir::makeExpr<hdk::ir::Constant>(ti, false, result_datum);
+            return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, result_datum);
           }
           break;
         }
         case kCAST: {
           // Trying to fold number to number casts only
-          if (!ti.is_number() || !operand_ti.is_number()) {
+          if (!type->isNumber() || !operand_type->isNumber()) {
             break;
           }
           // Disallowing folding of FP to DECIMAL casts for now:
@@ -483,16 +494,16 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           //    update dectest set d=cast( 1234.0 as float );
           // which is expected to throw in Update.ImplicitCastToNumericTypes
           // due to cast codegen currently not supporting these casts
-          if (ti.is_decimal() && operand_ti.is_fp()) {
+          if (type->isDecimal() && operand_type->isFloatingPoint()) {
             break;
           }
           auto operand_copy = const_operand->deep_copy();
-          auto cast_operand = operand_copy->add_cast(ti);
+          auto cast_operand = operand_copy->add_cast(type);
           auto const_cast_operand =
               std::dynamic_pointer_cast<const hdk::ir::Constant>(cast_operand);
           if (const_cast_operand) {
             auto const_cast_datum = const_cast_operand->get_constval();
-            return hdk::ir::makeExpr<hdk::ir::Constant>(ti, false, const_cast_datum);
+            return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, const_cast_datum);
           }
         }
         default:
@@ -501,28 +512,29 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     }
 
     return hdk::ir::makeExpr<hdk::ir::UOper>(
-        uoper->get_type_info(), uoper->get_contains_agg(), optype, operand);
+        uoper->type(), uoper->get_contains_agg(), optype, operand);
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
     const auto optype = bin_oper->get_optype();
-    auto ti = bin_oper->get_type_info();
+    auto type = bin_oper->type();
+    auto& ctx = type->ctx();
     auto left_operand = bin_oper->get_own_left_operand();
     auto right_operand = bin_oper->get_own_right_operand();
 
     // Check if bin_oper result is cast to a larger int or fp type
     if (casts_.find(bin_oper) != casts_.end()) {
-      const auto cast_ti = casts_[bin_oper];
-      const auto& lhs_ti = bin_oper->get_left_operand()->get_type_info();
+      auto cast_type = casts_[bin_oper];
+      auto lhs_type = bin_oper->get_left_operand()->type();
       // Propagate cast down to the operands for folding
-      if ((cast_ti.is_integer() || cast_ti.is_fp()) && lhs_ti.is_integer() &&
-          cast_ti.get_size() > lhs_ti.get_size() &&
+      if ((cast_type->isInteger() || cast_type->isFloatingPoint()) &&
+          lhs_type->isInteger() && cast_type->size() > lhs_type->size() &&
           (optype == kMINUS || optype == kPLUS || optype == kMULTIPLY)) {
         // Before folding, cast the operands to the bigger type to avoid overflows.
         // Currently upcasting smaller integer types to larger integers or double.
-        left_operand = left_operand->deep_copy()->add_cast(cast_ti);
-        right_operand = right_operand->deep_copy()->add_cast(cast_ti);
-        ti = cast_ti;
+        left_operand = left_operand->deep_copy()->add_cast(cast_type);
+        right_operand = right_operand->deep_copy()->add_cast(cast_type);
+        type = cast_type;
       }
     }
 
@@ -531,37 +543,36 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
     auto const_lhs = std::dynamic_pointer_cast<hdk::ir::Constant>(lhs);
     auto const_rhs = std::dynamic_pointer_cast<hdk::ir::Constant>(rhs);
-    const auto& lhs_ti = lhs->get_type_info();
-    const auto& rhs_ti = rhs->get_type_info();
-    auto lhs_type = lhs_ti.is_decimal() ? decimal_to_int_type(lhs_ti) : lhs_ti.get_type();
-    auto rhs_type = rhs_ti.is_decimal() ? decimal_to_int_type(rhs_ti) : rhs_ti.get_type();
+    auto lhs_type = lhs->type();
+    auto rhs_type = rhs->type();
 
-    if (const_lhs && const_rhs && lhs_type == rhs_type) {
+    if (const_lhs && const_rhs && lhs_type->id() == rhs_type->id() && lhs_type->size() &&
+        rhs_type->size()) {
       auto lhs_datum = const_lhs->get_constval();
       auto rhs_datum = const_rhs->get_constval();
       Datum result_datum = {};
-      SQLTypes result_type;
+      const hdk::ir::Type* result_type;
       if (foldOper(optype, lhs_type, lhs_datum, rhs_datum, result_datum, result_type)) {
         // Fold all ops that don't take in decimal operands, and also decimal comparisons
-        if (!lhs_ti.is_decimal() || IS_COMPARISON(optype)) {
+        if (!lhs_type->isDecimal() || IS_COMPARISON(optype)) {
           return hdk::ir::makeExpr<hdk::ir::Constant>(result_type, false, result_datum);
         }
         // Decimal arithmetic has been done as kBIGINT. Selectively fold some decimal ops,
         // using result_datum and BinOper expr typeinfo which was adjusted for these ops.
         if (optype == kMINUS || optype == kPLUS || optype == kMULTIPLY) {
-          return hdk::ir::makeExpr<hdk::ir::Constant>(ti, false, result_datum);
+          return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, result_datum);
         }
       }
     }
 
-    if (optype == kAND && lhs_type == rhs_type && lhs_type == kBOOLEAN) {
+    if (optype == kAND && lhs_type == rhs_type && lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->get_is_null()) {
         auto rhs_datum = const_rhs->get_constval();
         if (rhs_datum.boolval == false) {
           Datum d;
           d.boolval = false;
           // lhs && false --> false
-          return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+          return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
         }
         // lhs && true --> lhs
         return lhs;
@@ -572,20 +583,20 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           Datum d;
           d.boolval = false;
           // false && rhs --> false
-          return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+          return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
         }
         // true && rhs --> rhs
         return rhs;
       }
     }
-    if (optype == kOR && lhs_type == rhs_type && lhs_type == kBOOLEAN) {
+    if (optype == kOR && lhs_type == rhs_type && lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->get_is_null()) {
         auto rhs_datum = const_rhs->get_constval();
         if (rhs_datum.boolval == true) {
           Datum d;
           d.boolval = true;
           // lhs || true --> true
-          return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+          return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
         }
         // lhs || false --> lhs
         return lhs;
@@ -596,7 +607,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           Datum d;
           d.boolval = true;
           // true || rhs --> true
-          return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+          return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
         }
         // false || rhs --> rhs
         return rhs;
@@ -607,13 +618,13 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       if (optype == kEQ || optype == kLE || optype == kGE) {
         Datum d;
         d.boolval = true;
-        return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+        return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
       }
       // Contradictions: v!=v; v<v; v>v
       if (optype == kNE || optype == kLT || optype == kGT) {
         Datum d;
         d.boolval = false;
-        return hdk::ir::makeExpr<hdk::ir::Constant>(kBOOLEAN, false, d);
+        return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
       }
       // v-v
       if (optype == kMINUS) {
@@ -622,10 +633,10 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       }
     }
     // Convert fp division by a constant to multiplication by 1/constant
-    if (optype == kDIVIDE && const_rhs && rhs_ti.is_fp()) {
+    if (optype == kDIVIDE && const_rhs && rhs_type->isFloatingPoint()) {
       auto rhs_datum = const_rhs->get_constval();
       hdk::ir::ExprPtr recip_rhs = nullptr;
-      if (rhs_ti.get_type() == kFLOAT) {
+      if (rhs_type->isFp32()) {
         if (rhs_datum.floatval == 1.0) {
           return lhs;
         }
@@ -634,7 +645,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           rhs_datum.floatval = 1.0 / rhs_datum.floatval;
           recip_rhs = hdk::ir::makeExpr<hdk::ir::Constant>(rhs_type, false, rhs_datum);
         }
-      } else if (rhs_ti.get_type() == kDOUBLE) {
+      } else if (rhs_type->isFp64()) {
         if (rhs_datum.doubleval == 1.0) {
           return lhs;
         }
@@ -645,7 +656,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         }
       }
       if (recip_rhs) {
-        return hdk::ir::makeExpr<hdk::ir::BinOper>(ti,
+        return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
                                                    bin_oper->get_contains_agg(),
                                                    kMULTIPLY,
                                                    bin_oper->get_qualifier(),
@@ -654,7 +665,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       }
     }
 
-    return hdk::ir::makeExpr<hdk::ir::BinOper>(ti,
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
                                                bin_oper->get_contains_agg(),
                                                bin_oper->get_optype(),
                                                bin_oper->get_qualifier(),
@@ -673,7 +684,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
   }
 
  protected:
-  mutable std::unordered_map<const hdk::ir::Expr*, const SQLTypeInfo> casts_;
+  mutable std::unordered_map<const hdk::ir::Expr*, const hdk::ir::Type*> casts_;
   mutable int32_t num_overflows_;
 
  public:
@@ -822,15 +833,15 @@ hdk::ir::ExprPtr fold_expr(const hdk::ir::Expr* expr) {
   const auto expr_no_likelihood = strip_likelihood(expr);
   ConstantFoldingVisitor visitor;
   auto rewritten_expr = visitor.visit(expr_no_likelihood);
-  if (visitor.get_num_overflows() > 0 && rewritten_expr->get_type_info().is_integer() &&
-      rewritten_expr->get_type_info().get_type() != kBIGINT) {
+  if (visitor.get_num_overflows() > 0 && rewritten_expr->type()->isInteger() &&
+      !rewritten_expr->type()->isInt64()) {
     auto rewritten_expr_const =
         std::dynamic_pointer_cast<const hdk::ir::Constant>(rewritten_expr);
     if (!rewritten_expr_const) {
       // Integer expression didn't fold completely the first time due to
       // overflows in smaller type subexpressions, trying again with a cast
-      const auto& ti = SQLTypeInfo(kBIGINT, false);
-      auto bigint_expr_no_likelihood = expr_no_likelihood->deep_copy()->add_cast(ti);
+      auto type = expr->type()->ctx().int64();
+      auto bigint_expr_no_likelihood = expr_no_likelihood->deep_copy()->add_cast(type);
       auto rewritten_expr_take2 = visitor.visit(bigint_expr_no_likelihood.get());
       auto rewritten_expr_take2_const =
           std::dynamic_pointer_cast<hdk::ir::Constant>(rewritten_expr_take2);
