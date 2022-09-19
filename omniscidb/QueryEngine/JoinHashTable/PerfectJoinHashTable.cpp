@@ -45,7 +45,7 @@ InnerOuter get_cols(const hdk::ir::BinOper* qual_bin_oper,
   return HashJoin::normalizeColumnPair(lhs, rhs, schema_provider, temporary_tables);
 }
 
-HashEntryInfo get_bucketized_hash_entry_info(SQLTypeInfo const& context_ti,
+HashEntryInfo get_bucketized_hash_entry_info(const hdk::ir::Type* context_type,
                                              ExpressionRange const& col_range,
                                              bool const is_bw_eq) {
   using EmptyRangeSize = boost::optional<size_t>;
@@ -73,8 +73,7 @@ HashEntryInfo get_bucketized_hash_entry_info(SQLTypeInfo const& context_ti,
     throw TooManyHashEntries();
   }
 
-  int64_t bucket_normalization =
-      context_ti.get_type() == kDATE ? col_range.getBucket() : 1;
+  int64_t bucket_normalization = context_type->isDate() ? col_range.getBucket() : 1;
   CHECK_GT(bucket_normalization, 0);
   return {size_t(col_range.getIntMax() - col_range.getIntMin() + 1 + (is_bw_eq ? 1 : 0)),
           bucket_normalization};
@@ -102,16 +101,17 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
       qual_bin_oper.get(), executor->getSchemaProvider(), executor->temporary_tables_);
   const auto inner_col = cols.first;
   CHECK(inner_col);
-  const auto& ti = inner_col->get_type_info();
+  auto type = inner_col->type();
+  auto is_string_type = type->isString() || type->isExtDictionary();
   auto col_range =
-      getExpressionRange(ti.is_string() ? cols.second : inner_col, query_infos, executor);
+      getExpressionRange(is_string_type ? cols.second : inner_col, query_infos, executor);
   if (col_range.getType() == ExpressionRangeType::Invalid) {
     throw HashJoinFail(
         "Could not compute range for the expressions involved in the equijoin");
   }
   const auto rhs_source_col_range =
-      ti.is_string() ? getExpressionRange(inner_col, query_infos, executor) : col_range;
-  if (ti.is_string()) {
+      is_string_type ? getExpressionRange(inner_col, query_infos, executor) : col_range;
+  if (is_string_type) {
     // The nullable info must be the same as the source column.
     if (rhs_source_col_range.getType() == ExpressionRangeType::Invalid) {
       throw HashJoinFail(
@@ -138,7 +138,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
           : static_cast<size_t>(std::numeric_limits<int32_t>::max());
 
   auto bucketized_entry_count_info = get_bucketized_hash_entry_info(
-      ti, col_range, qual_bin_oper->get_optype() == kBW_EQ);
+      type, col_range, qual_bin_oper->get_optype() == kBW_EQ);
   auto bucketized_entry_count = bucketized_entry_count_info.getNormalizedHashEntryCount();
 
   if (bucketized_entry_count > max_hash_entry_count) {
@@ -276,10 +276,10 @@ bool needs_dictionary_translation(const hdk::ir::ColumnVar* inner_col,
 bool PerfectJoinHashTable::isOneToOneHashPossible(
     const std::vector<ColumnsForDevice>& columns_per_device) const {
   CHECK(!inner_outer_pairs_.empty());
-  const auto& rhs_col_ti = inner_outer_pairs_.front().first->get_type_info();
+  auto rhs_col_type = inner_outer_pairs_.front().first->type();
   const auto max_unique_hash_input_entries =
       get_bucketized_hash_entry_info(
-          rhs_col_ti, rhs_source_col_range_, qual_bin_oper_->get_optype() == kBW_EQ)
+          rhs_col_type, rhs_source_col_range_, qual_bin_oper_->get_optype() == kBW_EQ)
           .getNormalizedHashEntryCount() +
       rhs_source_col_range_.hasNulls();
   for (const auto& device_columns : columns_per_device) {
@@ -448,14 +448,15 @@ ColumnsForDevice PerfectJoinHashTable::fetchColumnsForDevice(
                                               malloc_owner,
                                               executor_,
                                               &column_cache_));
-    const auto& ti = inner_col->get_type_info();
-    join_column_types.emplace_back(JoinColumnTypeInfo{static_cast<size_t>(ti.get_size()),
-                                                      0,
-                                                      0,
-                                                      inline_fixed_encoding_null_val(ti),
-                                                      isBitwiseEq(),
-                                                      0,
-                                                      get_join_column_type_kind(ti)});
+    auto type = inner_col->type();
+    join_column_types.emplace_back(
+        JoinColumnTypeInfo{static_cast<size_t>(type->size()),
+                           0,
+                           0,
+                           inline_fixed_encoding_null_value(type),
+                           isBitwiseEq(),
+                           0,
+                           get_join_column_type_kind(type)});
   }
   return {join_columns, join_column_types, chunks_owner, malloc_owner};
 }
@@ -506,8 +507,8 @@ int PerfectJoinHashTable::initHashTableForDevice(
   const auto inner_col = cols.first;
   CHECK(inner_col);
 
-  auto hash_entry_info = get_bucketized_hash_entry_info(
-      inner_col->get_type_info(), col_range_, isBitwiseEq());
+  auto hash_entry_info =
+      get_bucketized_hash_entry_info(inner_col->type(), col_range_, isBitwiseEq());
   if (!hash_entry_info && layout == HashType::OneToOne) {
     // TODO: what is this for?
     return 0;
@@ -622,8 +623,8 @@ int PerfectJoinHashTable::initHashTableForDevice(
     if (memory_level_ == Data_Namespace::GPU_LEVEL) {
 #ifdef HAVE_CUDA
       auto buffer_provider = executor_->getBufferProvider();
-      const auto& ti = inner_col->get_type_info();
-      CHECK(ti.is_string());
+      auto type = inner_col->type();
+      CHECK(type->isString() || type->isExtDictionary());
       std::lock_guard<std::mutex> cpu_hash_table_buff_lock(cpu_hash_table_buff_mutex_);
 
       PerfectJoinHashTableBuilder gpu_builder;
@@ -704,9 +705,8 @@ ChunkKey PerfectJoinHashTable::genChunkKey(const std::vector<FragmentInfo>& frag
                                            const hdk::ir::ColumnVar* inner_col) const {
   ChunkKey chunk_key{
       inner_col->get_db_id(), inner_col->get_table_id(), inner_col->get_column_id()};
-  const auto& ti = inner_col->get_type_info();
-  if (ti.is_string()) {
-    CHECK_EQ(kENCODING_DICT, ti.get_compression());
+  auto type = inner_col->type();
+  if (type->isExtDictionary()) {
     size_t outer_elem_count = 0;
     const auto outer_col = dynamic_cast<const hdk::ir::ColumnVar*>(outer_col_expr);
     CHECK(outer_col);
@@ -773,21 +773,21 @@ std::vector<llvm::Value*> PerfectJoinHashTable::getHashJoinArgs(
   CodeGenerator code_generator(executor_);
   const auto key_lvs = code_generator.codegen(key_col, true, co);
   CHECK_EQ(size_t(1), key_lvs.size());
-  auto const& key_col_ti = key_col->get_type_info();
+  auto key_col_type = key_col->type();
   auto hash_entry_info =
-      get_bucketized_hash_entry_info(key_col_ti, col_range_, isBitwiseEq());
+      get_bucketized_hash_entry_info(key_col_type, col_range_, isBitwiseEq());
 
   std::vector<llvm::Value*> hash_join_idx_args{
       hash_ptr,
       executor_->cgen_state_->castToTypeIn(key_lvs.front(), 64),
       executor_->cgen_state_->llInt(col_range_.getIntMin()),
       executor_->cgen_state_->llInt(col_range_.getIntMax())};
-  auto key_col_logical_ti = get_logical_type_info(key_col->get_type_info());
-  if (!key_col_logical_ti.get_notnull() || isBitwiseEq()) {
+  auto key_col_logical_type = hdk::ir::logicalType(key_col->type());
+  if (key_col_logical_type->nullable() || isBitwiseEq()) {
     hash_join_idx_args.push_back(executor_->cgen_state_->llInt(
-        inline_fixed_encoding_null_val(key_col_logical_ti)));
+        inline_fixed_encoding_null_value(key_col_logical_type)));
   }
-  auto special_date_bucketization_case = key_col_ti.get_type() == kDATE;
+  auto special_date_bucketization_case = key_col_type->isDate();
   if (isBitwiseEq()) {
     if (special_date_bucketization_case) {
       hash_join_idx_args.push_back(executor_->cgen_state_->llInt(
@@ -834,11 +834,11 @@ HashJoinMatchingSet PerfectJoinHashTable::codegenMatchingSet(const CompilationOp
   }
   auto hash_join_idx_args = getHashJoinArgs(pos_ptr, key_col, co);
   const int64_t sub_buff_size = getComponentBufferSize();
-  const auto& key_col_ti = key_col->get_type_info();
+  auto key_col_type = key_col->type();
 
-  auto bucketize = (key_col_ti.get_type() == kDATE);
+  auto bucketize = key_col_type->isDate();
   return HashJoin::codegenMatchingSet(hash_join_idx_args,
-                                      !key_col_ti.get_notnull(),
+                                      key_col_type->nullable(),
                                       isBitwiseEq(),
                                       sub_buff_size,
                                       executor_,
@@ -979,15 +979,15 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
   CHECK(hash_ptr);
   const auto hash_join_idx_args = getHashJoinArgs(hash_ptr, key_col, co);
 
-  const auto& key_col_ti = key_col->get_type_info();
-  std::string fname((key_col_ti.get_type() == kDATE) ? "bucketized_hash_join_idx"s
-                                                     : "hash_join_idx"s);
+  auto key_col_type = key_col->type();
+  std::string fname(key_col_type->isDate() ? "bucketized_hash_join_idx"s
+                                           : "hash_join_idx"s);
 
   if (isBitwiseEq()) {
     fname += "_bitwise";
   }
 
-  if (!isBitwiseEq() && !key_col_ti.get_notnull()) {
+  if (!isBitwiseEq() && key_col_type->nullable()) {
     fname += "_nullable";
   }
   return executor_->cgen_state_->emitCall(fname, hash_join_idx_args);

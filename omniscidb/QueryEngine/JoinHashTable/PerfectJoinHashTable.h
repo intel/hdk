@@ -230,7 +230,7 @@ class PerfectJoinHashTable : public HashJoin {
       AlternativeCacheKeyForPerfectHashJoin& info) {
     auto hash = boost::hash_value(::toString(info.chunk_key));
     boost::hash_combine(hash, info.inner_col->toString());
-    if (info.inner_col->get_type_info().is_string()) {
+    if (info.inner_col->type()->isString() || info.inner_col->type()->isExtDictionary()) {
       boost::hash_combine(hash, info.outer_col->toString());
     }
     boost::hash_combine(hash, info.col_range.toString());
