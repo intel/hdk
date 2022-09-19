@@ -2177,8 +2177,8 @@ void Executor::addTransientStringLiterals(
   }
 
   for (const auto target_expr : ra_exe_unit.target_exprs) {
-    const auto& target_type = target_expr->get_type_info();
-    if (target_type.is_string() && target_type.get_compression() != kENCODING_DICT) {
+    auto target_type = target_expr->type();
+    if (target_type->isString()) {
       continue;
     }
     const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr);
@@ -2268,13 +2268,13 @@ ResultSetPtr build_row_for_empty_input(const std::vector<hdk::ir::Expr*>& target
     const auto target_expr_copy =
         std::dynamic_pointer_cast<hdk::ir::AggExpr>(target_expr->deep_copy());
     CHECK(target_expr_copy);
-    auto ti = target_expr->get_type_info();
-    ti.set_notnull(false);
-    target_expr_copy->set_type_info(ti);
+    auto type = target_expr->type();
+    type = type->withNullable(true);
+    target_expr_copy->set_type_info(type);
     if (target_expr_copy->get_arg()) {
-      auto arg_ti = target_expr_copy->get_arg()->get_type_info();
-      arg_ti.set_notnull(false);
-      target_expr_copy->get_arg()->set_type_info(arg_ti);
+      auto arg_type = target_expr_copy->get_arg()->type();
+      arg_type = arg_type->withNullable(true);
+      target_expr_copy->get_arg()->set_type_info(arg_type);
     }
     target_exprs_owned_copies.push_back(target_expr_copy);
     target_exprs.push_back(target_expr_copy.get());
@@ -3597,11 +3597,20 @@ int64_t Executor::deviceCycles(int milliseconds) const {
 llvm::Value* Executor::castToFP(llvm::Value* value,
                                 SQLTypeInfo const& from_ti,
                                 SQLTypeInfo const& to_ti) {
+  auto from_type = hdk::ir::Context::defaultCtx().fromTypeInfo(from_ti);
+  auto to_type = hdk::ir::Context::defaultCtx().fromTypeInfo(to_ti);
+  return castToFP(value, from_type, to_type);
+}
+
+llvm::Value* Executor::castToFP(llvm::Value* value,
+                                const hdk::ir::Type* from_type,
+                                const hdk::ir::Type* to_type) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
-  if (value->getType()->isIntegerTy() && from_ti.is_number() && to_ti.is_fp() &&
-      (!from_ti.is_fp() || from_ti.get_size() != to_ti.get_size())) {
+  if (value->getType()->isIntegerTy() && from_type->isNumber() &&
+      to_type->isFloatingPoint() &&
+      (!from_type->isFloatingPoint() || from_type->size() != to_type->size())) {
     llvm::Type* fp_type{nullptr};
-    switch (to_ti.get_size()) {
+    switch (to_type->size()) {
       case 4:
         fp_type = llvm::Type::getFloatTy(cgen_state_->context_);
         break;
@@ -3609,13 +3618,15 @@ llvm::Value* Executor::castToFP(llvm::Value* value,
         fp_type = llvm::Type::getDoubleTy(cgen_state_->context_);
         break;
       default:
-        LOG(FATAL) << "Unsupported FP size: " << to_ti.get_size();
+        LOG(FATAL) << "Unsupported FP size: " << to_type->size();
     }
     value = cgen_state_->ir_builder_.CreateSIToFP(value, fp_type);
-    if (from_ti.get_scale()) {
-      value = cgen_state_->ir_builder_.CreateFDiv(
-          value,
-          llvm::ConstantFP::get(value->getType(), exp_to_scale(from_ti.get_scale())));
+    if (from_type->isDecimal()) {
+      auto scale = from_type->as<hdk::ir::DecimalType>()->scale();
+      if (scale) {
+        value = cgen_state_->ir_builder_.CreateFDiv(
+            value, llvm::ConstantFP::get(value->getType(), exp_to_scale(scale)));
+      }
     }
   }
   return value;
@@ -3660,17 +3671,20 @@ namespace {
 std::tuple<bool, int64_t, int64_t> get_hpt_overflow_underflow_safe_scaled_values(
     const int64_t chunk_min,
     const int64_t chunk_max,
-    const SQLTypeInfo& lhs_type,
-    const SQLTypeInfo& rhs_type) {
-  const int32_t ldim = lhs_type.get_dimension();
-  const int32_t rdim = rhs_type.get_dimension();
-  CHECK(ldim != rdim);
-  const auto scale = DateTimeUtils::get_timestamp_precision_scale(abs(rdim - ldim));
-  if (ldim > rdim) {
+    const hdk::ir::Type* lhs_type,
+    const hdk::ir::Type* rhs_type) {
+  auto lunit = lhs_type->isTimestamp() ? lhs_type->as<hdk::ir::TimestampType>()->unit()
+                                       : hdk::ir::TimeUnit::kSecond;
+  auto runit = rhs_type->isTimestamp() ? rhs_type->as<hdk::ir::TimestampType>()->unit()
+                                       : hdk::ir::TimeUnit::kSecond;
+  CHECK(lunit != runit);
+  if (lunit > runit) {
+    auto scale = hdk::ir::unitsPerSecond(lunit) / hdk::ir::unitsPerSecond(runit);
     // LHS type precision is more than RHS col type. No chance of overflow/underflow.
     return {true, chunk_min / scale, chunk_max / scale};
   }
 
+  auto scale = hdk::ir::unitsPerSecond(runit) / hdk::ir::unitsPerSecond(lunit);
   using checked_int64_t = boost::multiprecision::number<
       boost::multiprecision::cpp_int_backend<64,
                                              64,
@@ -3712,11 +3726,11 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
   }
 
   const auto datum_fp = rhs_const->get_constval();
-  const auto rhs_type = rhs_const->get_type_info().get_type();
-  CHECK(rhs_type == kFLOAT || rhs_type == kDOUBLE);
+  const auto rhs_type = rhs_const->type();
+  CHECK(rhs_type->isFloatingPoint());
 
   // Do we need to codegen the constant like the integer path does?
-  const auto rhs_val = rhs_type == kFLOAT ? datum_fp.floatval : datum_fp.doubleval;
+  const auto rhs_val = rhs_type->isFp32() ? datum_fp.floatval : datum_fp.doubleval;
 
   // Todo: dedup the following comparison code with the integer/timestamp path, it is
   // slightly tricky due to do cleanly as we do not have rowid on this path
@@ -3788,12 +3802,12 @@ std::pair<bool, int64_t> Executor::skipFragment(
       // is this possible?
       return {false, -1};
     }
-    if (!lhs->get_type_info().is_integer() && !lhs->get_type_info().is_time() &&
-        !lhs->get_type_info().is_fp()) {
+    if (!lhs->type()->isInteger() && !lhs->type()->isDateTime() &&
+        !lhs->type()->isFloatingPoint()) {
       continue;
     }
 
-    if (lhs->get_type_info().is_fp()) {
+    if (lhs->type()->isFloatingPoint()) {
       const auto fragment_skip_status =
           canSkipFragmentForFpQual(comp_expr.get(), lhs_col, fragment, rhs_const);
       switch (fragment_skip_status) {
@@ -3836,11 +3850,15 @@ std::pair<bool, int64_t> Executor::skipFragment(
       // invalid metadata range, do not skip fragment
       return {false, -1};
     }
-    if (lhs->get_type_info().is_timestamp() &&
-        (lhs_col->get_type_info().get_dimension() !=
-         rhs_const->get_type_info().get_dimension()) &&
-        (lhs_col->get_type_info().is_high_precision_timestamp() ||
-         rhs_const->get_type_info().is_high_precision_timestamp())) {
+    auto lhs_col_unit = lhs_col->type()->isTimestamp()
+                            ? lhs_col->type()->as<hdk::ir::TimestampType>()->unit()
+                            : hdk::ir::TimeUnit::kSecond;
+    auto rhs_unit = rhs->type()->isTimestamp()
+                        ? rhs->type()->as<hdk::ir::TimestampType>()->unit()
+                        : hdk::ir::TimeUnit::kSecond;
+    if (lhs->type()->isTimestamp() && (lhs_col_unit != rhs_unit) &&
+        (lhs_col_unit > hdk::ir::TimeUnit::kSecond ||
+         rhs_unit > hdk::ir::TimeUnit::kSecond)) {
       // If original timestamp lhs col has different precision,
       // column metadata holds value in original precision
       // therefore adjust rhs value to match lhs precision
@@ -3851,27 +3869,25 @@ std::pair<bool, int64_t> Executor::skipFragment(
       bool is_valid;
       std::tie(is_valid, chunk_min, chunk_max) =
           get_hpt_overflow_underflow_safe_scaled_values(
-              chunk_min, chunk_max, lhs_col->get_type_info(), rhs_const->get_type_info());
+              chunk_min, chunk_max, lhs_col->type(), rhs_const->type());
       if (!is_valid) {
         VLOG(4) << "Overflow/Underflow detecting in fragments skipping logic.\nChunk min "
                    "value: "
                 << std::to_string(chunk_min)
                 << "\nChunk max value: " << std::to_string(chunk_max)
-                << "\nLHS col precision is: "
-                << std::to_string(lhs_col->get_type_info().get_dimension())
-                << "\nRHS precision is: "
-                << std::to_string(rhs_const->get_type_info().get_dimension()) << ".";
+                << "\nLHS col precision is: " << toString(lhs_col_unit)
+                << "\nRHS precision is: " << toString(rhs_unit) << ".";
         return {false, -1};
       }
     }
-    if (lhs_col->get_type_info().is_timestamp() && rhs_const->get_type_info().is_date()) {
+    if (lhs_col->type()->isTimestamp() && rhs_const->type()->isDate()) {
       // It is obvious that a cast from timestamp to date is happening here,
       // so we have to correct the chunk min and max values to lower the precision as of
       // the date
       chunk_min = truncate_high_precision_timestamp_to_date(
-          chunk_min, pow(10, lhs_col->get_type_info().get_dimension()));
+          chunk_min, hdk::ir::unitsPerSecond(lhs_col_unit));
       chunk_max = truncate_high_precision_timestamp_to_date(
-          chunk_max, pow(10, lhs_col->get_type_info().get_dimension()));
+          chunk_max, hdk::ir::unitsPerSecond(lhs_col_unit));
     }
     llvm::LLVMContext local_context;
     CgenState local_cgen_state(getConfig(), local_context);
