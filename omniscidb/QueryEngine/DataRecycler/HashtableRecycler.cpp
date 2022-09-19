@@ -284,15 +284,15 @@ std::pair<QueryPlan, HashtableCacheMetaInfo> HashtableRecycler::getHashtableKeyS
     join_qual_info.push_back(::toString(op_type));
     join_qual_info.push_back(::toString(join_type));
     auto outer_col_var = dynamic_cast<const hdk::ir::ColumnVar*>(join_col_pair.second);
-    join_qual_info.push_back(join_col_pair.first->get_type_info().toString());
+    join_qual_info.push_back(join_col_pair.first->type()->toString());
     if (outer_col_var) {
       outer_cols_vec.push_back(outer_col_var);
-      if (join_col_pair.first->get_type_info().is_dict_encoded_string()) {
+      if (join_col_pair.first->type()->isExtDictionary()) {
         // add comp param for dict encoded string
         join_qual_info.push_back(
             executor->getQueryPlanDagCache().getJoinColumnsInfoString(
                 outer_col_var, JoinColumnSide::kDirect, true));
-        join_qual_info.push_back(outer_col_var->get_type_info().toString());
+        join_qual_info.push_back(outer_col_var->type()->toString());
       }
     }
   }
@@ -305,7 +305,7 @@ std::pair<QueryPlan, HashtableCacheMetaInfo> HashtableRecycler::getHashtableKeyS
     std::vector<std::string> hashtable_access_path_info;
     hashtable_access_path_info.push_back(it->second.inner_cols_access_path);
     hashtable_access_path_info.push_back(inner_join_cols_info);
-    if (inner_cols_vec.front()->get_type_info().is_dict_encoded_string()) {
+    if (inner_cols_vec.front()->type()->isExtDictionary()) {
       hashtable_access_path_info.push_back(it->second.outer_cols_access_path);
     }
     hashtable_access_path = boost::join(hashtable_access_path_info, "|");
