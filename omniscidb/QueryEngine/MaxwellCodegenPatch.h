@@ -20,10 +20,10 @@
 #include "../CudaMgr/CudaMgr.h"
 #include "Execute.h"
 
-inline bool need_patch_unnest_double(const SQLTypeInfo& ti,
+inline bool need_patch_unnest_double(const hdk::ir::Type* type,
                                      const bool is_maxwell,
                                      const bool mem_shared) {
-  return is_maxwell && mem_shared && ti.is_fp() && ti.get_type() == kDOUBLE;
+  return is_maxwell && mem_shared && type->isFp64();
 }
 
 inline std::string patch_agg_fname(const std::string& agg_name) {

@@ -61,7 +61,6 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
       CHECK_NE(dict_id, 0);
       return {codegen(constant, true, dict_id, co)};
     }
-    CHECK(constant->get_type_info().get_compression() == kENCODING_NONE);
     return {codegen(constant, false, 0, co)};
   }
   auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
@@ -205,15 +204,15 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::SampleRatioExpr* expr,
   CHECK_EQ(size_t(1), double_lv.size());
 
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
-  const bool is_nullable = !input_expr->get_type_info().get_notnull();
+  const bool is_nullable = input_expr->type()->nullable();
   if (is_nullable) {
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(cgen_state_,
                                                            executor(),
                                                            double_lv.front(),
-                                                           input_expr->get_type_info(),
+                                                           input_expr->type(),
                                                            "sample_ratio_nullcheck");
   }
-  CHECK_EQ(input_expr->get_type_info().get_type(), kDOUBLE);
+  CHECK(input_expr->type()->isFp64());
   std::vector<llvm::Value*> args{double_lv[0], posArg(nullptr)};
   auto ret = cgen_state_->emitCall("sample_ratio", args);
   if (nullcheck_codegen) {
@@ -342,7 +341,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     return codegen(double_const_expr.get(), false, co);
   };
 
-  auto target_value_ti = target_value_expr->get_type_info();
+  auto target_value_type = target_value_expr->type();
   auto target_value_expr_lvs = codegen(target_value_expr, true, co);
   CHECK_EQ(size_t(1), target_value_expr_lvs.size());
   auto lower_expr_lvs = codegen(lower_bound_expr, true, co);
@@ -363,11 +362,11 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     width_bucket_args.push_back(upper_expr_lvs[0]);
     width_bucket_args.push_back(scale_factor_lvs[0]);
     width_bucket_args.push_back(partition_count_expr_lvs[0]);
-    if (!target_value_ti.get_notnull()) {
+    if (target_value_type->nullable()) {
       func_name += "_nullable";
-      auto translated_null_value = target_value_ti.is_fp()
-                                       ? inline_fp_null_val(target_value_ti)
-                                       : inline_int_null_val(target_value_ti);
+      auto translated_null_value = target_value_type->isFloatingPoint()
+                                       ? inline_fp_null_value(target_value_type)
+                                       : inline_int_null_value(target_value_type);
       auto null_value_lvs = get_double_constant_lvs(translated_null_value);
       CHECK_EQ(size_t(1), null_value_lvs.size());
       width_bucket_args.push_back(null_value_lvs[0]);
@@ -387,7 +386,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
   bool nullable_expr = false;
   if (expr->can_skip_out_of_bound_check()) {
     func_name += "_no_oob_check";
-  } else if (!target_value_expr->get_type_info().get_notnull()) {
+  } else if (target_value_expr->type()->nullable()) {
     func_name += "_nullable";
     nullable_expr = true;
   }
@@ -400,19 +399,19 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
   CHECK_EQ(size_t(1), upper_bound_expr_lvs.size());
   auto partition_count_expr_lvs = codegen(partition_count_expr, true, co);
   CHECK_EQ(size_t(1), partition_count_expr_lvs.size());
-  auto target_value_ti = target_value_expr->get_type_info();
-  auto null_value_lv = cgen_state_->inlineFpNull(target_value_ti);
+  auto target_value_type = target_value_expr->type();
+  auto null_value_lv = cgen_state_->inlineFpNull(target_value_type);
 
   // check partition count : 1 ~ INT32_MAX
   // INT32_MAX will be checked during casting by OVERFLOW checking step
-  auto partition_count_ti = partition_count_expr->get_type_info();
-  CHECK(partition_count_ti.is_integer());
-  auto int32_ti = SQLTypeInfo(kINT, partition_count_ti.get_notnull());
+  auto partition_count_type = partition_count_expr->type();
+  CHECK(partition_count_type->isInteger());
+  auto int32_type = expr->ctx().int32(partition_count_type->nullable());
   auto partition_count_expr_lv =
       codegenCastBetweenIntTypes(partition_count_expr_lvs[0],
-                                 partition_count_ti,
-                                 int32_ti,
-                                 partition_count_ti.get_size() < int32_ti.get_size());
+                                 partition_count_type,
+                                 int32_type,
+                                 partition_count_type->size() < int32_type->size());
   llvm::Value* chosen_min = cgen_state_->llInt(static_cast<int32_t>(0));
   llvm::Value* partition_count_min =
       cgen_state_->ir_builder_.CreateICmpSLE(partition_count_expr_lv, chosen_min);
@@ -437,8 +436,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
                                "width_bucket_bound_check_ok_bb",
                                cgen_state_->current_func_);
   llvm::Value* bound_check{nullptr};
-  if (lower_bound_expr->get_type_info().get_notnull() &&
-      upper_bound_expr->get_type_info().get_notnull()) {
+  if (!lower_bound_expr->type()->nullable() && !upper_bound_expr->type()->nullable()) {
     bound_check = cgen_state_->ir_builder_.CreateFCmpOEQ(
         lower_bound_expr_lvs[0], upper_bound_expr_lvs[0], "bound_check");
   } else {
@@ -511,10 +509,10 @@ void check_valid_join_qual(std::shared_ptr<hdk::ir::BinOper>& bin_oper) {
   auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
   auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
   if (lhs_cv && rhs_cv) {
-    auto lhs_type = lhs_cv->get_type_info().get_type();
-    auto rhs_type = rhs_cv->get_type_info().get_type();
+    auto lhs_type = lhs_cv->type();
+    auto rhs_type = rhs_cv->type();
     // check #1. avoid a join btw full array columns
-    if (lhs_type == SQLTypes::kARRAY && rhs_type == SQLTypes::kARRAY) {
+    if (lhs_type->isArray() && rhs_type->isArray()) {
       throw std::runtime_error(
           "Join operation between full array columns (i.e., R.arr = S.arr) instead of "
           "indexed array columns (i.e., R.arr[1] = S.arr[2]) is not supported yet.");
@@ -1224,18 +1222,18 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     CHECK(array_idx_ptr);
     cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
     const auto arr_expr = static_cast<hdk::ir::UOper*>(group_by_col)->get_operand();
-    const auto& array_ti = arr_expr->get_type_info();
-    CHECK(array_ti.is_array());
-    const auto& elem_ti = array_ti.get_elem_type();
+    auto array_type = arr_expr->type();
+    CHECK(array_type->isArray());
+    auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
     auto array_len =
-        (array_ti.get_size() > 0)
-            ? cgen_state_->llInt(array_ti.get_size() / elem_ti.get_size())
+        (array_type->size() > 0)
+            ? cgen_state_->llInt(array_type->size() / elem_type->size())
             : cgen_state_->emitExternalCall(
                   "array_size",
                   ret_ty,
                   {group_key,
                    code_generator.posArg(arr_expr),
-                   cgen_state_->llInt(log2_bytes(elem_ti.get_logical_size()))});
+                   cgen_state_->llInt(log2_bytes(hdk::ir::logicalSize(elem_type)))});
     cgen_state_->ir_builder_.CreateBr(array_loop_head);
     cgen_state_->ir_builder_.SetInsertPoint(array_loop_head);
     CHECK(array_len);
@@ -1253,25 +1251,24 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     cgen_state_->ir_builder_.CreateStore(
         cgen_state_->ir_builder_.CreateAdd(array_idx, cgen_state_->llInt(int32_t(1))),
         array_idx_ptr);
-    auto array_at_fname = "array_at_" + numeric_type_name(elem_ti);
-    if (array_ti.get_size() < 0) {
-      if (array_ti.get_notnull()) {
+    auto array_at_fname = "array_at_" + numeric_type_name(elem_type);
+    if (array_type->size() < 0) {
+      if (!array_type->nullable()) {
         array_at_fname = "notnull_" + array_at_fname;
       }
       array_at_fname = "varlen_" + array_at_fname;
     }
     const auto ar_ret_ty =
-        elem_ti.is_fp()
-            ? (elem_ti.get_type() == kDOUBLE
-                   ? llvm::Type::getDoubleTy(cgen_state_->context_)
-                   : llvm::Type::getFloatTy(cgen_state_->context_))
-            : get_int_type(elem_ti.get_logical_size() * 8, cgen_state_->context_);
+        elem_type->isFloatingPoint()
+            ? (elem_type->isFp64() ? llvm::Type::getDoubleTy(cgen_state_->context_)
+                                   : llvm::Type::getFloatTy(cgen_state_->context_))
+            : get_int_type(hdk::ir::logicalSize(elem_type) * 8, cgen_state_->context_);
     group_key = cgen_state_->emitExternalCall(
         array_at_fname,
         ar_ret_ty,
         {group_key, code_generator.posArg(arr_expr), array_idx});
     if (need_patch_unnest_double(
-            elem_ti, isArchMaxwell(co.device_type), thread_mem_shared)) {
+            elem_type, isArchMaxwell(co.device_type), thread_mem_shared)) {
       key_to_cache = spillDoubleElement(group_key, ar_ret_ty);
     } else {
       key_to_cache = group_key;
@@ -1284,14 +1281,15 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
   if (translate_null_val) {
     const std::string translator_func_name(
         col_width == sizeof(int32_t) ? "translate_null_key_i32_" : "translate_null_key_");
-    const auto& ti = group_by_col->get_type_info();
-    const auto key_type = get_int_type(ti.get_logical_size() * 8, cgen_state_->context_);
+    auto type = group_by_col->type();
+    const auto key_type =
+        get_int_type(hdk::ir::logicalSize(type) * 8, cgen_state_->context_);
     orig_group_key = group_key;
     group_key = cgen_state_->emitCall(
-        translator_func_name + numeric_type_name(ti),
+        translator_func_name + numeric_type_name(type),
         {group_key,
          static_cast<llvm::Value*>(
-             llvm::ConstantInt::get(key_type, inline_int_null_val(ti))),
+             llvm::ConstantInt::get(key_type, inline_int_null_value(type))),
          static_cast<llvm::Value*>(llvm::ConstantInt::get(
              llvm::Type::getInt64Ty(cgen_state_->context_), translated_null_val))});
   }
