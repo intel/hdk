@@ -704,60 +704,58 @@ std::vector<std::string> get_agg_fnames(const std::vector<hdk::ir::Expr*>& targe
        ++target_idx, ++agg_col_idx) {
     const auto target_expr = target_exprs[target_idx];
     CHECK(target_expr);
-    const auto target_type_info = target_expr->get_type_info();
+    auto target_type = target_expr->type();
     const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
     const bool is_varlen =
-        (target_type_info.is_string() &&
-         target_type_info.get_compression() == kENCODING_NONE) ||
-        target_type_info.is_array();  // TODO: should it use is_varlen_array() ?
+        target_type->isString() ||
+        target_type->isArray();  // TODO: should it use is_varlen_array() ?
     if (!agg_expr || agg_expr->get_aggtype() == kSAMPLE) {
-      result.emplace_back(target_type_info.is_fp() ? "agg_id_double" : "agg_id");
+      result.emplace_back(target_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
       if (is_varlen) {
         result.emplace_back("agg_id");
       }
       continue;
     }
-    const auto agg_type = agg_expr->get_aggtype();
-    const auto& agg_type_info =
-        agg_type != kCOUNT ? agg_expr->get_arg()->get_type_info() : target_type_info;
-    switch (agg_type) {
+    const auto agg = agg_expr->get_aggtype();
+    auto agg_type = agg != kCOUNT ? agg_expr->get_arg()->type() : target_type;
+    switch (agg) {
       case kAVG: {
-        if (!agg_type_info.is_integer() && !agg_type_info.is_decimal() &&
-            !agg_type_info.is_fp()) {
+        if (!agg_type->isInteger() && !agg_type->isDecimal() &&
+            !agg_type->isFloatingPoint()) {
           throw std::runtime_error("AVG is only valid on integer and floating point");
         }
-        result.emplace_back((agg_type_info.is_integer() || agg_type_info.is_time())
+        result.emplace_back((agg_type->isInteger() || agg_type->isDateTime())
                                 ? "agg_sum"
                                 : "agg_sum_double");
-        result.emplace_back((agg_type_info.is_integer() || agg_type_info.is_time())
+        result.emplace_back((agg_type->isInteger() || agg_type->isDateTime())
                                 ? "agg_count"
                                 : "agg_count_double");
         break;
       }
       case kMIN: {
-        if (agg_type_info.is_string() || agg_type_info.is_array()) {
+        if (agg_type->isString() || agg_type->isExtDictionary() || agg_type->isArray()) {
           throw std::runtime_error("MIN on strings or arrays types not supported yet");
         }
-        result.emplace_back((agg_type_info.is_integer() || agg_type_info.is_time())
+        result.emplace_back((agg_type->isInteger() || agg_type->isDateTime())
                                 ? "agg_min"
                                 : "agg_min_double");
         break;
       }
       case kMAX: {
-        if (agg_type_info.is_string() || agg_type_info.is_array()) {
+        if (agg_type->isString() || agg_type->isExtDictionary() || agg_type->isArray()) {
           throw std::runtime_error("MAX on strings or arrays types not supported yet");
         }
-        result.emplace_back((agg_type_info.is_integer() || agg_type_info.is_time())
+        result.emplace_back((agg_type->isInteger() || agg_type->isDateTime())
                                 ? "agg_max"
                                 : "agg_max_double");
         break;
       }
       case kSUM: {
-        if (!agg_type_info.is_integer() && !agg_type_info.is_decimal() &&
-            !agg_type_info.is_fp()) {
+        if (!agg_type->isInteger() && !agg_type->isDecimal() &&
+            !agg_type->isFloatingPoint()) {
           throw std::runtime_error("SUM is only valid on integer and floating point");
         }
-        result.emplace_back((agg_type_info.is_integer() || agg_type_info.is_time())
+        result.emplace_back((agg_type->isInteger() || agg_type->isDateTime())
                                 ? "agg_sum"
                                 : "agg_sum_double");
         break;
@@ -767,12 +765,12 @@ std::vector<std::string> get_agg_fnames(const std::vector<hdk::ir::Expr*>& targe
                                                         : "agg_count");
         break;
       case kSINGLE_VALUE: {
-        result.emplace_back(agg_type_info.is_fp() ? "agg_id_double" : "agg_id");
+        result.emplace_back(agg_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
         break;
       }
       case kSAMPLE: {
         // Note that varlen SAMPLE arguments are handled separately above
-        result.emplace_back(agg_type_info.is_fp() ? "agg_id_double" : "agg_id");
+        result.emplace_back(agg_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
         break;
       }
       case kAPPROX_COUNT_DISTINCT:
