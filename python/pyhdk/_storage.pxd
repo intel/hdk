@@ -119,10 +119,10 @@ cdef class Storage(SchemaProvider):
 
 cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
   cdef cppclass CArrowStorage "ArrowStorage"(CSchemaProvider, CAbstractDataProvider):
-    CArrowStorage(int, string, int);
+    CArrowStorage(int, string, int) except +;
 
-    CTableInfoPtr importArrowTable(shared_ptr[CArrowTable], string&, CTableOptions&);
-    void dropTable(const string&, bool)
+    CTableInfoPtr importArrowTable(shared_ptr[CArrowTable], string&, CTableOptions&) except +;
+    void dropTable(const string&, bool) except +;
 
 cdef extern from "omniscidb/BufferProvider/BufferProvider.h" namespace "Data_Namespace":
   cdef cppclass CBufferProvider "BufferProvider":
@@ -146,11 +146,11 @@ cdef extern from "omniscidb/DataMgr/PersistentStorageMgr/PersistentStorageMgr.h"
 
 cdef extern from "omniscidb/DataMgr/DataMgr.h" namespace "Data_Namespace":
   cdef cppclass CDataMgr "DataMgr":
-    CDataMgr(const CConfig&, const CSystemParameters&, map[CGpuMgrPlatform, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads)
+    CDataMgr(const CConfig&, const CSystemParameters&, map[CGpuMgrPlatform, unique_ptr[CGpuMgr]]&& gpuMgrs, size_t reservedGpuMem, size_t numReaderThreads) except +;
 
-    CPersistentStorageMgr* getPersistentStorageMgr()
-    CBufferProvider* getBufferProvider()
-    CDataProvider* getDataProvider()
+    CPersistentStorageMgr* getPersistentStorageMgr() except +;
+    CBufferProvider* getBufferProvider() except +;
+    CDataProvider* getDataProvider() except +;
 
 cdef class DataMgr:
   cdef shared_ptr[CDataMgr] c_data_mgr
