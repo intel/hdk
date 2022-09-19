@@ -10,6 +10,10 @@ We are committed to supporting a baseline set of functionality on all x86 CPUs, 
 
 ## Components
 
+### Config
+
+`Config` controls library-wide properties and must be passed to `Executor` and `DataMgr`. Default config objects should suffice for most installations. Instantiate a config first as part of library setup.
+
 ### Storage
 
 `ArrowStorage` is currently the default (and only available) HDK storage layer. `ArrowStorage` provides storage support for [Apache Arrow](https://github.com/apache/arrow) format data. The storage layer must be explicitly initialized:
@@ -71,6 +75,10 @@ The return from RelAlgExecutor is a ResultSet object which can be converted to A
 ```
      df = res.to_arrow().to_pandas()
 ```
+
+## Examples
+
+Standalone examples are available in the `examples` directory. Most examples run via Jupyter notebooks. 
 
 ## Build
 
