@@ -45,6 +45,10 @@ class TestSql:
         )
         return rel_alg_executor.execute(**kwargs)
 
+    @classmethod
+    def get_storage(cls):
+        return cls.storage
+
     def test_simple_count(self):
         res = self.execute_sql("SELECT COUNT(*) FROM test;")
         df = res.to_arrow().to_pandas()
@@ -62,3 +66,12 @@ class TestSql:
         res = self.execute_sql("SELECT * FROM test;", just_explain=True)
         explain_str = res.to_explain_str()
         assert explain_str[:15] == "IR for the CPU:"
+
+    def test_storage_exceptions(self):
+        at = pyarrow.Table.from_pandas(
+            pandas.DataFrame({"c": [1, 2, 3], "d": [10, 20, 30]})
+        )
+        opt = pyhdk.storage.TableOptions(2)
+
+        with pytest.raises(RuntimeError):
+            self.get_storage().importArrowTable(at, "test", opt)
