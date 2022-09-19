@@ -302,21 +302,23 @@ std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
 HashJoin::getStrDictProxies(const InnerOuter& cols, const Executor* executor) {
   const auto inner_col = cols.first;
   CHECK(inner_col);
-  const auto inner_ti = inner_col->get_type_info();
+  auto inner_type = inner_col->type();
   const auto outer_col = dynamic_cast<const hdk::ir::ColumnVar*>(cols.second);
   std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
       inner_outer_str_dict_proxies{nullptr, nullptr};
-  if (inner_ti.is_string() && outer_col) {
-    CHECK(outer_col->get_type_info().is_string());
+  if (inner_type->isExtDictionary() && outer_col) {
+    CHECK(outer_col->type()->isExtDictionary());
+    auto inner_dict_id = inner_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto outer_dict_id = outer_col->type()->as<hdk::ir::ExtDictionaryType>()->dictId();
     inner_outer_str_dict_proxies.first =
-        executor->getStringDictionaryProxy(inner_col->get_comp_param(), true);
+        executor->getStringDictionaryProxy(inner_dict_id, true);
     CHECK(inner_outer_str_dict_proxies.first);
     inner_outer_str_dict_proxies.second =
-        executor->getStringDictionaryProxy(outer_col->get_comp_param(), true);
+        executor->getStringDictionaryProxy(outer_dict_id, true);
     CHECK(inner_outer_str_dict_proxies.second);
     if (*inner_outer_str_dict_proxies.first == *inner_outer_str_dict_proxies.second) {
       // Dictionaries are the same - don't need to translate
-      CHECK(inner_col->get_comp_param() == outer_col->get_comp_param());
+      CHECK(inner_dict_id == outer_dict_id);
       inner_outer_str_dict_proxies.first = nullptr;
       inner_outer_str_dict_proxies.second = nullptr;
     }
@@ -352,19 +354,22 @@ CompositeKeyInfo HashJoin::getCompositeKeyInfo(
   for (const auto& inner_outer_pair : inner_outer_pairs) {
     const auto inner_col = inner_outer_pair.first;
     const auto outer_col = inner_outer_pair.second;
-    const auto& inner_ti = inner_col->get_type_info();
-    const auto& outer_ti = outer_col->get_type_info();
+    auto inner_type = inner_col->type();
+    auto outer_type = outer_col->type();
     ChunkKey cache_key_chunks_for_column{
         inner_col->get_db_id(), inner_col->get_table_id(), inner_col->get_column_id()};
-    if (inner_ti.is_string() &&
-        !(inner_ti.get_comp_param() == outer_ti.get_comp_param())) {
-      CHECK(outer_ti.is_string());
-      CHECK(inner_ti.get_compression() == kENCODING_DICT &&
-            outer_ti.get_compression() == kENCODING_DICT);
+    auto inner_dict_id = inner_type->isExtDictionary()
+                             ? inner_type->as<hdk::ir::ExtDictionaryType>()->dictId()
+                             : -1;
+    auto outer_dict_id = outer_type->isExtDictionary()
+                             ? outer_type->as<hdk::ir::ExtDictionaryType>()->dictId()
+                             : -1;
+    if (inner_type->isExtDictionary() && inner_dict_id != outer_dict_id) {
+      CHECK(outer_type->isExtDictionary());
       const auto sd_inner_proxy = executor->getStringDictionaryProxy(
-          inner_ti.get_comp_param(), executor->getRowSetMemoryOwner(), true);
+          inner_dict_id, executor->getRowSetMemoryOwner(), true);
       const auto sd_outer_proxy = executor->getStringDictionaryProxy(
-          outer_ti.get_comp_param(), executor->getRowSetMemoryOwner(), true);
+          outer_dict_id, executor->getRowSetMemoryOwner(), true);
       CHECK(sd_inner_proxy && sd_outer_proxy);
       sd_inner_proxy_per_key.push_back(sd_inner_proxy);
       sd_outer_proxy_per_key.push_back(sd_outer_proxy);
@@ -606,32 +611,35 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
                                          const hdk::ir::Expr* rhs,
                                          SchemaProviderPtr schema_provider,
                                          const TemporaryTables* temporary_tables) {
-  const auto& lhs_ti = lhs->get_type_info();
-  const auto& rhs_ti = rhs->get_type_info();
-  if (lhs_ti.get_type() != rhs_ti.get_type()) {
+  auto lhs_type = lhs->type();
+  auto rhs_type = rhs->type();
+  if (lhs_type->id() != rhs_type->id() || lhs_type->size() != rhs_type->size()) {
     throw HashJoinFail("Equijoin types must be identical, found: " +
-                       lhs_ti.get_type_name() + ", " + rhs_ti.get_type_name());
+                       lhs_type->toString() + ", " + rhs_type->toString());
   }
-  if (!lhs_ti.is_integer() && !lhs_ti.is_time() && !lhs_ti.is_string() &&
-      !lhs_ti.is_decimal()) {
+  if (!lhs_type->isInteger() && !lhs_type->isDateTime() && !lhs_type->isString() &&
+      !lhs_type->isExtDictionary() && !lhs_type->isDecimal()) {
     throw HashJoinFail("Cannot apply hash join to inner column type " +
-                       lhs_ti.get_type_name());
+                       lhs_type->toString());
   }
   // Decimal types should be identical.
-  if (lhs_ti.is_decimal() && (lhs_ti.get_scale() != rhs_ti.get_scale() ||
-                              lhs_ti.get_precision() != rhs_ti.get_precision())) {
+  if (lhs_type->isDecimal() && (lhs_type->as<hdk::ir::DecimalType>()->scale() !=
+                                    rhs_type->as<hdk::ir::DecimalType>()->scale() ||
+                                lhs_type->as<hdk::ir::DecimalType>()->precision() !=
+                                    rhs_type->as<hdk::ir::DecimalType>()->precision())) {
     throw HashJoinFail("Equijoin with different decimal types");
   }
 
   const auto lhs_cast = dynamic_cast<const hdk::ir::UOper*>(lhs);
   const auto rhs_cast = dynamic_cast<const hdk::ir::UOper*>(rhs);
-  if (lhs_ti.is_string() && (static_cast<bool>(lhs_cast) != static_cast<bool>(rhs_cast) ||
-                             (lhs_cast && lhs_cast->get_optype() != kCAST) ||
-                             (rhs_cast && rhs_cast->get_optype() != kCAST))) {
+  if ((lhs_type->isString() || lhs_type->isExtDictionary()) &&
+      (static_cast<bool>(lhs_cast) != static_cast<bool>(rhs_cast) ||
+       (lhs_cast && lhs_cast->get_optype() != kCAST) ||
+       (rhs_cast && rhs_cast->get_optype() != kCAST))) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }
   // Casts to decimal are not suported.
-  if (lhs_ti.is_decimal() && (lhs_cast || rhs_cast)) {
+  if (lhs_type->isDecimal() && (lhs_cast || rhs_cast)) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }
   const auto lhs_col =
@@ -645,8 +653,8 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   }
   const hdk::ir::ColumnVar* inner_col{nullptr};
   const hdk::ir::ColumnVar* outer_col{nullptr};
-  auto outer_ti = lhs_ti;
-  auto inner_ti = rhs_ti;
+  auto outer_type = lhs_type;
+  auto inner_type = rhs_type;
   const hdk::ir::Expr* outer_expr{lhs};
   if (!lhs_col || (rhs_col && lhs_col->get_rte_idx() < rhs_col->get_rte_idx())) {
     inner_col = rhs_col;
@@ -657,7 +665,7 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
     }
     inner_col = lhs_col;
     outer_col = rhs_col;
-    std::swap(outer_ti, inner_ti);
+    std::swap(outer_type, inner_type);
     outer_expr = rhs;
   }
   if (!inner_col) {
@@ -687,12 +695,11 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
                                                    inner_col->get_table_id(),
                                                    inner_col_info,
                                                    temporary_tables);
-  const auto& outer_col_ti =
-      !(dynamic_cast<const hdk::ir::FunctionOper*>(lhs)) && outer_col
-          ? outer_col->get_type_info()
-          : outer_ti;
+  auto outer_col_type = !(dynamic_cast<const hdk::ir::FunctionOper*>(lhs)) && outer_col
+                            ? outer_col->type()
+                            : outer_type;
   // Casts from decimal are not supported.
-  if ((inner_col_real_type->isDecimal() || outer_col_ti.is_decimal()) &&
+  if ((inner_col_real_type->isDecimal() || outer_col_type->isDecimal()) &&
       (lhs_cast || rhs_cast)) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }
@@ -707,13 +714,14 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   auto normalized_inner_col = inner_col;
   auto normalized_outer_col = outer_col ? outer_col : outer_expr;
 
-  const auto& normalized_inner_ti = normalized_inner_col->get_type_info();
-  const auto& normalized_outer_ti = normalized_outer_col->get_type_info();
+  auto normalized_inner_type = normalized_inner_col->type();
+  auto normalized_outer_type = normalized_outer_col->type();
 
-  if (normalized_inner_ti.is_string() != normalized_outer_ti.is_string()) {
+  if (normalized_inner_type->isExtDictionary() !=
+      normalized_outer_type->isExtDictionary()) {
     throw HashJoinFail(std::string("Could not build hash tables for incompatible types " +
-                                   normalized_inner_ti.get_type_name() + " and " +
-                                   normalized_outer_ti.get_type_name()));
+                                   normalized_inner_type->toString() + " and " +
+                                   normalized_outer_type->toString()));
   }
 
   return {normalized_inner_col, normalized_outer_col};
