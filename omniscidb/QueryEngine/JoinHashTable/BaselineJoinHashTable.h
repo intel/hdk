@@ -214,7 +214,7 @@ class BaselineJoinHashTable : public HashJoin {
       auto rhs_col_var = dynamic_cast<const hdk::ir::ColumnVar*>(inner_outer.second);
       auto outer_col = rhs_col_var ? rhs_col_var : inner_col;
       boost::hash_combine(hash, inner_col->toString());
-      if (inner_col->get_type_info().is_string()) {
+      if (inner_col->type()->isString() || inner_col->type()->isExtDictionary()) {
         boost::hash_combine(hash, outer_col->toString());
       }
     }

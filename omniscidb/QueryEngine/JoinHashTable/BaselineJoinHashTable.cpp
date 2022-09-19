@@ -458,14 +458,15 @@ ColumnsForDevice BaselineJoinHashTable::fetchColumnsForDevice(
                                               malloc_owner,
                                               executor_,
                                               &column_cache_));
-    const auto& ti = inner_col->get_type_info();
-    join_column_types.emplace_back(JoinColumnTypeInfo{static_cast<size_t>(ti.get_size()),
-                                                      0,
-                                                      0,
-                                                      inline_fixed_encoding_null_val(ti),
-                                                      isBitwiseEq(),
-                                                      0,
-                                                      get_join_column_type_kind(ti)});
+    auto type = inner_col->type();
+    join_column_types.emplace_back(
+        JoinColumnTypeInfo{static_cast<size_t>(type->size()),
+                           0,
+                           0,
+                           inline_fixed_encoding_null_value(type),
+                           isBitwiseEq(),
+                           0,
+                           get_join_column_type_kind(type)});
   }
   return {join_columns, join_column_types, chunks_owner, malloc_owner};
 }
@@ -495,9 +496,9 @@ void BaselineJoinHashTable::reifyForDevice(const ColumnsForDevice& columns_for_d
 size_t BaselineJoinHashTable::getKeyComponentWidth() const {
   for (const auto& inner_outer_pair : inner_outer_pairs_) {
     const auto inner_col = inner_outer_pair.first;
-    const auto& inner_col_ti = inner_col->get_type_info();
-    if (inner_col_ti.get_logical_size() > 4) {
-      CHECK_EQ(8, inner_col_ti.get_logical_size());
+    auto inner_col_type = inner_col->type();
+    if (hdk::ir::logicalSize(inner_col_type) > 4) {
+      CHECK_EQ(8, hdk::ir::logicalSize(inner_col_type));
       return 8;
     }
   }

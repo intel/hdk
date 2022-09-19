@@ -151,11 +151,24 @@ struct JoinColumnTypeInfo {
   const ColumnType column_type;
 };
 
+inline bool is_unsigned_type(const hdk::ir::Type* type) {
+  return type->isExtDictionary() && type->size() < hdk::ir::logicalSize(type);
+}
+
 inline ColumnType get_join_column_type_kind(const SQLTypeInfo& ti) {
   if (ti.is_date_in_days()) {
     return SmallDate;
   } else {
     return is_unsigned_type(ti) ? Unsigned : Signed;
+  }
+}
+
+inline ColumnType get_join_column_type_kind(const hdk::ir::Type* type) {
+  if (type->isDate() &&
+      type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) {
+    return SmallDate;
+  } else {
+    return is_unsigned_type(type) ? Unsigned : Signed;
   }
 }
 
