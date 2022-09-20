@@ -162,16 +162,6 @@ const inline std::pair<SQLOps, int64_t> get_dateadd_high_precision_adjusted_scal
 
 const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scale(
     const ExtractField& field,
-    const int32_t dimen) {
-  const auto result = orig_extract_precision_lookup.find(std::make_pair(dimen, field));
-  if (result != orig_extract_precision_lookup.end()) {
-    return result->second;
-  }
-  return {};
-}
-
-const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scale(
-    const ExtractField& field,
     const hdk::ir::TimeUnit unit) {
   const auto result = extract_precision_lookup.find(std::make_pair(unit, field));
   if (result != extract_precision_lookup.end()) {

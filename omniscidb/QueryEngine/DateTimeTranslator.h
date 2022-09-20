@@ -30,19 +30,19 @@ class DateTimeTranslator {
  public:
   static inline int64_t getExtractFromTimeConstantValue(const int64_t& timeval,
                                                         const ExtractField& field,
-                                                        const SQLTypeInfo& ti) {
-    if (ti.is_high_precision_timestamp()) {
+                                                        const hdk::ir::Type* type) {
+    auto unit = type->isTimestamp() ? type->as<hdk::ir::TimestampType>()->unit()
+                                    : hdk::ir::TimeUnit::kSecond;
+    if (type->isTimestamp() && unit > hdk::ir::TimeUnit::kSecond) {
       if (is_subsecond_extract_field(field)) {
-        const auto result =
-            get_extract_high_precision_adjusted_scale(field, ti.get_dimension());
+        const auto result = get_extract_high_precision_adjusted_scale(field, unit);
         return result.second ? ExtractFromTime(field,
                                                result.first == kDIVIDE
                                                    ? floor_div(timeval, result.second)
                                                    : timeval * result.second)
                              : ExtractFromTime(field, timeval);
       } else {
-        return ExtractFromTime(
-            field, floor_div(timeval, get_timestamp_precision_scale(ti.get_dimension())));
+        return ExtractFromTime(field, floor_div(timeval, hdk::ir::unitsPerSecond(unit)));
       }
     } else if (is_subsecond_extract_field(field)) {
       return ExtractFromTime(field,
@@ -70,14 +70,6 @@ class DateTimeTranslator {
       }
     }
     return DateTruncate(field, timeval);
-  }
-
- protected:
-  static inline std::shared_ptr<hdk::ir::Constant> getNumericConstant(
-      const int64_t scale) {
-    Datum d{0};
-    d.bigintval = scale;
-    return hdk::ir::makeExpr<hdk::ir::Constant>(SQLTypeInfo(kBIGINT, false), false, d);
   }
 };
 

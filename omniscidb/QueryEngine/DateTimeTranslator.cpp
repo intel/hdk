@@ -165,31 +165,31 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
 
 hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
                                        const ExtractField& field) {
-  const auto expr_ti = from_expr->get_type_info();
-  if (!expr_ti.is_time()) {
+  const auto expr_type = from_expr->type();
+  if (!expr_type->isDateTime()) {
     throw std::runtime_error(
         "Only TIME, TIMESTAMP and DATE types can be in EXTRACT function.");
   }
-  if (expr_ti.get_type() == kTIME && field != kHOUR && field != kMINUTE &&
-      field != kSECOND) {
+  if (expr_type->isTime() && field != kHOUR && field != kMINUTE && field != kSECOND) {
     throw std::runtime_error("Cannot EXTRACT " + from_extract_field(field) +
                              " from TIME.");
   }
-  const SQLTypeInfo ti(kBIGINT, 0, 0, expr_ti.get_notnull());
+  auto type = expr_type->ctx().int64(expr_type->nullable());
   auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(from_expr);
   if (constant != nullptr) {
     Datum d;
     d.bigintval = field == kEPOCH
                       ? floor_div(constant->get_constval().bigintval,
-                                  get_timestamp_precision_scale(expr_ti.get_dimension()))
+                                  hdk::ir::unitsPerSecond(
+                                      expr_type->as<hdk::ir::DateTimeBaseType>()->unit()))
                       : getExtractFromTimeConstantValue(
-                            constant->get_constval().bigintval, field, expr_ti);
+                            constant->get_constval().bigintval, field, expr_type);
     constant->set_constval(d);
-    constant->set_type_info(ti);
+    constant->set_type_info(type);
     return constant;
   }
   return hdk::ir::makeExpr<hdk::ir::ExtractExpr>(
-      ti, from_expr->get_contains_agg(), field, from_expr->decompress());
+      type, from_expr->get_contains_agg(), field, from_expr->decompress());
 }
 
 DatetruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
