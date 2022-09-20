@@ -51,7 +51,7 @@ namespace Analyzer {
  */
 class Estimator : public hdk::ir::Expr {
  public:
-  Estimator() : Expr(SQLTypeInfo(kINT, true)){};
+  Estimator() : Expr(hdk::ir::Context::defaultCtx().int32(false)){};
 
   // The tuple argument received by the estimator for every row.
   virtual const hdk::ir::ExprPtrList& getArgument() const = 0;

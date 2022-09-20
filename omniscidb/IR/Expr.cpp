@@ -259,18 +259,6 @@ void OrderEntry::print() const {
 Expr::Expr(const Type* type, bool has_agg)
     : type_(type), type_info(type->toTypeInfo()), contains_agg(has_agg) {}
 
-Expr::Expr(const SQLTypeInfo& ti, bool has_agg)
-    : Expr(hdk::ir::Context::defaultCtx().fromTypeInfo(ti), has_agg) {
-  checkType(ti, type_info);
-}
-
-Expr::Expr(SQLTypes t, bool notnull) : Expr(SQLTypeInfo(t, notnull)) {}
-
-Expr::Expr(SQLTypes t, int d, bool notnull) : Expr(SQLTypeInfo(t, d, 0, notnull)) {}
-
-Expr::Expr(SQLTypes t, int d, int s, bool notnull)
-    : Expr(SQLTypeInfo(t, d, s, notnull)) {}
-
 void Expr::set_type_info(const SQLTypeInfo& ti) {
   set_type_info(hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
   checkType(ti, type_info);
@@ -1084,7 +1072,7 @@ void BinOper::group_predicates(std::list<const Expr*>& scan_predicates,
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
-    : Expr(kBOOLEAN, !is_in_values_nullable(a, l)), arg(a), value_list(l) {}
+    : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg(a), value_list(l) {}
 
 void InValues::group_predicates(std::list<const Expr*>& scan_predicates,
                                 std::list<const Expr*>& join_predicates,
@@ -1103,7 +1091,7 @@ void InValues::group_predicates(std::list<const Expr*>& scan_predicates,
 InIntegerSet::InIntegerSet(const std::shared_ptr<const Expr> a,
                            const std::vector<int64_t>& l,
                            const bool not_null)
-    : Expr(kBOOLEAN, not_null), arg(a), value_list(l) {}
+    : Expr(a->ctx().boolean(!not_null)), arg(a), value_list(l) {}
 
 void CharLengthExpr::group_predicates(std::list<const Expr*>& scan_predicates,
                                       std::list<const Expr*>& join_predicates,

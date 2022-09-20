@@ -73,10 +73,6 @@ using DomainSet = std::list<const Expr*>;
 class Expr : public std::enable_shared_from_this<Expr> {
  public:
   Expr(const Type* type, bool has_agg = false);
-  Expr(const SQLTypeInfo& ti, bool has_agg = false);
-  Expr(SQLTypes t, bool notnull);
-  Expr(SQLTypes t, int d, bool notnull);
-  Expr(SQLTypes t, int d, int s, bool notnull);
   virtual ~Expr() {}
 
   ExprPtr get_shared_ptr() { return shared_from_this(); }
@@ -196,8 +192,6 @@ class ColumnRef : public Expr {
  public:
   ColumnRef(const Type* type, const RelAlgNode* node, unsigned idx)
       : Expr(type), node_(node), idx_(idx) {}
-  ColumnRef(const SQLTypeInfo& ti, const RelAlgNode* node, unsigned idx)
-      : Expr(ti), node_(node), idx_(idx) {}
 
   ExprPtr deep_copy() const override { return makeExpr<ColumnRef>(type_, node_, idx_); }
 
@@ -226,7 +220,6 @@ class ColumnRef : public Expr {
 class GroupColumnRef : public Expr {
  public:
   GroupColumnRef(const Type* type, unsigned idx) : Expr(type), idx_(idx) {}
-  GroupColumnRef(const SQLTypeInfo& ti, unsigned idx) : Expr(ti), idx_(idx) {}
 
   ExprPtr deep_copy() const override { return makeExpr<GroupColumnRef>(type_, idx_); }
 
@@ -332,7 +325,8 @@ class ColumnVar : public Expr {
  */
 class ExpressionTuple : public Expr {
  public:
-  ExpressionTuple(const ExprPtrVector& tuple) : Expr(SQLTypeInfo()), tuple_(tuple){};
+  ExpressionTuple(const ExprPtrVector& tuple)
+      : Expr(hdk::ir::Context::defaultCtx().null()), tuple_(tuple){};
 
   const ExprPtrVector& getTuple() const { return tuple_; }
 
@@ -601,7 +595,7 @@ class BinOper : public Expr {
 class RangeOper : public Expr {
  public:
   RangeOper(const bool l_inclusive, const bool r_inclusive, ExprPtr l, ExprPtr r)
-      : Expr(SQLTypeInfo(kNULLT), /*not_null=*/false)
+      : Expr(hdk::ir::Context::defaultCtx().null())
       , left_inclusive_(l_inclusive)
       , right_inclusive_(r_inclusive)
       , left_operand_(l)
@@ -1623,7 +1617,7 @@ class FunctionOperWithCustomTypeHandling : public FunctionOper {
  */
 class OffsetInFragment : public Expr {
  public:
-  OffsetInFragment() : Expr(SQLTypeInfo(kBIGINT, true)){};
+  OffsetInFragment() : Expr(hdk::ir::Context::defaultCtx().int64(false)){};
 
   ExprPtr deep_copy() const override;
 
