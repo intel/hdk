@@ -90,7 +90,7 @@ inline std::shared_ptr<hdk::ir::Var> var_ref(const hdk::ir::Expr* expr,
     return hdk::ir::makeExpr<hdk::ir::Var>(
         col_expr->get_column_info(), col_expr->get_rte_idx(), which_row, varno);
   }
-  return hdk::ir::makeExpr<hdk::ir::Var>(expr->get_type_info(), which_row, varno);
+  return hdk::ir::makeExpr<hdk::ir::Var>(expr->type(), which_row, varno);
 }
 
 // Remove a cast operator if present.

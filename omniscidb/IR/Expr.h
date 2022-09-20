@@ -374,13 +374,10 @@ class ExpressionTuple : public Expr {
 class Var : public ColumnVar {
  public:
   enum WhichRow { kINPUT_OUTER, kINPUT_INNER, kOUTPUT, kGROUPBY };
-  Var(const SQLTypeInfo& ti, int r, int c, int i, bool is_virtual, WhichRow o, int v)
-      : ColumnVar(ti, r, c, i, is_virtual), which_row(o), varno(v) {}
   Var(ColumnInfoPtr col_info, int i, WhichRow o, int v)
       : ColumnVar(col_info, i), which_row(o), varno(v) {}
   Var(const hdk::ir::Type* type, WhichRow o, int v)
       : ColumnVar(type), which_row(o), varno(v) {}
-  Var(const SQLTypeInfo& ti, WhichRow o, int v) : ColumnVar(ti), which_row(o), varno(v) {}
   WhichRow get_which_row() const { return which_row; }
   void set_which_row(WhichRow r) { which_row = r; }
   int get_varno() const { return varno; }
