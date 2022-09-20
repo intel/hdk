@@ -205,7 +205,7 @@ std::vector<TargetInfo> get_sort_notnull_fp_target_infos() {
   std::vector<TargetInfo> target_infos;
   SQLTypeInfo null_ti(kNULLT, false);
   SQLTypeInfo fp_ti(kFLOAT, true);
-  auto fp_type = hdk::ir::Context::defaultCtx().fp32();
+  auto fp_type = hdk::ir::Context::defaultCtx().fp32(false);
   target_infos.push_back(
       TargetInfo{false, kMIN, fp_type, nullptr, fp_ti, null_ti, false, false});
   target_infos.push_back(

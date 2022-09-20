@@ -970,8 +970,8 @@ std::vector<TargetInfo> generate_random_groups_target_infos() {
   SQLTypeInfo int_ti(kINT, true);
   SQLTypeInfo double_ti(kDOUBLE, true);
   auto& ctx = hdk::ir::Context::defaultCtx();
-  auto int_type = ctx.int32();
-  auto double_type = ctx.fp64();
+  auto int_type = ctx.int32(false);
+  auto double_type = ctx.fp64(false);
   // SQLTypeInfo null_ti(kNULLT, false);
   target_infos.push_back(
       TargetInfo{true, kMIN, int_type, int_type, int_ti, int_ti, true, false});
@@ -2111,7 +2111,7 @@ TEST(MoreReduce, OffsetRewrite) {
   SQLTypeInfo real_str_ti(kTEXT, true, kENCODING_NONE);
   SQLTypeInfo null_ti(kNULLT, false);
   auto bigint_type = hdk::ir::Context::defaultCtx().int64();
-  auto text_type = hdk::ir::Context::defaultCtx().text();
+  auto text_type = hdk::ir::Context::defaultCtx().text(false);
 
   target_infos.push_back(
       TargetInfo{false, kMIN, bigint_type, nullptr, bigint_ti, null_ti, true, false});

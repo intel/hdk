@@ -44,13 +44,13 @@ inline bool is_varlen_projection(const hdk::ir::Expr* target_expr,
 
 std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info,
                                            const bool is_varlen_projection) {
-  const auto& chosen_type = get_compact_type(target_info);
+  auto chosen_type = get_compact_type(target_info);
   if (is_varlen_projection) {
     UNREACHABLE();
     return {"agg_id_varlen"};
   }
   if (!target_info.is_agg || target_info.agg_kind == kSAMPLE) {
-    if (chosen_type.is_varlen()) {
+    if (chosen_type->isString() || chosen_type->isArray()) {
       // not a varlen projection (not creating new varlen outputs). Just store the pointer
       // and offset into the input buffer in the output slots.
       return {"agg_id", "agg_id"};
@@ -324,7 +324,7 @@ void TargetExprCodegen::codegenAggregate(
     llvm::Value* agg_col_ptr{nullptr};
     const auto chosen_bytes =
         static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index));
-    const auto& chosen_type = get_compact_type(target_info);
+    auto chosen_type = get_compact_type(target_info);
     const auto& arg_type =
         ((arg_expr && arg_expr->get_type_info().get_type() != kNULLT) &&
          !target_info.is_distinct)
@@ -415,7 +415,7 @@ void TargetExprCodegen::codegenAggregate(
 
     if (is_distinct_target(target_info)) {
       CHECK_EQ(agg_chosen_bytes, sizeof(int64_t));
-      CHECK(!chosen_type.is_fp());
+      CHECK(!chosen_type->isFloatingPoint());
       row_func_builder->codegenCountDistinct(
           target_idx, target_expr, agg_args, query_mem_desc, co.device_type);
     } else if (target_info.agg_kind == kAPPROX_QUANTILE) {

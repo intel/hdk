@@ -43,6 +43,10 @@ int64_t get_agg_initial_val(const SQLAgg agg,
                             const SQLTypeInfo& ti,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact);
+int64_t get_agg_initial_val(const SQLAgg agg,
+                            const hdk::ir::Type* type,
+                            const bool enable_compaction,
+                            const unsigned min_byte_width_to_compact);
 
 std::vector<int64_t> init_agg_val_vec(const std::vector<hdk::ir::Expr*>& targets,
                                       const std::list<hdk::ir::ExprPtr>& quals,

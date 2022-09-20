@@ -384,8 +384,7 @@ class QueryMemoryDescriptor {
 
 inline void set_notnull(TargetInfo& target, const bool not_null) {
   target.skip_null_val = !not_null;
-  auto new_type = get_compact_type(target);
-  new_type.set_notnull(not_null);
+  auto new_type = get_compact_type(target)->withNullable(!not_null);
   set_compact_type(target, new_type);
 }
 

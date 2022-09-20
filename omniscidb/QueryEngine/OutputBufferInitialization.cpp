@@ -55,13 +55,13 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
     const auto chosen_bytes = query_mem_desc.isLogicalSizedColumnsAllowed()
                                   ? query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx)
                                   : query_mem_desc.getCompactByteWidth();
-    auto init_ti = get_compact_type(agg_info);
+    auto init_type = get_compact_type(agg_info);
     if (!is_group_by) {
-      init_ti.set_notnull(false);
+      init_type = init_type->withNullable(true);
     }
     agg_init_vals.push_back(
         get_agg_initial_val(agg_info.agg_kind,
-                            init_ti,
+                            init_type,
                             is_group_by || float_argument_input,
                             (float_argument_input ? sizeof(float) : chosen_bytes)));
     if (kAVG == agg_info.agg_kind) {
@@ -115,44 +115,53 @@ int64_t get_agg_initial_val(const SQLAgg agg,
                             const SQLTypeInfo& ti,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact) {
-  CHECK(!ti.is_string() || (agg == kSINGLE_VALUE || agg == kSAMPLE));
+  auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(ti);
+  return get_agg_initial_val(agg, type, enable_compaction, min_byte_width_to_compact);
+}
+
+int64_t get_agg_initial_val(const SQLAgg agg,
+                            const hdk::ir::Type* type,
+                            const bool enable_compaction,
+                            const unsigned min_byte_width_to_compact) {
+  CHECK(!(type->isString() || type->isExtDictionary()) ||
+        (agg == kSINGLE_VALUE || agg == kSAMPLE));
   const auto byte_width =
       enable_compaction
-          ? compact_byte_width(static_cast<unsigned>(get_bit_width(ti) >> 3),
+          ? compact_byte_width(static_cast<unsigned>(get_bit_width(type) >> 3),
                                unsigned(min_byte_width_to_compact))
           : sizeof(int64_t);
-  CHECK(ti.get_logical_size() < 0 ||
-        byte_width >= static_cast<unsigned>(ti.get_logical_size()));
+  CHECK(hdk::ir::logicalSize(type) < 0 ||
+        byte_width >= static_cast<unsigned>(hdk::ir::logicalSize(type)));
   switch (agg) {
     case kSUM: {
-      if (!ti.get_notnull()) {
-        if (ti.is_fp()) {
+      if (type->nullable()) {
+        if (type->isFloatingPoint()) {
           switch (byte_width) {
             case 4: {
-              const float null_float = inline_fp_null_val(ti);
+              const float null_float = inline_fp_null_value(type);
               return *reinterpret_cast<const int32_t*>(may_alias_ptr(&null_float));
             }
             case 8: {
-              const double null_double = inline_fp_null_val(ti);
+              const double null_double = inline_fp_null_value(type);
               return *reinterpret_cast<const int64_t*>(may_alias_ptr(&null_double));
             }
             default:
               CHECK(false);
           }
         } else {
-          return inline_int_null_val(ti);
+          return inline_int_null_value(type);
         }
       }
       switch (byte_width) {
         case 4: {
           const float zero_float{0.};
-          return ti.is_fp()
+          return type->isFloatingPoint()
                      ? *reinterpret_cast<const int32_t*>(may_alias_ptr(&zero_float))
                      : 0;
         }
         case 8: {
           const double zero_double{0.};
-          return ti.is_fp()
+          return type->isFloatingPoint()
                      ? *reinterpret_cast<const int64_t*>(may_alias_ptr(&zero_double))
                      : 0;
         }
@@ -169,36 +178,39 @@ int64_t get_agg_initial_val(const SQLAgg agg,
     case kMIN: {
       switch (byte_width) {
         case 1: {
-          CHECK(!ti.is_fp());
-          return ti.get_notnull() ? std::numeric_limits<int8_t>::max()
-                                  : inline_int_null_val(ti);
+          CHECK(!type->isFloatingPoint());
+          return !type->nullable() ? std::numeric_limits<int8_t>::max()
+                                   : inline_int_null_value(type);
         }
         case 2: {
-          CHECK(!ti.is_fp());
-          return ti.get_notnull() ? std::numeric_limits<int16_t>::max()
-                                  : inline_int_null_val(ti);
+          CHECK(!type->isFloatingPoint());
+          return !type->nullable() ? std::numeric_limits<int16_t>::max()
+                                   : inline_int_null_value(type);
         }
         case 4: {
           const float max_float = std::numeric_limits<float>::max();
-          const float null_float =
-              ti.is_fp() ? static_cast<float>(inline_fp_null_val(ti)) : 0.;
-          return ti.is_fp()
-                     ? (ti.get_notnull()
+          const float null_float = type->isFloatingPoint()
+                                       ? static_cast<float>(inline_fp_null_value(type))
+                                       : 0.;
+          return type->isFloatingPoint()
+                     ? (!type->nullable()
                             ? *reinterpret_cast<const int32_t*>(may_alias_ptr(&max_float))
                             : *reinterpret_cast<const int32_t*>(
                                   may_alias_ptr(&null_float)))
-                     : (ti.get_notnull() ? std::numeric_limits<int32_t>::max()
-                                         : inline_int_null_val(ti));
+                     : (!type->nullable() ? std::numeric_limits<int32_t>::max()
+                                          : inline_int_null_value(type));
         }
         case 8: {
           const double max_double = std::numeric_limits<double>::max();
-          const double null_double{ti.is_fp() ? inline_fp_null_val(ti) : 0.};
-          return ti.is_fp() ? (ti.get_notnull() ? *reinterpret_cast<const int64_t*>(
-                                                      may_alias_ptr(&max_double))
-                                                : *reinterpret_cast<const int64_t*>(
-                                                      may_alias_ptr(&null_double)))
-                            : (ti.get_notnull() ? std::numeric_limits<int64_t>::max()
-                                                : inline_int_null_val(ti));
+          const double null_double{type->isFloatingPoint() ? inline_fp_null_value(type)
+                                                           : 0.};
+          return type->isFloatingPoint()
+                     ? (!type->nullable() ? *reinterpret_cast<const int64_t*>(
+                                                may_alias_ptr(&max_double))
+                                          : *reinterpret_cast<const int64_t*>(
+                                                may_alias_ptr(&null_double)))
+                     : (!type->nullable() ? std::numeric_limits<int64_t>::max()
+                                          : inline_int_null_value(type));
         }
         default:
           CHECK(false);
@@ -209,36 +221,39 @@ int64_t get_agg_initial_val(const SQLAgg agg,
     case kMAX: {
       switch (byte_width) {
         case 1: {
-          CHECK(!ti.is_fp());
-          return ti.get_notnull() ? std::numeric_limits<int8_t>::min()
-                                  : inline_int_null_val(ti);
+          CHECK(!type->isFloatingPoint());
+          return !type->nullable() ? std::numeric_limits<int8_t>::min()
+                                   : inline_int_null_value(type);
         }
         case 2: {
-          CHECK(!ti.is_fp());
-          return ti.get_notnull() ? std::numeric_limits<int16_t>::min()
-                                  : inline_int_null_val(ti);
+          CHECK(!type->isFloatingPoint());
+          return !type->nullable() ? std::numeric_limits<int16_t>::min()
+                                   : inline_int_null_value(type);
         }
         case 4: {
           const float min_float = -std::numeric_limits<float>::max();
-          const float null_float =
-              ti.is_fp() ? static_cast<float>(inline_fp_null_val(ti)) : 0.;
-          return (ti.is_fp())
-                     ? (ti.get_notnull()
+          const float null_float = type->isFloatingPoint()
+                                       ? static_cast<float>(inline_fp_null_value(type))
+                                       : 0.;
+          return (type->isFloatingPoint())
+                     ? (!type->nullable()
                             ? *reinterpret_cast<const int32_t*>(may_alias_ptr(&min_float))
                             : *reinterpret_cast<const int32_t*>(
                                   may_alias_ptr(&null_float)))
-                     : (ti.get_notnull() ? std::numeric_limits<int32_t>::min()
-                                         : inline_int_null_val(ti));
+                     : (!type->nullable() ? std::numeric_limits<int32_t>::min()
+                                          : inline_int_null_value(type));
         }
         case 8: {
           const double min_double = -std::numeric_limits<double>::max();
-          const double null_double{ti.is_fp() ? inline_fp_null_val(ti) : 0.};
-          return ti.is_fp() ? (ti.get_notnull() ? *reinterpret_cast<const int64_t*>(
-                                                      may_alias_ptr(&min_double))
-                                                : *reinterpret_cast<const int64_t*>(
-                                                      may_alias_ptr(&null_double)))
-                            : (ti.get_notnull() ? std::numeric_limits<int64_t>::min()
-                                                : inline_int_null_val(ti));
+          const double null_double{type->isFloatingPoint() ? inline_fp_null_value(type)
+                                                           : 0.};
+          return type->isFloatingPoint()
+                     ? (!type->nullable() ? *reinterpret_cast<const int64_t*>(
+                                                may_alias_ptr(&min_double))
+                                          : *reinterpret_cast<const int64_t*>(
+                                                may_alias_ptr(&null_double)))
+                     : (!type->nullable() ? std::numeric_limits<int64_t>::min()
+                                          : inline_int_null_value(type));
         }
         default:
           CHECK(false);

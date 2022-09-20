@@ -399,6 +399,7 @@ class Constant : public Expr {
     if (n) {
       set_null_value();
     } else {
+      type_ = type_->withNullable(false);
       type_info.set_notnull(true);
     }
   }

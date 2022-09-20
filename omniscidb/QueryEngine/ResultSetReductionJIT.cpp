@@ -84,9 +84,9 @@ void emit_aggregate_one_value(const std::string& agg_kind,
                               const size_t chosen_bytes,
                               const TargetInfo& agg_info,
                               Function* ir_reduce_one_entry) {
-  const auto sql_type = get_compact_type(agg_info);
+  auto type = get_compact_type(agg_info);
   const auto dest_name = agg_kind + "_dest";
-  if (sql_type.is_fp()) {
+  if (type->isFloatingPoint()) {
     if (chosen_bytes == sizeof(float)) {
       const auto agg = ir_reduce_one_entry->add<Cast>(
           Cast::CastOp::BitCast, val_ptr, Type::Int32Ptr, dest_name);
@@ -129,8 +129,8 @@ void emit_aggregate_one_nullable_value(const std::string& agg_kind,
                                        Function* ir_reduce_one_entry) {
   const auto dest_name = agg_kind + "_dest";
   if (agg_info.skip_null_val) {
-    const auto sql_type = get_compact_type(agg_info);
-    if (sql_type.is_fp()) {
+    auto type = get_compact_type(agg_info);
+    if (type->isFloatingPoint()) {
       if (chosen_bytes == sizeof(float)) {
         const auto agg = ir_reduce_one_entry->add<Cast>(
             Cast::CastOp::BitCast, val_ptr, Type::Int32Ptr, dest_name);

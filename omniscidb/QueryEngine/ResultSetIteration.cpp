@@ -1256,7 +1256,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
       actual_compact_sz = sizeof(float);
     }
   }
-  if (get_compact_type(target_info).is_date_in_days()) {
+  if (get_compact_type(target_info)->toTypeInfo().is_date_in_days()) {
     // Dates encoded in days are converted to 8 byte values on read.
     actual_compact_sz = sizeof(int64_t);
   }
@@ -1268,7 +1268,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
   }
 
   auto ival = read_int_from_buff(ptr, actual_compact_sz);
-  const auto& chosen_type = get_compact_type(target_info);
+  auto chosen_type = get_compact_type(target_info)->toTypeInfo();
   if (!lazy_fetch_info_.empty()) {
     CHECK_LT(target_logical_idx, lazy_fetch_info_.size());
     const auto& col_lazy_fetch = lazy_fetch_info_[target_logical_idx];
@@ -1677,6 +1677,25 @@ bool ResultSet::isNull(const SQLTypeInfo& ti,
   }
   if (val.isInt()) {
     return val.i1 == null_val_bit_pattern(ti, float_argument_input);
+  }
+  if (val.isPair()) {
+    return !val.i2;
+  }
+  if (val.isStr()) {
+    return !val.i1;
+  }
+  CHECK(val.isNull());
+  return true;
+}
+
+bool ResultSet::isNull(const hdk::ir::Type* type,
+                       const InternalTargetValue& val,
+                       const bool float_argument_input) {
+  if (!type->nullable()) {
+    return false;
+  }
+  if (val.isInt()) {
+    return val.i1 == null_val_bit_pattern(type, float_argument_input);
   }
   if (val.isPair()) {
     return !val.i2;

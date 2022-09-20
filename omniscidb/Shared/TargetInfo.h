@@ -51,8 +51,9 @@ struct TargetInfo {
     auto result = std::string("TargetInfo(");
     result += "is_agg=" + std::string(is_agg ? "true" : "false") + ", ";
     result += "agg_kind=" + ::toString(agg_kind) + ", ";
-    result += "sql_type=" + sql_type.to_string() + ", ";
-    result += "agg_arg_type=" + agg_arg_type->toString() + ", ";
+    result += "type=" + type->toString() + ", ";
+    result += "agg_arg_type=" +
+              (agg_arg_type ? agg_arg_type->toString() : std::string("null")) + ", ";
     result += "skip_null_val=" + std::string(skip_null_val ? "true" : "false") + ", ";
     result += "is_distinct=" + std::string(is_distinct ? "true" : "false") + ")";
     return result;

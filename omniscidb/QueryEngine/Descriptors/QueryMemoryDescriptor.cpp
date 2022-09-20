@@ -184,8 +184,7 @@ inline std::vector<int8_t> get_col_byte_widths(const T& col_expr_list,
     } else {
       const auto agg_info = get_target_info(col_expr, bigint_count);
       const auto chosen_type = get_compact_type(agg_info);
-      if ((chosen_type.is_string() && chosen_type.get_compression() == kENCODING_NONE) ||
-          chosen_type.is_array()) {
+      if (chosen_type->isString() || chosen_type->isArray()) {
         col_widths.push_back(sizeof(int64_t));
         col_widths.push_back(sizeof(int64_t));
         ++col_expr_idx;

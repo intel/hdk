@@ -577,6 +577,9 @@ class ResultSet {
   static bool isNull(const SQLTypeInfo& ti,
                      const InternalTargetValue& val,
                      const bool float_argument_input);
+  static bool isNull(const hdk::ir::Type* type,
+                     const InternalTargetValue& val,
+                     const bool float_argument_input);
 
   TargetValue getTargetValueFromBufferRowwise(
       int8_t* rowwise_target_ptr,

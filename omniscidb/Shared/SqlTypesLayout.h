@@ -33,16 +33,16 @@ class OverflowOrUnderflow : public std::runtime_error {
   OverflowOrUnderflow() : std::runtime_error("Overflow or underflow") {}
 };
 
-inline const SQLTypeInfo get_compact_type(const TargetInfo& target) {
+inline const hdk::ir::Type* get_compact_type(const TargetInfo& target) {
   if (!target.is_agg) {
-    return target.sql_type;
+    return target.type;
   }
   const auto agg_type = target.agg_kind;
-  const auto& agg_arg = target.agg_arg_type_info;
-  if (agg_arg.get_type() == kNULLT) {
+  auto agg_arg = target.agg_arg_type;
+  if (!agg_arg) {
     CHECK_EQ(kCOUNT, agg_type);
     CHECK(!target.is_distinct);
-    return target.sql_type;
+    return target.type;
   }
 
   if (is_agg_domain_range_equivalent(agg_type)) {
@@ -50,22 +50,21 @@ inline const SQLTypeInfo get_compact_type(const TargetInfo& target) {
   } else {
     // Nullability of the target needs to match that of the agg for proper initialization
     // of target (aggregate) values
-    auto modified_target_type = target.sql_type;
-    modified_target_type.set_notnull(agg_arg.get_notnull());
-    return modified_target_type;
+    return target.type->withNullable(agg_arg->nullable());
   }
 }
 
-inline void set_compact_type(TargetInfo& target, const SQLTypeInfo& new_type) {
+inline void set_compact_type(TargetInfo& target, const hdk::ir::Type* new_type) {
   if (target.is_agg) {
     const auto agg_type = target.agg_kind;
-    auto& agg_arg = target.agg_arg_type_info;
-    if (agg_type != kCOUNT || agg_arg.get_type() != kNULLT) {
-      agg_arg = new_type;
+    if (agg_type != kCOUNT || !target.agg_arg_type) {
+      target.agg_arg_type = new_type;
+      target.agg_arg_type_info = new_type->toTypeInfo();
       return;
     }
   }
-  target.sql_type = new_type;
+  target.type = new_type;
+  target.sql_type = new_type->toTypeInfo();
 }
 
 inline int64_t inline_int_null_val(const SQLTypeInfo& ti) {

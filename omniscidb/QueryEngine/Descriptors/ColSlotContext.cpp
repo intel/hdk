@@ -56,8 +56,7 @@ ColSlotContext::ColSlotContext(const std::vector<hdk::ir::Expr*>& col_expr_list,
       const auto agg_info = get_target_info(col_expr, bigint_count);
       const auto chosen_type = get_compact_type(agg_info);
 
-      if ((chosen_type.is_string() && chosen_type.get_compression() == kENCODING_NONE) ||
-          chosen_type.is_array()) {
+      if (chosen_type->isString() || chosen_type->isArray()) {
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
         ++col_expr_idx;

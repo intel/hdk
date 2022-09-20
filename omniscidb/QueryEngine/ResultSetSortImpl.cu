@@ -242,7 +242,7 @@ std::vector<uint32_t> baseline_sort_int(const ExecutorDeviceType device_type,
                                         const size_t top_n,
                                         const size_t start,
                                         const size_t step) {
-  const auto& entry_ti = get_compact_type(layout.oe_target_info);
+  auto entry_type = get_compact_type(layout.oe_target_info);
   std::vector<uint32_t> null_idx_buff;
   thrust::host_vector<uint32_t> notnull_idx_buff;
   const auto slice_entry_count =
@@ -254,7 +254,7 @@ std::vector<uint32_t> baseline_sort_int(const ExecutorDeviceType device_type,
   size_t oe_col_buffer_idx = 0;
   for (size_t i = start; i < layout.entry_count; i += step, ++oe_col_buffer_idx) {
     if (!is_empty_entry<K>(i, groupby_buffer, layout.row_bytes) &&
-        oe_col_buffer[oe_col_buffer_idx] == null_val_bit_pattern(entry_ti, false)) {
+        oe_col_buffer[oe_col_buffer_idx] == null_val_bit_pattern(entry_type, false)) {
       null_idx_buff.push_back(i);
     } else {
       notnull_idx_buff.push_back(i);
@@ -311,15 +311,15 @@ thrust::host_vector<int64_t> collect_order_entry_column(
   if (layout.oe_target_info.agg_kind == kAVG) {
     crt_group_ptr2 = crt_group_ptr1 + layout.col_bytes;
   }
-  const auto entry_ti = get_compact_type(layout.oe_target_info);
+  auto entry_type = get_compact_type(layout.oe_target_info);
   const bool float_argument_input = takes_float_argument(layout.oe_target_info);
   const auto step_bytes = layout.row_bytes * step;
-  const auto col_bytes = float_argument_input ? entry_ti.get_size() : layout.col_bytes;
+  const auto col_bytes = float_argument_input ? entry_type->size() : layout.col_bytes;
   for (size_t i = start; i < layout.entry_count; i += step) {
     auto val1 = read_int_from_buff(crt_group_ptr1, col_bytes > 0 ? col_bytes : sizeof(K));
     if (crt_group_ptr2) {
       const auto val2 = read_int_from_buff(crt_group_ptr2, 8);
-      const auto avg_val = pair_to_double({val1, val2}, entry_ti, float_argument_input);
+      const auto avg_val = pair_to_double({val1, val2}, entry_type, float_argument_input);
       val1 = *reinterpret_cast<const int64_t*>(&avg_val);
     }
     oe_col_buffer.push_back(val1);
@@ -344,9 +344,9 @@ std::vector<uint32_t> baseline_sort(const ExecutorDeviceType device_type,
                                     const size_t start,
                                     const size_t step) {
   auto oe_col_buffer = collect_order_entry_column<K>(groupby_buffer, layout, start, step);
-  const auto& entry_ti = get_compact_type(layout.oe_target_info);
-  CHECK(entry_ti.is_number());
-  if (entry_ti.is_fp() || layout.oe_target_info.agg_kind == kAVG) {
+  auto entry_type = get_compact_type(layout.oe_target_info);
+  CHECK(entry_type->isNumber());
+  if (entry_type->isFloatingPoint() || layout.oe_target_info.agg_kind == kAVG) {
     return baseline_sort_fp<K>(device_type,
                                device_id,
                                buffer_provider,

@@ -707,10 +707,10 @@ void sort_on_cpu(T* val_buff,
 
 void sort_onecol_cpu(int8_t* val_buff,
                      PermutationView pv,
-                     const SQLTypeInfo& type_info,
+                     const hdk::ir::Type* type,
                      const size_t slot_width,
                      const hdk::ir::OrderEntry& order_entry) {
-  if (type_info.is_integer() || type_info.is_decimal()) {
+  if (type->isInteger() || type->isDecimal()) {
     switch (slot_width) {
       case 1:
         sort_on_cpu(reinterpret_cast<int8_t*>(val_buff), pv, order_entry);
@@ -727,7 +727,7 @@ void sort_onecol_cpu(int8_t* val_buff,
       default:
         CHECK(false);
     }
-  } else if (type_info.is_fp()) {
+  } else if (type->isFloatingPoint()) {
     switch (slot_width) {
       case 4:
         sort_on_cpu(reinterpret_cast<float*>(val_buff), pv, order_entry);
@@ -799,9 +799,9 @@ void ResultSet::sort(const std::list<hdk::ir::OrderEntry>& order_entries,
       const auto& lazy_fetch_info = getLazyFetchInfo();
       bool is_not_lazy =
           lazy_fetch_info.empty() || !lazy_fetch_info[target_idx].is_lazily_fetched;
-      const auto entry_ti = get_compact_type(targets_[target_idx]);
+      const auto entry_type = get_compact_type(targets_[target_idx]);
       const auto slot_width = query_mem_desc_.getPaddedSlotWidthBytes(target_idx);
-      if (is_not_lazy && slot_width > 0 && entry_ti.is_number()) {
+      if (is_not_lazy && slot_width > 0 && entry_type->isNumber()) {
         const size_t buf_size = query_mem_desc_.getEntryCount() * slot_width;
         // std::vector<int8_t> sortkey_val_buff(buf_size);
         std::unique_ptr<int8_t[]> sortkey_val_buff(new int8_t[buf_size]);
@@ -812,7 +812,7 @@ void ResultSet::sort(const std::list<hdk::ir::OrderEntry>& order_entries,
         pv = initPermutationBuffer(pv, 0, permutation_.size());
         sort_onecol_cpu(reinterpret_cast<int8_t*>(&sortkey_val_buff[0]),
                         pv,
-                        entry_ti,
+                        entry_type,
                         slot_width,
                         order_entry);
         if (pv.size() < permutation_.size()) {
@@ -1079,14 +1079,14 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
   for (const auto& order_entry : order_entries_) {
     CHECK_GE(order_entry.tle_no, 1);
     const auto& agg_info = result_set_->targets_[order_entry.tle_no - 1];
-    const auto entry_ti = get_compact_type(agg_info);
+    const auto entry_type = get_compact_type(agg_info);
     bool float_argument_input = takes_float_argument(agg_info);
     // Need to determine if the float value has been stored as float
     // or if it has been compacted to a different (often larger 8 bytes)
     // in distributed case the floats are actually 4 bytes
     // TODO the above takes_float_argument() is widely used wonder if this problem
     // exists elsewhere
-    if (entry_ti.get_type() == kFLOAT) {
+    if (entry_type->isFp32()) {
       const auto is_col_lazy =
           !result_set_->lazy_fetch_info_.empty() &&
           result_set_->lazy_fetch_info_[order_entry.tle_no - 1].is_lazily_fetched;
@@ -1120,7 +1120,7 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
       ++materialized_approx_quantile_buffer_idx;
       if (lhs_value == rhs_value) {
         continue;
-      } else if (!entry_ti.get_notnull()) {
+      } else if (entry_type->nullable()) {
         if (lhs_value == NULL_DOUBLE) {
           return order_entry.nulls_first;
         } else if (rhs_value == NULL_DOUBLE) {
@@ -1139,27 +1139,28 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
                                                      order_entry.tle_no - 1,
                                                      rhs_storage_lookup_result);
 
-    if (UNLIKELY(isNull(entry_ti, lhs_v, float_argument_input) &&
-                 isNull(entry_ti, rhs_v, float_argument_input))) {
+    if (UNLIKELY(isNull(entry_type, lhs_v, float_argument_input) &&
+                 isNull(entry_type, rhs_v, float_argument_input))) {
       continue;
     }
-    if (UNLIKELY(isNull(entry_ti, lhs_v, float_argument_input) &&
-                 !isNull(entry_ti, rhs_v, float_argument_input))) {
+    if (UNLIKELY(isNull(entry_type, lhs_v, float_argument_input) &&
+                 !isNull(entry_type, rhs_v, float_argument_input))) {
       return order_entry.nulls_first;
     }
-    if (UNLIKELY(isNull(entry_ti, rhs_v, float_argument_input) &&
-                 !isNull(entry_ti, lhs_v, float_argument_input))) {
+    if (UNLIKELY(isNull(entry_type, rhs_v, float_argument_input) &&
+                 !isNull(entry_type, lhs_v, float_argument_input))) {
       return !order_entry.nulls_first;
     }
 
     if (LIKELY(lhs_v.isInt())) {
       CHECK(rhs_v.isInt());
-      if (UNLIKELY(entry_ti.is_string() &&
-                   entry_ti.get_compression() == kENCODING_DICT)) {
-        CHECK_EQ(4, entry_ti.get_logical_size());
+      if (UNLIKELY(entry_type->isExtDictionary())) {
+        CHECK_EQ(4, hdk::ir::logicalSize(entry_type));
         CHECK(executor_);
         const auto string_dict_proxy = executor_->getStringDictionaryProxy(
-            entry_ti.get_comp_param(), result_set_->row_set_mem_owner_, false);
+            entry_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+            result_set_->row_set_mem_owner_,
+            false);
         auto lhs_str = string_dict_proxy->getString(lhs_v.i1);
         auto rhs_str = string_dict_proxy->getString(rhs_v.i1);
         if (lhs_str == rhs_str) {
@@ -1171,7 +1172,7 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
       if (lhs_v.i1 == rhs_v.i1) {
         continue;
       }
-      if (entry_ti.is_fp()) {
+      if (entry_type->isFloatingPoint()) {
         if (float_argument_input) {
           const auto lhs_dval = *reinterpret_cast<const float*>(may_alias_ptr(&lhs_v.i1));
           const auto rhs_dval = *reinterpret_cast<const float*>(may_alias_ptr(&rhs_v.i1));
@@ -1189,9 +1190,9 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
       if (lhs_v.isPair()) {
         CHECK(rhs_v.isPair());
         const auto lhs =
-            pair_to_double({lhs_v.i1, lhs_v.i2}, entry_ti, float_argument_input);
+            pair_to_double({lhs_v.i1, lhs_v.i2}, entry_type, float_argument_input);
         const auto rhs =
-            pair_to_double({rhs_v.i1, rhs_v.i2}, entry_ti, float_argument_input);
+            pair_to_double({rhs_v.i1, rhs_v.i2}, entry_type, float_argument_input);
         if (lhs == rhs) {
           continue;
         }

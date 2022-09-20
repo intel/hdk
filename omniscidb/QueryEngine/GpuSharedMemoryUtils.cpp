@@ -225,9 +225,9 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
                                         const TargetInfo& target_info,
                                         llvm::Value* dest_byte_stream,
                                         llvm::Value* byte_offset) {
-  const auto sql_type = get_compact_type(target_info);
+  const auto type = get_compact_type(target_info);
   const auto slot_bytes = query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
-  auto ptr_type = [&context](const size_t slot_bytes, const SQLTypeInfo& sql_type) {
+  auto ptr_type = [&context](const size_t slot_bytes, const hdk::ir::Type* type) {
     if (slot_bytes == sizeof(int32_t)) {
       return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
     } else {
@@ -243,7 +243,7 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
           dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
           dest_byte_stream,
           byte_offset),
-      ptr_type(slot_bytes, sql_type),
+      ptr_type(slot_bytes, type),
       "dest_slot_adr_" + std::to_string(slot_idx));
   return casted_dest_slot_address;
 }

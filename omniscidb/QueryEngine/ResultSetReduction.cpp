@@ -1209,8 +1209,8 @@ void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const 
 #define AGGREGATE_ONE_VALUE(                                                      \
     agg_kind__, val_ptr__, other_ptr__, chosen_bytes__, agg_info__)               \
   do {                                                                            \
-    const auto sql_type = get_compact_type(agg_info__);                           \
-    if (sql_type.is_fp()) {                                                       \
+    const auto type = get_compact_type(agg_info__);                               \
+    if (type->isFloatingPoint()) {                                                \
       if (chosen_bytes__ == sizeof(float)) {                                      \
         agg_##agg_kind__##_float(reinterpret_cast<int32_t*>(val_ptr__),           \
                                  *reinterpret_cast<const float*>(other_ptr__));   \
@@ -1235,8 +1235,8 @@ void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const 
     agg_kind__, val_ptr__, other_ptr__, init_val__, chosen_bytes__, agg_info__)     \
   do {                                                                              \
     if (agg_info__.skip_null_val) {                                                 \
-      const auto sql_type = get_compact_type(agg_info__);                           \
-      if (sql_type.is_fp()) {                                                       \
+      const auto type = get_compact_type(agg_info__);                               \
+      if (type->isFloatingPoint()) {                                                \
         if (chosen_bytes__ == sizeof(float)) {                                      \
           agg_##agg_kind__##_float_skip_val(                                        \
               reinterpret_cast<int32_t*>(val_ptr__),                                \
@@ -1284,8 +1284,8 @@ void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const 
     val_ptr__, other_ptr__, init_val__, chosen_bytes__, agg_info__)          \
   {                                                                          \
     if (agg_info__.skip_null_val) {                                          \
-      const auto sql_type = get_compact_type(agg_info__);                    \
-      if (sql_type.is_fp()) {                                                \
+      const auto type = get_compact_type(agg_info__);                        \
+      if (type->isFloatingPoint()) {                                         \
         if (chosen_bytes__ == sizeof(float)) {                               \
           agg_sum_float_skip_val(                                            \
               reinterpret_cast<int32_t*>(val_ptr__),                         \
@@ -1654,7 +1654,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
       const auto chosen_bytes = float_argument_input
                                     ? sizeof(float)
                                     : query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx);
-      const auto& chosen_type = get_compact_type(agg_info);
+      auto chosen_type = get_compact_type(agg_info);
       if (agg_info.is_agg && agg_info.agg_kind != kSAMPLE) {
         try {
           switch (agg_info.agg_kind) {
@@ -1730,7 +1730,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
           // TODO(miyu): handle the case where chosen_bytes < 8
           LOG(ERROR) << e.what();
         }
-        if (chosen_type.is_integer() || chosen_type.is_decimal()) {
+        if (chosen_type->isInteger() || chosen_type->isDecimal()) {
           switch (chosen_bytes) {
             case 8:
               break;

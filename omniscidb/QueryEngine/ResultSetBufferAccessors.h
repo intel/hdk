@@ -199,6 +199,38 @@ inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
              : dividend / static_cast<double>(fp_pair.second);
 }
 
+inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
+                             const hdk::ir::Type* type,
+                             const bool float_argument_input) {
+  if (fp_pair.second == 0) {
+    return NULL_DOUBLE;
+  }
+
+  double dividend{0.0};
+  if (type->isFp32()) {
+    dividend = shared::reinterpret_bits<float>(fp_pair.first);
+  } else if (type->isFp64()) {
+    dividend = shared::reinterpret_bits<double>(fp_pair.first);
+  } else {
+#ifndef __CUDACC__
+    LOG_IF(FATAL, !(type->isInteger() || type->isDecimal()))
+        << "Unsupported type for pair to double conversion: " << type->toString();
+#else
+    CHECK(type->isInteger() || type->isDecimal());
+#endif
+    dividend = static_cast<double>(fp_pair.first);
+  }
+
+  if (type->isDecimal()) {
+    auto scale = type->as<hdk::ir::DecimalType>()->scale();
+    if (scale) {
+      return dividend / (static_cast<double>(fp_pair.second) * exp_to_scale(scale));
+    }
+  }
+
+  return dividend / static_cast<double>(fp_pair.second);
+}
+
 inline int64_t null_val_bit_pattern(const SQLTypeInfo& ti,
                                     const bool float_argument_input) {
   if (ti.is_fp()) {
@@ -212,6 +244,21 @@ inline int64_t null_val_bit_pattern(const SQLTypeInfo& ti,
     return 0;
   }
   return inline_int_null_val(ti);
+}
+
+inline int64_t null_val_bit_pattern(const hdk::ir::Type* type,
+                                    const bool float_argument_input) {
+  if (type->isFloatingPoint()) {
+    if (float_argument_input && type->isFp32()) {
+      return shared::reinterpret_bits<int64_t>(NULL_FLOAT);  // 1<<23
+    }
+    const auto double_null_val = inline_fp_null_value(type);
+    return shared::reinterpret_bits<int64_t>(double_null_val);  // 0x381<<52 or 1<<52
+  }
+  if (type->isString() || type->isArray()) {
+    return 0;
+  }
+  return inline_int_null_value(type);
 }
 
 // Interprets ptr as an integer of compact_sz byte width and reads it.
