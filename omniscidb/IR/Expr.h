@@ -1781,14 +1781,6 @@ class ArrayExpr : public Expr {
       , contained_expressions_(array_exprs)
       , local_alloc_(local_alloc)
       , is_null_(is_null) {}
-  ArrayExpr(SQLTypeInfo const& array_ti,
-            ExprPtrVector const& array_exprs,
-            bool is_null = false,
-            bool local_alloc = false)
-      : Expr(array_ti)
-      , contained_expressions_(array_exprs)
-      , local_alloc_(local_alloc)
-      , is_null_(is_null) {}
 
   ExprPtr deep_copy() const override;
   std::string toString() const override;
