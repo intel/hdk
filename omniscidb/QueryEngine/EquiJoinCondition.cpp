@@ -59,19 +59,17 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
   std::list<hdk::ir::ExprPtr> join_quals;
   std::vector<hdk::ir::ExprPtr> lhs_tuple;
   std::vector<hdk::ir::ExprPtr> rhs_tuple;
-  bool not_null{true};
+  bool nullable{false};
   for (const auto& qual : crt_coalesced_quals) {
     const auto qual_binary = std::dynamic_pointer_cast<hdk::ir::BinOper>(qual);
     CHECK(qual_binary);
-    not_null = not_null && qual_binary->get_type_info().get_notnull();
+    nullable = nullable || qual_binary->type()->nullable();
     const auto lhs_col = remove_cast(qual_binary->get_own_left_operand());
     const auto rhs_col = remove_cast(qual_binary->get_own_right_operand());
-    const auto lhs_ti = lhs_col->get_type_info();
+    const auto lhs_type = lhs_col->type();
     // Coalesce cols for integers, bool, and dict encoded strings. Forces baseline hash
     // join.
-    if (IS_NUMBER(lhs_ti.get_type()) ||
-        (IS_STRING(lhs_ti.get_type()) && lhs_ti.get_compression() == kENCODING_DICT) ||
-        (lhs_ti.get_type() == kBOOLEAN)) {
+    if (lhs_type->isNumber() || lhs_type->isExtDictionary() || lhs_type->isBoolean()) {
       lhs_tuple.push_back(lhs_col);
       rhs_tuple.push_back(rhs_col);
     } else {
@@ -85,7 +83,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
   CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
   if (lhs_tuple.size() > 0) {
     join_quals.push_front(std::make_shared<hdk::ir::BinOper>(
-        SQLTypeInfo(kBOOLEAN, not_null),
+        lhs_tuple.front()->ctx().boolean(nullable),
         false,
         first_qual->get_optype(),
         kONE,
