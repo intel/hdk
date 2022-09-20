@@ -97,7 +97,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
         const auto target = ra_exe_unit_in.target_exprs[i];
         if (*target == *in_vals->get_arg()) {
           auto var_case_expr = hdk::ir::makeExpr<hdk::ir::Var>(
-              case_expr->get_type_info(), hdk::ir::Var::kGROUPBY, groupby_idx);
+              case_expr->type(), hdk::ir::Var::kGROUPBY, groupby_idx);
           target_exprs_owned_.push_back(var_case_expr);
           new_target_exprs.push_back(var_case_expr.get());
         } else {
@@ -135,33 +135,36 @@ std::shared_ptr<hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainValues(
   auto in_val_arg = in_vals->get_arg()->deep_copy();
   for (const auto& in_val : in_vals->get_value_list()) {
     auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
-        SQLTypeInfo(kBOOLEAN, true), false, kEQ, kONE, in_val_arg, in_val);
+        in_vals->ctx().boolean(false), false, kEQ, kONE, in_val_arg, in_val);
     auto in_val_copy = in_val->deep_copy();
-    auto ti = in_val_copy->get_type_info();
-    if (ti.is_string() && ti.get_compression() == kENCODING_DICT) {
-      ti.set_comp_param(0);
+    auto type = in_val_copy->type();
+    if (type->isExtDictionary()) {
+      type = type->ctx().extDict(
+          type->as<hdk::ir::ExtDictionaryType>()->elemType(), 0, type->size());
     }
-    in_val_copy->set_type_info(ti);
+    in_val_copy->set_type_info(type);
     case_expr_list.emplace_back(case_cond, in_val_copy);
   }
   // TODO(alex): refine the expression range for case with empty else expression;
   //             for now, add a dummy else which should never be taken
   auto else_expr = case_expr_list.front().second;
   return hdk::ir::makeExpr<hdk::ir::CaseExpr>(
-      case_expr_list.front().second->get_type_info(), false, case_expr_list, else_expr);
+      case_expr_list.front().second->type(), false, case_expr_list, else_expr);
 }
 
 std::shared_ptr<hdk::ir::CaseExpr>
-QueryRewriter::generateCaseExprForCountDistinctOnGroupByCol(hdk::ir::ExprPtr expr,
-                                                            const SQLTypeInfo& ti) const {
+QueryRewriter::generateCaseExprForCountDistinctOnGroupByCol(
+    hdk::ir::ExprPtr expr,
+    const hdk::ir::Type* type) const {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
-  auto is_null = std::make_shared<hdk::ir::UOper>(kBOOLEAN, kISNULL, expr);
-  auto is_not_null = std::make_shared<hdk::ir::UOper>(kBOOLEAN, kNOT, is_null);
-  const auto then_constant = hdk::ir::Constant::make(ti, 1);
+  auto& ctx = expr->ctx();
+  auto is_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kISNULL, expr);
+  auto is_not_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kNOT, is_null);
+  const auto then_constant = hdk::ir::Constant::make(type, 1);
   case_expr_list.emplace_back(is_not_null, then_constant);
-  const auto else_constant = hdk::ir::Constant::make(ti, 0);
+  const auto else_constant = hdk::ir::Constant::make(type, 0);
   auto case_expr =
-      hdk::ir::makeExpr<hdk::ir::CaseExpr>(ti, false, case_expr_list, else_constant);
+      hdk::ir::makeExpr<hdk::ir::CaseExpr>(type, false, case_expr_list, else_constant);
   return case_expr;
 }
 
@@ -209,7 +212,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
         auto target_expr = agg_expr->get_arg();
         // we have some issues when this rewriting is applied to float_type groupby column
         // in subquery, i.e., SELECT MIN(v1) FROM (SELECT v1, AGG(v1) FROM T GROUP BY v1);
-        if (target_expr && target_expr->get_type_info().get_type() != SQLTypes::kFLOAT) {
+        if (target_expr && !target_expr->type()->isFp32()) {
           switch (agg_expr->get_aggtype()) {
             case SQLAgg::kCOUNT:
             case SQLAgg::kAPPROX_COUNT_DISTINCT: {
@@ -218,7 +221,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
                 break;
               }
               auto case_expr = generateCaseExprForCountDistinctOnGroupByCol(
-                  agg_expr->get_own_arg(), agg_expr->get_type_info());
+                  agg_expr->get_own_arg(), agg_expr->type());
               new_target_exprs.push_back(case_expr.get());
               target_exprs_owned_.emplace_back(case_expr);
               rewritten = true;
@@ -231,10 +234,10 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
             case SQLAgg::kMIN: {
               // we just replace the agg_expr into a plain expr
               // i.e, avg(x1) --> x1
-              auto agg_expr_ti = agg_expr->get_type_info();
+              auto agg_expr_type = agg_expr->type();
               auto target_expr = agg_expr->get_own_arg();
-              if (agg_expr_ti != target_expr->get_type_info()) {
-                target_expr = target_expr->add_cast(agg_expr_ti);
+              if (!agg_expr_type->equal(target_expr->type())) {
+                target_expr = target_expr->add_cast(agg_expr_type);
               }
               new_target_exprs.push_back(target_expr.get());
               target_exprs_owned_.emplace_back(target_expr);
