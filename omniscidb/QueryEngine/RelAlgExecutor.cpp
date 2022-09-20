@@ -1502,7 +1502,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
       }
       // Creates a tautology equality with the partition expression on both sides.
       partition_key_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
-          kBOOLEAN,
+          target_expr->ctx().boolean(),
           kBW_EQ,
           kONE,
           partition_key_tuple,
@@ -2528,7 +2528,7 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
   if ((*eq_lhs == *is_null_lhs && *eq_rhs == *is_null_rhs) ||
       (*eq_lhs == *is_null_rhs && *eq_rhs == *is_null_lhs)) {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(
-        kBOOLEAN,
+        expr->ctx().boolean(),
         kBW_EQ,
         kONE,
         equi_join_condition->get_left_operand()->deep_copy(),
@@ -2545,7 +2545,7 @@ hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
       return nullptr;
     }
     return hdk::ir::makeExpr<hdk::ir::BinOper>(
-        kBOOLEAN,
+        expr->ctx().boolean(),
         kAND,
         kONE,
         acc,

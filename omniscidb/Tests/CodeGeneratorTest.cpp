@@ -31,6 +31,8 @@
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "TestHelpers.h"
 
+hdk::ir::Context& ctx = hdk::ir::Context::defaultCtx();
+
 namespace {
 #ifdef HAVE_CUDA
 using DevicePtr = CUdeviceptr;
@@ -108,7 +110,7 @@ TEST(CodeGeneratorTest, IntegerAdd) {
   d.intval = 42;
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(kINT, kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -171,7 +173,7 @@ TEST(CodeGeneratorTest, IntegerExpr) {
   d.intval = 42;
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(kINT, kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -266,7 +268,7 @@ TEST(CodeGeneratorTest, IntegerAddGPU) {
 
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(kINT, kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -382,7 +384,7 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
   d.intval = 42;
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(kINT, kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);

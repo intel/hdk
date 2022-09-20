@@ -565,23 +565,10 @@ class UOper : public Expr {
  */
 class BinOper : public Expr {
  public:
-  BinOper(const SQLTypeInfo& ti,
-          bool has_agg,
-          SQLOps o,
-          SQLQualifier q,
-          ExprPtr l,
-          ExprPtr r)
-      : Expr(ti, has_agg), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
   BinOper(const Type* type, bool has_agg, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type, has_agg), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
   BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
-  BinOper(SQLTypes t, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
-      : Expr(t, l->get_type_info().get_notnull() && r->get_type_info().get_notnull())
-      , optype(o)
-      , qualifier(q)
-      , left_operand(l)
-      , right_operand(r) {}
   SQLOps get_optype() const { return optype; }
   SQLQualifier get_qualifier() const { return qualifier; }
   const Expr* get_left_operand() const { return left_operand.get(); }
