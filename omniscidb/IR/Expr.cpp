@@ -180,8 +180,7 @@ bool is_expr_nullable(const Expr* expr) {
   if (const_expr) {
     return const_expr->get_is_null();
   }
-  const auto& expr_ti = expr->get_type_info();
-  return !expr_ti.get_notnull();
+  return expr->type()->nullable();
 }
 
 bool is_in_values_nullable(const ExprPtr& a, const std::list<ExprPtr>& l) {
@@ -193,42 +192,6 @@ bool is_in_values_nullable(const ExprPtr& a, const std::list<ExprPtr>& l) {
       return true;
     }
   }
-  return false;
-}
-
-bool Datum_equal(const SQLTypeInfo& ti, Datum val1, Datum val2) {
-  switch (ti.get_type()) {
-    case kBOOLEAN:
-      return val1.boolval == val2.boolval;
-    case kCHAR:
-    case kVARCHAR:
-    case kTEXT:
-      return *val1.stringval == *val2.stringval;
-    case kNUMERIC:
-    case kDECIMAL:
-    case kBIGINT:
-      return val1.bigintval == val2.bigintval;
-    case kINT:
-      return val1.intval == val2.intval;
-    case kSMALLINT:
-      return val1.smallintval == val2.smallintval;
-    case kTINYINT:
-      return val1.tinyintval == val2.tinyintval;
-    case kFLOAT:
-      return val1.floatval == val2.floatval;
-    case kDOUBLE:
-      return val1.doubleval == val2.doubleval;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return val1.bigintval == val2.bigintval;
-    default:
-      throw std::runtime_error("Unrecognized type for Constant Datum equality: " +
-                               ti.get_type_name());
-  }
-  UNREACHABLE();
   return false;
 }
 
@@ -396,7 +359,7 @@ std::string ColumnRef::toString() const {
 }
 
 Constant::~Constant() {
-  if (type_info.is_string() && !is_null) {
+  if (type_->isString() && !is_null) {
     delete constval.stringval;
   }
 }
@@ -478,22 +441,22 @@ ExprPtr Var::deep_copy() const {
 
 ExprPtr Constant::deep_copy() const {
   Datum d = constval;
-  if (type_info.is_string() && !is_null) {
+  if (type_->isString() && !is_null) {
     d.stringval = new std::string(*constval.stringval);
   }
-  if (type_info.get_type() == kARRAY) {
-    return makeExpr<Constant>(type_info, is_null, value_list, cacheable_);
+  if (type_->isArray()) {
+    return makeExpr<Constant>(type_, is_null, value_list, cacheable_);
   }
-  return makeExpr<Constant>(type_info, is_null, d, cacheable_);
+  return makeExpr<Constant>(type_, is_null, d, cacheable_);
 }
 
 ExprPtr UOper::deep_copy() const {
   return makeExpr<UOper>(
-      type_info, contains_agg, optype, operand->deep_copy(), is_dict_intersection_);
+      type_, contains_agg, optype, operand->deep_copy(), is_dict_intersection_);
 }
 
 ExprPtr BinOper::deep_copy() const {
-  return makeExpr<BinOper>(type_info,
+  return makeExpr<BinOper>(type_,
                            contains_agg,
                            optype,
                            qualifier,
@@ -563,7 +526,7 @@ ExprPtr LikelihoodExpr::deep_copy() const {
 
 ExprPtr AggExpr::deep_copy() const {
   return makeExpr<AggExpr>(
-      type_info, aggtype, arg ? arg->deep_copy() : nullptr, is_distinct, arg1);
+      type_, aggtype, arg ? arg->deep_copy() : nullptr, is_distinct, arg1);
 }
 
 ExprPtr CaseExpr::deep_copy() const {
@@ -571,29 +534,27 @@ ExprPtr CaseExpr::deep_copy() const {
   for (auto p : expr_pair_list) {
     new_list.emplace_back(p.first->deep_copy(), p.second->deep_copy());
   }
-  return makeExpr<CaseExpr>(type_info,
+  return makeExpr<CaseExpr>(type_,
                             contains_agg,
                             new_list,
                             else_expr == nullptr ? nullptr : else_expr->deep_copy());
 }
 
 ExprPtr ExtractExpr::deep_copy() const {
-  return makeExpr<ExtractExpr>(type_info, contains_agg, field_, from_expr_->deep_copy());
+  return makeExpr<ExtractExpr>(type_, contains_agg, field_, from_expr_->deep_copy());
 }
 
 ExprPtr DateaddExpr::deep_copy() const {
   return makeExpr<DateaddExpr>(
-      type_info, field_, number_->deep_copy(), datetime_->deep_copy());
+      type_, field_, number_->deep_copy(), datetime_->deep_copy());
 }
 
 ExprPtr DatediffExpr::deep_copy() const {
-  return makeExpr<DatediffExpr>(
-      type_info, field_, start_->deep_copy(), end_->deep_copy());
+  return makeExpr<DatediffExpr>(type_, field_, start_->deep_copy(), end_->deep_copy());
 }
 
 ExprPtr DatetruncExpr::deep_copy() const {
-  return makeExpr<DatetruncExpr>(
-      type_info, contains_agg, field_, from_expr_->deep_copy());
+  return makeExpr<DatetruncExpr>(type_, contains_agg, field_, from_expr_->deep_copy());
 }
 
 ExprPtr OffsetInFragment::deep_copy() const {
@@ -614,7 +575,7 @@ ExprPtr WindowFunction::deep_copy() const {
     new_order_keys.emplace_back(expr->deep_copy());
   }
   return makeExpr<WindowFunction>(
-      type_info, kind_, new_args, new_partition_keys, new_order_keys, collation_);
+      type_, kind_, new_args, new_partition_keys, new_order_keys, collation_);
 }
 
 ExprPtr ArrayExpr::deep_copy() const {
@@ -622,8 +583,7 @@ ExprPtr ArrayExpr::deep_copy() const {
   for (auto& expr : contained_expressions_) {
     new_contained_expressions.emplace_back(expr->deep_copy());
   }
-  return makeExpr<ArrayExpr>(
-      type_info, new_contained_expressions, is_null_, local_alloc_);
+  return makeExpr<ArrayExpr>(type_, new_contained_expressions, is_null_, local_alloc_);
 }
 
 void Constant::cast_number(const Type* new_type) {
@@ -820,7 +780,7 @@ void Constant::cast_to_string(const Type* str_type) {
   if (str_type->isVarChar()) {
     // truncate the string
     auto max_length = str_type->as<hdk::ir::VarCharType>()->maxLength();
-    if (constval.stringval->length() > max_length) {
+    if (constval.stringval->length() > static_cast<size_t>(max_length)) {
       *constval.stringval = constval.stringval->substr(0, max_length);
     }
   }
@@ -1030,11 +990,11 @@ bool BinOper::simple_predicate_has_simple_cast(const ExprPtr cast_operand,
           !expr_is<Var>(u_expr->get_own_operand()))) {
       return false;
     }
-    const auto& ti = u_expr->get_type_info();
-    if (ti.is_time() && u_expr->get_operand()->get_type_info().is_time()) {
+    auto type = u_expr->type();
+    if (type->isDateTime() && u_expr->get_operand()->type()->isDateTime()) {
       // Allow casts between time types to pass through
       return true;
-    } else if (ti.is_integer() && u_expr->get_operand()->get_type_info().is_integer()) {
+    } else if (type->isInteger() && u_expr->get_operand()->type()->isInteger()) {
       // Allow casts between integer types to pass through
       return true;
     }
@@ -1059,7 +1019,7 @@ ExprPtr BinOper::normalize_simple_predicate(int& rte_idx) const {
       auto uo = std::dynamic_pointer_cast<UOper>(right_operand);
       auto cv = std::dynamic_pointer_cast<ColumnVar>(uo->get_own_operand());
       rte_idx = cv->get_rte_idx();
-      return makeExpr<BinOper>(type_info,
+      return makeExpr<BinOper>(type_,
                                contains_agg,
                                COMMUTE_COMPARISON(optype),
                                qualifier,
@@ -1075,7 +1035,7 @@ ExprPtr BinOper::normalize_simple_predicate(int& rte_idx) const {
              !expr_is<Var>(right_operand)) {
     auto cv = std::dynamic_pointer_cast<ColumnVar>(right_operand);
     rte_idx = cv->get_rte_idx();
-    return makeExpr<BinOper>(type_info,
+    return makeExpr<BinOper>(type_,
                              contains_agg,
                              COMMUTE_COMPARISON(optype),
                              qualifier,
@@ -1088,7 +1048,7 @@ ExprPtr BinOper::normalize_simple_predicate(int& rte_idx) const {
 void ColumnVar::group_predicates(std::list<const Expr*>& scan_predicates,
                                  std::list<const Expr*>& join_predicates,
                                  std::list<const Expr*>& const_predicates) const {
-  if (type_info.get_type() == kBOOLEAN) {
+  if (type_->isBoolean()) {
     scan_predicates.push_back(this);
   }
 }
@@ -1433,7 +1393,7 @@ ExprPtr Var::rewrite_agg_to_var(
   for (auto tle : tlist) {
     const Expr* e = tle->get_expr();
     if (*e == *this) {
-      return makeExpr<Var>(e->get_type_info(), Var::kINPUT_OUTER, varno);
+      return makeExpr<Var>(e->type(), Var::kINPUT_OUTER, varno);
     }
     varno++;
   }
@@ -1484,7 +1444,7 @@ ExprPtr AggExpr::rewrite_with_targetlist(
 
 ExprPtr AggExpr::rewrite_with_child_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<AggExpr>(type_info,
+  return makeExpr<AggExpr>(type_,
                            aggtype,
                            arg ? arg->rewrite_with_child_targetlist(tlist) : nullptr,
                            is_distinct,
@@ -1499,7 +1459,7 @@ ExprPtr AggExpr::rewrite_agg_to_var(
     if (typeid(*e) == typeid(AggExpr)) {
       const AggExpr* agg_expr = dynamic_cast<const AggExpr*>(e);
       if (*this == *agg_expr) {
-        return makeExpr<Var>(agg_expr->get_type_info(), Var::kINPUT_OUTER, varno);
+        return makeExpr<Var>(agg_expr->type(), Var::kINPUT_OUTER, varno);
       }
     }
     varno++;
@@ -1516,7 +1476,7 @@ ExprPtr CaseExpr::rewrite_with_targetlist(
                             p.second->rewrite_with_targetlist(tlist));
   }
   return makeExpr<CaseExpr>(
-      type_info,
+      type_,
       contains_agg,
       epair_list,
       else_expr ? else_expr->rewrite_with_targetlist(tlist) : nullptr);
@@ -1525,12 +1485,12 @@ ExprPtr CaseExpr::rewrite_with_targetlist(
 ExprPtr ExtractExpr::rewrite_with_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<ExtractExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_with_targetlist(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_with_targetlist(tlist));
 }
 
 ExprPtr DateaddExpr::rewrite_with_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DateaddExpr>(type_info,
+  return makeExpr<DateaddExpr>(type_,
                                field_,
                                number_->rewrite_with_targetlist(tlist),
                                datetime_->rewrite_with_targetlist(tlist));
@@ -1538,7 +1498,7 @@ ExprPtr DateaddExpr::rewrite_with_targetlist(
 
 ExprPtr DatediffExpr::rewrite_with_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DatediffExpr>(type_info,
+  return makeExpr<DatediffExpr>(type_,
                                 field_,
                                 start_->rewrite_with_targetlist(tlist),
                                 end_->rewrite_with_targetlist(tlist));
@@ -1547,7 +1507,7 @@ ExprPtr DatediffExpr::rewrite_with_targetlist(
 ExprPtr DatetruncExpr::rewrite_with_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<DatetruncExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_with_targetlist(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_with_targetlist(tlist));
 }
 
 ExprPtr CaseExpr::rewrite_with_child_targetlist(
@@ -1558,7 +1518,7 @@ ExprPtr CaseExpr::rewrite_with_child_targetlist(
                             p.second->rewrite_with_child_targetlist(tlist));
   }
   return makeExpr<CaseExpr>(
-      type_info,
+      type_,
       contains_agg,
       epair_list,
       else_expr ? else_expr->rewrite_with_child_targetlist(tlist) : nullptr);
@@ -1567,12 +1527,12 @@ ExprPtr CaseExpr::rewrite_with_child_targetlist(
 ExprPtr ExtractExpr::rewrite_with_child_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<ExtractExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_with_child_targetlist(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_with_child_targetlist(tlist));
 }
 
 ExprPtr DateaddExpr::rewrite_with_child_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DateaddExpr>(type_info,
+  return makeExpr<DateaddExpr>(type_,
                                field_,
                                number_->rewrite_with_child_targetlist(tlist),
                                datetime_->rewrite_with_child_targetlist(tlist));
@@ -1580,7 +1540,7 @@ ExprPtr DateaddExpr::rewrite_with_child_targetlist(
 
 ExprPtr DatediffExpr::rewrite_with_child_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DatediffExpr>(type_info,
+  return makeExpr<DatediffExpr>(type_,
                                 field_,
                                 start_->rewrite_with_child_targetlist(tlist),
                                 end_->rewrite_with_child_targetlist(tlist));
@@ -1589,7 +1549,7 @@ ExprPtr DatediffExpr::rewrite_with_child_targetlist(
 ExprPtr DatetruncExpr::rewrite_with_child_targetlist(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<DatetruncExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_with_child_targetlist(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_with_child_targetlist(tlist));
 }
 
 ExprPtr CaseExpr::rewrite_agg_to_var(
@@ -1599,7 +1559,7 @@ ExprPtr CaseExpr::rewrite_agg_to_var(
     epair_list.emplace_back(p.first->rewrite_agg_to_var(tlist),
                             p.second->rewrite_agg_to_var(tlist));
   }
-  return makeExpr<CaseExpr>(type_info,
+  return makeExpr<CaseExpr>(type_,
                             contains_agg,
                             epair_list,
                             else_expr ? else_expr->rewrite_agg_to_var(tlist) : nullptr);
@@ -1608,12 +1568,12 @@ ExprPtr CaseExpr::rewrite_agg_to_var(
 ExprPtr ExtractExpr::rewrite_agg_to_var(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<ExtractExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_agg_to_var(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_agg_to_var(tlist));
 }
 
 ExprPtr DateaddExpr::rewrite_agg_to_var(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DateaddExpr>(type_info,
+  return makeExpr<DateaddExpr>(type_,
                                field_,
                                number_->rewrite_agg_to_var(tlist),
                                datetime_->rewrite_agg_to_var(tlist));
@@ -1621,16 +1581,14 @@ ExprPtr DateaddExpr::rewrite_agg_to_var(
 
 ExprPtr DatediffExpr::rewrite_agg_to_var(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-  return makeExpr<DatediffExpr>(type_info,
-                                field_,
-                                start_->rewrite_agg_to_var(tlist),
-                                end_->rewrite_agg_to_var(tlist));
+  return makeExpr<DatediffExpr>(
+      type_, field_, start_->rewrite_agg_to_var(tlist), end_->rewrite_agg_to_var(tlist));
 }
 
 ExprPtr DatetruncExpr::rewrite_agg_to_var(
     const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
   return makeExpr<DatetruncExpr>(
-      type_info, contains_agg, field_, from_expr_->rewrite_agg_to_var(tlist));
+      type_, contains_agg, field_, from_expr_->rewrite_agg_to_var(tlist));
 }
 
 bool ColumnVar::operator==(const Expr& rhs) const {
@@ -1669,16 +1627,16 @@ bool Constant::operator==(const Expr& rhs) const {
     return false;
   }
   const Constant& rhs_c = dynamic_cast<const Constant&>(rhs);
-  if (type_info != rhs_c.get_type_info() || is_null != rhs_c.get_is_null()) {
+  if (!type_->equal(rhs_c.type()) || is_null != rhs_c.get_is_null()) {
     return false;
   }
   if (is_null && rhs_c.get_is_null()) {
     return true;
   }
-  if (type_info.is_array()) {
+  if (type_->isArray()) {
     return false;
   }
-  return Datum_equal(type_info, constval, rhs_c.get_constval());
+  return DatumEqual(constval, rhs_c.get_constval(), type_);
 }
 
 bool UOper::operator==(const Expr& rhs) const {
@@ -1970,8 +1928,7 @@ bool ArrayExpr::operator==(Expr const& rhs) const {
 std::string ColumnVar::toString() const {
   return "(ColumnVar table: " + std::to_string(get_table_id()) +
          " column: " + std::to_string(get_column_id()) +
-         " rte: " + std::to_string(rte_idx) + " " + get_type_info().get_type_name() +
-         ") ";
+         " rte: " + std::to_string(rte_idx) + " " + type()->toString() + ") ";
 }
 
 std::string ExpressionTuple::toString() const {
@@ -1994,11 +1951,10 @@ std::string Constant::toString() const {
   std::string str{"(Const "};
   if (is_null) {
     str += "NULL";
-  } else if (type_info.is_array()) {
-    const auto& elem_ti = type_info.get_elem_type();
-    str += ::toString(type_info.get_type()) + ": " + ::toString(elem_ti.get_type());
+  } else if (type_->isArray()) {
+    str += type_->toString();
   } else {
-    str += DatumToString(constval, type_info);
+    str += DatumToString(constval, type_);
   }
   str += ") ";
   return str;
@@ -2020,11 +1976,7 @@ std::string UOper::toString() const {
       op = "EXISTS ";
       break;
     case kCAST:
-      op = "CAST " + type_info.get_type_name() + "(" +
-           std::to_string(type_info.get_precision()) + "," +
-           std::to_string(type_info.get_scale()) + ") " +
-           type_info.get_compression_name() + "(" +
-           std::to_string(type_info.get_comp_param()) + ") ";
+      op = "CAST " + type_->toString() + " ";
       break;
     case kUNNEST:
       op = "UNNEST ";
@@ -2136,7 +2088,7 @@ std::string InValues::toString() const {
 
 ExprPtr InIntegerSet::deep_copy() const {
   return std::make_shared<InIntegerSet>(
-      arg->deep_copy(), value_list, get_type_info().get_notnull());
+      arg->deep_copy(), value_list, !type()->nullable());
 }
 
 bool InIntegerSet::operator==(const Expr& rhs) const {
@@ -2760,11 +2712,11 @@ ExprPtr FunctionOper::deep_copy() const {
   for (size_t i = 0; i < getArity(); ++i) {
     args_copy.push_back(getArg(i)->deep_copy());
   }
-  return makeExpr<FunctionOper>(type_info, getName(), args_copy);
+  return makeExpr<FunctionOper>(type_, getName(), args_copy);
 }
 
 bool FunctionOper::operator==(const Expr& rhs) const {
-  if (type_info != rhs.get_type_info()) {
+  if (!type_->equal(rhs.type())) {
     return false;
   }
   const auto rhs_func_oper = dynamic_cast<const FunctionOper*>(&rhs);
@@ -2799,11 +2751,11 @@ ExprPtr FunctionOperWithCustomTypeHandling::deep_copy() const {
   for (size_t i = 0; i < getArity(); ++i) {
     args_copy.push_back(getArg(i)->deep_copy());
   }
-  return makeExpr<FunctionOperWithCustomTypeHandling>(type_info, getName(), args_copy);
+  return makeExpr<FunctionOperWithCustomTypeHandling>(type_, getName(), args_copy);
 }
 
 bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
-  if (type_info != rhs.get_type_info()) {
+  if (!type_->equal(rhs.type())) {
     return false;
   }
   const auto rhs_func_oper =
@@ -2828,7 +2780,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
 double WidthBucketExpr::get_bound_val(const Expr* bound_expr) const {
   CHECK(bound_expr);
   auto copied_expr = bound_expr->deep_copy();
-  auto casted_expr = copied_expr->add_cast(SQLTypeInfo(kDOUBLE, false));
+  auto casted_expr = copied_expr->add_cast(ctx().fp64());
   CHECK(casted_expr);
   auto casted_constant = std::dynamic_pointer_cast<const Constant>(casted_expr);
   CHECK(casted_constant);
@@ -2841,20 +2793,25 @@ int32_t WidthBucketExpr::get_partition_count_val() const {
     return -1;
   }
   auto d = const_partition_count_expr->get_constval();
-  switch (const_partition_count_expr->get_type_info().get_type()) {
-    case kTINYINT:
-      return d.tinyintval;
-    case kSMALLINT:
-      return d.smallintval;
-    case kINT:
-      return d.intval;
-    case kBIGINT: {
-      auto bi = d.bigintval;
-      if (bi < 1 || bi > INT32_MAX) {
-        return -1;
+  switch (const_partition_count_expr->type()->id()) {
+    case hdk::ir::Type::kInteger:
+      switch (const_partition_count_expr->type()->size()) {
+        case 1:
+          return d.tinyintval;
+        case 2:
+          return d.smallintval;
+        case 4:
+          return d.intval;
+        case 8: {
+          auto bi = d.bigintval;
+          if (bi < 1 || bi > INT32_MAX) {
+            return -1;
+          }
+          return bi;
+        }
+        default:
+          return -1;
       }
-      return bi;
-    }
     default:
       return -1;
   }
@@ -2931,7 +2888,7 @@ size_t Constant::hash() const {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, is_null);
     if (!is_null) {
-      if (type_info.get_type() == kARRAY) {
+      if (type_->isArray()) {
         for (auto& expr : value_list) {
           boost::hash_combine(*hash_, expr->hash());
         }

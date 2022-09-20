@@ -199,9 +199,7 @@ class ColumnRef : public Expr {
   ColumnRef(const SQLTypeInfo& ti, const RelAlgNode* node, unsigned idx)
       : Expr(ti), node_(node), idx_(idx) {}
 
-  ExprPtr deep_copy() const override {
-    return makeExpr<ColumnRef>(type_info, node_, idx_);
-  }
+  ExprPtr deep_copy() const override { return makeExpr<ColumnRef>(type_, node_, idx_); }
 
   bool operator==(const Expr& rhs) const override {
     const ColumnRef* rhsp = dynamic_cast<const ColumnRef*>(&rhs);
@@ -230,7 +228,7 @@ class GroupColumnRef : public Expr {
   GroupColumnRef(const Type* type, unsigned idx) : Expr(type), idx_(idx) {}
   GroupColumnRef(const SQLTypeInfo& ti, unsigned idx) : Expr(ti), idx_(idx) {}
 
-  ExprPtr deep_copy() const override { return makeExpr<GroupColumnRef>(type_info, idx_); }
+  ExprPtr deep_copy() const override { return makeExpr<GroupColumnRef>(type_, idx_); }
 
   bool operator==(const Expr& rhs) const override {
     const GroupColumnRef* rhsp = dynamic_cast<const GroupColumnRef*>(&rhs);
@@ -259,6 +257,10 @@ class ColumnVar : public Expr {
  public:
   ColumnVar(ColumnInfoPtr col_info, int nest_level)
       : Expr(col_info->type), rte_idx(nest_level), col_info_(std::move(col_info)) {}
+  ColumnVar(const hdk::ir::Type* type)
+      : Expr(type)
+      , rte_idx(-1)
+      , col_info_(std::make_shared<ColumnInfo>(-1, 0, 0, "", type_, false)) {}
   ColumnVar(const SQLTypeInfo& ti)
       : Expr(ti)
       , rte_idx(-1)
@@ -376,6 +378,8 @@ class Var : public ColumnVar {
       : ColumnVar(ti, r, c, i, is_virtual), which_row(o), varno(v) {}
   Var(ColumnInfoPtr col_info, int i, WhichRow o, int v)
       : ColumnVar(col_info, i), which_row(o), varno(v) {}
+  Var(const hdk::ir::Type* type, WhichRow o, int v)
+      : ColumnVar(type), which_row(o), varno(v) {}
   Var(const SQLTypeInfo& ti, WhichRow o, int v) : ColumnVar(ti), which_row(o), varno(v) {}
   WhichRow get_which_row() const { return which_row; }
   void set_which_row(WhichRow r) { which_row = r; }
@@ -445,6 +449,12 @@ class Constant : public Expr {
       type_info.set_notnull(true);
     }
   }
+  Constant(const hdk::ir::Type* type, bool n, const ExprPtrList& l, bool cacheable = true)
+      : Expr(type)
+      , is_null(n)
+      , cacheable_(cacheable)
+      , constval(Datum{0})
+      , value_list(l) {}
   Constant(const SQLTypeInfo& ti, bool n, const ExprPtrList& l, bool cacheable = true)
       : Expr(ti), is_null(n), cacheable_(cacheable), constval(Datum{0}), value_list(l) {}
   ~Constant() override;
@@ -452,8 +462,8 @@ class Constant : public Expr {
   bool cacheable() const { return cacheable_; }
   Datum get_constval() const { return constval; }
   void set_constval(Datum d) { constval = d; }
-  int64_t intVal() const { return extract_int_type_from_datum(constval, type_info); }
-  double fpVal() const { return extract_fp_type_from_datum(constval, type_info); }
+  int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }
+  double fpVal() const { return extract_fp_type_from_datum(constval, type_); }
   const ExprPtrList& get_value_list() const { return value_list; }
   ExprPtr deep_copy() const override;
   ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false) override;
@@ -489,8 +499,15 @@ class Constant : public Expr {
  */
 class UOper : public Expr {
  public:
-  UOper(const Type* type, bool has_agg, SQLOps o, ExprPtr p)
-      : Expr(type, has_agg), optype(o), operand(p), is_dict_intersection_(false) {}
+  UOper(const Type* type,
+        bool has_agg,
+        SQLOps o,
+        ExprPtr p,
+        bool is_dict_intersection = false)
+      : Expr(type, has_agg)
+      , optype(o)
+      , operand(p)
+      , is_dict_intersection_(is_dict_intersection) {}
   UOper(const Type* type, SQLOps o, ExprPtr p)
       : Expr(type), optype(o), operand(p), is_dict_intersection_(false) {}
   UOper(const SQLTypeInfo& ti,
@@ -528,17 +545,17 @@ class UOper : public Expr {
   ExprPtr rewrite_with_targetlist(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
     return makeExpr<UOper>(
-        type_info, contains_agg, optype, operand->rewrite_with_targetlist(tlist));
+        type_, contains_agg, optype, operand->rewrite_with_targetlist(tlist));
   }
   ExprPtr rewrite_with_child_targetlist(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
     return makeExpr<UOper>(
-        type_info, contains_agg, optype, operand->rewrite_with_child_targetlist(tlist));
+        type_, contains_agg, optype, operand->rewrite_with_child_targetlist(tlist));
   }
   ExprPtr rewrite_agg_to_var(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
     return makeExpr<UOper>(
-        type_info, contains_agg, optype, operand->rewrite_agg_to_var(tlist));
+        type_, contains_agg, optype, operand->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -605,7 +622,7 @@ class BinOper : public Expr {
   }
   ExprPtr rewrite_with_targetlist(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_info,
+    return makeExpr<BinOper>(type_,
                              contains_agg,
                              optype,
                              qualifier,
@@ -614,7 +631,7 @@ class BinOper : public Expr {
   }
   ExprPtr rewrite_with_child_targetlist(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_info,
+    return makeExpr<BinOper>(type_,
                              contains_agg,
                              optype,
                              qualifier,
@@ -623,7 +640,7 @@ class BinOper : public Expr {
   }
   ExprPtr rewrite_agg_to_var(
       const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_info,
+    return makeExpr<BinOper>(type_,
                              contains_agg,
                              optype,
                              qualifier,
@@ -699,10 +716,7 @@ class ScalarSubquery : public Expr {
       : Expr(type), node_(node) {}
   ScalarSubquery(const SQLTypeInfo& ti, std::shared_ptr<const RelAlgNode> node)
       : Expr(ti), node_(node) {}
-
-  ExprPtr deep_copy() const override {
-    return makeExpr<ScalarSubquery>(type_info, node_);
-  }
+  ExprPtr deep_copy() const override { return makeExpr<ScalarSubquery>(type_, node_); }
 
   bool operator==(const Expr& rhs) const override {
     const ScalarSubquery* rhsp = dynamic_cast<const ScalarSubquery*>(&rhs);
@@ -804,7 +818,7 @@ class InSubquery : public Expr {
       : Expr(ti), arg_(std::move(arg)), node_(std::move(node)) {}
 
   ExprPtr deep_copy() const override {
-    return makeExpr<InSubquery>(type_info, arg_->deep_copy(), node_);
+    return makeExpr<InSubquery>(type_, arg_->deep_copy(), node_);
   }
 
   bool operator==(const Expr& rhs) const override {
@@ -834,7 +848,7 @@ class InSubquery : public Expr {
 class CharLengthExpr : public Expr {
  public:
   CharLengthExpr(ExprPtr a, bool e)
-      : Expr(kINT, a->get_type_info().get_notnull()), arg(a), calc_encoded_length(e) {}
+      : Expr(a->ctx().int32(a->type()->nullable())), arg(a), calc_encoded_length(e) {}
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   bool get_calc_encoded_length() const { return calc_encoded_length; }
@@ -884,7 +898,7 @@ class CharLengthExpr : public Expr {
  */
 class KeyForStringExpr : public Expr {
  public:
-  KeyForStringExpr(ExprPtr a) : Expr(kINT, a->get_type_info().get_notnull()), arg(a) {}
+  KeyForStringExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg(a) {}
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
@@ -930,7 +944,7 @@ class KeyForStringExpr : public Expr {
  */
 class SampleRatioExpr : public Expr {
  public:
-  SampleRatioExpr(ExprPtr a) : Expr(kBOOLEAN, a->get_type_info().get_notnull()), arg(a) {}
+  SampleRatioExpr(ExprPtr a) : Expr(a->ctx().boolean(a->type()->nullable())), arg(a) {}
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
@@ -976,7 +990,7 @@ class SampleRatioExpr : public Expr {
  */
 class LowerExpr : public Expr {
  public:
-  LowerExpr(ExprPtr arg) : Expr(arg->get_type_info()), arg(arg) {}
+  LowerExpr(ExprPtr arg) : Expr(arg->type()), arg(arg) {}
 
   const Expr* get_arg() const { return arg.get(); }
 
@@ -1034,7 +1048,7 @@ class LowerExpr : public Expr {
  */
 class CardinalityExpr : public Expr {
  public:
-  CardinalityExpr(ExprPtr a) : Expr(kINT, a->get_type_info().get_notnull()), arg(a) {}
+  CardinalityExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg(a) {}
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
@@ -1081,7 +1095,7 @@ class CardinalityExpr : public Expr {
 class LikeExpr : public Expr {
  public:
   LikeExpr(ExprPtr a, ExprPtr l, ExprPtr e, bool i, bool s)
-      : Expr(kBOOLEAN, a->get_type_info().get_notnull())
+      : Expr(a->ctx().boolean(a->type()->nullable()))
       , arg(a)
       , like_expr(l)
       , escape_expr(e)
@@ -1154,7 +1168,7 @@ class LikeExpr : public Expr {
 class RegexpExpr : public Expr {
  public:
   RegexpExpr(ExprPtr a, ExprPtr p, ExprPtr e)
-      : Expr(kBOOLEAN, a->get_type_info().get_notnull())
+      : Expr(a->ctx().boolean(a->type()->nullable()))
       , arg(a)
       , pattern_expr(p)
       , escape_expr(e) {}
@@ -1216,7 +1230,7 @@ class WidthBucketExpr : public Expr {
                   const ExprPtr lower_bound,
                   const ExprPtr upper_bound,
                   const ExprPtr partition_count)
-      : Expr(kINT, target_value->get_type_info().get_notnull())
+      : Expr(target_value->ctx().int32(target_value->type()->nullable()))
       , target_value_(target_value)
       , lower_bound_(lower_bound)
       , upper_bound_(upper_bound)
@@ -1324,7 +1338,7 @@ class WidthBucketExpr : public Expr {
 class LikelihoodExpr : public Expr {
  public:
   LikelihoodExpr(ExprPtr a, float l = 0.5)
-      : Expr(kBOOLEAN, a->get_type_info().get_notnull()), arg(a), likelihood(l) {}
+      : Expr(a->ctx().boolean(a->type()->nullable())), arg(a), likelihood(l) {}
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   float get_likelihood() const { return likelihood; }
