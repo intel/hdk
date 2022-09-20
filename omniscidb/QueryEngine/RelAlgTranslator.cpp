@@ -28,88 +28,108 @@
 namespace {
 
 std::pair<Datum, bool> datum_from_scalar_tv(const ScalarTargetValue* scalar_tv,
-                                            const SQLTypeInfo& ti) noexcept {
+                                            const hdk::ir::Type* type) noexcept {
   Datum d{0};
   bool is_null_const{false};
-  switch (ti.get_type()) {
-    case kBOOLEAN: {
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean: {
       const auto ival = boost::get<int64_t>(scalar_tv);
       CHECK(ival);
-      if (*ival == inline_int_null_val(ti)) {
+      if (*ival == inline_int_null_value(type)) {
         is_null_const = true;
       } else {
         d.boolval = *ival;
       }
       break;
     }
-    case kTINYINT: {
-      const auto ival = boost::get<int64_t>(scalar_tv);
-      CHECK(ival);
-      if (*ival == inline_int_null_val(ti)) {
-        is_null_const = true;
-      } else {
-        d.tinyintval = *ival;
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+      switch (type->size()) {
+        case 1: {
+          const auto ival = boost::get<int64_t>(scalar_tv);
+          CHECK(ival);
+          if (*ival == inline_int_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.tinyintval = *ival;
+          }
+          break;
+        }
+        case 2: {
+          const auto ival = boost::get<int64_t>(scalar_tv);
+          CHECK(ival);
+          if (*ival == inline_int_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.smallintval = *ival;
+          }
+          break;
+        }
+        case 4: {
+          const auto ival = boost::get<int64_t>(scalar_tv);
+          CHECK(ival);
+          if (*ival == inline_int_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.intval = *ival;
+          }
+          break;
+        }
+        case 8: {
+          const auto ival = boost::get<int64_t>(scalar_tv);
+          CHECK(ival);
+          if (*ival == inline_int_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.bigintval = *ival;
+          }
+          break;
+        }
+        default:
+          CHECK(false);
       }
       break;
-    }
-    case kSMALLINT: {
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp: {
       const auto ival = boost::get<int64_t>(scalar_tv);
       CHECK(ival);
-      if (*ival == inline_int_null_val(ti)) {
-        is_null_const = true;
-      } else {
-        d.smallintval = *ival;
-      }
-      break;
-    }
-    case kINT: {
-      const auto ival = boost::get<int64_t>(scalar_tv);
-      CHECK(ival);
-      if (*ival == inline_int_null_val(ti)) {
-        is_null_const = true;
-      } else {
-        d.intval = *ival;
-      }
-      break;
-    }
-    case kDECIMAL:
-    case kNUMERIC:
-    case kBIGINT:
-    case kDATE:
-    case kTIME:
-    case kTIMESTAMP: {
-      const auto ival = boost::get<int64_t>(scalar_tv);
-      CHECK(ival);
-      if (*ival == inline_int_null_val(ti)) {
+      if (*ival == inline_int_null_value(type)) {
         is_null_const = true;
       } else {
         d.bigintval = *ival;
       }
       break;
     }
-    case kDOUBLE: {
-      const auto dval = boost::get<double>(scalar_tv);
-      CHECK(dval);
-      if (*dval == inline_fp_null_val(ti)) {
-        is_null_const = true;
-      } else {
-        d.doubleval = *dval;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kDouble: {
+          const auto dval = boost::get<double>(scalar_tv);
+          CHECK(dval);
+          if (*dval == inline_fp_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.doubleval = *dval;
+          }
+          break;
+        }
+        case hdk::ir::FloatingPointType::kFloat: {
+          const auto fval = boost::get<float>(scalar_tv);
+          CHECK(fval);
+          if (*fval == inline_fp_null_value(type)) {
+            is_null_const = true;
+          } else {
+            d.floatval = *fval;
+          }
+          break;
+        }
+        default:
+          CHECK(false);
       }
       break;
-    }
-    case kFLOAT: {
-      const auto fval = boost::get<float>(scalar_tv);
-      CHECK(fval);
-      if (*fval == inline_fp_null_val(ti)) {
-        is_null_const = true;
-      } else {
-        d.floatval = *fval;
-      }
-      break;
-    }
-    case kTEXT:
-    case kVARCHAR:
-    case kCHAR: {
+    case hdk::ir::Type::kExtDictionary:
+    case hdk::ir::Type::kText:
+    case hdk::ir::Type::kVarChar: {
       auto nullable_sptr = boost::get<NullableString>(scalar_tv);
       CHECK(nullable_sptr);
       if (boost::get<void*>(nullable_sptr)) {
@@ -121,7 +141,7 @@ std::pair<Datum, bool> datum_from_scalar_tv(const ScalarTargetValue* scalar_tv,
       break;
     }
     default:
-      CHECK(false) << "Unhandled type: " << ti.get_type_name();
+      CHECK(false) << "Unhandled type: " << type->toString();
   }
   return {d, is_null_const};
 }
@@ -131,14 +151,14 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
   auto row_set = result->getRows();
   const size_t row_count = row_set->rowCount();
   CHECK_EQ(size_t(1), row_set->colCount());
-  auto ti = row_set->getColType(0);
+  auto type = row_set->colType(0);
   if (row_count > size_t(1)) {
     throw std::runtime_error("Scalar sub-query returned multiple rows");
   }
   if (row_count == size_t(0)) {
     if (row_set->isValidationOnlyRes()) {
       Datum d{0};
-      return hdk::ir::makeExpr<hdk::ir::Constant>(ti, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
     }
     throw std::runtime_error("Scalar sub-query returned no results");
   }
@@ -147,13 +167,13 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
   auto first_row = row_set->getNextRow(false, false);
   CHECK_EQ(first_row.size(), size_t(1));
   auto scalar_tv = boost::get<ScalarTargetValue>(&first_row[0]);
-  if (ti.is_string()) {
+  if (type->isString() || type->isExtDictionary()) {
     throw std::runtime_error("Scalar sub-queries which return strings not supported");
   }
   Datum d{0};
   bool is_null_const{false};
-  std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, ti);
-  return hdk::ir::makeExpr<hdk::ir::Constant>(ti, is_null_const, d);
+  std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, type);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(type, is_null_const, d);
 }
 
 class NormalizerVisitor : public DeepCopyVisitor {
@@ -198,20 +218,19 @@ class NormalizerVisitor : public DeepCopyVisitor {
       return std::make_shared<hdk::ir::ColumnVar>(col_info, rte_idx);
     }
     CHECK_GE(rte_idx, 0);
-    SQLTypeInfo col_ti;
     CHECK(!in_metainfo.empty()) << "for " << source->toString();
     CHECK_LT(col_idx, in_metainfo.size());
-    col_ti = in_metainfo[col_idx].get_type_info();
+    auto col_type = in_metainfo[col_idx].type();
 
     if (join_types_.size() > 0) {
       CHECK_LE(static_cast<size_t>(rte_idx), join_types_.size());
       if (rte_idx > 0 && join_types_[rte_idx - 1] == JoinType::LEFT) {
-        col_ti.set_notnull(false);
+        col_type = col_type->withNullable(true);
       }
     }
 
     return std::make_shared<hdk::ir::ColumnVar>(
-        col_ti, -source->getId(), col_idx, rte_idx);
+        col_type, -source->getId(), col_idx, rte_idx);
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
@@ -221,7 +240,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
     // not covered in Analyzer normalization.
     if (bin_oper->get_optype() == kARRAY_AT) {
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
-          bin_oper->get_type_info(),
+          bin_oper->type(),
           lhs->get_contains_agg() || rhs->get_contains_agg(),
           bin_oper->get_optype(),
           bin_oper->get_qualifier(),
@@ -239,11 +258,11 @@ class NormalizerVisitor : public DeepCopyVisitor {
     // Casts introduced on DAG build stage might become NOPs.
     if (uoper->get_optype() == kCAST) {
       auto op = visit(uoper->get_operand());
-      if (uoper->get_type_info() == op->get_type_info()) {
+      if (uoper->type()->equal(op->type())) {
         return op;
       }
       return hdk::ir::makeExpr<hdk::ir::UOper>(
-          uoper->get_type_info(), op->get_contains_agg(), kCAST, op);
+          uoper->type(), op->get_contains_agg(), kCAST, op);
     }
     return DeepCopyVisitor::visitUOper(uoper);
   }
@@ -321,7 +340,7 @@ hdk::ir::ExprPtr get_in_values_expr(hdk::ir::ExprPtr arg,
   std::vector<std::list<hdk::ir::ExprPtr>> expr_set(fetcher_count,
                                                     std::list<hdk::ir::ExprPtr>());
   std::vector<std::future<void>> fetcher_threads;
-  const auto& ti = arg->get_type_info();
+  auto type = arg->type();
   const auto entry_count = val_set.entryCount();
   for (size_t i = 0,
               start_entry = 0,
@@ -340,18 +359,16 @@ hdk::ir::ExprPtr get_in_values_expr(hdk::ir::ExprPtr arg,
             auto scalar_tv = boost::get<ScalarTargetValue>(&row[0]);
             Datum d{0};
             bool is_null_const{false};
-            std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, ti);
-            if (ti.is_string() && ti.get_compression() != kENCODING_NONE) {
-              auto ti_none_encoded = ti;
-              ti_none_encoded.set_compression(kENCODING_NONE);
-              auto none_encoded_string =
-                  hdk::ir::makeExpr<hdk::ir::Constant>(ti, is_null_const, d);
-              auto dict_encoded_string =
-                  std::make_shared<hdk::ir::UOper>(ti, false, kCAST, none_encoded_string);
+            std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, type);
+            if (type->isExtDictionary()) {
+              auto none_encoded_string = hdk::ir::makeExpr<hdk::ir::Constant>(
+                  type->ctx().text(is_null_const), is_null_const, d);
+              auto dict_encoded_string = std::make_shared<hdk::ir::UOper>(
+                  type, false, kCAST, none_encoded_string);
               in_vals.push_back(dict_encoded_string);
             } else {
               in_vals.push_back(
-                  hdk::ir::makeExpr<hdk::ir::Constant>(ti, is_null_const, d));
+                  hdk::ir::makeExpr<hdk::ir::Constant>(type, is_null_const, d));
             }
           }
         },
@@ -376,19 +393,19 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
     hdk::ir::ExprPtr lhs,
     std::shared_ptr<const ExecutionResult> result) const {
   CHECK(result);
-  auto ti = lhs->get_type_info();
+  auto type = lhs->type();
   auto& row_set = result->getRows();
   CHECK_EQ(size_t(1), row_set->colCount());
-  const auto& rhs_ti = row_set->getColType(0);
-  if (rhs_ti.get_type() != ti.get_type()) {
+  const auto& rhs_type = row_set->colType(0);
+  if (rhs_type->id() != type->id() || rhs_type->size() != type->size()) {
     throw std::runtime_error(
         "The two sides of the IN operator must have the same type; found " +
-        ti.get_type_name() + " and " + rhs_ti.get_type_name());
+        type->toString() + " and " + rhs_type->toString());
   }
   row_set->moveToBegin();
   if (row_set->entryCount() > 10000) {
     hdk::ir::ExprPtr expr;
-    if ((ti.is_integer() || (ti.is_string() && ti.get_compression() == kENCODING_DICT)) &&
+    if ((type->isInteger() || type->isExtDictionary()) &&
         !row_set->getQueryMemDesc().didOutputColumnar()) {
       expr = getInIntegerSetExpr(lhs, *row_set);
       // Handle the highly unlikely case when the InIntegerSet ended up being tiny.
@@ -419,17 +436,15 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
     auto scalar_tv = boost::get<ScalarTargetValue>(&row[0]);
     Datum d{0};
     bool is_null_const{false};
-    std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, ti);
-    if (ti.is_string() && ti.get_compression() != kENCODING_NONE) {
-      auto ti_none_encoded = ti;
-      ti_none_encoded.set_compression(kENCODING_NONE);
-      auto none_encoded_string =
-          hdk::ir::makeExpr<hdk::ir::Constant>(ti_none_encoded, is_null_const, d);
+    std::tie(d, is_null_const) = datum_from_scalar_tv(scalar_tv, type);
+    if (type->isExtDictionary()) {
+      auto none_encoded_string = hdk::ir::makeExpr<hdk::ir::Constant>(
+          type->ctx().text(is_null_const), is_null_const, d);
       auto dict_encoded_string =
-          std::make_shared<hdk::ir::UOper>(ti, false, kCAST, none_encoded_string);
+          std::make_shared<hdk::ir::UOper>(type, false, kCAST, none_encoded_string);
       value_exprs.push_back(dict_encoded_string);
     } else {
-      value_exprs.push_back(hdk::ir::makeExpr<hdk::ir::Constant>(ti, is_null_const, d));
+      value_exprs.push_back(hdk::ir::makeExpr<hdk::ir::Constant>(type, is_null_const, d));
     }
   }
   return hdk::ir::makeExpr<hdk::ir::InValues>(lhs, value_exprs);
@@ -512,10 +527,10 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
   const size_t fetcher_count = cpu_threads();
   std::vector<std::vector<int64_t>> expr_set(fetcher_count);
   std::vector<std::future<void>> fetcher_threads;
-  const auto& arg_type = arg->get_type_info();
+  auto arg_type = arg->type();
   const auto entry_count = val_set.entryCount();
   CHECK_EQ(size_t(1), val_set.colCount());
-  const auto& col_type = val_set.getColType(0);
+  auto col_type = val_set.colType(0);
   std::atomic<size_t> total_in_vals_count{0};
   for (size_t i = 0,
               start_entry = 0,
@@ -524,16 +539,16 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
        ++i, start_entry += stride) {
     expr_set[i].reserve(entry_count / fetcher_count);
     const auto end_entry = std::min(start_entry + stride, entry_count);
-    if (arg_type.is_string()) {
-      CHECK_EQ(kENCODING_DICT, arg_type.get_compression());
-      // const int32_t dest_dict_id = arg_type.get_comp_param();
-      // const int32_t source_dict_id = col_type.get_comp_param();
+    if (arg_type->isExtDictionary()) {
+      auto dest_dict_id = arg_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+      CHECK(col_type->isExtDictionary());
+      auto source_dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       const auto dd = executor_->getStringDictionaryProxy(
-          arg_type.get_comp_param(), val_set.getRowSetMemOwner(), true);
+          dest_dict_id, val_set.getRowSetMemOwner(), true);
       const auto sd = executor_->getStringDictionaryProxy(
-          col_type.get_comp_param(), val_set.getRowSetMemOwner(), true);
+          source_dict_id, val_set.getRowSetMemOwner(), true);
       CHECK(sd);
-      const auto needle_null_val = inline_int_null_val(arg_type);
+      const auto needle_null_val = inline_int_null_value(arg_type);
       fetcher_threads.push_back(std::async(
           std::launch::async,
           [this, &val_set, &total_in_vals_count, sd, dd, needle_null_val](
@@ -551,7 +566,7 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
           start_entry,
           end_entry));
     } else {
-      CHECK(arg_type.is_integer());
+      CHECK(arg_type->isInteger());
       fetcher_threads.push_back(std::async(
           std::launch::async,
           [this, &val_set, &total_in_vals_count](
@@ -577,7 +592,7 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
     value_exprs.insert(value_exprs.end(), exprs.begin(), exprs.end());
   }
   return hdk::ir::makeExpr<hdk::ir::InIntegerSet>(
-      arg, value_exprs, arg_type.get_notnull() && col_type.get_notnull());
+      arg, value_exprs, !arg_type->nullable() && !col_type->nullable());
 }
 
 QualsConjunctiveForm qual_to_conjunctive_form(const hdk::ir::ExprPtr qual_expr) {
