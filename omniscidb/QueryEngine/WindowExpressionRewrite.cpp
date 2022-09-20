@@ -32,15 +32,14 @@ bool matches_gt_bigint_zero(const hdk::ir::BinOper* window_gt_zero) {
   }
   const auto zero =
       dynamic_cast<const hdk::ir::Constant*>(window_gt_zero->get_right_operand());
-  return zero && zero->get_type_info().get_type() == kBIGINT &&
-         zero->get_constval().bigintval == 0;
+  return zero && zero->type()->isInt64() && zero->get_constval().bigintval == 0;
 }
 
 // Returns true iff the sum and the count match in type and arguments. Used to replace
 // combination can be replaced with an explicit average.
 bool window_sum_and_count_match(const hdk::ir::WindowFunction* sum_window_expr,
                                 const hdk::ir::WindowFunction* count_window_expr) {
-  CHECK_EQ(count_window_expr->get_type_info().get_type(), kBIGINT);
+  CHECK(count_window_expr->type()->isInt64());
   return expr_list_match(sum_window_expr->getArgs(), count_window_expr->getArgs());
 }
 
@@ -81,11 +80,11 @@ std::shared_ptr<hdk::ir::WindowFunction> rewrite_sum_window(const hdk::ir::Expr*
     return nullptr;
   }
   CHECK(sum_window_expr);
-  auto sum_ti = sum_window_expr->get_type_info();
-  if (sum_ti.is_integer()) {
-    sum_ti = SQLTypeInfo(kBIGINT, sum_ti.get_notnull());
+  auto sum_type = sum_window_expr->type();
+  if (sum_type->isInteger()) {
+    sum_type = sum_type->ctx().int64(sum_type->nullable());
   }
-  return hdk::ir::makeExpr<hdk::ir::WindowFunction>(sum_ti,
+  return hdk::ir::makeExpr<hdk::ir::WindowFunction>(sum_type,
                                                     SqlWindowFunctionKind::SUM,
                                                     sum_window_expr->getArgs(),
                                                     sum_window_expr->getPartitionKeys(),
@@ -115,15 +114,16 @@ std::shared_ptr<hdk::ir::WindowFunction> rewrite_avg_window(const hdk::ir::Expr*
   if (!count_window || count_window->getKind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
   }
-  CHECK_EQ(count_window->get_type_info().get_type(), kBIGINT);
-  if (cast_count_window && cast_count_window->get_type_info().get_type() !=
-                               sum_window_expr->get_type_info().get_type()) {
+  CHECK(count_window->type()->isInt64());
+  if (cast_count_window &&
+      (cast_count_window->type()->id() != sum_window_expr->type()->id() ||
+       cast_count_window->type()->size() != sum_window_expr->type()->size())) {
     return nullptr;
   }
   if (!expr_list_match(sum_window_expr.get()->getArgs(), count_window->getArgs())) {
     return nullptr;
   }
-  return hdk::ir::makeExpr<hdk::ir::WindowFunction>(SQLTypeInfo(kDOUBLE),
+  return hdk::ir::makeExpr<hdk::ir::WindowFunction>(expr->ctx().fp64(),
                                                     SqlWindowFunctionKind::AVG,
                                                     sum_window_expr->getArgs(),
                                                     sum_window_expr->getPartitionKeys(),
