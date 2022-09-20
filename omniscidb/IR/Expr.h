@@ -77,7 +77,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
 
   ExprPtr get_shared_ptr() { return shared_from_this(); }
   const SQLTypeInfo& get_type_info() const { return type_info; }
-  virtual void set_type_info(const SQLTypeInfo& ti);
   virtual void set_type_info(const hdk::ir::Type* new_type);
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }

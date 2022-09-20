@@ -195,18 +195,6 @@ bool is_in_values_nullable(const ExprPtr& a, const std::list<ExprPtr>& l) {
   return false;
 }
 
-void checkType(SQLTypeInfo old_ti, SQLTypeInfo new_ti) {
-  if (old_ti.get_type() == kNUMERIC) {
-    old_ti.set_type(kDECIMAL);
-  }
-  if (old_ti.get_compression() == kENCODING_DATE_IN_DAYS) {
-    old_ti.set_comp_param(old_ti.get_size() * 8);
-  }
-  CHECK(old_ti == new_ti) << "Type mismatch:" << std::endl
-                          << " old=" << old_ti.toString() << std::endl
-                          << " new=" << new_ti.toString() << std::endl;
-}
-
 bool isCastAllowed(const Type* old_type, const Type* new_type) {
   // can always cast between the same type but different precision/scale/encodings
   if (old_type->id() == new_type->id()) {
@@ -258,11 +246,6 @@ void OrderEntry::print() const {
 
 Expr::Expr(const Type* type, bool has_agg)
     : type_(type), type_info(type->toTypeInfo()), contains_agg(has_agg) {}
-
-void Expr::set_type_info(const SQLTypeInfo& ti) {
-  set_type_info(hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
-  checkType(ti, type_info);
-}
 
 void Expr::set_type_info(const hdk::ir::Type* new_type) {
   type_ = new_type;
