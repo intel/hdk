@@ -34,8 +34,8 @@ const hdk::ir::Expr* remove_truncate_int(const hdk::ir::Expr* expr) {
   }
   CHECK_EQ(size_t(2), func_oper->getArity());
   const auto arg = func_oper->getArg(0);
-  const auto& arg_ti = arg->get_type_info();
-  return arg_ti.is_integer() ? arg : nullptr;
+  auto arg_type = arg->type();
+  return arg_type->isInteger() ? arg : nullptr;
 }
 
 bool match_const_integer(const hdk::ir::Expr* expr, const int64_t v) {
@@ -43,19 +43,19 @@ bool match_const_integer(const hdk::ir::Expr* expr, const int64_t v) {
   if (!const_expr) {
     return false;
   }
-  const auto& const_ti = const_expr->get_type_info();
-  if (!const_ti.is_integer()) {
+  auto const_type = const_expr->type();
+  if (!const_type->isInteger()) {
     return false;
   }
   const auto& datum = const_expr->get_constval();
-  switch (const_ti.get_type()) {
-    case kTINYINT:
+  switch (const_type->size()) {
+    case 1:
       return v == datum.tinyintval;
-    case kSMALLINT:
+    case 2:
       return v == datum.smallintval;
-    case kINT:
+    case 4:
       return v == datum.intval;
-    case kBIGINT:
+    case 8:
       return v == datum.bigintval;
     default:
       break;
@@ -123,8 +123,9 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_ar
     }
     interval_multiplier = mul_by_interval->get_right_operand();
   }
-  const auto& interval_ti = interval->get_type_info();
-  if (interval_ti.get_type() != kINTERVAL_DAY_TIME) {
+  auto interval_type = interval->type();
+  if (!interval_type->isInterval() ||
+      interval_type->as<hdk::ir::IntervalType>()->unit() != hdk::ir::TimeUnit::kMilli) {
     return dtINVALID;
   }
   const auto& datum = interval->get_constval();
@@ -147,9 +148,9 @@ hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
   if (!uoper || uoper->get_optype() != kCAST) {
     return nullptr;
   }
-  const auto& operand_ti = uoper->get_operand()->get_type_info();
-  const auto& target_ti = uoper->get_type_info();
-  if (operand_ti.get_type() != kTIMESTAMP || target_ti.get_type() != kDATE) {
+  auto operand_type = uoper->get_operand()->type();
+  auto target_type = uoper->type();
+  if (!operand_type->isTimestamp() || !target_type->isDate()) {
     return nullptr;
   }
   return uoper->get_own_operand();
