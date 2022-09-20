@@ -24,122 +24,124 @@ namespace table_functions {
 
 namespace {
 
-SQLTypeInfo ext_arg_pointer_type_to_type_info(const ExtArgumentType ext_arg_type) {
+const hdk::ir::Type* ext_arg_pointer_type_to_type(const ExtArgumentType ext_arg_type) {
+  auto& ctx = hdk::ir::Context::defaultCtx();
   switch (ext_arg_type) {
     case ExtArgumentType::PInt8:
-      return SQLTypeInfo(kTINYINT, false);
+      return ctx.int8();
     case ExtArgumentType::PInt16:
-      return SQLTypeInfo(kSMALLINT, false);
+      return ctx.int16();
     case ExtArgumentType::PInt32:
-      return SQLTypeInfo(kINT, false);
+      return ctx.int32();
     case ExtArgumentType::PInt64:
-      return SQLTypeInfo(kBIGINT, false);
+      return ctx.int64();
     case ExtArgumentType::PFloat:
-      return SQLTypeInfo(kFLOAT, false);
+      return ctx.fp32();
     case ExtArgumentType::PDouble:
-      return SQLTypeInfo(kDOUBLE, false);
+      return ctx.fp64();
     case ExtArgumentType::PBool:
-      return SQLTypeInfo(kBOOLEAN, false);
+      return ctx.boolean();
     case ExtArgumentType::ColumnInt8:
-      return generate_column_type(kTINYINT);
+      return ctx.column(ctx.int8());
     case ExtArgumentType::ColumnInt16:
-      return generate_column_type(kSMALLINT);
+      return ctx.column(ctx.int16());
     case ExtArgumentType::ColumnInt32:
-      return generate_column_type(kINT);
+      return ctx.column(ctx.int32());
     case ExtArgumentType::ColumnInt64:
-      return generate_column_type(kBIGINT);
+      return ctx.column(ctx.int64());
     case ExtArgumentType::ColumnFloat:
-      return generate_column_type(kFLOAT);
+      return ctx.column(ctx.fp32());
     case ExtArgumentType::ColumnDouble:
-      return generate_column_type(kDOUBLE);
+      return ctx.column(ctx.fp64());
     case ExtArgumentType::ColumnBool:
-      return generate_column_type(kBOOLEAN);
+      return ctx.column(ctx.boolean());
     case ExtArgumentType::ColumnListInt8:
-      return generate_column_list_type(kTINYINT);
+      return ctx.columnList(ctx.int8(), 0);
     case ExtArgumentType::ColumnListInt16:
-      return generate_column_list_type(kSMALLINT);
+      return ctx.columnList(ctx.int16(), 0);
     case ExtArgumentType::ColumnListInt32:
-      return generate_column_list_type(kINT);
+      return ctx.columnList(ctx.int32(), 0);
     case ExtArgumentType::ColumnListInt64:
-      return generate_column_list_type(kBIGINT);
+      return ctx.columnList(ctx.int64(), 0);
     case ExtArgumentType::ColumnListFloat:
-      return generate_column_list_type(kFLOAT);
+      return ctx.columnList(ctx.fp32(), 0);
     case ExtArgumentType::ColumnListDouble:
-      return generate_column_list_type(kDOUBLE);
+      return ctx.columnList(ctx.fp64(), 0);
     case ExtArgumentType::ColumnListBool:
-      return generate_column_list_type(kBOOLEAN);
+      return ctx.columnList(ctx.boolean(), 0);
     default:
-      LOG(WARNING) << "ext_arg_pointer_type_to_type_info: ExtArgumentType `"
+      LOG(WARNING) << "ext_arg_pointer_type_to_type: ExtArgumentType `"
                    << ExtensionFunctionsWhitelist::toString(ext_arg_type)
-                   << "` conversion to SQLTypeInfo not implemented.";
+                   << "` conversion to Type not implemented.";
       UNREACHABLE();
   }
   UNREACHABLE();
-  return SQLTypeInfo(kNULLT, false);
+  return nullptr;
 }
 
-SQLTypeInfo ext_arg_type_to_type_info_output(const ExtArgumentType ext_arg_type) {
+const hdk::ir::Type* ext_arg_type_to_type_output(const ExtArgumentType ext_arg_type) {
+  auto& ctx = hdk::ir::Context::defaultCtx();
   switch (ext_arg_type) {
     case ExtArgumentType::PInt8:
     case ExtArgumentType::ColumnInt8:
     case ExtArgumentType::ColumnListInt8:
     case ExtArgumentType::Int8:
-      return SQLTypeInfo(kTINYINT, false);
+      return ctx.int8();
     case ExtArgumentType::PInt16:
     case ExtArgumentType::ColumnInt16:
     case ExtArgumentType::ColumnListInt16:
     case ExtArgumentType::Int16:
-      return SQLTypeInfo(kSMALLINT, false);
+      return ctx.int16();
     case ExtArgumentType::PInt32:
     case ExtArgumentType::ColumnInt32:
     case ExtArgumentType::ColumnListInt32:
     case ExtArgumentType::Int32:
-      return SQLTypeInfo(kINT, false);
+      return ctx.int32();
     case ExtArgumentType::PInt64:
     case ExtArgumentType::ColumnInt64:
     case ExtArgumentType::ColumnListInt64:
     case ExtArgumentType::Int64:
-      return SQLTypeInfo(kBIGINT, false);
+      return ctx.int64();
     case ExtArgumentType::PFloat:
     case ExtArgumentType::ColumnFloat:
     case ExtArgumentType::ColumnListFloat:
     case ExtArgumentType::Float:
-      return SQLTypeInfo(kFLOAT, false);
+      return ctx.fp32();
     case ExtArgumentType::PDouble:
     case ExtArgumentType::ColumnDouble:
     case ExtArgumentType::ColumnListDouble:
     case ExtArgumentType::Double:
-      return SQLTypeInfo(kDOUBLE, false);
+      return ctx.fp64();
     case ExtArgumentType::PBool:
     case ExtArgumentType::ColumnBool:
     case ExtArgumentType::ColumnListBool:
     case ExtArgumentType::Bool:
-      return SQLTypeInfo(kBOOLEAN, false);
+      return ctx.boolean();
     case ExtArgumentType::ColumnTextEncodingDict:
     case ExtArgumentType::ColumnListTextEncodingDict:
     case ExtArgumentType::TextEncodingDict:
-      return SQLTypeInfo(kTEXT, false, kENCODING_DICT);
+      return ctx.extDict(ctx.text(), 0);
     default:
-      LOG(WARNING) << "ext_arg_pointer_type_to_type_info: ExtArgumentType `"
+      LOG(WARNING) << "ext_arg_type_to_type_output: ExtArgumentType `"
                    << ExtensionFunctionsWhitelist::toString(ext_arg_type)
-                   << "` conversion to SQLTypeInfo not implemented.";
+                   << "` conversion to Type not implemented.";
       UNREACHABLE();
   }
   UNREACHABLE();
-  return SQLTypeInfo(kNULLT, false);
+  return nullptr;
 }
 
 }  // namespace
 
-SQLTypeInfo TableFunction::getInputSQLType(const size_t idx) const {
+const hdk::ir::Type* TableFunction::getInputType(const size_t idx) const {
   CHECK_LT(idx, input_args_.size());
-  return ext_arg_pointer_type_to_type_info(input_args_[idx]);
+  return ext_arg_pointer_type_to_type(input_args_[idx]);
 }
 
-SQLTypeInfo TableFunction::getOutputSQLType(const size_t idx) const {
+const hdk::ir::Type* TableFunction::getOutputType(const size_t idx) const {
   CHECK_LT(idx, output_args_.size());
   // TODO(adb): conditionally handle nulls
-  return ext_arg_type_to_type_info_output(output_args_[idx]);
+  return ext_arg_type_to_type_output(output_args_[idx]);
 }
 
 int32_t TableFunction::countScalarArgs() const {

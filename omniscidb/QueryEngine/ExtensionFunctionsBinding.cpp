@@ -104,20 +104,30 @@ ExtArgumentType get_array_arg_elem_type(const ExtArgumentType ext_arg_array_type
   return ExtArgumentType{};
 }
 
-static int match_numeric_argument(const SQLTypeInfo& arg_type_info,
+static int get_numeric_scalar_scale(const hdk::ir::Type* arg_type) {
+  switch (arg_type->id()) {
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kFloatingPoint:
+      return arg_type->size();
+    case hdk::ir::Type::kDecimal:
+      return arg_type->as<hdk::ir::DecimalType>()->precision() > 7 ? 8 : 4;
+    default:
+      CHECK(false);
+  }
+  return -1;
+}
+
+static int match_numeric_argument(const hdk::ir::Type* arg_type,
                                   const bool is_arg_literal,
                                   const ExtArgumentType& sig_ext_arg_type,
                                   int32_t& penalty_score) {
-  const auto arg_type = arg_type_info.get_type();
-  CHECK(arg_type == kBOOLEAN || arg_type == kTINYINT || arg_type == kSMALLINT ||
-        arg_type == kINT || arg_type == kBIGINT || arg_type == kFLOAT ||
-        arg_type == kDOUBLE || arg_type == kDECIMAL || arg_type == kNUMERIC);
+  CHECK(arg_type->isBoolean() || arg_type->isNumber());
   // Todo (todd): Add support for timestamp, date, and time types
-  const auto sig_type_info = ext_arg_type_to_type_info(sig_ext_arg_type);
-  const auto sig_type = sig_type_info.get_type();
+  const auto sig_type = ext_arg_type_to_type(arg_type->ctx(), sig_ext_arg_type);
 
   // If we can't legally auto-cast to sig_type, abort
-  if (!arg_type_info.is_numeric_scalar_auto_castable(sig_type_info)) {
+  if (!arg_type->toTypeInfo().is_numeric_scalar_auto_castable(sig_type->toTypeInfo())) {
     return -1;
   }
 
@@ -137,14 +147,12 @@ static int match_numeric_argument(const SQLTypeInfo& arg_type_info,
   // by a specific scale transformation (see the implementation
   // below). For instance, casting tinyint to fp64 is prefered over
   // casting it to fp32 to minimize precision loss.
-  const bool is_integer_to_fp_cast = (arg_type == kTINYINT || arg_type == kSMALLINT ||
-                                      arg_type == kINT || arg_type == kBIGINT) &&
-                                     (sig_type == kFLOAT || sig_type == kDOUBLE);
+  const bool is_integer_to_fp_cast = arg_type->isInteger() && sig_type->isFloatingPoint();
 
-  const auto arg_type_relative_scale = arg_type_info.get_numeric_scalar_scale();
+  const auto arg_type_relative_scale = get_numeric_scalar_scale(arg_type);
   CHECK_GE(arg_type_relative_scale, 1);
   CHECK_LE(arg_type_relative_scale, 8);
-  auto sig_type_relative_scale = sig_type_info.get_numeric_scalar_scale();
+  auto sig_type_relative_scale = get_numeric_scalar_scale(sig_type);
   CHECK_GE(sig_type_relative_scale, 1);
   CHECK_LE(sig_type_relative_scale, 8);
 
@@ -196,7 +204,7 @@ static int match_numeric_argument(const SQLTypeInfo& arg_type_info,
   return 1;
 }
 
-static int match_arguments(const SQLTypeInfo& arg_type,
+static int match_arguments(const hdk::ir::Type* arg_type,
                            const bool is_arg_literal,
                            int sig_pos,
                            const std::vector<ExtArgumentType>& sig_types,
@@ -228,18 +236,14 @@ static int match_arguments(const SQLTypeInfo& arg_type,
     return -1;
   }
   auto sig_type = sig_types[sig_pos];
-  switch (arg_type.get_type()) {
-    case kBOOLEAN:
-    case kTINYINT:
-    case kSMALLINT:
-    case kINT:
-    case kBIGINT:
-    case kFLOAT:
-    case kDOUBLE:
-    case kDECIMAL:
-    case kNUMERIC:
+  switch (arg_type->id()) {
+    case hdk::ir::Type::kBoolean:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kFloatingPoint:
+    case hdk::ir::Type::kDecimal:
       return match_numeric_argument(arg_type, is_arg_literal, sig_type, penalty_score);
-    case kARRAY:
+    case hdk::ir::Type::kFixedLenArray:
+    case hdk::ir::Type::kVarLenArray:
       if ((sig_type == ExtArgumentType::PInt8 || sig_type == ExtArgumentType::PInt16 ||
            sig_type == ExtArgumentType::PInt32 || sig_type == ExtArgumentType::PInt64 ||
            sig_type == ExtArgumentType::PFloat || sig_type == ExtArgumentType::PDouble ||
@@ -249,14 +253,16 @@ static int match_arguments(const SQLTypeInfo& arg_type,
         return 2;
       } else if (is_ext_arg_type_array(sig_type)) {
         // array arguments must match exactly
-        CHECK(arg_type.is_array());
-        const auto sig_type_ti =
-            ext_arg_type_to_type_info(get_array_arg_elem_type(sig_type));
-        if (arg_type.get_elem_type() == kBOOLEAN && sig_type_ti.get_type() == kTINYINT) {
+        CHECK(arg_type->isArray());
+        const auto sig_type_type =
+            ext_arg_type_to_type(arg_type->ctx(), get_array_arg_elem_type(sig_type));
+        auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+        if (elem_type->isBoolean() && sig_type_type->isInt8()) {
           /* Boolean array has the same low-level structure as Int8 array. */
           penalty_score += 1000;
           return 1;
-        } else if (arg_type.get_elem_type().get_type() == sig_type_ti.get_type()) {
+        } else if (elem_type->id() == sig_type_type->id() &&
+                   elem_type->size() == sig_type_type->size()) {
           penalty_score += 1000;
           return 1;
         } else {
@@ -264,7 +270,7 @@ static int match_arguments(const SQLTypeInfo& arg_type,
         }
       }
       break;
-    case kNULLT:  // NULL maps to a pointer and size argument
+    case hdk::ir::Type::kNull:  // NULL maps to a pointer and size argument
       if ((sig_type == ExtArgumentType::PInt8 || sig_type == ExtArgumentType::PInt16 ||
            sig_type == ExtArgumentType::PInt32 || sig_type == ExtArgumentType::PInt64 ||
            sig_type == ExtArgumentType::PFloat || sig_type == ExtArgumentType::PDouble ||
@@ -274,16 +280,18 @@ static int match_arguments(const SQLTypeInfo& arg_type,
         return 2;
       }
       break;
-    case kCOLUMN:
+    case hdk::ir::Type::kColumn:
       if (is_ext_arg_type_column(sig_type)) {
         // column arguments must match exactly
-        const auto sig_type_ti =
-            ext_arg_type_to_type_info(get_column_arg_elem_type(sig_type));
-        if (arg_type.get_elem_type() == kBOOLEAN && sig_type_ti.get_type() == kTINYINT) {
+        const auto sig_type_type =
+            ext_arg_type_to_type(arg_type->ctx(), get_column_arg_elem_type(sig_type));
+        auto elem_type = arg_type->as<hdk::ir::ColumnType>()->columnType();
+        if (elem_type->isBoolean() && sig_type_type->isInt8()) {
           /* Boolean column has the same low-level structure as Int8 column. */
           penalty_score += 1000;
           return 1;
-        } else if (arg_type.get_elem_type().get_type() == sig_type_ti.get_type()) {
+        } else if (elem_type->id() == sig_type_type->id() &&
+                   elem_type->size() == sig_type_type->size()) {
           penalty_score += 1000;
           return 1;
         } else {
@@ -291,16 +299,18 @@ static int match_arguments(const SQLTypeInfo& arg_type,
         }
       }
       break;
-    case kCOLUMN_LIST:
+    case hdk::ir::Type::kColumnList:
       if (is_ext_arg_type_column_list(sig_type)) {
         // column_list arguments must match exactly
-        const auto sig_type_ti =
-            ext_arg_type_to_type_info(get_column_list_arg_elem_type(sig_type));
-        if (arg_type.get_elem_type() == kBOOLEAN && sig_type_ti.get_type() == kTINYINT) {
+        const auto sig_type_type = ext_arg_type_to_type(
+            arg_type->ctx(), get_column_list_arg_elem_type(sig_type));
+        auto elem_type = arg_type->as<hdk::ir::ColumnListType>()->columnType();
+        if (elem_type->isBoolean() && sig_type_type->isInt8()) {
           /* Boolean column_list has the same low-level structure as Int8 column_list. */
           penalty_score += 10000;
           return 1;
-        } else if (arg_type.get_elem_type().get_type() == sig_type_ti.get_type()) {
+        } else if (elem_type->id() == sig_type_type->id() &&
+                   elem_type->size() == sig_type_type->size()) {
           penalty_score += 10000;
           return 1;
         } else {
@@ -308,49 +318,28 @@ static int match_arguments(const SQLTypeInfo& arg_type,
         }
       }
       break;
-    case kVARCHAR:
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
       if (sig_type != ExtArgumentType::TextEncodingNone) {
         return -1;
       }
-      switch (arg_type.get_compression()) {
-        case kENCODING_NONE:
-          penalty_score += 1000;
-          return 1;
-        case kENCODING_DICT:
-          return -1;
-          // Todo (todd): Evaluate when and where we can tranlate to dictionary-encoded
-        default:
-          UNREACHABLE();
-      }
-    case kTEXT:
-      if (sig_type != ExtArgumentType::TextEncodingNone) {
-        return -1;
-      }
-      switch (arg_type.get_compression()) {
-        case kENCODING_NONE:
-          penalty_score += 1000;
-          return 1;
-        case kENCODING_DICT:
-          return -1;
-        default:
-          UNREACHABLE();
-      }
+      penalty_score += 1000;
+      return 1;
       /* Not implemented types:
-         kCHAR
-         kTIME
-         kTIMESTAMP
-         kDATE
-         kINTERVAL_DAY_TIME
-         kINTERVAL_YEAR_MONTH
-         kEVAL_CONTEXT_TYPE
-         kVOID
-         kCURSOR
-      */
+        kCHAR
+        kTIME
+        kTIMESTAMP
+        kDATE
+        kINTERVAL_DAY_TIME
+        kINTERVAL_YEAR_MONTH
+        kEVAL_CONTEXT_TYPE
+        kVOID
+        kCURSOR
+     */
     default:
       throw std::runtime_error(std::string(__FILE__) + "#" + std::to_string(__LINE__) +
-                               ": support for " + arg_type.get_type_name() +
-                               "(type=" + std::to_string(arg_type.get_type()) + ")" +
-                               +" not implemented: \n  pos=" + std::to_string(sig_pos) +
+                               ": support for " + arg_type->toString() +
+                               " not implemented: \n  pos=" + std::to_string(sig_pos) +
                                " max_pos=" + std::to_string(max_pos) + "\n  sig_types=(" +
                                ExtensionFunctionsWhitelist::toString(sig_types) + ")");
   }
@@ -378,7 +367,7 @@ bool is_valid_identifier(std::string str) {
 }  // namespace
 
 template <typename T>
-std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
+std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
     std::string name,
     hdk::ir::ExprPtrVector func_args,  // function args from sql query
     const std::vector<T>& ext_funcs,   // list of functions registered
@@ -423,42 +412,38 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
   int optimal = -1;
   int optimal_variant = -1;
 
-  std::vector<SQLTypeInfo> type_infos_input;
+  std::vector<const hdk::ir::Type*> types_input;
   std::vector<bool> args_are_constants;
   for (auto atype : func_args) {
     if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
       if (dynamic_cast<const hdk::ir::ColumnVar*>(atype.get())) {
-        SQLTypeInfo type_info = atype->get_type_info();
-        if (atype->get_type_info().get_type() == kTEXT) {
-          auto ti = generate_column_type(type_info.get_type(),         // subtype
-                                         type_info.get_compression(),  // compression
-                                         type_info.get_comp_param());  // comp_param
-          type_infos_input.push_back(ti);
+        auto type = atype->type();
+        if (type->isText() || type->isExtDictionary()) {
+          types_input.push_back(type->ctx().column(type));
           args_are_constants.push_back(false);
         } else {
-          auto ti = generate_column_type(type_info.get_type());
-          type_infos_input.push_back(ti);
+          types_input.push_back(type->ctx().column(type));
           args_are_constants.push_back(true);
         }
         continue;
       }
     }
-    type_infos_input.push_back(atype->get_type_info());
+    types_input.push_back(atype->type());
     if (dynamic_cast<const hdk::ir::Constant*>(atype.get())) {
       args_are_constants.push_back(true);
     } else {
       args_are_constants.push_back(false);
     }
   }
-  CHECK_EQ(type_infos_input.size(), args_are_constants.size());
+  CHECK_EQ(types_input.size(), args_are_constants.size());
 
-  if (type_infos_input.size() == 0 && ext_funcs.size() > 0) {
+  if (types_input.size() == 0 && ext_funcs.size() > 0) {
     CHECK_EQ(ext_funcs.size(), static_cast<size_t>(1));
     CHECK_EQ(ext_funcs[0].getInputArgs().size(), static_cast<size_t>(0));
     if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
       CHECK(ext_funcs[0].hasNonUserSpecifiedOutputSize());
     }
-    std::vector<SQLTypeInfo> empty_type_info_variant(0);
+    std::vector<const hdk::ir::Type*> empty_type_info_variant(0);
     return {ext_funcs[0], empty_type_info_variant};
   }
 
@@ -506,42 +491,43 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
            (Column<int>, Column<int>, Column<int>, int)
    */
   // clang-format on
-  std::vector<std::vector<SQLTypeInfo>> type_infos_variants;
-  for (auto ti : type_infos_input) {
-    if (type_infos_variants.begin() == type_infos_variants.end()) {
-      type_infos_variants.push_back({ti});
+  std::vector<std::vector<const hdk::ir::Type*>> types_variants;
+  for (auto type : types_input) {
+    if (types_variants.begin() == types_variants.end()) {
+      types_variants.push_back({type});
       if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-        if (ti.is_column()) {
-          auto mti = generate_column_list_type(ti.get_subtype());
-          mti.set_dimension(1);
-          type_infos_variants.push_back({mti});
+        if (type->isColumn()) {
+          auto mt =
+              type->ctx().columnList(type->as<hdk::ir::ColumnType>()->columnType(), 1);
+          types_variants.push_back({mt});
         }
       }
       continue;
     }
-    std::vector<std::vector<SQLTypeInfo>> new_type_infos_variants;
-    for (auto& type_infos : type_infos_variants) {
+    std::vector<std::vector<const hdk::ir::Type*>> new_types_variants;
+    for (auto& types : types_variants) {
       if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-        if (ti.is_column()) {
-          auto new_type_infos = type_infos;  // makes a copy
-          const auto& last = type_infos.back();
-          if (last.is_column_list() && last.get_subtype() == ti.get_subtype()) {
+        if (type->isColumn()) {
+          auto col_type = type->as<hdk::ir::ColumnType>()->columnType();
+          auto new_types = types;  // makes a copy
+          const auto& last = types.back();
+          if (last->isColumnList() &&
+              last->as<hdk::ir::ColumnListType>()->columnType()->equal(col_type)) {
             // last column_list consumes column argument if types match
-            new_type_infos.back().set_dimension(last.get_dimension() + 1);
+            new_types.back() = type->ctx().columnList(
+                col_type, last->as<hdk::ir::ColumnListType>()->length() + 1);
           } else {
             // add column as column_list argument
-            auto mti = generate_column_list_type(ti.get_subtype());
-            mti.set_dimension(1);
-            new_type_infos.push_back(mti);
+            auto mt = type->ctx().columnList(col_type, 1);
+            new_types.push_back(mt);
           }
-          new_type_infos_variants.push_back(new_type_infos);
+          new_types_variants.push_back(new_types);
         }
       }
-      type_infos.push_back(ti);
+      types.push_back(type);
     }
-    type_infos_variants.insert(type_infos_variants.end(),
-                               new_type_infos_variants.begin(),
-                               new_type_infos_variants.end());
+    types_variants.insert(
+        types_variants.end(), new_types_variants.begin(), new_types_variants.end());
   }
 
   // Find extension function that gives the best match on the set of
@@ -551,15 +537,15 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
 
     auto ext_func_args = ext_func.getInputArgs();
     int index_variant = -1;
-    for (const auto& type_infos : type_infos_variants) {
+    for (const auto& types : types_variants) {
       index_variant++;
       int penalty_score = 0;
       int pos = 0;
       int original_input_idx = 0;
-      CHECK_LE(type_infos.size(), args_are_constants.size());
+      CHECK_LE(types.size(), args_are_constants.size());
       // for (size_t ti_idx = 0; ti_idx != type_infos.size(); ++ti_idx) {
-      for (const auto& ti : type_infos) {
-        int offset = match_arguments(ti,
+      for (auto type : types) {
+        int offset = match_arguments(type,
                                      args_are_constants[original_input_idx],
                                      pos,
                                      ext_func_args,
@@ -569,8 +555,8 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
           pos = -1;
           break;
         }
-        if (ti.get_type() == kCOLUMN_LIST) {
-          original_input_idx += ti.get_dimension();
+        if (type->isColumnList()) {
+          original_input_idx += type->as<hdk::ir::ColumnListType>()->length();
         } else {
           original_input_idx++;
         }
@@ -593,7 +579,7 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
   if (optimal == -1) {
     /* no extension function found that argument types would match
        with types in `arg_types` */
-    auto sarg_types = ExtensionFunctionsWhitelist::toString(type_infos_input);
+    auto sarg_types = ExtensionFunctionsWhitelist::toString(types_input);
     std::string message;
     if (!ext_funcs.size()) {
       message = "Function " + name + "(" + sarg_types + ") not supported.";
@@ -631,20 +617,21 @@ std::tuple<T, std::vector<SQLTypeInfo>> bind_function(
       for (size_t i = 0; i < ext_funcs.size(); i++) {
         if (ext_funcs[i].getName() == name) {
           optimal = i;
-          std::vector<SQLTypeInfo> type_info = type_infos_variants[optimal_variant];
+          std::vector<const hdk::ir::Type*> types = types_variants[optimal_variant];
           size_t sizer = ext_funcs[optimal].getOutputRowSizeParameter();
-          type_info.insert(type_info.begin() + sizer - 1, SQLTypeInfo(kINT, true));
-          return {ext_funcs[optimal], type_info};
+          types.insert(types.begin() + sizer - 1,
+                       hdk::ir::Context::defaultCtx().int32(false));
+          return {ext_funcs[optimal], types};
         }
       }
       UNREACHABLE();
     }
   }
 
-  return {ext_funcs[optimal], type_infos_variants[optimal_variant]};
+  return {ext_funcs[optimal], types_variants[optimal_variant]};
 }
 
-const std::tuple<table_functions::TableFunction, std::vector<SQLTypeInfo>>
+const std::tuple<table_functions::TableFunction, std::vector<const hdk::ir::Type*>>
 bind_table_function(std::string name,
                     hdk::ir::ExprPtrVector input_args,
                     const std::vector<table_functions::TableFunction>& table_funcs,
@@ -703,7 +690,7 @@ ExtensionFunction bind_function(const hdk::ir::FunctionOper* function_oper,
   return bind_function(name, func_args, is_gpu);
 }
 
-const std::tuple<table_functions::TableFunction, std::vector<SQLTypeInfo>>
+const std::tuple<table_functions::TableFunction, std::vector<const hdk::ir::Type*>>
 bind_table_function(std::string name,
                     hdk::ir::ExprPtrVector input_args,
                     const bool is_gpu) {

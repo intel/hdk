@@ -3204,7 +3204,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       target_exprs_owned_.end(), input_exprs_owned.begin(), input_exprs_owned.end());
   auto input_exprs = get_exprs_not_owned(input_exprs_owned);
 
-  const auto table_function_impl_and_type_infos = [=]() {
+  const auto table_function_impl_and_types = [=]() {
     if (is_gpu) {
       try {
         return bind_table_function(
@@ -3225,14 +3225,14 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       }
     }
   }();
-  const auto& table_function_impl = std::get<0>(table_function_impl_and_type_infos);
-  const auto& table_function_type_infos = std::get<1>(table_function_impl_and_type_infos);
+  const auto& table_function_impl = std::get<0>(table_function_impl_and_types);
+  const auto& table_function_types = std::get<1>(table_function_impl_and_types);
 
   size_t output_row_sizing_param = 0;
   if (table_function_impl
           .hasUserSpecifiedOutputSizeParameter()) {  // constant and row multiplier
     const auto parameter_index =
-        table_function_impl.getOutputRowSizeParameter(table_function_type_infos);
+        table_function_impl.getOutputRowSizeParameter(table_function_types);
     CHECK_GT(parameter_index, size_t(0));
     if (rel_table_func->countConstantArgs() == table_function_impl.countScalarArgs()) {
       auto param_expr = rel_table_func->getTableFuncInputExprAt(parameter_index - 1);
@@ -3274,24 +3274,25 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
   size_t input_index = 0;
   size_t arg_index = 0;
   const auto table_func_args = table_function_impl.getInputArgs();
-  CHECK_EQ(table_func_args.size(), table_function_type_infos.size());
-  for (const auto& ti : table_function_type_infos) {
-    if (ti.is_column_list()) {
-      for (int i = 0; i < ti.get_dimension(); i++) {
+  CHECK_EQ(table_func_args.size(), table_function_types.size());
+  for (auto type : table_function_types) {
+    if (type->isColumnList()) {
+      for (int i = 0; i < type->as<hdk::ir::ColumnListType>()->length(); i++) {
         auto& input_expr = input_exprs[input_index];
         auto col_var = dynamic_cast<hdk::ir::ColumnVar*>(input_expr);
         CHECK(col_var);
 
         // avoid setting type info to ti here since ti doesn't have all the
         // properties correctly set
-        auto type = input_expr->type();
-        type = type->ctx().columnList(type, ti.get_dimension());
+        auto input_type = input_expr->type();
+        input_type = input_type->ctx().columnList(
+            input_type, type->as<hdk::ir::ColumnListType>()->length());
         input_expr->set_type_info(type);
 
         input_col_exprs.push_back(col_var);
         input_index++;
       }
-    } else if (ti.is_column()) {
+    } else if (type->isColumn()) {
       auto& input_expr = input_exprs[input_index];
       auto col_var = dynamic_cast<hdk::ir::ColumnVar*>(input_expr);
       CHECK(col_var);
@@ -3318,8 +3319,8 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
   CHECK_EQ(input_col_exprs.size(), rel_table_func->getColInputsSize());
   std::vector<hdk::ir::Expr*> table_func_outputs;
   for (size_t i = 0; i < table_function_impl.getOutputsSize(); i++) {
-    auto ti = table_function_impl.getOutputSQLType(i);
-    if (ti.is_dict_encoded_string()) {
+    auto type = table_function_impl.getOutputType(i);
+    if (type->isExtDictionary()) {
       auto p = table_function_impl.getInputID(i);
 
       int32_t input_pos = p.first;
@@ -3327,8 +3328,9 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       // get the corresponding input
       int32_t offset = 0;
       for (int j = 0; j < input_pos; j++) {
-        const auto ti = table_function_type_infos[j];
-        offset += ti.is_column_list() ? ti.get_dimension() : 1;
+        auto type = table_function_types[j];
+        offset +=
+            type->isColumnList() ? type->as<hdk::ir::ColumnListType>()->length() : 1;
       }
       input_pos = offset + p.second;
 
@@ -3339,9 +3341,10 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
                                ->columnType()
                                ->as<hdk::ir::ExtDictionaryType>()
                                ->dictId();
-      ti.set_comp_param(comp_param);
+      type = type->ctx().extDict(type->as<hdk::ir::ExtDictionaryType>()->elemType(),
+                                 comp_param);
     }
-    target_exprs_owned_.push_back(std::make_shared<hdk::ir::ColumnVar>(ti, 0, i, -1));
+    target_exprs_owned_.push_back(std::make_shared<hdk::ir::ColumnVar>(type, 0, i, -1));
     table_func_outputs.push_back(target_exprs_owned_.back().get());
   }
   const TableFunctionExecutionUnit exe_unit = {

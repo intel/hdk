@@ -162,8 +162,8 @@ class TableFunction {
   }
   const ExtArgumentType getRet() const { return ExtArgumentType::Int32; }
 
-  SQLTypeInfo getInputSQLType(const size_t idx) const;
-  SQLTypeInfo getOutputSQLType(const size_t idx) const;
+  const hdk::ir::Type* getInputType(const size_t idx) const;
+  const hdk::ir::Type* getOutputType(const size_t idx) const;
 
   int32_t countScalarArgs() const;
 
@@ -240,15 +240,16 @@ class TableFunction {
 
   size_t getSqlOutputRowSizeParameter() const;
 
-  size_t getOutputRowSizeParameter(const std::vector<SQLTypeInfo>& variant) const {
+  size_t getOutputRowSizeParameter(
+      const std::vector<const hdk::ir::Type*>& variant) const {
     auto val = output_sizer_.val;
     if (hasUserSpecifiedOutputSizeMultiplier()) {
       size_t col_index = 0;
       size_t func_arg_index = 0;
-      for (const auto& ti : variant) {
+      for (auto type : variant) {
         func_arg_index++;
-        if (ti.is_column_list()) {
-          col_index += ti.get_dimension();
+        if (type->isColumnList()) {
+          col_index += type->as<hdk::ir::ColumnListType>()->length();
         } else {
           col_index++;
         }

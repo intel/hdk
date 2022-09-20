@@ -49,7 +49,7 @@ ExtensionFunction bind_function(std::string name, hdk::ir::ExprPtrVector func_ar
 ExtensionFunction bind_function(const hdk::ir::FunctionOper* function_oper,
                                 const bool is_gpu);
 
-const std::tuple<table_functions::TableFunction, std::vector<SQLTypeInfo>>
+const std::tuple<table_functions::TableFunction, std::vector<const hdk::ir::Type*>>
 bind_table_function(std::string name,
                     hdk::ir::ExprPtrVector input_args,
                     const bool is_gpu);

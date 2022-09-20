@@ -380,10 +380,10 @@ std::string ExtensionFunctionsWhitelist::toString(
 }
 
 std::string ExtensionFunctionsWhitelist::toString(
-    const std::vector<SQLTypeInfo>& arg_types) {
+    const std::vector<const hdk::ir::Type*>& arg_types) {
   std::string r = "";
   for (auto sig = arg_types.begin(); sig != arg_types.end();) {
-    r += sig->get_type_name();
+    r += (*sig)->toString();
     sig++;
     if (sig != arg_types.end()) {
       r += ", ";

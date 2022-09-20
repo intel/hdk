@@ -56,29 +56,25 @@ llvm::Function* generate_entry_point(const CgenState* cgen_state) {
   return func;
 }
 
-inline llvm::Type* get_llvm_type_from_sql_column_type(const SQLTypeInfo elem_ti,
+inline llvm::Type* get_llvm_type_from_sql_column_type(const hdk::ir::Type* elem_type,
                                                       llvm::LLVMContext& ctx) {
-  if (elem_ti.is_fp()) {
-    return get_fp_ptr_type(elem_ti.get_size() * 8, ctx);
-  } else if (elem_ti.is_boolean()) {
+  if (elem_type->isFloatingPoint()) {
+    return get_fp_ptr_type(elem_type->size() * 8, ctx);
+  } else if (elem_type->isBoolean()) {
     return get_int_ptr_type(8, ctx);
-  } else if (elem_ti.is_integer()) {
-    return get_int_ptr_type(elem_ti.get_size() * 8, ctx);
-  } else if (elem_ti.is_string()) {
-    if (elem_ti.get_compression() == kENCODING_DICT) {
-      return get_int_ptr_type(elem_ti.get_size() * 8, ctx);
-    }
-    CHECK(elem_ti.is_bytes());  // None encoded string
+  } else if (elem_type->isInteger() || elem_type->isExtDictionary()) {
+    return get_int_ptr_type(elem_type->size() * 8, ctx);
+  } else if (elem_type->isString()) {
     return get_int_ptr_type(8, ctx);
   }
   LOG(FATAL) << "get_llvm_type_from_sql_column_type: not implemented for "
-             << ::toString(elem_ti);
+             << elem_type->toString();
   return nullptr;
 }
 
 std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
                                                     const size_t index,
-                                                    const SQLTypeInfo& data_target_info,
+                                                    const hdk::ir::Type* data_target_type,
                                                     llvm::Value* data_ptr,
                                                     llvm::Value* data_size,
                                                     llvm::LLVMContext& ctx,
@@ -94,7 +90,7 @@ std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
     as a value) and a pointer to the Column instance.
    */
   llvm::Type* data_ptr_llvm_type =
-      get_llvm_type_from_sql_column_type(data_target_info, ctx);
+      get_llvm_type_from_sql_column_type(data_target_type, ctx);
   llvm::StructType* col_struct_type =
       llvm::StructType::get(ctx,
                             {
@@ -141,7 +137,7 @@ std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
 }
 
 llvm::Value* alloc_column_list(std::string col_list_name,
-                               const SQLTypeInfo& data_target_info,
+                               const hdk::ir::Type* data_target_type,
                                llvm::Value* data_ptrs,
                                int length,
                                llvm::Value* data_size,
@@ -335,23 +331,23 @@ void TableFunctionCompilationContext::generateEntryPoint(
   int col_index = -1;
   for (size_t i = 0; i < exe_unit.input_exprs.size(); i++) {
     const auto& expr = exe_unit.input_exprs[i];
-    const auto& ti = expr->get_type_info();
+    auto type = expr->type();
     if (col_index == -1) {
       func_arg_index += 1;
     }
-    if (ti.is_fp()) {
+    if (type->isFloatingPoint()) {
       auto r = cgen_state->ir_builder_.CreateBitCast(
-          col_heads[i], get_fp_ptr_type(get_bit_width(ti), ctx));
+          col_heads[i], get_fp_ptr_type(get_bit_width(type), ctx));
       func_args.push_back(
           cgen_state->ir_builder_.CreateLoad(r->getType()->getPointerElementType(), r));
       CHECK_EQ(col_index, -1);
-    } else if (ti.is_integer() || ti.is_boolean()) {
+    } else if (type->isInteger() || type->isBoolean()) {
       auto r = cgen_state->ir_builder_.CreateBitCast(
-          col_heads[i], get_int_ptr_type(get_bit_width(ti), ctx));
+          col_heads[i], get_int_ptr_type(get_bit_width(type), ctx));
       func_args.push_back(
           cgen_state->ir_builder_.CreateLoad(r->getType()->getPointerElementType(), r));
       CHECK_EQ(col_index, -1);
-    } else if (ti.is_bytes()) {
+    } else if (type->isString()) {
       auto varchar_size =
           cgen_state->ir_builder_.CreateBitCast(col_heads[i], get_int_ptr_type(64, ctx));
       auto varchar_ptr = cgen_state->ir_builder_.CreateGEP(
@@ -361,7 +357,7 @@ void TableFunctionCompilationContext::generateEntryPoint(
       auto [varchar_struct, varchar_struct_ptr] =
           alloc_column(std::string("varchar_literal.") + std::to_string(func_arg_index),
                        i,
-                       ti,
+                       type,
                        varchar_ptr,
                        varchar_size,
                        ctx,
@@ -372,11 +368,11 @@ void TableFunctionCompilationContext::generateEntryPoint(
                      varchar_struct->getType()->getPointerElementType(), varchar_struct)
                : varchar_struct_ptr));
       CHECK_EQ(col_index, -1);
-    } else if (ti.is_column()) {
+    } else if (type->isColumn()) {
       auto [col, col_ptr] =
           alloc_column(std::string("input_col.") + std::to_string(func_arg_index),
                        i,
-                       ti.get_elem_type(),
+                       type->as<hdk::ir::ColumnType>()->columnType(),
                        col_heads[i],
                        row_count_heads[i],
                        ctx,
@@ -386,20 +382,21 @@ void TableFunctionCompilationContext::generateEntryPoint(
                                      col->getType()->getPointerElementType(), col)
                                : col_ptr));
       CHECK_EQ(col_index, -1);
-    } else if (ti.is_column_list()) {
+    } else if (type->isColumnList()) {
+      auto col_list_type = type->as<hdk::ir::ColumnListType>();
       if (col_index == -1) {
         auto col_list = alloc_column_list(
             std::string("input_col_list.") + std::to_string(func_arg_index),
-            ti.get_elem_type(),
+            col_list_type->columnType(),
             col_heads[i],
-            ti.get_dimension(),
+            col_list_type->length(),
             row_count_heads[i],
             ctx,
             cgen_state->ir_builder_);
         func_args.push_back(col_list);
       }
       col_index++;
-      if (col_index + 1 == ti.get_dimension()) {
+      if (col_index + 1 == col_list_type->length()) {
         col_index = -1;
       }
     } else {
@@ -407,7 +404,7 @@ void TableFunctionCompilationContext::generateEntryPoint(
           "Only integer and floating point columns or scalars are supported as inputs to "
           "table "
           "functions, got " +
-          ti.get_type_name());
+          type->toString());
     }
   }
   std::vector<llvm::Value*> output_col_args;
@@ -419,14 +416,14 @@ void TableFunctionCompilationContext::generateEntryPoint(
     auto output_load =
         cgen_state->ir_builder_.CreateLoad(gep->getType()->getPointerElementType(), gep);
     const auto& expr = exe_unit.target_exprs[i];
-    const auto& ti = expr->get_type_info();
-    CHECK(!ti.is_column());       // UDTF output column type is its data type
-    CHECK(!ti.is_column_list());  // TODO: when UDTF outputs column_list, convert it to
-                                  // output columns
+    auto type = expr->type();
+    CHECK(!type->isColumn());      // UDTF output column type is its data type
+    CHECK(!type->isColumnList());  // TODO: when UDTF outputs column_list, convert it to
+                                   // output columns
     auto [col, col_ptr] = alloc_column(
         std::string("output_col.") + std::to_string(i),
         i,
-        ti,
+        type,
         (is_gpu ? output_load : nullptr),  // CPU: set_output_row_size will set the output
                                            // Column ptr member
         output_row_count_ptr,

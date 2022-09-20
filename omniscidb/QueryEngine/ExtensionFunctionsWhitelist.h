@@ -148,7 +148,7 @@ class ExtensionFunctionsWhitelist {
 
   static std::string toString(const std::vector<ExtensionFunction>& ext_funcs,
                               std::string tab = "");
-  static std::string toString(const std::vector<SQLTypeInfo>& arg_types);
+  static std::string toString(const std::vector<const hdk::ir::Type*>& arg_types);
   static std::string toString(const std::vector<ExtArgumentType>& sig_types);
   static std::string toStringSQL(const std::vector<ExtArgumentType>& sig_types);
   static std::string toString(const ExtArgumentType& sig_type);

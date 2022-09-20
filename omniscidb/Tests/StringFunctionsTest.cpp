@@ -271,7 +271,7 @@ TEST_F(LowerFunctionTest, SelectLowercase_ExperimentalStringFunctionsDisabled) {
                      ExecutorDeviceType::CPU);
     FAIL() << "An exception should have been thrown for this test case";
   } catch (const std::exception& e) {
-    ASSERT_STREQ("Function LOWER(TEXT) not supported.", e.what());
+    ASSERT_STREQ("Function LOWER(DICT32(TEXT)[16777261]) not supported.", e.what());
     config().exec.enable_experimental_string_functions = true;
   }
 }
