@@ -417,30 +417,6 @@ class Var : public ColumnVar {
  */
 class Constant : public Expr {
  public:
-  Constant(SQLTypes t, bool n, bool cacheable = true)
-      : Expr(t, !n), is_null(n), cacheable_(cacheable) {
-    if (n) {
-      set_null_value();
-    } else {
-      type_info.set_notnull(true);
-    }
-  }
-  Constant(SQLTypes t, bool n, Datum v, bool cacheable = true)
-      : Expr(t, !n), is_null(n), cacheable_(cacheable), constval(v) {
-    if (n) {
-      set_null_value();
-    } else {
-      type_info.set_notnull(true);
-    }
-  }
-  Constant(const SQLTypeInfo& ti, bool n, Datum v, bool cacheable = true)
-      : Expr(ti), is_null(n), cacheable_(cacheable), constval(v) {
-    if (n) {
-      set_null_value();
-    } else {
-      type_info.set_notnull(true);
-    }
-  }
   Constant(const Type* type, bool n, Datum v, bool cacheable = true)
       : Expr(type), is_null(n), cacheable_(cacheable), constval(v) {
     if (n) {
@@ -449,14 +425,12 @@ class Constant : public Expr {
       type_info.set_notnull(true);
     }
   }
-  Constant(const hdk::ir::Type* type, bool n, const ExprPtrList& l, bool cacheable = true)
+  Constant(const Type* type, bool n, const ExprPtrList& l, bool cacheable = true)
       : Expr(type)
       , is_null(n)
       , cacheable_(cacheable)
       , constval(Datum{0})
       , value_list(l) {}
-  Constant(const SQLTypeInfo& ti, bool n, const ExprPtrList& l, bool cacheable = true)
-      : Expr(ti), is_null(n), cacheable_(cacheable), constval(Datum{0}), value_list(l) {}
   ~Constant() override;
   bool get_is_null() const { return is_null; }
   bool cacheable() const { return cacheable_; }
@@ -473,8 +447,7 @@ class Constant : public Expr {
 
   size_t hash() const override;
 
-  static ExprPtr make(const SQLTypeInfo& ti, int64_t val, bool cacheable = true);
-  static ExprPtr make(const hdk::ir::Type* type, int64_t val, bool cacheable = true);
+  static ExprPtr make(const Type* type, int64_t val, bool cacheable = true);
 
  protected:
   // Constant is NULL

@@ -3258,8 +3258,8 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       // RowMultiplier not specified in the SQL query. Set it to 1
       output_row_sizing_param = 1;  // default value for RowMultiplier
       static Datum d = {DEFAULT_ROW_MULTIPLIER_VALUE};
-      static auto DEFAULT_ROW_MULTIPLIER_EXPR =
-          hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+      static auto DEFAULT_ROW_MULTIPLIER_EXPR = hdk::ir::makeExpr<hdk::ir::Constant>(
+          hdk::ir::Context::defaultCtx().int32(false), false, d);
       // Push the constant 1 to input_exprs
       input_exprs.insert(input_exprs.begin() + parameter_index - 1,
                          DEFAULT_ROW_MULTIPLIER_EXPR.get());

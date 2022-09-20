@@ -81,7 +81,7 @@ TEST(CodeGeneratorTest, IntegerConstant) {
 
   Datum d;
   d.intval = 42;
-  auto constant = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto constant = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   const auto compiled_expr =
       code_generator.compile(constant.get(), true, co, get_traits());
 
@@ -108,8 +108,8 @@ TEST(CodeGeneratorTest, IntegerAdd) {
 
   Datum d;
   d.intval = 42;
-  auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
+  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
@@ -172,7 +172,7 @@ TEST(CodeGeneratorTest, IntegerExpr) {
   Datum d;
   d.intval = 42;
 
-  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
@@ -216,7 +216,7 @@ TEST(CodeGeneratorTest, IntegerConstantGPU) {
   Datum d;
   d.intval = 42;
 
-  auto constant = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto constant = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   const auto compiled_expr =
       code_generator.compile(constant.get(), true, co, get_traits());
 
@@ -266,8 +266,8 @@ TEST(CodeGeneratorTest, IntegerAddGPU) {
   Datum d;
   d.intval = 42;
 
-  auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
-  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
+  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
@@ -383,7 +383,7 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
   Datum d;
   d.intval = 42;
 
-  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(kINT, false, d);
+  auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 

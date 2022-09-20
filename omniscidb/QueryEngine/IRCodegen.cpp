@@ -333,11 +333,11 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     func_name += "_reversed";
   }
 
-  auto get_double_constant_lvs = [this, &co](double const_val) {
+  auto get_double_constant_lvs = [this, &co, &ctx = expr->ctx()](double const_val) {
     Datum d;
     d.doubleval = const_val;
     auto double_const_expr =
-        hdk::ir::makeExpr<hdk::ir::Constant>(SQLTypeInfo(kDOUBLE, false), false, d);
+        hdk::ir::makeExpr<hdk::ir::Constant>(ctx.fp64(false), false, d);
     return codegen(double_const_expr.get(), false, co);
   };
 

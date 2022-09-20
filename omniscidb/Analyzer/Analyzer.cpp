@@ -430,19 +430,21 @@ const hdk::ir::Type* common_numeric_type(const hdk::ir::Type* type1,
 }
 
 hdk::ir::ExprPtr analyzeIntValue(const int64_t intval) {
+  auto& ctx = hdk::ir::Context::defaultCtx();
+  const hdk::ir::Type* type;
   SQLTypes t;
   Datum d;
   if (intval >= INT16_MIN && intval <= INT16_MAX) {
-    t = kSMALLINT;
+    type = ctx.int16(false);
     d.smallintval = (int16_t)intval;
   } else if (intval >= INT32_MIN && intval <= INT32_MAX) {
-    t = kINT;
+    type = ctx.int32(false);
     d.intval = (int32_t)intval;
   } else {
-    t = kBIGINT;
+    type = ctx.int64();
     d.bigintval = intval;
   }
-  return hdk::ir::makeExpr<hdk::ir::Constant>(t, false, d);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
 }
 
 hdk::ir::ExprPtr analyzeFixedPtValue(const int64_t numericval,
@@ -862,13 +864,18 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
 hdk::ir::ExprPtr getUserLiteral(const std::string& user) {
   Datum d;
   d.stringval = new std::string(user);
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kTEXT, false, d, false);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().text(false), false, d, false);
 }
 
 hdk::ir::ExprPtr getTimestampLiteral(const int64_t timestampval) {
   Datum d;
   d.bigintval = timestampval;
-  return hdk::ir::makeExpr<hdk::ir::Constant>(kTIMESTAMP, false, d, false);
+  return hdk::ir::makeExpr<hdk::ir::Constant>(
+      hdk::ir::Context::defaultCtx().timestamp(hdk::ir::TimeUnit::kSecond, false),
+      false,
+      d,
+      false);
 }
 
 }  // namespace Analyzer

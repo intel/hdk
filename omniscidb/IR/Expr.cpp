@@ -364,10 +364,6 @@ Constant::~Constant() {
   }
 }
 
-ExprPtr Constant::make(const SQLTypeInfo& ti, int64_t val, bool cacheable) {
-  return make(Context::defaultCtx().fromTypeInfo(ti), val, cacheable);
-}
-
 ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
   CHECK(type->isNumber() || type->isBoolean());
   Datum datum{0};
