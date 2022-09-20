@@ -660,8 +660,6 @@ class ScalarSubquery : public Expr {
  public:
   ScalarSubquery(const hdk::ir::Type* type, std::shared_ptr<const RelAlgNode> node)
       : Expr(type), node_(node) {}
-  ScalarSubquery(const SQLTypeInfo& ti, std::shared_ptr<const RelAlgNode> node)
-      : Expr(ti), node_(node) {}
   ExprPtr deep_copy() const override { return makeExpr<ScalarSubquery>(type_, node_); }
 
   bool operator==(const Expr& rhs) const override {
@@ -758,10 +756,6 @@ class InSubquery : public Expr {
              hdk::ir::ExprPtr arg,
              std::shared_ptr<const RelAlgNode> node)
       : Expr(type), arg_(std::move(arg)), node_(std::move(node)) {}
-  InSubquery(const SQLTypeInfo& ti,
-             hdk::ir::ExprPtr arg,
-             std::shared_ptr<const RelAlgNode> node)
-      : Expr(ti), arg_(std::move(arg)), node_(std::move(node)) {}
 
   ExprPtr deep_copy() const override {
     return makeExpr<InSubquery>(type_, arg_->deep_copy(), node_);
@@ -1391,11 +1385,6 @@ class AggExpr : public Expr {
  */
 class CaseExpr : public Expr {
  public:
-  CaseExpr(const SQLTypeInfo& ti,
-           bool has_agg,
-           const std::list<std::pair<ExprPtr, ExprPtr>>& w,
-           ExprPtr e)
-      : Expr(ti, has_agg), expr_pair_list(w), else_expr(e) {}
   CaseExpr(const hdk::ir::Type* type,
            bool has_agg,
            std::list<std::pair<ExprPtr, ExprPtr>> expr_pairs,
@@ -1446,8 +1435,6 @@ class ExtractExpr : public Expr {
  public:
   ExtractExpr(const hdk::ir::Type* type, bool has_agg, ExtractField f, ExprPtr e)
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
-  ExtractExpr(const SQLTypeInfo& ti, bool has_agg, ExtractField f, ExprPtr e)
-      : Expr(ti, has_agg), field_(f), from_expr_(e) {}
   ExtractField get_field() const { return field_; }
   const Expr* get_from_expr() const { return from_expr_.get(); }
   const ExprPtr get_own_from_expr() const { return from_expr_; }
@@ -1490,11 +1477,6 @@ class DateaddExpr : public Expr {
               const ExprPtr number,
               const ExprPtr datetime)
       : Expr(type, false), field_(f), number_(number), datetime_(datetime) {}
-  DateaddExpr(const SQLTypeInfo& ti,
-              const DateaddField f,
-              const ExprPtr number,
-              const ExprPtr datetime)
-      : Expr(ti, false), field_(f), number_(number), datetime_(datetime) {}
   DateaddField get_field() const { return field_; }
   const Expr* get_number_expr() const { return number_.get(); }
   const Expr* get_datetime_expr() const { return datetime_.get(); }
@@ -1538,11 +1520,6 @@ class DatediffExpr : public Expr {
                const ExprPtr start,
                const ExprPtr end)
       : Expr(type, false), field_(f), start_(start), end_(end) {}
-  DatediffExpr(const SQLTypeInfo& ti,
-               const DatetruncField f,
-               const ExprPtr start,
-               const ExprPtr end)
-      : Expr(ti, false), field_(f), start_(start), end_(end) {}
   DatetruncField get_field() const { return field_; }
   const Expr* get_start_expr() const { return start_.get(); }
   const Expr* get_end_expr() const { return end_.get(); }
@@ -1581,8 +1558,6 @@ class DatediffExpr : public Expr {
  */
 class DatetruncExpr : public Expr {
  public:
-  DatetruncExpr(const SQLTypeInfo& ti, bool has_agg, DatetruncField f, ExprPtr e)
-      : Expr(ti, has_agg), field_(f), from_expr_(e) {}
   DatetruncExpr(const hdk::ir::Type* type, bool has_agg, DatetruncField f, ExprPtr e)
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
   DatetruncField get_field() const { return field_; }
@@ -1622,8 +1597,6 @@ class FunctionOper : public Expr {
                const std::string& name,
                const ExprPtrVector& args)
       : Expr(type, false), name_(name), args_(args) {}
-  FunctionOper(const SQLTypeInfo& ti, const std::string& name, const ExprPtrVector& args)
-      : Expr(ti, false), name_(name), args_(args) {}
 
   const std::string& getName() const { return name_; }
 
@@ -1662,10 +1635,6 @@ class FunctionOperWithCustomTypeHandling : public FunctionOper {
                                      const std::string& name,
                                      const ExprPtrVector& args)
       : FunctionOper(type, name, args) {}
-  FunctionOperWithCustomTypeHandling(const SQLTypeInfo& ti,
-                                     const std::string& name,
-                                     const ExprPtrVector& args)
-      : FunctionOper(ti, name, args) {}
 
   ExprPtr deep_copy() const override;
 
@@ -1723,18 +1692,6 @@ class WindowFunction : public Expr {
                  const ExprPtrVector& order_keys,
                  const std::vector<OrderEntry>& collation)
       : Expr(type)
-      , kind_(kind)
-      , args_(args)
-      , partition_keys_(partition_keys)
-      , order_keys_(order_keys)
-      , collation_(collation){};
-  WindowFunction(const SQLTypeInfo& ti,
-                 const SqlWindowFunctionKind kind,
-                 const ExprPtrVector& args,
-                 const ExprPtrVector& partition_keys,
-                 const ExprPtrVector& order_keys,
-                 const std::vector<OrderEntry>& collation)
-      : Expr(ti)
       , kind_(kind)
       , args_(args)
       , partition_keys_(partition_keys)
