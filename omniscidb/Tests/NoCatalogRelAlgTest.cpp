@@ -255,11 +255,16 @@ TEST_F(NoCatalogRelAlgTest, SelectAllColumnsMultiFrag) {
 }
 
 TEST_F(NoCatalogRelAlgTest, GroupBySingleColumn) {
+  auto& ctx = hdk::ir::Context::defaultCtx();
   auto dag = std::make_unique<TestRelAlgDagBuilder>(schema_provider_, config_);
   auto proj =
       dag->addProject(dag->addScan(TEST_DB_ID, "test_agg"), std::vector<int>({0, 1}));
-  auto agg = dag->addAgg(
-      proj, 1, {{kCOUNT}, {kCOUNT, kINT, 1}, {kSUM, kBIGINT, 1}, {kAVG, kINT, 1}});
+  auto agg = dag->addAgg(proj,
+                         1,
+                         {{kCOUNT},
+                          {kCOUNT, ctx.int32(), 1},
+                          {kSUM, ctx.int64(), 1},
+                          {kAVG, ctx.int32(), 1}});
   dag->addSort(agg, {{0, SortDirection::Ascending, NullSortedPosition::Last}});
   dag->finalize();
   auto res = runRelAlgQuery(std::move(dag));

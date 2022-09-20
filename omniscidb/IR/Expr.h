@@ -1328,14 +1328,6 @@ class AggExpr : public Expr {
  public:
   AggExpr(const Type* type, SQLAgg a, ExprPtr g, bool d, std::shared_ptr<Constant> e)
       : Expr(type, true), aggtype(a), arg(g), is_distinct(d), arg1(e) {}
-  AggExpr(const SQLTypeInfo& ti, SQLAgg a, ExprPtr g, bool d, std::shared_ptr<Constant> e)
-      : Expr(ti, true), aggtype(a), arg(g), is_distinct(d), arg1(e) {}
-  AggExpr(SQLTypes t, SQLAgg a, Expr* g, bool d, std::shared_ptr<Constant> e, int idx)
-      : Expr(SQLTypeInfo(t, g == nullptr ? true : g->get_type_info().get_notnull()), true)
-      , aggtype(a)
-      , arg(g)
-      , is_distinct(d)
-      , arg1(e) {}
   SQLAgg get_aggtype() const { return aggtype; }
   Expr* get_arg() const { return arg.get(); }
   ExprPtr get_own_arg() const { return arg; }

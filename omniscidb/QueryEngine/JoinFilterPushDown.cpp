@@ -76,7 +76,7 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
     input_col_descs.push_back(std::make_shared<const InputColDescriptor>(input_col_desc));
   }
   const auto count_expr = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-      SQLTypeInfo(config_.exec.group_by.bigint_count ? kBIGINT : kINT, false),
+      hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
       kCOUNT,
       nullptr,
       false,
