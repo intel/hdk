@@ -92,8 +92,7 @@ class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
         CHECK_LE(prev_input_count, new_index);
         new_index -= prev_input_count;
       }
-      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->get_type_info(), new_node, new_index);
+      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(col_ref->type(), new_node, new_index);
     }
     return col_ref->deep_copy();
   };
@@ -113,7 +112,6 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
     , condition_(filter ? filter->getConditionExprShared() : nullptr)
     , original_filter_(filter)
     , original_joins_(original_joins) {
-  bool is_notnull = true;
   // Accumulate join conditions from the (explicit) joins themselves and
   // from the filter node at the root of the left-deep tree pattern.
   outer_conditions_per_level_.resize(original_joins.size());
@@ -123,11 +121,9 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
         dynamic_cast<const hdk::ir::Constant*>(original_join->getCondition());
 
     bool cond_is_not_const_true = !condition_true ||
-                                  !condition_true->get_type_info().is_boolean() ||
+                                  !condition_true->type()->isBoolean() ||
                                   !condition_true->get_constval().boolval;
     if (cond_is_not_const_true) {
-      is_notnull =
-          is_notnull && original_join->getCondition()->get_type_info().get_notnull();
       switch (original_join->getJoinType()) {
         case JoinType::INNER:
         case JoinType::SEMI:
@@ -137,7 +133,11 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
               condition_ = original_join->getConditionShared();
             } else {
               condition_ = hdk::ir::makeExpr<hdk::ir::BinOper>(
-                  kBOOLEAN, kAND, kONE, condition_, original_join->getConditionShared());
+                  condition_->ctx().boolean(),
+                  kAND,
+                  kONE,
+                  condition_,
+                  original_join->getConditionShared());
             }
           }
           break;
@@ -158,7 +158,7 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
   if (condition_) {
     condition_ = rebind_inputs_from_left_deep_join(condition_.get(), this);
   } else {
-    condition_ = hdk::ir::Constant::make(kBOOLEAN, true);
+    condition_ = hdk::ir::Constant::make(hdk::ir::Context::defaultCtx().boolean(), true);
   }
 }
 
