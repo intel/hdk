@@ -510,20 +510,6 @@ class UOper : public Expr {
       , is_dict_intersection_(is_dict_intersection) {}
   UOper(const Type* type, SQLOps o, ExprPtr p)
       : Expr(type), optype(o), operand(p), is_dict_intersection_(false) {}
-  UOper(const SQLTypeInfo& ti,
-        bool has_agg,
-        SQLOps o,
-        ExprPtr p,
-        bool is_dict_intersection = false)
-      : Expr(ti, has_agg)
-      , optype(o)
-      , operand(p)
-      , is_dict_intersection_(is_dict_intersection) {}
-  UOper(SQLTypes t, SQLOps o, ExprPtr p)
-      : Expr(t, o == kISNULL ? true : p->get_type_info().get_notnull())
-      , optype(o)
-      , operand(p)
-      , is_dict_intersection_(false) {}
   SQLOps get_optype() const { return optype; }
   const Expr* get_operand() const { return operand.get(); }
   const ExprPtr get_own_operand() const { return operand; }

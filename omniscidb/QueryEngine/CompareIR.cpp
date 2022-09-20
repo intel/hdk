@@ -121,16 +121,17 @@ std::string string_cmp_func(const SQLOps optype) {
 }
 
 std::shared_ptr<hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_eq) {
+  auto& ctx = bw_eq->ctx();
   const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->type(),
                                                           bw_eq->get_contains_agg(),
                                                           kEQ,
                                                           bw_eq->get_qualifier(),
                                                           bw_eq->get_own_left_operand(),
                                                           bw_eq->get_own_right_operand());
-  const auto lhs_is_null =
-      std::make_shared<hdk::ir::UOper>(kBOOLEAN, kISNULL, bw_eq->get_own_left_operand());
-  const auto rhs_is_null =
-      std::make_shared<hdk::ir::UOper>(kBOOLEAN, kISNULL, bw_eq->get_own_right_operand());
+  const auto lhs_is_null = std::make_shared<hdk::ir::UOper>(
+      ctx.boolean(false), kISNULL, bw_eq->get_own_left_operand());
+  const auto rhs_is_null = std::make_shared<hdk::ir::UOper>(
+      ctx.boolean(false), kISNULL, bw_eq->get_own_right_operand());
   const auto both_are_null =
       Analyzer::normalizeOperExpr(kAND, kONE, lhs_is_null, rhs_is_null);
   const auto bw_eq_oper = std::dynamic_pointer_cast<hdk::ir::BinOper>(

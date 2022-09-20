@@ -810,7 +810,8 @@ hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
   hdk::ir::ExprPtr result = hdk::ir::makeExpr<hdk::ir::LikeExpr>(
       arg_expr->decompress(), like_expr, escape_expr, is_ilike, is_simple);
   if (is_not) {
-    result = hdk::ir::makeExpr<hdk::ir::UOper>(kBOOLEAN, kNOT, result);
+    result = hdk::ir::makeExpr<hdk::ir::UOper>(
+        arg_expr->ctx().boolean(result->type()->nullable()), kNOT, result);
   }
   return result;
 }
@@ -852,7 +853,8 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
   hdk::ir::ExprPtr result = hdk::ir::makeExpr<hdk::ir::RegexpExpr>(
       arg_expr->decompress(), pattern_expr, escape_expr);
   if (is_not) {
-    result = hdk::ir::makeExpr<hdk::ir::UOper>(kBOOLEAN, kNOT, result);
+    result = hdk::ir::makeExpr<hdk::ir::UOper>(
+        arg_expr->ctx().boolean(result->type()->nullable()), kNOT, result);
   }
   return result;
 }
