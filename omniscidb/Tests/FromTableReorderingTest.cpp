@@ -30,8 +30,8 @@ hdk::ir::Context& ctx = hdk::ir::Context::defaultCtx();
 TEST(Ordering, Basic) {
   // Basic test of inner join ordering. Equal table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
@@ -48,8 +48,8 @@ TEST(Ordering, Basic) {
 
   // Basic test of inner join ordering. Descending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
@@ -68,8 +68,8 @@ TEST(Ordering, Basic) {
 
   // Basic test of inner join ordering. Ascending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
@@ -88,8 +88,8 @@ TEST(Ordering, Basic) {
 
   // Basic test of left join ordering. Equal table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
@@ -106,8 +106,8 @@ TEST(Ordering, Basic) {
 
   // Basic test of left join ordering. Descending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
@@ -126,8 +126,8 @@ TEST(Ordering, Basic) {
 
   // Basic test of left join ordering. Ascending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kGT, kONE, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
@@ -148,9 +148,9 @@ TEST(Ordering, Basic) {
 TEST(Ordering, Triple) {
   // Triple test of inner join ordering. Equal table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 
@@ -170,9 +170,9 @@ TEST(Ordering, Triple) {
 
   // Triple test of inner join ordering. Descending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 
@@ -195,9 +195,9 @@ TEST(Ordering, Triple) {
 
   // Triple test of inner join ordering. Ascending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 
@@ -220,9 +220,9 @@ TEST(Ordering, Triple) {
 
   // Triple test of left join ordering. Equal table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 
@@ -242,9 +242,9 @@ TEST(Ordering, Triple) {
 
   // Triple test of left join ordering. Descending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 
@@ -267,9 +267,9 @@ TEST(Ordering, Triple) {
 
   // Triple test of left join ordering. Ascending table sizes.
   {
-    auto a1 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 0, 0, 0);
-    auto a2 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 1, 1, 1);
-    auto a3 = std::make_shared<hdk::ir::ColumnVar>(SQLTypeInfo{kINT, true}, 2, 2, 2);
+    auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
+    auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
+    auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(ctx.int32(), kEQ, kONE, a2, a3);
 

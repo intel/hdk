@@ -261,25 +261,12 @@ class ColumnVar : public Expr {
       : Expr(type)
       , rte_idx(-1)
       , col_info_(std::make_shared<ColumnInfo>(-1, 0, 0, "", type_, false)) {}
-  ColumnVar(const SQLTypeInfo& ti)
-      : Expr(ti)
-      , rte_idx(-1)
-      , col_info_(std::make_shared<ColumnInfo>(-1, 0, 0, "", type_, false)) {}
   ColumnVar(const hdk::ir::Type* type,
             int table_id,
             int col_id,
             int nest_level,
             bool is_virtual = false)
       : Expr(type)
-      , rte_idx(nest_level)
-      , col_info_(
-            std::make_shared<ColumnInfo>(-1, table_id, col_id, "", type_, is_virtual)) {}
-  ColumnVar(const SQLTypeInfo& ti,
-            int table_id,
-            int col_id,
-            int nest_level,
-            bool is_virtual = false)
-      : Expr(ti)
       , rte_idx(nest_level)
       , col_info_(
             std::make_shared<ColumnInfo>(-1, table_id, col_id, "", type_, is_virtual)) {}

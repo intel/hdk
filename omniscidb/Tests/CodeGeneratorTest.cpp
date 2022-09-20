@@ -134,12 +134,12 @@ TEST(CodeGeneratorTest, IntegerColumn) {
   CompilationOptions co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
   co.hoist_literals = false;
 
-  SQLTypeInfo ti(kINT, false);
+  auto type = hdk::ir::Context::defaultCtx().int32();
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
 
-  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(ti, table_id, column_id, rte_idx);
+  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
   const auto compiled_expr = code_generator.compile(col.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -164,11 +164,11 @@ TEST(CodeGeneratorTest, IntegerExpr) {
   CompilationOptions co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
   co.hoist_literals = false;
 
-  SQLTypeInfo ti(kINT, false);
+  auto type = hdk::ir::Context::defaultCtx().int32();
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
-  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(ti, table_id, column_id, rte_idx);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
   Datum d;
   d.intval = 42;
 
@@ -314,12 +314,12 @@ TEST(CodeGeneratorTest, IntegerColumnGPU) {
   CompilationOptions co = CompilationOptions::defaults(ExecutorDeviceType::GPU);
   co.hoist_literals = false;
 
-  SQLTypeInfo ti(kINT, false);
+  auto type = hdk::ir::Context::defaultCtx().int32();
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
 
-  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(ti, table_id, column_id, rte_idx);
+  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
   const auto compiled_expr = code_generator.compile(col.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -375,11 +375,11 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
   CompilationOptions co = CompilationOptions::defaults(ExecutorDeviceType::GPU);
   co.hoist_literals = false;
 
-  SQLTypeInfo ti(kINT, false);
+  auto type = hdk::ir::Context::defaultCtx().int32();
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
-  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(ti, table_id, column_id, rte_idx);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
   Datum d;
   d.intval = 42;
 
