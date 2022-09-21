@@ -113,51 +113,63 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
     CHECK_EQ(target_infos.size(), row.size());
     for (size_t target_idx = 0; target_idx < target_infos.size(); ++target_idx) {
       const auto& target_info = target_infos[target_idx];
-      const auto& ti = target_info.agg_kind == kAVG ? SQLTypeInfo{kDOUBLE, false}
-                                                    : target_info.sql_type;
-      switch (ti.get_type()) {
-        case kBIGINT: {
-          const auto ival_result_set = v<int64_t>(row[target_idx]);
-          const auto ival_converted = static_cast<int64_t>(
-              columnar_results.getEntryAt<int64_t>(cr_row_idx, target_idx));
-          ASSERT_EQ(ival_converted, ival_result_set);
+      auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
+                                               : target_info.type;
+      switch (type->id()) {
+        case hdk::ir::Type::kInteger:
+          switch (type->size()) {
+            case 8: {
+              const auto ival_result_set = v<int64_t>(row[target_idx]);
+              const auto ival_converted = static_cast<int64_t>(
+                  columnar_results.getEntryAt<int64_t>(cr_row_idx, target_idx));
+              ASSERT_EQ(ival_converted, ival_result_set);
+              break;
+            }
+            case 4: {
+              const auto ival_result_set = v<int64_t>(row[target_idx]);
+              const auto ival_converted = static_cast<int64_t>(
+                  columnar_results.getEntryAt<int32_t>(cr_row_idx, target_idx));
+              ASSERT_EQ(ival_converted, ival_result_set);
+              break;
+            }
+            case 2: {
+              const auto ival_result_set = v<int64_t>(row[target_idx]);
+              const auto ival_converted = static_cast<int64_t>(
+                  columnar_results.getEntryAt<int16_t>(cr_row_idx, target_idx));
+              ASSERT_EQ(ival_result_set, ival_converted);
+              break;
+            }
+            case 1: {
+              const auto ival_result_set = v<int64_t>(row[target_idx]);
+              const auto ival_converted = static_cast<int64_t>(
+                  columnar_results.getEntryAt<int8_t>(cr_row_idx, target_idx));
+              ASSERT_EQ(ival_converted, ival_result_set);
+              break;
+            }
+            default:
+              UNREACHABLE() << "Invalid type info encountered.";
+          }
           break;
-        }
-        case kINT: {
-          const auto ival_result_set = v<int64_t>(row[target_idx]);
-          const auto ival_converted = static_cast<int64_t>(
-              columnar_results.getEntryAt<int32_t>(cr_row_idx, target_idx));
-          ASSERT_EQ(ival_converted, ival_result_set);
+        case hdk::ir::Type::kFloatingPoint:
+          switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+            case hdk::ir::FloatingPointType::kFloat: {
+              const auto fval_result_set = v<float>(row[target_idx]);
+              const auto fval_converted =
+                  columnar_results.getEntryAt<float>(cr_row_idx, target_idx);
+              ASSERT_FLOAT_EQ(fval_result_set, fval_converted);
+              break;
+            }
+            case hdk::ir::FloatingPointType::kDouble: {
+              const auto dval_result_set = v<double>(row[target_idx]);
+              const auto dval_converted =
+                  columnar_results.getEntryAt<double>(cr_row_idx, target_idx);
+              ASSERT_FLOAT_EQ(dval_result_set, dval_converted);
+              break;
+            }
+            default:
+              UNREACHABLE() << "Invalid type info encountered.";
+          }
           break;
-        }
-        case kSMALLINT: {
-          const auto ival_result_set = v<int64_t>(row[target_idx]);
-          const auto ival_converted = static_cast<int64_t>(
-              columnar_results.getEntryAt<int16_t>(cr_row_idx, target_idx));
-          ASSERT_EQ(ival_result_set, ival_converted);
-          break;
-        }
-        case kTINYINT: {
-          const auto ival_result_set = v<int64_t>(row[target_idx]);
-          const auto ival_converted = static_cast<int64_t>(
-              columnar_results.getEntryAt<int8_t>(cr_row_idx, target_idx));
-          ASSERT_EQ(ival_converted, ival_result_set);
-          break;
-        }
-        case kFLOAT: {
-          const auto fval_result_set = v<float>(row[target_idx]);
-          const auto fval_converted =
-              columnar_results.getEntryAt<float>(cr_row_idx, target_idx);
-          ASSERT_FLOAT_EQ(fval_result_set, fval_converted);
-          break;
-        }
-        case kDOUBLE: {
-          const auto dval_result_set = v<double>(row[target_idx]);
-          const auto dval_converted =
-              columnar_results.getEntryAt<double>(cr_row_idx, target_idx);
-          ASSERT_FLOAT_EQ(dval_result_set, dval_converted);
-          break;
-        }
         default:
           UNREACHABLE() << "Invalid type info encountered.";
       }
