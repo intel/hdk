@@ -1814,7 +1814,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createSortInputWorkUnit(
     CHECK_GT(order_entry.tle_no, 0);  // tle_no is a 1-base index
     const auto& te = source_exe_unit.target_exprs[order_entry.tle_no - 1];
     const auto& ti = get_target_info(te, false);
-    if (ti.sql_type.is_array()) {
+    if (ti.type->isArray()) {
       throw std::runtime_error(
           "Columns with array types cannot be used in an ORDER BY clause.");
     }
