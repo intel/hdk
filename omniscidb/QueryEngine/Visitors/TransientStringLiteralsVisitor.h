@@ -27,7 +27,7 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
   }
 
   void* visitConstant(const hdk::ir::Constant* constant) const override {
-    if (constant->get_type_info().is_string() && !constant->get_is_null()) {
+    if (constant->type()->isString() && !constant->get_is_null()) {
       CHECK(constant->get_constval().stringval);
       sdp_->getOrAddTransient(*constant->get_constval().stringval);
     }
@@ -47,30 +47,32 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
 
   void* visitUOper(const hdk::ir::UOper* uoper) const override {
     visit(uoper->get_operand());
-    const auto& uoper_ti = uoper->get_type_info();
-    const auto& operand_ti = uoper->get_operand()->get_type_info();
-    if (!(uoper->get_optype() == kCAST && uoper_ti.is_dict_encoded_string() &&
-          operand_ti.is_dict_encoded_string())) {
+    auto uoper_type = uoper->type();
+    auto operand_type = uoper->get_operand()->type();
+    if (!(uoper->get_optype() == kCAST && uoper_type->isExtDictionary() &&
+          operand_type->isExtDictionary())) {
       // If we are not casting from a dictionary-encoded string
       // to a dictionary-encoded string
       return defaultResult();
     }
-    if (uoper_ti.get_comp_param() != sdp_->getDictId()) {
+    auto uoper_dict_id = uoper_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto operand_dict_id = operand_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    if (uoper_dict_id != sdp_->getDictId()) {
       // If we are not casting to our dictionary (sdp_
       return defaultResult();
     }
-    if (uoper_ti.get_comp_param() == operand_ti.get_comp_param()) {
+    if (uoper_dict_id == operand_dict_id) {
       // If cast is inert, i.e. source and destination dict ids are same
       return defaultResult();
     }
-    if (uoper_ti.is_dict_intersection()) {
+    if (uoper->is_dict_intersection()) {
       // Intersection translations don't add transients to the dest proxy,
       // and hence can be ignored for the purposes of populating transients
       return defaultResult();
     }
     executor_->getStringProxyTranslationMap(
-        operand_ti.get_comp_param(),
-        uoper_ti.get_comp_param(),
+        operand_dict_id,
+        uoper_dict_id,
         RowSetMemoryOwner::StringTranslationType::SOURCE_UNION,
         executor_->getRowSetMemoryOwner(),
         true);  // with_generation
@@ -88,18 +90,17 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
 class TransientDictIdVisitor : public ScalarExprVisitor<int> {
  public:
   int visitUOper(const hdk::ir::UOper* uoper) const override {
-    const auto& expr_ti = uoper->get_type_info();
-    if (uoper->get_optype() == kCAST && expr_ti.is_string() &&
-        expr_ti.get_compression() == kENCODING_DICT) {
-      return expr_ti.get_comp_param();
+    auto expr_type = uoper->type();
+    if (uoper->get_optype() == kCAST && expr_type->isExtDictionary()) {
+      return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     }
     return defaultResult();
   }
 
   int visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
-    const auto& expr_ti = case_expr->get_type_info();
-    if (expr_ti.is_string() && expr_ti.get_compression() == kENCODING_DICT) {
-      return expr_ti.get_comp_param();
+    auto expr_type = case_expr->type();
+    if (expr_type->isExtDictionary()) {
+      return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     }
     return defaultResult();
   }
