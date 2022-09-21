@@ -177,8 +177,8 @@ void do_radix_sort(thrust::device_ptr<I> d_idx_first,
                    const PodOrderEntry& oe,
                    const GroupByBufferLayoutInfo& layout,
                    ThrustAllocator& allocator) {
-  const auto& oe_type = layout.oe_target_info.sql_type;
-  if (oe_type.is_fp()) {
+  auto oe_type = layout.oe_target_info.type;
+  if (oe_type->isFloatingPoint()) {
     switch (layout.col_bytes) {
       case 4: {
         auto d_oe_buffer = get_device_ptr<float>(idx_count, allocator);
@@ -209,7 +209,7 @@ void do_radix_sort(thrust::device_ptr<I> d_idx_first,
     }
     return;
   }
-  CHECK(oe_type.is_number() || oe_type.is_time());
+  CHECK(oe_type->isNumber() || oe_type->isDateTime());
   switch (layout.col_bytes) {
     case 4: {
       auto d_oe_buffer = get_device_ptr<int32_t>(idx_count, allocator);
@@ -321,8 +321,8 @@ std::vector<int8_t> pop_n_rows_from_merged_heaps_gpu(
     return top_rows;
   }
 
-  const auto& oe_type = layout.oe_target_info.sql_type;
-  if (oe_type.get_notnull()) {
+  const auto oe_type = layout.oe_target_info.type;
+  if (!oe_type->nullable()) {
     do_radix_sort(d_indices, actual_entry_count, rows_ptr, oe, layout, thrust_allocator);
   } else {
     auto separator = partition_by_null(d_indices,
