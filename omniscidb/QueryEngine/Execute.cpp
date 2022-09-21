@@ -884,7 +884,7 @@ int Executor::deviceCountForMemoryLevel(
 
 // TODO(alex): remove or split
 std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
-                                                    const SQLTypeInfo& ti,
+                                                    const hdk::ir::Type* type,
                                                     const int64_t agg_init_val,
                                                     const int8_t out_byte_width,
                                                     const int64_t* out_vec,
@@ -895,14 +895,15 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
     case kAVG:
     case kSUM:
       if (0 != agg_init_val) {
-        if (ti.is_integer() || ti.is_decimal() || ti.is_time() || ti.is_boolean()) {
+        if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
+            type->isBoolean()) {
           int64_t agg_result = agg_init_val;
           for (size_t i = 0; i < out_vec_sz; ++i) {
             agg_sum_skip_val(&agg_result, out_vec[i], agg_init_val);
           }
           return {agg_result, 0};
         } else {
-          CHECK(ti.is_fp());
+          CHECK(type->isFloatingPoint());
           switch (out_byte_width) {
             case 4: {
               int agg_result = static_cast<int32_t>(agg_init_val);
@@ -935,14 +936,14 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
           }
         }
       }
-      if (ti.is_integer() || ti.is_decimal() || ti.is_time()) {
+      if (type->isInteger() || type->isDecimal() || type->isDateTime()) {
         int64_t agg_result = 0;
         for (size_t i = 0; i < out_vec_sz; ++i) {
           agg_result += out_vec[i];
         }
         return {agg_result, 0};
       } else {
-        CHECK(ti.is_fp());
+        CHECK(type->isFloatingPoint());
         switch (out_byte_width) {
           case 4: {
             float r = 0.;
@@ -975,7 +976,8 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
       return {static_cast<int64_t>(agg_result), 0};
     }
     case kMIN: {
-      if (ti.is_integer() || ti.is_decimal() || ti.is_time() || ti.is_boolean()) {
+      if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
+          type->isBoolean()) {
         int64_t agg_result = agg_init_val;
         for (size_t i = 0; i < out_vec_sz; ++i) {
           agg_min_skip_val(&agg_result, out_vec[i], agg_init_val);
@@ -1013,7 +1015,8 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
       }
     }
     case kMAX:
-      if (ti.is_integer() || ti.is_decimal() || ti.is_time() || ti.is_boolean()) {
+      if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
+          type->isBoolean()) {
         int64_t agg_result = agg_init_val;
         for (size_t i = 0; i < out_vec_sz; ++i) {
           agg_max_skip_val(&agg_result, out_vec[i], agg_init_val);
@@ -1031,7 +1034,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
             }
             const int64_t converted_bin =
                 float_argument_input ? static_cast<int64_t>(agg_result)
-                                     : float_to_double_bin(agg_result, !ti.get_notnull());
+                                     : float_to_double_bin(agg_result, type->nullable());
             return {converted_bin, 0};
           }
           case 8: {
@@ -2215,19 +2218,20 @@ ExecutorDeviceType Executor::getDeviceTypeForTargets(
 
 namespace {
 
-int64_t inline_null_val(const SQLTypeInfo& ti, const bool float_argument_input) {
-  CHECK(ti.is_number() || ti.is_time() || ti.is_boolean() || ti.is_string());
-  if (ti.is_fp()) {
-    if (float_argument_input && ti.get_type() == kFLOAT) {
+int64_t inline_null_val(const hdk::ir::Type* type, const bool float_argument_input) {
+  CHECK(type->isNumber() || type->isDateTime() || type->isBoolean() || type->isString() ||
+        type->isExtDictionary());
+  if (type->isFloatingPoint()) {
+    if (float_argument_input && type->isFp32()) {
       int64_t float_null_val = 0;
       *reinterpret_cast<float*>(may_alias_ptr(&float_null_val)) =
-          static_cast<float>(inline_fp_null_val(ti));
+          static_cast<float>(inline_fp_null_value(type));
       return float_null_val;
     }
-    const auto double_null_val = inline_fp_null_val(ti);
+    const auto double_null_val = inline_fp_null_value(type);
     return *reinterpret_cast<const int64_t*>(may_alias_ptr(&double_null_val));
   }
-  return inline_int_null_val(ti);
+  return inline_int_null_value(type);
 }
 
 void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
@@ -2247,14 +2251,14 @@ void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
       entry.push_back(0);
       entry.push_back(0);
     } else if (agg_info.agg_kind == kSINGLE_VALUE || agg_info.agg_kind == kSAMPLE) {
-      if (agg_info.sql_type.is_varlen()) {
+      if (agg_info.type->isString() || agg_info.type->isArray()) {
         entry.push_back(0);
         entry.push_back(0);
       } else {
-        entry.push_back(inline_null_val(agg_info.sql_type, float_argument_input));
+        entry.push_back(inline_null_val(agg_info.type, float_argument_input));
       }
     } else {
-      entry.push_back(inline_null_val(agg_info.sql_type, float_argument_input));
+      entry.push_back(inline_null_val(agg_info.type, float_argument_input));
     }
   }
 }
@@ -3311,7 +3315,7 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
               query_exe_context->query_mem_desc_.getPaddedSlotWidthBytes(out_vec_idx));
           std::tie(val1, error_code) = Executor::reduceResults(
               agg_info.agg_kind,
-              agg_info.sql_type,
+              agg_info.type,
               query_exe_context->getAggInitValForIndex(out_vec_idx),
               float_argument_input ? sizeof(int32_t) : chosen_bytes,
               out_vec[out_vec_idx],
@@ -3324,14 +3328,15 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
         }
         reduced_outs.push_back(val1);
         if (agg_info.agg_kind == kAVG ||
-            (agg_info.agg_kind == kSAMPLE && agg_info.sql_type.is_varlen())) {
+            (agg_info.agg_kind == kSAMPLE &&
+             (agg_info.type->isString() || agg_info.type->isArray()))) {
           const auto chosen_bytes = static_cast<size_t>(
               query_exe_context->query_mem_desc_.getPaddedSlotWidthBytes(out_vec_idx +
                                                                          1));
           int64_t val2;
           std::tie(val2, error_code) = Executor::reduceResults(
               agg_info.agg_kind == kAVG ? kCOUNT : agg_info.agg_kind,
-              agg_info.sql_type,
+              agg_info.type,
               query_exe_context->getAggInitValForIndex(out_vec_idx + 1),
               float_argument_input ? sizeof(int32_t) : chosen_bytes,
               out_vec[out_vec_idx + 1],

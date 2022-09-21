@@ -661,7 +661,7 @@ class Executor {
 
  public:  // Temporary, ask saman about this
   static std::pair<int64_t, int32_t> reduceResults(const SQLAgg agg,
-                                                   const SQLTypeInfo& ti,
+                                                   const hdk::ir::Type* type,
                                                    const int64_t agg_init_val,
                                                    const int8_t out_byte_width,
                                                    const int64_t* out_vec,
