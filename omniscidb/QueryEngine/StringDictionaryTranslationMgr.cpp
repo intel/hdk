@@ -119,8 +119,6 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
         std::dynamic_pointer_cast<hdk::ir::Constant>(
             Analyzer::analyzeIntValue(translation_map_handle));
     CHECK(translation_map_handle_literal);
-    CHECK_EQ(kENCODING_NONE,
-             translation_map_handle_literal->get_type_info().get_compression());
     constants_owned.push_back(translation_map_handle_literal);
     constants.push_back(translation_map_handle_literal.get());
   }
@@ -132,7 +130,8 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
 
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
   const bool is_nullable = input_type->nullable();
-  const auto decoded_input_type = SQLTypeInfo(kTEXT, is_nullable, kENCODING_DICT);
+  const auto decoded_input_type =
+      input_type->ctx().extDict(input_type->ctx().text(is_nullable), 0);
   if (add_nullcheck && is_nullable) {
     nullcheck_codegen = std::make_unique<CodeGenerator::NullCheckCodegen>(
         cgen_state_ptr,
