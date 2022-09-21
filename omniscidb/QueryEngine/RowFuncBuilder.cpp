@@ -1021,15 +1021,14 @@ void RowFuncBuilder::codegenApproxQuantile(const size_t target_idx,
   }
   llvm::BasicBlock *calc, *skip;
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
-  auto const arg_ti =
-      static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->get_type_info();
-  bool const nullable = !arg_ti.get_notnull();
+  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->type();
+  bool const nullable = arg_type->nullable();
 
   auto* cs = executor_->cgen_state_.get();
   auto& irb = cs->ir_builder_;
   if (nullable) {
-    auto* const null_value = cs->castToTypeIn(cs->inlineNull(arg_ti), 64);
-    auto* const skip_cond = arg_ti.is_fp()
+    auto* const null_value = cs->castToTypeIn(cs->inlineNull(arg_type), 64);
+    auto* const skip_cond = arg_type->isFloatingPoint()
                                 ? irb.CreateFCmpOEQ(agg_args.back(), null_value)
                                 : irb.CreateICmpEQ(agg_args.back(), null_value);
     calc = llvm::BasicBlock::Create(cs->context_, "calc_approx_quantile");
@@ -1038,10 +1037,10 @@ void RowFuncBuilder::codegenApproxQuantile(const size_t target_idx,
     cs->current_func_->getBasicBlockList().push_back(calc);
     irb.SetInsertPoint(calc);
   }
-  if (!arg_ti.is_fp()) {
+  if (!arg_type->isFloatingPoint()) {
     auto const agg_info =
         get_target_info(target_expr, config_.exec.group_by.bigint_count);
-    agg_args.back() = executor_->castToFP(agg_args.back(), arg_ti, agg_info.sql_type);
+    agg_args.back() = executor_->castToFP(agg_args.back(), arg_type, agg_info.type);
   }
   cs->emitExternalCall(
       "agg_approx_quantile", llvm::Type::getVoidTy(cs->context_), agg_args);
