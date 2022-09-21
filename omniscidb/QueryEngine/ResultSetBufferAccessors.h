@@ -36,9 +36,7 @@
 
 inline bool is_real_str_or_array(const TargetInfo& target_info) {
   return (!target_info.is_agg || target_info.agg_kind == kSAMPLE) &&
-         (target_info.sql_type.is_array() ||
-          (target_info.sql_type.is_string() &&
-           target_info.sql_type.get_compression() == kENCODING_NONE));
+         (target_info.type->isArray() || target_info.type->isString());
 }
 
 inline size_t get_slots_for_target(const TargetInfo& target_info,
