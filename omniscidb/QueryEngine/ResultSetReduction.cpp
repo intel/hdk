@@ -401,9 +401,9 @@ void ResultSetStorage::reduceEntriesNoCollisionsColWise(
     const auto& slots_for_col = col_slot_context.getSlotsForCol(target_idx);
 
     bool two_slot_target{false};
-    if (agg_info.is_agg &&
-        (agg_info.agg_kind == kAVG ||
-         (agg_info.agg_kind == kSAMPLE && agg_info.sql_type.is_varlen()))) {
+    if (agg_info.is_agg && (agg_info.agg_kind == kAVG ||
+                            (agg_info.agg_kind == kSAMPLE &&
+                             (agg_info.type->isString() || agg_info.type->isArray())))) {
       // Note that this assumes if one of the slot pairs in a given target is an array,
       // all slot pairs are arrays.
       two_slot_target = true;
@@ -539,16 +539,18 @@ void ResultSetStorage::rewriteAggregateBufferOffsets(
     for (size_t target_logical_idx = 0; target_logical_idx < targets_.size();
          ++target_logical_idx) {
       const auto& target_info = targets_[target_logical_idx];
-      if (target_info.sql_type.is_varlen() && target_info.is_agg) {
+      if ((target_info.type->isString() || target_info.type->isArray()) &&
+          target_info.is_agg) {
         CHECK(target_info.agg_kind == kSAMPLE);
         auto ptr1 = rowwise_targets_ptr;
         auto slot_idx = target_slot_idx;
         auto ptr2 = ptr1 + query_mem_desc_.getPaddedSlotWidthBytes(slot_idx);
         auto offset = *reinterpret_cast<const int64_t*>(ptr1);
 
-        const auto& elem_ti = target_info.sql_type.get_elem_type();
         size_t length_to_elems =
-            target_info.sql_type.is_string() ? 1 : elem_ti.get_size();
+            target_info.type->isString()
+                ? 1
+                : target_info.type->as<hdk::ir::ArrayBaseType>()->elemType()->size();
         CHECK_LT(static_cast<size_t>(offset), serialized_varlen_buffer.size());
         const auto& varlen_bytes_str = serialized_varlen_buffer[offset];
         const auto str_ptr = reinterpret_cast<const int8_t*>(varlen_bytes_str.c_str());
@@ -869,7 +871,8 @@ void ResultSetStorage::reduceOneSlotBaseline(int64_t* this_buff,
   const int8_t* that_ptr2{nullptr};
   if (target_info.is_agg &&
       (target_info.agg_kind == kAVG ||
-       (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()))) {
+       (target_info.agg_kind == kSAMPLE &&
+        (target_info.type->isString() || target_info.type->isArray())))) {
     const auto this_count_off = query_mem_desc_.getEntryCount();
     const auto that_count_off = that_entry_count;
     this_ptr2 = reinterpret_cast<int8_t*>(&this_buff[this_slot + this_count_off]);
@@ -1402,7 +1405,7 @@ void ResultSetStorage::reduceOneSlotSingleValue(int8_t* this_ptr1,
       break;
     }
     case 8: {
-      CHECK(!target_info.sql_type.is_varlen());
+      CHECK(!target_info.type->isString() && !target_info.type->isArray());
       reduce(int64_t());
       break;
     }
@@ -1518,11 +1521,14 @@ void ResultSetStorage::reduceOneSlot(
       }
       case 8: {
         auto rhs_proj_col = *reinterpret_cast<const int64_t*>(that_ptr1);
-        if ((target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()) &&
+        if ((target_info.agg_kind == kSAMPLE &&
+             (target_info.type->isString() || target_info.type->isArray())) &&
             !serialized_varlen_buffer.empty()) {
           size_t length_to_elems{0};
-          const auto& elem_ti = target_info.sql_type.get_elem_type();
-          length_to_elems = target_info.sql_type.is_string() ? 1 : elem_ti.get_size();
+          length_to_elems =
+              target_info.type->isString()
+                  ? 1
+                  : target_info.type->as<hdk::ir::ArrayBaseType>()->elemType()->size();
 
           CHECK_LT(static_cast<size_t>(rhs_proj_col), serialized_varlen_buffer.size());
           const auto& varlen_bytes_str = serialized_varlen_buffer[rhs_proj_col];
@@ -1535,7 +1541,8 @@ void ResultSetStorage::reduceOneSlot(
           if (rhs_proj_col != init_val) {
             *reinterpret_cast<int64_t*>(this_ptr1) = rhs_proj_col;
           }
-          if ((target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen())) {
+          if ((target_info.agg_kind == kSAMPLE &&
+               (target_info.type->isString() || target_info.type->isArray()))) {
             CHECK(this_ptr2 && that_ptr2);
             *reinterpret_cast<int64_t*>(this_ptr2) =
                 *reinterpret_cast<const int64_t*>(that_ptr2);
@@ -1750,7 +1757,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
         }
       } else {
         if (agg_info.agg_kind == kSAMPLE) {
-          CHECK(!agg_info.sql_type.is_varlen())
+          CHECK(!agg_info.type->isString() && !agg_info.type->isArray())
               << "Interleaved bins reduction not supported for variable length "
                  "arguments "
                  "to SAMPLE";
