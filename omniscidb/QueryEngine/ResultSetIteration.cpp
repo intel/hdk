@@ -72,7 +72,7 @@ TargetValue make_avg_target_value(const int8_t* ptr1,
     CHECK(false);
   }
   const auto count = read_int_from_buff(ptr2, compact_sz2);
-  return pair_to_double({sum, count}, target_info.sql_type, false);
+  return pair_to_double({sum, count}, target_info.type, false);
 }
 
 // Given the entire buffer for the result set, buff, finds the beginning of the

@@ -168,38 +168,6 @@ inline size_t get_slot_off_quad(const QueryMemoryDescriptor& query_mem_desc) {
 #endif  // __CUDACC__
 
 inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
-                             const SQLTypeInfo& ti,
-                             const bool float_argument_input) {
-  if (fp_pair.second == 0) {
-    return NULL_DOUBLE;
-  }
-  double dividend{0.0};
-  switch (ti.get_type()) {
-    case kFLOAT:
-      if (float_argument_input) {
-        dividend = shared::reinterpret_bits<float>(fp_pair.first);
-        break;
-      }
-    case kDOUBLE:
-      dividend = shared::reinterpret_bits<double>(fp_pair.first);
-      break;
-    default:
-#ifndef __CUDACC__
-      LOG_IF(FATAL, !(ti.is_integer() || ti.is_decimal()))
-          << "Unsupported type for pair to double conversion: " << ti.get_type_name();
-#else
-      CHECK(ti.is_integer() || ti.is_decimal());
-#endif
-      dividend = static_cast<double>(fp_pair.first);
-      break;
-  }
-  return ti.is_decimal() && ti.get_scale()
-             ? dividend /
-                   (static_cast<double>(fp_pair.second) * exp_to_scale(ti.get_scale()))
-             : dividend / static_cast<double>(fp_pair.second);
-}
-
-inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
                              const hdk::ir::Type* type,
                              const bool float_argument_input) {
   if (fp_pair.second == 0) {
@@ -207,9 +175,9 @@ inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
   }
 
   double dividend{0.0};
-  if (type->isFp32()) {
+  if (type->isFp32() && float_argument_input) {
     dividend = shared::reinterpret_bits<float>(fp_pair.first);
-  } else if (type->isFp64()) {
+  } else if (type->isFloatingPoint()) {
     dividend = shared::reinterpret_bits<double>(fp_pair.first);
   } else {
 #ifndef __CUDACC__

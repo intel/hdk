@@ -3036,56 +3036,49 @@ TEST(Util, PairToDouble) {
   EXPECT_EQ(int64_t(1) << 52, null_double);
   // Test all 8 combinations of (kFloat,kDouble)x(bool)x(bool).
   // If the denominator is 0, then the return value should always be NULL_DOUBLE.
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-4, 0}, SQLTypeInfo(kFLOAT, false), false));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-3, 0}, SQLTypeInfo(kFLOAT, false), true));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-2, 0}, SQLTypeInfo(kFLOAT, true), false));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-1, 0}, SQLTypeInfo(kFLOAT, true), true));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({0, 0}, SQLTypeInfo(kDOUBLE, false), false));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({1, 0}, SQLTypeInfo(kDOUBLE, false), true));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({2, 0}, SQLTypeInfo(kDOUBLE, true), false));
-  EXPECT_EQ(NULL_DOUBLE, pair_to_double({3, 0}, SQLTypeInfo(kDOUBLE, true), true));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-4, 0}, ctx().fp32(), false));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-3, 0}, ctx().fp32(), true));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-2, 0}, ctx().fp32(false), false));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({-1, 0}, ctx().fp32(false), true));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({0, 0}, ctx().fp64(), false));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({1, 0}, ctx().fp64(), true));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({2, 0}, ctx().fp64(false), false));
+  EXPECT_EQ(NULL_DOUBLE, pair_to_double({3, 0}, ctx().fp64(false), true));
   // Test all 16 combinations of (null_float,null_double)x(kFloat,kDouble)x(bool)x(bool).
   // All should be non-null.
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kFLOAT, false), false));
+            pair_to_double({null_float, 2}, ctx().fp32(), false));
   EXPECT_EQ(shared::reinterpret_bits<float>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kFLOAT, false), true));
+            pair_to_double({null_float, 2}, ctx().fp32(), true));
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kFLOAT, true), false));
+            pair_to_double({null_float, 2}, ctx().fp32(false), false));
   EXPECT_EQ(shared::reinterpret_bits<float>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kFLOAT, true), true));
+            pair_to_double({null_float, 2}, ctx().fp32(false), true));
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kDOUBLE, false), false));
+            pair_to_double({null_float, 2}, ctx().fp64(), false));
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kDOUBLE, false), true));
+            pair_to_double({null_float, 2}, ctx().fp64(), true));
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kDOUBLE, true), false));
+            pair_to_double({null_float, 2}, ctx().fp64(false), false));
   EXPECT_EQ(shared::reinterpret_bits<double>(null_float) / 2,
-            pair_to_double({null_float, 2}, SQLTypeInfo(kDOUBLE, true), true));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kFLOAT, false), false));
-  EXPECT_EQ(0.0 / 2, pair_to_double({null_double, 2}, SQLTypeInfo(kFLOAT, false), true));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kFLOAT, true), false));
-  EXPECT_EQ(0.0 / 2, pair_to_double({null_double, 2}, SQLTypeInfo(kFLOAT, true), true));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kDOUBLE, false), false));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kDOUBLE, false), true));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kDOUBLE, true), false));
-  EXPECT_EQ(NULL_DOUBLE / 2,
-            pair_to_double({null_double, 2}, SQLTypeInfo(kDOUBLE, true), true));
+            pair_to_double({null_float, 2}, ctx().fp64(false), true));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp32(), false));
+  EXPECT_EQ(0.0 / 2, pair_to_double({null_double, 2}, ctx().fp32(), true));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp32(false), false));
+  EXPECT_EQ(0.0 / 2, pair_to_double({null_double, 2}, ctx().fp32(false), true));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp64(), false));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp64(), true));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp64(false), false));
+  EXPECT_EQ(NULL_DOUBLE / 2, pair_to_double({null_double, 2}, ctx().fp64(false), true));
   // Misc
   EXPECT_EQ(0.5,
-            pair_to_double({shared::reinterpret_bits<int64_t, float>(1.0), 2},
-                           SQLTypeInfo(kFLOAT, false),
-                           true));
-  EXPECT_EQ(-0.5,
-            pair_to_double({shared::reinterpret_bits<int64_t, double>(-1.0), 2},
-                           SQLTypeInfo(kDOUBLE, false),
-                           true));
-  EXPECT_EQ(2.5, pair_to_double({1000, 4}, SQLTypeInfo(kDECIMAL, 19, 2), true));
+            pair_to_double(
+                {shared::reinterpret_bits<int64_t, float>(1.0), 2}, ctx().fp32(), true));
+  EXPECT_EQ(
+      -0.5,
+      pair_to_double(
+          {shared::reinterpret_bits<int64_t, double>(-1.0), 2}, ctx().fp64(), true));
+  EXPECT_EQ(2.5, pair_to_double({1000, 4}, ctx().decimal64(19, 2), true));
 }
 
 int main(int argc, char** argv) {
