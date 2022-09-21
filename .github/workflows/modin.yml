@@ -30,7 +30,7 @@ jobs:
         run: |
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.8 binutils
+          conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.8
 
       - name: Restore Maven cache
         uses: actions/cache@v3
@@ -61,5 +61,8 @@ jobs:
 
       - name: Run tests
         run: |
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "python -c 'import pyhdk'"
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "pwd && python python/tests/modin/modin_smoke_test.py"
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python -c 'import pyhdk'
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/modin/modin_smoke_test.py
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_bindings.py
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
+
