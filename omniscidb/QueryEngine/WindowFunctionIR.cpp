@@ -71,7 +71,7 @@ llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
 namespace {
 
 std::string get_window_agg_name(const SqlWindowFunctionKind kind,
-                                const SQLTypeInfo& window_func_ti) {
+                                const hdk::ir::Type* window_func_type) {
   std::string agg_name;
   switch (kind) {
     case SqlWindowFunctionKind::MIN: {
@@ -95,28 +95,21 @@ std::string get_window_agg_name(const SqlWindowFunctionKind kind,
       LOG(FATAL) << "Invalid window function kind";
     }
   }
-  switch (window_func_ti.get_type()) {
-    case kFLOAT: {
-      agg_name += "_float";
-      break;
-    }
-    case kDOUBLE: {
-      agg_name += "_double";
-      break;
-    }
-    default: {
-      break;
-    }
+  if (window_func_type->isFp32()) {
+    agg_name += "_float";
+  } else if (window_func_type->isFp64()) {
+    agg_name += "_double";
   }
   return agg_name;
 }
 
-SQLTypeInfo get_adjusted_window_type_info(const hdk::ir::WindowFunction* window_func) {
+const hdk::ir::Type* get_adjusted_window_type(
+    const hdk::ir::WindowFunction* window_func) {
   const auto& args = window_func->getArgs();
   return ((window_func->getKind() == SqlWindowFunctionKind::COUNT && !args.empty()) ||
           window_func->getKind() == SqlWindowFunctionKind::AVG)
-             ? args.front()->get_type_info()
-             : window_func->get_type_info();
+             ? args.front()->type()
+             : window_func->type();
 }
 
 }  // namespace
@@ -126,9 +119,9 @@ llvm::Value* Executor::aggregateWindowStatePtr() {
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
-  const auto arg_ti = get_adjusted_window_type_info(window_func);
+  const auto arg_type = get_adjusted_window_type(window_func);
   llvm::Type* aggregate_state_type =
-      arg_ti.get_type() == kFLOAT
+      arg_type->isFp32()
           ? llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0)
           : llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
   const auto aggregate_state_i64 = cgen_state_->llInt(
@@ -198,48 +191,33 @@ void Executor::codegenWindowFunctionStateInit(llvm::Value* aggregate_state) {
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
-  const auto window_func_ti = get_adjusted_window_type_info(window_func);
+  const auto window_func_type = get_adjusted_window_type(window_func);
   const auto window_func_null_val =
-      window_func_ti.is_fp()
-          ? cgen_state_->inlineFpNull(window_func_ti)
-          : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_ti), 64);
+      window_func_type->isFloatingPoint()
+          ? cgen_state_->inlineFpNull(window_func_type)
+          : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_type), 64);
   llvm::Value* window_func_init_val;
   if (window_func_context->getWindowFunction()->getKind() ==
       SqlWindowFunctionKind::COUNT) {
-    switch (window_func_ti.get_type()) {
-      case kFLOAT: {
-        window_func_init_val = cgen_state_->llFp(float(0));
-        break;
-      }
-      case kDOUBLE: {
-        window_func_init_val = cgen_state_->llFp(double(0));
-        break;
-      }
-      default: {
-        window_func_init_val = cgen_state_->llInt(int64_t(0));
-        break;
-      }
+    if (window_func_type->isFp32()) {
+      window_func_init_val = cgen_state_->llFp(float(0));
+    } else if (window_func_type->isFp64()) {
+      window_func_init_val = cgen_state_->llFp(double(0));
+    } else {
+      window_func_init_val = cgen_state_->llInt(int64_t(0));
     }
   } else {
     window_func_init_val = window_func_null_val;
   }
   const auto pi32_type =
       llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0);
-  switch (window_func_ti.get_type()) {
-    case kDOUBLE: {
-      cgen_state_->emitCall("agg_id_double", {aggregate_state, window_func_init_val});
-      break;
-    }
-    case kFLOAT: {
-      aggregate_state =
-          cgen_state_->ir_builder_.CreateBitCast(aggregate_state, pi32_type);
-      cgen_state_->emitCall("agg_id_float", {aggregate_state, window_func_init_val});
-      break;
-    }
-    default: {
-      cgen_state_->emitCall("agg_id", {aggregate_state, window_func_init_val});
-      break;
-    }
+  if (window_func_type->isFp64()) {
+    cgen_state_->emitCall("agg_id_double", {aggregate_state, window_func_init_val});
+  } else if (window_func_type->isFp32()) {
+    aggregate_state = cgen_state_->ir_builder_.CreateBitCast(aggregate_state, pi32_type);
+    cgen_state_->emitCall("agg_id_float", {aggregate_state, window_func_init_val});
+  } else {
+    cgen_state_->emitCall("agg_id", {aggregate_state, window_func_init_val});
   }
 }
 
@@ -249,11 +227,11 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
-  const auto window_func_ti = get_adjusted_window_type_info(window_func);
+  const auto window_func_type = get_adjusted_window_type(window_func);
   const auto window_func_null_val =
-      window_func_ti.is_fp()
-          ? cgen_state_->inlineFpNull(window_func_ti)
-          : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_ti), 64);
+      window_func_type->isFloatingPoint()
+          ? cgen_state_->inlineFpNull(window_func_type)
+          : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_type), 64);
   const auto& args = window_func->getArgs();
   llvm::Value* crt_val;
   if (args.empty()) {
@@ -263,16 +241,17 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
     CodeGenerator code_generator(this);
     const auto arg_lvs = code_generator.codegen(args.front().get(), true, co);
     CHECK_EQ(arg_lvs.size(), size_t(1));
-    if (window_func->getKind() == SqlWindowFunctionKind::SUM && !window_func_ti.is_fp()) {
+    if (window_func->getKind() == SqlWindowFunctionKind::SUM &&
+        !window_func_type->isFloatingPoint()) {
       crt_val = code_generator.codegenCastBetweenIntTypes(
-          arg_lvs.front(), args.front()->get_type_info(), window_func_ti, false);
+          arg_lvs.front(), args.front()->type(), window_func_type, false);
     } else {
-      crt_val = window_func_ti.get_type() == kFLOAT
+      crt_val = window_func_type->isFp32()
                     ? arg_lvs.front()
                     : cgen_state_->castToTypeIn(arg_lvs.front(), 64);
     }
   }
-  const auto agg_name = get_window_agg_name(window_func->getKind(), window_func_ti);
+  const auto agg_name = get_window_agg_name(window_func->getKind(), window_func_type);
   llvm::Value* multiplicity_lv = nullptr;
   if (args.empty()) {
     cgen_state_->emitCall(agg_name, {aggregate_state, crt_val});
@@ -293,30 +272,21 @@ void Executor::codegenWindowAvgEpilogue(llvm::Value* crt_val,
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
-  const auto window_func_ti = get_adjusted_window_type_info(window_func);
+  const auto window_func_type = get_adjusted_window_type(window_func);
   const auto pi32_type =
       llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0);
   const auto pi64_type =
       llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
-  const auto aggregate_state_type =
-      window_func_ti.get_type() == kFLOAT ? pi32_type : pi64_type;
+  const auto aggregate_state_type = window_func_type->isFp32() ? pi32_type : pi64_type;
   const auto aggregate_state_count_i64 = cgen_state_->llInt(
       reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
   auto aggregate_state_count = cgen_state_->ir_builder_.CreateIntToPtr(
       aggregate_state_count_i64, aggregate_state_type);
   std::string agg_count_func_name = "agg_count";
-  switch (window_func_ti.get_type()) {
-    case kFLOAT: {
-      agg_count_func_name += "_float";
-      break;
-    }
-    case kDOUBLE: {
-      agg_count_func_name += "_double";
-      break;
-    }
-    default: {
-      break;
-    }
+  if (window_func_type->isFp32()) {
+    agg_count_func_name += "_float";
+  } else if (window_func_type->isFp64()) {
+    agg_count_func_name += "_double";
   }
   agg_count_func_name += "_skip_val";
   cgen_state_->emitCall(agg_count_func_name,
@@ -332,53 +302,44 @@ llvm::Value* Executor::codegenAggregateWindowState() {
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const hdk::ir::WindowFunction* window_func = window_func_context->getWindowFunction();
-  const auto window_func_ti = get_adjusted_window_type_info(window_func);
-  const auto aggregate_state_type =
-      window_func_ti.get_type() == kFLOAT ? pi32_type : pi64_type;
+  const auto window_func_type = get_adjusted_window_type(window_func);
+  const auto aggregate_state_type = window_func_type->isFp32() ? pi32_type : pi64_type;
   auto aggregate_state = aggregateWindowStatePtr();
   if (window_func->getKind() == SqlWindowFunctionKind::AVG) {
     const auto aggregate_state_count_i64 = cgen_state_->llInt(
         reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
     auto aggregate_state_count = cgen_state_->ir_builder_.CreateIntToPtr(
         aggregate_state_count_i64, aggregate_state_type);
-    const auto double_null_lv = cgen_state_->inlineFpNull(SQLTypeInfo(kDOUBLE));
-    switch (window_func_ti.get_type()) {
-      case kFLOAT: {
-        return cgen_state_->emitCall(
-            "load_avg_float", {aggregate_state, aggregate_state_count, double_null_lv});
-      }
-      case kDOUBLE: {
-        return cgen_state_->emitCall(
-            "load_avg_double", {aggregate_state, aggregate_state_count, double_null_lv});
-      }
-      case kDECIMAL: {
-        return cgen_state_->emitCall(
-            "load_avg_decimal",
-            {aggregate_state,
-             aggregate_state_count,
-             double_null_lv,
-             cgen_state_->llInt<int32_t>(window_func_ti.get_scale())});
-      }
-      default: {
-        return cgen_state_->emitCall(
-            "load_avg_int", {aggregate_state, aggregate_state_count, double_null_lv});
-      }
+    const auto double_null_lv = cgen_state_->inlineFpNull(window_func_type->ctx().fp64());
+    if (window_func_type->isFp32()) {
+      return cgen_state_->emitCall(
+          "load_avg_float", {aggregate_state, aggregate_state_count, double_null_lv});
+    } else if (window_func_type->isFp64()) {
+      return cgen_state_->emitCall(
+          "load_avg_double", {aggregate_state, aggregate_state_count, double_null_lv});
+    } else if (window_func_type->isDecimal()) {
+      return cgen_state_->emitCall(
+          "load_avg_decimal",
+          {aggregate_state,
+           aggregate_state_count,
+           double_null_lv,
+           cgen_state_->llInt<int32_t>(
+               window_func_type->as<hdk::ir::DecimalType>()->scale())});
+    } else {
+      return cgen_state_->emitCall(
+          "load_avg_int", {aggregate_state, aggregate_state_count, double_null_lv});
     }
   }
   if (window_func->getKind() == SqlWindowFunctionKind::COUNT) {
     return cgen_state_->ir_builder_.CreateLoad(
         aggregate_state->getType()->getPointerElementType(), aggregate_state);
   }
-  switch (window_func_ti.get_type()) {
-    case kFLOAT: {
-      return cgen_state_->emitCall("load_float", {aggregate_state});
-    }
-    case kDOUBLE: {
-      return cgen_state_->emitCall("load_double", {aggregate_state});
-    }
-    default: {
-      return cgen_state_->ir_builder_.CreateLoad(
-          aggregate_state->getType()->getPointerElementType(), aggregate_state);
-    }
+  if (window_func_type->isFp32()) {
+    return cgen_state_->emitCall("load_float", {aggregate_state});
+  } else if (window_func_type->isFp64()) {
+    return cgen_state_->emitCall("load_double", {aggregate_state});
+  } else {
+    return cgen_state_->ir_builder_.CreateLoad(
+        aggregate_state->getType()->getPointerElementType(), aggregate_state);
   }
 }
