@@ -37,18 +37,8 @@
 
 namespace {
 
-inline bool is_varlen_projection(const hdk::ir::Expr* target_expr,
-                                 const SQLTypeInfo& ti) {
-  return false;
-}
-
-std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info,
-                                           const bool is_varlen_projection) {
+std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info) {
   auto chosen_type = get_compact_type(target_info);
-  if (is_varlen_projection) {
-    UNREACHABLE();
-    return {"agg_id_varlen"};
-  }
   if (!target_info.is_agg || target_info.agg_kind == kSAMPLE) {
     if (chosen_type->isString() || chosen_type->isArray()) {
       // not a varlen projection (not creating new varlen outputs). Just store the pointer
@@ -113,8 +103,7 @@ void TargetExprCodegen::codegen(
   auto agg_out_ptr_w_idx = agg_out_ptr_w_idx_in;
   const auto arg_expr = agg_arg(target_expr);
 
-  const bool varlen_projection = is_varlen_projection(target_expr, target_info.sql_type);
-  const auto agg_fn_names = agg_fn_base_names(target_info, varlen_projection);
+  const auto agg_fn_names = agg_fn_base_names(target_info);
   const auto window_func = dynamic_cast<const hdk::ir::WindowFunction*>(target_expr);
   WindowProjectNodeContext::resetWindowFunctionContext(executor);
   auto target_lvs =
@@ -158,8 +147,7 @@ void TargetExprCodegen::codegen(
 
   uint32_t col_off{0};
   if (co.device_type == ExecutorDeviceType::GPU && query_mem_desc.threadsShareMemory() &&
-      is_simple_count(target_info) &&
-      (!arg_expr || arg_expr->get_type_info().get_notnull())) {
+      is_simple_count(target_info) && (!arg_expr || !arg_expr->type()->nullable())) {
     CHECK_EQ(size_t(1), agg_fn_names.size());
     const auto chosen_bytes = query_mem_desc.getPaddedSlotWidthBytes(slot_index);
     llvm::Value* agg_col_ptr{nullptr};
@@ -283,17 +271,16 @@ void TargetExprCodegen::codegenAggregate(
 
   CodeGenerator code_generator(executor);
 
-  const auto agg_fn_names = agg_fn_base_names(
-      target_info, is_varlen_projection(target_expr, target_info.sql_type));
+  const auto agg_fn_names = agg_fn_base_names(target_info);
   auto arg_expr = agg_arg(target_expr);
 
   for (const auto& agg_base_name : agg_fn_names) {
-    if (target_info.is_distinct && arg_expr->get_type_info().is_array()) {
+    if (target_info.is_distinct && arg_expr->type()->isArray()) {
       CHECK_EQ(static_cast<size_t>(query_mem_desc.getLogicalSlotWidthBytes(slot_index)),
                sizeof(int64_t));
       // TODO(miyu): check if buffer may be columnar here
       CHECK(!query_mem_desc.didOutputColumnar());
-      const auto& elem_ti = arg_expr->get_type_info().get_elem_type();
+      auto elem_type = arg_expr->type()->as<hdk::ir::ArrayBaseType>()->elemType();
       uint32_t col_off{0};
       if (is_group_by) {
         const auto col_off_in_bytes = query_mem_desc.getColOnlyOffInBytes(slot_index);
@@ -301,7 +288,7 @@ void TargetExprCodegen::codegenAggregate(
         col_off /= sizeof(int64_t);
       }
       executor->cgen_state_->emitExternalCall(
-          "agg_count_distinct_array_" + numeric_type_name(elem_ti),
+          "agg_count_distinct_array_" + numeric_type_name(elem_type),
           llvm::Type::getVoidTy(LL_CONTEXT),
           {is_group_by ? LL_BUILDER.CreateGEP(std::get<0>(agg_out_ptr_w_idx)
                                                   ->getType()
@@ -312,10 +299,10 @@ void TargetExprCodegen::codegenAggregate(
                        : agg_out_vec[slot_index],
            target_lvs[target_lv_idx],
            code_generator.posArg(arg_expr),
-           elem_ti.is_fp()
-               ? static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(elem_ti))
+           elem_type->isFloatingPoint()
+               ? static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(elem_type))
                : static_cast<llvm::Value*>(
-                     executor->cgen_state_->inlineIntNull(elem_ti))});
+                     executor->cgen_state_->inlineIntNull(elem_type))});
       ++slot_index;
       ++target_lv_idx;
       continue;
@@ -325,13 +312,12 @@ void TargetExprCodegen::codegenAggregate(
     const auto chosen_bytes =
         static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index));
     auto chosen_type = get_compact_type(target_info);
-    const auto& arg_type =
-        ((arg_expr && arg_expr->get_type_info().get_type() != kNULLT) &&
-         !target_info.is_distinct)
-            ? target_info.agg_arg_type_info
-            : target_info.sql_type;
+    auto arg_type =
+        ((arg_expr && !arg_expr->type()->isNull()) && !target_info.is_distinct)
+            ? target_info.agg_arg_type
+            : target_info.type;
     const bool is_fp_arg =
-        !lazy_fetched && arg_type.get_type() != kNULLT && arg_type.is_fp();
+        !lazy_fetched && !arg_type->isNull() && arg_type->isFloatingPoint();
     if (is_group_by) {
       agg_col_ptr = row_func_builder->codegenAggColumnPtr(output_buffer_byte_stream,
                                                           out_row_idx,
@@ -342,10 +328,6 @@ void TargetExprCodegen::codegenAggregate(
                                                           target_idx);
       CHECK(agg_col_ptr);
       agg_col_ptr->setName("agg_col_ptr");
-    }
-
-    if (is_varlen_projection(target_expr, target_info.sql_type)) {
-      UNREACHABLE();
     }
 
     const bool float_argument_input = takes_float_argument(target_info);
@@ -365,7 +347,7 @@ void TargetExprCodegen::codegenAggregate(
       if (need_skip_null && !is_agg_domain_range_equivalent(target_info.agg_kind)) {
         target_lv = row_func_builder->convertNullIfAny(arg_type, target_info, target_lv);
       } else if (is_fp_arg) {
-        target_lv = executor->castToFP(target_lv, arg_type, target_info.sql_type);
+        target_lv = executor->castToFP(target_lv, arg_type, target_info.type);
       }
       if (!dynamic_cast<const hdk::ir::AggExpr*>(target_expr) || arg_expr) {
         target_lv =
@@ -397,7 +379,7 @@ void TargetExprCodegen::codegenAggregate(
     if (is_fp_arg) {
       if (!lazy_fetched) {
         if (agg_chosen_bytes == sizeof(float)) {
-          CHECK_EQ(arg_type.get_type(), kFLOAT);
+          CHECK(arg_type->isFp32());
           agg_fname += "_float";
         } else {
           CHECK_EQ(agg_chosen_bytes, sizeof(double));
@@ -423,21 +405,20 @@ void TargetExprCodegen::codegenAggregate(
       row_func_builder->codegenApproxQuantile(
           target_idx, target_expr, agg_args, query_mem_desc, co.device_type);
     } else {
-      const auto& arg_ti = target_info.agg_arg_type_info;
+      auto arg_type = target_info.agg_arg_type;
       if (need_skip_null) {
         agg_fname += "_skip_val";
       }
 
       if (target_info.agg_kind == kSINGLE_VALUE || need_skip_null) {
         llvm::Value* null_in_lv{nullptr};
-        if (arg_ti.is_fp()) {
+        if (arg_type->isFloatingPoint()) {
           null_in_lv =
-              static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(arg_ti));
+              static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(arg_type));
         } else {
           null_in_lv = static_cast<llvm::Value*>(executor->cgen_state_->inlineIntNull(
-              is_agg_domain_range_equivalent(target_info.agg_kind)
-                  ? arg_ti
-                  : target_info.sql_type));
+              is_agg_domain_range_equivalent(target_info.agg_kind) ? arg_type
+                                                                   : target_info.type));
         }
         CHECK(null_in_lv);
         auto null_lv =
@@ -468,29 +449,22 @@ void TargetExprCodegen::codegenAggregate(
       executor->cgen_state_->emitExternalCall("add_window_pending_output",
                                               llvm::Type::getVoidTy(LL_CONTEXT),
                                               {agg_args.front(), pending_outputs});
-      const auto& window_func_ti = window_func->get_type_info();
+      auto window_func_type = window_func->type();
       std::string apply_window_pending_outputs_name = "apply_window_pending_outputs";
-      switch (window_func_ti.get_type()) {
-        case kFLOAT: {
-          apply_window_pending_outputs_name += "_float";
-          if (query_mem_desc.didOutputColumnar()) {
-            apply_window_pending_outputs_name += "_columnar";
-          }
-          break;
+      if (window_func_type->isFp32()) {
+        apply_window_pending_outputs_name += "_float";
+        if (query_mem_desc.didOutputColumnar()) {
+          apply_window_pending_outputs_name += "_columnar";
         }
-        case kDOUBLE: {
-          apply_window_pending_outputs_name += "_double";
-          break;
-        }
-        default: {
-          apply_window_pending_outputs_name += "_int";
-          if (query_mem_desc.didOutputColumnar()) {
-            apply_window_pending_outputs_name +=
-                std::to_string(window_func_ti.get_size() * 8);
-          } else {
-            apply_window_pending_outputs_name += "64";
-          }
-          break;
+      } else if (window_func_type->isFp64()) {
+        apply_window_pending_outputs_name += "_double";
+      } else {
+        apply_window_pending_outputs_name += "_int";
+        if (query_mem_desc.didOutputColumnar()) {
+          apply_window_pending_outputs_name +=
+              std::to_string(window_func_type->size() * 8);
+        } else {
+          apply_window_pending_outputs_name += "64";
         }
       }
       const auto partition_end =
@@ -550,7 +524,7 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
       target_info.skip_null_val = false;
     } else if (query_mem_desc.getQueryDescriptionType() ==
                    QueryDescriptionType::NonGroupedAggregate &&
-               !arg_expr->get_type_info().is_varlen()) {
+               !arg_expr->type()->isString() && !arg_expr->type()->isArray()) {
       // TODO: COUNT is currently not null-aware for varlen types. Need to add proper code
       // generation for handling varlen nulls.
       target_info.skip_null_val = true;
@@ -576,8 +550,7 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
                                          is_group_by);
   }
 
-  const auto agg_fn_names = agg_fn_base_names(
-      target_info, is_varlen_projection(target_expr, target_info.sql_type));
+  const auto agg_fn_names = agg_fn_base_names(target_info);
   slot_index_counter += agg_fn_names.size();
 }
 
@@ -586,10 +559,9 @@ namespace {
 inline int64_t get_initial_agg_val(const TargetInfo& target_info,
                                    const QueryMemoryDescriptor& query_mem_desc) {
   const bool is_group_by{query_mem_desc.isGroupBy()};
-  if (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_string() &&
-      target_info.sql_type.get_compression() != kENCODING_NONE) {
+  if (target_info.agg_kind == kSAMPLE && target_info.type->isExtDictionary()) {
     return get_agg_initial_val(target_info.agg_kind,
-                               target_info.sql_type,
+                               target_info.type,
                                is_group_by,
                                query_mem_desc.getCompactByteWidth());
   }
@@ -654,7 +626,8 @@ void TargetExprCodegenBuilder::codegenSampleExpressions(
   CHECK(!sample_exprs_to_codegen.empty());
   CHECK(co.device_type == ExecutorDeviceType::GPU);
   if (sample_exprs_to_codegen.size() == 1 &&
-      !sample_exprs_to_codegen.front().target_info.sql_type.is_varlen()) {
+      !sample_exprs_to_codegen.front().target_info.type->isString() &&
+      !sample_exprs_to_codegen.front().target_info.type->isArray()) {
     codegenSingleSlotSampleExpression(row_func_builder,
                                       executor,
                                       query_mem_desc,
@@ -689,7 +662,8 @@ void TargetExprCodegenBuilder::codegenSingleSlotSampleExpression(
     DiamondCodegen& diamond_codegen) const {
   AUTOMATIC_IR_METADATA(executor->cgen_state_.get());
   CHECK_EQ(size_t(1), sample_exprs_to_codegen.size());
-  CHECK(!sample_exprs_to_codegen.front().target_info.sql_type.is_varlen());
+  CHECK(!sample_exprs_to_codegen.front().target_info.type->isString() &&
+        !sample_exprs_to_codegen.front().target_info.type->isArray());
   CHECK(co.device_type == ExecutorDeviceType::GPU);
   // no need for the atomic if we only have one SAMPLE target
   sample_exprs_to_codegen.front().codegen(row_func_builder,
@@ -717,7 +691,8 @@ void TargetExprCodegenBuilder::codegenMultiSlotSampleExpressions(
     DiamondCodegen& diamond_codegen) const {
   AUTOMATIC_IR_METADATA(executor->cgen_state_.get());
   CHECK(sample_exprs_to_codegen.size() > 1 ||
-        sample_exprs_to_codegen.front().target_info.sql_type.is_varlen());
+        sample_exprs_to_codegen.front().target_info.type->isString() ||
+        sample_exprs_to_codegen.front().target_info.type->isArray());
   CHECK(co.device_type == ExecutorDeviceType::GPU);
   const auto& first_sample_expr = sample_exprs_to_codegen.front();
   auto target_lvs = row_func_builder->codegenAggArg(first_sample_expr.target_expr, co);
@@ -730,8 +705,9 @@ void TargetExprCodegenBuilder::codegenMultiSlotSampleExpressions(
   if (is_group_by) {
     const auto agg_column_size_bytes =
         query_mem_desc.isLogicalSizedColumnsAllowed() &&
-                !first_sample_expr.target_info.sql_type.is_varlen()
-            ? first_sample_expr.target_info.sql_type.get_size()
+                !first_sample_expr.target_info.type->isString() &&
+                !first_sample_expr.target_info.type->isArray()
+            ? first_sample_expr.target_info.type->size()
             : sizeof(int64_t);
     agg_col_ptr = row_func_builder->codegenAggColumnPtr(output_buffer_byte_stream,
                                                         out_row_idx,
@@ -776,16 +752,16 @@ llvm::Value* TargetExprCodegenBuilder::codegenSlotEmptyKey(
     const int64_t init_val) const {
   AUTOMATIC_IR_METADATA(executor->cgen_state_.get());
   const auto& first_sample_expr = sample_exprs_to_codegen.front();
+  bool is_varlen = first_sample_expr.target_info.type->isString() ||
+                   first_sample_expr.target_info.type->isArray();
   const auto first_sample_slot_bytes =
-      first_sample_expr.target_info.sql_type.is_varlen()
-          ? sizeof(int64_t)
-          : first_sample_expr.target_info.sql_type.get_size();
+      is_varlen ? sizeof(int64_t) : first_sample_expr.target_info.type->size();
   llvm::Value* target_lv_casted{nullptr};
   // deciding whether proper casting is required for the first sample's slot:
-  if (first_sample_expr.target_info.sql_type.is_varlen()) {
+  if (is_varlen) {
     target_lv_casted =
         LL_BUILDER.CreatePtrToInt(target_lvs.front(), llvm::Type::getInt64Ty(LL_CONTEXT));
-  } else if (first_sample_expr.target_info.sql_type.is_fp()) {
+  } else if (first_sample_expr.target_info.type->isFloatingPoint()) {
     // Initialization value for SAMPLE on a float column should be 0
     CHECK_EQ(init_val, 0);
     if (query_mem_desc.isLogicalSizedColumnsAllowed()) {
@@ -810,7 +786,8 @@ llvm::Value* TargetExprCodegenBuilder::codegenSlotEmptyKey(
   std::string slot_empty_cas_func_name("slotEmptyKeyCAS");
   llvm::Value* init_val_lv{LL_INT(init_val)};
   if (query_mem_desc.isLogicalSizedColumnsAllowed() &&
-      !first_sample_expr.target_info.sql_type.is_varlen()) {
+      !first_sample_expr.target_info.type->isString() &&
+      !first_sample_expr.target_info.type->isArray()) {
     // add proper suffix to the function name:
     switch (first_sample_slot_bytes) {
       case 1:

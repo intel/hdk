@@ -90,7 +90,7 @@ class RowFuncBuilder {
       const size_t key_width,
       const int32_t row_size_quad);
 
-  llvm::Value* convertNullIfAny(const SQLTypeInfo& arg_type,
+  llvm::Value* convertNullIfAny(const hdk::ir::Type* arg_type,
                                 const TargetInfo& agg_info,
                                 llvm::Value* target);
 

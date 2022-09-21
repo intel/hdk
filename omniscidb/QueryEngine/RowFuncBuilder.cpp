@@ -650,21 +650,21 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction() {
   return key_hash_func;
 }
 
-llvm::Value* RowFuncBuilder::convertNullIfAny(const SQLTypeInfo& arg_type,
+llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
                                               const TargetInfo& agg_info,
                                               llvm::Value* target) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
 
-  const auto& agg_type = agg_info.sql_type;
-  const size_t chosen_bytes = agg_type.get_size();
+  auto agg_type = agg_info.type;
+  const size_t chosen_bytes = agg_type->size();
 
   bool need_conversion{false};
   llvm::Value* arg_null{nullptr};
   llvm::Value* agg_null{nullptr};
   llvm::Value* target_to_cast{target};
-  if (arg_type.is_fp()) {
+  if (arg_type->isFloatingPoint()) {
     arg_null = executor_->cgen_state_->inlineFpNull(arg_type);
-    if (agg_type.is_fp()) {
+    if (agg_type->isFloatingPoint()) {
       agg_null = executor_->cgen_state_->inlineFpNull(agg_type);
       if (!static_cast<llvm::ConstantFP*>(arg_null)->isExactlyValue(
               static_cast<llvm::ConstantFP*>(agg_null)->getValueAPF())) {
@@ -676,7 +676,7 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const SQLTypeInfo& arg_type,
     }
   } else {
     arg_null = executor_->cgen_state_->inlineIntNull(arg_type);
-    if (agg_type.is_fp()) {
+    if (agg_type->isFloatingPoint()) {
       agg_null = executor_->cgen_state_->inlineFpNull(agg_type);
       need_conversion = true;
       target_to_cast = executor_->castToFP(target, arg_type, agg_type);
@@ -691,8 +691,8 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const SQLTypeInfo& arg_type,
     }
   }
   if (need_conversion) {
-    auto cmp = arg_type.is_fp() ? LL_BUILDER.CreateFCmpOEQ(target, arg_null)
-                                : LL_BUILDER.CreateICmpEQ(target, arg_null);
+    auto cmp = arg_type->isFloatingPoint() ? LL_BUILDER.CreateFCmpOEQ(target, arg_null)
+                                           : LL_BUILDER.CreateICmpEQ(target, arg_null);
     return LL_BUILDER.CreateSelect(
         cmp,
         agg_null,
