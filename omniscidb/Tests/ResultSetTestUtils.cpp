@@ -112,8 +112,8 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
   int64_t vv = 0;
   for (const auto& target_info : target_infos) {
     const auto slot_bytes = query_mem_desc.getLogicalSlotWidthBytes(target_idx);
-    CHECK_LE(target_info.sql_type.get_size(), slot_bytes);
-    bool isNullable = !target_info.sql_type.get_notnull();
+    CHECK_LE(target_info.type->size(), slot_bytes);
+    bool isNullable = target_info.type->nullable();
     if (target_info.agg_kind == kCOUNT) {
       if (empty || null_val) {
         vv = 0;
@@ -122,7 +122,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
       }
     } else {
       if (isNullable && target_info.skip_null_val && null_val) {
-        vv = inline_int_null_val(target_info.sql_type);
+        vv = inline_int_null_value(target_info.type);
       } else {
         vv = v;
       }
@@ -130,12 +130,12 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
     if (empty) {
       write_int(slot_ptr, query_mem_desc.hasKeylessHash() ? 0 : vv, slot_bytes);
     } else {
-      if (target_info.sql_type.is_integer()) {
+      if (target_info.type->isInteger()) {
         write_int(slot_ptr, vv, slot_bytes);
-      } else if (target_info.sql_type.is_string()) {
+      } else if (target_info.type->isString() || target_info.type->isExtDictionary()) {
         write_int(slot_ptr, -(vv + 2), slot_bytes);
       } else {
-        CHECK(target_info.sql_type.is_fp());
+        CHECK(target_info.type->isFloatingPoint());
         write_fp(slot_ptr, vv, slot_bytes);
       }
     }
@@ -177,9 +177,9 @@ void fill_one_entry_one_col(int8_t* ptr1,
       vv = v;
     }
   } else {
-    bool isNullable = !target_info.sql_type.get_notnull();
+    bool isNullable = target_info.type->nullable();
     if (isNullable && target_info.skip_null_val && null_val) {
-      vv = inline_int_null_val(target_info.sql_type);
+      vv = inline_int_null_value(target_info.type);
     } else {
       if (empty_entry && (target_info.agg_kind == kAVG)) {
         vv = 0;
@@ -191,7 +191,7 @@ void fill_one_entry_one_col(int8_t* ptr1,
   CHECK(ptr1);
   switch (compact_sz1) {
     case 8:
-      if (target_info.sql_type.is_fp()) {
+      if (target_info.type->isFloatingPoint()) {
         double di = vv;
         *reinterpret_cast<int64_t*>(ptr1) =
             *reinterpret_cast<const int64_t*>(may_alias_ptr(&di));
@@ -200,7 +200,7 @@ void fill_one_entry_one_col(int8_t* ptr1,
       }
       break;
     case 4:
-      if (target_info.sql_type.is_fp()) {
+      if (target_info.type->isFloatingPoint()) {
         float fi = vv;
         *reinterpret_cast<int32_t*>(ptr1) =
             *reinterpret_cast<const int32_t*>(may_alias_ptr(&fi));
@@ -209,11 +209,11 @@ void fill_one_entry_one_col(int8_t* ptr1,
       }
       break;
     case 2:
-      CHECK(!target_info.sql_type.is_fp());
+      CHECK(!target_info.type->isFloatingPoint());
       *reinterpret_cast<int16_t*>(ptr1) = vv;
       break;
     case 1:
-      CHECK(!target_info.sql_type.is_fp());
+      CHECK(!target_info.type->isFloatingPoint());
       *reinterpret_cast<int8_t*>(ptr1) = vv;
       break;
     default:
@@ -287,7 +287,10 @@ void fill_storage_buffer_perfect_hash_colwise(int8_t* buff,
       }
       if (i % step == 0) {
         const auto gen_val = generator.getNextValue();
-        const auto val = target_info.sql_type.is_string() ? -(gen_val + 2) : gen_val;
+        const auto val =
+            (target_info.type->isString() || target_info.type->isExtDictionary())
+                ? -(gen_val + 2)
+                : gen_val;
         fill_one_entry_one_col(col_entry_ptr,
                                col_bytes,
                                ptr2,
@@ -381,7 +384,10 @@ void fill_storage_buffer_baseline_colwise(int8_t* buff,
         i64_buff, query_mem_desc.getEntryCount(), &key[0], key.size());
     CHECK(value_slots);
     for (const auto& target_info : target_infos) {
-      const auto val = target_info.sql_type.is_string() ? -(gen_val + step) : gen_val;
+      const auto val =
+          (target_info.type->isString() || target_info.type->isExtDictionary())
+              ? -(gen_val + step)
+              : gen_val;
       fill_one_entry_one_col(
           value_slots, val, target_info, query_mem_desc.getEntryCount());
       value_slots += query_mem_desc.getEntryCount();
@@ -472,7 +478,7 @@ QueryMemoryDescriptor perfect_hash_one_col_desc_small(
       QueryDescriptionType::GroupByPerfectHash, 0, 19, false, {8});
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
@@ -499,14 +505,14 @@ QueryMemoryDescriptor perfect_hash_one_col_desc(
                                        group_column_widths);
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
     slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
-    if (target_info.sql_type.is_varlen()) {
+    if (target_info.type->isString() || target_info.type->isArray()) {
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
     query_mem_desc.addColSlotInfo(slots_for_target);
@@ -523,7 +529,7 @@ QueryMemoryDescriptor perfect_hash_two_col_desc(
       QueryDescriptionType::GroupByPerfectHash, 0, 36, false, {8, 8});
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
@@ -543,7 +549,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc_large(
       QueryDescriptionType::GroupByBaselineHash, 0, 19, false, {8, 8});
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
@@ -564,7 +570,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc_overflow32(
       QueryDescriptionType::GroupByBaselineHash, 0, 54703480, false, {8, 8});
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
@@ -585,7 +591,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc(
       QueryDescriptionType::GroupByBaselineHash, 0, 3, false, {8, 8});
   for (const auto& target_info : target_infos) {
     const auto slot_bytes =
-        std::max(num_bytes, static_cast<int8_t>(target_info.sql_type.get_size()));
+        std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
     if (target_info.agg_kind == kAVG) {
       CHECK(target_info.is_agg);
@@ -615,35 +621,32 @@ void fill_one_entry_baseline(int64_t* value_slots,
         vv = v;
       }
     } else {
-      bool isNullable = !target_info.sql_type.get_notnull();
+      bool isNullable = target_info.type->nullable();
       if ((isNullable && target_info.skip_null_val && null_val) || empty) {
-        vv = null_val_bit_pattern(target_info.sql_type, float_argument_input);
+        vv = null_val_bit_pattern(target_info.type, float_argument_input);
       } else {
         vv = v;
       }
     }
 
-    switch (target_info.sql_type.get_type()) {
-      case kTINYINT:
-      case kSMALLINT:
-      case kINT:
-      case kBIGINT:
+    switch (target_info.type->id()) {
+      case hdk::ir::Type::kInteger:
         value_slots[target_slot] = vv;
         break;
-      case kFLOAT:
-        if (float_argument_input) {
+      case hdk::ir::Type::kFloatingPoint:
+        if (target_info.type->isFp32() && float_argument_input) {
           float fi = vv;
           int64_t fi_bin = *reinterpret_cast<const int32_t*>(may_alias_ptr(&fi));
           value_slots[target_slot] = null_val ? vv : fi_bin;
           break;
+        } else {
+          double di = vv;
+          value_slots[target_slot] =
+              null_val ? vv : *reinterpret_cast<const int64_t*>(may_alias_ptr(&di));
         }
-      case kDOUBLE: {
-        double di = vv;
-        value_slots[target_slot] =
-            null_val ? vv : *reinterpret_cast<const int64_t*>(may_alias_ptr(&di));
         break;
-      }
-      case kTEXT:
+      case hdk::ir::Type::kText:
+      case hdk::ir::Type::kExtDictionary:
         value_slots[target_slot] = -(vv + 2);
         break;
       default:

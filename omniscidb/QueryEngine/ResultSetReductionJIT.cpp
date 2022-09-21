@@ -1274,8 +1274,10 @@ namespace {
 std::string target_info_key(const TargetInfo& target_info) {
   return std::to_string(target_info.is_agg) + "\n" +
          std::to_string(target_info.agg_kind) + "\n" + target_info.type->toString() +
-         "\n" + target_info.agg_arg_type->toString() + "\n" +
-         std::to_string(target_info.skip_null_val) + "\n" +
+         "\n" +
+         (target_info.agg_arg_type ? target_info.agg_arg_type->toString()
+                                   : std::string("null")) +
+         "\n" + std::to_string(target_info.skip_null_val) + "\n" +
          std::to_string(target_info.is_distinct);
 }
 
