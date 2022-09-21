@@ -27,12 +27,12 @@ MemoryLayoutBuilder::MemoryLayoutBuilder(const RelAlgExecutionUnit& ra_exe_unit)
     if (!groupby_expr) {
       continue;
     }
-    const auto& groupby_ti = groupby_expr->get_type_info();
-    if (groupby_ti.is_bytes()) {
+    auto groupby_type = groupby_expr->type();
+    if (groupby_type->isText()) {
       throw std::runtime_error(
           "Cannot group by string columns which are not dictionary encoded.");
     }
-    if (groupby_ti.is_buffer()) {
+    if (groupby_type->isBuffer()) {
       throw std::runtime_error("Group by buffer not supported");
     }
   }
@@ -136,7 +136,9 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
   // TODO: consider allowing TIMESTAMP(9) (nanoseconds) with quals to use perfect hash if
   // the range is small enough
   if (ra_exe_unit.groupby_exprs.front() &&
-      ra_exe_unit.groupby_exprs.front()->get_type_info().is_high_precision_timestamp() &&
+      ra_exe_unit.groupby_exprs.front()->type()->isTimestamp() &&
+      ra_exe_unit.groupby_exprs.front()->type()->as<hdk::ir::TimestampType>()->unit() >
+          hdk::ir::TimeUnit::kSecond &&
       ra_exe_unit.simple_quals.size() > 0) {
     return {QueryDescriptionType::GroupByBaselineHash, 0, 0, 0, false};
   }
@@ -152,10 +154,8 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
   if (has_count_distinct(ra_exe_unit, config.exec.group_by.bigint_count)) {
     max_entry_count = std::min(max_entry_count, baseline_threshold);
   }
-  const auto& groupby_expr_ti = ra_exe_unit.groupby_exprs.front()->get_type_info();
-  if (groupby_expr_ti.is_string() && !col_range_info.bucket) {
-    CHECK(groupby_expr_ti.get_compression() == kENCODING_DICT);
-
+  auto groupby_expr_type = ra_exe_unit.groupby_exprs.front()->type();
+  if (groupby_expr_type->isExtDictionary() && !col_range_info.bucket) {
     const bool has_filters =
         !ra_exe_unit.quals.empty() || !ra_exe_unit.simple_quals.empty();
     if (has_filters &&
@@ -242,7 +242,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
       switch (agg_info.agg_kind) {
         case kAVG:
           ++index;
-          if (arg_expr && !arg_expr->get_type_info().get_notnull()) {
+          if (arg_expr && arg_expr->type()->nullable()) {
             auto expr_range_info = getExpressionRange(arg_expr, query_infos, executor);
             if (expr_range_info.getType() == ExpressionRangeType::Invalid ||
                 expr_range_info.hasNulls()) {
@@ -252,7 +252,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           found = true;
           break;
         case kCOUNT:
-          if (arg_expr && !arg_expr->get_type_info().get_notnull()) {
+          if (arg_expr && arg_expr->type()->nullable()) {
             auto expr_range_info = getExpressionRange(arg_expr, query_infos, executor);
             if (expr_range_info.getType() == ExpressionRangeType::Invalid ||
                 expr_range_info.hasNulls()) {
@@ -262,11 +262,11 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           found = true;
           break;
         case kSUM: {
-          auto arg_ti = arg_expr->get_type_info();
+          auto arg_type = arg_expr->type();
           if (constrained_not_null(arg_expr, ra_exe_unit.quals)) {
-            arg_ti.set_notnull(true);
+            arg_type = arg_type->withNullable(false);
           }
-          if (!arg_ti.get_notnull()) {
+          if (arg_type->nullable()) {
             auto expr_range_info = getExpressionRange(arg_expr, query_infos, executor);
             if (expr_range_info.getType() != ExpressionRangeType::Invalid &&
                 !expr_range_info.hasNulls()) {
@@ -294,8 +294,9 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
         }
         case kMIN: {
           CHECK(agg_expr && agg_expr->get_arg());
-          const auto& arg_ti = agg_expr->get_arg()->get_type_info();
-          if (arg_ti.is_string() || arg_ti.is_buffer()) {
+          auto arg_type = agg_expr->get_arg()->type();
+          if (arg_type->isString() || arg_type->isExtDictionary() ||
+              arg_type->isBuffer()) {
             break;
           }
           auto expr_range_info =
@@ -326,8 +327,9 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
         }
         case kMAX: {
           CHECK(agg_expr && agg_expr->get_arg());
-          const auto& arg_ti = agg_expr->get_arg()->get_type_info();
-          if (arg_ti.is_string() || arg_ti.is_buffer()) {
+          auto arg_type = agg_expr->get_arg()->type();
+          if (arg_type->isString() || arg_type->isExtDictionary() ||
+              arg_type->isBuffer()) {
             break;
           }
           auto expr_range_info =
@@ -397,25 +399,26 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       CHECK(agg_info.is_agg);
       CHECK(agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT);
       const auto agg_expr = static_cast<const hdk::ir::AggExpr*>(target_expr);
-      const auto& arg_ti = agg_expr->get_arg()->get_type_info();
-      if (arg_ti.is_bytes()) {
+      auto arg_type = agg_expr->get_arg()->type();
+      if (arg_type->isText()) {
         throw std::runtime_error(
             "Strings must be dictionary-encoded for COUNT(DISTINCT).");
       }
-      if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT && arg_ti.is_buffer()) {
+      if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT && arg_type->isBuffer()) {
         throw std::runtime_error("APPROX_COUNT_DISTINCT on arrays not supported yet");
       }
       ColRangeInfo no_range_info{QueryDescriptionType::Projection, 0, 0, 0, false};
       auto arg_range_info =
-          arg_ti.is_fp() ? no_range_info
-                         : get_expr_range_info(
-                               ra_exe_unit, query_infos, agg_expr->get_arg(), executor);
+          arg_type->isFloatingPoint()
+              ? no_range_info
+              : get_expr_range_info(
+                    ra_exe_unit, query_infos, agg_expr->get_arg(), executor);
       CountDistinctImplType count_distinct_impl_type{CountDistinctImplType::HashSet};
       int64_t bitmap_sz_bits{0};
       if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
         const auto error_rate = agg_expr->get_arg1();
         if (error_rate) {
-          CHECK(error_rate->get_type_info().get_type() == kINT);
+          CHECK(error_rate->type()->isInt32());
           CHECK_GE(error_rate->get_constval().intval, 1);
           bitmap_sz_bits = hll_size_for_rate(error_rate->get_constval().smallintval);
         } else {
@@ -433,8 +436,8 @@ CountDistinctDescriptors init_count_distinct_descriptors(
         continue;
       }
       if (arg_range_info.hash_type_ == QueryDescriptionType::GroupByPerfectHash &&
-          !arg_ti.is_buffer()) {  // TODO(alex): allow bitmap
-                                  // implementation for arrays
+          !arg_type->isBuffer()) {  // TODO(alex): allow bitmap
+                                    // implementation for arrays
         count_distinct_impl_type = CountDistinctImplType::Bitmap;
         if (agg_info.agg_kind == kCOUNT) {
           bitmap_sz_bits = arg_range_info.max - arg_range_info.min + 1;
@@ -456,7 +459,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       }
       if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT &&
           count_distinct_impl_type == CountDistinctImplType::HashSet &&
-          !arg_ti.is_array()) {
+          !arg_type->isArray()) {
         count_distinct_impl_type = CountDistinctImplType::Bitmap;
       }
 
@@ -581,8 +584,8 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
       return false;
     }
     if (agg_expr->get_arg()) {
-      const auto& arg_ti = agg_expr->get_arg()->get_type_info();
-      if (arg_ti.is_fp()) {
+      auto arg_type = agg_expr->get_arg()->type();
+      if (arg_type->isFloatingPoint()) {
         return false;
       }
       auto expr_range_info =
@@ -595,9 +598,9 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
         return false;
       }
     }
-    const auto& target_ti = target_expr->get_type_info();
-    CHECK(!target_ti.is_buffer());
-    if (!target_ti.is_integer()) {
+    auto target_type = target_expr->type();
+    CHECK(!target_type->isBuffer());
+    if (!target_type->isInteger()) {
       return false;
     }
   }
