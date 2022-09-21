@@ -114,8 +114,8 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
         CHECK(constant);
 
         if (constant->get_is_null()) {
-          CHECK(!targets[j].sql_type.is_varlen());
-          *reinterpret_cast<int64_t*>(ptr) = inline_int_null_val(targets[j].sql_type);
+          CHECK(!targets[j].type->isString() && !targets[j].type->isArray());
+          *reinterpret_cast<int64_t*>(ptr) = inline_int_null_value(targets[j].type);
         } else {
           const auto ti = constant->get_type_info();
           const auto datum = constant->get_constval();
