@@ -1126,7 +1126,7 @@ class RelLogicalValues : public RelAlgNode {
     std::string ret = ::typeName(this) + getIdString() + "(";
     for (const auto& target_meta_info : tuple_type_) {
       ret += " (" + target_meta_info.get_resname() + " " +
-             target_meta_info.get_type_info().get_type_name() + ")";
+             target_meta_info.type()->toString() + ")";
     }
     ret += ")";
     return ret;
@@ -1137,7 +1137,7 @@ class RelLogicalValues : public RelAlgNode {
       hash_ = typeid(RelLogicalValues).hash_code();
       for (auto& target_meta_info : tuple_type_) {
         boost::hash_combine(*hash_, target_meta_info.get_resname());
-        boost::hash_combine(*hash_, target_meta_info.get_type_info().get_type_name());
+        boost::hash_combine(*hash_, target_meta_info.type()->toString());
       }
     }
     return *hash_;
