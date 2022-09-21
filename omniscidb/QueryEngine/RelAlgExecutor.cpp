@@ -1660,7 +1660,7 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
                                          kCOUNT,
                                          tuple_type_component.type(),
                                          nullptr,
-                                         tuple_type_component.get_type_info(),
+                                         tuple_type_component.type()->toTypeInfo(),
                                          SQLTypeInfo(kNULLT, false),
                                          false,
                                          false});

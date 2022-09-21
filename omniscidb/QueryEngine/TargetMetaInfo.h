@@ -29,21 +29,17 @@
 class TargetMetaInfo {
  public:
   TargetMetaInfo(const std::string& resname, const hdk::ir::Type* type)
-      : resname_(resname), type_(type), ti_(type_->toTypeInfo()) {}
+      : resname_(resname), type_(type) {}
   const std::string& get_resname() const { return resname_; }
   const hdk::ir::Type* type() const { return type_; }
-  const SQLTypeInfo& get_type_info() const { return ti_; }
 
   std::string toString() const {
-    return "TargetMetaInfo(" + resname_ + ", " + ti_.to_string() + ") ";
+    return "TargetMetaInfo(" + resname_ + ", " + type_->toString() + ")";
   }
 
  private:
   std::string resname_;
   const hdk::ir::Type* type_;
-  const hdk::ir::Type* physical_type_;
-  SQLTypeInfo ti_;
-  SQLTypeInfo physical_ti_;
 };
 
 inline std::ostream& operator<<(std::ostream& os, TargetMetaInfo const& tmi) {

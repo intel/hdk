@@ -42,6 +42,54 @@ int vt_destructor(sqlite3_vtab* pVtab) {
   return 0;
 }
 
+std::string sqlTypeName(const hdk::ir::Type* type) {
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
+      return "BOOLEAN";
+    case hdk::ir::Type::kDecimal: {
+      auto precision = type->as<hdk::ir::DecimalType>()->precision();
+      auto scale = type->as<hdk::ir::DecimalType>()->scale();
+      return "DECIMAL(" + std::to_string(precision) + "," + std::to_string(scale) + ")";
+    }
+    case hdk::ir::Type::kInteger:
+      switch (type->size()) {
+        case 1:
+          return "TINYINT";
+        case 2:
+          return "SMALLINT";
+        case 4:
+          return "INT";
+        case 8:
+          return "BIGINT";
+        default:
+          break;
+      }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          return "FLOAT";
+        case hdk::ir::FloatingPointType::kDouble:
+          return "DOUBLE";
+        default:
+          break;
+      }
+      break;
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
+      break;
+    case hdk::ir::Type::kExtDictionary:
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
+      return "TEXT";
+    default:
+      break;
+  }
+  return "<UNSUPPORTED_TYPE>";
+}
+
 int vt_create(sqlite3* db,
               void* p_aux,
               int argc,
@@ -63,7 +111,7 @@ int vt_create(sqlite3* db,
                  std::back_inserter(col_defs),
                  [](const TargetMetaInfo& target_metainfo) {
                    return target_metainfo.get_resname() + " " +
-                          target_metainfo.get_type_info().get_type_name();
+                          sqlTypeName(target_metainfo.type());
                  });
   const auto col_defs_str = boost::algorithm::join(col_defs, ", ");
   const auto create_statement =
@@ -174,116 +222,127 @@ int vt_column(sqlite3_vtab_cursor* cur, sqlite3_context* ctx, int col_idx) {
   CHECK_LT(static_cast<size_t>(col_idx),
            external_query_table.fetch_result.col_buffers[0].size());
   const auto column = external_query_table.fetch_result.col_buffers[0][col_idx];
-  const auto& col_ti = external_query_table.schema[col_idx].get_type_info();
-  switch (col_ti.get_type()) {
-    case kTINYINT: {
-      const auto val = column[p_cur->count - 1];
-      if (val == inline_int_null_value<int8_t>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_int(ctx, val);
-      }
-      break;
-    }
-    case kSMALLINT: {
-      const auto int_column = reinterpret_cast<const int16_t*>(column);
-      const auto val = int_column[p_cur->count - 1];
-      if (val == inline_int_null_value<int16_t>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_int(ctx, val);
-      }
-      break;
-    }
-    case kINT: {
-      const auto int_column = reinterpret_cast<const int32_t*>(column);
-      const auto val = int_column[p_cur->count - 1];
-      if (val == inline_int_null_value<int32_t>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_int(ctx, val);
-      }
-      break;
-    }
-    case kBIGINT: {
-      const auto int_column = reinterpret_cast<const int64_t*>(column);
-      const auto val = int_column[p_cur->count - 1];
-      if (val == inline_int_null_value<int64_t>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_int(ctx, val);
-      }
-      break;
-    }
-    case kFLOAT: {
-      const auto float_column = reinterpret_cast<const float*>(column);
-      const auto val = float_column[p_cur->count - 1];
-      if (val == inline_fp_null_value<float>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_double(ctx, val);
-      }
-      break;
-    }
-    case kDOUBLE: {
-      const auto double_column = reinterpret_cast<const double*>(column);
-      const auto val = double_column[p_cur->count - 1];
-      if (val == inline_fp_null_value<double>()) {
-        sqlite3_result_null(ctx);
-      } else {
-        sqlite3_result_double(ctx, val);
-      }
-      break;
-    }
-    case kTEXT: {
-      if (col_ti.get_compression() == kENCODING_DICT) {
-        const auto executor = external_query_table.executor;
-        const auto sdp = executor->getStringDictionaryProxy(
-            col_ti.get_comp_param(), executor->getRowSetMemoryOwner(), true);
-        CHECK(sdp);
-        DecodedString decoded_string;
-        switch (col_ti.get_size()) {
-          case 1: {
-            decoded_string = decode_string<uint8_t>(column, p_cur->count - 1, sdp);
-            break;
+  auto col_type = external_query_table.schema[col_idx].type();
+  switch (col_type->id()) {
+    case hdk::ir::Type::kInteger:
+      switch (col_type->size()) {
+        case 1: {
+          const auto val = column[p_cur->count - 1];
+          if (val == inline_int_null_value<int8_t>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_int(ctx, val);
           }
-          case 2: {
-            decoded_string = decode_string<uint16_t>(column, p_cur->count - 1, sdp);
-            break;
-          }
-          case 4: {
-            decoded_string = decode_string<int32_t>(column, p_cur->count - 1, sdp);
-            break;
-          }
-          default: {
-            decoded_string = DecodedString{};
-            LOG(FATAL) << "Invalid encoding size: " << col_ti.get_size();
-          }
+          break;
         }
-        if (decoded_string.is_null) {
-          sqlite3_result_null(ctx);
-        } else {
-          sqlite3_result_text(
-              ctx, decoded_string.payload.first, decoded_string.payload.second, nullptr);
+        case 2: {
+          const auto int_column = reinterpret_cast<const int16_t*>(column);
+          const auto val = int_column[p_cur->count - 1];
+          if (val == inline_int_null_value<int16_t>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_int(ctx, val);
+          }
+          break;
         }
-      } else {
-        CHECK(col_ti.get_compression() == kENCODING_NONE);
-        const auto chunk_iter =
-            const_cast<ChunkIter*>(reinterpret_cast<const ChunkIter*>(column));
-        VarlenDatum vd;
-        bool is_end;
-        ChunkIter_get_nth(chunk_iter, p_cur->count - 1, false, &vd, &is_end);
-        if (vd.is_null) {
-          sqlite3_result_null(ctx);
-        } else {
-          sqlite3_result_text(
-              ctx, reinterpret_cast<const char*>(vd.pointer), vd.length, nullptr);
+        case 4: {
+          const auto int_column = reinterpret_cast<const int32_t*>(column);
+          const auto val = int_column[p_cur->count - 1];
+          if (val == inline_int_null_value<int32_t>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_int(ctx, val);
+          }
+          break;
+        }
+        case 8: {
+          const auto int_column = reinterpret_cast<const int64_t*>(column);
+          const auto val = int_column[p_cur->count - 1];
+          if (val == inline_int_null_value<int64_t>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_int(ctx, val);
+          }
+          break;
+        }
+        default:
+          LOG(FATAL) << "Unexpected type: " << col_type->toString();
+      }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (col_type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat: {
+          const auto float_column = reinterpret_cast<const float*>(column);
+          const auto val = float_column[p_cur->count - 1];
+          if (val == inline_fp_null_value<float>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_double(ctx, val);
+          }
+          break;
+        }
+        case hdk::ir::FloatingPointType::kDouble: {
+          const auto double_column = reinterpret_cast<const double*>(column);
+          const auto val = double_column[p_cur->count - 1];
+          if (val == inline_fp_null_value<double>()) {
+            sqlite3_result_null(ctx);
+          } else {
+            sqlite3_result_double(ctx, val);
+          }
+          break;
+        }
+        default:
+          LOG(FATAL) << "Unexpected type: " << col_type->toString();
+      }
+      break;
+    case hdk::ir::Type::kExtDictionary: {
+      const auto executor = external_query_table.executor;
+      const auto sdp = executor->getStringDictionaryProxy(
+          col_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
+          executor->getRowSetMemoryOwner(),
+          true);
+      CHECK(sdp);
+      DecodedString decoded_string;
+      switch (col_type->size()) {
+        case 1: {
+          decoded_string = decode_string<uint8_t>(column, p_cur->count - 1, sdp);
+          break;
+        }
+        case 2: {
+          decoded_string = decode_string<uint16_t>(column, p_cur->count - 1, sdp);
+          break;
+        }
+        case 4: {
+          decoded_string = decode_string<int32_t>(column, p_cur->count - 1, sdp);
+          break;
+        }
+        default: {
+          decoded_string = DecodedString{};
+          LOG(FATAL) << "Invalid encoding size: " << col_type->size();
         }
       }
-      break;
-    }
+      if (decoded_string.is_null) {
+        sqlite3_result_null(ctx);
+      } else {
+        sqlite3_result_text(
+            ctx, decoded_string.payload.first, decoded_string.payload.second, nullptr);
+      }
+    } break;
+    case hdk::ir::Type::kText: {
+      const auto chunk_iter =
+          const_cast<ChunkIter*>(reinterpret_cast<const ChunkIter*>(column));
+      VarlenDatum vd;
+      bool is_end;
+      ChunkIter_get_nth(chunk_iter, p_cur->count - 1, false, &vd, &is_end);
+      if (vd.is_null) {
+        sqlite3_result_null(ctx);
+      } else {
+        sqlite3_result_text(
+            ctx, reinterpret_cast<const char*>(vd.pointer), vd.length, nullptr);
+      }
+    } break;
     default: {
-      LOG(FATAL) << "Unexpected type: " << col_ti.get_type_name();
+      LOG(FATAL) << "Unexpected type: " << col_type->toString();
       break;
     }
   }
