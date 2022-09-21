@@ -722,7 +722,7 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
     if (std::find_if(target_infos.begin(),
                      target_infos.end(),
                      [&supported_aggs](const TargetInfo& ti) {
-                       if (ti.sql_type.is_varlen() ||
+                       if (ti.type->isString() || ti.type->isArray() ||
                            !supported_aggs.count(ti.agg_kind)) {
                          return true;
                        } else {
@@ -779,7 +779,7 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
       if (std::find_if(target_infos.begin(),
                        target_infos.end(),
                        [&supported_aggs](const TargetInfo& ti) {
-                         if (ti.sql_type.is_varlen() ||
+                         if (ti.type->isString() || ti.type->isArray() ||
                              !supported_aggs.count(ti.agg_kind)) {
                            return true;
                          } else {
