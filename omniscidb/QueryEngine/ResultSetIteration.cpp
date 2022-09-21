@@ -436,7 +436,7 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
 
   const auto& offsets_for_target = offsets_for_storage_[storage_idx][target_logical_idx];
   const auto& agg_info = result_set_->storage_->targets_[target_logical_idx];
-  const auto& type_info = agg_info.sql_type;
+  auto type = agg_info.type;
 
   keys_ptr = get_rowwise_ptr(buff, entry_idx);
   rowwise_target_ptr = keys_ptr + key_bytes_with_padding_;
@@ -459,7 +459,7 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
     const auto i2 = read_int_from_buff(ptr2, offsets_for_target.compact_sz2);
     return InternalTargetValue(i1, i2);
   } else {
-    if (type_info.is_string() && type_info.get_compression() == kENCODING_NONE) {
+    if (type->isString()) {
       CHECK(!agg_info.is_agg);
       if (!result_set_->lazy_fetch_info_.empty()) {
         CHECK_LT(target_logical_idx, result_set_->lazy_fetch_info_.size());
@@ -488,7 +488,7 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
       return result_set_->getVarlenOrderEntry(i1, str_len);
     }
     return InternalTargetValue(
-        type_info.is_fp() ? i1 : int_resize_cast(i1, type_info.get_logical_size()));
+        type->isFloatingPoint() ? i1 : int_resize_cast(i1, hdk::ir::logicalSize(type)));
   }
 }
 
@@ -561,7 +561,7 @@ InternalTargetValue ResultSet::ColumnWiseTargetAccessor::getColumnInternal(
 
   const auto& offsets_for_target = offsets_for_storage_[storage_idx][target_logical_idx];
   const auto& agg_info = result_set_->storage_->targets_[target_logical_idx];
-  const auto& type_info = agg_info.sql_type;
+  auto type = agg_info.type;
   auto ptr1 = offsets_for_target.ptr1;
   if (result_set_->query_mem_desc_.targetGroupbyIndicesSize() > 0) {
     if (result_set_->query_mem_desc_.getTargetGroupbyIndex(target_logical_idx) >= 0) {
@@ -587,7 +587,7 @@ InternalTargetValue ResultSet::ColumnWiseTargetAccessor::getColumnInternal(
     return InternalTargetValue(i1, i2);
   } else {
     // for TEXT ENCODING NONE:
-    if (type_info.is_string() && type_info.get_compression() == kENCODING_NONE) {
+    if (type->isString()) {
       CHECK(!agg_info.is_agg);
       if (!result_set_->lazy_fetch_info_.empty()) {
         CHECK_LT(target_logical_idx, result_set_->lazy_fetch_info_.size());
@@ -617,7 +617,7 @@ InternalTargetValue ResultSet::ColumnWiseTargetAccessor::getColumnInternal(
       return result_set_->getVarlenOrderEntry(i1, i2);
     }
     return InternalTargetValue(
-        type_info.is_fp() ? i1 : int_resize_cast(i1, type_info.get_logical_size()));
+        type->isFloatingPoint() ? i1 : int_resize_cast(i1, hdk::ir::logicalSize(type)));
   }
 }
 
@@ -658,8 +658,7 @@ int64_t ResultSet::lazyReadInt(const int64_t ival,
       CHECK_LT(target_logical_idx, targets_.size());
       const TargetInfo& target_info = targets_[target_logical_idx];
       CHECK(!target_info.is_agg);
-      if (target_info.sql_type.is_string() &&
-          target_info.sql_type.get_compression() == kENCODING_NONE) {
+      if (target_info.type->isString()) {
         VarlenDatum vd;
         bool is_end{false};
         ChunkIter_get_nth(
@@ -820,35 +819,38 @@ TargetValue build_string_array_target_value(
   return ArrayTargetValue(values);
 }
 
-TargetValue build_array_target_value(const SQLTypeInfo& array_ti,
+TargetValue build_array_target_value(const hdk::ir::Type* array_type,
                                      const int8_t* buff,
                                      const size_t buff_sz,
                                      const bool translate_strings,
                                      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                                      const Data_Namespace::DataMgr* data_mgr) {
-  CHECK(array_ti.is_array());
-  const auto& elem_ti = array_ti.get_elem_type();
-  if (elem_ti.is_string()) {
+  CHECK(array_type->isArray());
+  auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  if (elem_type->isString() || elem_type->isExtDictionary()) {
+    auto dict_id = elem_type->isExtDictionary()
+                       ? elem_type->as<hdk::ir::ExtDictionaryType>()->dictId()
+                       : 0;
     return build_string_array_target_value(reinterpret_cast<const int32_t*>(buff),
                                            buff_sz,
-                                           elem_ti.get_comp_param(),
+                                           dict_id,
                                            translate_strings,
                                            row_set_mem_owner,
                                            data_mgr);
   }
-  switch (elem_ti.get_size()) {
+  switch (elem_type->size()) {
     case 1:
       return build_array_target_value<int8_t>(buff, buff_sz, row_set_mem_owner);
     case 2:
       return build_array_target_value<int16_t>(buff, buff_sz, row_set_mem_owner);
     case 4:
-      if (elem_ti.is_fp()) {
+      if (elem_type->isFloatingPoint()) {
         return build_array_target_value<float>(buff, buff_sz, row_set_mem_owner);
       } else {
         return build_array_target_value<int32_t>(buff, buff_sz, row_set_mem_owner);
       }
     case 8:
-      if (elem_ti.is_fp()) {
+      if (elem_type->isFloatingPoint()) {
         return build_array_target_value<double>(buff, buff_sz, row_set_mem_owner);
       } else {
         return build_array_target_value<int64_t>(buff, buff_sz, row_set_mem_owner);
@@ -1120,26 +1122,25 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
   if (separate_varlen_storage_valid_ && !target_info.is_agg) {
     if (varlen_ptr < 0) {
       CHECK_EQ(-1, varlen_ptr);
-      if (target_info.sql_type.get_type() == kARRAY) {
+      if (target_info.type->isArray()) {
         return ArrayTargetValue(boost::optional<std::vector<ScalarTargetValue>>{});
       }
       return TargetValue(nullptr);
     }
     const auto storage_idx = getStorageIndex(entry_buff_idx);
-    if (target_info.sql_type.is_string()) {
-      CHECK(target_info.sql_type.get_compression() == kENCODING_NONE);
+    if (target_info.type->isString()) {
       CHECK_LT(storage_idx.first, serialized_varlen_buffer_.size());
       const auto& varlen_buffer_for_storage =
           serialized_varlen_buffer_[storage_idx.first];
       CHECK_LT(static_cast<size_t>(varlen_ptr), varlen_buffer_for_storage.size());
       return varlen_buffer_for_storage[varlen_ptr];
-    } else if (target_info.sql_type.get_type() == kARRAY) {
+    } else if (target_info.type->isArray()) {
       CHECK_LT(storage_idx.first, serialized_varlen_buffer_.size());
       const auto& varlen_buffer = serialized_varlen_buffer_[storage_idx.first];
       CHECK_LT(static_cast<size_t>(varlen_ptr), varlen_buffer.size());
 
       return build_array_target_value(
-          target_info.sql_type,
+          target_info.type,
           reinterpret_cast<const int8_t*>(varlen_buffer[varlen_ptr].data()),
           varlen_buffer[varlen_ptr].size(),
           translate_strings,
@@ -1158,7 +1159,7 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
       auto& frag_col_buffers =
           getColumnFrag(storage_idx.first, target_logical_idx, varlen_ptr);
       bool is_end{false};
-      if (target_info.sql_type.is_string()) {
+      if (target_info.type->isString() || target_info.type->isExtDictionary()) {
         VarlenDatum vd;
         ChunkIter_get_nth(reinterpret_cast<ChunkIter*>(const_cast<int8_t*>(
                               frag_col_buffers[col_lazy_fetch.local_col_id])),
@@ -1175,7 +1176,7 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
         std::string fetched_str(reinterpret_cast<char*>(vd.pointer), vd.length);
         return fetched_str;
       } else {
-        CHECK(target_info.sql_type.is_array());
+        CHECK(target_info.type->isArray());
         ArrayDatum ad;
         ChunkIter_get_nth(reinterpret_cast<ChunkIter*>(const_cast<int8_t*>(
                               frag_col_buffers[col_lazy_fetch.local_col_id])),
@@ -1190,7 +1191,7 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
         if (ad.length > 0) {
           CHECK(ad.pointer);
         }
-        return build_array_target_value(target_info.sql_type,
+        return build_array_target_value(target_info.type,
                                         ad.pointer,
                                         ad.length,
                                         translate_strings,
@@ -1200,15 +1201,15 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
     }
   }
   if (!varlen_ptr) {
-    if (target_info.sql_type.is_array()) {
+    if (target_info.type->isArray()) {
       return ArrayTargetValue(boost::optional<std::vector<ScalarTargetValue>>{});
     }
     return TargetValue(nullptr);
   }
   auto length = read_int_from_buff(ptr2, compact_sz2);
-  if (target_info.sql_type.is_array()) {
-    const auto& elem_ti = target_info.sql_type.get_elem_type();
-    length *= elem_ti.get_array_context_logical_size();
+  if (target_info.type->isArray()) {
+    auto elem_type = target_info.type->as<hdk::ir::ArrayBaseType>()->elemType();
+    length *= elem_type->isString() ? 4 : hdk::ir::logicalSize(elem_type);
   }
   std::vector<int8_t> cpu_buffer;
   if (varlen_ptr && device_type_ == ExecutorDeviceType::GPU) {
@@ -1220,8 +1221,8 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
         &cpu_buffer[0], reinterpret_cast<const int8_t*>(varlen_ptr), length, device_id_);
     varlen_ptr = reinterpret_cast<int64_t>(&cpu_buffer[0]);
   }
-  if (target_info.sql_type.is_array()) {
-    return build_array_target_value(target_info.sql_type,
+  if (target_info.type->isArray()) {
+    return build_array_target_value(target_info.type,
                                     reinterpret_cast<const int8_t*>(varlen_ptr),
                                     length,
                                     translate_strings,
@@ -1240,8 +1241,8 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
                                        const bool decimal_to_double,
                                        const size_t entry_buff_idx) const {
   auto actual_compact_sz = compact_sz;
-  const auto& type_info = target_info.sql_type;
-  if (type_info.get_type() == kFLOAT && !query_mem_desc_.forceFourByteFloat()) {
+  auto type = target_info.type;
+  if (type->isFp32() && !query_mem_desc_.forceFourByteFloat()) {
     if (query_mem_desc_.isLogicalSizedColumnsAllowed()) {
       actual_compact_sz = sizeof(float);
     } else {
@@ -1262,8 +1263,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
   }
 
   // String dictionary keys are read as 32-bit values regardless of encoding
-  if (type_info.is_string() && type_info.get_compression() == kENCODING_DICT &&
-      type_info.get_comp_param()) {
+  if (type->isExtDictionary() && type->as<hdk::ir::ExtDictionaryType>()->dictId()) {
     actual_compact_sz = sizeof(int32_t);
   }
 
@@ -1321,7 +1321,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
     // right type instead
     if (inline_int_null_val(chosen_type) ==
         int_resize_cast(ival, chosen_type.get_logical_size())) {
-      return inline_int_null_val(type_info);
+      return inline_int_null_value(type);
     }
     return ival;
   }
@@ -1491,9 +1491,7 @@ TargetValue ResultSet::getTargetValueFromBufferRowwise(
     // Skip reading the second slot if we have a none encoded string and are using
     // the none encoded strings buffer attached to ResultSetStorage
     if (!(separate_varlen_storage_valid_ &&
-          (target_info.sql_type.is_array() ||
-           (target_info.sql_type.is_string() &&
-            target_info.sql_type.get_compression() == kENCODING_NONE)))) {
+          (target_info.type->isArray() || target_info.type->isString()))) {
       compact_sz2 = query_mem_desc_.getPaddedSlotWidthBytes(slot_idx + 1);
     }
     if (separate_varlen_storage_valid_ && target_info.is_agg) {
