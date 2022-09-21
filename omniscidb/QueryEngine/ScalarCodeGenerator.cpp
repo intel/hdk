@@ -42,16 +42,12 @@ class UsedColumnExpressions : public ScalarExprVisitor<ScalarCodeGenerator::Colu
 
 std::vector<InputTableInfo> g_table_infos;
 
-llvm::Type* llvm_type_from_sql(const SQLTypeInfo& ti, llvm::LLVMContext& ctx) {
-  switch (ti.get_type()) {
-    case kINT: {
-      return get_int_type(32, ctx);
-    }
-    default: {
-      LOG(FATAL) << "Unsupported type";
-      return nullptr;  // satisfy -Wreturn-type
-    }
+llvm::Type* llvm_type_from_type(const hdk::ir::Type* type, llvm::LLVMContext& ctx) {
+  if (type->isInt32()) {
+    return get_int_type(32, ctx);
   }
+  LOG(FATAL) << "Unsupported type";
+  return nullptr;  // satisfy -Wreturn-type
 }
 
 }  // namespace
@@ -85,10 +81,10 @@ ScalarCodeGenerator::CompiledExpression ScalarCodeGenerator::compile(
     const auto it = used_columns.find(kv.first);
     const auto col_expr = it->second;
     inputs[arg_idx] = col_expr;
-    const auto& ti = col_expr->get_type_info();
-    arg_types[arg_idx + 1] = llvm_type_from_sql(ti, ctx);
+    auto type = col_expr->type();
+    arg_types[arg_idx + 1] = llvm_type_from_type(type, ctx);
   }
-  arg_types[0] = traits.globalPointerType(llvm_type_from_sql(expr->get_type_info(), ctx));
+  arg_types[0] = traits.globalPointerType(llvm_type_from_type(expr->type(), ctx));
   auto ft = llvm::FunctionType::get(get_int_type(32, ctx), arg_types, false);
   auto scalar_expr_func = llvm::Function::Create(
       ft, llvm::Function::ExternalLinkage, "scalar_expr", module_.get());
