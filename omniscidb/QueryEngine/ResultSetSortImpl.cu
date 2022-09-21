@@ -136,8 +136,8 @@ std::vector<uint32_t> baseline_sort_fp(const ExecutorDeviceType device_type,
   pos_oe_col_buffer.reserve(slice_entry_count);
   size_t oe_col_buffer_idx = 0;
   const auto& oe_info = layout.oe_target_info;
-  const auto col_ti =
-      oe_info.agg_kind == kAVG ? SQLTypeInfo(kDOUBLE, false) : oe_info.sql_type;
+  const auto col_type =
+      oe_info.agg_kind == kAVG ? oe_info.type->ctx().fp64() : oe_info.type;
   // Execlude AVG b/c collect_order_entry_column already makes its pair collapse into a
   // double
   const bool float_argument_input =
@@ -150,7 +150,7 @@ std::vector<uint32_t> baseline_sort_fp(const ExecutorDeviceType device_type,
   for (size_t i = start; i < layout.entry_count; i += step, ++oe_col_buffer_idx) {
     if (!is_empty_entry<K>(i, groupby_buffer, layout.row_bytes) &&
         oe_col_buffer[oe_col_buffer_idx] ==
-            null_val_bit_pattern(col_ti, float_argument_input)) {
+            null_val_bit_pattern(col_type, float_argument_input)) {
       null_idx_buff.push_back(i);
       continue;
     }
