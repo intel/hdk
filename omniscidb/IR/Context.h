@@ -73,8 +73,7 @@ class Context {
 
   const ExtDictionaryType* extDict(const Type* elem_type,
                                    int dict_id,
-                                   int index_size = 4,
-                                   bool nullable = true);
+                                   int index_size = 4);
 
   const ColumnType* column(const Type* column_type, bool nullable = true);
   const ColumnListType* columnList(const Type* column_type,

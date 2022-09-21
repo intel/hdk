@@ -13,8 +13,7 @@ namespace hdk::ir {
 const Type* logicalType(const Type* type) {
   if (type->isExtDictionary() && type->size() != 4) {
     auto dict_type = type->as<ExtDictionaryType>();
-    return type->ctx().extDict(
-        dict_type->elemType(), dict_type->dictId(), 4, dict_type->nullable());
+    return type->ctx().extDict(dict_type->elemType(), dict_type->dictId(), 4);
   } else if (type->isDate()) {
     auto date_type = type->as<DateType>();
     if (date_type->unit() != TimeUnit::kSecond || date_type->size() != 8) {

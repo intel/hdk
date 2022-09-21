@@ -436,8 +436,7 @@ class ExtDictionaryType : public Type {
   static const ExtDictionaryType* make(Context& ctx,
                                        const Type* elem_type,
                                        int dict_id,
-                                       int index_size = 4,
-                                       bool nullable = true);
+                                       int index_size = 4);
 
   const Type* elemType() const { return elem_type_; }
 
@@ -454,11 +453,7 @@ class ExtDictionaryType : public Type {
  protected:
   friend class ContextImpl;
 
-  ExtDictionaryType(Context& ctx,
-                    const Type* elem_type,
-                    int dict_id,
-                    int index_size,
-                    bool nullable);
+  ExtDictionaryType(Context& ctx, const Type* elem_type, int dict_id, int index_size);
 
   const Type* elem_type_;
   int dict_id_;

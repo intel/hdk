@@ -323,7 +323,7 @@ const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
     auto dict_id1 = type1->as<hdk::ir::ExtDictionaryType>()->dictId();
     auto dict_id2 = type2->as<hdk::ir::ExtDictionaryType>()->dictId();
     if (dict_id1 == dict_id2 || dict_id1 == TRANSIENT_DICT(dict_id2)) {
-      common_type = ctx.extDict(ctx.text(), std::min(dict_id1, dict_id2), 4, nullable);
+      common_type = ctx.extDict(ctx.text(nullable), std::min(dict_id1, dict_id2), 4);
     } else {
       common_type = ctx.text();
     }
@@ -432,7 +432,6 @@ const hdk::ir::Type* common_numeric_type(const hdk::ir::Type* type1,
 hdk::ir::ExprPtr analyzeIntValue(const int64_t intval) {
   auto& ctx = hdk::ir::Context::defaultCtx();
   const hdk::ir::Type* type;
-  SQLTypes t;
   Datum d;
   if (intval >= INT16_MIN && intval <= INT16_MAX) {
     type = ctx.int16(false);
@@ -515,7 +514,7 @@ const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
     auto dict_id1 = type1->as<hdk::ir::ExtDictionaryType>()->dictId();
     auto dict_id2 = type2->as<hdk::ir::ExtDictionaryType>()->dictId();
     if (dict_id1 == dict_id2 || dict_id1 == TRANSIENT_DICT(dict_id2)) {
-      common_type = ctx.extDict(ctx.text(), std::min(dict_id1, dict_id2), 4, nullable);
+      common_type = ctx.extDict(ctx.text(nullable), std::min(dict_id1, dict_id2), 4);
     } else {
       common_type = get_str_dict_cast_type(type1, type2, executor);
     }
@@ -625,17 +624,13 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
       }
     } else if (new_left_type->isExtDictionary() && !new_right_type->isExtDictionary()) {
       CHECK(new_right_type->isString());
-      auto type = ctx.extDict(new_right_type,
-                              new_left_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
-                              4,
-                              new_right_type->nullable());
+      auto type = ctx.extDict(
+          new_right_type, new_left_type->as<hdk::ir::ExtDictionaryType>()->dictId(), 4);
       right_expr = right_expr->add_cast(type);
     } else if (new_right_type->isExtDictionary() && !new_left_type->isExtDictionary()) {
       CHECK(new_left_type->isString());
-      auto type = ctx.extDict(new_left_type,
-                              new_right_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
-                              4,
-                              new_left_type->nullable());
+      auto type = ctx.extDict(
+          new_left_type, new_right_type->as<hdk::ir::ExtDictionaryType>()->dictId(), 4);
       left_expr = left_expr->add_cast(type);
     } else {
       left_expr = left_expr->decompress();

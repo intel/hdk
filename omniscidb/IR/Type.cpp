@@ -573,22 +573,20 @@ SQLTypeInfo VarLenArrayType::toTypeInfo() const {
 ExtDictionaryType::ExtDictionaryType(Context& ctx,
                                      const Type* elem_type,
                                      int dict_id,
-                                     int index_size,
-                                     bool nullable)
-    : Type(ctx, kExtDictionary, index_size, nullable)
+                                     int index_size)
+    : Type(ctx, kExtDictionary, index_size, elem_type->nullable())
     , elem_type_(elem_type)
     , dict_id_(dict_id) {}
 
 const ExtDictionaryType* ExtDictionaryType::make(Context& ctx,
                                                  const Type* elem_type,
                                                  int dict_id,
-                                                 int index_size,
-                                                 bool nullable) {
-  return ctx.extDict(elem_type, dict_id, index_size, nullable);
+                                                 int index_size) {
+  return ctx.extDict(elem_type, dict_id, index_size);
 }
 
 const Type* ExtDictionaryType::withNullable(bool nullable) const {
-  return make(ctx_, elem_type_, dict_id_, size_, nullable);
+  return make(ctx_, elem_type_->withNullable(nullable), dict_id_, size_);
 }
 
 bool ExtDictionaryType::equal(const Type& other) const {

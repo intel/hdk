@@ -347,10 +347,8 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
         auto dict_type = elem_type->as<hdk::ir::ExtDictionaryType>();
         auto sharing_id = dict_type->dictId();
         if (sharing_id < 0 && dict_ids.count(sharing_id)) {
-          elem_type = ctx_.extDict(dict_type->elemType(),
-                                   dict_ids.at(sharing_id),
-                                   dict_type->size(),
-                                   dict_type->nullable());
+          elem_type = ctx_.extDict(
+              dict_type->elemType(), dict_ids.at(sharing_id), dict_type->size());
         } else if (sharing_id <= 0) {
           if (next_dict_id_ > MAX_DB_ID) {
             throw std::runtime_error("Dictionary count limit exceeded.");
@@ -365,8 +363,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
             dict_ids.emplace(sharing_id, dict_id);
           }
           dicts_.emplace(dict_id, std::move(dict_desc));
-          elem_type = ctx_.extDict(
-              dict_type->elemType(), dict_id, dict_type->size(), dict_type->nullable());
+          elem_type = ctx_.extDict(dict_type->elemType(), dict_id, dict_type->size());
         }
 
         if (type->isFixedLenArray()) {

@@ -196,12 +196,8 @@ class ContextImpl {
     return res.get();
   }
 
-  const ExtDictionaryType* extDict(const Type* elem_type,
-                                   int dict_id,
-                                   int index_size,
-                                   bool nullable) {
-    auto& res =
-        ext_dict_types_[std::make_tuple(elem_type, dict_id, index_size, nullable)];
+  const ExtDictionaryType* extDict(const Type* elem_type, int dict_id, int index_size) {
+    auto& res = ext_dict_types_[std::make_tuple(elem_type, dict_id, index_size)];
     if (!res) {
       if (&ctx_ != &elem_type->ctx()) {
         throw InvalidTypeError()
@@ -215,7 +211,7 @@ class ContextImpl {
         throw UnsupportedTypeError()
             << "Only string types are supported for external dictionary element.";
       }
-      res.reset(new ExtDictionaryType(ctx_, elem_type, dict_id, index_size, nullable));
+      res.reset(new ExtDictionaryType(ctx_, elem_type, dict_id, index_size));
     }
     return res.get();
   }
@@ -307,10 +303,8 @@ class ContextImpl {
       }
       case Type::kExtDictionary: {
         auto ext_dict_type = static_cast<const ExtDictionaryType*>(type);
-        return extDict(ext_dict_type->elemType(),
-                       ext_dict_type->dictId(),
-                       ext_dict_type->size(),
-                       ext_dict_type->nullable());
+        return extDict(
+            ext_dict_type->elemType(), ext_dict_type->dictId(), ext_dict_type->size());
       }
       default:
         throw InvalidTypeError() << "Unexpected type: " << type;
@@ -389,16 +383,14 @@ class ContextImpl {
         break;
       case kTEXT:
         if (compression == kENCODING_DICT) {
-          return extDict(text(nullable), ti.get_comp_param(), ti.get_size(), nullable);
+          return extDict(text(nullable), ti.get_comp_param(), ti.get_size());
         } else {
           return text(nullable);
         }
       case kVARCHAR:
         if (compression == kENCODING_DICT) {
-          return extDict(varChar(ti.get_dimension(), nullable),
-                         ti.get_comp_param(),
-                         ti.get_size(),
-                         nullable);
+          return extDict(
+              varChar(ti.get_dimension(), nullable), ti.get_comp_param(), ti.get_size());
         } else {
           return varChar(ti.get_dimension(), nullable);
         }
@@ -472,9 +464,9 @@ class ContextImpl {
                      std::unique_ptr<const VarLenArrayType>,
                      boost::hash<std::tuple<int, const Type*, bool>>>
       varlen_array_types_;
-  std::unordered_map<std::tuple<const Type*, int, int, bool>,
+  std::unordered_map<std::tuple<const Type*, int, int>,
                      std::unique_ptr<const ExtDictionaryType>,
-                     boost::hash<std::tuple<const Type*, int, int, bool>>>
+                     boost::hash<std::tuple<const Type*, int, int>>>
       ext_dict_types_;
   std::unordered_map<std::pair<const Type*, bool>,
                      std::unique_ptr<const ColumnType>,
@@ -610,9 +602,8 @@ const VarLenArrayType* Context::arrayVarLen(const Type* elem_type,
 
 const ExtDictionaryType* Context::extDict(const Type* elem_type,
                                           int dict_id,
-                                          int index_size,
-                                          bool nullable) {
-  return impl_->extDict(elem_type, dict_id, index_size, nullable);
+                                          int index_size) {
+  return impl_->extDict(elem_type, dict_id, index_size);
 }
 
 const ColumnType* Context::column(const Type* column_type, bool nullable) {
