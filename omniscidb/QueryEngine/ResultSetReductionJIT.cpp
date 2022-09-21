@@ -728,7 +728,8 @@ void ResultSetReductionJIT::reduceOneEntryTargetsNoCollisions(
     bool two_slot_target{false};
     if (target_info.is_agg &&
         (target_info.agg_kind == kAVG ||
-         (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()))) {
+         (target_info.agg_kind == kSAMPLE &&
+          (target_info.type->isString() || target_info.type->isArray())))) {
       // Note that this assumes if one of the slot pairs in a given target is an array,
       // all slot pairs are arrays.
       two_slot_target = true;
@@ -808,7 +809,8 @@ void ResultSetReductionJIT::reduceOneEntryBaseline(
     Value* that_ptr2{nullptr};
     if (target_info.is_agg &&
         (target_info.agg_kind == kAVG ||
-         (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()))) {
+         (target_info.agg_kind == kSAMPLE &&
+          (target_info.type->isString() || target_info.type->isArray())))) {
       const auto desc = "target_" + std::to_string(target_logical_idx) + "_second_slot";
       const auto second_slot_rel_off =
           ir_reduce_one_entry->addConstant<ConstantInt>(sizeof(int64_t), Type::Int32);
@@ -1098,11 +1100,14 @@ void ResultSetReductionJIT::reduceOneSlot(Value* this_ptr1,
   } else {
     emit_write_projection(
         this_ptr1, that_ptr1, init_val, chosen_bytes, ir_reduce_one_entry);
-    if (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()) {
+    if (target_info.agg_kind == kSAMPLE &&
+        (target_info.type->isString() || target_info.type->isArray())) {
       CHECK(this_ptr2 && that_ptr2);
       size_t length_to_elems{0};
-      const auto& elem_ti = target_info.sql_type.get_elem_type();
-      length_to_elems = target_info.sql_type.is_string() ? 1 : elem_ti.get_size();
+      length_to_elems =
+          target_info.type->isString()
+              ? 1
+              : target_info.type->as<hdk::ir::ArrayBaseType>()->elemType()->size();
       const auto serialized_varlen_buffer_arg = ir_reduce_one_entry->arg(4);
       ir_reduce_one_entry->add<ExternalCall>(
           "serialized_varlen_buffer_sample",
