@@ -501,53 +501,56 @@ std::unique_ptr<ResultSet> SqliteMemDatabase::runSelect(
     CHECK_EQ(output_spec.target_infos.size(), connector.getNumCols());
     size_t slot_idx = 0;
     for (size_t col_idx = 0; col_idx < connector.getNumCols(); ++col_idx, ++slot_idx) {
-      const auto& col_type = output_spec.target_infos[col_idx].sql_type;
+      auto col_type = output_spec.target_infos[col_idx].type;
       const int sqlite_col_type = connector.columnTypes[col_idx];
-      switch (col_type.get_type()) {
-        case kBOOLEAN:
-        case kTINYINT:
-        case kSMALLINT:
-        case kINT:
-        case kBIGINT: {
+      switch (col_type->id()) {
+        case hdk::ir::Type::kBoolean:
+        case hdk::ir::Type::kInteger: {
           static const std::string overflow_message{"Overflow or underflow"};
           if (sqlite_col_type != SQLITE_INTEGER && sqlite_col_type != SQLITE_NULL) {
             throw std::runtime_error(overflow_message);
           }
           if (!connector.isNull(row_idx, col_idx)) {
-            const auto limits = inline_int_max_min(col_type.get_logical_size());
+            const auto limits = inline_int_max_min(hdk::ir::logicalSize(col_type));
             const auto val = connector.getData<int64_t>(row_idx, col_idx);
             if (val > limits.first || val < limits.second) {
               throw std::runtime_error(overflow_message);
             }
             row[slot_idx] = val;
           } else {
-            row[slot_idx] = inline_int_null_val(col_type);
+            row[slot_idx] = inline_int_null_value(col_type);
           }
           break;
         }
-        case kFLOAT: {
-          CHECK(sqlite_col_type == SQLITE_FLOAT || sqlite_col_type == SQLITE_NULL);
-          if (!connector.isNull(row_idx, col_idx)) {
-            reinterpret_cast<double*>(row)[slot_idx] =
-                connector.getData<double>(row_idx, col_idx);
-          } else {
-            reinterpret_cast<double*>(row)[slot_idx] = inline_fp_null_value<float>();
+        case hdk::ir::Type::kFloatingPoint:
+          switch (col_type->as<hdk::ir::FloatingPointType>()->precision()) {
+            case hdk::ir::FloatingPointType::kFloat: {
+              CHECK(sqlite_col_type == SQLITE_FLOAT || sqlite_col_type == SQLITE_NULL);
+              if (!connector.isNull(row_idx, col_idx)) {
+                reinterpret_cast<double*>(row)[slot_idx] =
+                    connector.getData<double>(row_idx, col_idx);
+              } else {
+                reinterpret_cast<double*>(row)[slot_idx] = inline_fp_null_value<float>();
+              }
+              break;
+            }
+            case hdk::ir::FloatingPointType::kDouble: {
+              CHECK(sqlite_col_type == SQLITE_FLOAT || sqlite_col_type == SQLITE_NULL);
+              if (!connector.isNull(row_idx, col_idx)) {
+                reinterpret_cast<double*>(row)[slot_idx] =
+                    connector.getData<double>(row_idx, col_idx);
+              } else {
+                reinterpret_cast<double*>(row)[slot_idx] = inline_fp_null_value<double>();
+              }
+              break;
+            }
+            default:
+              LOG(FATAL) << "Unexpected type: " << col_type->toString();
           }
           break;
-        }
-        case kDOUBLE: {
-          CHECK(sqlite_col_type == SQLITE_FLOAT || sqlite_col_type == SQLITE_NULL);
-          if (!connector.isNull(row_idx, col_idx)) {
-            reinterpret_cast<double*>(row)[slot_idx] =
-                connector.getData<double>(row_idx, col_idx);
-          } else {
-            reinterpret_cast<double*>(row)[slot_idx] = inline_fp_null_value<double>();
-          }
-          break;
-        }
-        case kCHAR:
-        case kTEXT:
-        case kVARCHAR: {
+        case hdk::ir::Type::kExtDictionary:
+        case hdk::ir::Type::kText:
+        case hdk::ir::Type::kVarChar: {
           CHECK(sqlite_col_type == SQLITE_TEXT || sqlite_col_type == SQLITE_NULL);
           if (!connector.isNull(row_idx, col_idx)) {
             const auto str = connector.getData<std::string>(row_idx, col_idx);
@@ -562,7 +565,7 @@ std::unique_ptr<ResultSet> SqliteMemDatabase::runSelect(
           break;
         }
         default: {
-          LOG(FATAL) << "Unexpected type: " << col_type.get_type_name();
+          LOG(FATAL) << "Unexpected type: " << col_type->toString();
           break;
         }
       }
