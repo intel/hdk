@@ -180,7 +180,7 @@ bool ResultSet::canUseFastBaselineSort(
   CHECK_GE(order_entry.tle_no, 1);
   CHECK_LE(static_cast<size_t>(order_entry.tle_no), targets_.size());
   const auto& target_info = targets_[order_entry.tle_no - 1];
-  if (!target_info.sql_type.is_number() || is_distinct_target(target_info)) {
+  if (!target_info.type->isNumber() || is_distinct_target(target_info)) {
     return false;
   }
   return (query_mem_desc_.getQueryDescriptionType() ==
