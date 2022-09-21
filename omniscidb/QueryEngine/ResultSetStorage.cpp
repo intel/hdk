@@ -91,16 +91,17 @@ std::vector<int64_t> result_set::initialize_target_values_for_storage(
       target_init_vals.push_back(0);
       continue;
     }
-    if (!target_info.sql_type.get_notnull()) {
+    if (target_info.type->nullable()) {
       int64_t init_val =
-          null_val_bit_pattern(target_info.sql_type, takes_float_argument(target_info));
+          null_val_bit_pattern(target_info.type, takes_float_argument(target_info));
       target_init_vals.push_back(target_info.is_agg ? init_val : 0);
     } else {
       target_init_vals.push_back(target_info.is_agg ? 0xdeadbeef : 0);
     }
     if (target_info.agg_kind == kAVG) {
       target_init_vals.push_back(0);
-    } else if (target_info.agg_kind == kSAMPLE && target_info.sql_type.is_varlen()) {
+    } else if (target_info.agg_kind == kSAMPLE &&
+               (target_info.type->isString() || target_info.type->isArray())) {
       target_init_vals.push_back(0);
     }
   }
