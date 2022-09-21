@@ -144,7 +144,7 @@ class ResultSetEmulator {
   int64_t rse_get_null_val() {
     int64_t null_val = 0;
     for (const auto& target_info : rs_target_infos) {
-      null_val = inline_int_null_val(target_info.sql_type);
+      null_val = inline_int_null_value(target_info.type);
       break;  // currently all of TargetInfo's columns used in tests have same type, so
               // the they all share same null_val, and that's why the first column is used
               // here.
@@ -477,9 +477,9 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_colwise(
     for (const auto& target_info : rs_target_infos) {
       if (target_info.agg_kind == kCOUNT) {
         init_val = 0;
-      } else if (!target_info.sql_type.get_notnull() && target_info.skip_null_val &&
+      } else if (target_info.type->nullable() && target_info.skip_null_val &&
                  (rs_flow == 2)) {  // null_val support
-        init_val = inline_int_null_val(target_info.sql_type);
+        init_val = inline_int_null_value(target_info.type);
       } else {
         init_val = 0xdeadbeef;
       }
@@ -541,9 +541,9 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_rowwise(
     for (const auto& target_info : rs_target_infos) {
       if (target_info.agg_kind == kCOUNT) {
         init_val = 0;
-      } else if (!target_info.sql_type.get_notnull() && target_info.skip_null_val &&
+      } else if (target_info.type->nullable() && target_info.skip_null_val &&
                  (rs_flow == 2)) {  // null_val support
-        init_val = inline_int_null_val(target_info.sql_type);
+        init_val = inline_int_null_value(target_info.type);
       } else {
         init_val = 0xdeadbeef;
       }
@@ -881,7 +881,6 @@ std::shared_ptr<StringDictionary> g_sd =
 
 void test_iterate(const std::vector<TargetInfo>& target_infos,
                   const QueryMemoryDescriptor& query_mem_desc) {
-  SQLTypeInfo double_ti(kDOUBLE, false);
   auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   StringDictionaryProxy* sdp =
@@ -910,22 +909,22 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
     CHECK_EQ(target_infos.size(), row.size());
     for (size_t i = 0; i < target_infos.size(); ++i) {
       const auto& target_info = target_infos[i];
-      const auto& ti = target_info.agg_kind == kAVG ? double_ti : target_info.sql_type;
-      switch (ti.get_type()) {
-        case kTINYINT:
-        case kSMALLINT:
-        case kINT:
-        case kBIGINT: {
+      auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
+                                               : target_info.type;
+      switch (type->id()) {
+        case hdk::ir::Type::kInteger: {
           const auto ival = v<int64_t>(row[i]);
           ASSERT_EQ(ref_val, ival);
           break;
         }
-        case kDOUBLE: {
+        case hdk::ir::Type::kFloatingPoint: {
+          CHECK(type->isFp64());
           const auto dval = v<double>(row[i]);
           ASSERT_NEAR(ref_val, dval, EPS);
           break;
         }
-        case kTEXT: {
+        case hdk::ir::Type::kExtDictionary:
+        case hdk::ir::Type::kText: {
           const auto sval = v<NullableString>(row[i]);
           ASSERT_EQ(std::to_string(ref_val), boost::get<std::string>(sval));
           break;
@@ -1115,8 +1114,6 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
     const auto end_index = std::min(start_index + thread_row_count, row_count);
     reduction_threads.emplace_back(std::async(
         std::launch::async, [start_index, end_index, result_rs, &target_infos, step] {
-          SQLTypeInfo double_ti(kDOUBLE, false);
-
           for (size_t row_idx = start_index; row_idx < end_index; ++row_idx) {
             const auto row = result_rs->getRowAtNoTranslations(row_idx);
             if (row.empty()) {
@@ -1126,13 +1123,10 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
 
             for (size_t i = 0; i < target_infos.size(); ++i) {
               const auto& target_info = target_infos[i];
-              const auto& ti =
-                  target_info.agg_kind == kAVG ? double_ti : target_info.sql_type;
-              switch (ti.get_type()) {
-                case kTINYINT:
-                case kSMALLINT:
-                case kINT:
-                case kBIGINT: {
+              auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
+                                                       : target_info.type;
+              switch (type->id()) {
+                case hdk::ir::Type::kInteger: {
                   const auto ival = v<int64_t>(row[i]);
                   const int64_t ref =
                       (target_info.agg_kind == kSUM || target_info.agg_kind == kCOUNT)
@@ -1141,7 +1135,8 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                   ASSERT_EQ(ref, ival);
                   break;
                 }
-                case kDOUBLE: {
+                case hdk::ir::Type::kFloatingPoint: {
+                  CHECK(type->isFp64());
                   const auto dval = v<double>(row[i]);
                   ASSERT_DOUBLE_EQ(static_cast<double>((target_info.agg_kind == kSUM ||
                                                         target_info.agg_kind == kCOUNT)
@@ -1150,7 +1145,8 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                                    dval);
                   break;
                 }
-                case kTEXT:
+                case hdk::ir::Type::kExtDictionary:
+                case hdk::ir::Type::kText:
                   break;
                 default:
                   CHECK(false);
@@ -1172,7 +1168,6 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
                                const int prct2,
                                bool silent,
                                const int flow = 0) {
-  SQLTypeInfo double_ti(kDOUBLE, false);
   const ResultSetStorage* storage1{nullptr};
   const ResultSetStorage* storage2{nullptr};
   std::unique_ptr<ResultSet> rs1;
@@ -1273,15 +1268,15 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
     for (size_t i = 0; i < target_infos.size(); ++i) {
       ref_val = ref_row[i];
       const auto& target_info = target_infos[i];
-      const auto& ti = target_info.agg_kind == kAVG ? double_ti : target_info.sql_type;
+      auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
+                                               : target_info.type;
       std::string p_tag("");
       if (flow == 2) {  // null_val test-cases
         p_tag += "kNULLT_";
       }
-      switch (ti.get_type()) {
-        case kSMALLINT:
-        case kINT:
-        case kBIGINT: {
+      switch (type->id()) {
+        case hdk::ir::Type::kInteger: {
+          CHECK(type->size() > 1);
           const auto ival = v<int64_t>(row[i]);
           switch (target_info.agg_kind) {
             case kMIN: {
@@ -1362,7 +1357,8 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
           }
           break;
         }
-        case kDOUBLE: {
+        case hdk::ir::Type::kFloatingPoint: {
+          CHECK(type->isFp64());
           const auto dval = v<double>(row[i]);
           switch (target_info.agg_kind) {
             case kMIN: {
