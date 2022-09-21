@@ -222,21 +222,15 @@ size_t get_int_constant_from_expr(const hdk::ir::Expr* expr) {
   if (!lag_constant) {
     throw std::runtime_error("LAG with non-constant lag argument not supported yet");
   }
-  const auto& lag_ti = lag_constant->get_type_info();
-  switch (lag_ti.get_type()) {
-    case kSMALLINT: {
-      return lag_constant->get_constval().smallintval;
-    }
-    case kINT: {
-      return lag_constant->get_constval().intval;
-    }
-    case kBIGINT: {
-      return lag_constant->get_constval().bigintval;
-    }
-    default: {
-      LOG(FATAL) << "Invalid type for the lag argument";
-    }
+  auto lag_type = lag_constant->type();
+  if (lag_type->isInt16()) {
+    return lag_constant->get_constval().smallintval;
+  } else if (lag_type->isInt32()) {
+    return lag_constant->get_constval().intval;
+  } else if (lag_type->isInt64()) {
+    return lag_constant->get_constval().bigintval;
   }
+  LOG(FATAL) << "Invalid type for the lag argument";
   return 0;
 }
 
@@ -642,7 +636,7 @@ namespace {
 template <class T>
 WindowFunctionContext::WindowComparatorResult integer_comparator(
     const int8_t* order_column_buffer,
-    const SQLTypeInfo& ti,
+    const hdk::ir::Type* type,
     const int32_t* partition_indices,
     const int64_t lhs,
     const int64_t rhs,
@@ -650,7 +644,7 @@ WindowFunctionContext::WindowComparatorResult integer_comparator(
   const auto values = reinterpret_cast<const T*>(order_column_buffer);
   const auto lhs_val = values[partition_indices[lhs]];
   const auto rhs_val = values[partition_indices[rhs]];
-  const auto null_val = inline_fixed_encoding_null_val(ti);
+  const auto null_val = inline_fixed_encoding_null_value(type);
   if (lhs_val == null_val && rhs_val == null_val) {
     return WindowFunctionContext::WindowComparatorResult::EQ;
   }
@@ -674,7 +668,7 @@ WindowFunctionContext::WindowComparatorResult integer_comparator(
 template <class T, class NullPatternType>
 WindowFunctionContext::WindowComparatorResult fp_comparator(
     const int8_t* order_column_buffer,
-    const SQLTypeInfo& ti,
+    const hdk::ir::Type* type,
     const int32_t* partition_indices,
     const int64_t lhs,
     const int64_t rhs,
@@ -682,7 +676,7 @@ WindowFunctionContext::WindowComparatorResult fp_comparator(
   const auto values = reinterpret_cast<const T*>(order_column_buffer);
   const auto lhs_val = values[partition_indices[lhs]];
   const auto rhs_val = values[partition_indices[rhs]];
-  const auto null_bit_pattern = null_val_bit_pattern(ti, ti.get_type() == kFLOAT);
+  const auto null_bit_pattern = null_val_bit_pattern(type, type->isFp32());
   const auto lhs_bit_pattern =
       *reinterpret_cast<const NullPatternType*>(may_alias_ptr(&lhs_val));
   const auto rhs_bit_pattern =
@@ -714,56 +708,56 @@ WindowFunctionContext::Comparator WindowFunctionContext::makeComparator(
     const int8_t* order_column_buffer,
     const int32_t* partition_indices,
     const bool nulls_first) {
-  const auto& ti = col_var->get_type_info();
-  if (ti.is_integer() || ti.is_decimal() || ti.is_time() || ti.is_boolean()) {
-    switch (ti.get_size()) {
+  auto type = col_var->type();
+  if (type->isInteger() || type->isDecimal() || type->isDateTime() || type->isBoolean()) {
+    switch (type->size()) {
       case 8: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return integer_comparator<int64_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
       case 4: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return integer_comparator<int32_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
       case 2: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return integer_comparator<int16_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
       case 1: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return integer_comparator<int8_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
       default: {
-        LOG(FATAL) << "Invalid type size: " << ti.get_size();
+        LOG(FATAL) << "Invalid type size: " << type->size();
       }
     }
   }
-  if (ti.is_fp()) {
-    switch (ti.get_type()) {
-      case kFLOAT: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+  if (type->isFloatingPoint()) {
+    switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+      case hdk::ir::FloatingPointType::kFloat: {
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return fp_comparator<float, int32_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
-      case kDOUBLE: {
-        return [order_column_buffer, nulls_first, partition_indices, &ti](
+      case hdk::ir::FloatingPointType::kDouble: {
+        return [order_column_buffer, nulls_first, partition_indices, type](
                    const int64_t lhs, const int64_t rhs) {
           return fp_comparator<double, int64_t>(
-              order_column_buffer, ti, partition_indices, lhs, rhs, nulls_first);
+              order_column_buffer, type, partition_indices, lhs, rhs, nulls_first);
         };
       }
       default: {
