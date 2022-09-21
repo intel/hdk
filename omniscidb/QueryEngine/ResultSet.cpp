@@ -317,7 +317,7 @@ SQLTypeInfo ResultSet::getColType(const size_t col_idx) const {
   }
   CHECK_LT(col_idx, targets_.size());
   return targets_[col_idx].agg_kind == kAVG ? SQLTypeInfo(kDOUBLE, false)
-                                            : targets_[col_idx].sql_type;
+                                            : targets_[col_idx].type->toTypeInfo();
 }
 
 const hdk::ir::Type* ResultSet::colType(const size_t col_idx) const {
@@ -357,21 +357,26 @@ void ResultSet::translateDictEncodedColumns(std::vector<TargetInfo> const& targe
     CHECK_EQ(targets.size(), storage_->targets_.size());
     RowIterationState state;
     for (size_t target_idx = start_idx; target_idx < targets.size(); ++target_idx) {
-      auto const& type_lhs = targets[target_idx].sql_type;
-      if (type_lhs.is_dict_encoded_string()) {
-        auto& type_rhs =
-            const_cast<SQLTypeInfo&>(storage_->targets_[target_idx].sql_type);
-        CHECK(type_rhs.is_dict_encoded_string());
-        if (type_lhs.get_comp_param() != type_rhs.get_comp_param()) {
-          auto* const sdp_lhs = getStringDictionaryProxy(type_lhs.get_comp_param());
+      auto type_lhs = targets[target_idx].type;
+      if (type_lhs->isExtDictionary()) {
+        auto type_rhs = storage_->targets_[target_idx].type;
+        CHECK(type_rhs->isExtDictionary());
+        auto lhs_dict_id = type_lhs->as<hdk::ir::ExtDictionaryType>()->dictId();
+        auto rhs_dict_id = type_rhs->as<hdk::ir::ExtDictionaryType>()->dictId();
+        if (lhs_dict_id != rhs_dict_id) {
+          auto* const sdp_lhs = getStringDictionaryProxy(lhs_dict_id);
           CHECK(sdp_lhs);
-          auto const* const sdp_rhs = getStringDictionaryProxy(type_rhs.get_comp_param());
+          auto const* const sdp_rhs = getStringDictionaryProxy(rhs_dict_id);
           CHECK(sdp_rhs);
           state.cur_target_idx_ = target_idx;
           CellCallback const translate_string_ids(sdp_lhs->transientUnion(*sdp_rhs),
-                                                  inline_int_null_val(type_rhs));
+                                                  inline_int_null_value(type_rhs));
           eachCellInColumn(state, translate_string_ids);
-          type_rhs.set_comp_param(type_lhs.get_comp_param());
+          const_cast<TargetInfo&>(storage_->targets_[target_idx]).type =
+              type_rhs->ctx().extDict(
+                  type_rhs->as<hdk::ir::ExtDictionaryType>()->elemType(),
+                  lhs_dict_id,
+                  type_rhs->size());
         }
       }
     }
@@ -387,7 +392,7 @@ void ResultSet::eachCellInColumn(RowIterationState& state, CellCallback const& f
   CHECK_LT(target_idx, lazy_fetch_info_.size());
   auto& col_lazy_fetch = lazy_fetch_info_[target_idx];
   CHECK(col_lazy_fetch.is_lazily_fetched);
-  int const target_size = storage_->targets_[target_idx].sql_type.get_size();
+  int const target_size = storage_->targets_[target_idx].type->size();
   CHECK_LT(0, target_size) << storage_->targets_[target_idx].toString();
   size_t const nrows = storage_->binSearchRowCount();
   if (storage_qmd.didOutputColumnar()) {
@@ -1429,10 +1434,10 @@ std::tuple<std::vector<bool>, size_t> ResultSet::getSingleSlotTargetBitmap() con
   std::vector<bool> target_bitmap(targets_.size(), true);
   size_t num_single_slot_targets = 0;
   for (size_t target_idx = 0; target_idx < targets_.size(); target_idx++) {
-    const auto& sql_type = targets_[target_idx].sql_type;
+    auto sql_type = targets_[target_idx].type;
     if (targets_[target_idx].is_agg && targets_[target_idx].agg_kind == kAVG) {
       target_bitmap[target_idx] = false;
-    } else if (sql_type.is_varlen()) {
+    } else if (sql_type->isString() || sql_type->isArray()) {
       target_bitmap[target_idx] = false;
     } else {
       num_single_slot_targets++;
@@ -1458,7 +1463,7 @@ std::tuple<std::vector<bool>, size_t> ResultSet::getSupportedSingleSlotTargetBit
     const auto& target = targets_[target_idx];
     if (single_slot_targets[target_idx] &&
         (is_distinct_target(target) || target.agg_kind == kAPPROX_QUANTILE ||
-         (target.is_agg && target.agg_kind == kSAMPLE && target.sql_type == kFLOAT))) {
+         (target.is_agg && target.agg_kind == kSAMPLE && target.type->isFp32()))) {
       single_slot_targets[target_idx] = false;
       num_single_slot_targets--;
     }
