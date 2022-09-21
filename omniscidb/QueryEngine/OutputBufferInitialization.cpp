@@ -30,13 +30,12 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
        ++target_idx, ++agg_col_idx) {
     CHECK_LT(agg_col_idx, query_mem_desc.getSlotCount());
     const auto agg_info = targets[target_idx];
-    const auto& agg_ti = agg_info.sql_type;
+    auto agg_type = agg_info.type;
     if (!agg_info.is_agg || agg_info.agg_kind == kSAMPLE) {
-      if (agg_info.agg_kind == kSAMPLE && agg_ti.is_string() &&
-          agg_ti.get_compression() != kENCODING_NONE) {
+      if (agg_info.agg_kind == kSAMPLE && agg_type->isExtDictionary()) {
         agg_init_vals.push_back(
             get_agg_initial_val(agg_info.agg_kind,
-                                agg_ti,
+                                agg_type,
                                 is_group_by,
                                 query_mem_desc.getCompactByteWidth()));
         continue;
@@ -44,8 +43,7 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
       if (query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx) > 0) {
         agg_init_vals.push_back(0);
       }
-      if (agg_ti.is_array() ||
-          (agg_ti.is_string() && agg_ti.get_compression() == kENCODING_NONE)) {
+      if (agg_type->isArray() || agg_type->isString()) {
         agg_init_vals.push_back(0);
       }
       continue;
