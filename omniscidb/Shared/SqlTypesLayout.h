@@ -59,7 +59,6 @@ inline void set_compact_type(TargetInfo& target, const hdk::ir::Type* new_type) 
     const auto agg_type = target.agg_kind;
     if (agg_type != kCOUNT || !target.agg_arg_type) {
       target.agg_arg_type = new_type;
-      target.agg_arg_type_info = new_type->toTypeInfo();
       return;
     }
   }
