@@ -47,8 +47,8 @@ class TargetMetaInfo {
 };
 
 inline std::ostream& operator<<(std::ostream& os, TargetMetaInfo const& tmi) {
-  return os << "TargetMetaInfo(resname_(" << tmi.get_resname() << ") ti_("
-            << tmi.get_type_info().to_string() << "))";
+  return os << "TargetMetaInfo(resname=" << tmi.get_resname()
+            << " type=" << tmi.type()->toString() << ")";
 }
 
 #endif  // QUERYENGINE_TARGETMETAINFO_H

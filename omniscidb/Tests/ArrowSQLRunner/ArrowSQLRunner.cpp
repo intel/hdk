@@ -206,12 +206,11 @@ class ArrowSQLRunnerImpl {
     std::unordered_set<size_t> dictionary_encoded_col_idxs;
     std::vector<std::unordered_set<std::string>> per_column_dictionary_sets(num_columns);
     for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
-      const auto column_typeinfo = arrow_result_set->getColType(col_idx);
-      if (column_typeinfo.get_type() != kTEXT) {
+      const auto column_type = arrow_result_set->colType(col_idx);
+      if (!column_type->isExtDictionary()) {
         continue;
       }
       dictionary_encoded_col_idxs.emplace(col_idx);
-      ASSERT_EQ(column_typeinfo.get_compression(), kENCODING_DICT);
 
       const auto dictionary_strings = arrow_result_set->getDictionaryStrings(col_idx);
       auto& dictionary_set = per_column_dictionary_sets[col_idx];
@@ -251,8 +250,8 @@ class ArrowSQLRunnerImpl {
           dictionary_encoded_col_idxs.end()) {
         continue;
       }
-      const auto omnisci_col_type = omnisci_results->getColType(col_idx);
-      const auto dict_id = omnisci_col_type.get_comp_param();
+      const auto omnisci_col_type = omnisci_results->colType(col_idx);
+      const auto dict_id = omnisci_col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       const auto str_dict_proxy = omnisci_results->getStringDictionaryProxy(dict_id);
       const size_t omnisci_dict_proxy_size = str_dict_proxy->entryCount();
 

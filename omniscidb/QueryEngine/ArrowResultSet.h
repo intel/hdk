@@ -137,7 +137,7 @@ class ArrowResultSet {
 
   size_t colCount() const;
 
-  SQLTypeInfo getColType(const size_t col_idx) const;
+  const hdk::ir::Type* colType(size_t col_idx) const;
 
   bool definitelyHasNoRows() const;
 

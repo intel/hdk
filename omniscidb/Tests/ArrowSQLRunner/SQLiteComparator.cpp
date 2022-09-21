@@ -35,15 +35,15 @@ namespace TestHelpers {
 
 namespace {
 
-void checkTypeConsistency(const int ref_col_type, const SQLTypeInfo& omnisci_ti) {
+void checkTypeConsistency(const int ref_col_type, const hdk::ir::Type* col_type) {
   if (ref_col_type == SQLITE_NULL) {
-    // TODO(alex): re-enable the check that omnisci_ti is nullable,
+    // TODO(alex): re-enable the check that col_type is nullable,
     //             got invalidated because of outer joins
     return;
   }
-  if (omnisci_ti.is_integer()) {
+  if (col_type->isInteger()) {
     CHECK_EQ(SQLITE_INTEGER, ref_col_type);
-  } else if (omnisci_ti.is_fp() || omnisci_ti.is_decimal()) {
+  } else if (col_type->isFloatingPoint() || col_type->isDecimal()) {
     CHECK(ref_col_type == SQLITE_FLOAT || ref_col_type == SQLITE_INTEGER);
   } else {
     CHECK_EQ(SQLITE_TEXT, ref_col_type);
@@ -84,29 +84,25 @@ void compare_impl(SqliteConnector& connector,
       const auto omnisci_variant = crt_row[col_idx];
       const auto scalar_omnisci_variant = boost::get<ScalarTargetValue>(&omnisci_variant);
       CHECK(scalar_omnisci_variant) << errmsg;
-      auto omnisci_ti = omnisci_results->getColType(col_idx);
-      const auto omnisci_type = omnisci_ti.get_type();
-      checkTypeConsistency(ref_col_type, omnisci_ti);
+      auto col_type = omnisci_results->colType(col_idx);
+      checkTypeConsistency(ref_col_type, col_type);
       const bool ref_is_null = connector.isNull(row_idx, col_idx);
-      switch (omnisci_type) {
-        case kTINYINT:
-        case kSMALLINT:
-        case kINT:
-        case kBIGINT: {
+      switch (col_type->id()) {
+        case hdk::ir::Type::kInteger: {
           const auto omnisci_as_int_p = boost::get<int64_t>(scalar_omnisci_variant);
           ASSERT_NE(nullptr, omnisci_as_int_p);
           const auto omnisci_val = *omnisci_as_int_p;
           if (ref_is_null) {
-            ASSERT_EQ(inline_int_null_val(omnisci_ti), omnisci_val) << errmsg;
+            ASSERT_EQ(inline_int_null_value(col_type), omnisci_val) << errmsg;
           } else {
             const auto ref_val = connector.getData<int64_t>(row_idx, col_idx);
             ASSERT_EQ(ref_val, omnisci_val) << errmsg;
           }
           break;
         }
-        case kTEXT:
-        case kCHAR:
-        case kVARCHAR: {
+        case hdk::ir::Type::kExtDictionary:
+        case hdk::ir::Type::kText:
+        case hdk::ir::Type::kVarChar: {
           const auto omnisci_as_str_p =
               boost::get<NullableString>(scalar_omnisci_variant);
           ASSERT_NE(nullptr, omnisci_as_str_p) << errmsg;
@@ -122,50 +118,46 @@ void compare_impl(SqliteConnector& connector,
           }
           break;
         }
-        case kNUMERIC:
-        case kDECIMAL:
-        case kDOUBLE: {
-          const auto omnisci_as_double_p = boost::get<double>(scalar_omnisci_variant);
-          ASSERT_NE(nullptr, omnisci_as_double_p) << errmsg;
-          const auto omnisci_val = *omnisci_as_double_p;
-          if (ref_is_null) {
-            ASSERT_EQ(inline_fp_null_val(SQLTypeInfo(kDOUBLE, false)), omnisci_val)
-                << errmsg;
+        case hdk::ir::Type::kFloatingPoint:
+        case hdk::ir::Type::kDecimal:
+          if (!col_type->isFp32()) {
+            const auto omnisci_as_double_p = boost::get<double>(scalar_omnisci_variant);
+            ASSERT_NE(nullptr, omnisci_as_double_p) << errmsg;
+            const auto omnisci_val = *omnisci_as_double_p;
+            if (ref_is_null) {
+              ASSERT_EQ(inline_fp_null_value(col_type->ctx().fp64()), omnisci_val)
+                  << errmsg;
+            } else {
+              const auto ref_val = connector.getData<double>(row_idx, col_idx);
+              if (!std::isinf(omnisci_val) || !std::isinf(ref_val) ||
+                  ((omnisci_val < 0) ^ (ref_val < 0))) {
+                ASSERT_NEAR(ref_val, omnisci_val, EPS * std::fabs(ref_val)) << errmsg;
+              }
+            }
           } else {
-            const auto ref_val = connector.getData<double>(row_idx, col_idx);
-            if (!std::isinf(omnisci_val) || !std::isinf(ref_val) ||
-                ((omnisci_val < 0) ^ (ref_val < 0))) {
-              ASSERT_NEAR(ref_val, omnisci_val, EPS * std::fabs(ref_val)) << errmsg;
+            const auto omnisci_as_float_p = boost::get<float>(scalar_omnisci_variant);
+            ASSERT_NE(nullptr, omnisci_as_float_p) << errmsg;
+            const auto omnisci_val = *omnisci_as_float_p;
+            if (ref_is_null) {
+              ASSERT_EQ(inline_fp_null_value(col_type), omnisci_val) << errmsg;
+            } else {
+              const auto ref_val = connector.getData<float>(row_idx, col_idx);
+              if (!std::isinf(omnisci_val) || !std::isinf(ref_val) ||
+                  ((omnisci_val < 0) ^ (ref_val < 0))) {
+                ASSERT_NEAR(ref_val, omnisci_val, EPS * std::fabs(ref_val)) << errmsg;
+              }
             }
           }
           break;
-        }
-        case kFLOAT: {
-          const auto omnisci_as_float_p = boost::get<float>(scalar_omnisci_variant);
-          ASSERT_NE(nullptr, omnisci_as_float_p) << errmsg;
-          const auto omnisci_val = *omnisci_as_float_p;
-          if (ref_is_null) {
-            ASSERT_EQ(inline_fp_null_val(SQLTypeInfo(kFLOAT, false)), omnisci_val)
-                << errmsg;
-          } else {
-            const auto ref_val = connector.getData<float>(row_idx, col_idx);
-            if (!std::isinf(omnisci_val) || !std::isinf(ref_val) ||
-                ((omnisci_val < 0) ^ (ref_val < 0))) {
-              ASSERT_NEAR(ref_val, omnisci_val, EPS * std::fabs(ref_val)) << errmsg;
-            }
-          }
-          break;
-        }
-        case kTIMESTAMP:
-        case kDATE: {
+        case hdk::ir::Type::kTimestamp:
+        case hdk::ir::Type::kDate: {
           const auto omnisci_as_int_p = boost::get<int64_t>(scalar_omnisci_variant);
           CHECK(omnisci_as_int_p);
           const auto omnisci_val = *omnisci_as_int_p;
           time_t nsec = 0;
-          auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(omnisci_ti);
-          auto unit = dynamic_cast<const hdk::ir::DateTimeBaseType*>(type)->unit();
+          auto unit = dynamic_cast<const hdk::ir::DateTimeBaseType*>(col_type)->unit();
           if (ref_is_null) {
-            CHECK_EQ(inline_int_null_val(omnisci_ti), omnisci_val) << errmsg;
+            CHECK_EQ(inline_int_null_value(col_type), omnisci_val) << errmsg;
           } else {
             const auto ref_val = connector.getData<std::string>(row_idx, col_idx);
             auto temp_val =
@@ -188,7 +180,7 @@ void compare_impl(SqliteConnector& connector,
 #else
               gmtime_r(&nsec, &tm_struct);
 #endif
-              if (is_arrow && omnisci_type == kDATE) {
+              if (is_arrow && col_type->isDate()) {
                 if (device_type == ExecutorDeviceType::CPU) {
                   ASSERT_EQ(
                       *omnisci_as_int_p,
@@ -207,12 +199,12 @@ void compare_impl(SqliteConnector& connector,
           }
           break;
         }
-        case kBOOLEAN: {
+        case hdk::ir::Type::kBoolean: {
           const auto omnisci_as_int_p = boost::get<int64_t>(scalar_omnisci_variant);
           CHECK(omnisci_as_int_p) << errmsg;
           const auto omnisci_val = *omnisci_as_int_p;
           if (ref_is_null) {
-            CHECK_EQ(inline_int_null_val(omnisci_ti), omnisci_val) << errmsg;
+            CHECK_EQ(inline_int_null_value(col_type), omnisci_val) << errmsg;
           } else {
             const auto ref_val = connector.getData<std::string>(row_idx, col_idx);
             if (ref_val == "t" || ref_val == "1") {
@@ -224,12 +216,12 @@ void compare_impl(SqliteConnector& connector,
           }
           break;
         }
-        case kTIME: {
+        case hdk::ir::Type::kTime: {
           const auto omnisci_as_int_p = boost::get<int64_t>(scalar_omnisci_variant);
           CHECK(omnisci_as_int_p) << errmsg;
           const auto omnisci_val = *omnisci_as_int_p;
           if (ref_is_null) {
-            CHECK_EQ(inline_int_null_val(omnisci_ti), omnisci_val) << errmsg;
+            CHECK_EQ(inline_int_null_value(col_type), omnisci_val) << errmsg;
           } else {
             const auto ref_val = connector.getData<std::string>(row_idx, col_idx);
             std::vector<std::string> time_tokens;

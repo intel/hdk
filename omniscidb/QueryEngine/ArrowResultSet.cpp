@@ -119,13 +119,12 @@ std::vector<std::string> ArrowResultSet::getDictionaryStrings(
   if (col_idx >= colCount()) {
     throw std::runtime_error("ArrowResultSet::getDictionaryStrings: col_idx is invalid.");
   }
-  const auto& column_typeinfo = getColType(col_idx);
-  if (column_typeinfo.get_type() != kTEXT) {
+  auto column_type = colType(col_idx);
+  if (!column_type->isExtDictionary()) {
     throw std::runtime_error(
         "ArrowResultSet::getDictionaryStrings: col_idx does not refer to column of type "
         "TEXT.");
   }
-  CHECK_EQ(kENCODING_DICT, column_typeinfo.get_compression());
   const auto& column = *columns_[col_idx];
   CHECK_EQ(arrow::Type::DICTIONARY, column.type_id());
   const auto& dict_column = static_cast<const arrow::DictionaryArray&>(column);
@@ -149,46 +148,51 @@ std::vector<TargetValue> ArrowResultSet::getRowAt(const size_t index) const {
   std::vector<TargetValue> row;
   for (int i = 0; i < record_batch_->num_columns(); ++i) {
     const auto& column = *columns_[i];
-    const auto& column_typeinfo = getColType(i);
-    switch (column_typeinfo.get_type()) {
-      case kTINYINT: {
-        CHECK_EQ(arrow::Type::INT8, column.type_id());
-        appendValue<int64_t, arrow::Int8Array>(
-            row, column, inline_int_null_val(column_typeinfo), index);
+    auto column_type = colType(i);
+    switch (column_type->id()) {
+      case hdk::ir::Type::kInteger:
+        switch (column_type->size()) {
+          case 1:
+            CHECK_EQ(arrow::Type::INT8, column.type_id());
+            appendValue<int64_t, arrow::Int8Array>(
+                row, column, inline_int_null_value(column_type), index);
+            break;
+          case 2:
+            CHECK_EQ(arrow::Type::INT16, column.type_id());
+            appendValue<int64_t, arrow::Int16Array>(
+                row, column, inline_int_null_value(column_type), index);
+            break;
+          case 4:
+            CHECK_EQ(arrow::Type::INT32, column.type_id());
+            appendValue<int64_t, arrow::Int32Array>(
+                row, column, inline_int_null_value(column_type), index);
+            break;
+          case 8:
+            CHECK_EQ(arrow::Type::INT64, column.type_id());
+            appendValue<int64_t, arrow::Int64Array>(
+                row, column, inline_int_null_value(column_type), index);
+            break;
+          default:
+            CHECK(false);
+        }
         break;
-      }
-      case kSMALLINT: {
-        CHECK_EQ(arrow::Type::INT16, column.type_id());
-        appendValue<int64_t, arrow::Int16Array>(
-            row, column, inline_int_null_val(column_typeinfo), index);
+      case hdk::ir::Type::kFloatingPoint:
+        switch (column_type->as<hdk::ir::FloatingPointType>()->precision()) {
+          case hdk::ir::FloatingPointType::kFloat:
+            CHECK_EQ(arrow::Type::FLOAT, column.type_id());
+            appendValue<float, arrow::FloatArray>(
+                row, column, inline_fp_null_value<float>(), index);
+            break;
+          case hdk::ir::FloatingPointType::kDouble:
+            CHECK_EQ(arrow::Type::DOUBLE, column.type_id());
+            appendValue<double, arrow::DoubleArray>(
+                row, column, inline_fp_null_value<double>(), index);
+            break;
+          default:
+            CHECK(false);
+        }
         break;
-      }
-      case kINT: {
-        CHECK_EQ(arrow::Type::INT32, column.type_id());
-        appendValue<int64_t, arrow::Int32Array>(
-            row, column, inline_int_null_val(column_typeinfo), index);
-        break;
-      }
-      case kBIGINT: {
-        CHECK_EQ(arrow::Type::INT64, column.type_id());
-        appendValue<int64_t, arrow::Int64Array>(
-            row, column, inline_int_null_val(column_typeinfo), index);
-        break;
-      }
-      case kFLOAT: {
-        CHECK_EQ(arrow::Type::FLOAT, column.type_id());
-        appendValue<float, arrow::FloatArray>(
-            row, column, inline_fp_null_value<float>(), index);
-        break;
-      }
-      case kDOUBLE: {
-        CHECK_EQ(arrow::Type::DOUBLE, column.type_id());
-        appendValue<double, arrow::DoubleArray>(
-            row, column, inline_fp_null_value<double>(), index);
-        break;
-      }
-      case kTEXT: {
-        CHECK_EQ(kENCODING_DICT, column_typeinfo.get_compression());
+      case hdk::ir::Type::kExtDictionary: {
         CHECK_EQ(arrow::Type::DICTIONARY, column.type_id());
         const auto& dict_column = static_cast<const arrow::DictionaryArray&>(column);
         if (dict_column.IsNull(index)) {
@@ -202,27 +206,27 @@ std::vector<TargetValue> ArrowResultSet::getRowAt(const size_t index) const {
         }
         break;
       }
-      case kTIMESTAMP: {
+      case hdk::ir::Type::kTimestamp: {
         CHECK_EQ(arrow::Type::TIMESTAMP, column.type_id());
         appendValue<int64_t, arrow::TimestampArray>(
-            row, column, inline_int_null_val(column_typeinfo), index);
+            row, column, inline_int_null_value(column_type), index);
         break;
       }
-      case kDATE: {
+      case hdk::ir::Type::kDate: {
         // TODO(wamsi): constexpr?
         CHECK(arrow::Type::DATE32 == column.type_id() ||
               arrow::Type::DATE64 == column.type_id());
-        column_typeinfo.is_date_in_days()
+        column_type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay
             ? appendValue<int64_t, arrow::Date32Array>(
-                  row, column, inline_int_null_val(column_typeinfo), index)
+                  row, column, inline_int_null_value(column_type), index)
             : appendValue<int64_t, arrow::Date64Array>(
-                  row, column, inline_int_null_val(column_typeinfo), index);
+                  row, column, inline_int_null_value(column_type), index);
         break;
       }
-      case kTIME: {
+      case hdk::ir::Type::kTime: {
         CHECK_EQ(arrow::Type::TIME32, column.type_id());
         appendValue<int64_t, arrow::Time32Array>(
-            row, column, inline_int_null_val(column_typeinfo), index);
+            row, column, inline_int_null_value(column_type), index);
         break;
       }
       default:
@@ -247,9 +251,9 @@ size_t ArrowResultSet::colCount() const {
   return column_metainfo_.size();
 }
 
-SQLTypeInfo ArrowResultSet::getColType(const size_t col_idx) const {
+const hdk::ir::Type* ArrowResultSet::colType(size_t col_idx) const {
   CHECK_LT(col_idx, column_metainfo_.size());
-  return column_metainfo_[col_idx].get_type_info();
+  return column_metainfo_[col_idx].type();
 }
 
 bool ArrowResultSet::definitelyHasNoRows() const {
