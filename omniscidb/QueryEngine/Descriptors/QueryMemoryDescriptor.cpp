@@ -28,11 +28,11 @@
 
 namespace {
 
-bool is_int_and_no_bigger_than(const SQLTypeInfo& ti, const size_t byte_width) {
-  if (!ti.is_integer()) {
+bool is_int_and_no_bigger_than(const hdk::ir::Type* type, const size_t byte_width) {
+  if (!type->isInteger()) {
     return false;
   }
-  return get_bit_width(ti) <= (byte_width * 8);
+  return get_bit_width(type) <= (byte_width * 8);
 }
 
 bool is_valid_int32_range(const ExpressionRange& range) {
@@ -86,17 +86,16 @@ std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_
        ++target_idx) {
     const auto target_expr = ra_exe_unit.target_exprs[target_idx];
     CHECK(target_expr);
-    const auto& ti = target_expr->get_type_info();
+    auto type = target_expr->type();
     // TODO: add proper lazy fetch for varlen types in result set
-    if (ti.is_varlen()) {
+    if (type->isString() || type->isArray()) {
       continue;
     }
     const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target_expr);
     if (!col_var) {
       continue;
     }
-    if (!ti.is_varlen() &&
-        used_columns.find(col_var->get_column_id()) == used_columns.end()) {
+    if (used_columns.find(col_var->get_column_id()) == used_columns.end()) {
       // setting target index to be zero so that later it can be decoded properly (in lazy
       // fetch, the zeroth target index indicates the corresponding rowid column for the
       // projected entry)
@@ -133,9 +132,9 @@ int8_t pick_baseline_key_width(const RelAlgExecutionUnit& ra_exe_unit,
   int8_t compact_width{4};
   for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
     const auto expr_range = getExpressionRange(groupby_expr.get(), query_infos, executor);
-    compact_width = std::max(compact_width,
-                             pick_baseline_key_component_width(
-                                 expr_range, groupby_expr->get_type_info().get_size()));
+    compact_width = std::max(
+        compact_width,
+        pick_baseline_key_component_width(expr_range, groupby_expr->type()->size()));
   }
   return compact_width;
 }
@@ -162,8 +161,8 @@ bool use_streaming_top_n(const RelAlgExecutionUnit& ra_exe_unit,
              ra_exe_unit.target_exprs.size());
     const auto order_entry_expr = ra_exe_unit.target_exprs[only_order_entry.tle_no - 1];
     const auto n = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
-    if ((order_entry_expr->get_type_info().is_number() ||
-         order_entry_expr->get_type_info().is_time()) &&
+    if ((order_entry_expr->type()->isNumber() ||
+         order_entry_expr->type()->isDateTime()) &&
         n <= streaming_topn_max) {
       return true;
     }
@@ -314,7 +313,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
             const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
             CHECK(agg_expr);
             if (agg_expr->get_aggtype() == kSAMPLE &&
-                agg_expr->get_type_info().is_varlen()) {
+                (agg_expr->type()->isString() || agg_expr->type()->isArray())) {
               has_varlen_sample_agg = true;
               break;
             }
@@ -679,10 +678,10 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
   for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
     const auto uoper = dynamic_cast<hdk::ir::UOper*>(groupby_expr.get());
     if (uoper && uoper->get_optype() == kUNNEST) {
-      const auto& arg_ti = uoper->get_operand()->get_type_info();
-      CHECK(arg_ti.is_array());
-      const auto& elem_ti = arg_ti.get_elem_type();
-      if (elem_ti.is_string() && elem_ti.get_compression() == kENCODING_DICT) {
+      auto arg_type = uoper->get_operand()->type();
+      CHECK(arg_type->isArray());
+      auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+      if (elem_type->isExtDictionary()) {
         unnest_array_col_id = (*col_it)->getColId();
       } else {
         compact_width = crt_min_byte_width;
@@ -701,7 +700,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
     col_it = ra_exe_unit.input_col_descs.begin();
     std::advance(col_it, ra_exe_unit.groupby_exprs.size());
     for (const auto target : ra_exe_unit.target_exprs) {
-      const auto& ti = target->get_type_info();
+      auto type = target->type();
       const auto agg = dynamic_cast<const hdk::ir::AggExpr*>(target);
       if (agg && agg->get_arg()) {
         compact_width = crt_min_byte_width;
@@ -717,8 +716,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
         continue;
       }
 
-      if (is_int_and_no_bigger_than(ti, 4) ||
-          (ti.is_string() && ti.get_compression() == kENCODING_DICT)) {
+      if (is_int_and_no_bigger_than(type, 4) || (type->isExtDictionary())) {
         if (col_it != end) {
           ++col_it;
         }
@@ -728,10 +726,10 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
       const auto uoper = dynamic_cast<hdk::ir::UOper*>(target);
       if (uoper && uoper->get_optype() == kUNNEST &&
           (*col_it)->getColId() == unnest_array_col_id) {
-        const auto arg_ti = uoper->get_operand()->get_type_info();
-        CHECK(arg_ti.is_array());
-        const auto& elem_ti = arg_ti.get_elem_type();
-        if (elem_ti.is_string() && elem_ti.get_compression() == kENCODING_DICT) {
+        auto arg_type = uoper->get_operand()->type();
+        CHECK(arg_type->isArray());
+        auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+        if (elem_type->isExtDictionary()) {
           if (col_it != end) {
             ++col_it;
           }
@@ -1216,6 +1214,7 @@ std::vector<TargetInfo> target_exprs_to_infos(const std::vector<hdk::ir::Expr*>&
     if (query_mem_desc.getQueryDescriptionType() ==
         QueryDescriptionType::NonGroupedAggregate) {
       set_notnull(target, false);
+      target.type = target.type->withNullable(true);
       target.sql_type.set_notnull(false);
     }
     target_infos.push_back(target);
