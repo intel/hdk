@@ -947,9 +947,6 @@ std::vector<TargetInfo> generate_test_target_infos() {
   target_infos.push_back(TargetInfo{true, kSUM, int_type, int_type, true, false});
   target_infos.push_back(TargetInfo{false, kMIN, double_type, nullptr, true, false});
   {
-    SQLTypeInfo dict_string_ti(kTEXT, false);
-    dict_string_ti.set_compression(kENCODING_DICT);
-    dict_string_ti.set_comp_param(1);
     auto dict_type = ctx.extDict(ctx.text(), 1);
     target_infos.push_back(TargetInfo{false, kMIN, dict_type, nullptr, true, false});
   }
@@ -961,7 +958,6 @@ std::vector<TargetInfo> generate_random_groups_target_infos() {
   auto& ctx = hdk::ir::Context::defaultCtx();
   auto int_type = ctx.int32(false);
   auto double_type = ctx.fp64(false);
-  // SQLTypeInfo null_ti(kNULLT, false);
   target_infos.push_back(TargetInfo{true, kMIN, int_type, int_type, true, false});
   target_infos.push_back(TargetInfo{true, kMAX, int_type, int_type, true, false});
   target_infos.push_back(TargetInfo{true, kSUM, int_type, int_type, true, false});
