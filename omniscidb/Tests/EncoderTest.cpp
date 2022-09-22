@@ -35,10 +35,11 @@
 using AbstractBuffer = Data_Namespace::AbstractBuffer;
 using MemoryLevel = Data_Namespace::MemoryLevel;
 
+auto& ctx = hdk::ir::Context::defaultCtx();
+
 class TestBuffer : public AbstractBuffer {
  public:
-  TestBuffer(const SQLTypeInfo sql_type)
-      : AbstractBuffer(0, hdk::ir::Context::defaultCtx().fromTypeInfo(sql_type)) {}
+  TestBuffer(const hdk::ir::Type* type) : AbstractBuffer(0, type) {}
 
   void read(int8_t* const dst,
             const size_t num_bytes,
@@ -95,9 +96,7 @@ class EncoderTest : public testing::Test {
  protected:
   void TearDown() override { buffer_.reset(); }
 
-  void createEncoder(SQLTypes type) { buffer_.reset(new TestBuffer(type)); }
-
-  void createEncoder(SQLTypeInfo type) { buffer_.reset(new TestBuffer(type)); }
+  void createEncoder(const hdk::ir::Type* type) { buffer_.reset(new TestBuffer(type)); }
 
   std::unique_ptr<TestBuffer> buffer_;
 };
@@ -105,13 +104,14 @@ class EncoderTest : public testing::Test {
 class EncoderUpdateStatsTest : public EncoderTest {
  protected:
   template <typename T, typename V>
-  std::vector<T> convertToDatum(const std::vector<std::string>& data, SQLTypeInfo ti) {
+  std::vector<T> convertToDatum(const std::vector<std::string>& data,
+                                const hdk::ir::Type* type) {
     std::vector<T> datums;
     for (const auto& val : data) {
       if (to_upper(val) == "NULL") {
         datums.push_back(inline_int_null_value<V>());
       } else {
-        Datum d = StringToDatum(val, ti);
+        Datum d = StringToDatum(val, type);
         datums.push_back(DatumFetcher::getDatumVal<T>(d));
       }
     }
@@ -190,14 +190,14 @@ class EncoderUpdateStatsTest : public EncoderTest {
 
 TEST_F(EncoderUpdateStatsTest, StringNoneEncoder) {
   std::vector<std::string> data = {"text1", "text2", "text3", "", "text4"};
-  createEncoder(kTEXT);
+  createEncoder(ctx.text());
   updateWithStrings(data);
   assertHasNulls(true);
 }
 
 template <typename T>
 struct NoneEncoderTraits {
-  inline static SQLTypeInfo getSqlType() {
+  inline static const hdk::ir::Type* getSqlType() {
     throw std::runtime_error(
         "Generic NoneEncoder not supported, only certain types supported.");
   }
@@ -205,32 +205,32 @@ struct NoneEncoderTraits {
 
 template <>
 struct NoneEncoderTraits<int64_t> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kBIGINT); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.int64(); }
 };
 
 template <>
 struct NoneEncoderTraits<int32_t> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kINT); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.int32(); }
 };
 
 template <>
 struct NoneEncoderTraits<int16_t> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kSMALLINT); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.int16(); }
 };
 
 template <>
 struct NoneEncoderTraits<int8_t> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kTINYINT); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.int8(); }
 };
 
 template <>
 struct NoneEncoderTraits<float> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kFLOAT); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.fp32(); }
 };
 
 template <>
 struct NoneEncoderTraits<double> {
-  inline static SQLTypeInfo getSqlType() { return SQLTypeInfo(kDOUBLE); }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.fp64(); }
 };
 
 template <typename T>
@@ -257,7 +257,7 @@ TYPED_TEST(NoneEncoderUpdateStatsTest, TypedTest) {
 
 template <typename T, typename V>
 struct DateDaysEncoderTraits {
-  inline static SQLTypeInfo getSqlType() {
+  inline static const hdk::ir::Type* getSqlType() {
     throw std::runtime_error(
         "Generic DateDaysEncoder not supported, only certain types supported.");
   }
@@ -265,20 +265,15 @@ struct DateDaysEncoderTraits {
 
 template <>
 struct DateDaysEncoderTraits<int64_t, int32_t> {
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kDATE, false, kENCODING_DATE_IN_DAYS);
-    sql_type_info.set_comp_param(32);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.date32(hdk::ir::TimeUnit::kDay);
   }
 };
 
 template <>
 struct DateDaysEncoderTraits<int64_t, int16_t> {
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kDATE, false, kENCODING_DATE_IN_DAYS);
-    sql_type_info.set_comp_param(16);
-    sql_type_info.set_size(2);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.date16(hdk::ir::TimeUnit::kDay);
   }
 };
 
@@ -322,7 +317,7 @@ struct ArrayNoneEncoderTestTraits {
     return {};
   }
 
-  inline static SQLTypeInfo getSqlType() {
+  inline static const hdk::ir::Type* getSqlType() {
     unsupported();
     return {};
   }
@@ -340,11 +335,7 @@ struct ArrayNoneEncoderTestTraits<int64_t> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kBIGINT);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.int64()); }
 };
 
 template <>
@@ -359,11 +350,7 @@ struct ArrayNoneEncoderTestTraits<int32_t> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kINT);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.int32()); }
 };
 
 template <>
@@ -378,11 +365,7 @@ struct ArrayNoneEncoderTestTraits<int16_t> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kSMALLINT);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.int16()); }
 };
 
 template <>
@@ -397,11 +380,7 @@ struct ArrayNoneEncoderTestTraits<int8_t> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kTINYINT);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.int8()); }
 };
 
 template <>
@@ -416,10 +395,8 @@ struct ArrayNoneEncoderTestTraits<bool> {
     return std::make_tuple(false, true, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kBOOLEAN);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayVarLen(ctx.boolean());
   }
 };
 
@@ -435,11 +412,7 @@ struct ArrayNoneEncoderTestTraits<float> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kFLOAT);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.fp32()); }
 };
 
 template <>
@@ -454,11 +427,7 @@ struct ArrayNoneEncoderTestTraits<double> {
     return std::make_tuple(-10, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kDOUBLE);
-    return sql_type_info;
-  }
+  inline static const hdk::ir::Type* getSqlType() { return ctx.arrayVarLen(ctx.fp64()); }
 };
 
 template <typename T>
@@ -504,7 +473,7 @@ struct FixedLengthArrayNoneEncoderTestTraits {
     return {};
   }
 
-  inline static SQLTypeInfo getSqlType() {
+  inline static const hdk::ir::Type* getSqlType() {
     unsupported();
     return {};
   }
@@ -522,11 +491,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<int64_t> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kBIGINT);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.int64());
   }
 };
 
@@ -542,11 +508,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<int32_t> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kINT);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.int32());
   }
 };
 
@@ -562,11 +525,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<int16_t> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kSMALLINT);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.int16());
   }
 };
 
@@ -582,11 +542,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<int8_t> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kTINYINT);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.int8());
   }
 };
 
@@ -602,11 +559,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<bool> {
     return std::make_tuple(false, true, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kBOOLEAN);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.boolean());
   }
 };
 
@@ -622,11 +576,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<float> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kFLOAT);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.fp32());
   }
 };
 
@@ -642,11 +593,8 @@ struct FixedLengthArrayNoneEncoderTestTraits<double> {
     return std::make_tuple(-100, 100, true);
   }
 
-  inline static SQLTypeInfo getSqlType() {
-    auto sql_type_info = SQLTypeInfo(kARRAY, false);
-    sql_type_info.set_subtype(kDOUBLE);
-    sql_type_info.set_size(3);
-    return sql_type_info;
+  inline static const hdk::ir::Type* getSqlType() {
+    return ctx.arrayFixed(3, ctx.fp64());
   }
 };
 
