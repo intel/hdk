@@ -73,8 +73,8 @@ int32_t get_agg_count(const std::vector<hdk::ir::Expr*>& target_exprs) {
     CHECK(target_expr);
     const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
     if (!agg_expr || agg_expr->get_aggtype() == kSAMPLE) {
-      const auto& ti = target_expr->get_type_info();
-      if (ti.is_buffer()) {
+      auto type = target_expr->type();
+      if (type->isBuffer()) {
         agg_count += 2;
       } else {
         ++agg_count;
@@ -88,6 +88,21 @@ int32_t get_agg_count(const std::vector<hdk::ir::Expr*>& target_exprs) {
     }
   }
   return agg_count;
+}
+
+inline std::string get_buffer_name(const hdk::ir::Type* type) {
+  if (type->isArray()) {
+    return "Array";
+  }
+  if (type->isText()) {
+    return "Bytes";
+  }
+  if (type->isColumn()) {
+    return "Column";
+  }
+
+  UNREACHABLE();
+  return "";
 }
 
 }  // namespace
@@ -259,27 +274,27 @@ llvm::Value* RowFuncBuilder::codegenOutputSlot(
         code_generator.codegen(order_entry_expr, true, co).front(), chosen_bytes * 8);
     const uint32_t n = ra_exe_unit_.sort_info.offset + ra_exe_unit_.sort_info.limit;
     std::string fname = "get_bin_from_k_heap";
-    const auto& oe_ti = order_entry_expr->get_type_info();
+    auto oe_type = order_entry_expr->type();
     llvm::Value* null_key_lv = nullptr;
-    if (oe_ti.is_integer() || oe_ti.is_decimal() || oe_ti.is_time()) {
+    if (oe_type->isInteger() || oe_type->isDecimal() || oe_type->isDateTime()) {
       const size_t bit_width = order_entry_lv->getType()->getIntegerBitWidth();
       switch (bit_width) {
         case 32:
-          null_key_lv = LL_INT(static_cast<int32_t>(inline_int_null_val(oe_ti)));
+          null_key_lv = LL_INT(static_cast<int32_t>(inline_int_null_value(oe_type)));
           break;
         case 64:
-          null_key_lv = LL_INT(static_cast<int64_t>(inline_int_null_val(oe_ti)));
+          null_key_lv = LL_INT(static_cast<int64_t>(inline_int_null_value(oe_type)));
           break;
         default:
           CHECK(false);
       }
       fname += "_int" + std::to_string(bit_width) + "_t";
     } else {
-      CHECK(oe_ti.is_fp());
+      CHECK(oe_type->isFloatingPoint());
       if (order_entry_lv->getType()->isDoubleTy()) {
-        null_key_lv = LL_FP(static_cast<double>(inline_fp_null_val(oe_ti)));
+        null_key_lv = LL_FP(static_cast<double>(inline_fp_null_value(oe_type)));
       } else {
-        null_key_lv = LL_FP(static_cast<float>(inline_fp_null_val(oe_ti)));
+        null_key_lv = LL_FP(static_cast<float>(inline_fp_null_value(oe_type)));
       }
       fname += order_entry_lv->getType()->isDoubleTy() ? "_double" : "_float";
     }
@@ -292,7 +307,7 @@ llvm::Value* RowFuncBuilder::codegenOutputSlot(
          LL_INT(row_size_quad),
          LL_INT(static_cast<uint32_t>(query_mem_desc.getColOffInBytes(key_slot_idx))),
          LL_BOOL(only_order_entry.is_desc),
-         LL_BOOL(!order_entry_expr->get_type_info().get_notnull()),
+         LL_BOOL(order_entry_expr->type()->nullable()),
          LL_BOOL(only_order_entry.nulls_first),
          null_key_lv,
          order_entry_lv});
@@ -950,9 +965,8 @@ void RowFuncBuilder::codegenCountDistinct(const size_t target_idx,
                                           const ExecutorDeviceType device_type) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   const auto agg_info = get_target_info(target_expr, config_.exec.group_by.bigint_count);
-  const auto& arg_ti =
-      static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->get_type_info();
-  if (arg_ti.is_fp()) {
+  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->type();
+  if (arg_type->isFloatingPoint()) {
     agg_args.back() = executor_->cgen_state_->ir_builder_.CreateBitCast(
         agg_args.back(), get_int_type(64, executor_->cgen_state_->context_));
   }
@@ -980,9 +994,10 @@ void RowFuncBuilder::codegenCountDistinct(const size_t target_idx,
   }
   if (agg_info.skip_null_val) {
     auto null_lv = executor_->cgen_state_->castToTypeIn(
-        (arg_ti.is_fp()
-             ? static_cast<llvm::Value*>(executor_->cgen_state_->inlineFpNull(arg_ti))
-             : static_cast<llvm::Value*>(executor_->cgen_state_->inlineIntNull(arg_ti))),
+        (arg_type->isFloatingPoint()
+             ? static_cast<llvm::Value*>(executor_->cgen_state_->inlineFpNull(arg_type))
+             : static_cast<llvm::Value*>(
+                   executor_->cgen_state_->inlineIntNull(arg_type))),
         64);
     null_lv = executor_->cgen_state_->ir_builder_.CreateBitCast(
         null_lv, get_int_type(64, executor_->cgen_state_->context_));
@@ -1073,8 +1088,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
   // TODO(alex): handle arrays uniformly?
   CodeGenerator code_generator(executor_);
   if (target_expr) {
-    const auto& target_ti = target_expr->get_type_info();
-    if (target_ti.is_buffer() &&
+    auto target_type = target_expr->type();
+    if (target_type->isBuffer() &&
         !executor_->plan_state_->isLazyFetchColumn(target_expr)) {
       const auto target_lvs =
           agg_expr ? code_generator.codegen(agg_expr->get_arg(), true, co)
@@ -1083,28 +1098,28 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
       if (!func_expr && !arr_expr) {
         // Something with the chunk transport is code that was generated from a source
         // other than an ARRAY[] expression
-        if (target_ti.is_bytes()) {
+        if (target_type->isText()) {
           CHECK_EQ(size_t(3), target_lvs.size());
           return {target_lvs[1], target_lvs[2]};
         }
-        CHECK(target_ti.is_array());
+        CHECK(target_type->isArray());
         CHECK_EQ(size_t(1), target_lvs.size());
         CHECK(!agg_expr || agg_expr->get_aggtype() == kSAMPLE);
         const auto i32_ty = get_int_type(32, executor_->cgen_state_->context_);
         const auto i8p_ty =
             llvm::PointerType::get(get_int_type(8, executor_->cgen_state_->context_), 0);
-        const auto& elem_ti = target_ti.get_elem_type();
-        return {
-            executor_->cgen_state_->emitExternalCall(
-                "array_buff",
-                i8p_ty,
-                {target_lvs.front(), code_generator.posArg(target_expr)}),
-            executor_->cgen_state_->emitExternalCall(
-                "array_size",
-                i32_ty,
-                {target_lvs.front(),
-                 code_generator.posArg(target_expr),
-                 executor_->cgen_state_->llInt(log2_bytes(elem_ti.get_logical_size()))})};
+        auto elem_type = target_type->as<hdk::ir::ArrayBaseType>()->elemType();
+        return {executor_->cgen_state_->emitExternalCall(
+                    "array_buff",
+                    i8p_ty,
+                    {target_lvs.front(), code_generator.posArg(target_expr)}),
+                executor_->cgen_state_->emitExternalCall(
+                    "array_size",
+                    i32_ty,
+                    {target_lvs.front(),
+                     code_generator.posArg(target_expr),
+                     executor_->cgen_state_->llInt(
+                         log2_bytes(hdk::ir::logicalSize(elem_type)))})};
       } else {
         if (agg_expr) {
           throw std::runtime_error(
@@ -1114,8 +1129,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         CHECK(func_expr || arr_expr);
         if (dynamic_cast<const hdk::ir::FunctionOper*>(target_expr)) {
           CHECK_EQ(size_t(1), target_lvs.size());
-          const auto prefix = target_ti.get_buffer_name();
-          CHECK(target_ti.is_array() || target_ti.is_bytes());
+          const auto prefix = get_buffer_name(target_type);
+          CHECK(target_type->isArray() || target_type->isText());
           const auto target_lv = LL_BUILDER.CreateLoad(
               target_lvs[0]->getType()->getPointerElementType(), target_lvs[0]);
           // const auto target_lv_type = target_lvs[0]->getType();
