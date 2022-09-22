@@ -76,14 +76,12 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual ~Expr() {}
 
   ExprPtr get_shared_ptr() { return shared_from_this(); }
-  const SQLTypeInfo& get_type_info() const { return type_info; }
   virtual void set_type_info(const hdk::ir::Type* new_type);
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
   void set_contains_agg(bool a) { contains_agg = a; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false);
-  ExprPtr add_cast(const SQLTypeInfo& new_type_info);
   virtual void check_group_by(const ExprPtrList& groupby) const {};
   virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
 
@@ -179,7 +177,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
 
  protected:
   const Type* type_;
-  SQLTypeInfo type_info;  // SQLTypeInfo of the return result of this expression
   bool contains_agg;
   mutable std::optional<size_t> hash_;
 };
@@ -268,8 +265,6 @@ class ColumnVar : public Expr {
   int get_rte_idx() const { return rte_idx; }
   ColumnInfoPtr get_column_info() const { return col_info_; }
   bool is_virtual() const { return col_info_->is_rowid; }
-  EncodingType get_compression() const { return type_info.get_compression(); }
-  int get_comp_param() const { return type_info.get_comp_param(); }
   void set_type_info(const hdk::ir::Type* new_type) override {
     if (!type_->equal(new_type)) {
       col_info_ = std::make_shared<ColumnInfo>(col_info_->db_id,
@@ -400,7 +395,6 @@ class Constant : public Expr {
       set_null_value();
     } else {
       type_ = type_->withNullable(false);
-      type_info.set_notnull(true);
     }
   }
   Constant(const Type* type, bool n, const ExprPtrList& l, bool cacheable = true)

@@ -989,7 +989,7 @@ int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
 int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
                                        const hdk::ir::Type* type,
                                        const hdk::ir::Type* new_type);
-size_t hash(Datum datum, const SQLTypeInfo& ti);
+size_t hash(Datum datum, const hdk::ir::Type* type);
 
 #include "../QueryEngine/DateAdd.h"
 #include "../QueryEngine/DateTruncate.h"

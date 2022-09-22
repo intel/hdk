@@ -244,12 +244,10 @@ void OrderEntry::print() const {
   std::cout << toString() << std::endl;
 }
 
-Expr::Expr(const Type* type, bool has_agg)
-    : type_(type), type_info(type->toTypeInfo()), contains_agg(has_agg) {}
+Expr::Expr(const Type* type, bool has_agg) : type_(type), contains_agg(has_agg) {}
 
 void Expr::set_type_info(const hdk::ir::Type* new_type) {
   type_ = new_type;
-  type_info = type_->toTypeInfo();
 }
 
 void Expr::print() const {
@@ -284,7 +282,6 @@ ExprPtr Expr::decompress() {
         kCAST,
         shared_from_this());
   }
-  CHECK(type_info.get_compression() == kENCODING_NONE);
   return shared_from_this();
 }
 
@@ -316,11 +313,6 @@ ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) {
         "yet.");
   }
   return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
-}
-
-ExprPtr Expr::add_cast(const SQLTypeInfo& new_type_info) {
-  return add_cast(hdk::ir::Context::defaultCtx().fromTypeInfo(new_type_info),
-                  new_type_info.is_dict_intersection());
 }
 
 std::string ColumnRef::toString() const {
@@ -716,7 +708,6 @@ void Constant::cast_number(const Type* new_type) {
       CHECK(false);
   }
   type_ = new_type;
-  type_info = type_->toTypeInfo();
 }
 
 void Constant::cast_string(const Type* new_type) {
@@ -730,7 +721,6 @@ void Constant::cast_string(const Type* new_type) {
     }
   }
   type_ = new_type;
-  type_info = type_->toTypeInfo();
 }
 
 void Constant::cast_from_string(const Type* new_type) {
@@ -738,7 +728,6 @@ void Constant::cast_from_string(const Type* new_type) {
   constval = StringToDatum(*s, new_type);
   delete s;
   type_ = new_type;
-  type_info = type_->toTypeInfo();
 }
 
 void Constant::cast_to_string(const Type* str_type) {
@@ -752,7 +741,6 @@ void Constant::cast_to_string(const Type* str_type) {
     }
   }
   type_ = str_type;
-  type_info = type_->toTypeInfo();
 }
 
 void Constant::do_cast(const Type* new_type) {
@@ -807,51 +795,62 @@ void Constant::do_cast(const Type* new_type) {
                              new_type->toString() + " not supported");
   }
   type_ = new_type;
-  type_info = type_->toTypeInfo();
   if (is_null) {
     set_null_value();
   }
 }
 
 void Constant::set_null_value() {
-  switch (type_info.get_type()) {
-    case kBOOLEAN:
+  switch (type_->id()) {
+    case Type::kBoolean:
       constval.boolval = NULL_BOOLEAN;
       break;
-    case kTINYINT:
-      constval.tinyintval = NULL_TINYINT;
+    case Type::kInteger:
+    case Type::kDecimal:
+      switch (type_->size()) {
+        case 1:
+          constval.tinyintval = NULL_TINYINT;
+          break;
+        case 2:
+          constval.smallintval = NULL_SMALLINT;
+          break;
+        case 4:
+          constval.intval = NULL_INT;
+          break;
+        case 8:
+          constval.bigintval = NULL_BIGINT;
+          break;
+        default:
+          CHECK(false);
+      }
       break;
-    case kINT:
-      constval.intval = NULL_INT;
+    case Type::kFloatingPoint:
+      switch (type_->as<FloatingPointType>()->precision()) {
+        case FloatingPointType::kFloat:
+          constval.floatval = NULL_FLOAT;
+          break;
+        case FloatingPointType::kDouble:
+          constval.doubleval = NULL_DOUBLE;
+          break;
+        default:
+          CHECK(false);
+      }
       break;
-    case kSMALLINT:
-      constval.smallintval = NULL_SMALLINT;
-      break;
-    case kBIGINT:
-    case kNUMERIC:
-    case kDECIMAL:
+    case Type::kTime:
+    case Type::kTimestamp:
+    case Type::kDate:
       constval.bigintval = NULL_BIGINT;
       break;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-      constval.bigintval = NULL_BIGINT;
-      break;
-    case kVARCHAR:
-    case kCHAR:
-    case kTEXT:
+    case Type::kExtDictionary:
+    case Type::kVarChar:
+    case Type::kText:
       constval.stringval = nullptr;
       break;
-    case kFLOAT:
-      constval.floatval = NULL_FLOAT;
-      break;
-    case kDOUBLE:
-      constval.doubleval = NULL_DOUBLE;
-      break;
-    case kNULLT:
+    case Type::kNull:
       constval.bigintval = 0;
       break;
-    case kARRAY:
+    case Type::kFixedLenArray:
+    case Type::kVarLenArray:
       constval.arrayval = nullptr;
       break;
     default:
@@ -863,7 +862,6 @@ ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) {
   CHECK(!is_dict_intersection);
   if (is_null) {
     type_ = new_type;
-    type_info = type_->toTypeInfo();
     set_null_value();
     return shared_from_this();
   }
@@ -910,7 +908,6 @@ ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) {
   expr_pair_list = new_expr_pair_list;
 
   type_ = new_type;
-  type_info = type_->toTypeInfo();
 
   return shared_from_this();
 }
@@ -2799,7 +2796,7 @@ bool expr_list_match(const std::vector<ExprPtr>& lhs, const std::vector<ExprPtr>
 size_t Expr::hash() const {
   if (!hash_) {
     hash_ = typeid(*this).hash_code();
-    boost::hash_combine(*hash_, type_info.hash());
+    boost::hash_combine(*hash_, type_->toString());
     boost::hash_combine(*hash_, contains_agg);
   }
   return *hash_;
@@ -2860,7 +2857,7 @@ size_t Constant::hash() const {
           boost::hash_combine(*hash_, expr->hash());
         }
       } else {
-        boost::hash_combine(*hash_, ::hash(constval, type_info));
+        boost::hash_combine(*hash_, ::hash(constval, type_));
       }
     }
   }

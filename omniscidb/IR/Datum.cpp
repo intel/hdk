@@ -439,52 +439,64 @@ bool DatumEqual(const Datum a, const Datum b, const SQLTypeInfo& ti) {
   return false;
 }
 
-size_t hash(Datum datum, const SQLTypeInfo& ti) {
+size_t hash(Datum datum, const hdk::ir::Type* type) {
   size_t res = 0;
-  switch (ti.get_type()) {
-    case kBOOLEAN:
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
       boost::hash_combine(res, datum.boolval);
       break;
-    case kBIGINT:
-    case kNUMERIC:
-    case kDECIMAL:
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+      switch (type->size()) {
+        case 1:
+          boost::hash_combine(res, datum.tinyintval);
+          break;
+        case 2:
+          boost::hash_combine(res, datum.smallintval);
+          break;
+        case 4:
+          boost::hash_combine(res, datum.intval);
+          break;
+        case 8:
+          boost::hash_combine(res, datum.bigintval);
+          break;
+        default:
+          throw std::runtime_error("Internal error: unsupported Datum type: " +
+                                   type->toString());
+      }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          boost::hash_combine(res, datum.floatval);
+          break;
+        case hdk::ir::FloatingPointType::kDouble:
+          boost::hash_combine(res, datum.doubleval);
+          break;
+        default:
+          throw std::runtime_error("Internal error: unsupported Datum type: " +
+                                   type->toString());
+      }
+      break;
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kInterval:
       boost::hash_combine(res, datum.bigintval);
       break;
-    case kINT:
+    case hdk::ir::Type::kExtDictionary:
       boost::hash_combine(res, datum.intval);
-      break;
-    case kSMALLINT:
-      boost::hash_combine(res, datum.smallintval);
-      break;
-    case kTINYINT:
-      boost::hash_combine(res, datum.tinyintval);
-      break;
-    case kFLOAT:
-      boost::hash_combine(res, datum.floatval);
-      break;
-    case kDOUBLE:
-      boost::hash_combine(res, datum.doubleval);
-      break;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      boost::hash_combine(res, datum.bigintval);
-      break;
-    case kTEXT:
-    case kVARCHAR:
-    case kCHAR:
-      if (ti.get_compression() == kENCODING_DICT) {
-        boost::hash_combine(res, datum.intval);
-      } else if (datum.stringval) {
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
+      if (datum.stringval) {
         boost::hash_combine(res, *datum.stringval);
       }
       break;
     default:
       throw std::runtime_error("Internal error: unsupported Datum type: " +
-                               ti.get_type_name());
+                               type->toString());
   }
+
   return res;
 }
 
