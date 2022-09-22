@@ -134,8 +134,7 @@ llvm::Value* InValuesBitmap::codegen(llvm::Value* needle, Executor* executor) co
     constants.push_back(bitset_handle_literal.get());
   }
   const auto needle_i64 = executor->cgen_state_->castToTypeIn(needle, 64);
-  const auto null_bool_val =
-      static_cast<int8_t>(inline_int_null_val(SQLTypeInfo(kBOOLEAN, false)));
+  const auto null_bool_val = static_cast<int8_t>(inline_null_value<bool>());
   if (bitsets_.empty()) {
     return executor->cgen_state_->emitCall("bit_is_set",
                                            {executor->cgen_state_->llInt(int64_t(0)),

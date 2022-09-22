@@ -110,14 +110,6 @@ std::pair<uint64_t, uint64_t> inline_uint_max_min(const size_t byte_width) {
 
 // TODO(alex): proper types for aggregate
 int64_t get_agg_initial_val(const SQLAgg agg,
-                            const SQLTypeInfo& ti,
-                            const bool enable_compaction,
-                            const unsigned min_byte_width_to_compact) {
-  auto type = hdk::ir::Context::defaultCtx().fromTypeInfo(ti);
-  return get_agg_initial_val(agg, type, enable_compaction, min_byte_width_to_compact);
-}
-
-int64_t get_agg_initial_val(const SQLAgg agg,
                             const hdk::ir::Type* type,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact) {

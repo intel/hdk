@@ -960,8 +960,6 @@ class SQLTypeInfo {
   }
 };
 
-SQLTypes decimal_to_int_type(const SQLTypeInfo&);
-
 #ifndef __CUDACC__
 inline std::ostream& operator<<(std::ostream& os, const SQLTypeInfo& ti) {
   os << ti.toString();

@@ -197,21 +197,6 @@ inline double pair_to_double(const std::pair<int64_t, int64_t>& fp_pair,
   return dividend / static_cast<double>(fp_pair.second);
 }
 
-inline int64_t null_val_bit_pattern(const SQLTypeInfo& ti,
-                                    const bool float_argument_input) {
-  if (ti.is_fp()) {
-    if (float_argument_input && ti.get_type() == kFLOAT) {
-      return shared::reinterpret_bits<int64_t>(NULL_FLOAT);  // 1<<23
-    }
-    const auto double_null_val = inline_fp_null_val(ti);
-    return shared::reinterpret_bits<int64_t>(double_null_val);  // 0x381<<52 or 1<<52
-  }
-  if ((ti.is_string() && ti.get_compression() == kENCODING_NONE) || ti.is_array()) {
-    return 0;
-  }
-  return inline_int_null_val(ti);
-}
-
 inline int64_t null_val_bit_pattern(const hdk::ir::Type* type,
                                     const bool float_argument_input) {
   if (type->isFloatingPoint()) {
