@@ -118,6 +118,56 @@ static int get_numeric_scalar_scale(const hdk::ir::Type* arg_type) {
   return -1;
 }
 
+/**
+ * @brief returns true if the lhs_type can be cast to the rhs_type with no loss of
+ * precision.
+ */
+static bool is_numeric_scalar_auto_castable(const hdk::ir::Type* lhs_type,
+                                            const hdk::ir::Type* rhs_type) {
+  switch (lhs_type->id()) {
+    case hdk::ir::Type::kBoolean:
+      return rhs_type->isBoolean();
+    case hdk::ir::Type::kInteger:
+      if (!rhs_type->isNumber()) {
+        return false;
+      }
+      if (rhs_type->isFloatingPoint()) {
+        // We can lose precision here, but preserving existing behavior
+        return true;
+      }
+      return rhs_type->size() >= lhs_type->size();
+    case hdk::ir::Type::kFloatingPoint:
+      if (!rhs_type->isFloatingPoint()) {
+        return false;
+      }
+      return rhs_type->size() >= lhs_type->size();
+    case hdk::ir::Type::kDecimal:
+      if (rhs_type->isDecimal()) {
+        return rhs_type->as<hdk::ir::DecimalType>()->precision() >=
+               lhs_type->as<hdk::ir::DecimalType>()->precision();
+      } else if (rhs_type->isFp64()) {
+        return true;
+      } else if (rhs_type->isFp32()) {
+        return lhs_type->as<hdk::ir::DecimalType>()->precision() <= 7;
+      } else {
+        return false;
+      }
+    case hdk::ir::Type::kTimestamp:
+      if (!rhs_type->isTimestamp()) {
+        return false;
+      }
+      return rhs_type->as<hdk::ir::TimestampType>()->unit() >=
+             lhs_type->as<hdk::ir::TimestampType>()->unit();
+    case hdk::ir::Type::kDate:
+      return rhs_type->isDate();
+    case hdk::ir::Type::kTime:
+      return rhs_type->isTime();
+    default:
+      UNREACHABLE();
+      return false;
+  }
+}
+
 static int match_numeric_argument(const hdk::ir::Type* arg_type,
                                   const bool is_arg_literal,
                                   const ExtArgumentType& sig_ext_arg_type,
@@ -127,7 +177,7 @@ static int match_numeric_argument(const hdk::ir::Type* arg_type,
   const auto sig_type = ext_arg_type_to_type(arg_type->ctx(), sig_ext_arg_type);
 
   // If we can't legally auto-cast to sig_type, abort
-  if (!arg_type->toTypeInfo().is_numeric_scalar_auto_castable(sig_type->toTypeInfo())) {
+  if (!is_numeric_scalar_auto_castable(arg_type, sig_type)) {
     return -1;
   }
 
@@ -469,8 +519,8 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
       (ColumnList[3]<int>, int)
 
     where the integers in [..] indicate the number of collected
-    columns. In the SQLTypeInfo instance, this number is stored in the
-    SQLTypeInfo dimension attribute.
+    columns. In the ColumnListType instance, this number is stored in the
+    length attribute.
 
     As an example, let us consider a SQL query containing the
     following expression calling a UDTF foo:
@@ -566,7 +616,8 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
       if ((size_t)pos == ext_func_args.size()) {
         CHECK_EQ(args_are_constants.size(), original_input_idx);
         // prefer smaller return types
-        penalty_score += ext_arg_type_to_type_info(ext_func.getRet()).get_logical_size();
+        penalty_score += hdk::ir::logicalSize(
+            ext_arg_type_to_type(hdk::ir::Context::defaultCtx(), ext_func.getRet()));
         if (penalty_score < minimal_score) {
           optimal = index;
           minimal_score = penalty_score;

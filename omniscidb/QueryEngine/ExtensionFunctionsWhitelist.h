@@ -79,7 +79,6 @@ enum class ExtArgumentType {
   ColumnListTextEncodingDict,
 };
 
-SQLTypeInfo ext_arg_type_to_type_info(const ExtArgumentType ext_arg_type);
 const hdk::ir::Type* ext_arg_type_to_type(hdk::ir::Context& ctx,
                                           const ExtArgumentType ext_arg_type);
 
@@ -144,7 +143,7 @@ class ExtensionFunctionsWhitelist {
 
   static std::vector<ExtensionFunction> get_ext_funcs(const std::string& name,
                                                       size_t arity,
-                                                      const SQLTypeInfo& rtype);
+                                                      const hdk::ir::Type* rtype);
 
   static std::string toString(const std::vector<ExtensionFunction>& ext_funcs,
                               std::string tab = "");

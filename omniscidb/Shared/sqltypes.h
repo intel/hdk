@@ -548,66 +548,6 @@ class SQLTypeInfo {
   }
 
   /**
-   * @brief returns true if the sql_type can be cast to the type specified by
-   * new_type_info with no loss of precision. Currently only used in
-   * ExtensionFunctionsBindings to determine legal function matches, but we should
-   * consider whether we need to rationalize implicit casting behavior more broadly in
-   * QueryEngine.
-   */
-
-  inline bool is_numeric_scalar_auto_castable(const SQLTypeInfo& new_type_info) const {
-    const auto& new_type = new_type_info.get_type();
-    switch (type) {
-      case kBOOLEAN:
-        return new_type == kBOOLEAN;
-      case kTINYINT:
-      case kSMALLINT:
-      case kINT:
-        if (!new_type_info.is_number()) {
-          return false;
-        }
-        if (new_type_info.is_fp()) {
-          // We can lose precision here, but preserving existing behavior
-          return true;
-        }
-        return new_type_info.get_logical_size() >= get_logical_size();
-      case kBIGINT:
-        return new_type == kBIGINT || new_type == kDOUBLE || new_type == kFLOAT;
-      case kFLOAT:
-      case kDOUBLE:
-        if (!new_type_info.is_fp()) {
-          return false;
-        }
-        return (new_type_info.get_logical_size() >= get_logical_size());
-      case kDECIMAL:
-      case kNUMERIC:
-        switch (new_type) {
-          case kDECIMAL:
-          case kNUMERIC:
-            return new_type_info.get_dimension() >= get_dimension();
-          case kDOUBLE:
-            return true;
-          case kFLOAT:
-            return get_dimension() <= 7;
-          default:
-            return false;
-        }
-      case kTIMESTAMP:
-        if (new_type != kTIMESTAMP) {
-          return false;
-        }
-        return new_type_info.get_dimension() >= get_dimension();
-      case kDATE:
-        return new_type == kDATE;
-      case kTIME:
-        return new_type == kTIME;
-      default:
-        UNREACHABLE();
-        return false;
-    }
-  }
-
-  /**
    * @brief returns integer between 1 and 8 indicating what is roughly equivalent to the
    * logical byte size of a scalar numeric type (including boolean + time types), but with
    * decimals and numerics mapped to the byte size of their dimension (which may vary from

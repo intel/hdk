@@ -85,7 +85,7 @@ std::vector<ExtensionFunction> ExtensionFunctionsWhitelist::get_ext_funcs(
 std::vector<ExtensionFunction> ExtensionFunctionsWhitelist::get_ext_funcs(
     const std::string& name,
     size_t arity,
-    const SQLTypeInfo& rtype) {
+    const hdk::ir::Type* rtype) {
   std::vector<ExtensionFunction> ext_funcs = {};
   const auto collections = {&functions_, &udf_functions_, &rt_udf_functions_};
   const auto uname = to_upper(name);
@@ -95,23 +95,23 @@ std::vector<ExtensionFunction> ExtensionFunctionsWhitelist::get_ext_funcs(
       continue;
     }
     auto ext_func_sigs = it->second;
-    std::copy_if(ext_func_sigs.begin(),
-                 ext_func_sigs.end(),
-                 std::back_inserter(ext_funcs),
-                 [arity, rtype](auto sig) {
-                   // Ideally, arity should be equal to the number of
-                   // sig arguments but there seems to be many cases
-                   // where some sig arguments will be represented
-                   // with multiple arguments, for instance, array
-                   // argument is translated to data pointer and array
-                   // size arguments.
-                   if (arity > sig.getArgs().size()) {
-                     return false;
-                   }
-                   auto rt = rtype.get_type();
-                   auto st = ext_arg_type_to_type_info(sig.getRet()).get_type();
-                   return (st == rt || (st == kTINYINT && rt == kBOOLEAN));
-                 });
+    std::copy_if(
+        ext_func_sigs.begin(),
+        ext_func_sigs.end(),
+        std::back_inserter(ext_funcs),
+        [arity, rtype](auto sig) {
+          // Ideally, arity should be equal to the number of
+          // sig arguments but there seems to be many cases
+          // where some sig arguments will be represented
+          // with multiple arguments, for instance, array
+          // argument is translated to data pointer and array
+          // size arguments.
+          if (arity > sig.getArgs().size()) {
+            return false;
+          }
+          auto stype = ext_arg_type_to_type(rtype->ctx(), sig.getRet());
+          return (stype->equal(rtype) || (stype->isInt8() && rtype->isBoolean()));
+        });
   }
   return ext_funcs;
 }
@@ -213,83 +213,6 @@ std::string serialize_type(const ExtArgumentType type,
 }
 
 }  // namespace
-
-SQLTypeInfo ext_arg_type_to_type_info(const ExtArgumentType ext_arg_type) {
-  /* This function is mostly used for scalar types.
-     For non-scalar types, NULL is returned as a placeholder.
-   */
-
-  switch (ext_arg_type) {
-    case ExtArgumentType::Bool:
-      return SQLTypeInfo(kBOOLEAN, false);
-    case ExtArgumentType::Int8:
-      return SQLTypeInfo(kTINYINT, false);
-    case ExtArgumentType::Int16:
-      return SQLTypeInfo(kSMALLINT, false);
-    case ExtArgumentType::Int32:
-      return SQLTypeInfo(kINT, false);
-    case ExtArgumentType::Int64:
-      return SQLTypeInfo(kBIGINT, false);
-    case ExtArgumentType::Float:
-      return SQLTypeInfo(kFLOAT, false);
-    case ExtArgumentType::Double:
-      return SQLTypeInfo(kDOUBLE, false);
-    case ExtArgumentType::ArrayInt8:
-      return generate_array_type(kTINYINT);
-    case ExtArgumentType::ArrayInt16:
-      return generate_array_type(kSMALLINT);
-    case ExtArgumentType::ArrayInt32:
-      return generate_array_type(kINT);
-    case ExtArgumentType::ArrayInt64:
-      return generate_array_type(kBIGINT);
-    case ExtArgumentType::ArrayFloat:
-      return generate_array_type(kFLOAT);
-    case ExtArgumentType::ArrayDouble:
-      return generate_array_type(kDOUBLE);
-    case ExtArgumentType::ArrayBool:
-      return generate_array_type(kBOOLEAN);
-    case ExtArgumentType::ColumnInt8:
-      return generate_column_type(kTINYINT);
-    case ExtArgumentType::ColumnInt16:
-      return generate_column_type(kSMALLINT);
-    case ExtArgumentType::ColumnInt32:
-      return generate_column_type(kINT);
-    case ExtArgumentType::ColumnInt64:
-      return generate_column_type(kBIGINT);
-    case ExtArgumentType::ColumnFloat:
-      return generate_column_type(kFLOAT);
-    case ExtArgumentType::ColumnDouble:
-      return generate_column_type(kDOUBLE);
-    case ExtArgumentType::ColumnBool:
-      return generate_column_type(kBOOLEAN);
-    case ExtArgumentType::ColumnTextEncodingDict:
-      return generate_column_type(kTEXT, kENCODING_DICT, 0 /* comp_param */);
-    case ExtArgumentType::TextEncodingNone:
-      return SQLTypeInfo(kTEXT, false, kENCODING_NONE);
-    case ExtArgumentType::TextEncodingDict:
-      return SQLTypeInfo(kTEXT, false, kENCODING_DICT);
-    case ExtArgumentType::ColumnListInt8:
-      return generate_column_type(kTINYINT);
-    case ExtArgumentType::ColumnListInt16:
-      return generate_column_type(kSMALLINT);
-    case ExtArgumentType::ColumnListInt32:
-      return generate_column_type(kINT);
-    case ExtArgumentType::ColumnListInt64:
-      return generate_column_type(kBIGINT);
-    case ExtArgumentType::ColumnListFloat:
-      return generate_column_type(kFLOAT);
-    case ExtArgumentType::ColumnListDouble:
-      return generate_column_type(kDOUBLE);
-    case ExtArgumentType::ColumnListBool:
-      return generate_column_type(kBOOLEAN);
-    case ExtArgumentType::ColumnListTextEncodingDict:
-      return generate_column_type(kTEXT, kENCODING_DICT, 0 /* comp_param */);
-    default:
-      LOG(FATAL) << "ExtArgumentType `" << serialize_type(ext_arg_type)
-                 << "` cannot be converted to SQLTypeInfo.";
-  }
-  return SQLTypeInfo(kNULLT, false);
-}
 
 const hdk::ir::Type* ext_arg_type_to_type(hdk::ir::Context& ctx,
                                           const ExtArgumentType ext_arg_type) {
