@@ -33,7 +33,7 @@ class ColumnarResultsTester : public ColumnarResults {
   ColumnarResultsTester(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                         const ResultSet& rows,
                         const size_t num_columns,
-                        const std::vector<SQLTypeInfo>& target_types,
+                        const std::vector<const hdk::ir::Type*> target_types,
                         const bool is_parallel_execution_enforced = false)
       : ColumnarResults(row_set_mem_owner,
                         rows,
@@ -92,9 +92,9 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
                       non_empty_step_size);
 
   // Columnar Conversion:
-  std::vector<SQLTypeInfo> col_types;
+  std::vector<const hdk::ir::Type*> col_types;
   for (size_t i = 0; i < result_set.colCount(); ++i) {
-    col_types.push_back(get_logical_type_info(result_set.getColType(i)));
+    col_types.push_back(hdk::ir::logicalType(result_set.colType(i)));
   }
   ColumnarResultsTester columnar_results(
       row_set_mem_owner, result_set, col_types.size(), col_types, is_parallel_conversion);
@@ -180,7 +180,7 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
 
 TEST(Construct, Empty) {
   std::vector<TargetInfo> target_infos;
-  std::vector<SQLTypeInfo> sql_type_infos;
+  std::vector<const hdk::ir::Type*> types;
   QueryMemoryDescriptor query_mem_desc;
   auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       nullptr, Executor::getArenaBlockSize(), /*num_threads=*/1);
@@ -193,7 +193,7 @@ TEST(Construct, Empty) {
                        0,
                        0);
   ColumnarResultsTester columnar_results(
-      row_set_mem_owner, result_set, sql_type_infos.size(), sql_type_infos);
+      row_set_mem_owner, result_set, types.size(), types);
 }
 
 // Projections:

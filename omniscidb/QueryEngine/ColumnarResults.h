@@ -63,7 +63,7 @@ class ColumnarResults {
   ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                   const ResultSet& rows,
                   const size_t num_columns,
-                  const std::vector<SQLTypeInfo>& target_types,
+                  const std::vector<const hdk::ir::Type*>& target_types,
                   const size_t thread_idx,
                   Executor* executor,
                   const bool is_parallel_execution_enforced = false);
@@ -71,7 +71,7 @@ class ColumnarResults {
   ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                   const int8_t* one_col_buffer,
                   const size_t num_rows,
-                  const SQLTypeInfo& target_type,
+                  const hdk::ir::Type* target_type,
                   const size_t thread_idx,
                   Executor* executor);
 
@@ -83,7 +83,7 @@ class ColumnarResults {
 
   const size_t size() const { return num_rows_; }
 
-  const SQLTypeInfo& getColumnType(const int col_id) const {
+  const hdk::ir::Type* columnType(const int col_id) const {
     CHECK_GE(col_id, 0);
     CHECK_LT(static_cast<size_t>(col_id), target_types_.size());
     return target_types_[col_id];
@@ -111,7 +111,8 @@ class ColumnarResults {
   size_t num_rows_;
 
  private:
-  ColumnarResults(const size_t num_rows, const std::vector<SQLTypeInfo>& target_types)
+  ColumnarResults(const size_t num_rows,
+                  const std::vector<const hdk::ir::Type*>& target_types)
       : num_rows_(num_rows), target_types_(target_types) {}
   inline void writeBackCell(const TargetValue& col_val,
                             const size_t row_idx,
@@ -191,7 +192,7 @@ class ColumnarResults {
                              const std::vector<size_t>& slot_idx_per_target_idx,
                              const std::vector<bool>& targets_to_skip = {});
 
-  const std::vector<SQLTypeInfo> target_types_;
+  const std::vector<const hdk::ir::Type*> target_types_;
   bool parallel_conversion_;         // multi-threaded execution of columnar conversion
   bool direct_columnar_conversion_;  // whether columnar conversion might happen directly
   // with minimal ussage of result set's iterator access

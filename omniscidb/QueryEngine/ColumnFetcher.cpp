@@ -36,9 +36,9 @@ inline const ColumnarResults* columnarize_result(
   INJECT_TIMER(columnarize_result);
   CHECK_EQ(0, frag_id);
 
-  std::vector<SQLTypeInfo> col_types;
+  std::vector<const hdk::ir::Type*> col_types;
   for (size_t i = 0; i < result->colCount(); ++i) {
-    col_types.push_back(get_logical_type_info(result->getColType(i)));
+    col_types.push_back(hdk::ir::logicalType(result->colType(i)));
   }
   return new ColumnarResults(
       row_set_mem_owner, *result, result->colCount(), col_types, thread_idx, executor);
@@ -331,7 +331,7 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
             std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
                                               col_buffer,
                                               fragment.getNumTuples(),
-                                              chunk_meta_it->second->type->toTypeInfo(),
+                                              chunk_meta_it->second->type,
                                               thread_idx,
                                               executor_));
       }
@@ -995,8 +995,8 @@ const int8_t* ColumnFetcher::transferColumnIfNeeded(
   const auto& col_buffers = columnar_results->getColumnBuffers();
   CHECK_LT(static_cast<size_t>(col_id), col_buffers.size());
   if (memory_level == Data_Namespace::GPU_LEVEL) {
-    const auto& col_ti = columnar_results->getColumnType(col_id);
-    const auto num_bytes = columnar_results->size() * col_ti.get_size();
+    const auto col_type = columnar_results->columnType(col_id);
+    const auto num_bytes = columnar_results->size() * col_type->size();
     CHECK(device_allocator);
     auto gpu_col_buffer = device_allocator->alloc(num_bytes);
     device_allocator->copyToDevice(gpu_col_buffer, col_buffers[col_id], num_bytes);

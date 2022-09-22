@@ -28,15 +28,10 @@
 
 namespace {
 
-inline int64_t fixed_encoding_nullable_val(const int64_t val,
-                                           const SQLTypeInfo& type_info) {
-  if (type_info.get_compression() != kENCODING_NONE) {
-    CHECK(type_info.get_compression() == kENCODING_FIXED ||
-          type_info.get_compression() == kENCODING_DICT);
-    auto logical_ti = get_logical_type_info(type_info);
-    if (val == inline_int_null_val(logical_ti)) {
-      return inline_fixed_encoding_null_val(type_info);
-    }
+inline int64_t fixed_encoding_nullable_val(const int64_t val, const hdk::ir::Type* type) {
+  auto logical_type = hdk::ir::logicalType(type);
+  if (val == inline_int_null_value(logical_type)) {
+    return inline_fixed_encoding_null_value(type);
   }
   return val;
 }
@@ -46,7 +41,7 @@ inline int64_t fixed_encoding_nullable_val(const int64_t val,
 ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                                  const ResultSet& rows,
                                  const size_t num_columns,
-                                 const std::vector<SQLTypeInfo>& target_types,
+                                 const std::vector<const hdk::ir::Type*>& target_types,
                                  const size_t thread_idx,
                                  Executor* executor,
                                  const bool is_parallel_execution_enforced)
@@ -71,16 +66,14 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
   auto timer = DEBUG_TIMER(__func__);
   column_buffers_.resize(num_columns);
   for (size_t i = 0; i < num_columns; ++i) {
-    const bool is_varlen = target_types[i].is_array() ||
-                           (target_types[i].is_string() &&
-                            target_types[i].get_compression() == kENCODING_NONE);
+    const bool is_varlen = target_types[i]->isArray() || target_types[i]->isString();
     if (is_varlen) {
       throw ColumnarConversionNotSupported();
     }
     if (!isDirectColumnarConversionPossible() ||
         !rows.isZeroCopyColumnarConversionPossible(i)) {
-      column_buffers_[i] = row_set_mem_owner->allocate(
-          num_rows_ * target_types[i].get_size(), thread_idx_);
+      column_buffers_[i] =
+          row_set_mem_owner->allocate(num_rows_ * target_types[i]->size(), thread_idx_);
     }
   }
 
@@ -94,7 +87,7 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
 ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                                  const int8_t* one_col_buffer,
                                  const size_t num_rows,
-                                 const SQLTypeInfo& target_type,
+                                 const hdk::ir::Type* target_type,
                                  const size_t thread_idx,
                                  Executor* executor)
     : column_buffers_(1)
@@ -109,14 +102,12 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
                                   .exec.interrupt.enable_non_kernel_time_query_interrupt
                             : false) {
   auto timer = DEBUG_TIMER(__func__);
-  const bool is_varlen =
-      target_type.is_array() ||
-      (target_type.is_string() && target_type.get_compression() == kENCODING_NONE);
+  const bool is_varlen = target_type->isArray() || target_type->isString();
 
   if (is_varlen) {
     throw ColumnarConversionNotSupported();
   }
-  const auto buf_size = num_rows * target_type.get_size();
+  const auto buf_size = num_rows * target_type->size();
   column_buffers_[0] =
       reinterpret_cast<int8_t*>(row_set_mem_owner->allocate(buf_size, thread_idx_));
   memcpy(((void*)column_buffers_[0]), one_col_buffer, buf_size);
@@ -146,7 +137,7 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
     return nullptr;
   }
   for (size_t col_idx = 0; col_idx < col_count; ++col_idx) {
-    const auto byte_width = (*nonempty_it)->getColumnType(col_idx).get_size();
+    const auto byte_width = (*nonempty_it)->columnType(col_idx)->size();
     auto write_ptr = row_set_mem_owner->allocate(byte_width * total_row_count);
     merged_results->column_buffers_.push_back(write_ptr);
     for (auto& rs : sub_results) {
@@ -154,7 +145,7 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
       if (!rs->size()) {
         continue;
       }
-      CHECK_EQ(byte_width, rs->getColumnType(col_idx).get_size());
+      CHECK_EQ(byte_width, rs->columnType(col_idx)->size());
       memcpy(write_ptr, rs->column_buffers_[col_idx], rs->size() * byte_width);
       write_ptr += rs->size() * byte_width;
     }
@@ -264,10 +255,10 @@ inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
   const auto scalar_col_val = boost::get<ScalarTargetValue>(&col_val);
   CHECK(scalar_col_val);
   auto i64_p = boost::get<int64_t>(scalar_col_val);
-  const auto& type_info = target_types_[column_idx];
+  auto type = target_types_[column_idx];
   if (i64_p) {
-    const auto val = fixed_encoding_nullable_val(*i64_p, type_info);
-    switch (target_types_[column_idx].get_size()) {
+    const auto val = fixed_encoding_nullable_val(*i64_p, type);
+    switch (type->size()) {
       case 1:
         ((int8_t*)column_buffers_[column_idx])[row_idx] = static_cast<int8_t>(val);
         break;
@@ -284,20 +275,14 @@ inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
         CHECK(false);
     }
   } else {
-    CHECK(target_types_[column_idx].is_fp());
-    switch (target_types_[column_idx].get_type()) {
-      case kFLOAT: {
-        auto float_p = boost::get<float>(scalar_col_val);
-        ((float*)column_buffers_[column_idx])[row_idx] = static_cast<float>(*float_p);
-        break;
-      }
-      case kDOUBLE: {
-        auto double_p = boost::get<double>(scalar_col_val);
-        ((double*)column_buffers_[column_idx])[row_idx] = static_cast<double>(*double_p);
-        break;
-      }
-      default:
-        CHECK(false);
+    CHECK(type->isFloatingPoint());
+    if (type->isFp32()) {
+      auto float_p = boost::get<float>(scalar_col_val);
+      ((float*)column_buffers_[column_idx])[row_idx] = static_cast<float>(*float_p);
+    } else {
+      CHECK(type->isFp64());
+      auto double_p = boost::get<double>(scalar_col_val);
+      ((double*)column_buffers_[column_idx])[row_idx] = static_cast<double>(*double_p);
     }
   }
 }
@@ -429,7 +414,7 @@ void ColumnarResults::copyAllNonLazyColumns(
       direct_copy_threads.push_back(std::async(
           std::launch::async,
           [&rows, this](const size_t column_index) {
-            const size_t column_size = num_rows_ * target_types_[column_index].get_size();
+            const size_t column_size = num_rows_ * target_types_[column_index]->size();
             rows.copyColumnIntoBuffer(
                 column_index, column_buffers_[column_index], column_size);
           },
@@ -941,8 +926,8 @@ std::vector<ColumnarResults::WriteFunction> ColumnarResults::initWriteFunctions(
       continue;
     }
 
-    if (target_types_[target_idx].is_fp()) {
-      switch (target_types_[target_idx].get_size()) {
+    if (target_types_[target_idx]->isFloatingPoint()) {
+      switch (target_types_[target_idx]->size()) {
         case 8:
           result.emplace_back(std::bind(&ColumnarResults::writeBackCellDirect<double>,
                                         this,
@@ -968,7 +953,7 @@ std::vector<ColumnarResults::WriteFunction> ColumnarResults::initWriteFunctions(
           break;
       }
     } else {
-      switch (target_types_[target_idx].get_size()) {
+      switch (target_types_[target_idx]->size()) {
         case 8:
           result.emplace_back(std::bind(&ColumnarResults::writeBackCellDirect<int64_t>,
                                         this,
@@ -1129,14 +1114,15 @@ std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
       if (rows.getPaddedSlotWidthBytes(slot_idx_per_target_idx[target_idx]) == 0) {
         // for key columns only
         CHECK(rows.query_mem_desc_.getTargetGroupbyIndex(target_idx) >= 0);
-        if (target_types_[target_idx].is_fp()) {
+        if (target_types_[target_idx]->isFloatingPoint()) {
           CHECK_EQ(size_t(8), rows.query_mem_desc_.getEffectiveKeyWidth());
-          switch (target_types_[target_idx].get_type()) {
-            case kFLOAT:
+          switch (
+              target_types_[target_idx]->as<hdk::ir::FloatingPointType>()->precision()) {
+            case hdk::ir::FloatingPointType::kFloat:
               read_functions.emplace_back(
                   read_float_key_baseline<QUERY_TYPE, COLUMNAR_OUTPUT>);
               break;
-            case kDOUBLE:
+            case hdk::ir::FloatingPointType::kDouble:
               read_functions.emplace_back(read_double_func<QUERY_TYPE, COLUMNAR_OUTPUT>);
               break;
             default:
@@ -1160,7 +1146,7 @@ std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
         continue;
       }
     }
-    if (target_types_[target_idx].is_fp()) {
+    if (target_types_[target_idx]->isFloatingPoint()) {
       switch (rows.getPaddedSlotWidthBytes(slot_idx_per_target_idx[target_idx])) {
         case 8:
           read_functions.emplace_back(read_double_func<QUERY_TYPE, COLUMNAR_OUTPUT>);
