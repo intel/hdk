@@ -66,5 +66,4 @@ std::unique_ptr<ResultSet> run_query_external(const ExecutionUnitSql& sql,
                                               const PlanState* plan_state,
                                               const ExternalQueryOutputSpec& output_spec);
 
-bool is_supported_type_for_extern_execution(const SQLTypeInfo& ti);
 bool is_supported_type_for_extern_execution(const hdk::ir::Type* type);

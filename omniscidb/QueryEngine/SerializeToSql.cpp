@@ -41,9 +41,9 @@ std::string ScalarExprToSql::visitConstant(const hdk::ir::Constant* constant) co
   if (constant->get_is_null()) {
     return "NULL";
   }
-  const auto& constant_ti = constant->get_type_info();
-  const auto result = DatumToString(constant->get_constval(), constant_ti);
-  if (constant_ti.is_string()) {
+  auto constant_type = constant->type();
+  const auto result = DatumToString(constant->get_constval(), constant_type);
+  if (constant_type->isString() || constant_type->isExtDictionary()) {
     return "'" + result + "'";
   } else {
     return result;
@@ -65,17 +65,19 @@ std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
       return operand_str + " IS NULL";
     }
     case kCAST: {
-      const auto& operand_ti = operand->get_type_info();
-      const auto& target_ti = uoper->get_type_info();
-      if (!is_supported_type_for_extern_execution(target_ti)) {
+      auto operand_type = operand->type();
+      auto target_type = uoper->type();
+      if (!is_supported_type_for_extern_execution(target_type)) {
         throw std::runtime_error("Type not supported yet for extern execution: " +
-                                 target_ti.get_type_name());
+                                 target_type->toString());
       }
-      if ((operand_ti.get_type() == target_ti.get_type()) ||
-          ((operand_ti.is_string() && target_ti.is_string()))) {
+      if ((operand_type->id() == target_type->id() &&
+           operand_type->size() == target_type->size()) ||
+          ((operand_type->isString() || operand_type->isExtDictionary()) &&
+           (target_type->isString() && target_type->isExtDictionary()))) {
         return operand_str;
       }
-      return "CAST(" + operand_str + " AS " + target_ti.get_type_name() + ")";
+      return "CAST(" + operand_str + " AS " + hdk::ir::sqlTypeName(target_type) + ")";
     }
     default: {
       throw std::runtime_error("Unary operator type: " + std::to_string(optype) +

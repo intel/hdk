@@ -26,4 +26,6 @@ const Type* logicalType(const Type* type);
  */
 const int logicalSize(const Type* type);
 
+std::string sqlTypeName(const Type* type);
+
 }  // namespace hdk::ir

@@ -42,54 +42,6 @@ int vt_destructor(sqlite3_vtab* pVtab) {
   return 0;
 }
 
-std::string sqlTypeName(const hdk::ir::Type* type) {
-  switch (type->id()) {
-    case hdk::ir::Type::kBoolean:
-      return "BOOLEAN";
-    case hdk::ir::Type::kDecimal: {
-      auto precision = type->as<hdk::ir::DecimalType>()->precision();
-      auto scale = type->as<hdk::ir::DecimalType>()->scale();
-      return "DECIMAL(" + std::to_string(precision) + "," + std::to_string(scale) + ")";
-    }
-    case hdk::ir::Type::kInteger:
-      switch (type->size()) {
-        case 1:
-          return "TINYINT";
-        case 2:
-          return "SMALLINT";
-        case 4:
-          return "INT";
-        case 8:
-          return "BIGINT";
-        default:
-          break;
-      }
-      break;
-    case hdk::ir::Type::kFloatingPoint:
-      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
-        case hdk::ir::FloatingPointType::kFloat:
-          return "FLOAT";
-        case hdk::ir::FloatingPointType::kDouble:
-          return "DOUBLE";
-        default:
-          break;
-      }
-      break;
-    case hdk::ir::Type::kTime:
-    case hdk::ir::Type::kTimestamp:
-    case hdk::ir::Type::kDate:
-    case hdk::ir::Type::kInterval:
-      break;
-    case hdk::ir::Type::kExtDictionary:
-    case hdk::ir::Type::kVarChar:
-    case hdk::ir::Type::kText:
-      return "TEXT";
-    default:
-      break;
-  }
-  return "<UNSUPPORTED_TYPE>";
-}
-
 int vt_create(sqlite3* db,
               void* p_aux,
               int argc,
@@ -111,7 +63,7 @@ int vt_create(sqlite3* db,
                  std::back_inserter(col_defs),
                  [](const TargetMetaInfo& target_metainfo) {
                    return target_metainfo.get_resname() + " " +
-                          sqlTypeName(target_metainfo.type());
+                          hdk::ir::sqlTypeName(target_metainfo.type());
                  });
   const auto col_defs_str = boost::algorithm::join(col_defs, ", ");
   const auto create_statement =
@@ -589,10 +541,6 @@ std::unique_ptr<ResultSet> run_query_external(
   const auto create_table = "create virtual table " + sql.from_table + " using omnisci";
   db.run(create_table);
   return db.runSelect(sql.query, output_spec);
-}
-
-bool is_supported_type_for_extern_execution(const SQLTypeInfo& ti) {
-  return ti.is_integer() || ti.is_fp() || ti.is_string();
 }
 
 bool is_supported_type_for_extern_execution(const hdk::ir::Type* type) {

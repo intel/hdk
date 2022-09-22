@@ -152,54 +152,6 @@ void runSingleValueTestValidation(const hdk::ir::Type* colType, ExecutorDeviceTy
   }
 }
 
-std::string sqlTypeName(const hdk::ir::Type* type) {
-  switch (type->id()) {
-    case hdk::ir::Type::kBoolean:
-      return "BOOLEAN";
-    case hdk::ir::Type::kDecimal: {
-      auto precision = type->as<hdk::ir::DecimalType>()->precision();
-      auto scale = type->as<hdk::ir::DecimalType>()->scale();
-      return "DECIMAL(" + std::to_string(precision) + "," + std::to_string(scale) + ")";
-    }
-    case hdk::ir::Type::kInteger:
-      switch (type->size()) {
-        case 1:
-          return "TINYINT";
-        case 2:
-          return "SMALLINT";
-        case 4:
-          return "INT";
-        case 8:
-          return "BIGINT";
-        default:
-          break;
-      }
-      break;
-    case hdk::ir::Type::kFloatingPoint:
-      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
-        case hdk::ir::FloatingPointType::kFloat:
-          return "FLOAT";
-        case hdk::ir::FloatingPointType::kDouble:
-          return "DOUBLE";
-        default:
-          break;
-      }
-      break;
-    case hdk::ir::Type::kTime:
-    case hdk::ir::Type::kTimestamp:
-    case hdk::ir::Type::kDate:
-    case hdk::ir::Type::kInterval:
-      break;
-    case hdk::ir::Type::kExtDictionary:
-    case hdk::ir::Type::kVarChar:
-    case hdk::ir::Type::kText:
-      return "TEXT";
-    default:
-      break;
-  }
-  throw std::runtime_error("Unsupported type: " + type->toString());
-}
-
 void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
   if (skip_tests_on_gpu(dt)) {
     return;
@@ -235,7 +187,7 @@ void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
   {
     auto results = run_multiple_agg(
         "SELECT id, SINGLE_VALUE(val) FROM test_facts WHERE id NOT IN (CAST (1 as  " +
-            sqlTypeName(colType) +
+            hdk::ir::sqlTypeName(colType) +
             " )) GROUP BY id ORDER BY "
             "id;",
         dt);
