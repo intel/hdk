@@ -141,8 +141,8 @@ ResultSetPtr TableFunctionExecutionContext::execute(
   // arguments are not supported on GPU atm.
   std::vector<std::vector<const int8_t*>> col_list_bufs;
   for (const auto& input_expr : exe_unit.input_exprs) {
-    auto ti = input_expr->get_type_info();
-    if (!ti.is_column_list()) {
+    auto type = input_expr->type();
+    if (!type->isColumnList()) {
       CHECK_EQ(col_index, -1);
     }
     if (auto col_var = dynamic_cast<hdk::ir::ColumnVar*>(input_expr)) {
@@ -169,17 +169,18 @@ ResultSetPtr TableFunctionExecutionContext::execute(
       if (!input_num_rows) {
         input_num_rows = (buf_elem_count ? buf_elem_count : 1);
       }
-      if (ti.is_column_list()) {
+      if (type->isColumnList()) {
+        auto list_length = type->as<hdk::ir::ColumnListType>()->length();
         if (col_index == -1) {
           col_list_bufs.push_back({});
-          col_list_bufs.back().reserve(ti.get_dimension());
+          col_list_bufs.back().reserve(list_length);
         } else {
           CHECK_EQ(col_sizes.back(), buf_elem_count);
         }
         col_index++;
         col_list_bufs.back().push_back(col_buf);
         // append col_buf to column_list col_buf
-        if (col_index + 1 == ti.get_dimension()) {
+        if (col_index + 1 == list_length) {
           col_index = -1;
         }
         // columns in the same column_list point to column_list data
@@ -193,9 +194,9 @@ ResultSetPtr TableFunctionExecutionContext::execute(
       // separate serialization component
       col_sizes.push_back(0);
       const auto const_val_datum = constant_val->get_constval();
-      const auto& ti = constant_val->get_type_info();
-      if (ti.is_fp()) {
-        switch (get_bit_width(ti)) {
+      auto type = constant_val->type();
+      if (type->isFloatingPoint()) {
+        switch (get_bit_width(type)) {
           case 32:
             col_buf_ptrs.push_back(create_literal_buffer(const_val_datum.floatval,
                                                          device_type,
@@ -211,8 +212,8 @@ ResultSetPtr TableFunctionExecutionContext::execute(
           default:
             UNREACHABLE();
         }
-      } else if (ti.is_integer()) {
-        switch (get_bit_width(ti)) {
+      } else if (type->isInteger()) {
+        switch (get_bit_width(type)) {
           case 8:
             col_buf_ptrs.push_back(create_literal_buffer(const_val_datum.tinyintval,
                                                          device_type,
@@ -240,12 +241,12 @@ ResultSetPtr TableFunctionExecutionContext::execute(
           default:
             UNREACHABLE();
         }
-      } else if (ti.is_boolean()) {
+      } else if (type->isBoolean()) {
         col_buf_ptrs.push_back(create_literal_buffer(const_val_datum.boolval,
                                                      device_type,
                                                      literals_owner,
                                                      device_allocator.get()));
-      } else if (ti.is_bytes()) {  // text encoding none string
+      } else if (type->isText()) {
         col_buf_ptrs.push_back(create_literal_buffer(const_val_datum.stringval,
                                                      device_type,
                                                      literals_owner,
