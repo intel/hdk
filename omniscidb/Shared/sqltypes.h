@@ -44,99 +44,6 @@ class Type;
 }
 
 // must not change because these values persist in catalogs.
-enum SQLTypes {
-  kNULLT = 0,  // type for null values
-  kBOOLEAN = 1,
-  kCHAR = 2,
-  kVARCHAR = 3,
-  kNUMERIC = 4,
-  kDECIMAL = 5,
-  kINT = 6,
-  kSMALLINT = 7,
-  kFLOAT = 8,
-  kDOUBLE = 9,
-  kTIME = 10,
-  kTIMESTAMP = 11,
-  kBIGINT = 12,
-  kTEXT = 13,
-  kDATE = 14,
-  kARRAY = 15,
-  kINTERVAL_DAY_TIME = 16,
-  kINTERVAL_YEAR_MONTH = 17,
-  kTINYINT = 18,
-  kEVAL_CONTEXT_TYPE = 19,  // Placeholder Type for ANY
-  kVOID = 20,
-  kCURSOR = 21,
-  kCOLUMN = 22,
-  kCOLUMN_LIST = 23,
-  kSQLTYPE_LAST = 24
-};
-
-#ifndef __CUDACC__
-
-inline std::string toString(const SQLTypes& type) {
-  switch (type) {
-    case kNULLT:
-      return "NULL";
-    case kBOOLEAN:
-      return "BOOL";
-    case kCHAR:
-      return "CHAR";
-    case kVARCHAR:
-      return "VARCHAR";
-    case kNUMERIC:
-      return "NUMERIC";
-    case kDECIMAL:
-      return "DECIMAL";
-    case kINT:
-      return "INT";
-    case kSMALLINT:
-      return "SMALLINT";
-    case kFLOAT:
-      return "FLOAT";
-    case kDOUBLE:
-      return "DOUBLE";
-    case kTIME:
-      return "TIME";
-    case kTIMESTAMP:
-      return "TIMESTAMP";
-    case kBIGINT:
-      return "BIGINT";
-    case kTEXT:
-      return "TEXT";
-    case kDATE:
-      return "DATE";
-    case kARRAY:
-      return "ARRAY";
-    case kINTERVAL_DAY_TIME:
-      return "DAY TIME INTERVAL";
-    case kINTERVAL_YEAR_MONTH:
-      return "YEAR MONTH INTERVAL";
-    case kTINYINT:
-      return "TINYINT";
-    case kEVAL_CONTEXT_TYPE:
-      return "UNEVALUATED ANY";
-    case kVOID:
-      return "VOID";
-    case kCURSOR:
-      return "CURSOR";
-    case kCOLUMN:
-      return "COLUMN";
-    case kCOLUMN_LIST:
-      return "COLUMN_LIST";
-    case kSQLTYPE_LAST:
-      break;
-  }
-  LOG(FATAL) << "Invalid SQL type: " << type;
-  return "";
-}
-
-inline std::ostream& operator<<(std::ostream& os, SQLTypes const sql_type) {
-  os << toString(sql_type);
-  return os;
-}
-
-#endif
 
 struct VarlenDatum {
   size_t length;
@@ -220,27 +127,6 @@ union DataBlockPtr {
 };
 #endif
 
-// must not change because these values persist in catalogs.
-enum EncodingType {
-  kENCODING_NONE = 0,          // no encoding
-  kENCODING_FIXED = 1,         // Fixed-bit encoding
-  kENCODING_RL = 2,            // Run Length encoding
-  kENCODING_DIFF = 3,          // Differential encoding
-  kENCODING_DICT = 4,          // Dictionary encoding
-  kENCODING_SPARSE = 5,        // Null encoding for sparse columns
-  kENCODING_DATE_IN_DAYS = 7,  // Date encoding in days
-  kENCODING_LAST = 8
-};
-
-#define IS_INTEGER(T) \
-  (((T) == kINT) || ((T) == kSMALLINT) || ((T) == kBIGINT) || ((T) == kTINYINT))
-#define IS_NUMBER(T)                                                             \
-  (((T) == kINT) || ((T) == kSMALLINT) || ((T) == kDOUBLE) || ((T) == kFLOAT) || \
-   ((T) == kBIGINT) || ((T) == kNUMERIC) || ((T) == kDECIMAL) || ((T) == kTINYINT))
-#define IS_STRING(T) (((T) == kTEXT) || ((T) == kVARCHAR) || ((T) == kCHAR))
-#define IS_INTERVAL(T) ((T) == kINTERVAL_DAY_TIME || (T) == kINTERVAL_YEAR_MONTH)
-#define IS_DECIMAL(T) ((T) == kNUMERIC || (T) == kDECIMAL)
-
 #include "InlineNullValues.h"
 
 #define INF_FLOAT HUGE_VALF
@@ -248,10 +134,6 @@ enum EncodingType {
 #define TRANSIENT_DICT_ID 0
 #define TRANSIENT_DICT(ID) (-(ID))
 #define REGULAR_DICT(TRANSIENTID) (-(TRANSIENTID))
-
-constexpr auto is_datetime(SQLTypes type) {
-  return type == kTIME || type == kTIMESTAMP || type == kDATE;
-}
 
 #ifndef __CUDACC__
 

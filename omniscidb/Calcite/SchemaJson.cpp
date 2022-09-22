@@ -21,6 +21,34 @@
 
 namespace {
 
+enum SQLTypes {
+  kNULLT = 0,  // type for null values
+  kBOOLEAN = 1,
+  kCHAR = 2,
+  kVARCHAR = 3,
+  kNUMERIC = 4,
+  kDECIMAL = 5,
+  kINT = 6,
+  kSMALLINT = 7,
+  kFLOAT = 8,
+  kDOUBLE = 9,
+  kTIME = 10,
+  kTIMESTAMP = 11,
+  kBIGINT = 12,
+  kTEXT = 13,
+  kDATE = 14,
+  kARRAY = 15,
+  kINTERVAL_DAY_TIME = 16,
+  kINTERVAL_YEAR_MONTH = 17,
+  kTINYINT = 18,
+  kEVAL_CONTEXT_TYPE = 19,  // Placeholder Type for ANY
+  kVOID = 20,
+  kCURSOR = 21,
+  kCOLUMN = 22,
+  kCOLUMN_LIST = 23,
+  kSQLTYPE_LAST = 24
+};
+
 int toCalciteTypeId(const hdk::ir::Type* type) {
   switch (type->id()) {
     case hdk::ir::Type::kNull:

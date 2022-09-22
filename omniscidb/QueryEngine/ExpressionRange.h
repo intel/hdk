@@ -50,9 +50,6 @@ T getMin(const ExpressionRange& other);
 template <typename T>
 T getMax(const ExpressionRange& other);
 
-template <typename T>
-T get_value_from_datum(const Datum datum, const SQLTypes type_info) noexcept;
-
 class ExpressionRange {
  public:
   static ExpressionRange makeIntRange(const int64_t int_min,
@@ -278,63 +275,6 @@ template <>
 inline double getMax<double>(const ExpressionRange& e) {
   return e.getFpMax();
 }
-
-template <>
-inline int64_t get_value_from_datum(const Datum datum,
-                                    const SQLTypes type_info) noexcept {
-  switch (type_info) {
-    case kBOOLEAN:
-      return datum.boolval;
-    case kTINYINT:
-      return datum.tinyintval;
-    case kSMALLINT:
-      return datum.smallintval;
-    case kINT:
-      return datum.intval;
-    case kBIGINT:
-      return datum.bigintval;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-      return datum.bigintval;
-    case kNUMERIC:
-    case kDECIMAL: {
-      return datum.bigintval;
-      break;
-    }
-    default:
-      UNREACHABLE();
-  }
-  return (int64_t)0;
-}
-
-template <>
-inline double get_value_from_datum(const Datum datum, const SQLTypes type_info) noexcept {
-  switch (type_info) {
-    case kFLOAT:
-      return datum.floatval;
-    case kDOUBLE:
-      return datum.doubleval;
-    default:
-      UNREACHABLE();
-  }
-  return 0.0;
-}
-
-void apply_int_qual(const Datum const_datum,
-                    const SQLTypes const_type,
-                    const SQLOps sql_op,
-                    ExpressionRange& qual_range);
-void apply_fp_qual(const Datum const_datum,
-                   const SQLTypes const_type,
-                   const SQLOps sql_op,
-                   ExpressionRange& qual_range);
-void apply_hpt_qual(const Datum const_datum,
-                    const SQLTypes const_type,
-                    const int32_t const_dimen,
-                    const int32_t col_dimen,
-                    const SQLOps sql_op,
-                    ExpressionRange& qual_range);
 
 ExpressionRange apply_simple_quals(
     const hdk::ir::ColumnVar*,
