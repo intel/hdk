@@ -1257,7 +1257,9 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
       actual_compact_sz = sizeof(float);
     }
   }
-  if (get_compact_type(target_info)->toTypeInfo().is_date_in_days()) {
+  auto chosen_type = get_compact_type(target_info);
+  if (chosen_type->isDate() &&
+      chosen_type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) {
     // Dates encoded in days are converted to 8 byte values on read.
     actual_compact_sz = sizeof(int64_t);
   }
@@ -1268,7 +1270,6 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
   }
 
   auto ival = read_int_from_buff(ptr, actual_compact_sz);
-  auto chosen_type = get_compact_type(target_info)->toTypeInfo();
   if (!lazy_fetch_info_.empty()) {
     CHECK_LT(target_logical_idx, lazy_fetch_info_.size());
     const auto& col_lazy_fetch = lazy_fetch_info_[target_logical_idx];
@@ -1280,9 +1281,9 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
       CHECK_LT(size_t(col_lazy_fetch.local_col_id), frag_col_buffers.size());
       ival = result_set::lazy_decode(
           col_lazy_fetch, frag_col_buffers[col_lazy_fetch.local_col_id], ival);
-      if (chosen_type.is_fp()) {
+      if (chosen_type->isFloatingPoint()) {
         const auto dval = *reinterpret_cast<const double*>(may_alias_ptr(&ival));
-        if (chosen_type.get_type() == kFLOAT) {
+        if (chosen_type->isFp32()) {
           return ScalarTargetValue(static_cast<float>(dval));
         } else {
           return ScalarTargetValue(dval);
@@ -1290,7 +1291,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
       }
     }
   }
-  if (chosen_type.is_fp()) {
+  if (chosen_type->isFloatingPoint()) {
     if (target_info.agg_kind == kAPPROX_QUANTILE) {
       return *reinterpret_cast<double const*>(ptr) == NULL_DOUBLE
                  ? NULL_DOUBLE  // sql_validate / just_validate
@@ -1299,68 +1300,66 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
     switch (actual_compact_sz) {
       case 8: {
         const auto dval = *reinterpret_cast<const double*>(ptr);
-        return chosen_type.get_type() == kFLOAT
-                   ? ScalarTargetValue(static_cast<const float>(dval))
-                   : ScalarTargetValue(dval);
+        return chosen_type->isFp32() ? ScalarTargetValue(static_cast<const float>(dval))
+                                     : ScalarTargetValue(dval);
       }
       case 4: {
-        CHECK_EQ(kFLOAT, chosen_type.get_type());
+        CHECK(chosen_type->isFp32());
         return *reinterpret_cast<const float*>(ptr);
       }
       default:
         CHECK(false);
     }
   }
-  if (chosen_type.is_integer() | chosen_type.is_boolean() || chosen_type.is_time() ||
-      chosen_type.is_timeinterval()) {
+  if (chosen_type->isInteger() | chosen_type->isBoolean() || chosen_type->isDateTime() ||
+      chosen_type->isInterval()) {
     if (is_distinct_target(target_info)) {
       return TargetValue(count_distinct_set_size(
           ival, query_mem_desc_.getCountDistinctDescriptor(target_logical_idx)));
     }
     // TODO(alex): remove int_resize_cast, make read_int_from_buff return the
     // right type instead
-    if (inline_int_null_val(chosen_type) ==
-        int_resize_cast(ival, chosen_type.get_logical_size())) {
+    if (inline_int_null_value(chosen_type) ==
+        int_resize_cast(ival, hdk::ir::logicalSize(chosen_type))) {
       return inline_int_null_value(type);
     }
     return ival;
   }
-  if (chosen_type.is_string() && chosen_type.get_compression() == kENCODING_DICT) {
+  if (chosen_type->isExtDictionary()) {
     if (translate_strings) {
       if (static_cast<int32_t>(ival) ==
           NULL_INT) {  // TODO(alex): this isn't nice, fix it
         return NullableString(nullptr);
       }
       StringDictionaryProxy* sdp{nullptr};
-      if (!chosen_type.get_comp_param()) {
+      auto dict_id = chosen_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+      if (!dict_id) {
         sdp = row_set_mem_owner_->getLiteralStringDictProxy();
       } else {
         sdp = data_mgr_
-                  ? row_set_mem_owner_->getOrAddStringDictProxy(
-                        chosen_type.get_comp_param(),
-                        /*with_generation=*/false)
+                  ? row_set_mem_owner_->getOrAddStringDictProxy(dict_id,
+                                                                /*with_generation=*/false)
                   : row_set_mem_owner_->getStringDictProxy(
-                        chosen_type.get_comp_param());  // unit tests bypass the catalog
+                        dict_id);  // unit tests bypass the catalog
       }
       return NullableString(sdp->getString(ival));
     } else {
       return static_cast<int64_t>(static_cast<int32_t>(ival));
     }
   }
-  if (chosen_type.is_decimal()) {
+  if (chosen_type->isDecimal()) {
     if (decimal_to_double) {
       if (target_info.is_agg &&
           (target_info.agg_kind == kAVG || target_info.agg_kind == kSUM ||
            target_info.agg_kind == kMIN || target_info.agg_kind == kMAX) &&
-          ival == inline_int_null_val(SQLTypeInfo(kBIGINT, false))) {
+          ival == inline_int_null_value(chosen_type->ctx().int64())) {
         return NULL_DOUBLE;
       }
-      if (!chosen_type.get_notnull() &&
-          ival ==
-              inline_int_null_val(SQLTypeInfo(decimal_to_int_type(chosen_type), false))) {
+      if (chosen_type->nullable() && ival == inline_int_null_value(chosen_type)) {
         return NULL_DOUBLE;
       }
-      return static_cast<double>(ival) / exp_to_scale(chosen_type.get_scale());
+      return static_cast<double>(ival) /
+             exp_to_scale(chosen_type->as<hdk::ir::DecimalType>()->scale());
     }
     return ival;
   }
