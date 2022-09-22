@@ -1463,8 +1463,8 @@ TEST(Iterate, PerfectHashOneColColumnar16) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kMAX, kMIN, kCOUNT, kSUM, kAVG},
-      {kSMALLINT, kSMALLINT, kINT, kINT, kDOUBLE},
-      {kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT});
+      {ctx().int16(), ctx().int16(), ctx().int32(), ctx().int32(), ctx().fp64()},
+      {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc = perfect_hash_one_col_desc(
       target_infos, suggested_agg_width, 0, 99, group_column_widths);
   query_mem_desc.setOutputColumnar(true);
@@ -1477,8 +1477,8 @@ TEST(Iterate, PerfectHashOneColColumnar8) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kMAX, kMIN, kCOUNT, kSUM, kAVG},
-      {kTINYINT, kTINYINT, kINT, kINT, kDOUBLE},
-      {kTINYINT, kTINYINT, kTINYINT, kTINYINT, kTINYINT});
+      {ctx().int8(), ctx().int8(), ctx().int32(), ctx().int32(), ctx().fp64()},
+      {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc = perfect_hash_one_col_desc(
       target_infos, suggested_agg_width, 0, 99, group_column_widths);
   query_mem_desc.setOutputColumnar(true);
@@ -1525,8 +1525,8 @@ TEST(Iterate, PerfectHashOneColColumnarKeyless16) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kAVG, kSUM, kMIN, kCOUNT, kMAX},
-      {kDOUBLE, kINT, kSMALLINT, kINT, kSMALLINT},
-      {kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT});
+      {ctx().fp64(), ctx().int32(), ctx().int16(), ctx().int32(), ctx().int16()},
+      {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 99);
   query_mem_desc.setOutputColumnar(true);
@@ -1541,8 +1541,8 @@ TEST(Iterate, PerfectHashOneColColumnarKeyless8) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kAVG, kSUM, kMIN, kCOUNT, kMAX},
-      {kDOUBLE, kINT, kTINYINT, kINT, kTINYINT},
-      {kTINYINT, kTINYINT, kTINYINT, kTINYINT, kTINYINT});
+      {ctx().fp64(), ctx().int32(), ctx().int8(), ctx().int32(), ctx().int8()},
+      {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 99);
   query_mem_desc.setOutputColumnar(true);
@@ -1664,8 +1664,8 @@ TEST(Reduce, PerfectHashOneColColumnar16) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kMAX, kMIN, kCOUNT, kSUM, kAVG},
-      {kSMALLINT, kSMALLINT, kINT, kBIGINT, kDOUBLE},
-      {kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT});
+      {ctx().int16(), ctx().int16(), ctx().int32(), ctx().int64(), ctx().fp64()},
+      {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc = perfect_hash_one_col_desc(
       target_infos, suggested_agg_width, 0, 99, group_column_widths);
   query_mem_desc.setOutputColumnar(true);
@@ -1680,8 +1680,8 @@ TEST(Reduce, PerfectHashOneColColumnar8) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kMAX, kMIN, kCOUNT, kSUM, kAVG},
-      {kTINYINT, kTINYINT, kINT, kBIGINT, kDOUBLE},
-      {kTINYINT, kTINYINT, kTINYINT, kTINYINT, kTINYINT});
+      {ctx().int8(), ctx().int8(), ctx().int32(), ctx().int64(), ctx().fp64()},
+      {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc = perfect_hash_one_col_desc(
       target_infos, suggested_agg_width, 0, 99, group_column_widths);
   query_mem_desc.setOutputColumnar(true);
@@ -1738,8 +1738,8 @@ TEST(Reduce, PerfectHashOneColColumnarKeyless16) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kAVG, kSUM, kMIN, kCOUNT, kMAX},
-      {kDOUBLE, kINT, kSMALLINT, kINT, kSMALLINT},
-      {kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT, kSMALLINT});
+      {ctx().fp64(), ctx().int32(), ctx().int16(), ctx().int32(), ctx().int16()},
+      {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 99);
   query_mem_desc.setOutputColumnar(true);
@@ -1756,8 +1756,8 @@ TEST(Reduce, PerfectHashOneColColumnarKeyless8) {
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
       {kAVG, kSUM, kMIN, kCOUNT, kMAX},
-      {kDOUBLE, kINT, kTINYINT, kINT, kTINYINT},
-      {kTINYINT, kTINYINT, kTINYINT, kTINYINT, kTINYINT});
+      {ctx().fp64(), ctx().int32(), ctx().int8(), ctx().int32(), ctx().int8()},
+      {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 99);
   query_mem_desc.setOutputColumnar(true);

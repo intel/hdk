@@ -28,6 +28,13 @@
 
 extern bool g_is_test_env;
 
+auto int8_type = hdk::ir::Context::defaultCtx().int8();
+auto int16_type = hdk::ir::Context::defaultCtx().int16();
+auto int32_type = hdk::ir::Context::defaultCtx().int32();
+auto int64_type = hdk::ir::Context::defaultCtx().int64();
+auto float_type = hdk::ir::Context::defaultCtx().fp32();
+auto double_type = hdk::ir::Context::defaultCtx().fp64();
+
 class ColumnarResultsTester : public ColumnarResults {
  public:
   ColumnarResultsTester(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
@@ -206,8 +213,8 @@ TEST(PerfectHashRowWise, OneCol_64Key_64Agg_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kSUM, kSUM, kCOUNT, kMIN, kMAX, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT});
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type},
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -220,11 +227,23 @@ TEST(PerfectHashRowWise, OneCol_64Key_64Agg_wo_avg) {
 TEST(PerfectHashRowWise, OneCol_64Key_64Agg_w_avg) {
   std::vector<int8_t> key_column_widths{8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kDOUBLE, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -240,8 +259,8 @@ TEST(PerfectHashRowWise, OneCol_32Key_64Agg_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kSUM, kSUM, kCOUNT, kMIN, kMAX, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT});
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type},
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -254,11 +273,23 @@ TEST(PerfectHashRowWise, OneCol_32Key_64Agg_wo_avg) {
 TEST(PerfectHashRowWise, OneCol_32Key_64Agg_w_avg) {
   std::vector<int8_t> key_column_widths{4};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kSUM, kSUM, kAVG, kCOUNT, kAVG, kMAX, kMIN},
-      {kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kDOUBLE, kBIGINT, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kSUM, kSUM, kAVG, kCOUNT, kAVG, kMAX, kMIN},
+                                       {int64_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        int64_type},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -274,8 +305,8 @@ TEST(PerfectHashRowWise, OneCol_64Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE});
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type},
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -288,11 +319,25 @@ TEST(PerfectHashRowWise, OneCol_64Key_MixedAggs_wo_avg) {
 TEST(PerfectHashRowWise, OneCol_64Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kDOUBLE, kBIGINT, kFLOAT, kDOUBLE, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kSMALLINT, kBIGINT, kFLOAT, kINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        double_type,
+                                        int64_type,
+                                        float_type,
+                                        double_type,
+                                        double_type},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        int16_type,
+                                        int64_type,
+                                        float_type,
+                                        int32_type,
+                                        double_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -308,8 +353,8 @@ TEST(PerfectHashRowWise, OneCol_32Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type},
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -322,11 +367,25 @@ TEST(PerfectHashRowWise, OneCol_32Key_MixedAggs_wo_avg) {
 TEST(PerfectHashRowWise, OneCol_32Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kAVG, kMAX, kMAX, kMAX},
-      {kDOUBLE, kDOUBLE, kFLOAT, kBIGINT, kDOUBLE, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kDOUBLE, kFLOAT, kBIGINT, kFLOAT, kINT, kSMALLINT, kTINYINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kAVG, kMAX, kMAX, kMAX},
+                                       {double_type,
+                                        double_type,
+                                        float_type,
+                                        int64_type,
+                                        double_type,
+                                        int32_type,
+                                        int16_type,
+                                        int8_type},
+                                       {double_type,
+                                        double_type,
+                                        float_type,
+                                        int64_type,
+                                        float_type,
+                                        int32_type,
+                                        int16_type,
+                                        int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   for (auto is_parallel : {false, true}) {
@@ -339,11 +398,23 @@ TEST(PerfectHashRowWise, OneCol_32Key_MixedAggs_w_avg) {
 TEST(PerfectHashColumnar, OneCol_64Key_64Agg_w_avg) {
   std::vector<int8_t> key_column_widths{8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kDOUBLE, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -357,11 +428,11 @@ TEST(PerfectHashColumnar, OneCol_64Key_64Agg_w_avg) {
 TEST(PerfectHashColumnar, OneCol_64Key_64Agg_wo_avg) {
   std::vector<int8_t> key_column_widths{8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos =
-      generate_custom_agg_target_infos(key_column_widths,
-                                       {kSUM, kSUM, kCOUNT, kMAX, kMIN},
-                                       {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT},
-                                       {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
+      key_column_widths,
+      {kSUM, kSUM, kCOUNT, kMAX, kMIN},
+      {int64_type, int64_type, int64_type, int64_type, int64_type},
+      {int64_type, int64_type, int64_type, int64_type, int64_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -375,11 +446,25 @@ TEST(PerfectHashColumnar, OneCol_64Key_64Agg_wo_avg) {
 TEST(PerfectHashColumnar, OneCol_64Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8};
   const int8_t suggested_agg_width = 1;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kDOUBLE, kBIGINT, kINT, kDOUBLE, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kINT, kBIGINT, kINT, kSMALLINT, kSMALLINT, kTINYINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {double_type,
+                                        float_type,
+                                        double_type,
+                                        int64_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        int8_type},
+                                       {double_type,
+                                        float_type,
+                                        int32_type,
+                                        int64_type,
+                                        int32_type,
+                                        int16_type,
+                                        int16_type,
+                                        int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -396,8 +481,8 @@ TEST(PerfectHashColumnar, OneCol_64Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type},
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -411,11 +496,25 @@ TEST(PerfectHashColumnar, OneCol_64Key_MixedAggs_wo_avg) {
 TEST(PerfectHashColumnar, OneCol_32Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4};
   const int8_t suggested_agg_width = 1;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kAVG, kAVG, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kDOUBLE, kDOUBLE, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kTINYINT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kAVG, kAVG, kMAX, kMAX, kMAX, kMAX},
+                                       {double_type,
+                                        float_type,
+                                        double_type,
+                                        double_type,
+                                        int64_type,
+                                        int32_type,
+                                        int16_type,
+                                        int8_type},
+                                       {double_type,
+                                        float_type,
+                                        int64_type,
+                                        int8_type,
+                                        int64_type,
+                                        int32_type,
+                                        int16_type,
+                                        int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -432,8 +531,8 @@ TEST(PerfectHashColumnar, OneCol_32Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type},
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -447,11 +546,25 @@ TEST(PerfectHashColumnar, OneCol_32Key_MixedAggs_wo_avg) {
 TEST(PerfectHashColumnar, OneCol_16Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{2};
   const int8_t suggested_agg_width = 1;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kMAX, kAVG, kMAX},
-      {kDOUBLE, kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kDOUBLE, kTINYINT},
-      {kDOUBLE, kINT, kFLOAT, kBIGINT, kINT, kSMALLINT, kBIGINT, kTINYINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kMAX, kAVG, kMAX},
+                                       {double_type,
+                                        double_type,
+                                        float_type,
+                                        int64_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type,
+                                        int8_type},
+                                       {double_type,
+                                        int32_type,
+                                        float_type,
+                                        int64_type,
+                                        int32_type,
+                                        int16_type,
+                                        int64_type,
+                                        int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -468,8 +581,8 @@ TEST(PerfectHashColumnar, OneCol_16Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type},
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -483,11 +596,25 @@ TEST(PerfectHashColumnar, OneCol_16Key_MixedAggs_wo_avg) {
 TEST(PerfectHashColumnar, OneCol_8Key_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{1};
   const int8_t suggested_agg_width = 1;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kMAX, kMAX, kAVG, kMAX, kAVG, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kINT, kSMALLINT, kSMALLINT, kTINYINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kMAX, kMAX, kAVG, kMAX, kAVG, kMAX},
+                                       {double_type,
+                                        float_type,
+                                        int64_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type,
+                                        int8_type},
+                                       {double_type,
+                                        float_type,
+                                        int64_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        int16_type,
+                                        int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -504,8 +631,8 @@ TEST(PerfectHashColumnar, OneCol_8Key_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT},
-      {kDOUBLE, kFLOAT, kBIGINT, kINT, kSMALLINT, kTINYINT});
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type},
+      {double_type, float_type, int64_type, int32_type, int16_type, int8_type});
   auto query_mem_desc =
       perfect_hash_one_col_desc(target_infos, suggested_agg_width, 0, 118);
   query_mem_desc.setOutputColumnar(true);
@@ -523,8 +650,8 @@ TEST(PerfectHashRowWise, TwoCol_64_64_64Agg_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kSUM, kSUM, kCOUNT, kMIN, kMAX, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT});
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type},
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   for (auto is_parallel : {false, true}) {
     for (auto step_size : {1, 2, 13, 67, 127}) {
@@ -536,11 +663,23 @@ TEST(PerfectHashRowWise, TwoCol_64_64_64Agg_wo_avg) {
 TEST(PerfectHashRowWise, TwoCol_64_64_64Agg_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kDOUBLE, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   for (auto is_parallel : {false, true}) {
     for (auto step_size : {1, 2, 13, 67, 127}) {
@@ -555,8 +694,8 @@ TEST(PerfectHashRowWise, TwoCol_64_64_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE});
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type},
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   for (auto is_parallel : {false, true}) {
     for (auto step_size : {2, 13, 67, 127}) {
@@ -568,11 +707,25 @@ TEST(PerfectHashRowWise, TwoCol_64_64_MixedAggs_wo_avg) {
 TEST(PerfectHashRowWise, TwoCol_64_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kDOUBLE, kBIGINT, kFLOAT, kDOUBLE, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kSMALLINT, kBIGINT, kFLOAT, kINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        double_type,
+                                        int64_type,
+                                        float_type,
+                                        double_type,
+                                        double_type},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        int16_type,
+                                        int64_type,
+                                        float_type,
+                                        int32_type,
+                                        double_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   for (auto is_parallel : {false, true}) {
     for (auto step_size : {2, 13, 67, 127}) {
@@ -587,8 +740,8 @@ TEST(PerfectHashColumnar, OneCol_TwoCol_64_64_64Agg_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kSUM, kSUM, kCOUNT, kMIN, kMAX, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kBIGINT});
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type},
+      {int64_type, int64_type, int64_type, double_type, int64_type, int64_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setOutputColumnar(true);
   for (auto is_parallel : {false, true}) {
@@ -601,11 +754,23 @@ TEST(PerfectHashColumnar, OneCol_TwoCol_64_64_64Agg_wo_avg) {
 TEST(PerfectHashColumnar, TwoCol_64_64_64Agg_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
-      {kBIGINT, kBIGINT, kBIGINT, kDOUBLE, kBIGINT, kDOUBLE, kBIGINT},
-      {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT, kBIGINT});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kSUM, kSUM, kCOUNT, kAVG, kMAX, kAVG, kMIN},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type,
+                                        double_type,
+                                        int64_type},
+                                       {int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type,
+                                        int64_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setOutputColumnar(true);
   for (auto is_parallel : {false, true}) {
@@ -621,8 +786,8 @@ TEST(PerfectHashColumnar, TwoCol_64_64_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kBIGINT, kFLOAT, kDOUBLE});
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type},
+      {int8_type, int16_type, int32_type, int64_type, float_type, double_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setOutputColumnar(true);
   for (auto is_parallel : {false, true}) {
@@ -635,11 +800,25 @@ TEST(PerfectHashColumnar, TwoCol_64_64_MixedAggs_wo_avg) {
 TEST(PerfectHashColumnar, TwoCol_64_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
-      {kTINYINT, kSMALLINT, kINT, kDOUBLE, kBIGINT, kFLOAT, kDOUBLE, kDOUBLE},
-      {kTINYINT, kSMALLINT, kINT, kSMALLINT, kBIGINT, kFLOAT, kINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kMAX, kMAX, kAVG, kMAX, kMAX, kAVG, kMAX},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        double_type,
+                                        int64_type,
+                                        float_type,
+                                        double_type,
+                                        double_type},
+                                       {int8_type,
+                                        int16_type,
+                                        int32_type,
+                                        int16_type,
+                                        int64_type,
+                                        float_type,
+                                        int32_type,
+                                        double_type});
   auto query_mem_desc = perfect_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setOutputColumnar(true);
   for (auto is_parallel : {false, true}) {
@@ -656,8 +835,8 @@ TEST(BaselineHashRowWise, TwoCol_64_64_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE});
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type},
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -670,11 +849,25 @@ TEST(BaselineHashRowWise, TwoCol_64_64_MixedAggs_wo_avg) {
 TEST(BaselineHashRowWise, TwoCol_64_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -690,8 +883,8 @@ TEST(BaselineHashRowWise, TwoCol_64_32_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE});
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type},
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -704,11 +897,25 @@ TEST(BaselineHashRowWise, TwoCol_64_32_MixedAggs_wo_avg) {
 TEST(BaselineHashRowWise, TwoCol_32_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -724,8 +931,8 @@ TEST(BaselineHashRowWise, TwoCol_32_32_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE});
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type},
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -738,11 +945,25 @@ TEST(BaselineHashRowWise, TwoCol_32_32_MixedAggs_wo_avg) {
 TEST(BaselineHashRowWise, TwoCol_32_32_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4, 4};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -755,11 +976,25 @@ TEST(BaselineHashRowWise, TwoCol_32_32_MixedAggs_w_avg) {
 TEST(BaselineHashColumnar, TwoCol_64_64_MixedAggs_wo_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   query_mem_desc.setOutputColumnar(true);
@@ -773,11 +1008,25 @@ TEST(BaselineHashColumnar, TwoCol_64_64_MixedAggs_wo_avg) {
 TEST(BaselineHashColumnar, TwoCol_64_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{8, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   for (auto is_parallel : {false, true}) {
@@ -793,8 +1042,8 @@ TEST(BaselineHashColumnar, TwoCol_64_32_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE});
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type},
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1});
   query_mem_desc.setOutputColumnar(true);
@@ -808,11 +1057,25 @@ TEST(BaselineHashColumnar, TwoCol_64_32_MixedAggs_wo_avg) {
 TEST(BaselineHashColumnar, TwoCol_32_64_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4, 8};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   query_mem_desc.setOutputColumnar(true);
@@ -829,8 +1092,8 @@ TEST(BaselineHashColumnar, TwoCol_32_32_MixedAggs_wo_avg) {
   std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
       key_column_widths,
       {kMAX, kMAX, kMAX, kMAX, kMAX, kMAX},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE},
-      {kFLOAT, kBIGINT, kTINYINT, kINT, kSMALLINT, kDOUBLE});
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type},
+      {float_type, int64_type, int8_type, int32_type, int16_type, double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1});
   query_mem_desc.setOutputColumnar(true);
@@ -844,11 +1107,25 @@ TEST(BaselineHashColumnar, TwoCol_32_32_MixedAggs_wo_avg) {
 TEST(BaselineHashColumnar, TwoCol_32_32_MixedAggs_w_avg) {
   std::vector<int8_t> key_column_widths{4, 4};
   const int8_t suggested_agg_width = 8;
-  std::vector<TargetInfo> target_infos = generate_custom_agg_target_infos(
-      key_column_widths,
-      {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
-      {kFLOAT, kDOUBLE, kBIGINT, kTINYINT, kINT, kDOUBLE, kSMALLINT, kDOUBLE},
-      {kFLOAT, kTINYINT, kBIGINT, kTINYINT, kINT, kINT, kSMALLINT, kDOUBLE});
+  std::vector<TargetInfo> target_infos =
+      generate_custom_agg_target_infos(key_column_widths,
+                                       {kMAX, kAVG, kMAX, kMAX, kMAX, kAVG, kMAX, kMAX},
+                                       {float_type,
+                                        double_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        double_type,
+                                        int16_type,
+                                        double_type},
+                                       {float_type,
+                                        int8_type,
+                                        int64_type,
+                                        int8_type,
+                                        int32_type,
+                                        int32_type,
+                                        int16_type,
+                                        double_type});
   auto query_mem_desc = baseline_hash_two_col_desc(target_infos, suggested_agg_width);
   query_mem_desc.setAllTargetGroupbyIndices({0, 1, -1, -1, -1, -1, -1, -1, -1, -1});
   query_mem_desc.setOutputColumnar(true);

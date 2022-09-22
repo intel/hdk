@@ -21,6 +21,13 @@
 
 extern bool g_is_test_env;
 
+auto int8_type = hdk::ir::Context::defaultCtx().int8();
+auto int16_type = hdk::ir::Context::defaultCtx().int16();
+auto int32_type = hdk::ir::Context::defaultCtx().int32();
+auto int64_type = hdk::ir::Context::defaultCtx().int64();
+auto float_type = hdk::ir::Context::defaultCtx().fp32();
+auto double_type = hdk::ir::Context::defaultCtx().fp64();
+
 namespace {
 
 void init_storage_buffer(int8_t* buffer,
@@ -498,7 +505,8 @@ TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
     TestInputData input;
     input.setDeviceId(0)
         .setNumInputBuffers(4)
-        .setTargetInfos(generate_custom_agg_target_infos({4}, {kCOUNT}, {kINT}, {kINT}))
+        .setTargetInfos(
+            generate_custom_agg_target_infos({4}, {kCOUNT}, {int32_type}, {int32_type}))
         .setAggWidth(4)
         .setMinEntry(0)
         .setMaxEntry(num_entries)
@@ -515,7 +523,7 @@ TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
     input.setDeviceId(0)
         .setNumInputBuffers(4)
         .setTargetInfos(
-            generate_custom_agg_target_infos({8}, {kCOUNT}, {kBIGINT}, {kBIGINT}))
+            generate_custom_agg_target_infos({8}, {kCOUNT}, {int64_type}, {int64_type}))
         .setAggWidth(8)
         .setMinEntry(0)
         .setMaxEntry(num_entries)
@@ -535,11 +543,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_1) {
       .setMaxEntry(126)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
-      .setTargetInfos(
-          generate_custom_agg_target_infos({8},
-                                           {kCOUNT, kMAX, kMIN, kSUM, kAVG},
-                                           {kBIGINT, kBIGINT, kBIGINT, kBIGINT, kDOUBLE},
-                                           {kINT, kINT, kINT, kINT, kINT}));
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {kCOUNT, kMAX, kMIN, kSUM, kAVG},
+          {int64_type, int64_type, int64_type, int64_type, double_type},
+          {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
     input.setStepSize(step_size);
@@ -556,11 +564,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_2) {
       .setMaxEntry(126)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
-      .setTargetInfos(
-          generate_custom_agg_target_infos({8},
-                                           {kCOUNT, kAVG, kMAX, kSUM, kMIN},
-                                           {kBIGINT, kDOUBLE, kBIGINT, kBIGINT, kBIGINT},
-                                           {kINT, kINT, kINT, kINT, kINT}));
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {kCOUNT, kAVG, kMAX, kSUM, kMIN},
+          {int64_type, double_type, int64_type, int64_type, int64_type},
+          {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
     input.setStepSize(step_size);
@@ -577,11 +585,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_3) {
       .setMaxEntry(367)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
-      .setTargetInfos(
-          generate_custom_agg_target_infos({8},
-                                           {kCOUNT, kMAX, kAVG, kSUM, kMIN},
-                                           {kBIGINT, kDOUBLE, kDOUBLE, kDOUBLE, kDOUBLE},
-                                           {kINT, kDOUBLE, kDOUBLE, kDOUBLE, kDOUBLE}));
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {kCOUNT, kMAX, kAVG, kSUM, kMIN},
+          {int64_type, double_type, double_type, double_type, double_type},
+          {int32_type, double_type, double_type, double_type, double_type}));
 
   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
     input.setStepSize(step_size);
@@ -598,11 +606,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_4) {
       .setMaxEntry(517)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
-      .setTargetInfos(
-          generate_custom_agg_target_infos({8},
-                                           {kCOUNT, kSUM, kMAX, kAVG, kMIN},
-                                           {kBIGINT, kFLOAT, kFLOAT, kFLOAT, kFLOAT},
-                                           {kSMALLINT, kFLOAT, kFLOAT, kFLOAT, kFLOAT}));
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {kCOUNT, kSUM, kMAX, kAVG, kMIN},
+          {int64_type, float_type, float_type, float_type, float_type},
+          {int16_type, float_type, float_type, float_type, float_type}));
 
   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
     input.setStepSize(step_size);
@@ -621,8 +629,8 @@ TEST(SingleColumn, VariableNumBuffers) {
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
           {kCOUNT, kSUM, kAVG, kMAX, kMIN},
-          {kINT, kBIGINT, kDOUBLE, kFLOAT, kDOUBLE},
-          {kTINYINT, kTINYINT, kSMALLINT, kFLOAT, kDOUBLE}));
+          {int32_type, int64_type, double_type, float_type, double_type},
+          {int8_type, int8_type, int16_type, float_type, double_type}));
 
   for (auto& num_buffers : {2, 3, 4, 5, 6, 7, 8, 16, 32, 64, 128}) {
     input.setNumInputBuffers(num_buffers);

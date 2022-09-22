@@ -670,8 +670,8 @@ size_t get_slot_count(const std::vector<TargetInfo>& target_infos) {
 std::vector<TargetInfo> generate_custom_agg_target_infos(
     std::vector<int8_t> group_columns,
     std::vector<SQLAgg> sql_aggs,
-    std::vector<SQLTypes> agg_types,
-    std::vector<SQLTypes> arg_types) {
+    std::vector<const hdk::ir::Type*> agg_types,
+    std::vector<const hdk::ir::Type*> arg_types) {
   const auto num_targets = sql_aggs.size();
   CHECK_EQ(agg_types.size(), num_targets);
   CHECK_EQ(arg_types.size(), num_targets);
@@ -688,13 +688,8 @@ std::vector<TargetInfo> generate_custom_agg_target_infos(
   }
   // creating proper TargetInfo for aggregate columns:
   for (size_t i = 0; i < num_targets; i++) {
-    auto ti = SQLTypeInfo{agg_types[i], false};
-    target_infos.push_back(TargetInfo{true,
-                                      sql_aggs[i],
-                                      hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
-                                      hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
-                                      true,
-                                      false});
+    target_infos.push_back(
+        TargetInfo{true, sql_aggs[i], agg_types[i], agg_types[i], true, false});
   }
   return target_infos;
 }

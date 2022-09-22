@@ -171,10 +171,11 @@ size_t get_slot_count(const std::vector<TargetInfo>& target_infos);
 std::unordered_map<size_t, size_t> get_slot_to_target_mapping(
     const std::vector<TargetInfo>& target_infos);
 
-std::vector<TargetInfo> generate_custom_agg_target_infos(std::vector<int8_t> key_columns,
-                                                         std::vector<SQLAgg> sql_aggs,
-                                                         std::vector<SQLTypes> agg_types,
-                                                         std::vector<SQLTypes> arg_types);
+std::vector<TargetInfo> generate_custom_agg_target_infos(
+    std::vector<int8_t> key_columns,
+    std::vector<SQLAgg> sql_aggs,
+    std::vector<const hdk::ir::Type*> agg_types,
+    std::vector<const hdk::ir::Type*> arg_types);
 
 template <class T>
 inline T v(const TargetValue& r) {
