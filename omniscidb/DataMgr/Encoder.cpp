@@ -117,9 +117,8 @@ Encoder* Encoder::Create(Data_Namespace::AbstractBuffer* buffer,
 Encoder::Encoder(Data_Namespace::AbstractBuffer* buffer)
     : num_elems_(0)
     , buffer_(buffer)
-    , decimal_overflow_validator_(buffer ? buffer->type()->toTypeInfo() : SQLTypeInfo())
-    , date_days_overflow_validator_(buffer ? buffer->type()->toTypeInfo()
-                                           : SQLTypeInfo()){};
+    , decimal_overflow_validator_(buffer ? buffer->type() : nullptr)
+    , date_days_overflow_validator_(buffer ? buffer->type() : nullptr){};
 
 void Encoder::getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata) {
   chunkMetadata->type = buffer_->type();

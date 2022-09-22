@@ -38,17 +38,25 @@ class AbstractBuffer;
 
 class DecimalOverflowValidator {
  public:
-  DecimalOverflowValidator(SQLTypeInfo type) {
-    if (type.is_array()) {
-      type = type.get_elem_type();
+  DecimalOverflowValidator(const hdk::ir::Type* type) {
+    if (type && type->isArray()) {
+      type = type->as<hdk::ir::ArrayBaseType>()->elemType();
     }
 
-    do_check_ = type.is_decimal();
-    int precision = type.get_precision();
-    int scale = type.get_scale();
-    max_ = (int64_t)std::pow((double)10.0, precision);
-    min_ = -max_;
-    pow10_ = precision - scale;
+    if (type && type->isDecimal()) {
+      do_check_ = true;
+      int precision = type->as<hdk::ir::DecimalType>()->precision();
+      int scale = type->as<hdk::ir::DecimalType>()->scale();
+      max_ = (int64_t)std::pow((double)10.0, precision);
+      min_ = -max_;
+      pow10_ = precision - scale;
+
+    } else {
+      do_check_ = false;
+      max_ = 1;
+      min_ = -1;
+      pow10_ = 0;
+    }
   }
 
   template <typename T>
@@ -86,12 +94,12 @@ class DecimalOverflowValidator {
 template <typename INNER_VALIDATOR>
 class NullAwareValidator {
  public:
-  NullAwareValidator(SQLTypeInfo type, INNER_VALIDATOR* inner_validator) {
-    if (type.is_array()) {
-      type = type.get_elem_type();
+  NullAwareValidator(const hdk::ir::Type* type, INNER_VALIDATOR* inner_validator) {
+    if (type && type->isArray()) {
+      type = type->as<hdk::ir::ArrayBaseType>()->elemType();
     }
 
-    skip_null_check_ = type.get_notnull();
+    skip_null_check_ = !type || !type->nullable();
     inner_validator_ = inner_validator;
   }
 
@@ -109,10 +117,19 @@ class NullAwareValidator {
 
 class DateDaysOverflowValidator {
  public:
-  DateDaysOverflowValidator(SQLTypeInfo type) {
-    is_date_in_days_ =
-        type.is_array() ? type.get_elem_type().is_date_in_days() : type.is_date_in_days();
-    const bool is_date_16_ = is_date_in_days_ ? type.get_comp_param() == 16 : false;
+  DateDaysOverflowValidator(const hdk::ir::Type* type) {
+    if (type && type->isArray()) {
+      type = type->as<hdk::ir::ArrayBaseType>()->elemType();
+    }
+
+    bool is_date_16_;
+    if (type && type->isDate()) {
+      is_date_in_days_ = type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay;
+      is_date_16_ = type->size() == 2;
+    } else {
+      is_date_in_days_ = false;
+      is_date_16_ = false;
+    }
     max_ = is_date_16_ ? static_cast<int64_t>(std::numeric_limits<int16_t>::max())
                        : static_cast<int64_t>(std::numeric_limits<int32_t>::max());
     min_ = is_date_16_ ? static_cast<int64_t>(std::numeric_limits<int16_t>::min())
