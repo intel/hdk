@@ -311,15 +311,6 @@ size_t ResultSet::colCount() const {
   return just_explain_ ? 1 : targets_.size();
 }
 
-SQLTypeInfo ResultSet::getColType(const size_t col_idx) const {
-  if (just_explain_) {
-    return SQLTypeInfo(kTEXT, false);
-  }
-  CHECK_LT(col_idx, targets_.size());
-  return targets_[col_idx].agg_kind == kAVG ? SQLTypeInfo(kDOUBLE, false)
-                                            : targets_[col_idx].type->toTypeInfo();
-}
-
 const hdk::ir::Type* ResultSet::colType(const size_t col_idx) const {
   if (just_explain_) {
     return hdk::ir::Context::defaultCtx().text();
@@ -1332,13 +1323,13 @@ const std::vector<std::string> ResultSet::getStringDictionaryPayloadCopy(
 
 const std::pair<std::vector<int32_t>, std::vector<std::string>>
 ResultSet::getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const {
-  const auto col_type_info = getColType(col_idx);
-  CHECK(col_type_info.is_dict_encoded_string());
+  const auto col_type = colType(col_idx);
+  CHECK(col_type->isExtDictionary());
   std::unordered_set<int32_t> unique_string_ids_set;
   const size_t num_entries = entryCount();
   std::vector<bool> targets_to_skip(colCount(), true);
   targets_to_skip[col_idx] = false;
-  const auto null_val = inline_fixed_encoding_null_val(col_type_info);
+  const auto null_val = inline_fixed_encoding_null_value(col_type);
 
   for (size_t row_idx = 0; row_idx < num_entries; ++row_idx) {
     const auto result_row = getRowAtNoTranslations(row_idx, targets_to_skip);
@@ -1358,7 +1349,7 @@ ResultSet::getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const {
     unique_string_ids[string_idx++] = unique_string_id;
   }
 
-  const int32_t dict_id = col_type_info.get_comp_param();
+  const int32_t dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id,
                                                                /*with_generation=*/true);
   CHECK(sdp);

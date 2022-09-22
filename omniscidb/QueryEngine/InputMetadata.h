@@ -51,7 +51,6 @@ class TemporaryTable {
   size_t rowCount() const;
   size_t colCount() const;
 
-  SQLTypeInfo getColType(const size_t col_idx) const;
   const hdk::ir::Type* colType(const size_t col_idx) const;
 
   bool empty() const { return results_.empty(); }

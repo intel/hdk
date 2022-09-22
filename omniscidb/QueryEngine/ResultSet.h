@@ -280,7 +280,6 @@ class ResultSet {
 
   size_t colCount() const;
 
-  SQLTypeInfo getColType(const size_t col_idx) const;
   const hdk::ir::Type* colType(const size_t col_idx) const;
 
   /**

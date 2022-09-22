@@ -55,10 +55,6 @@ size_t TemporaryTable::colCount() const {
   return results_.front()->colCount();
 }
 
-SQLTypeInfo TemporaryTable::getColType(const size_t col_idx) const {
-  return results_.front()->getColType(col_idx);
-}
-
 const hdk::ir::Type* TemporaryTable::colType(const size_t col_idx) const {
   return results_.front()->colType(col_idx);
 }
@@ -102,10 +98,9 @@ void InputTableInfoCache::clear() {
 
 namespace {
 
-bool uses_int_meta(const SQLTypeInfo& col_ti) {
-  return col_ti.is_integer() || col_ti.is_decimal() || col_ti.is_time() ||
-         col_ti.is_boolean() ||
-         (col_ti.is_string() && col_ti.get_compression() == kENCODING_DICT);
+bool uses_int_meta(const hdk::ir::Type* col_type) {
+  return col_type->isInteger() || col_type->isDecimal() || col_type->isDateTime() ||
+         col_type->isBoolean() || col_type->isExtDictionary();
 }
 
 TableFragmentsInfo synthesize_table_info(const TemporaryTable& table) {
@@ -193,35 +188,35 @@ ChunkMetadataMap synthesize_metadata(const ResultSet* rows) {
   const auto do_work = [rows](const std::vector<TargetValue>& crt_row,
                               std::vector<std::unique_ptr<Encoder>>& dummy_encoders) {
     for (size_t i = 0; i < rows->colCount(); ++i) {
-      const auto& col_ti = rows->getColType(i);
+      auto col_type = rows->colType(i);
       const auto& col_val = crt_row[i];
       const auto scalar_col_val = boost::get<ScalarTargetValue>(&col_val);
       CHECK(scalar_col_val);
-      if (uses_int_meta(col_ti)) {
+      if (uses_int_meta(col_type)) {
         const auto i64_p = boost::get<int64_t>(scalar_col_val);
         CHECK(i64_p);
-        dummy_encoders[i]->updateStats(*i64_p, *i64_p == inline_int_null_val(col_ti));
-      } else if (col_ti.is_fp()) {
-        switch (col_ti.get_type()) {
-          case kFLOAT: {
+        dummy_encoders[i]->updateStats(*i64_p, *i64_p == inline_int_null_value(col_type));
+      } else if (col_type->isFloatingPoint()) {
+        switch (col_type->as<hdk::ir::FloatingPointType>()->precision()) {
+          case hdk::ir::FloatingPointType::kFloat: {
             const auto float_p = boost::get<float>(scalar_col_val);
             CHECK(float_p);
             dummy_encoders[i]->updateStats(*float_p,
-                                           *float_p == inline_fp_null_val(col_ti));
+                                           *float_p == inline_fp_null_value(col_type));
             break;
           }
-          case kDOUBLE: {
+          case hdk::ir::FloatingPointType::kDouble: {
             const auto double_p = boost::get<double>(scalar_col_val);
             CHECK(double_p);
             dummy_encoders[i]->updateStats(*double_p,
-                                           *double_p == inline_fp_null_val(col_ti));
+                                           *double_p == inline_fp_null_value(col_type));
             break;
           }
           default:
             CHECK(false);
         }
       } else {
-        throw std::runtime_error(col_ti.get_type_name() +
+        throw std::runtime_error(col_type->toString() +
                                  " is not supported in temporary table.");
       }
     }
@@ -280,26 +275,6 @@ ChunkMetadataMap synthesize_metadata(const ResultSet* rows) {
     CHECK(it_ok.second);
   }
   return metadata_map;
-}
-
-TableFragmentsInfo synthesize_table_info(const TemporaryTable& table) {
-  std::vector<FragmentInfo> result;
-  bool non_empty = false;
-  for (int frag_id = 0; frag_id < table.getFragCount(); ++frag_id) {
-    result.emplace_back();
-    auto& fragment = result.back();
-    fragment.fragmentId = frag_id;
-    fragment.deviceIds.resize(3);
-    fragment.resultSet = table.getResultSet(frag_id).get();
-    fragment.resultSetMutex.reset(new std::mutex());
-    fragment.setPhysicalNumTuples(fragment.resultSet ? fragment.resultSet->entryCount()
-                                                     : 0);
-    non_empty |= (fragment.resultSet != nullptr);
-  }
-  TableFragmentsInfo table_info;
-  if (non_empty)
-    table_info.fragments = std::move(result);
-  return table_info;
 }
 
 size_t get_frag_count_of_table(const int db_id, const int table_id, Executor* executor) {

@@ -1505,7 +1505,7 @@ class ExecuteTestBase {
       CHECK(!crt_row.empty());
       CHECK_EQ(size_t(3), crt_row.size());
       const auto sv0 = v<int64_t>(crt_row[0]);
-      ASSERT_EQ(inline_int_null_val(rows.getColType(0)), sv0);
+      ASSERT_EQ(inline_int_null_value(rows.colType(0)), sv0);
       const auto sv1 = boost::get<std::string>(v<NullableString>(crt_row[1]));
       ASSERT_EQ("bar", sv1);
       const auto sv2 = v<int64_t>(crt_row[2]);
@@ -11196,8 +11196,8 @@ TEST_F(Select, RuntimeFunctions) {
       auto result = run_multiple_agg("SELECT fn, isnan(fn) FROM test;", dt);
       ASSERT_EQ(result->rowCount(), size_t(2 * g_num_rows));
       // Ensure the type for `isnan` is nullable
-      const auto func_ti = result->getColType(1);
-      ASSERT_FALSE(func_ti.get_notnull());
+      const auto func_type = result->colType(1);
+      ASSERT_TRUE(func_type->nullable());
       for (size_t i = 0; i < g_num_rows; i++) {
         auto crt_row = result->getNextRow(false, false);
         ASSERT_EQ(crt_row.size(), size_t(2));
