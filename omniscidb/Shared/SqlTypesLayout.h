@@ -63,7 +63,6 @@ inline void set_compact_type(TargetInfo& target, const hdk::ir::Type* new_type) 
     }
   }
   target.type = new_type;
-  target.sql_type = new_type->toTypeInfo();
 }
 
 inline int64_t inline_int_null_val(const SQLTypeInfo& ti) {

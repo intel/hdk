@@ -677,30 +677,12 @@ std::vector<TargetInfo> generate_custom_agg_target_infos(
   CHECK_EQ(arg_types.size(), num_targets);
   std::vector<TargetInfo> target_infos;
   target_infos.reserve(group_columns.size() + num_targets);
-  auto find_group_col_type = [](int8_t group_width) {
-    switch (group_width) {
-      case 8:
-        return kBIGINT;
-      case 4:
-        return kINT;
-      case 2:
-        return kSMALLINT;
-      case 1:
-        return kTINYINT;
-      default:
-        UNREACHABLE();
-    }
-    UNREACHABLE();
-    return kINT;
-  };
   // creating proper TargetInfo to represent group columns:
   for (auto group_size : group_columns) {
     target_infos.push_back(TargetInfo{false,
                                       kMIN,
                                       hdk::ir::Context::defaultCtx().integer(group_size),
                                       nullptr,
-                                      SQLTypeInfo{find_group_col_type(group_size), false},
-                                      SQLTypeInfo{kNULLT, false},
                                       true,
                                       false});
   }
@@ -711,8 +693,6 @@ std::vector<TargetInfo> generate_custom_agg_target_infos(
                                       sql_aggs[i],
                                       hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
                                       hdk::ir::Context::defaultCtx().fromTypeInfo(ti),
-                                      ti,
-                                      ti,
                                       true,
                                       false});
   }

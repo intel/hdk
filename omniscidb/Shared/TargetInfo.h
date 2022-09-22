@@ -41,8 +41,6 @@ struct TargetInfo {
   SQLAgg agg_kind;
   const hdk::ir::Type* type;
   const hdk::ir::Type* agg_arg_type;
-  SQLTypeInfo sql_type;
-  SQLTypeInfo agg_arg_type_info;
   bool skip_null_val;
   bool is_distinct;
 #ifndef __CUDACC__
@@ -86,33 +84,18 @@ inline TargetInfo get_target_info(const PointerType target_expr,
   bool nullable = target_expr->type()->nullable();
   if (!agg_expr) {
     auto target_type = hdk::ir::logicalType(target_expr->type());
-    auto target_ti = get_logical_type_info(target_expr->get_type_info());
-    return {false,
-            kMIN,
-            target_type,
-            nullptr,
-            target_ti,
-            SQLTypeInfo(kNULLT, false),
-            false,
-            false};
+    return {false, kMIN, target_type, nullptr, false, false};
   }
   const auto agg_type = agg_expr->get_aggtype();
   const auto agg_arg = agg_expr->get_arg();
   if (!agg_arg) {
     CHECK_EQ(kCOUNT, agg_type);
     CHECK(!agg_expr->get_is_distinct());
-    return {true,
-            kCOUNT,
-            ctx.integer(bigint_count ? 8 : 4, nullable),
-            nullptr,
-            SQLTypeInfo(bigint_count ? kBIGINT : kINT, !nullable),
-            SQLTypeInfo(kNULLT, false),
-            false,
-            false};
+    return {
+        true, kCOUNT, ctx.integer(bigint_count ? 8 : 4, nullable), nullptr, false, false};
   }
 
-  const auto& agg_arg_type = agg_arg->type();
-  const auto& agg_arg_ti = agg_arg->get_type_info();
+  auto agg_arg_type = agg_arg->type();
   bool is_distinct{false};
   if (agg_expr->get_aggtype() == kCOUNT) {
     is_distinct = agg_expr->get_is_distinct();
@@ -126,25 +109,20 @@ inline TargetInfo get_target_info(const PointerType target_expr,
         agg_expr->get_aggtype(),
         agg_arg_type->isInteger() ? ctx.int64(agg_arg_type->nullable()) : agg_arg_type,
         agg_arg_type,
-        agg_arg_ti.is_integer() ? SQLTypeInfo(kBIGINT, agg_arg_ti.get_notnull())
-                                : agg_arg_ti,
-        agg_arg_ti,
-        !agg_arg_ti.get_notnull(),
+        agg_arg_type->nullable(),
         is_distinct};
   }
 
-  return {
-      true,
-      agg_expr->get_aggtype(),
-      agg_type == kCOUNT ? ctx.integer((is_distinct || bigint_count) ? 8 : 4, nullable)
-                         : agg_expr->type(),
-      agg_arg_type,
-      agg_type == kCOUNT
-          ? SQLTypeInfo((is_distinct || bigint_count) ? kBIGINT : kINT, !nullable)
-          : agg_expr->get_type_info(),
-      agg_arg_ti,
-      agg_type == kCOUNT && agg_arg_ti.is_varlen() ? false : !agg_arg_ti.get_notnull(),
-      is_distinct};
+  return {true,
+          agg_expr->get_aggtype(),
+          agg_type == kCOUNT
+              ? ctx.integer((is_distinct || bigint_count) ? 8 : 4, nullable)
+              : agg_expr->type(),
+          agg_arg_type,
+          agg_type == kCOUNT && (agg_arg_type->isString() || agg_arg_type->isArray())
+              ? false
+              : agg_arg_type->nullable(),
+          is_distinct};
 }
 
 inline bool is_distinct_target(const TargetInfo& target_info) {

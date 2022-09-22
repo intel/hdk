@@ -1215,7 +1215,6 @@ std::vector<TargetInfo> target_exprs_to_infos(const std::vector<hdk::ir::Expr*>&
         QueryDescriptionType::NonGroupedAggregate) {
       set_notnull(target, false);
       target.type = target.type->withNullable(true);
-      target.sql_type.set_notnull(false);
     }
     target_infos.push_back(target);
   }

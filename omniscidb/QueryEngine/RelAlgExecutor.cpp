@@ -1656,14 +1656,8 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
 
   std::vector<TargetInfo> target_infos;
   for (const auto& tuple_type_component : tuple_type) {
-    target_infos.emplace_back(TargetInfo{false,
-                                         kCOUNT,
-                                         tuple_type_component.type(),
-                                         nullptr,
-                                         tuple_type_component.type()->toTypeInfo(),
-                                         SQLTypeInfo(kNULLT, false),
-                                         false,
-                                         false});
+    target_infos.emplace_back(
+        TargetInfo{false, kCOUNT, tuple_type_component.type(), nullptr, false, false});
   }
 
   std::shared_ptr<ResultSet> rs{

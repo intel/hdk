@@ -45,15 +45,10 @@ namespace {
 
 std::vector<TargetInfo> get_sort_int_target_infos() {
   std::vector<TargetInfo> target_infos;
-  SQLTypeInfo int_ti(kINT, false);
-  SQLTypeInfo null_ti(kNULLT, false);
   auto int_type = hdk::ir::Context::defaultCtx().int32();
-  target_infos.push_back(
-      TargetInfo{false, kMIN, int_type, nullptr, int_ti, null_ti, false, false});
-  target_infos.push_back(
-      TargetInfo{false, kMIN, int_type, nullptr, int_ti, null_ti, false, false});
-  target_infos.push_back(
-      TargetInfo{true, kCOUNT, int_type, nullptr, int_ti, null_ti, false, false});
+  target_infos.push_back(TargetInfo{false, kMIN, int_type, nullptr, false, false});
+  target_infos.push_back(TargetInfo{false, kMIN, int_type, nullptr, false, false});
+  target_infos.push_back(TargetInfo{true, kCOUNT, int_type, nullptr, false, false});
   return target_infos;
 }
 
@@ -189,29 +184,19 @@ void check_sorted(const ResultSet& result_set,
 
 std::vector<TargetInfo> get_sort_fp_target_infos() {
   std::vector<TargetInfo> target_infos;
-  SQLTypeInfo null_ti(kNULLT, false);
-  SQLTypeInfo fp_ti(kFLOAT, false);
   auto fp_type = hdk::ir::Context::defaultCtx().fp32();
-  target_infos.push_back(
-      TargetInfo{false, kMIN, fp_type, nullptr, fp_ti, null_ti, false, false});
-  target_infos.push_back(
-      TargetInfo{false, kMIN, fp_type, nullptr, fp_ti, null_ti, false, false});
-  target_infos.push_back(
-      TargetInfo{true, kSUM, fp_type, fp_type, fp_ti, fp_ti, true, false});
+  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
+  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
+  target_infos.push_back(TargetInfo{true, kSUM, fp_type, fp_type, true, false});
   return target_infos;
 }
 
 std::vector<TargetInfo> get_sort_notnull_fp_target_infos() {
   std::vector<TargetInfo> target_infos;
-  SQLTypeInfo null_ti(kNULLT, false);
-  SQLTypeInfo fp_ti(kFLOAT, true);
   auto fp_type = hdk::ir::Context::defaultCtx().fp32(false);
-  target_infos.push_back(
-      TargetInfo{false, kMIN, fp_type, nullptr, fp_ti, null_ti, false, false});
-  target_infos.push_back(
-      TargetInfo{false, kMIN, fp_type, nullptr, fp_ti, null_ti, true, false});
-  target_infos.push_back(
-      TargetInfo{true, kMAX, fp_type, fp_type, fp_ti, fp_ti, true, false});
+  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
+  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, true, false});
+  target_infos.push_back(TargetInfo{true, kMAX, fp_type, fp_type, true, false});
   return target_infos;
 }
 
