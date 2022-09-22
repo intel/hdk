@@ -50,46 +50,59 @@ struct CgenState {
                          const bool use_dict_encoding,
                          const int dict_id,
                          const int device_id) {
-    const auto& ti = constant->get_type_info();
-    const auto type = ti.is_decimal() ? decimal_to_int_type(ti) : ti.get_type();
-    switch (type) {
-      case kBOOLEAN:
+    auto type = constant->type();
+    switch (type->id()) {
+      case hdk::ir::Type::kBoolean:
         return getOrAddLiteral(constant->get_is_null()
-                                   ? int8_t(inline_int_null_val(ti))
+                                   ? int8_t(inline_int_null_value(type))
                                    : int8_t(constant->get_constval().boolval ? 1 : 0),
                                device_id);
-      case kTINYINT:
-        return getOrAddLiteral(constant->get_is_null()
-                                   ? int8_t(inline_int_null_val(ti))
-                                   : constant->get_constval().tinyintval,
-                               device_id);
-      case kSMALLINT:
-        return getOrAddLiteral(constant->get_is_null()
-                                   ? int16_t(inline_int_null_val(ti))
-                                   : constant->get_constval().smallintval,
-                               device_id);
-      case kINT:
-        return getOrAddLiteral(constant->get_is_null() ? int32_t(inline_int_null_val(ti))
-                                                       : constant->get_constval().intval,
-                               device_id);
-      case kBIGINT:
-        return getOrAddLiteral(constant->get_is_null()
-                                   ? int64_t(inline_int_null_val(ti))
-                                   : constant->get_constval().bigintval,
-                               device_id);
-      case kFLOAT:
-        return getOrAddLiteral(constant->get_is_null()
-                                   ? float(inline_fp_null_val(ti))
-                                   : constant->get_constval().floatval,
-                               device_id);
-      case kDOUBLE:
-        return getOrAddLiteral(constant->get_is_null()
-                                   ? inline_fp_null_val(ti)
-                                   : constant->get_constval().doubleval,
-                               device_id);
-      case kCHAR:
-      case kTEXT:
-      case kVARCHAR:
+      case hdk::ir::Type::kInteger:
+      case hdk::ir::Type::kDecimal:
+        switch (type->size()) {
+          case 1:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? int8_t(inline_int_null_value(type))
+                                       : constant->get_constval().tinyintval,
+                                   device_id);
+          case 2:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? int16_t(inline_int_null_value(type))
+                                       : constant->get_constval().smallintval,
+                                   device_id);
+          case 4:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? int32_t(inline_int_null_value(type))
+                                       : constant->get_constval().intval,
+                                   device_id);
+          case 8:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? int64_t(inline_int_null_value(type))
+                                       : constant->get_constval().bigintval,
+                                   device_id);
+          default:
+            abort();
+        }
+        break;
+      case hdk::ir::Type::kFloatingPoint:
+        switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+          case hdk::ir::FloatingPointType::kFloat:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? float(inline_fp_null_value(type))
+                                       : constant->get_constval().floatval,
+                                   device_id);
+          case hdk::ir::FloatingPointType::kDouble:
+            return getOrAddLiteral(constant->get_is_null()
+                                       ? inline_fp_null_value(type)
+                                       : constant->get_constval().doubleval,
+                                   device_id);
+          default:
+            abort();
+        }
+        break;
+      case hdk::ir::Type::kExtDictionary:
+      case hdk::ir::Type::kText:
+      case hdk::ir::Type::kVarChar:
         if (use_dict_encoding) {
           if (constant->get_is_null()) {
             return getOrAddLiteral((int32_t)inline_int_null_value<int32_t>(), device_id);
@@ -104,16 +117,17 @@ struct CgenState {
                                                                              // null
         }
         return getOrAddLiteral(*constant->get_constval().stringval, device_id);
-      case kTIME:
-      case kTIMESTAMP:
-      case kDATE:
-      case kINTERVAL_DAY_TIME:
-      case kINTERVAL_YEAR_MONTH:
+      case hdk::ir::Type::kTime:
+      case hdk::ir::Type::kTimestamp:
+      case hdk::ir::Type::kDate:
+      case hdk::ir::Type::kInterval:
         // TODO(alex): support null
         return getOrAddLiteral(constant->get_constval().bigintval, device_id);
-      case kARRAY: {
+      case hdk::ir::Type::kFixedLenArray:
+      case hdk::ir::Type::kVarLenArray: {
         if (!use_dict_encoding) {
-          if (ti.get_subtype() == kDOUBLE) {
+          auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
+          if (elem_type->isFp64()) {
             std::vector<double> double_array_literal;
             for (const auto& value : constant->get_value_list()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
@@ -123,7 +137,7 @@ struct CgenState {
             }
             return getOrAddLiteral(double_array_literal, device_id);
           }
-          if (ti.get_subtype() == kINT) {
+          if (elem_type->isInt32()) {
             std::vector<int32_t> int32_array_literal;
             for (const auto& value : constant->get_value_list()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
@@ -133,16 +147,13 @@ struct CgenState {
             }
             return getOrAddLiteral(int32_array_literal, device_id);
           }
-          if (ti.get_subtype() == kTINYINT) {
+          if (elem_type->isInt8()) {
             std::vector<int8_t> int8_array_literal;
             for (const auto& value : constant->get_value_list()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
               int8_t i = c->get_constval().tinyintval;
               int8_array_literal.push_back(i);
-            }
-            if (ti.get_comp_param() == 64) {
-              return getOrAddLiteral(std::make_pair(int8_array_literal, 64), device_id);
             }
             return getOrAddLiteral(int8_array_literal, device_id);
           }

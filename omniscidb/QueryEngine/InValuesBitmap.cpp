@@ -130,7 +130,6 @@ llvm::Value* InValuesBitmap::codegen(llvm::Value* needle, Executor* executor) co
     const auto bitset_handle_literal = std::dynamic_pointer_cast<hdk::ir::Constant>(
         Analyzer::analyzeIntValue(bitset_handle));
     CHECK(bitset_handle_literal);
-    CHECK_EQ(kENCODING_NONE, bitset_handle_literal->get_type_info().get_compression());
     constants_owned.push_back(bitset_handle_literal);
     constants.push_back(bitset_handle_literal.get());
   }

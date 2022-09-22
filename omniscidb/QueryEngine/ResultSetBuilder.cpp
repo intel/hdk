@@ -117,10 +117,10 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
           CHECK(!targets[j].type->isString() && !targets[j].type->isArray());
           *reinterpret_cast<int64_t*>(ptr) = inline_int_null_value(targets[j].type);
         } else {
-          const auto ti = constant->get_type_info();
+          auto type = constant->type();
           const auto datum = constant->get_constval();
 
-          if (ti.is_string()) {
+          if (type->isString() || type->isExtDictionary()) {
             // get string from datum and push to vector
             separate_varlen_storage.push_back(*(datum.stringval));
 
@@ -133,7 +133,7 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
             // Initialize the entire 8-byte slot
             *reinterpret_cast<int64_t*>(ptr) = EMPTY_KEY_64;
 
-            const auto sz = ti.get_size();
+            const auto sz = type->size();
             CHECK_GE(sz, int(0));
             std::memcpy(ptr, &datum, sz);
           }
