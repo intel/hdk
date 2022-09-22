@@ -286,10 +286,6 @@ struct CgenState {
       const size_t byte_width,
       const bool is_signed);
 
-  llvm::ConstantInt* inlineIntNull(const SQLTypeInfo&);
-  llvm::ConstantFP* inlineFpNull(const SQLTypeInfo&);
-  llvm::Constant* inlineNull(const SQLTypeInfo&);
-
   llvm::ConstantInt* inlineIntNull(const hdk::ir::Type*);
   llvm::ConstantFP* inlineFpNull(const hdk::ir::Type*);
   llvm::Constant* inlineNull(const hdk::ir::Type*);

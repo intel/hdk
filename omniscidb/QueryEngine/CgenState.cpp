@@ -58,61 +58,6 @@ CgenState::CgenState(const Config& config, llvm::LLVMContext& context)
     , query_func_(nullptr)
     , query_func_entry_ir_builder_(context_){};
 
-llvm::ConstantInt* CgenState::inlineIntNull(const SQLTypeInfo& type_info) {
-  auto type = type_info.get_type();
-  if (type_info.is_string()) {
-    switch (type_info.get_compression()) {
-      case kENCODING_DICT:
-        return llInt(static_cast<int32_t>(inline_int_null_val(type_info)));
-      case kENCODING_NONE:
-        return llInt(int64_t(0));
-      default:
-        CHECK(false);
-    }
-  }
-  switch (type) {
-    case kBOOLEAN:
-      return llInt(static_cast<int8_t>(inline_int_null_val(type_info)));
-    case kTINYINT:
-      return llInt(static_cast<int8_t>(inline_int_null_val(type_info)));
-    case kSMALLINT:
-      return llInt(static_cast<int16_t>(inline_int_null_val(type_info)));
-    case kINT:
-      return llInt(static_cast<int32_t>(inline_int_null_val(type_info)));
-    case kBIGINT:
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return llInt(inline_int_null_val(type_info));
-    case kDECIMAL:
-    case kNUMERIC:
-      return llInt(inline_int_null_val(type_info));
-    case kARRAY:
-      return llInt(int64_t(0));
-    default:
-      abort();
-  }
-}
-
-llvm::ConstantFP* CgenState::inlineFpNull(const SQLTypeInfo& type_info) {
-  CHECK(type_info.is_fp());
-  switch (type_info.get_type()) {
-    case kFLOAT:
-      return llFp(NULL_FLOAT);
-    case kDOUBLE:
-      return llFp(NULL_DOUBLE);
-    default:
-      abort();
-  }
-}
-
-llvm::Constant* CgenState::inlineNull(const SQLTypeInfo& ti) {
-  return ti.is_fp() ? static_cast<llvm::Constant*>(inlineFpNull(ti))
-                    : static_cast<llvm::Constant*>(inlineIntNull(ti));
-}
-
 llvm::ConstantInt* CgenState::inlineIntNull(const hdk::ir::Type* type) {
   switch (type->id()) {
     case hdk::ir::Type::kBoolean:

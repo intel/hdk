@@ -137,6 +137,7 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
                                                        const hdk::ir::TimeUnit unit,
                                                        const bool nullable) {
   AUTOMATIC_IR_METADATA(cgen_state_);
+  auto& ctx = hdk::ir::Context::defaultCtx();
   CHECK(ts_lv->getType()->isIntegerTy(64));
   if (unit > hdk::ir::TimeUnit::kSecond) {
     if (nullable) {
@@ -145,7 +146,7 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
           get_int_type(64, cgen_state_->context_),
           {{ts_lv,
             cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)),
-            cgen_state_->inlineIntNull(SQLTypeInfo(kBIGINT, false))}});
+            cgen_state_->inlineIntNull(ctx.int64())}});
     }
     return cgen_state_->emitExternalCall(
         "DateTruncateHighPrecisionToDate",
@@ -154,7 +155,7 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
   }
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
   if (nullable) {
-    auto type = hdk::ir::Context::defaultCtx().timestamp(unit, nullable);
+    auto type = ctx.timestamp(unit, nullable);
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
         cgen_state_, executor(), ts_lv, type, "cast_timestamp_nullcheck");
   }
@@ -315,7 +316,7 @@ llvm::Value* CodeGenerator::codegenCastBetweenIntTypes(llvm::Value* operand_lv,
               {operand_lv,
                scale_lv,
                cgen_state_->llInt(inline_int_null_value(operand_type)),
-               cgen_state_->inlineIntNull(SQLTypeInfo(kBIGINT, false))});
+               cgen_state_->inlineIntNull(operand_type->ctx().int64())});
         } else {
           operand_lv = cgen_state_->ir_builder_.CreateMul(operand_lv, scale_lv);
         }
@@ -406,7 +407,7 @@ void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
     const auto type_name =
         is_narrowing ? numeric_type_name(operand_type) : numeric_type_name(type);
     const auto null_operand_val = cgen_state_->llInt(inline_int_null_value(operand_type));
-    const auto null_bool_val = cgen_state_->inlineIntNull(SQLTypeInfo(kBOOLEAN, false));
+    const auto null_bool_val = cgen_state_->inlineIntNull(type->ctx().boolean());
     over = toBool(cgen_state_->emitCall(
         "gt_" + type_name + "_nullable_lhs",
         {operand_lv, operand_max_lv, null_operand_val, null_bool_val}));
