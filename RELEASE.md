@@ -10,3 +10,5 @@ HDK uses a semantic versioning scheme for software version numbers. The version 
 2. Bump the version number in `CMakeLists.txt` in the release branch.
 3. Ensure CI on the release branch is green.
 4. Create a tag for the release. 
+5. Create GitHub Release w/ source code archive. 
+6. Build and publish updated `conda-forge` packages.
