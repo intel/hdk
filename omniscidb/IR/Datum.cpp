@@ -147,10 +147,6 @@ int64_t parse_numeric(const std::string_view s, const hdk::ir::Type* type) {
   return result * sign;
 }
 
-int64_t parse_numeric(const std::string_view s, SQLTypeInfo& ti) {
-  return parse_numeric(s, hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
-}
-
 namespace {
 
 // Equal to NULL value for nullable types.
@@ -229,7 +225,7 @@ T parseInteger(std::string_view s, const hdk::ir::Type* type) {
     throw std::runtime_error("Invalid conversion from \"" + std::string(s) + "\" to " +
                              type->toString());
   }
-  // Bounds checking based on SQLTypeInfo.
+  // Bounds checking based on Type.
   unsigned const fieldsize = type->size() * 8;
   if (fieldsize < 8 * sizeof(T)) {
     if (maxValue<T>(fieldsize) < retval) {
