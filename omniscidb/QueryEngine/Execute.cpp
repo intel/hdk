@@ -67,7 +67,6 @@
 #include "QueryEngine/TableFunctions/TableFunctionExecutionContext.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
 #include "Shared/SystemParameters.h"
-#include "Shared/TypedDataAccessors.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
