@@ -267,8 +267,8 @@ class ArrowResultSetConverter {
 
     std::shared_ptr<arrow::Field> field;
     std::unique_ptr<arrow::ArrayBuilder> builder;
-    SQLTypeInfo col_type;
-    SQLTypes physical_type;
+    const hdk::ir::Type* col_type;
+    const hdk::ir::Type* physical_type;
     ArrowStringRemapMode string_remap_mode{ArrowStringRemapMode::INVALID};
     std::unordered_map<StrId, ArrowStrId> string_remapping;
   };
@@ -309,7 +309,7 @@ class ArrowResultSetConverter {
       const std::shared_ptr<arrow::Schema>& schema) const;
 
   std::shared_ptr<arrow::Field> makeField(const std::string name,
-                                          const SQLTypeInfo& target_type) const;
+                                          const hdk::ir::Type* target_type) const;
   std::shared_ptr<arrow::Schema> makeSchema() const;
 
   struct SerializedArrowOutput {
@@ -320,7 +320,7 @@ class ArrowResultSetConverter {
       arrow::ipc::DictionaryFieldMapper* mapper) const;
 
   void initializeColumnBuilder(ColumnBuilder& column_builder,
-                               const SQLTypeInfo& col_type,
+                               const hdk::ir::Type* col_type,
                                const size_t result_col_idx,
                                const std::shared_ptr<arrow::Field>& field) const;
 

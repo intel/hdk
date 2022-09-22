@@ -80,42 +80,6 @@ class ResultSetBuffer : public arrow::Buffer {
   ResultSetPtr _rs;
 };
 
-inline SQLTypes get_dict_index_type(const SQLTypeInfo& ti) {
-  CHECK(ti.is_dict_encoded_string());
-  switch (ti.get_size()) {
-    case 1:
-      return kTINYINT;
-    case 2:
-      return kSMALLINT;
-    case 4:
-      return kINT;
-    case 8:
-      return kBIGINT;
-    default:
-      CHECK(false);
-  }
-  return ti.get_type();
-}
-
-inline SQLTypes get_physical_type(const SQLTypeInfo& ti) {
-  auto logical_type = ti.get_type();
-  if (IS_INTEGER(logical_type)) {
-    switch (ti.get_size()) {
-      case 1:
-        return kTINYINT;
-      case 2:
-        return kSMALLINT;
-      case 4:
-        return kINT;
-      case 8:
-        return kBIGINT;
-      default:
-        CHECK(false);
-    }
-  }
-  return logical_type;
-}
-
 template <typename TYPE, typename VALUE_ARRAY_TYPE>
 void create_or_append_value(const ScalarTargetValue& val_cty,
                             std::shared_ptr<ValueArray>& values,
@@ -135,26 +99,26 @@ void create_or_append_value(const ScalarTargetValue& val_cty,
 
 template <typename TYPE>
 void create_or_append_validity(const ScalarTargetValue& value,
-                               const SQLTypeInfo& col_type,
+                               const hdk::ir::Type* col_type,
                                std::shared_ptr<std::vector<bool>>& null_bitmap,
                                const size_t max_size) {
-  if (col_type.get_notnull()) {
+  if (!col_type->nullable()) {
     CHECK(!null_bitmap);
     return;
   }
   auto pvalue = boost::get<TYPE>(&value);
   CHECK(pvalue);
   bool is_valid = false;
-  if (col_type.is_boolean()) {
-    is_valid = inline_int_null_val(col_type) != static_cast<int8_t>(*pvalue);
-  } else if (col_type.is_dict_encoded_string()) {
-    is_valid = inline_int_null_val(col_type) != static_cast<int32_t>(*pvalue);
-  } else if (col_type.is_integer() || col_type.is_time()) {
-    is_valid = inline_int_null_val(col_type) != static_cast<int64_t>(*pvalue);
-  } else if (col_type.is_fp()) {
-    is_valid = inline_fp_null_val(col_type) != static_cast<double>(*pvalue);
-  } else if (col_type.is_decimal()) {
-    is_valid = inline_int_null_val(col_type) != static_cast<int64_t>(*pvalue);
+  if (col_type->isBoolean()) {
+    is_valid = inline_int_null_value(col_type) != static_cast<int8_t>(*pvalue);
+  } else if (col_type->isExtDictionary()) {
+    is_valid = inline_int_null_value(col_type) != static_cast<int32_t>(*pvalue);
+  } else if (col_type->isInteger() || col_type->isDateTime()) {
+    is_valid = inline_int_null_value(col_type) != static_cast<int64_t>(*pvalue);
+  } else if (col_type->isFloatingPoint()) {
+    is_valid = inline_fp_null_value(col_type) != static_cast<double>(*pvalue);
+  } else if (col_type->isDecimal()) {
+    is_valid = inline_int_null_value(col_type) != static_cast<int64_t>(*pvalue);
   } else {
     UNREACHABLE();
   }
@@ -191,7 +155,7 @@ void convert_column(ResultSetPtr result,
                     size_t col,
                     size_t entry_count,
                     std::shared_ptr<arrow::Array>& out) {
-  CHECK(sizeof(C_TYPE) == result->getColType(col).get_size());
+  CHECK(sizeof(C_TYPE) == result->colType(col)->size());
 
   std::shared_ptr<arrow::Buffer> values;
   std::shared_ptr<arrow::Buffer> is_valid;
@@ -363,7 +327,7 @@ void convert_column(ResultSetPtr result,
                     size_t col,
                     size_t entry_count,
                     std::shared_ptr<arrow::ChunkedArray>& out) {
-  CHECK(sizeof(C_TYPE) == result->getColType(col).get_size());
+  CHECK(sizeof(C_TYPE) == result->colType(col)->size());
 
   std::vector<std::shared_ptr<arrow::Buffer>> values;
 
@@ -415,32 +379,46 @@ void convert_column(ResultSetPtr result,
 }
 
 template <typename ArrowArrayType>
-void convert_column(SQLTypes physical_type,
+void convert_column(const hdk::ir::Type* physical_type,
                     ResultSetPtr results,
                     size_t col_idx,
                     size_t entry_count,
                     std::shared_ptr<ArrowArrayType>& out) {
-  switch (physical_type) {
-    case kTINYINT:
-      convert_column<int8_t>(results, col_idx, entry_count, out);
+  switch (physical_type->id()) {
+    case hdk::ir::Type::kInteger:
+      switch (physical_type->size()) {
+        case 1:
+          convert_column<int8_t>(results, col_idx, entry_count, out);
+          break;
+        case 2:
+          convert_column<int16_t>(results, col_idx, entry_count, out);
+          break;
+        case 4:
+          convert_column<int32_t>(results, col_idx, entry_count, out);
+          break;
+        case 8:
+          convert_column<int64_t>(results, col_idx, entry_count, out);
+          break;
+        default:
+          throw std::runtime_error(physical_type->toString() +
+                                   " is not supported in Arrow column converter.");
+      }
       break;
-    case kSMALLINT:
-      convert_column<int16_t>(results, col_idx, entry_count, out);
-      break;
-    case kINT:
-      convert_column<int32_t>(results, col_idx, entry_count, out);
-      break;
-    case kBIGINT:
-      convert_column<int64_t>(results, col_idx, entry_count, out);
-      break;
-    case kFLOAT:
-      convert_column<float>(results, col_idx, entry_count, out);
-      break;
-    case kDOUBLE:
-      convert_column<double>(results, col_idx, entry_count, out);
+    case hdk::ir::Type::kFloatingPoint:
+      switch (physical_type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          convert_column<float>(results, col_idx, entry_count, out);
+          break;
+        case hdk::ir::FloatingPointType::kDouble:
+          convert_column<double>(results, col_idx, entry_count, out);
+          break;
+        default:
+          throw std::runtime_error(physical_type->toString() +
+                                   " is not supported in Arrow column converter.");
+      }
       break;
     default:
-      throw std::runtime_error(toString(physical_type) +
+      throw std::runtime_error(physical_type->toString() +
                                " is not supported in Arrow column converter.");
   }
 }
@@ -829,62 +807,72 @@ size_t convert_rowwise(
       // TODO(miyu): support more types other than scalar.
       CHECK(scalar_value);
       const auto& column = builders[j];
-      switch (column.physical_type) {
-        case kBOOLEAN:
+      switch (column.physical_type->id()) {
+        case hdk::ir::Type::kBoolean:
           create_or_append_value<bool, int64_t>(
               *scalar_value, value_seg[j], local_entry_count);
           create_or_append_validity<int64_t>(
               *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
           break;
-        case kTINYINT:
-          create_or_append_value<int8_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+        case hdk::ir::Type::kInteger:
+        case hdk::ir::Type::kDecimal:
+        case hdk::ir::Type::kTimestamp:
+          switch (column.physical_type->size()) {
+            case 1:
+              create_or_append_value<int8_t, int64_t>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<int64_t>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            case 2:
+              create_or_append_value<int16_t, int64_t>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<int64_t>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            case 4:
+              create_or_append_value<int32_t, int64_t>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<int64_t>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            case 8:
+              create_or_append_value<int64_t, int64_t>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<int64_t>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            default:
+              throw std::runtime_error(column.col_type->toString() +
+                                       " is not supported in Arrow result sets.");
+          }
           break;
-        case kSMALLINT:
-          create_or_append_value<int16_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+        case hdk::ir::Type::kFloatingPoint:
+          switch (column.physical_type->as<hdk::ir::FloatingPointType>()->precision()) {
+            case hdk::ir::FloatingPointType::kFloat:
+              create_or_append_value<float, float>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<float>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            case hdk::ir::FloatingPointType::kDouble:
+              create_or_append_value<double, double>(
+                  *scalar_value, value_seg[j], local_entry_count);
+              create_or_append_validity<double>(
+                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+              break;
+            default:
+              throw std::runtime_error(column.col_type->toString() +
+                                       " is not supported in Arrow result sets.");
+          }
           break;
-        case kINT:
+        case hdk::ir::Type::kTime:
           create_or_append_value<int32_t, int64_t>(
               *scalar_value, value_seg[j], local_entry_count);
           create_or_append_validity<int64_t>(
               *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
           break;
-        case kBIGINT:
-          create_or_append_value<int64_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case kDECIMAL:
-          create_or_append_value<int64_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case kFLOAT:
-          create_or_append_value<float, float>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<float>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case kDOUBLE:
-          create_or_append_value<double, double>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<double>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case kTIME:
-          create_or_append_value<int32_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case kDATE:
+        case hdk::ir::Type::kDate:
           device_type == ExecutorDeviceType::GPU
               ? create_or_append_value<int64_t, int64_t>(
                     *scalar_value, value_seg[j], local_entry_count)
@@ -893,15 +881,9 @@ size_t convert_rowwise(
           create_or_append_validity<int64_t>(
               *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
           break;
-        case kTIMESTAMP:
-          create_or_append_value<int64_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
         default:
           // TODO(miyu): support more scalar types.
-          throw std::runtime_error(column.col_type.get_type_name() +
+          throw std::runtime_error(column.col_type->toString() +
                                    " is not supported in Arrow result sets.");
       }
     }
@@ -932,7 +914,7 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
 
   // Create array builders
   for (size_t i = 0; i < col_count; ++i) {
-    initializeColumnBuilder(builders[i], results_->getColType(i), i, schema->field(i));
+    initializeColumnBuilder(builders[i], results_->colType(i), i, schema->field(i));
   }
 
   // TODO(miyu): speed up for columnar buffers
@@ -986,11 +968,11 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
           lazy_fetch_info.empty() ? false : lazy_fetch_info[i].is_lazily_fetched;
       // Currently column converter cannot handle some data types.
       // Treat them as lazy.
-      switch (builders[i].physical_type) {
-        case kBOOLEAN:
-        case kTIME:
-        case kDATE:
-        case kTIMESTAMP:
+      switch (builders[i].physical_type->id()) {
+        case hdk::ir::Type::kBoolean:
+        case hdk::ir::Type::kTime:
+        case hdk::ir::Type::kDate:
+        case hdk::ir::Type::kTimestamp:
           is_lazy = true;
           break;
         default:
@@ -1132,10 +1114,8 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
   std::vector<ColumnBuilder> builders(col_count);
   for (size_t col_idx = 0; col_idx < col_count; ++col_idx) {
-    initializeColumnBuilder(builders[col_idx],
-                            results_->getColType(col_idx),
-                            col_idx,
-                            schema->field(col_idx));
+    initializeColumnBuilder(
+        builders[col_idx], results_->colType(col_idx), col_idx, schema->field(col_idx));
   }
 
   bool columnar_conversion_possible =
@@ -1156,11 +1136,11 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
       use_columnar_conversion = use_columnar_conversion && !is_lazy;
 
       // Some types are not supported by columnar converter.
-      switch (builders[col_idx].physical_type) {
-        case kBOOLEAN:
-        case kTIME:
-        case kDATE:
-        case kTIMESTAMP:
+      switch (builders[col_idx].physical_type->id()) {
+        case hdk::ir::Type::kBoolean:
+        case hdk::ir::Type::kTime:
+        case hdk::ir::Type::kDate:
+        case hdk::ir::Type::kTimestamp:
           use_columnar_conversion = false;
           break;
         default:
@@ -1207,7 +1187,7 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
     size_t row_size_bytes = 0;
     for (size_t i = 0; i < col_count; i++) {
-      row_size_bytes += results_->getColType(i).get_size();
+      row_size_bytes += results_->colType(i)->size();
     }
     CHECK_GT(row_size_bytes, 0);
 
@@ -1264,37 +1244,48 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
 namespace {
 
-std::shared_ptr<arrow::DataType> get_arrow_type(const SQLTypeInfo& sql_type,
+std::shared_ptr<arrow::DataType> get_arrow_type(const hdk::ir::Type* type,
                                                 const ExecutorDeviceType device_type) {
-  switch (get_physical_type(sql_type)) {
-    case kBOOLEAN:
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
       return arrow::boolean();
-    case kTINYINT:
-      return arrow::int8();
-    case kSMALLINT:
-      return arrow::int16();
-    case kINT:
-      return arrow::int32();
-    case kBIGINT:
-      return arrow::int64();
-    case kFLOAT:
-      return arrow::float32();
-    case kDOUBLE:
-      return arrow::float64();
-    case kCHAR:
-    case kVARCHAR:
-    case kTEXT:
-      if (sql_type.is_dict_encoded_string()) {
-        auto value_type = std::make_shared<arrow::StringType>();
-        return dictionary(arrow::int32(), value_type, false);
+    case hdk::ir::Type::kInteger:
+      switch (type->size()) {
+        case 1:
+          return arrow::int8();
+        case 2:
+          return arrow::int16();
+        case 4:
+          return arrow::int32();
+        case 8:
+          return arrow::int64();
+        default:
+          break;
       }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          return arrow::float32();
+        case hdk::ir::FloatingPointType::kDouble:
+          return arrow::float64();
+        default:
+          break;
+      }
+      break;
+    case hdk::ir::Type::kExtDictionary: {
+      auto value_type = std::make_shared<arrow::StringType>();
+      return dictionary(arrow::int32(), value_type, false);
+    }
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
       return arrow::utf8();
-    case kDECIMAL:
-    case kNUMERIC:
-      return arrow::decimal(sql_type.get_precision(), sql_type.get_scale());
-    case kTIME:
+    case hdk::ir::Type::kDecimal:
+      return arrow::decimal(type->as<hdk::ir::DecimalType>()->precision(),
+                            type->as<hdk::ir::DecimalType>()->scale());
+    case hdk::ir::Type::kTime:
       return time32(arrow::TimeUnit::SECOND);
-    case kDATE: {
+    case hdk::ir::Type::kDate: {
       // TODO(wamsi) : Remove date64() once date32() support is added in cuDF. date32()
       // Currently support for date32() is missing in cuDF.Hence, if client requests for
       // date on GPU, return date64() for the time being, till support is added.
@@ -1304,38 +1295,35 @@ std::shared_ptr<arrow::DataType> get_arrow_type(const SQLTypeInfo& sql_type,
         return arrow::date32();
       }
     }
-    case kTIMESTAMP:
-      switch (sql_type.get_precision()) {
-        case 0:
+    case hdk::ir::Type::kTimestamp: {
+      auto unit = type->as<hdk::ir::TimestampType>()->unit();
+      switch (unit) {
+        case hdk::ir::TimeUnit::kSecond:
           return timestamp(arrow::TimeUnit::SECOND);
-        case 3:
+        case hdk::ir::TimeUnit::kMilli:
           return timestamp(arrow::TimeUnit::MILLI);
-        case 6:
+        case hdk::ir::TimeUnit::kMicro:
           return timestamp(arrow::TimeUnit::MICRO);
-        case 9:
+        case hdk::ir::TimeUnit::kNano:
           return timestamp(arrow::TimeUnit::NANO);
         default:
           throw std::runtime_error(
-              "Unsupported timestamp precision for Arrow result sets: " +
-              std::to_string(sql_type.get_precision()));
+              "Unsupported timestamp precision for Arrow result sets: " + toString(unit));
       }
-    case kARRAY:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
+    }
     default:
-      throw std::runtime_error(sql_type.get_type_name() +
-                               " is not supported in Arrow result sets.");
+      break;
   }
-  return nullptr;
+  throw std::runtime_error(type->toString() + " is not supported in Arrow result sets.");
 }
 
 }  // namespace
 
 std::shared_ptr<arrow::Field> ArrowResultSetConverter::makeField(
     const std::string name,
-    const SQLTypeInfo& target_type) const {
+    const hdk::ir::Type* target_type) const {
   return arrow::field(
-      name, get_arrow_type(target_type, device_type_), !target_type.get_notnull());
+      name, get_arrow_type(target_type, device_type_), target_type->nullable());
 }
 
 std::shared_ptr<arrow::Schema> ArrowResultSetConverter::makeSchema() const {
@@ -1343,8 +1331,8 @@ std::shared_ptr<arrow::Schema> ArrowResultSetConverter::makeSchema() const {
   std::vector<std::shared_ptr<arrow::Field>> fields;
   CHECK(col_names_.empty() || col_names_.size() == col_count);
   for (size_t i = 0; i < col_count; ++i) {
-    const auto ti = results_->getColType(i);
-    fields.push_back(makeField(col_names_.empty() ? "" : col_names_[i], ti));
+    const auto type = results_->colType(i);
+    fields.push_back(makeField(col_names_.empty() ? "" : col_names_[i], type));
   }
 #if ARROW_CONVERTER_DEBUG
   VLOG(1) << "Arrow fields: ";
@@ -1395,21 +1383,20 @@ void ArrowResultSet::deallocateArrowResultBuffer(const ArrowResult& result,
 
 void ArrowResultSetConverter::initializeColumnBuilder(
     ColumnBuilder& column_builder,
-    const SQLTypeInfo& col_type,
+    const hdk::ir::Type* col_type,
     const size_t results_col_slot_idx,
     const std::shared_ptr<arrow::Field>& field) const {
   column_builder.field = field;
   column_builder.col_type = col_type;
-  column_builder.physical_type = col_type.is_dict_encoded_string()
-                                     ? get_dict_index_type(col_type)
-                                     : get_physical_type(col_type);
+  column_builder.physical_type =
+      col_type->isExtDictionary() ? col_type->ctx().integer(col_type->size()) : col_type;
 
   auto value_type = field->type();
-  if (col_type.is_dict_encoded_string()) {
+  if (col_type->isExtDictionary()) {
     auto timer = DEBUG_TIMER("Translate string dictionary to Arrow dictionary");
     column_builder.builder.reset(new arrow::StringDictionary32Builder());
     // add values to the builder
-    const int dict_id = col_type.get_comp_param();
+    const int dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
 
     // ResultSet::rowCount(), unlike ResultSet::entryCount(), will return
     // the actual number of rows in the result set, taking into account
@@ -1631,65 +1618,81 @@ void ArrowResultSetConverter::append(
     ColumnBuilder& column_builder,
     const ValueArray& values,
     const std::shared_ptr<std::vector<bool>>& is_valid) const {
-  if (column_builder.col_type.is_dict_encoded_string()) {
-    CHECK_EQ(column_builder.physical_type,
-             kINT);  // assume all dicts use none-encoded type for now
+  if (column_builder.col_type->isExtDictionary()) {
+    CHECK(column_builder.physical_type
+              ->isInt32());  // assume all dicts use none-encoded type for now
     appendToColumnBuilder<arrow::StringDictionary32Builder, int32_t>(
         column_builder, values, is_valid);
     return;
   }
-  switch (column_builder.physical_type) {
-    case kBOOLEAN:
+  switch (column_builder.physical_type->id()) {
+    case hdk::ir::Type::kBoolean:
       appendToColumnBuilder<arrow::BooleanBuilder, bool>(
           column_builder, values, is_valid);
       break;
-    case kTINYINT:
-      appendToColumnBuilder<arrow::Int8Builder, int8_t>(column_builder, values, is_valid);
+    case hdk::ir::Type::kInteger:
+      switch (column_builder.physical_type->size()) {
+        case 1:
+          appendToColumnBuilder<arrow::Int8Builder, int8_t>(
+              column_builder, values, is_valid);
+          break;
+        case 2:
+          appendToColumnBuilder<arrow::Int16Builder, int16_t>(
+              column_builder, values, is_valid);
+          break;
+        case 4:
+          appendToColumnBuilder<arrow::Int32Builder, int32_t>(
+              column_builder, values, is_valid);
+          break;
+        case 8:
+          appendToColumnBuilder<arrow::Int64Builder, int64_t>(
+              column_builder, values, is_valid);
+          break;
+        default:
+          throw std::runtime_error(column_builder.col_type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
       break;
-    case kSMALLINT:
-      appendToColumnBuilder<arrow::Int16Builder, int16_t>(
-          column_builder, values, is_valid);
-      break;
-    case kINT:
-      appendToColumnBuilder<arrow::Int32Builder, int32_t>(
-          column_builder, values, is_valid);
-      break;
-    case kBIGINT:
-      appendToColumnBuilder<arrow::Int64Builder, int64_t>(
-          column_builder, values, is_valid);
-      break;
-    case kDECIMAL:
+    case hdk::ir::Type::kDecimal:
       appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
           column_builder, values, is_valid);
       break;
-    case kFLOAT:
-      appendToColumnBuilder<arrow::FloatBuilder, float>(column_builder, values, is_valid);
+    case hdk::ir::Type::kFloatingPoint:
+      switch (
+          column_builder.physical_type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          appendToColumnBuilder<arrow::FloatBuilder, float>(
+              column_builder, values, is_valid);
+          break;
+        case hdk::ir::FloatingPointType::kDouble:
+          appendToColumnBuilder<arrow::DoubleBuilder, double>(
+              column_builder, values, is_valid);
+          break;
+        default:
+          throw std::runtime_error(column_builder.col_type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
       break;
-    case kDOUBLE:
-      appendToColumnBuilder<arrow::DoubleBuilder, double>(
-          column_builder, values, is_valid);
-      break;
-    case kTIME:
+    case hdk::ir::Type::kTime:
       appendToColumnBuilder<arrow::Time32Builder, int32_t>(
           column_builder, values, is_valid);
       break;
-    case kTIMESTAMP:
+    case hdk::ir::Type::kTimestamp:
       appendToColumnBuilder<arrow::TimestampBuilder, int64_t>(
           column_builder, values, is_valid);
       break;
-    case kDATE:
+    case hdk::ir::Type::kDate:
       device_type_ == ExecutorDeviceType::GPU
           ? appendToColumnBuilder<arrow::Date64Builder, int64_t>(
                 column_builder, values, is_valid)
           : appendToColumnBuilder<arrow::Date32Builder, int32_t>(
                 column_builder, values, is_valid);
       break;
-    case kCHAR:
-    case kVARCHAR:
-    case kTEXT:
+    case hdk::ir::Type::kVarChar:
+    case hdk::ir::Type::kText:
     default:
       // TODO(miyu): support more scalar types.
-      throw std::runtime_error(column_builder.col_type.get_type_name() +
+      throw std::runtime_error(column_builder.col_type->toString() +
                                " is not supported in Arrow result sets.");
   }
 }
