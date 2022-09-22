@@ -65,94 +65,6 @@ inline void set_compact_type(TargetInfo& target, const hdk::ir::Type* new_type) 
   target.type = new_type;
 }
 
-inline int64_t inline_int_null_val(const SQLTypeInfo& ti) {
-  auto type = ti.get_type();
-  if (ti.is_string()) {
-    CHECK_EQ(kENCODING_DICT, ti.get_compression());
-    CHECK_EQ(4, ti.get_logical_size());
-    type = kINT;
-  }
-  switch (type) {
-    case kBOOLEAN:
-      return inline_int_null_value<int8_t>();
-    case kTINYINT:
-      return inline_int_null_value<int8_t>();
-    case kSMALLINT:
-      return inline_int_null_value<int16_t>();
-    case kINT:
-      return inline_int_null_value<int32_t>();
-    case kBIGINT:
-      return inline_int_null_value<int64_t>();
-    case kTIMESTAMP:
-    case kTIME:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return inline_int_null_value<int64_t>();
-    case kDECIMAL:
-    case kNUMERIC:
-      return inline_int_null_value<int64_t>();
-    default:
-      abort();
-  }
-}
-
-inline int64_t inline_fixed_encoding_null_val(const SQLTypeInfo& ti) {
-  if (ti.get_compression() == kENCODING_NONE) {
-    return inline_int_null_val(ti);
-  }
-  if (ti.get_compression() == kENCODING_DATE_IN_DAYS) {
-    switch (ti.get_comp_param()) {
-      case 0:
-      case 32:
-        return inline_int_null_value<int32_t>();
-      case 16:
-        return inline_int_null_value<int16_t>();
-      default:
-#ifndef __CUDACC__
-        CHECK(false) << "Unknown encoding width for date in days: "
-                     << ti.get_comp_param();
-#else
-        CHECK(false);
-#endif
-    }
-  }
-  if (ti.get_compression() == kENCODING_DICT) {
-    CHECK(ti.is_string());
-    switch (ti.get_size()) {
-      case 1:
-        return inline_int_null_value<uint8_t>();
-      case 2:
-        return inline_int_null_value<uint16_t>();
-      case 4:
-        return inline_int_null_value<int32_t>();
-      default:
-#ifndef __CUDACC__
-        CHECK(false) << "Unknown size for dictionary encoded type: " << ti.get_size();
-#else
-        CHECK(false);
-#endif
-    }
-  }
-  CHECK_EQ(kENCODING_FIXED, ti.get_compression());
-  CHECK(ti.is_integer() || ti.is_time() || ti.is_decimal());
-  CHECK_EQ(0, ti.get_comp_param() % 8);
-  return -(1LL << (ti.get_comp_param() - 1));
-}
-
-inline double inline_fp_null_val(const SQLTypeInfo& ti) {
-  CHECK(ti.is_fp());
-  const auto type = ti.get_type();
-  switch (type) {
-    case kFLOAT:
-      return inline_fp_null_value<float>();
-    case kDOUBLE:
-      return inline_fp_null_value<double>();
-    default:
-      abort();
-  }
-}
-
 inline uint64_t exp_to_scale(const unsigned exp) {
   uint64_t res = 1;
   for (unsigned i = 0; i < exp; ++i) {
@@ -161,62 +73,12 @@ inline uint64_t exp_to_scale(const unsigned exp) {
   return res;
 }
 
-inline size_t get_bit_width(const SQLTypeInfo& ti) {
-  const auto int_type = ti.is_decimal() ? kBIGINT : ti.get_type();
-  switch (int_type) {
-    case kNULLT:
-      throw std::runtime_error(
-          "Untyped NULL values are not supported. Please CAST any NULL "
-          "constants to a type.");
-    case kBOOLEAN:
-      return 8;
-    case kTINYINT:
-      return 8;
-    case kSMALLINT:
-      return 16;
-    case kINT:
-      return 32;
-    case kBIGINT:
-      return 64;
-    case kFLOAT:
-      return 32;
-    case kDOUBLE:
-      return 64;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return sizeof(time_t) * 8;
-    case kTEXT:
-    case kVARCHAR:
-    case kCHAR:
-      return 32;
-    case kARRAY:
-      if (ti.get_size() == -1) {
-        throw std::runtime_error("Projecting on unsized array column not supported.");
-      }
-      return ti.get_size() * 8;
-    case kCOLUMN:
-    case kCOLUMN_LIST:
-      return ti.get_elem_type().get_size() * 8;
-    default:
-      LOG(FATAL) << "Unhandled int_type: " << int_type;
-      return {};
-  }
-}
-
 inline size_t get_bit_width(const hdk::ir::Type* type) {
   size_t res = type->isString() ? 32 : hdk::ir::logicalSize(type) * 8;
   if (res < 0) {
     throw std::runtime_error("Unexpected type: " + type->toString());
   }
-  CHECK((size_t)res == get_bit_width(type->toTypeInfo()));
   return static_cast<size_t>(res);
-}
-
-inline bool is_unsigned_type(const SQLTypeInfo& ti) {
-  return ti.get_compression() == kENCODING_DICT && ti.get_size() < ti.get_logical_size();
 }
 
 #endif  // QUERYENGINE_SQLTYPESLAYOUT_H

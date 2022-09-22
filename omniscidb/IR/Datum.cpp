@@ -344,10 +344,6 @@ Datum StringToDatum(std::string_view s, const hdk::ir::Type* type) {
   return d;
 }
 
-Datum StringToDatum(std::string_view s, SQLTypeInfo& ti) {
-  return StringToDatum(s, hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
-}
-
 bool DatumEqual(const Datum a, const Datum b, const hdk::ir::Type* type) {
   switch (type->id()) {
     case hdk::ir::Type::kBoolean:
@@ -383,49 +379,6 @@ bool DatumEqual(const Datum a, const Datum b, const hdk::ir::Type* type) {
       return a.bigintval == b.bigintval;
     case hdk::ir::Type::kText:
     case hdk::ir::Type::kVarChar:
-      if (a.stringval == nullptr && b.stringval == nullptr) {
-        return true;
-      }
-      if (a.stringval == nullptr || b.stringval == nullptr) {
-        return false;
-      }
-      return *a.stringval == *b.stringval;
-    default:
-      return false;
-  }
-  return false;
-}
-
-bool DatumEqual(const Datum a, const Datum b, const SQLTypeInfo& ti) {
-  switch (ti.get_type()) {
-    case kBOOLEAN:
-      return a.boolval == b.boolval;
-    case kBIGINT:
-    case kNUMERIC:
-    case kDECIMAL:
-      return a.bigintval == b.bigintval;
-    case kINT:
-      return a.intval == b.intval;
-    case kSMALLINT:
-      return a.smallintval == b.smallintval;
-    case kTINYINT:
-      return a.tinyintval == b.tinyintval;
-    case kFLOAT:
-      return a.floatval == b.floatval;
-    case kDOUBLE:
-      return a.doubleval == b.doubleval;
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-    case kINTERVAL_DAY_TIME:
-    case kINTERVAL_YEAR_MONTH:
-      return a.bigintval == b.bigintval;
-    case kTEXT:
-    case kVARCHAR:
-    case kCHAR:
-      if (ti.get_compression() == kENCODING_DICT) {
-        return a.intval == b.intval;
-      }
       if (a.stringval == nullptr && b.stringval == nullptr) {
         return true;
       }
@@ -584,10 +537,6 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
                            " in DatumToString.");
 }
 
-std::string DatumToString(Datum d, const SQLTypeInfo& ti) {
-  return DatumToString(d, hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
-}
-
 int64_t extract_int_type_from_datum(const Datum datum, const hdk::ir::Type* type) {
   switch (type->id()) {
     case hdk::ir::Type::kBoolean:
@@ -617,11 +566,6 @@ int64_t extract_int_type_from_datum(const Datum datum, const hdk::ir::Type* type
   }
 }
 
-int64_t extract_int_type_from_datum(const Datum datum, const SQLTypeInfo& ti) {
-  return extract_int_type_from_datum(datum,
-                                     hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
-}
-
 double extract_fp_type_from_datum(const Datum datum, const hdk::ir::Type* type) {
   switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
     case hdk::ir::FloatingPointType::kFloat:
@@ -631,11 +575,6 @@ double extract_fp_type_from_datum(const Datum datum, const hdk::ir::Type* type) 
     default:
       abort();
   }
-}
-
-double extract_fp_type_from_datum(const Datum datum, const SQLTypeInfo& ti) {
-  return extract_fp_type_from_datum(datum,
-                                    hdk::ir::Context::defaultCtx().fromTypeInfo(ti));
 }
 
 SQLTypes decimal_to_int_type(const SQLTypeInfo& ti) {
@@ -662,13 +601,4 @@ int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
   int const dscale = new_type->as<hdk::ir::DecimalType>()->scale() -
                      type->as<hdk::ir::DecimalType>()->scale();
   return convert_decimal_value_to_scale_internal(decimal_value, dscale);
-}
-
-int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
-                                       const SQLTypeInfo& type_info,
-                                       const SQLTypeInfo& new_type_info) {
-  return convert_decimal_value_to_scale(
-      decimal_value,
-      hdk::ir::Context::defaultCtx().fromTypeInfo(type_info),
-      hdk::ir::Context::defaultCtx().fromTypeInfo(new_type_info));
 }

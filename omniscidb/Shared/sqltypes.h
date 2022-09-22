@@ -970,22 +970,14 @@ inline std::ostream& operator<<(std::ostream& os, const SQLTypeInfo& ti) {
 
 #include <string_view>
 
-Datum StringToDatum(std::string_view s, SQLTypeInfo& ti);
 Datum StringToDatum(std::string_view s, const hdk::ir::Type* type);
-std::string DatumToString(Datum d, const SQLTypeInfo& ti);
 std::string DatumToString(Datum d, const hdk::ir::Type* type);
 #endif
 
-int64_t extract_int_type_from_datum(const Datum datum, const SQLTypeInfo& ti);
 int64_t extract_int_type_from_datum(const Datum datum, const hdk::ir::Type* type);
-double extract_fp_type_from_datum(const Datum datum, const SQLTypeInfo& ti);
 double extract_fp_type_from_datum(const Datum datum, const hdk::ir::Type* type);
 
-bool DatumEqual(const Datum, const Datum, const SQLTypeInfo& ti);
 bool DatumEqual(const Datum, const Datum, const hdk::ir::Type* type);
-int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
-                                       const SQLTypeInfo& type_info,
-                                       const SQLTypeInfo& new_type_info);
 int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
                                        const hdk::ir::Type* type,
                                        const hdk::ir::Type* new_type);
@@ -995,69 +987,8 @@ size_t hash(Datum datum, const hdk::ir::Type* type);
 #include "../QueryEngine/DateTruncate.h"
 #include "../QueryEngine/ExtractFromTime.h"
 
-inline SQLTypeInfo get_logical_type_info(const SQLTypeInfo& type_info) {
-  EncodingType encoding = type_info.get_compression();
-  if (encoding == kENCODING_DATE_IN_DAYS ||
-      (encoding == kENCODING_FIXED && type_info.get_type() != kARRAY)) {
-    encoding = kENCODING_NONE;
-  }
-  return SQLTypeInfo(type_info.get_type(),
-                     type_info.get_dimension(),
-                     type_info.get_scale(),
-                     type_info.get_notnull(),
-                     encoding,
-                     type_info.get_comp_param(),
-                     type_info.get_subtype());
-}
-
-inline SQLTypeInfo get_nullable_type_info(const SQLTypeInfo& type_info) {
-  SQLTypeInfo nullable_type_info = type_info;
-  nullable_type_info.set_notnull(false);
-  return nullable_type_info;
-}
-
-inline SQLTypeInfo get_nullable_logical_type_info(const SQLTypeInfo& type_info) {
-  SQLTypeInfo nullable_type_info = get_logical_type_info(type_info);
-  return get_nullable_type_info(nullable_type_info);
-}
-
 using StringOffsetT = int32_t;
 using ArrayOffsetT = int32_t;
-
-inline int8_t* appendDatum(int8_t* buf, Datum d, const SQLTypeInfo& ti) {
-  switch (ti.get_type()) {
-    case kBOOLEAN:
-      *(int8_t*)buf = d.boolval;
-      return buf + sizeof(int8_t);
-    case kNUMERIC:
-    case kDECIMAL:
-    case kBIGINT:
-      *(int64_t*)buf = d.bigintval;
-      return buf + sizeof(int64_t);
-    case kINT:
-      *(int32_t*)buf = d.intval;
-      return buf + sizeof(int32_t);
-    case kSMALLINT:
-      *(int16_t*)buf = d.smallintval;
-      return buf + sizeof(int16_t);
-    case kTINYINT:
-      *(int8_t*)buf = d.tinyintval;
-      return buf + sizeof(int8_t);
-    case kFLOAT:
-      *(float*)buf = d.floatval;
-      return buf + sizeof(float);
-    case kDOUBLE:
-      *(double*)buf = d.doubleval;
-      return buf + sizeof(double);
-    case kTIME:
-    case kTIMESTAMP:
-    case kDATE:
-      *reinterpret_cast<int64_t*>(buf) = d.bigintval;
-      return buf + sizeof(int64_t);
-    default:
-      return nullptr;
-  }
-}
 
 inline auto generate_array_type(const SQLTypes subtype) {
   auto ti = SQLTypeInfo(kARRAY, false);
@@ -1076,11 +1007,5 @@ inline auto generate_column_type(const SQLTypes subtype, EncodingType c, int p) 
   ti.set_subtype(subtype);
   ti.set_compression(c);
   ti.set_comp_param(p);
-  return ti;
-}
-
-inline auto generate_column_list_type(const SQLTypes subtype) {
-  auto ti = SQLTypeInfo(kCOLUMN_LIST, false);
-  ti.set_subtype(subtype);
   return ti;
 }
