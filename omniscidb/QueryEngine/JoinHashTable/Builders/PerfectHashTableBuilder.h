@@ -90,16 +90,16 @@ class PerfectJoinHashTableBuilder {
     // TODO: pass this in? duplicated in JoinHashTable currently
     const auto inner_col = cols.first;
     CHECK(inner_col);
-    const auto& ti = inner_col->get_type_info();
+    auto type = inner_col->type();
 
-    JoinColumnTypeInfo type_info{static_cast<size_t>(ti.get_size()),
+    JoinColumnTypeInfo type_info{static_cast<size_t>(type->size()),
                                  col_range.getIntMin(),
                                  col_range.getIntMax(),
-                                 inline_fixed_encoding_null_val(ti),
+                                 inline_fixed_encoding_null_value(type),
                                  is_bitwise_eq,
                                  col_range.getIntMax() + 1,
-                                 get_join_column_type_kind(ti)};
-    auto use_bucketization = inner_col->get_type_info().get_type() == kDATE;
+                                 get_join_column_type_kind(type)};
+    auto use_bucketization = inner_col->type()->isDate();
     if (layout == HashType::OneToOne) {
       fill_hash_join_buff_on_device_bucketized(
           reinterpret_cast<int32_t*>(gpu_hash_table_buff),
@@ -155,7 +155,7 @@ class PerfectJoinHashTableBuilder {
     auto timer = DEBUG_TIMER(__func__);
     const auto inner_col = cols.first;
     CHECK(inner_col);
-    const auto& ti = inner_col->get_type_info();
+    auto type = inner_col->type();
 
     CHECK(!hash_table_);
     hash_table_ =
@@ -206,7 +206,7 @@ class PerfectJoinHashTableBuilder {
                                             str_proxy_translation_map,
                                             thread_idx,
                                             thread_count,
-                                            &ti,
+                                            type,
                                             &err,
                                             &col_range,
                                             &is_bitwise_eq,
@@ -218,13 +218,13 @@ class PerfectJoinHashTableBuilder {
               hash_join_invalid_val,
               for_semi_join,
               join_column,
-              {static_cast<size_t>(ti.get_size()),
+              {static_cast<size_t>(type->size()),
                col_range.getIntMin(),
                col_range.getIntMax(),
-               inline_fixed_encoding_null_val(ti),
+               inline_fixed_encoding_null_value(type),
                is_bitwise_eq,
                col_range.getIntMax() + 1,
-               get_join_column_type_kind(ti)},
+               get_join_column_type_kind(type)},
               str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
               str_proxy_translation_map ? str_proxy_translation_map->domainStart()
                                         : 0,  // 0 is dummy value
@@ -258,7 +258,7 @@ class PerfectJoinHashTableBuilder {
     auto timer = DEBUG_TIMER(__func__);
     const auto inner_col = cols.first;
     CHECK(inner_col);
-    const auto& ti = inner_col->get_type_info();
+    auto type = inner_col->type();
     CHECK(!hash_table_);
     hash_table_ =
         std::make_unique<PerfectHashTable>(executor->getBufferProvider(),
@@ -300,19 +300,19 @@ class PerfectJoinHashTableBuilder {
     {
       auto timer_fill = DEBUG_TIMER(
           "CPU One-To-Many Perfect Hash Table Builder: fill_hash_join_buff_bucketized");
-      if (ti.get_type() == kDATE) {
+      if (type->isDate()) {
         fill_one_to_many_hash_table_bucketized(
             cpu_hash_table_buff,
             hash_entry_info,
             hash_join_invalid_val,
             join_column,
-            {static_cast<size_t>(ti.get_size()),
+            {static_cast<size_t>(type->size()),
              col_range.getIntMin(),
              col_range.getIntMax(),
-             inline_fixed_encoding_null_val(ti),
+             inline_fixed_encoding_null_value(type),
              is_bitwise_eq,
              col_range.getIntMax() + 1,
-             get_join_column_type_kind(ti)},
+             get_join_column_type_kind(type)},
             str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
             str_proxy_translation_map ? str_proxy_translation_map->domainStart()
                                       : 0 /*dummy*/,
@@ -323,13 +323,13 @@ class PerfectJoinHashTableBuilder {
             hash_entry_info,
             hash_join_invalid_val,
             join_column,
-            {static_cast<size_t>(ti.get_size()),
+            {static_cast<size_t>(type->size()),
              col_range.getIntMin(),
              col_range.getIntMax(),
-             inline_fixed_encoding_null_val(ti),
+             inline_fixed_encoding_null_value(type),
              is_bitwise_eq,
              col_range.getIntMax() + 1,
-             get_join_column_type_kind(ti)},
+             get_join_column_type_kind(type)},
             str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
             str_proxy_translation_map ? str_proxy_translation_map->domainStart()
                                       : 0 /*dummy*/,
