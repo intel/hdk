@@ -3600,14 +3600,6 @@ int64_t Executor::deviceCycles(int milliseconds) const {
 }
 
 llvm::Value* Executor::castToFP(llvm::Value* value,
-                                SQLTypeInfo const& from_ti,
-                                SQLTypeInfo const& to_ti) {
-  auto from_type = hdk::ir::Context::defaultCtx().fromTypeInfo(from_ti);
-  auto to_type = hdk::ir::Context::defaultCtx().fromTypeInfo(to_ti);
-  return castToFP(value, from_type, to_type);
-}
-
-llvm::Value* Executor::castToFP(llvm::Value* value,
                                 const hdk::ir::Type* from_type,
                                 const hdk::ir::Type* to_type) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());

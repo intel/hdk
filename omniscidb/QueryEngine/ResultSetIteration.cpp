@@ -1667,25 +1667,6 @@ bool ResultSetStorage::isEmptyEntry(const size_t entry_idx) const {
   return isEmptyEntry(entry_idx, buff_);
 }
 
-bool ResultSet::isNull(const SQLTypeInfo& ti,
-                       const InternalTargetValue& val,
-                       const bool float_argument_input) {
-  if (ti.get_notnull()) {
-    return false;
-  }
-  if (val.isInt()) {
-    return val.i1 == null_val_bit_pattern(ti, float_argument_input);
-  }
-  if (val.isPair()) {
-    return !val.i2;
-  }
-  if (val.isStr()) {
-    return !val.i1;
-  }
-  CHECK(val.isNull());
-  return true;
-}
-
 bool ResultSet::isNull(const hdk::ir::Type* type,
                        const InternalTargetValue& val,
                        const bool float_argument_input) {

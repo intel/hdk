@@ -55,18 +55,10 @@ class CodeGenerator {
                                             CgenState* cgen_state);
 
   llvm::Value* codegenCastBetweenIntTypes(llvm::Value* operand_lv,
-                                          const SQLTypeInfo& operand_ti,
-                                          const SQLTypeInfo& ti,
-                                          bool upscale = true);
-  llvm::Value* codegenCastBetweenIntTypes(llvm::Value* operand_lv,
                                           const hdk::ir::Type* operand_type,
                                           const hdk::ir::Type* type,
                                           bool upscale = true);
 
-  void codegenCastBetweenIntTypesOverflowChecks(llvm::Value* operand_lv,
-                                                const SQLTypeInfo& operand_ti,
-                                                const SQLTypeInfo& ti,
-                                                const int64_t scale);
   void codegenCastBetweenIntTypesOverflowChecks(llvm::Value* operand_lv,
                                                 const hdk::ir::Type* operand_type,
                                                 const hdk::ir::Type* type,
@@ -106,11 +98,6 @@ class CodeGenerator {
                      Executor* executor,
                      llvm::Value* nullable_lv,
                      const hdk::ir::Type* nullable_type,
-                     const std::string& name = "");
-    NullCheckCodegen(CgenState* cgen_state,
-                     Executor* executor,
-                     llvm::Value* nullable_lv,
-                     const SQLTypeInfo& nullable_ti,
                      const std::string& name = "");
 
     llvm::Value* finalize(llvm::Value* null_lv, llvm::Value* notnull_lv);
@@ -155,12 +142,6 @@ class CodeGenerator {
 
   llvm::Value* codegenCast(const hdk::ir::UOper*, const CompilationOptions&);
 
-  llvm::Value* codegenCast(llvm::Value* operand_lv,
-                           const SQLTypeInfo& operand_ti,
-                           const SQLTypeInfo& ti,
-                           const bool operand_is_const,
-                           bool is_dict_intersection,
-                           const CompilationOptions& co);
   llvm::Value* codegenCast(llvm::Value* operand_lv,
                            const hdk::ir::Type* operand_type,
                            const hdk::ir::Type* type,

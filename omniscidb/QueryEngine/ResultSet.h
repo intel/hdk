@@ -573,9 +573,6 @@ class ResultSet {
 
   void radixSortOnCpu(const std::list<hdk::ir::OrderEntry>& order_entries) const;
 
-  static bool isNull(const SQLTypeInfo& ti,
-                     const InternalTargetValue& val,
-                     const bool float_argument_input);
   static bool isNull(const hdk::ir::Type* type,
                      const InternalTargetValue& val,
                      const bool float_argument_input);

@@ -851,9 +851,6 @@ class Executor {
                                          const bool thread_mem_shared);
 
   llvm::Value* castToFP(llvm::Value*,
-                        SQLTypeInfo const& from_ti,
-                        SQLTypeInfo const& to_ti);
-  llvm::Value* castToFP(llvm::Value*,
                         const hdk::ir::Type* from_type,
                         const hdk::ir::Type* to_type);
   llvm::Value* castToIntPtrTyIn(llvm::Value* val, const size_t bit_width);
@@ -1106,22 +1103,6 @@ class Executor {
   friend struct TargetExprCodegen;
   friend class WindowProjectNodeContext;
 };
-
-inline std::string get_null_check_suffix(const SQLTypeInfo& lhs_ti,
-                                         const SQLTypeInfo& rhs_ti) {
-  if (lhs_ti.get_notnull() && rhs_ti.get_notnull()) {
-    return "";
-  }
-  std::string null_check_suffix{"_nullable"};
-  if (lhs_ti.get_notnull()) {
-    CHECK(!rhs_ti.get_notnull());
-    null_check_suffix += "_rhs";
-  } else if (rhs_ti.get_notnull()) {
-    CHECK(!lhs_ti.get_notnull());
-    null_check_suffix += "_lhs";
-  }
-  return null_check_suffix;
-}
 
 inline std::string get_null_check_suffix(const hdk::ir::Type* lhs_type,
                                          const hdk::ir::Type* rhs_type) {

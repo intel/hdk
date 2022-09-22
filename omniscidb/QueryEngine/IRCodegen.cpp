@@ -1307,17 +1307,6 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
 CodeGenerator::NullCheckCodegen::NullCheckCodegen(CgenState* cgen_state,
                                                   Executor* executor,
                                                   llvm::Value* nullable_lv,
-                                                  const SQLTypeInfo& nullable_ti,
-                                                  const std::string& name)
-    : NullCheckCodegen(cgen_state,
-                       executor,
-                       nullable_lv,
-                       hdk::ir::Context::defaultCtx().fromTypeInfo(nullable_ti),
-                       name) {}
-
-CodeGenerator::NullCheckCodegen::NullCheckCodegen(CgenState* cgen_state,
-                                                  Executor* executor,
-                                                  llvm::Value* nullable_lv,
                                                   const hdk::ir::Type* nullable_type,
                                                   const std::string& name)
     : cgen_state(cgen_state), name(name) {
