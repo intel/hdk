@@ -83,8 +83,6 @@ class Context {
   // Return the same type but attached to this context.
   const Type* copyType(const Type* type);
 
-  const Type* fromTypeInfo(const SQLTypeInfo& ti);
-
   static Context& defaultCtx();
 
  protected:

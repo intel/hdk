@@ -36,10 +36,6 @@ void Type::print() const {
   std::cout << toString() << std::endl;
 }
 
-const Type* Type::fromTypeInfo(Context& ctx, const SQLTypeInfo& ti) {
-  return ctx.fromTypeInfo(ti);
-}
-
 std::string_view Type::nullableStr() const {
   return nullable_ ? "" : "[NN]";
 }
@@ -56,10 +52,6 @@ const Type* NullType::withNullable(bool nullable) const {
 
 std::string NullType::toString() const {
   return "NULLT";
-}
-
-SQLTypeInfo NullType::toTypeInfo() const {
-  return SQLTypeInfo(kNULLT, !nullable());
 }
 
 BooleanType::BooleanType(Context& ctx, bool nullable)
@@ -79,10 +71,6 @@ std::string BooleanType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo BooleanType::toTypeInfo() const {
-  return SQLTypeInfo(kBOOLEAN, !nullable());
-}
-
 IntegerType::IntegerType(Context& ctx, int size, bool nullable)
     : Type(ctx, kInteger, size, nullable) {}
 
@@ -98,21 +86,6 @@ std::string IntegerType::toString() const {
   std::stringstream ss;
   ss << "INT" << (size() * 8) << nullableStr();
   return ss.str();
-}
-
-SQLTypeInfo IntegerType::toTypeInfo() const {
-  switch (size()) {
-    case 1:
-      return SQLTypeInfo(kTINYINT, !nullable());
-    case 2:
-      return SQLTypeInfo(kSMALLINT, !nullable());
-    case 4:
-      return SQLTypeInfo(kINT, !nullable());
-    case 8:
-      return SQLTypeInfo(kBIGINT, !nullable());
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
 }
 
 FloatingPointType::FloatingPointType(Context& ctx, Precision precision, bool nullable)
@@ -155,17 +128,6 @@ std::string FloatingPointType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo FloatingPointType::toTypeInfo() const {
-  switch (precision_) {
-    case kFloat:
-      return SQLTypeInfo(kFLOAT, !nullable());
-    case kDouble:
-      return SQLTypeInfo(kDOUBLE, !nullable());
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-}
-
 DecimalType::DecimalType(Context& ctx, int size, int precision, int scale, bool nullable)
     : Type(ctx, kDecimal, size, nullable), precision_(precision), scale_(scale) {}
 
@@ -195,15 +157,6 @@ std::string DecimalType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo DecimalType::toTypeInfo() const {
-  switch (size()) {
-    case 8:
-      return SQLTypeInfo(kDECIMAL, precision_, scale_, !nullable());
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-}
-
 VarCharType::VarCharType(Context& ctx, int max_length, bool nullable)
     : Type(ctx, kVarChar, -1, nullable), max_length_(max_length) {}
 
@@ -229,10 +182,6 @@ std::string VarCharType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo VarCharType::toTypeInfo() const {
-  return SQLTypeInfo(kVARCHAR, max_length_, 0, !nullable());
-}
-
 TextType::TextType(Context& ctx, bool nullable) : Type(ctx, kText, -1, nullable) {}
 
 const TextType* TextType::make(Context& ctx, bool nullable) {
@@ -247,10 +196,6 @@ std::string TextType::toString() const {
   std::stringstream ss;
   ss << "TEXT" << nullableStr();
   return ss.str();
-}
-
-SQLTypeInfo TextType::toTypeInfo() const {
-  return SQLTypeInfo(kTEXT, !nullable());
 }
 
 int64_t unitsPerSecond(TimeUnit unit) {
@@ -320,25 +265,6 @@ std::string DateType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo DateType::toTypeInfo() const {
-  switch (unit()) {
-    case TimeUnit::kDay:
-      if (size() == 2 || size() == 4) {
-        return SQLTypeInfo(
-            kDATE, 0, 0, !nullable(), kENCODING_DATE_IN_DAYS, size() * 8, kNULLT);
-      }
-      break;
-    case TimeUnit::kSecond:
-      if (size() == 8) {
-        return SQLTypeInfo(kDATE, !nullable());
-      }
-      break;
-    default:
-      break;
-  }
-  throw UnsupportedTypeError() << "Cannot export type: " << this;
-}
-
 TimeType::TimeType(Context& ctx, int size, TimeUnit unit, bool nullable)
     : DateTimeBaseType(ctx, kTime, size, unit, nullable) {}
 
@@ -356,19 +282,6 @@ std::string TimeType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo TimeType::toTypeInfo() const {
-  switch (unit()) {
-    case TimeUnit::kSecond:
-      if (size() == 8) {
-        return SQLTypeInfo(kTIME, !nullable());
-      } else {
-        return SQLTypeInfo(kTIME, 0, 0, !nullable(), kENCODING_FIXED, size() * 8, kNULLT);
-      }
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-}
-
 TimestampType::TimestampType(Context& ctx, TimeUnit unit, bool nullable)
     : DateTimeBaseType(ctx, kTimestamp, 8, unit, nullable) {}
 
@@ -384,24 +297,6 @@ std::string TimestampType::toString() const {
   std::stringstream ss;
   ss << "TIMESTAMP" << unitStr() << nullableStr();
   return ss.str();
-}
-
-SQLTypeInfo TimestampType::toTypeInfo() const {
-  if (size() != 8) {
-    throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-  switch (unit()) {
-    case TimeUnit::kSecond:
-      return SQLTypeInfo(kTIMESTAMP, 0, 0, !nullable());
-    case TimeUnit::kMilli:
-      return SQLTypeInfo(kTIMESTAMP, 3, 0, !nullable());
-    case TimeUnit::kMicro:
-      return SQLTypeInfo(kTIMESTAMP, 6, 0, !nullable());
-    case TimeUnit::kNano:
-      return SQLTypeInfo(kTIMESTAMP, 9, 0, !nullable());
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
 }
 
 IntervalType::IntervalType(Context& ctx, int size, TimeUnit unit, bool nullable)
@@ -422,27 +317,6 @@ std::string IntervalType::toString() const {
   std::stringstream ss;
   ss << "INTERVAL" << (size() * 8) << unitStr() << nullableStr();
   return ss.str();
-}
-
-SQLTypeInfo IntervalType::toTypeInfo() const {
-  switch (unit()) {
-    case TimeUnit::kMonth:
-      if (size() == 8) {
-        return SQLTypeInfo(kINTERVAL_YEAR_MONTH, !nullable());
-      } else {
-        return SQLTypeInfo(
-            kINTERVAL_YEAR_MONTH, 0, 0, !nullable(), kENCODING_FIXED, size() * 8, kNULLT);
-      }
-    case TimeUnit::kMilli:
-      if (size() == 8) {
-        return SQLTypeInfo(kINTERVAL_DAY_TIME, !nullable());
-      } else {
-        return SQLTypeInfo(
-            kINTERVAL_DAY_TIME, 0, 0, !nullable(), kENCODING_FIXED, size() * 8, kNULLT);
-      }
-    default:
-      throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
 }
 
 ArrayBaseType::ArrayBaseType(Context& ctx,
@@ -500,24 +374,6 @@ std::string FixedLenArrayType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo FixedLenArrayType::toTypeInfo() const {
-  if (!elem_type_->isBoolean() && !elem_type_->isNumber() && !elem_type_->isDateTime() &&
-      !elem_type_->isInterval() && !elem_type_->isExtDictionary() &&
-      !elem_type_->isNull()) {
-    throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-  auto elem_ti = elem_type_->toTypeInfo();
-  SQLTypeInfo res(kARRAY,
-                  elem_ti.get_dimension(),
-                  elem_ti.get_scale(),
-                  elem_type_->isNull() ? !nullable() : elem_ti.get_notnull(),
-                  elem_ti.get_compression(),
-                  elem_ti.get_comp_param(),
-                  elem_ti.get_type());
-  res.set_size(num_elems_ * elem_ti.get_size());
-  return res;
-}
-
 VarLenArrayType::VarLenArrayType(Context& ctx,
                                  const Type* elem_type,
                                  int offs_size,
@@ -551,23 +407,6 @@ std::string VarLenArrayType::toString() const {
   std::stringstream ss;
   ss << "ARRAY" << (offs_size_ * 8) << "(" << elem_type_->toString() << ")";
   return ss.str();
-}
-
-SQLTypeInfo VarLenArrayType::toTypeInfo() const {
-  if (!elem_type_->isBoolean() && !elem_type_->isNumber() && !elem_type_->isDateTime() &&
-      !elem_type_->isInterval() && !elem_type_->isExtDictionary() &&
-      !elem_type_->isNull()) {
-    throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-  auto elem_ti = elem_type_->toTypeInfo();
-  SQLTypeInfo res(kARRAY,
-                  elem_ti.get_dimension(),
-                  elem_ti.get_scale(),
-                  elem_type_->isNull() ? !nullable() : elem_ti.get_notnull(),
-                  elem_ti.get_compression(),
-                  elem_ti.get_comp_param(),
-                  elem_ti.get_type());
-  return res;
 }
 
 ExtDictionaryType::ExtDictionaryType(Context& ctx,
@@ -604,20 +443,6 @@ std::string ExtDictionaryType::toString() const {
   return ss.str();
 }
 
-SQLTypeInfo ExtDictionaryType::toTypeInfo() const {
-  if (!elem_type_->isString()) {
-    throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-  if (size() != 1 && size() != 2 && size() != 4) {
-    throw UnsupportedTypeError() << "Cannot export type: " << this;
-  }
-  SQLTypeInfo res = elem_type_->toTypeInfo();
-  res.set_compression(kENCODING_DICT);
-  res.set_comp_param(dict_id_);
-  res.set_size(size());
-  return res;
-}
-
 ColumnType::ColumnType(Context& ctx, const Type* column_type, bool nullable)
     : Type(ctx, kColumn, column_type->size(), nullable), column_type_(column_type) {}
 
@@ -641,20 +466,6 @@ std::string ColumnType::toString() const {
   std::stringstream ss;
   ss << "COLUMN(" << column_type_->toString() << ")";
   return ss.str();
-}
-
-SQLTypeInfo ColumnType::toTypeInfo() const {
-  auto col_ti = column_type_->toTypeInfo();
-  CHECK(col_ti.get_subtype() == kNULLT);
-  SQLTypeInfo res(kCOLUMN,
-                  0,
-                  0,
-                  !nullable(),
-                  col_ti.get_compression(),
-                  col_ti.get_comp_param(),
-                  col_ti.get_type());
-  res.set_size(col_ti.get_size());
-  return res;
 }
 
 ColumnListType::ColumnListType(Context& ctx,
@@ -689,20 +500,6 @@ std::string ColumnListType::toString() const {
   std::stringstream ss;
   ss << "COLUMN_LIST" << length_ << "(" << column_type_->toString() << ")";
   return ss.str();
-}
-
-SQLTypeInfo ColumnListType::toTypeInfo() const {
-  auto col_ti = column_type_->toTypeInfo();
-  CHECK(col_ti.get_subtype() == kNULLT);
-  SQLTypeInfo res(kCOLUMN_LIST,
-                  length_,
-                  0,
-                  !nullable(),
-                  col_ti.get_compression(),
-                  0,
-                  col_ti.get_type());
-  res.set_size(col_ti.get_size());
-  return res;
 }
 
 }  // namespace hdk::ir

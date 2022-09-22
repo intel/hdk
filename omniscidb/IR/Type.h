@@ -105,9 +105,6 @@ class Type {
 
   void print() const;
 
-  virtual SQLTypeInfo toTypeInfo() const = 0;
-  static const Type* fromTypeInfo(Context& ctx, const SQLTypeInfo& ti);
-
  protected:
   Type(Context& ctx, Id id, int size, bool nullable);
 
@@ -127,8 +124,6 @@ class NullType : public Type {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  private:
   friend class ContextImpl;
 
@@ -143,8 +138,6 @@ class BooleanType : public Type {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -158,8 +151,6 @@ class IntegerType : public Type {
   const Type* withNullable(bool nullable) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -184,8 +175,6 @@ class FloatingPointType : public Type {
   bool equal(const Type& other) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -212,8 +201,6 @@ class DecimalType : public Type {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -235,8 +222,6 @@ class VarCharType : public Type {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -252,8 +237,6 @@ class TextType : public Type {
   const Type* withNullable(bool nullable) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -297,8 +280,6 @@ class DateType : public DateTimeBaseType {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -316,8 +297,6 @@ class TimeType : public DateTimeBaseType {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -331,8 +310,6 @@ class TimestampType : public DateTimeBaseType {
   const Type* withNullable(bool nullable) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -350,8 +327,6 @@ class IntervalType : public DateTimeBaseType {
   const Type* withNullable(bool nullable) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -394,8 +369,6 @@ class FixedLenArrayType : public ArrayBaseType {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -420,8 +393,6 @@ class VarLenArrayType : public ArrayBaseType {
   bool equal(const Type& other) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -448,8 +419,6 @@ class ExtDictionaryType : public Type {
 
   std::string toString() const override;
 
-  SQLTypeInfo toTypeInfo() const override;
-
  protected:
   friend class ContextImpl;
 
@@ -472,8 +441,6 @@ class ColumnType : public Type {
   bool equal(const Type& other) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;
@@ -499,8 +466,6 @@ class ColumnListType : public Type {
   bool equal(const Type& other) const override;
 
   std::string toString() const override;
-
-  SQLTypeInfo toTypeInfo() const override;
 
  protected:
   friend class ContextImpl;

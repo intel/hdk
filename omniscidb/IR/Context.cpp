@@ -311,114 +311,6 @@ class ContextImpl {
     }
   }
 
-  const Type* fromTypeInfo(const SQLTypeInfo& ti) {
-    auto nullable = !ti.get_notnull();
-    auto compression = ti.get_compression();
-    if (compression == kENCODING_SPARSE || compression == kENCODING_RL ||
-        compression == kENCODING_DIFF) {
-      throw UnsupportedTypeError()
-          << "Unsupported SQLTypeInfo conversion: " << ti.toString();
-    }
-
-    switch (ti.get_type()) {
-      case kNULLT:
-        return null();
-      case kBOOLEAN:
-        return boolean(nullable);
-      case kTINYINT:
-      case kSMALLINT:
-      case kINT:
-      case kBIGINT:
-        return integer(ti.get_size(), nullable);
-      case kNUMERIC:
-      case kDECIMAL:
-        return decimal(ti.get_size(), ti.get_precision(), ti.get_scale(), nullable);
-      case kFLOAT:
-        return fp(FloatingPointType::kFloat, nullable);
-      case kDOUBLE:
-        return fp(FloatingPointType::kDouble, nullable);
-      case kDATE:
-        if (ti.get_compression() == kENCODING_DATE_IN_DAYS) {
-          return date(ti.get_size(), TimeUnit::kDay, nullable);
-        } else {
-          return date(ti.get_size(), TimeUnit::kSecond, nullable);
-        }
-      case kTIME:
-        if (compression == kENCODING_NONE) {
-          return time(ti.get_size(), TimeUnit::kSecond, nullable);
-        }
-        break;
-      case kTIMESTAMP:
-        if (compression == kENCODING_NONE && ti.get_size() == 8) {
-          TimeUnit unit;
-          switch (ti.get_dimension()) {
-            case 0:
-              unit = TimeUnit::kSecond;
-              break;
-            case 3:
-              unit = TimeUnit::kMilli;
-              break;
-            case 6:
-              unit = TimeUnit::kMicro;
-              break;
-            case 9:
-              unit = TimeUnit::kNano;
-              break;
-            default:
-              throw UnsupportedTypeError()
-                  << "Unsupported SQLTypeInfo conversion: " << ti.toString();
-          }
-          return timestamp(unit, nullable);
-        }
-        break;
-      case kINTERVAL_DAY_TIME:
-        if (compression == kENCODING_NONE) {
-          return interval(ti.get_size(), TimeUnit::kMilli, nullable);
-        }
-        break;
-      case kINTERVAL_YEAR_MONTH:
-        if (compression == kENCODING_NONE) {
-          return interval(ti.get_size(), TimeUnit::kMonth, nullable);
-        }
-        break;
-      case kTEXT:
-        if (compression == kENCODING_DICT) {
-          return extDict(text(nullable), ti.get_comp_param(), ti.get_size());
-        } else {
-          return text(nullable);
-        }
-      case kVARCHAR:
-        if (compression == kENCODING_DICT) {
-          return extDict(
-              varChar(ti.get_dimension(), nullable), ti.get_comp_param(), ti.get_size());
-        } else {
-          return varChar(ti.get_dimension(), nullable);
-        }
-      case kARRAY: {
-        auto elem_type = fromTypeInfo(ti.get_elem_type());
-        if (ti.get_size() > 0) {
-          return arrayFixed(ti.get_size() / elem_type->size(), elem_type, nullable);
-        } else {
-          return arrayVarlen(elem_type, 4, nullable);
-        }
-      }
-      case kCOLUMN: {
-        auto column_type = fromTypeInfo(ti.get_elem_type());
-        return column(column_type, nullable);
-      }
-      case kCOLUMN_LIST: {
-        auto column_type = fromTypeInfo(ti.get_elem_type());
-        return columnList(column_type, ti.get_dimension(), nullable);
-      }
-      case kCHAR:
-        break;
-      default:
-        break;
-    }
-    throw UnsupportedTypeError()
-        << "Unsupported SQLTypeInfo conversion: " << ti.toString();
-  }
-
  private:
   Context& ctx_;
   std::unique_ptr<const NullType> null_type_;
@@ -618,10 +510,6 @@ const ColumnListType* Context::columnList(const Type* column_type,
 
 const Type* Context::copyType(const Type* type) {
   return impl_->copyType(type);
-}
-
-const Type* Context::fromTypeInfo(const SQLTypeInfo& ti) {
-  return impl_->fromTypeInfo(ti);
 }
 
 Context& Context::defaultCtx() {
