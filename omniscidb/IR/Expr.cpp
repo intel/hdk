@@ -943,29 +943,6 @@ void BinOper::check_group_by(const std::list<ExprPtr>& groupby) const {
   right_operand->check_group_by(groupby);
 }
 
-bool BinOper::simple_predicate_has_simple_cast(const ExprPtr cast_operand,
-                                               const ExprPtr const_operand) {
-  if (expr_is<UOper>(cast_operand) && expr_is<Constant>(const_operand)) {
-    auto u_expr = std::dynamic_pointer_cast<UOper>(cast_operand);
-    if (u_expr->get_optype() != kCAST) {
-      return false;
-    }
-    if (!(expr_is<ColumnVar>(u_expr->get_own_operand()) &&
-          !expr_is<Var>(u_expr->get_own_operand()))) {
-      return false;
-    }
-    auto type = u_expr->type();
-    if (type->isDateTime() && u_expr->get_operand()->type()->isDateTime()) {
-      // Allow casts between time types to pass through
-      return true;
-    } else if (type->isInteger() && u_expr->get_operand()->type()->isInteger()) {
-      // Allow casts between integer types to pass through
-      return true;
-    }
-  }
-  return false;
-}
-
 void ColumnVar::group_predicates(std::list<const Expr*>& scan_predicates,
                                  std::list<const Expr*>& join_predicates,
                                  std::list<const Expr*>& const_predicates) const {

@@ -557,8 +557,6 @@ class BinOper : public Expr {
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
                  std::list<const Expr*>& expr_list) const override;
-  static bool simple_predicate_has_simple_cast(const ExprPtr cast_operand,
-                                               const ExprPtr const_operand);
 
   size_t hash() const override;
 

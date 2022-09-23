@@ -595,6 +595,32 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
       arg, value_exprs, !arg_type->nullable() && !col_type->nullable());
 }
 
+namespace {
+
+bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
+                                      const hdk::ir::ExprPtr const_operand) {
+  if (hdk::ir::expr_is<hdk::ir::UOper>(cast_operand) &&
+      hdk::ir::expr_is<hdk::ir::Constant>(const_operand)) {
+    auto u_expr = std::dynamic_pointer_cast<hdk::ir::UOper>(cast_operand);
+    if (u_expr->get_optype() != kCAST) {
+      return false;
+    }
+    if (!(hdk::ir::expr_is<hdk::ir::ColumnVar>(u_expr->get_own_operand()) &&
+          !hdk::ir::expr_is<hdk::ir::Var>(u_expr->get_own_operand()))) {
+      return false;
+    }
+    auto type = u_expr->type();
+    if (type->isDateTime() && u_expr->get_operand()->type()->isDateTime()) {
+      // Allow casts between time types to pass through
+      return true;
+    } else if (type->isInteger() && u_expr->get_operand()->type()->isInteger()) {
+      // Allow casts between integer types to pass through
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
  * @brief normalize_simple_predicate only applies to boolean expressions.
  * it checks if it is an expression comparing a column
@@ -612,14 +638,14 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
   auto left_operand = bin_oper->get_own_left_operand();
   auto right_operand = bin_oper->get_own_right_operand();
   if (hdk::ir::expr_is<hdk::ir::UOper>(left_operand)) {
-    if (hdk::ir::BinOper::simple_predicate_has_simple_cast(left_operand, right_operand)) {
+    if (simple_predicate_has_simple_cast(left_operand, right_operand)) {
       auto uo = std::dynamic_pointer_cast<hdk::ir::UOper>(left_operand);
       auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(uo->get_own_operand());
       rte_idx = cv->get_rte_idx();
       return bin_oper->deep_copy();
     }
   } else if (hdk::ir::expr_is<hdk::ir::UOper>(right_operand)) {
-    if (hdk::ir::BinOper::simple_predicate_has_simple_cast(right_operand, left_operand)) {
+    if (simple_predicate_has_simple_cast(right_operand, left_operand)) {
       auto uo = std::dynamic_pointer_cast<hdk::ir::UOper>(right_operand);
       auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(uo->get_own_operand());
       rte_idx = cv->get_rte_idx();
@@ -651,6 +677,8 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
   }
   return nullptr;
 }
+
+}  // namespace
 
 QualsConjunctiveForm qual_to_conjunctive_form(const hdk::ir::ExprPtr qual_expr) {
   CHECK(qual_expr);
