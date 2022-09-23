@@ -80,61 +80,15 @@ class Expr : public std::enable_shared_from_this<Expr> {
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
-  void set_contains_agg(bool a) { contains_agg = a; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false);
   virtual void check_group_by(const ExprPtrList& groupby) const {};
   virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
 
   /*
-   * @brief seperate conjunctive predicates into scan predicates, join predicates and
-   * constant predicates.
-   */
-  virtual void group_predicates(std::list<const Expr*>& scan_predicates,
-                                std::list<const Expr*>& join_predicates,
-                                std::list<const Expr*>& const_predicates) const {}
-  /*
    * @brief collect_rte_idx collects the indices of all the range table
    * entries involved in an expression
    */
   virtual void collect_rte_idx(std::set<int>& rte_idx_set) const {}
-  /*
-   * @brief collect_column_var collects all unique ColumnVar nodes in an expression
-   * If include_agg = false, it does not include to ColumnVar nodes inside
-   * the argument to AggExpr's.  Otherwise, they are included.
-   * It does not make copies of the ColumnVar
-   */
-  virtual void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const {}
-  /*
-   * @brief rewrite_with_targetlist rewrite ColumnVar's in expression with entries in a
-   * targetlist. targetlist expressions are expected to be only Var's or AggExpr's.
-   * returns a new expression copy
-   */
-  virtual ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-    return deep_copy();
-  };
-  /*
-   * @brief rewrite_with_child_targetlist rewrite ColumnVar's in expression with entries
-   * in a child plan's targetlist. targetlist expressions are expected to be only Var's or
-   * ColumnVar's returns a new expression copy
-   */
-  virtual ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-    return deep_copy();
-  };
-  /*
-   * @brief rewrite_agg_to_var rewrite ColumnVar's in expression with entries in an
-   * AggPlan's targetlist. targetlist expressions are expected to be only Var's or
-   * ColumnVar's or AggExpr's All AggExpr's are written into Var's. returns a new
-   * expression copy
-   */
-  virtual ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const {
-    return deep_copy();
-  }
   virtual bool operator==(const Expr& rhs) const = 0;
   virtual std::string toString() const = 0;
   virtual void print() const;
@@ -268,9 +222,6 @@ class ColumnVar : public Expr {
 
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     rte_idx_set.insert(rte_idx);
   }
@@ -279,18 +230,6 @@ class ColumnVar : public Expr {
            (l->get_table_id() == r->get_table_id() &&
             l->get_column_id() < r->get_column_id());
   }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    colvar_set.insert(this);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -352,16 +291,6 @@ class Var : public ColumnVar {
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     rte_idx_set.insert(-1);
   }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return deep_copy();
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return deep_copy();
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
 
   size_t hash() const override;
 
@@ -450,32 +379,8 @@ class UOper : public Expr {
   bool is_dict_intersection() const { return is_dict_intersection_; }
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     operand->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    operand->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<UOper>(
-        type_, contains_agg, optype, operand->rewrite_with_targetlist(tlist));
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<UOper>(
-        type_, contains_agg, optype, operand->rewrite_with_child_targetlist(tlist));
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<UOper>(
-        type_, contains_agg, optype, operand->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -512,46 +417,9 @@ class BinOper : public Expr {
 
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     left_operand->collect_rte_idx(rte_idx_set);
     right_operand->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    left_operand->collect_column_var(colvar_set, include_agg);
-    right_operand->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_,
-                             contains_agg,
-                             optype,
-                             qualifier,
-                             left_operand->rewrite_with_targetlist(tlist),
-                             right_operand->rewrite_with_targetlist(tlist));
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_,
-                             contains_agg,
-                             optype,
-                             qualifier,
-                             left_operand->rewrite_with_child_targetlist(tlist),
-                             right_operand->rewrite_with_child_targetlist(tlist));
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<BinOper>(type_,
-                             contains_agg,
-                             optype,
-                             qualifier,
-                             left_operand->rewrite_agg_to_var(tlist),
-                             right_operand->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -594,14 +462,6 @@ class RangeOper : public Expr {
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     left_operand_->collect_rte_idx(rte_idx_set);
     right_operand_->collect_rte_idx(rte_idx_set);
-  }
-
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    left_operand_->collect_column_var(colvar_set, include_agg);
-    right_operand_->collect_column_var(colvar_set, include_agg);
   }
 
   size_t hash() const override;
@@ -648,24 +508,9 @@ class InValues : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   const ExprPtrList& get_value_list() const { return value_list; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
   }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -751,31 +596,8 @@ class CharLengthExpr : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   bool get_calc_encoded_length() const { return calc_encoded_length; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CharLengthExpr>(arg->rewrite_with_targetlist(tlist),
-                                    calc_encoded_length);
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CharLengthExpr>(arg->rewrite_with_child_targetlist(tlist),
-                                    calc_encoded_length);
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CharLengthExpr>(arg->rewrite_agg_to_var(tlist), calc_encoded_length);
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -800,29 +622,8 @@ class KeyForStringExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<KeyForStringExpr>(arg->rewrite_with_targetlist(tlist));
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<KeyForStringExpr>(arg->rewrite_with_child_targetlist(tlist));
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<KeyForStringExpr>(arg->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -846,29 +647,8 @@ class SampleRatioExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<SampleRatioExpr>(arg->rewrite_with_targetlist(tlist));
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<SampleRatioExpr>(arg->rewrite_with_child_targetlist(tlist));
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<SampleRatioExpr>(arg->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -898,33 +678,7 @@ class LowerExpr : public Expr {
     arg->collect_rte_idx(rte_idx_set);
   }
 
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LowerExpr>(arg->rewrite_with_targetlist(tlist));
-  }
-
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LowerExpr>(arg->rewrite_with_child_targetlist(tlist));
-  }
-
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LowerExpr>(arg->rewrite_agg_to_var(tlist));
-  }
-
   ExprPtr deep_copy() const override;
-
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
 
   bool operator==(const Expr& rhs) const override;
 
@@ -950,29 +704,8 @@ class CardinalityExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CardinalityExpr>(arg->rewrite_with_targetlist(tlist));
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CardinalityExpr>(arg->rewrite_with_child_targetlist(tlist));
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<CardinalityExpr>(arg->rewrite_agg_to_var(tlist));
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1006,41 +739,8 @@ class LikeExpr : public Expr {
   bool get_is_ilike() const { return is_ilike; }
   bool get_is_simple() const { return is_simple; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikeExpr>(arg->rewrite_with_targetlist(tlist),
-                              like_expr->deep_copy(),
-                              escape_expr ? escape_expr->deep_copy() : nullptr,
-                              is_ilike,
-                              is_simple);
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikeExpr>(arg->rewrite_with_child_targetlist(tlist),
-                              like_expr->deep_copy(),
-                              escape_expr ? escape_expr->deep_copy() : nullptr,
-                              is_ilike,
-                              is_simple);
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikeExpr>(arg->rewrite_agg_to_var(tlist),
-                              like_expr->deep_copy(),
-                              escape_expr ? escape_expr->deep_copy() : nullptr,
-                              is_ilike,
-                              is_simple);
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1075,35 +775,8 @@ class RegexpExpr : public Expr {
   const Expr* get_pattern_expr() const { return pattern_expr.get(); }
   const Expr* get_escape_expr() const { return escape_expr.get(); }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<RegexpExpr>(arg->rewrite_with_targetlist(tlist),
-                                pattern_expr->deep_copy(),
-                                escape_expr ? escape_expr->deep_copy() : nullptr);
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<RegexpExpr>(arg->rewrite_with_child_targetlist(tlist),
-                                pattern_expr->deep_copy(),
-                                escape_expr ? escape_expr->deep_copy() : nullptr);
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<RegexpExpr>(arg->rewrite_agg_to_var(tlist),
-                                pattern_expr->deep_copy(),
-                                escape_expr ? escape_expr->deep_copy() : nullptr);
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1140,38 +813,8 @@ class WidthBucketExpr : public Expr {
   const Expr* get_upper_bound() const { return upper_bound_.get(); }
   const Expr* get_partition_count() const { return partition_count_.get(); }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     target_value_->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    target_value_->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<WidthBucketExpr>(target_value_->rewrite_with_targetlist(tlist),
-                                     lower_bound_,
-                                     upper_bound_,
-                                     partition_count_);
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<WidthBucketExpr>(target_value_->rewrite_with_child_targetlist(tlist),
-                                     lower_bound_,
-                                     upper_bound_,
-                                     partition_count_);
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<WidthBucketExpr>(target_value_->rewrite_agg_to_var(tlist),
-                                     lower_bound_,
-                                     upper_bound_,
-                                     partition_count_);
   }
   double get_bound_val(const Expr* bound_expr) const;
   int32_t get_partition_count_val() const;
@@ -1241,30 +884,8 @@ class LikelihoodExpr : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   float get_likelihood() const { return likelihood; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     arg->collect_rte_idx(rte_idx_set);
-  }
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    arg->collect_column_var(colvar_set, include_agg);
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikelihoodExpr>(arg->rewrite_with_targetlist(tlist), likelihood);
-  }
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikelihoodExpr>(arg->rewrite_with_child_targetlist(tlist),
-                                    likelihood);
-  }
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override {
-    return makeExpr<LikelihoodExpr>(arg->rewrite_agg_to_var(tlist), likelihood);
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1292,28 +913,11 @@ class AggExpr : public Expr {
   bool get_is_distinct() const { return is_distinct; }
   std::shared_ptr<Constant> get_arg1() const { return arg1; }
   ExprPtr deep_copy() const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override {
     if (arg) {
       arg->collect_rte_idx(rte_idx_set);
     }
   };
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override {
-    if (include_agg && arg != nullptr) {
-      arg->collect_column_var(colvar_set, include_agg);
-    }
-  }
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1346,20 +950,7 @@ class CaseExpr : public Expr {
   const Expr* get_else_expr() const { return else_expr.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1390,20 +981,7 @@ class ExtractExpr : public Expr {
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1432,20 +1010,7 @@ class DateaddExpr : public Expr {
   const Expr* get_datetime_expr() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1475,20 +1040,7 @@ class DatediffExpr : public Expr {
   const Expr* get_end_expr() const { return end_.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1515,20 +1067,7 @@ class DatetruncExpr : public Expr {
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void group_predicates(std::list<const Expr*>& scan_predicates,
-                        std::list<const Expr*>& join_predicates,
-                        std::list<const Expr*>& const_predicates) const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
-  ExprPtr rewrite_with_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_with_child_targetlist(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
-  ExprPtr rewrite_agg_to_var(
-      const std::vector<std::shared_ptr<TargetEntry>>& tlist) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1564,10 +1103,6 @@ class FunctionOper : public Expr {
 
   ExprPtr deep_copy() const override;
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1702,10 +1237,6 @@ class ArrayExpr : public Expr {
   }
 
   void collect_rte_idx(std::set<int>& rte_idx_set) const override;
-  void collect_column_var(
-      std::set<const ColumnVar*, bool (*)(const ColumnVar*, const ColumnVar*)>&
-          colvar_set,
-      bool include_agg) const override;
 
   size_t hash() const override;
 
