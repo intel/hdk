@@ -966,49 +966,6 @@ bool BinOper::simple_predicate_has_simple_cast(const ExprPtr cast_operand,
   return false;
 }
 
-ExprPtr BinOper::normalize_simple_predicate(int& rte_idx) const {
-  rte_idx = -1;
-  if (!IS_COMPARISON(optype) || qualifier != kONE) {
-    return nullptr;
-  }
-  if (expr_is<UOper>(left_operand)) {
-    if (BinOper::simple_predicate_has_simple_cast(left_operand, right_operand)) {
-      auto uo = std::dynamic_pointer_cast<UOper>(left_operand);
-      auto cv = std::dynamic_pointer_cast<ColumnVar>(uo->get_own_operand());
-      rte_idx = cv->get_rte_idx();
-      return this->deep_copy();
-    }
-  } else if (expr_is<UOper>(right_operand)) {
-    if (BinOper::simple_predicate_has_simple_cast(right_operand, left_operand)) {
-      auto uo = std::dynamic_pointer_cast<UOper>(right_operand);
-      auto cv = std::dynamic_pointer_cast<ColumnVar>(uo->get_own_operand());
-      rte_idx = cv->get_rte_idx();
-      return makeExpr<BinOper>(type_,
-                               contains_agg,
-                               COMMUTE_COMPARISON(optype),
-                               qualifier,
-                               right_operand->deep_copy(),
-                               left_operand->deep_copy());
-    }
-  } else if (expr_is<ColumnVar>(left_operand) && !expr_is<Var>(left_operand) &&
-             expr_is<Constant>(right_operand)) {
-    auto cv = std::dynamic_pointer_cast<ColumnVar>(left_operand);
-    rte_idx = cv->get_rte_idx();
-    return this->deep_copy();
-  } else if (expr_is<Constant>(left_operand) && expr_is<ColumnVar>(right_operand) &&
-             !expr_is<Var>(right_operand)) {
-    auto cv = std::dynamic_pointer_cast<ColumnVar>(right_operand);
-    rte_idx = cv->get_rte_idx();
-    return makeExpr<BinOper>(type_,
-                             contains_agg,
-                             COMMUTE_COMPARISON(optype),
-                             qualifier,
-                             right_operand->deep_copy(),
-                             left_operand->deep_copy());
-  }
-  return nullptr;
-}
-
 void ColumnVar::group_predicates(std::list<const Expr*>& scan_predicates,
                                  std::list<const Expr*>& join_predicates,
                                  std::list<const Expr*>& const_predicates) const {

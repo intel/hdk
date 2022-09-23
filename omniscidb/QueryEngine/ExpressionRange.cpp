@@ -155,7 +155,7 @@ ExpressionRange apply_simple_quals(
     if (!qual_col) {
       // Check for possibility that column is wrapped in a cast
       // Presumes that only simple casts (i.e. timestamp to timestamp or int to int) have
-      // been passed through by BinOper::normalize_simple_predicate
+      // been passed through by normalize_simple_predicate
       auto u_expr = dynamic_cast<const hdk::ir::UOper*>(left_operand);
       if (!u_expr) {
         continue;

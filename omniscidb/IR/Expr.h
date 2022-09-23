@@ -86,17 +86,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
 
   /*
-   * @brief normalize_simple_predicate only applies to boolean expressions.
-   * it checks if it is an expression comparing a column
-   * with a constant.  if so, it returns a normalized copy of the predicate with ColumnVar
-   * always as the left operand with rte_idx set to the rte_idx of the ColumnVar.
-   * it returns nullptr with rte_idx set to -1 otherwise.
-   */
-  virtual ExprPtr normalize_simple_predicate(int& rte_idx) const {
-    rte_idx = -1;
-    return nullptr;
-  }
-  /*
    * @brief seperate conjunctive predicates into scan predicates, join predicates and
    * constant predicates.
    */
@@ -523,7 +512,6 @@ class BinOper : public Expr {
 
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  ExprPtr normalize_simple_predicate(int& rte_idx) const override;
   void group_predicates(std::list<const Expr*>& scan_predicates,
                         std::list<const Expr*>& join_predicates,
                         std::list<const Expr*>& const_predicates) const override;
