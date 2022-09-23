@@ -84,11 +84,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual void check_group_by(const ExprPtrList& groupby) const {};
   virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
 
-  /*
-   * @brief collect_rte_idx collects the indices of all the range table
-   * entries involved in an expression
-   */
-  virtual void collect_rte_idx(std::set<int>& rte_idx_set) const {}
   virtual bool operator==(const Expr& rhs) const = 0;
   virtual std::string toString() const = 0;
   virtual void print() const;
@@ -222,9 +217,6 @@ class ColumnVar : public Expr {
 
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    rte_idx_set.insert(rte_idx);
-  }
   static bool colvar_comp(const ColumnVar* l, const ColumnVar* r) {
     return l->get_table_id() < r->get_table_id() ||
            (l->get_table_id() == r->get_table_id() &&
@@ -251,8 +243,6 @@ class ExpressionTuple : public Expr {
       : Expr(hdk::ir::Context::defaultCtx().null()), tuple_(tuple){};
 
   const ExprPtrVector& getTuple() const { return tuple_; }
-
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
 
   ExprPtr deep_copy() const override;
 
@@ -288,9 +278,6 @@ class Var : public ColumnVar {
   ExprPtr deep_copy() const override;
   std::string toString() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    rte_idx_set.insert(-1);
-  }
 
   size_t hash() const override;
 
@@ -379,9 +366,6 @@ class UOper : public Expr {
   bool is_dict_intersection() const { return is_dict_intersection_; }
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    operand->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -417,10 +401,6 @@ class BinOper : public Expr {
 
   void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    left_operand->collect_rte_idx(rte_idx_set);
-    right_operand->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -458,11 +438,6 @@ class RangeOper : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    left_operand_->collect_rte_idx(rte_idx_set);
-    right_operand_->collect_rte_idx(rte_idx_set);
-  }
 
   size_t hash() const override;
 
@@ -508,9 +483,6 @@ class InValues : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   const ExprPtrList& get_value_list() const { return value_list; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -596,9 +568,6 @@ class CharLengthExpr : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   bool get_calc_encoded_length() const { return calc_encoded_length; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -622,9 +591,6 @@ class KeyForStringExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -647,9 +613,6 @@ class SampleRatioExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -673,10 +636,6 @@ class LowerExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
 
   const ExprPtr get_own_arg() const { return arg; }
-
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
 
   ExprPtr deep_copy() const override;
 
@@ -704,9 +663,6 @@ class CardinalityExpr : public Expr {
   const Expr* get_arg() const { return arg.get(); }
   const ExprPtr get_own_arg() const { return arg; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -739,9 +695,6 @@ class LikeExpr : public Expr {
   bool get_is_ilike() const { return is_ilike; }
   bool get_is_simple() const { return is_simple; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -775,9 +728,6 @@ class RegexpExpr : public Expr {
   const Expr* get_pattern_expr() const { return pattern_expr.get(); }
   const Expr* get_escape_expr() const { return escape_expr.get(); }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -813,9 +763,6 @@ class WidthBucketExpr : public Expr {
   const Expr* get_upper_bound() const { return upper_bound_.get(); }
   const Expr* get_partition_count() const { return partition_count_.get(); }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    target_value_->collect_rte_idx(rte_idx_set);
-  }
   double get_bound_val(const Expr* bound_expr) const;
   int32_t get_partition_count_val() const;
   template <typename T>
@@ -884,9 +831,6 @@ class LikelihoodExpr : public Expr {
   const ExprPtr get_own_arg() const { return arg; }
   float get_likelihood() const { return likelihood; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    arg->collect_rte_idx(rte_idx_set);
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -913,11 +857,6 @@ class AggExpr : public Expr {
   bool get_is_distinct() const { return is_distinct; }
   std::shared_ptr<Constant> get_arg1() const { return arg1; }
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override {
-    if (arg) {
-      arg->collect_rte_idx(rte_idx_set);
-    }
-  };
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -950,7 +889,6 @@ class CaseExpr : public Expr {
   const Expr* get_else_expr() const { return else_expr.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -981,7 +919,6 @@ class ExtractExpr : public Expr {
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1010,7 +947,6 @@ class DateaddExpr : public Expr {
   const Expr* get_datetime_expr() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1040,7 +976,6 @@ class DatediffExpr : public Expr {
   const Expr* get_end_expr() const { return end_.get(); }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1067,7 +1002,6 @@ class DatetruncExpr : public Expr {
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
   void check_group_by(const ExprPtrList& groupby) const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   void find_expr(bool (*f)(const Expr*),
@@ -1102,7 +1036,6 @@ class FunctionOper : public Expr {
   }
 
   ExprPtr deep_copy() const override;
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1235,8 +1168,6 @@ class ArrayExpr : public Expr {
     CHECK_LT(i, contained_expressions_.size());
     return contained_expressions_[i].get();
   }
-
-  void collect_rte_idx(std::set<int>& rte_idx_set) const override;
 
   size_t hash() const override;
 

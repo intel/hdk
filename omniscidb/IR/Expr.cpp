@@ -377,12 +377,6 @@ ExprPtr ColumnVar::deep_copy() const {
   return makeExpr<ColumnVar>(col_info_, rte_idx);
 }
 
-void ExpressionTuple::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  for (const auto& column : tuple_) {
-    column->collect_rte_idx(rte_idx_set);
-  }
-}
-
 ExprPtr ExpressionTuple::deep_copy() const {
   std::vector<ExprPtr> tuple_deep_copy;
   for (const auto& column : tuple_) {
@@ -1880,48 +1874,6 @@ void DatetruncExpr::find_expr(bool (*f)(const Expr*),
     return;
   }
   from_expr_->find_expr(f, expr_list);
-}
-
-void CaseExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  for (auto p : expr_pair_list) {
-    p.first->collect_rte_idx(rte_idx_set);
-    p.second->collect_rte_idx(rte_idx_set);
-  }
-  if (else_expr != nullptr) {
-    else_expr->collect_rte_idx(rte_idx_set);
-  }
-}
-
-void ExtractExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  from_expr_->collect_rte_idx(rte_idx_set);
-}
-
-void DateaddExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  number_->collect_rte_idx(rte_idx_set);
-  datetime_->collect_rte_idx(rte_idx_set);
-}
-
-void DatediffExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  start_->collect_rte_idx(rte_idx_set);
-  end_->collect_rte_idx(rte_idx_set);
-}
-
-void DatetruncExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  from_expr_->collect_rte_idx(rte_idx_set);
-}
-
-void ArrayExpr::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  for (unsigned i = 0; i < getElementCount(); i++) {
-    const auto expr = getElement(i);
-    expr->collect_rte_idx(rte_idx_set);
-  }
-}
-
-void FunctionOper::collect_rte_idx(std::set<int>& rte_idx_set) const {
-  for (unsigned i = 0; i < getArity(); i++) {
-    const auto expr = getArg(i);
-    expr->collect_rte_idx(rte_idx_set);
-  }
 }
 
 void CaseExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
