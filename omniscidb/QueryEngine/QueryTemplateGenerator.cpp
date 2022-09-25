@@ -633,8 +633,8 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
           "group_buff_idx_varlen_offset",
           bb_entry);
     } else {
-      row_func_call_args->varlen_output_buffer =
-          llvm::ConstantPointerNull::get(llvm::Type::getInt64PtrTy(mod->getContext()));
+      row_func_call_args->varlen_output_buffer = llvm::ConstantPointerNull::get(
+          codegen_traits.localPointerType(llvm::Type::getInt64Ty(mod->getContext())));
     }
     CHECK(row_func_call_args && row_func_call_args->varlen_output_buffer);
 

@@ -1481,8 +1481,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   auto traits = backend->traits();
 
   if (is_gpu) {
-    cgen_state_->module_->setDataLayout(compiler::get_gpu_data_layout());
-    cgen_state_->module_->setTargetTriple(compiler::get_gpu_target_triple_string());
+    cgen_state_->module_->setDataLayout(traits.dataLayout());
+    cgen_state_->module_->setTargetTriple(traits.triple());
   }
   if (has_udf_module(/*is_gpu=*/is_gpu)) {
     CodeGenerator::link_udf_module(getExtModuleContext()->getUdfModule(/*is_gpu=*/is_gpu),

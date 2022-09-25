@@ -161,7 +161,9 @@ void TargetExprCodegen::codegen(
             LL_BUILDER.CreateAdd(std::get<1>(agg_out_ptr_w_idx), LL_INT(col_off));
         auto* bit_cast = LL_BUILDER.CreateBitCast(
             std::get<0>(agg_out_ptr_w_idx),
-            llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT), 0));
+            llvm::PointerType::get(
+                get_int_type((chosen_bytes << 3), LL_CONTEXT),
+                std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
         agg_col_ptr = LL_BUILDER.CreateGEP(
             bit_cast->getType()->getScalarType()->getPointerElementType(),
             bit_cast,
@@ -172,7 +174,9 @@ void TargetExprCodegen::codegen(
         col_off /= chosen_bytes;
         auto* bit_cast = LL_BUILDER.CreateBitCast(
             std::get<0>(agg_out_ptr_w_idx),
-            llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT), 0));
+            llvm::PointerType::get(
+                get_int_type((chosen_bytes << 3), LL_CONTEXT),
+                std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
         agg_col_ptr = LL_BUILDER.CreateGEP(
             bit_cast->getType()->getScalarType()->getPointerElementType(),
             bit_cast,
@@ -182,10 +186,12 @@ void TargetExprCodegen::codegen(
 
     if (chosen_bytes != sizeof(int32_t)) {
       CHECK_EQ(8, chosen_bytes);
+      llvm::Value* acc_col = is_group_by ? agg_col_ptr : agg_out_vec[slot_index];
       if (executor->getConfig().exec.group_by.bigint_count) {
         const auto acc_i64 = LL_BUILDER.CreateBitCast(
-            is_group_by ? agg_col_ptr : agg_out_vec[slot_index],
-            llvm::PointerType::get(get_int_type(64, LL_CONTEXT), 0));
+            acc_col,
+            llvm::PointerType::get(get_int_type(64, LL_CONTEXT),
+                                   acc_col->getType()->getPointerAddressSpace()));
         if (gpu_smem_context.isSharedMemoryUsed()) {
           row_func_builder->emitCall(
               "agg_count_shared", std::vector<llvm::Value*>{acc_i64, LL_INT(int64_t(1))});
@@ -200,8 +206,9 @@ void TargetExprCodegen::codegen(
         }
       } else {
         auto acc_i32 = LL_BUILDER.CreateBitCast(
-            is_group_by ? agg_col_ptr : agg_out_vec[slot_index],
-            llvm::PointerType::get(get_int_type(32, LL_CONTEXT), 0));
+            acc_col,
+            llvm::PointerType::get(get_int_type(32, LL_CONTEXT),
+                                   acc_col->getType()->getPointerAddressSpace()));
         if (gpu_smem_context.isSharedMemoryUsed()) {
           acc_i32 = LL_BUILDER.CreatePointerCast(
               acc_i32, llvm::Type::getInt32PtrTy(LL_CONTEXT, 3));

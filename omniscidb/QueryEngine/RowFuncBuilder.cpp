@@ -793,7 +793,9 @@ bool RowFuncBuilder::codegenAggCalls(
       query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) {
     output_buffer_byte_stream = LL_BUILDER.CreateBitCast(
         std::get<0>(agg_out_ptr_w_idx),
-        llvm::PointerType::get(llvm::Type::getInt8Ty(LL_CONTEXT), 0));
+        llvm::PointerType::get(
+            llvm::Type::getInt8Ty(LL_CONTEXT),
+            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
     output_buffer_byte_stream->setName("out_buff_b_stream");
     CHECK(std::get<1>(agg_out_ptr_w_idx));
     out_row_idx = LL_BUILDER.CreateZExt(std::get<1>(agg_out_ptr_w_idx),
@@ -868,7 +870,8 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
           byte_offset);
       agg_col_ptr = LL_BUILDER.CreateBitCast(
           output_ptr,
-          llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT), 0));
+          llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT),
+                                 output_ptr->getType()->getPointerAddressSpace()));
       agg_col_ptr->setName("out_ptr_target_" + std::to_string(target_idx));
     } else {
       uint32_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
@@ -878,7 +881,9 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       auto offset = LL_BUILDER.CreateAdd(std::get<1>(agg_out_ptr_w_idx), LL_INT(col_off));
       auto* bit_cast = LL_BUILDER.CreateBitCast(
           std::get<0>(agg_out_ptr_w_idx),
-          llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT), 0));
+          llvm::PointerType::get(
+              get_int_type((chosen_bytes << 3), LL_CONTEXT),
+              std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
       agg_col_ptr = LL_BUILDER.CreateGEP(
           bit_cast->getType()->getScalarType()->getPointerElementType(),
           bit_cast,
@@ -890,7 +895,9 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     col_off /= chosen_bytes;
     auto* bit_cast = LL_BUILDER.CreateBitCast(
         std::get<0>(agg_out_ptr_w_idx),
-        llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT), 0));
+        llvm::PointerType::get(
+            get_int_type((chosen_bytes << 3), LL_CONTEXT),
+            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
     agg_col_ptr = LL_BUILDER.CreateGEP(
         bit_cast->getType()->getScalarType()->getPointerElementType(),
         bit_cast,

@@ -414,7 +414,11 @@ llvm::Value* CodeGenerator::colByteStream(const hdk::ir::ColumnVar* col_var,
       "col_buf" + std::to_string(plan_state_->getLocalColumnId(col_var, fetch_column));
   for (auto& arg : cgen_state_->row_func_->args()) {
     if (arg.getName() == stream_arg_name) {
-      CHECK(arg.getType() == llvm::Type::getInt8PtrTy(cgen_state_->context_));
+      CHECK(arg.getType()->isPointerTy());
+      CHECK_EQ(arg.getType(),
+               llvm::Type::getInt8PtrTy(cgen_state_->context_,
+                                        arg.getType()->getPointerAddressSpace()))
+          << ", actual arg type is " << toString(arg.getType());
       return &arg;
     }
   }
