@@ -81,7 +81,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false);
-  virtual void check_group_by(const ExprPtrList& groupby) const {};
   virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
 
   virtual bool operator==(const Expr& rhs) const = 0;
@@ -197,7 +196,6 @@ class ColumnVar : public Expr {
     }
   }
 
-  void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
   static bool colvar_comp(const ColumnVar* l, const ColumnVar* r) {
     return l->get_table_id() < r->get_table_id() ||
@@ -259,7 +257,6 @@ class Var : public ColumnVar {
   void set_varno(int n) { varno = n; }
   ExprPtr deep_copy() const override;
   std::string toString() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
 
   size_t hash() const override;
 
@@ -346,7 +343,6 @@ class UOper : public Expr {
   const Expr* get_operand() const { return operand.get(); }
   const ExprPtr get_own_operand() const { return operand; }
   bool is_dict_intersection() const { return is_dict_intersection_; }
-  void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -379,7 +375,6 @@ class BinOper : public Expr {
   const ExprPtr get_own_left_operand() const { return left_operand; }
   const ExprPtr get_own_right_operand() const { return right_operand; }
 
-  void check_group_by(const ExprPtrList& groupby) const override;
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -843,7 +838,6 @@ class CaseExpr : public Expr {
   }
   const Expr* get_else_expr() const { return else_expr.get(); }
   ExprPtr deep_copy() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   ExprPtr add_cast(const Type* new_type, bool is_dict_intersection) override;
@@ -870,7 +864,6 @@ class ExtractExpr : public Expr {
   const Expr* get_from_expr() const { return from_expr_.get(); }
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -896,7 +889,6 @@ class DateaddExpr : public Expr {
   const Expr* get_number_expr() const { return number_.get(); }
   const Expr* get_datetime_expr() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -923,7 +915,6 @@ class DatediffExpr : public Expr {
   const Expr* get_start_expr() const { return start_.get(); }
   const Expr* get_end_expr() const { return end_.get(); }
   ExprPtr deep_copy() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -947,7 +938,6 @@ class DatetruncExpr : public Expr {
   const Expr* get_from_expr() const { return from_expr_.get(); }
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
-  void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 

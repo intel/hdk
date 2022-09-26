@@ -906,37 +906,6 @@ ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) {
   return shared_from_this();
 }
 
-void ColumnVar::check_group_by(const std::list<ExprPtr>& groupby) const {
-  if (!groupby.empty()) {
-    for (auto e : groupby) {
-      auto c = std::dynamic_pointer_cast<ColumnVar>(e);
-      if (c && get_table_id() == c->get_table_id() &&
-          get_column_id() == c->get_column_id()) {
-        return;
-      }
-    }
-  }
-  throw std::runtime_error(
-      "expressions in the SELECT or HAVING clause must be an aggregate function or an "
-      "expression "
-      "over GROUP BY columns.");
-}
-
-void Var::check_group_by(const std::list<ExprPtr>& groupby) const {
-  if (which_row != kGROUPBY) {
-    throw std::runtime_error("Internal error: invalid VAR in GROUP BY or HAVING.");
-  }
-}
-
-void UOper::check_group_by(const std::list<ExprPtr>& groupby) const {
-  operand->check_group_by(groupby);
-}
-
-void BinOper::check_group_by(const std::list<ExprPtr>& groupby) const {
-  left_operand->check_group_by(groupby);
-  right_operand->check_group_by(groupby);
-}
-
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
     : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg(a), value_list(l) {}
 
@@ -1680,34 +1649,6 @@ std::string OrderEntry::toString() const {
   }
   str += " ";
   return str;
-}
-
-void CaseExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
-  for (auto p : expr_pair_list) {
-    p.first->check_group_by(groupby);
-    p.second->check_group_by(groupby);
-  }
-  if (else_expr != nullptr) {
-    else_expr->check_group_by(groupby);
-  }
-}
-
-void ExtractExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
-  from_expr_->check_group_by(groupby);
-}
-
-void DateaddExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
-  number_->check_group_by(groupby);
-  datetime_->check_group_by(groupby);
-}
-
-void DatediffExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
-  start_->check_group_by(groupby);
-  end_->check_group_by(groupby);
-}
-
-void DatetruncExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
-  from_expr_->check_group_by(groupby);
 }
 
 ExprPtr FunctionOper::deep_copy() const {
