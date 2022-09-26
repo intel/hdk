@@ -105,11 +105,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
    * @brief decompress adds cast operator to decompress encoded result
    */
   ExprPtr decompress();
-  /*
-   * @brief perform domain analysis on Expr and fill in domain
-   * information in domain_set.  Empty domain_set means no information.
-   */
-  virtual void get_domain(DomainSet& domain_set) const { domain_set.clear(); }
 
   virtual size_t hash() const;
 
@@ -894,7 +889,6 @@ class CaseExpr : public Expr {
   void find_expr(bool (*f)(const Expr*),
                  std::list<const Expr*>& expr_list) const override;
   ExprPtr add_cast(const Type* new_type, bool is_dict_intersection) override;
-  void get_domain(DomainSet& domain_set) const override;
 
   size_t hash() const override;
 

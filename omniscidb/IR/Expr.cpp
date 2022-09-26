@@ -1904,65 +1904,6 @@ void DatetruncExpr::check_group_by(const std::list<ExprPtr>& groupby) const {
   from_expr_->check_group_by(groupby);
 }
 
-void CaseExpr::get_domain(DomainSet& domain_set) const {
-  for (const auto& p : expr_pair_list) {
-    const auto c = std::dynamic_pointer_cast<const Constant>(p.second);
-    if (c != nullptr) {
-      c->add_unique(domain_set);
-    } else {
-      const auto v = std::dynamic_pointer_cast<const ColumnVar>(p.second);
-      if (v != nullptr) {
-        v->add_unique(domain_set);
-      } else {
-        const auto cast = std::dynamic_pointer_cast<const UOper>(p.second);
-        if (cast != nullptr && cast->get_optype() == kCAST) {
-          const Constant* c = dynamic_cast<const Constant*>(cast->get_operand());
-          if (c != nullptr) {
-            cast->add_unique(domain_set);
-            continue;
-          } else {
-            const auto v = std::dynamic_pointer_cast<const ColumnVar>(p.second);
-            if (v != nullptr) {
-              v->add_unique(domain_set);
-              continue;
-            }
-          }
-        }
-        p.second->get_domain(domain_set);
-        if (domain_set.empty()) {
-          return;
-        }
-      }
-    }
-  }
-  if (else_expr != nullptr) {
-    const auto c = std::dynamic_pointer_cast<const Constant>(else_expr);
-    if (c != nullptr) {
-      c->add_unique(domain_set);
-    } else {
-      const auto v = std::dynamic_pointer_cast<const ColumnVar>(else_expr);
-      if (v != nullptr) {
-        v->add_unique(domain_set);
-      } else {
-        const auto cast = std::dynamic_pointer_cast<const UOper>(else_expr);
-        if (cast != nullptr && cast->get_optype() == kCAST) {
-          const Constant* c = dynamic_cast<const Constant*>(cast->get_operand());
-          if (c != nullptr) {
-            c->add_unique(domain_set);
-          } else {
-            const auto v = std::dynamic_pointer_cast<const ColumnVar>(else_expr);
-            if (v != nullptr) {
-              v->add_unique(domain_set);
-            }
-          }
-        } else {
-          else_expr->get_domain(domain_set);
-        }
-      }
-    }
-  }
-}
-
 ExprPtr FunctionOper::deep_copy() const {
   std::vector<ExprPtr> args_copy;
   for (size_t i = 0; i < getArity(); ++i) {
