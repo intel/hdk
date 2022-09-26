@@ -16,6 +16,7 @@
 
 #include "CodeGenerator.h"
 #include "Execute.h"
+#include "ExprByPredicateVisitor.h"
 #include "NullableValue.h"
 
 #include <llvm/IR/MDBuilder.h>
@@ -46,8 +47,8 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
     }
     return false;
   };
-  std::list<const hdk::ir::Expr*> binoper_list;
-  expr->find_expr(is_div, binoper_list);
+  std::list<const hdk::ir::Expr*> binoper_list =
+      ExprByPredicateVisitor::collect(expr, is_div);
   return !binoper_list.empty();
 }
 

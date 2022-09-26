@@ -88,19 +88,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual std::string toString() const = 0;
   virtual void print() const;
 
-  virtual void add_unique(std::list<const Expr*>& expr_list) const;
-  /*
-   * @brief find_expr traverse Expr hierarchy and adds the node pointer to
-   * the expr_list if the function f returns true.
-   * Duplicate Expr's are not added the list.
-   * Cannot use std::set because we don't have an ordering function.
-   */
-  virtual void find_expr(bool (*f)(const Expr*),
-                         std::list<const Expr*>& expr_list) const {
-    if (f(this)) {
-      add_unique(expr_list);
-    }
-  }
   /*
    * @brief decompress adds cast operator to decompress encoded result
    */
@@ -363,8 +350,6 @@ class UOper : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
   ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false) override;
 
   size_t hash() const override;
@@ -398,8 +383,6 @@ class BinOper : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -480,8 +463,6 @@ class InValues : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -565,8 +546,6 @@ class CharLengthExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -588,8 +567,6 @@ class KeyForStringExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -610,8 +587,6 @@ class SampleRatioExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -638,9 +613,6 @@ class LowerExpr : public Expr {
 
   std::string toString() const override;
 
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
-
   size_t hash() const override;
 
  private:
@@ -660,8 +632,6 @@ class CardinalityExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -692,8 +662,6 @@ class LikeExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -725,8 +693,6 @@ class RegexpExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -794,8 +760,6 @@ class WidthBucketExpr : public Expr {
   }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
   bool can_skip_out_of_bound_check() const { return skip_out_of_bound_check_; }
   void skip_out_of_bound_check() const { skip_out_of_bound_check_ = true; }
   void set_constant_expr() const { constant_expr_ = true; }
@@ -828,8 +792,6 @@ class LikelihoodExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -854,8 +816,6 @@ class AggExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -886,8 +846,6 @@ class CaseExpr : public Expr {
   void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
   ExprPtr add_cast(const Type* new_type, bool is_dict_intersection) override;
 
   size_t hash() const override;
@@ -915,8 +873,6 @@ class ExtractExpr : public Expr {
   void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -943,8 +899,6 @@ class DateaddExpr : public Expr {
   void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -972,8 +926,6 @@ class DatediffExpr : public Expr {
   void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 
@@ -998,8 +950,6 @@ class DatetruncExpr : public Expr {
   void check_group_by(const ExprPtrList& groupby) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  void find_expr(bool (*f)(const Expr*),
-                 std::list<const Expr*>& expr_list) const override;
 
   size_t hash() const override;
 

@@ -20,6 +20,7 @@
 #include "DateTimeTranslator.h"
 #include "DeepCopyVisitor.h"
 #include "Descriptors/RelAlgExecutionDescriptor.h"
+#include "ExprByPredicateVisitor.h"
 #include "ExpressionRewrite.h"
 #include "ExtensionFunctionsBinding.h"
 #include "ExtensionFunctionsWhitelist.h"
@@ -2629,8 +2630,8 @@ void separate_window_function_expressions(
         continue;
       }
 
-      std::list<const hdk::ir::Expr*> window_function_exprs;
-      expr->find_expr(is_window_function_expr, window_function_exprs);
+      std::list<const hdk::ir::Expr*> window_function_exprs =
+          ExprByPredicateVisitor::collect(expr.get(), is_window_function_expr);
       if (!window_function_exprs.empty()) {
         const auto ret = embedded_window_function_exprs.insert(std::make_pair(
             i,
