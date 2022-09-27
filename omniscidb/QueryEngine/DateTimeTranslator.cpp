@@ -184,9 +184,8 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
                                       expr_type->as<hdk::ir::DateTimeBaseType>()->unit()))
                       : getExtractFromTimeConstantValue(
                             constant->get_constval().bigintval, field, expr_type);
-    constant->set_constval(d);
-    constant->set_type_info(type);
-    return constant;
+    return hdk::ir::makeExpr<hdk::ir::Constant>(
+        type, constant->get_is_null(), d, constant->cacheable());
   }
   return hdk::ir::makeExpr<hdk::ir::ExtractExpr>(
       type, from_expr->get_contains_agg(), field, from_expr->decompress());
@@ -259,9 +258,8 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
     Datum d{0};
     d.bigintval =
         getDateTruncConstantValue(constant->get_constval().bigintval, field, expr_type);
-    constant->set_constval(d);
-    constant->set_type_info(type);
-    return constant;
+    return hdk::ir::makeExpr<hdk::ir::Constant>(
+        type, constant->get_is_null(), d, constant->cacheable());
   }
   return hdk::ir::makeExpr<hdk::ir::DatetruncExpr>(
       type, from_expr->get_contains_agg(), field, from_expr->decompress());

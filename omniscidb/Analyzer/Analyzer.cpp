@@ -664,6 +664,8 @@ hdk::ir::ExprPtr normalizeCaseExpr(
     const std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>>& expr_pair_list,
     const hdk::ir::ExprPtr else_e_in,
     const Executor* executor) {
+  std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> cast_expr_pair_list =
+      expr_pair_list;
   const hdk::ir::Type* type = nullptr;
   bool has_agg = false;
   // We need to keep track of whether there was at
@@ -676,7 +678,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
   // types are none-encoded (column or literal)
   const hdk::ir::Type* none_encoded_literal_type = nullptr;
 
-  for (auto& p : expr_pair_list) {
+  for (auto& p : cast_expr_pair_list) {
     auto e1 = p.first;
     CHECK(e1->type()->isBoolean());
     auto e2 = p.second;
@@ -696,7 +698,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
       type = e2_type;
     } else if (e2_type->isNull()) {
       type = type->withNullable(true);
-      e2->set_type_info(type);
+      p.second = e2->withType(type);
     } else if (!type->equal(e2_type)) {
       if ((type->isString() || type->isExtDictionary()) &&
           (e2_type->isString() || e2_type->isExtDictionary())) {
@@ -730,7 +732,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
         type = else_type;
       } else if (expr_is_null(else_e.get())) {
         type = type->withNullable(true);
-        else_e->set_type_info(type);
+        else_e = else_e->withType(type);
       } else if (!type->equal(else_type)) {
         type = type->withNullable(true);
         if ((type->isString() || type->isExtDictionary()) &&
@@ -766,10 +768,10 @@ hdk::ir::ExprPtr normalizeCaseExpr(
         "Cannot deduce the type for case expressions, all branches null");
   }
 
-  std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> cast_expr_pair_list;
-  for (auto p : expr_pair_list) {
-    cast_expr_pair_list.emplace_back(p.first,
-                                     executor ? p.second->add_cast(type) : p.second);
+  if (executor) {
+    for (auto& p : cast_expr_pair_list) {
+      p.second = p.second->add_cast(type);
+    }
   }
   if (else_e != nullptr) {
     else_e = executor ? else_e->add_cast(type) : else_e;

@@ -81,7 +81,11 @@ class Expr : public std::enable_shared_from_this<Expr> {
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false);
-  virtual ExprPtr deep_copy() const = 0;  // make a deep copy of self
+
+  // Make a deep copy of self
+  virtual ExprPtr deep_copy() const = 0;
+  // Make a deep copy of self replacing its type with the specified one.
+  virtual ExprPtr withType(const Type* type) const;
 
   virtual bool operator==(const Expr& rhs) const = 0;
   virtual std::string toString() const = 0;
@@ -197,6 +201,8 @@ class ColumnVar : public Expr {
   }
 
   ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* type) const override;
+
   static bool colvar_comp(const ColumnVar* l, const ColumnVar* r) {
     return l->get_table_id() < r->get_table_id() ||
            (l->get_table_id() == r->get_table_id() &&
@@ -256,6 +262,7 @@ class Var : public ColumnVar {
   int get_varno() const { return varno; }
   void set_varno(int n) { varno = n; }
   ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* type) const override;
   std::string toString() const override;
 
   size_t hash() const override;

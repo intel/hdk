@@ -315,6 +315,15 @@ ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) {
   return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
 }
 
+ExprPtr Expr::withType(const Type* type) const {
+  if (!type_->equal(type)) {
+    auto res = deep_copy();
+    res->type_ = type;
+    return res;
+  }
+  return const_cast<Expr*>(this)->shared_from_this();
+}
+
 std::string ColumnRef::toString() const {
   std::stringstream ss;
   ss << "(ColumnRef " << node_->getIdString() << ":" << idx_ << ")";
@@ -377,6 +386,19 @@ ExprPtr ColumnVar::deep_copy() const {
   return makeExpr<ColumnVar>(col_info_, rte_idx);
 }
 
+ExprPtr ColumnVar::withType(const Type* type) const {
+  if (!type_->equal(type)) {
+    auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
+                                                 col_info_->table_id,
+                                                 col_info_->column_id,
+                                                 col_info_->name,
+                                                 type,
+                                                 col_info_->is_rowid);
+    return makeExpr<ColumnVar>(col_info, rte_idx);
+  }
+  return const_cast<ColumnVar*>(this)->shared_from_this();
+}
+
 ExprPtr ExpressionTuple::deep_copy() const {
   std::vector<ExprPtr> tuple_deep_copy;
   for (const auto& column : tuple_) {
@@ -390,6 +412,19 @@ ExprPtr ExpressionTuple::deep_copy() const {
 
 ExprPtr Var::deep_copy() const {
   return makeExpr<Var>(col_info_, rte_idx, which_row, varno);
+}
+
+ExprPtr Var::withType(const Type* type) const {
+  if (!type_->equal(type)) {
+    auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
+                                                 col_info_->table_id,
+                                                 col_info_->column_id,
+                                                 col_info_->name,
+                                                 type,
+                                                 col_info_->is_rowid);
+    return makeExpr<Var>(col_info, rte_idx, which_row, varno);
+  }
+  return const_cast<Var*>(this)->shared_from_this();
 }
 
 ExprPtr Constant::deep_copy() const {

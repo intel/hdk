@@ -141,8 +141,8 @@ std::shared_ptr<hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainValues(
     if (type->isExtDictionary()) {
       type = type->ctx().extDict(
           type->as<hdk::ir::ExtDictionaryType>()->elemType(), 0, type->size());
+      in_val_copy = in_val_copy->withType(type);
     }
-    in_val_copy->set_type_info(type);
     case_expr_list.emplace_back(case_cond, in_val_copy);
   }
   // TODO(alex): refine the expression range for case with empty else expression;

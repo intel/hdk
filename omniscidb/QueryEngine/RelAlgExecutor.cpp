@@ -3229,38 +3229,35 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
     if (type->isColumnList()) {
       for (int i = 0; i < type->as<hdk::ir::ColumnListType>()->length(); i++) {
         auto& input_expr = input_exprs[input_index];
-        auto col_var = dynamic_cast<hdk::ir::ColumnVar*>(input_expr);
+        auto input_type = type->ctx().columnList(
+            input_expr->type(), type->as<hdk::ir::ColumnListType>()->length());
+        auto col_var = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(
+            input_expr->withType(input_type));
         CHECK(col_var);
 
-        // avoid setting type info to ti here since ti doesn't have all the
-        // properties correctly set
-        auto input_type = input_expr->type();
-        input_type = input_type->ctx().columnList(
-            input_type, type->as<hdk::ir::ColumnListType>()->length());
-        input_expr->set_type_info(type);
-
-        input_col_exprs.push_back(col_var);
+        target_exprs_owned_.push_back(col_var);
+        input_exprs[input_index] = col_var.get();
+        input_col_exprs.push_back(col_var.get());
         input_index++;
       }
     } else if (type->isColumn()) {
       auto& input_expr = input_exprs[input_index];
-      auto col_var = dynamic_cast<hdk::ir::ColumnVar*>(input_expr);
+      auto input_type = type->ctx().column(input_expr->type());
+      auto col_var =
+          std::dynamic_pointer_cast<hdk::ir::ColumnVar>(input_expr->withType(input_type));
       CHECK(col_var);
 
-      // same here! avoid setting type info to ti since it doesn't have all the
-      // properties correctly set
-      auto type = input_expr->type();
-      type = type->ctx().column(type);
-      input_expr->set_type_info(type);
-
-      input_col_exprs.push_back(col_var);
+      target_exprs_owned_.push_back(col_var);
+      input_exprs[input_index] = col_var.get();
+      input_col_exprs.push_back(col_var.get());
       input_index++;
     } else {
       auto input_expr = input_exprs[input_index];
       auto ext_func_arg_type =
           ext_arg_type_to_type(input_expr->ctx(), table_func_args[arg_index]);
       if (!ext_func_arg_type->equal(input_expr->type())) {
-        input_exprs[input_index] = input_expr->add_cast(ext_func_arg_type).get();
+        target_exprs_owned_.push_back(input_expr->add_cast(ext_func_arg_type));
+        input_exprs[input_index] = target_exprs_owned_.back().get();
       }
       input_index++;
     }
@@ -3285,7 +3282,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       input_pos = offset + p.second;
 
       CHECK_LT(input_pos, input_exprs.size());
-      auto input_type = input_exprs_owned[input_pos]->type();
+      auto input_type = input_exprs[input_pos]->type();
       CHECK(input_type->isColumn()) << input_type->toString();
       int32_t comp_param = input_type->as<hdk::ir::ColumnType>()
                                ->columnType()

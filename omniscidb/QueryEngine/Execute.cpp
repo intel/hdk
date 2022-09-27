@@ -2262,16 +2262,19 @@ ResultSetPtr build_row_for_empty_input(const std::vector<hdk::ir::Expr*>& target
   std::vector<hdk::ir::ExprPtr> target_exprs_owned_copies;
   std::vector<hdk::ir::Expr*> target_exprs;
   for (const auto target_expr : target_exprs_in) {
-    const auto target_expr_copy =
-        std::dynamic_pointer_cast<hdk::ir::AggExpr>(target_expr->deep_copy());
-    CHECK(target_expr_copy);
-    auto type = target_expr->type();
-    type = type->withNullable(true);
-    target_expr_copy->set_type_info(type);
-    if (target_expr_copy->get_arg()) {
-      auto arg_type = target_expr_copy->get_arg()->type();
-      arg_type = arg_type->withNullable(true);
-      target_expr_copy->get_arg()->set_type_info(arg_type);
+    auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
+    CHECK(agg_expr);
+    hdk::ir::ExprPtr target_expr_copy;
+    if (agg_expr->get_arg()) {
+      auto arg_type = agg_expr->get_arg()->type()->withNullable(true);
+      target_expr_copy =
+          hdk::ir::makeExpr<hdk::ir::AggExpr>(agg_expr->type()->withNullable(true),
+                                              agg_expr->get_aggtype(),
+                                              agg_expr->get_arg()->withType(arg_type),
+                                              agg_expr->get_is_distinct(),
+                                              agg_expr->get_arg1());
+    } else {
+      target_expr_copy = agg_expr->withType(agg_expr->type()->withNullable(true));
     }
     target_exprs_owned_copies.push_back(target_expr_copy);
     target_exprs.push_back(target_expr_copy.get());
