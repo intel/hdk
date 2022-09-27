@@ -76,7 +76,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual ~Expr() {}
 
   ExprPtr get_shared_ptr() { return shared_from_this(); }
-  virtual void set_type_info(const hdk::ir::Type* new_type);
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
@@ -188,17 +187,6 @@ class ColumnVar : public Expr {
   int get_rte_idx() const { return rte_idx; }
   ColumnInfoPtr get_column_info() const { return col_info_; }
   bool is_virtual() const { return col_info_->is_rowid; }
-  void set_type_info(const hdk::ir::Type* new_type) override {
-    if (!type_->equal(new_type)) {
-      col_info_ = std::make_shared<ColumnInfo>(col_info_->db_id,
-                                               col_info_->table_id,
-                                               col_info_->column_id,
-                                               col_info_->name,
-                                               new_type,
-                                               col_info_->is_rowid);
-      Expr::set_type_info(new_type);
-    }
-  }
 
   ExprPtr deep_copy() const override;
   ExprPtr withType(const Type* type) const override;

@@ -246,10 +246,6 @@ void OrderEntry::print() const {
 
 Expr::Expr(const Type* type, bool has_agg) : type_(type), contains_agg(has_agg) {}
 
-void Expr::set_type_info(const hdk::ir::Type* new_type) {
-  type_ = new_type;
-}
-
 void Expr::print() const {
   std::cout << toString() << std::endl;
 }
