@@ -49,7 +49,7 @@ std::vector<int64_t> target_expr_group_by_indices(
       continue;
     }
     const auto var_expr = dynamic_cast<const hdk::ir::Var*>(target_expr);
-    if (var_expr && var_expr->get_which_row() == hdk::ir::Var::kGROUPBY) {
+    if (var_expr && var_expr->whichRow() == hdk::ir::Var::kGROUPBY) {
       indices[target_idx] = var_expr->get_varno() - 1;
       continue;
     }

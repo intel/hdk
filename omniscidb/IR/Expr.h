@@ -225,7 +225,7 @@ class Var : public ColumnVar {
       : ColumnVar(col_info, i), which_row(o), varno(v) {}
   Var(const hdk::ir::Type* type, WhichRow o, int v)
       : ColumnVar(type), which_row(o), varno(v) {}
-  WhichRow get_which_row() const { return which_row; }
+  WhichRow whichRow() const { return which_row; }
   int get_varno() const { return varno; }
   void set_varno(int n) { varno = n; }
   ExprPtr deep_copy() const override;
