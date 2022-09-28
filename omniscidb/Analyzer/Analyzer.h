@@ -88,7 +88,7 @@ inline std::shared_ptr<const hdk::ir::Var> var_ref(const hdk::ir::Expr* expr,
                                                    const int varno) {
   if (const auto col_expr = dynamic_cast<const hdk::ir::ColumnVar*>(expr)) {
     return hdk::ir::makeExpr<hdk::ir::Var>(
-        col_expr->get_column_info(), col_expr->get_rte_idx(), which_row, varno);
+        col_expr->get_column_info(), col_expr->rteIdx(), which_row, varno);
   }
   return hdk::ir::makeExpr<hdk::ir::Var>(expr->type(), which_row, varno);
 }

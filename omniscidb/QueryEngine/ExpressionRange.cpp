@@ -623,7 +623,7 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  const int rte_idx = col_expr->get_rte_idx();
+  const int rte_idx = col_expr->rteIdx();
   CHECK_GE(rte_idx, 0);
   CHECK_LT(static_cast<size_t>(rte_idx), query_infos.size());
   bool is_outer_join_proj = rte_idx > 0 && executor->containsLeftDeepOuterJoin();

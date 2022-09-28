@@ -926,7 +926,7 @@ int BaselineJoinHashTable::getInnerTableId() const noexcept {
 int BaselineJoinHashTable::getInnerTableRteIdx() const noexcept {
   CHECK(!inner_outer_pairs_.empty());
   const auto first_inner_col = inner_outer_pairs_.front().first;
-  return first_inner_col->get_rte_idx();
+  return first_inner_col->rteIdx();
 }
 
 HashType BaselineJoinHashTable::getHashType() const noexcept {

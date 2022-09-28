@@ -474,7 +474,7 @@ class RteIdxCollector : public ScalarExprVisitor<void*> {
   }
 
   virtual void* visitColumnVar(const hdk::ir::ColumnVar* col_var) const {
-    rte_idx_set_.insert(col_var->get_rte_idx());
+    rte_idx_set_.insert(col_var->rteIdx());
     return nullptr;
   }
 

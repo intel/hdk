@@ -47,7 +47,7 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
     return false;
   }
   if (!crt_inner || !prev_inner || crt_inner->tableId() != prev_inner->tableId() ||
-      crt_inner->get_rte_idx() != prev_inner->get_rte_idx()) {
+      crt_inner->rteIdx() != prev_inner->rteIdx()) {
     return false;
   }
   return true;

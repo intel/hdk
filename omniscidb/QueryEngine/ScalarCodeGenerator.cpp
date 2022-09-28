@@ -25,7 +25,7 @@ class UsedColumnExpressions : public ScalarExprVisitor<ScalarCodeGenerator::Colu
   ScalarCodeGenerator::ColumnMap visitColumnVar(
       const hdk::ir::ColumnVar* column) const override {
     ScalarCodeGenerator::ColumnMap m;
-    InputColDescriptor input_desc(column->get_column_info(), column->get_rte_idx());
+    InputColDescriptor input_desc(column->get_column_info(), column->rteIdx());
     m.emplace(input_desc,
               std::static_pointer_cast<const hdk::ir::ColumnVar>(column->deep_copy()));
     return m;

@@ -3776,14 +3776,14 @@ std::pair<bool, int64_t> Executor::skipFragment(
     }
     const auto lhs = comp_expr->get_left_operand();
     auto lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
-    if (!lhs_col || !lhs_col->tableId() || lhs_col->get_rte_idx()) {
+    if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
       // See if lhs is a simple cast that was allowed through normalize_simple_predicate
       auto lhs_uexpr = dynamic_cast<const hdk::ir::UOper*>(lhs);
       if (lhs_uexpr) {
         CHECK(lhs_uexpr->get_optype() ==
               kCAST);  // We should have only been passed a cast expression
         lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs_uexpr->get_operand());
-        if (!lhs_col || !lhs_col->tableId() || lhs_col->get_rte_idx()) {
+        if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
           continue;
         }
       } else {

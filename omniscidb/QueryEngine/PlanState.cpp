@@ -64,7 +64,7 @@ void PlanState::allocateLocalColumnIds(
 int PlanState::getLocalColumnId(const hdk::ir::ColumnVar* col_var,
                                 const bool fetch_column) {
   CHECK(col_var);
-  InputColDescriptor scan_col_desc(col_var->get_column_info(), col_var->get_rte_idx());
+  InputColDescriptor scan_col_desc(col_var->get_column_info(), col_var->rteIdx());
   const auto it = global_to_local_col_ids_.find(scan_col_desc);
   CHECK(it != global_to_local_col_ids_.end()) << "Expected to find " << scan_col_desc;
   if (fetch_column) {

@@ -23,7 +23,7 @@
 class MaxRangeTableIndexVisitor : public ScalarExprVisitor<int> {
  protected:
   int visitColumnVar(const hdk::ir::ColumnVar* column) const override {
-    return column->get_rte_idx();
+    return column->rteIdx();
   }
 
   int visitColumnVarTuple(const hdk::ir::ExpressionTuple* expr_tuple) const override {
@@ -44,7 +44,7 @@ class MaxRangeTableIndexVisitor : public ScalarExprVisitor<int> {
 class AllRangeTableIndexVisitor : public ScalarExprVisitor<std::set<int>> {
  protected:
   std::set<int> visitColumnVar(const hdk::ir::ColumnVar* column) const override {
-    return {column->get_rte_idx()};
+    return {column->rteIdx()};
   }
 
   std::set<int> visitColumnVarTuple(

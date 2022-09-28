@@ -861,8 +861,7 @@ bool self_join_not_covered_by_left_deep_tree(const hdk::ir::ColumnVar* key_side,
                                              const hdk::ir::ColumnVar* val_side,
                                              const int max_rte_covered) {
   if (key_side->tableId() == val_side->tableId() &&
-      key_side->get_rte_idx() == val_side->get_rte_idx() &&
-      key_side->get_rte_idx() > max_rte_covered) {
+      key_side->rteIdx() == val_side->rteIdx() && key_side->rteIdx() > max_rte_covered) {
     return true;
   }
   return false;

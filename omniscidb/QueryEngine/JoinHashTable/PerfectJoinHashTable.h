@@ -77,9 +77,7 @@ class PerfectJoinHashTable : public HashJoin {
 
   int getInnerTableId() const noexcept override { return col_var_.get()->tableId(); };
 
-  int getInnerTableRteIdx() const noexcept override {
-    return col_var_.get()->get_rte_idx();
-  };
+  int getInnerTableRteIdx() const noexcept override { return col_var_.get()->rteIdx(); };
 
   HashType getHashType() const noexcept override { return hash_type_; }
 

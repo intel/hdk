@@ -169,7 +169,7 @@ class ColumnVar : public Expr {
   int dbId() const { return col_info_->db_id; }
   int tableId() const { return col_info_->table_id; }
   int columnId() const { return col_info_->column_id; }
-  int get_rte_idx() const { return rte_idx; }
+  int rteIdx() const { return rte_idx; }
   ColumnInfoPtr get_column_info() const { return col_info_; }
   bool is_virtual() const { return col_info_->is_rowid; }
 

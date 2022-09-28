@@ -467,7 +467,7 @@ void setupSyntheticCaching(DataProvider* data_provider,
 
   std::unordered_set<InputColDescriptor> col_descs;
   for (auto cv : cvs) {
-    col_descs.emplace(InputColDescriptor{cv->get_column_info(), cv->get_rte_idx()});
+    col_descs.emplace(InputColDescriptor{cv->get_column_info(), cv->rteIdx()});
   }
 
   executor->setupCaching(data_provider, col_descs, phys_table_ids);
@@ -657,11 +657,11 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   auto outer_type = lhs_type;
   auto inner_type = rhs_type;
   const hdk::ir::Expr* outer_expr{lhs};
-  if (!lhs_col || (rhs_col && lhs_col->get_rte_idx() < rhs_col->get_rte_idx())) {
+  if (!lhs_col || (rhs_col && lhs_col->rteIdx() < rhs_col->rteIdx())) {
     inner_col = rhs_col;
     outer_col = lhs_col;
   } else {
-    if (lhs_col && lhs_col->get_rte_idx() == 0) {
+    if (lhs_col && lhs_col->rteIdx() == 0) {
       throw HashJoinFail("Cannot use hash join for given expression");
     }
     inner_col = lhs_col;
@@ -684,7 +684,7 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
     int outer_rte_idx = rte_idx_visitor.visit(outer_expr);
     // The inner column candidate is not actually inner; the outer
     // expression contains columns which are at least as deep.
-    if (inner_col->get_rte_idx() <= outer_rte_idx) {
+    if (inner_col->rteIdx() <= outer_rte_idx) {
       throw HashJoinFail("Cannot use hash join for given expression");
     }
   }

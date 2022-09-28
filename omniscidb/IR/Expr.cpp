@@ -951,7 +951,7 @@ bool ColumnVar::operator==(const Expr& rhs) const {
   const ColumnVar& rhs_cv = dynamic_cast<const ColumnVar&>(rhs);
   if (rte_idx != -1) {
     return (tableId() == rhs_cv.tableId()) && (columnId() == rhs_cv.columnId()) &&
-           (rte_idx == rhs_cv.get_rte_idx());
+           (rte_idx == rhs_cv.rteIdx());
   }
   const Var* v = dynamic_cast<const Var*>(this);
   if (v == nullptr) {

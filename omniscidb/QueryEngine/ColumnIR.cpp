@@ -58,7 +58,7 @@ size_t get_col_bit_width(const hdk::ir::ColumnVar* col_var) {
 }
 
 int adjusted_range_table_index(const hdk::ir::ColumnVar* col_var) {
-  return col_var->get_rte_idx() == -1 ? 0 : col_var->get_rte_idx();
+  return col_var->rteIdx() == -1 ? 0 : col_var->rteIdx();
 }
 
 }  // namespace
@@ -67,9 +67,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenColumn(const hdk::ir::ColumnVar*
                                                        const bool fetch_column,
                                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (col_var->get_rte_idx() <= 0 ||
-      cgen_state_->outer_join_match_found_per_level_.empty() ||
-      !foundOuterJoinMatch(col_var->get_rte_idx())) {
+  if (col_var->rteIdx() <= 0 || cgen_state_->outer_join_match_found_per_level_.empty() ||
+      !foundOuterJoinMatch(col_var->rteIdx())) {
     return codegenColVar(col_var, fetch_column, true, co);
   }
   return codegenOuterJoinNullPlaceholder(col_var, fetch_column, co);
@@ -273,12 +272,12 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
   auto rowid_lv = posArg(col_var);
   if (offset_lv) {
     rowid_lv = cgen_state_->ir_builder_.CreateAdd(rowid_lv, offset_lv);
-  } else if (col_var->get_rte_idx() > 0) {
+  } else if (col_var->rteIdx() > 0) {
     auto frag_off_ptr = get_arg_by_name(cgen_state_->row_func_, "frag_row_off");
     auto input_off_ptr = cgen_state_->ir_builder_.CreateGEP(
         frag_off_ptr->getType()->getScalarType()->getPointerElementType(),
         frag_off_ptr,
-        cgen_state_->llInt(int32_t(col_var->get_rte_idx())));
+        cgen_state_->llInt(int32_t(col_var->rteIdx())));
     auto rowid_offset_lv = cgen_state_->ir_builder_.CreateLoad(
         input_off_ptr->getType()->getPointerElementType(), input_off_ptr);
     rowid_lv = cgen_state_->ir_builder_.CreateAdd(rowid_lv, rowid_offset_lv);
@@ -347,7 +346,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenOuterJoinNullPlaceholder(
       cgen_state_->context_, "outer_join_nulls", cgen_state_->current_func_);
   const auto phi_bb = llvm::BasicBlock::Create(
       cgen_state_->context_, "outer_join_phi", cgen_state_->current_func_);
-  const auto outer_join_match_lv = foundOuterJoinMatch(col_var->get_rte_idx());
+  const auto outer_join_match_lv = foundOuterJoinMatch(col_var->rteIdx());
   CHECK(outer_join_match_lv);
   cgen_state_->ir_builder_.CreateCondBr(
       outer_join_match_lv, outer_join_args_bb, outer_join_nulls_bb);
@@ -390,10 +389,10 @@ std::vector<llvm::Value*> CodeGenerator::codegenOuterJoinNullPlaceholder(
 llvm::Value* CodeGenerator::resolveGroupedColumnReference(
     const hdk::ir::ColumnVar* col_var) {
   auto col_id = col_var->columnId();
-  if (col_var->get_rte_idx() >= 0) {
+  if (col_var->rteIdx() >= 0) {
     return nullptr;
   }
-  CHECK((col_id == 0) || (col_var->get_rte_idx() >= 0 && col_var->tableId() > 0));
+  CHECK((col_id == 0) || (col_var->rteIdx() >= 0 && col_var->tableId() > 0));
   const auto var = dynamic_cast<const hdk::ir::Var*>(col_var);
   CHECK(var);
   col_id = var->get_varno();
@@ -429,9 +428,8 @@ llvm::Value* CodeGenerator::colByteStream(const hdk::ir::ColumnVar* col_var,
 llvm::Value* CodeGenerator::posArg(const hdk::ir::Expr* expr) const {
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(expr);
-  if (col_var && col_var->get_rte_idx() > 0) {
-    const auto hash_pos_it =
-        cgen_state_->scan_idx_to_hash_pos_.find(col_var->get_rte_idx());
+  if (col_var && col_var->rteIdx() > 0) {
+    const auto hash_pos_it = cgen_state_->scan_idx_to_hash_pos_.find(col_var->rteIdx());
     CHECK(hash_pos_it != cgen_state_->scan_idx_to_hash_pos_.end());
     if (hash_pos_it->second->getType()->isPointerTy()) {
       CHECK(hash_pos_it->second->getType()->getPointerElementType()->isIntegerTy(32));
@@ -491,7 +489,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
         }
         const auto eq_left_op_col = dynamic_cast<const hdk::ir::ColumnVar*>(eq_left_op);
         CHECK(eq_left_op_col);
-        if (eq_left_op_col->get_rte_idx() != 0) {
+        if (eq_left_op_col->rteIdx() != 0) {
           return nullptr;
         }
         if (rhs->type()->isString() || rhs->type()->isExtDictionary()) {
@@ -527,7 +525,7 @@ std::shared_ptr<const hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
     if (*rhs_tuple[i] == *rhs) {
       const auto lhs_col =
           std::static_pointer_cast<const hdk::ir::ColumnVar>(lhs_tuple[i]);
-      return lhs_col->get_rte_idx() == 0 ? lhs_col : nullptr;
+      return lhs_col->rteIdx() == 0 ? lhs_col : nullptr;
     }
   }
   return nullptr;
