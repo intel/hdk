@@ -135,7 +135,7 @@ class GroupColumnRef : public Expr {
     return "(GroupColumnRef idx=" + std::to_string(idx_) + ")";
   }
 
-  unsigned getIndex() const { return idx_; }
+  unsigned index() const { return idx_; }
 
   size_t hash() const override;
 

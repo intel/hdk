@@ -2080,8 +2080,8 @@ class InputReplacementVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitGroupColumnRef(
       const hdk::ir::GroupColumnRef* col_ref) const override {
     CHECK(groupby_exprs_);
-    CHECK_LE(col_ref->getIndex(), groupby_exprs_->size());
-    return visit((*groupby_exprs_)[col_ref->getIndex() - 1].get());
+    CHECK_LE(col_ref->index(), groupby_exprs_->size());
+    return visit((*groupby_exprs_)[col_ref->index() - 1].get());
   }
 
  private:

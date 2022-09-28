@@ -1200,7 +1200,7 @@ std::vector<const hdk::ir::Expr*> translate_targets(
     const auto* expr = compound->getExprs()[i].get();
     hdk::ir::ExprPtr target_expr;
     if (auto* group_ref = dynamic_cast<const hdk::ir::GroupColumnRef*>(expr)) {
-      const auto ref_idx = group_ref->getIndex();
+      const auto ref_idx = group_ref->index();
       CHECK_GE(ref_idx, size_t(1));
       CHECK_LE(ref_idx, groupby_exprs.size());
       const auto groupby_expr = *std::next(groupby_exprs.begin(), ref_idx - 1);
