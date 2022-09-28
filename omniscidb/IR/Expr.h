@@ -266,7 +266,7 @@ class Constant : public Expr {
   Datum get_constval() const { return constval; }
   int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }
   double fpVal() const { return extract_fp_type_from_datum(constval, type_); }
-  const ExprPtrList& get_value_list() const { return value_list; }
+  const ExprPtrList& valueList() const { return value_list; }
   ExprPtr deep_copy() const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
   bool operator==(const Expr& rhs) const override;

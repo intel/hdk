@@ -129,7 +129,7 @@ struct CgenState {
           auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
           if (elem_type->isFp64()) {
             std::vector<double> double_array_literal;
-            for (const auto& value : constant->get_value_list()) {
+            for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
               double d = c->get_constval().doubleval;
@@ -139,7 +139,7 @@ struct CgenState {
           }
           if (elem_type->isInt32()) {
             std::vector<int32_t> int32_array_literal;
-            for (const auto& value : constant->get_value_list()) {
+            for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
               int32_t i = c->get_constval().intval;
@@ -149,7 +149,7 @@ struct CgenState {
           }
           if (elem_type->isInt8()) {
             std::vector<int8_t> int8_array_literal;
-            for (const auto& value : constant->get_value_list()) {
+            for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
               int8_t i = c->get_constval().tinyintval;
