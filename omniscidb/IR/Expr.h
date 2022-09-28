@@ -75,7 +75,6 @@ class Expr : public std::enable_shared_from_this<Expr> {
   Expr(const Type* type, bool has_agg = false);
   virtual ~Expr() {}
 
-  ExprPtr get_shared_ptr() const { return shared_from_this(); }
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
