@@ -188,7 +188,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
       , executor_(executor) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    auto source = col_ref->getNode();
+    auto source = col_ref->node();
     auto col_idx = col_ref->getIndex();
     const auto it_rte_idx = input_to_nest_level_.find(source);
     const int rte_idx = it_rte_idx == input_to_nest_level_.end() ? 0 : it_rte_idx->second;

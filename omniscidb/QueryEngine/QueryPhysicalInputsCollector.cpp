@@ -129,7 +129,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
     ResultType result;
     for (auto& part_key : window_func->getPartitionKeys()) {
       if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(part_key.get())) {
-        if (auto filter = dynamic_cast<const RelFilter*>(col_ref->getNode())) {
+        if (auto filter = dynamic_cast<const RelFilter*>(col_ref->node())) {
           // Partitions utilize string dictionary translation in the hash join framework
           // if the partition key is a dictionary encoded string. Ensure we reach the
           // source for all partition keys, so we can access string dictionaries for the
@@ -164,7 +164,7 @@ class PhysicalInputsVisitor
   PhysicalInputsVisitor() {}
 
   InputColDescriptorSet visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    const auto source = col_ref->getNode();
+    const auto source = col_ref->node();
     const auto scan = dynamic_cast<const RelScan*>(source);
     if (!scan) {
       const auto join = dynamic_cast<const RelJoin*>(source);

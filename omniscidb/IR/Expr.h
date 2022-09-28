@@ -105,7 +105,7 @@ class ColumnRef : public Expr {
 
   std::string toString() const override;
 
-  const RelAlgNode* getNode() const { return node_; }
+  const RelAlgNode* node() const { return node_; }
 
   unsigned getIndex() const { return idx_; }
 

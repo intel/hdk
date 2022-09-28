@@ -1028,7 +1028,7 @@ void collect_used_input_desc(
     const ColumnRefSet& source_used_inputs,
     const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level) {
   for (const auto col_ref : source_used_inputs) {
-    const auto source = col_ref.getNode();
+    const auto source = col_ref.node();
     const int table_id = table_id_from_ra(source);
     const auto col_id = col_ref.getIndex();
     auto it = input_to_nest_level.find(source);

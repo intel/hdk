@@ -77,7 +77,7 @@ class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
   }
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    const auto node = col_ref->getNode();
+    const auto node = col_ref->node();
     if (left_deep_join_->coversOriginalNode(node)) {
       const auto it = std::lower_bound(input_size_prefix_sums_.begin(),
                                        input_size_prefix_sums_.end(),
