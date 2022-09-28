@@ -562,7 +562,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
   auto& ctx = left_type->ctx();
   if (qual != kONE) {
     // subquery not supported yet.
-    CHECK(!std::dynamic_pointer_cast<hdk::ir::ScalarSubquery>(right_expr));
+    CHECK(!right_expr->is<hdk::ir::ScalarSubquery>());
     if (!right_type->isArray()) {
       throw std::runtime_error(
           "Existential or universal qualifiers can only be used in front of a subquery "
@@ -802,13 +802,13 @@ hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
     if (!escape_expr->type()->isString()) {
       throw std::runtime_error("expression after ESCAPE must be of a string type.");
     }
-    auto c = std::dynamic_pointer_cast<hdk::ir::Constant>(escape_expr);
+    auto c = escape_expr->as<hdk::ir::Constant>();
     if (c != nullptr && c->get_constval().stringval->length() > 1) {
       throw std::runtime_error("String after ESCAPE must have a single character.");
     }
     escape_char = (*c->get_constval().stringval)[0];
   }
-  auto c = std::dynamic_pointer_cast<hdk::ir::Constant>(like_expr);
+  auto c = like_expr->as<hdk::ir::Constant>();
   bool is_simple = false;
   if (c != nullptr) {
     std::string& pattern = *c->get_constval().stringval;
@@ -848,7 +848,7 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
     if (!escape_expr->type()->isString()) {
       throw std::runtime_error("expression after ESCAPE must be of a string type.");
     }
-    auto c = std::dynamic_pointer_cast<hdk::ir::Constant>(escape_expr);
+    auto c = escape_expr->as<hdk::ir::Constant>();
     if (c != nullptr && c->get_constval().stringval->length() > 1) {
       throw std::runtime_error("String after ESCAPE must have a single character.");
     }
@@ -857,7 +857,7 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
       throw std::runtime_error("Only supporting '\\' escape character.");
     }
   }
-  auto c = std::dynamic_pointer_cast<hdk::ir::Constant>(pattern_expr);
+  auto c = pattern_expr->as<hdk::ir::Constant>();
   if (c != nullptr) {
     std::string& pattern = *c->get_constval().stringval;
     if (translate_to_like_pattern(pattern, escape_char)) {

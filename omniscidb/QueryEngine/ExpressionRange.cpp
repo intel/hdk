@@ -146,21 +146,21 @@ ExpressionRange apply_simple_quals(
   }
   ExpressionRange qual_range(col_range);
   for (auto const& itr : simple_quals.get()) {
-    auto qual_bin_oper = dynamic_cast<hdk::ir::BinOper*>(itr.get());
+    auto qual_bin_oper = itr->as<hdk::ir::BinOper>();
     if (!qual_bin_oper) {
       continue;
     }
     const hdk::ir::Expr* left_operand = qual_bin_oper->get_left_operand();
-    auto qual_col = dynamic_cast<const hdk::ir::ColumnVar*>(left_operand);
+    auto qual_col = left_operand->as<hdk::ir::ColumnVar>();
     if (!qual_col) {
       // Check for possibility that column is wrapped in a cast
       // Presumes that only simple casts (i.e. timestamp to timestamp or int to int) have
       // been passed through by normalize_simple_predicate
-      auto u_expr = dynamic_cast<const hdk::ir::UOper*>(left_operand);
+      auto u_expr = left_operand->as<hdk::ir::UOper>();
       if (!u_expr) {
         continue;
       }
-      qual_col = dynamic_cast<const hdk::ir::ColumnVar*>(u_expr->get_operand());
+      qual_col = u_expr->get_operand()->as<hdk::ir::ColumnVar>();
       if (!qual_col) {
         continue;
       }
@@ -170,7 +170,7 @@ ExpressionRange apply_simple_quals(
       continue;
     }
     const hdk::ir::Expr* right_operand = qual_bin_oper->get_right_operand();
-    auto qual_const = dynamic_cast<const hdk::ir::Constant*>(right_operand);
+    auto qual_const = right_operand->as<hdk::ir::Constant>();
     if (!qual_const) {
       continue;
     }

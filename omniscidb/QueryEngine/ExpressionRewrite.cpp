@@ -31,9 +31,9 @@
 
 namespace {
 
-class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<hdk::ir::InValues>> {
+class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::InValues>> {
  protected:
-  std::shared_ptr<hdk::ir::InValues> visitBinOper(
+  std::shared_ptr<const hdk::ir::InValues> visitBinOper(
       const hdk::ir::BinOper* bin_oper) const override {
     switch (bin_oper->get_optype()) {
       case kEQ: {
@@ -58,89 +58,89 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<hdk::ir::InValues
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitUOper(
+  std::shared_ptr<const hdk::ir::InValues> visitUOper(
       const hdk::ir::UOper* uoper) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitInValues(
+  std::shared_ptr<const hdk::ir::InValues> visitInValues(
       const hdk::ir::InValues*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitInIntegerSet(
+  std::shared_ptr<const hdk::ir::InValues> visitInIntegerSet(
       const hdk::ir::InIntegerSet*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitCharLength(
+  std::shared_ptr<const hdk::ir::InValues> visitCharLength(
       const hdk::ir::CharLengthExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitKeyForString(
+  std::shared_ptr<const hdk::ir::InValues> visitKeyForString(
       const hdk::ir::KeyForStringExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitSampleRatio(
+  std::shared_ptr<const hdk::ir::InValues> visitSampleRatio(
       const hdk::ir::SampleRatioExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitCardinality(
+  std::shared_ptr<const hdk::ir::InValues> visitCardinality(
       const hdk::ir::CardinalityExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitLikeExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitLikeExpr(
       const hdk::ir::LikeExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitRegexpExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitRegexpExpr(
       const hdk::ir::RegexpExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitCaseExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitCaseExpr(
       const hdk::ir::CaseExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitDatetruncExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitDatetruncExpr(
       const hdk::ir::DatetruncExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitDatediffExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitDatediffExpr(
       const hdk::ir::DatediffExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitDateaddExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitDateaddExpr(
       const hdk::ir::DateaddExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitExtractExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitExtractExpr(
       const hdk::ir::ExtractExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitLikelihood(
+  std::shared_ptr<const hdk::ir::InValues> visitLikelihood(
       const hdk::ir::LikelihoodExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> visitAggExpr(
+  std::shared_ptr<const hdk::ir::InValues> visitAggExpr(
       const hdk::ir::AggExpr*) const override {
     return nullptr;
   }
 
-  std::shared_ptr<hdk::ir::InValues> aggregateResult(
-      const std::shared_ptr<hdk::ir::InValues>& lhs,
-      const std::shared_ptr<hdk::ir::InValues>& rhs) const override {
+  std::shared_ptr<const hdk::ir::InValues> aggregateResult(
+      const std::shared_ptr<const hdk::ir::InValues>& lhs,
+      const std::shared_ptr<const hdk::ir::InValues>& rhs) const override {
     if (!lhs || !rhs) {
       return nullptr;
     }
@@ -541,8 +541,8 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     const auto lhs = visit(left_operand.get());
     const auto rhs = visit(right_operand.get());
 
-    auto const_lhs = std::dynamic_pointer_cast<hdk::ir::Constant>(lhs);
-    auto const_rhs = std::dynamic_pointer_cast<hdk::ir::Constant>(rhs);
+    auto const_lhs = lhs->as<hdk::ir::Constant>();
+    auto const_rhs = rhs->as<hdk::ir::Constant>();
     auto lhs_type = lhs->type();
     auto rhs_type = rhs->type();
 
@@ -777,7 +777,7 @@ class JoinCoveredQualVisitor : public ScalarExprVisitor<bool> {
   JoinCoveredQualVisitor(const JoinQualsPerNestingLevel& join_quals) {
     for (const auto& join_condition : join_quals) {
       for (const auto& qual : join_condition.quals) {
-        auto qual_bin_oper = dynamic_cast<hdk::ir::BinOper*>(qual.get());
+        auto qual_bin_oper = qual->as<hdk::ir::BinOper>();
         if (qual_bin_oper) {
           join_qual_pairs.emplace_back(qual_bin_oper->get_left_operand(),
                                        qual_bin_oper->get_right_operand());
@@ -835,19 +835,16 @@ hdk::ir::ExprPtr fold_expr(const hdk::ir::Expr* expr) {
   auto rewritten_expr = visitor.visit(expr_no_likelihood);
   if (visitor.get_num_overflows() > 0 && rewritten_expr->type()->isInteger() &&
       !rewritten_expr->type()->isInt64()) {
-    auto rewritten_expr_const =
-        std::dynamic_pointer_cast<const hdk::ir::Constant>(rewritten_expr);
+    auto rewritten_expr_const = rewritten_expr->as<hdk::ir::Constant>();
     if (!rewritten_expr_const) {
       // Integer expression didn't fold completely the first time due to
       // overflows in smaller type subexpressions, trying again with a cast
       auto type = expr->type()->ctx().int64();
       auto bigint_expr_no_likelihood = expr_no_likelihood->deep_copy()->add_cast(type);
       auto rewritten_expr_take2 = visitor.visit(bigint_expr_no_likelihood.get());
-      auto rewritten_expr_take2_const =
-          std::dynamic_pointer_cast<hdk::ir::Constant>(rewritten_expr_take2);
-      if (rewritten_expr_take2_const) {
+      if (rewritten_expr_take2->is<hdk::ir::Constant>()) {
         // Managed to fold, switch to the new constant
-        rewritten_expr = rewritten_expr_take2_const;
+        rewritten_expr = rewritten_expr_take2;
       }
     }
   }

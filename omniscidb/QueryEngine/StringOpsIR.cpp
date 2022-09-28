@@ -195,7 +195,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
                                             const char escape_char,
                                             const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto cast_oper = std::dynamic_pointer_cast<hdk::ir::UOper>(like_arg);
+  const auto cast_oper = like_arg->as<hdk::ir::UOper>();
   if (!cast_oper) {
     return nullptr;
   }
@@ -313,8 +313,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   }
   CHECK_EQ(kCAST, cast_oper->get_optype());
 
-  const auto const_expr =
-      dynamic_cast<hdk::ir::Constant*>(cast_oper->get_own_operand().get());
+  const auto const_expr = cast_oper->get_operand()->as<hdk::ir::Constant>();
   if (!const_expr) {
     // Analyzer casts dictionary encoded columns to none encoded if there is a comparison
     // between two encoded columns. Which we currently do not handle.
@@ -407,7 +406,7 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
                                               const char escape_char,
                                               const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto cast_oper = std::dynamic_pointer_cast<hdk::ir::UOper>(pattern_arg);
+  const auto cast_oper = pattern_arg->as<hdk::ir::UOper>();
   if (!cast_oper) {
     return nullptr;
   }

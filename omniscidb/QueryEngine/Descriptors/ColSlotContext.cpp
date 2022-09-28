@@ -32,7 +32,7 @@
 #include <numeric>
 #include <stdexcept>
 
-ColSlotContext::ColSlotContext(const std::vector<hdk::ir::Expr*>& col_expr_list,
+ColSlotContext::ColSlotContext(const std::vector<const hdk::ir::Expr*>& col_expr_list,
                                const std::vector<int64_t>& col_exprs_to_not_project,
                                bool bigint_count) {
   // Note that non-projected col exprs could be projected cols that we can lazy fetch or

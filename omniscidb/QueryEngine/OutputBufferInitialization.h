@@ -44,7 +44,7 @@ int64_t get_agg_initial_val(const SQLAgg agg,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact);
 
-std::vector<int64_t> init_agg_val_vec(const std::vector<hdk::ir::Expr*>& targets,
+std::vector<int64_t> init_agg_val_vec(const std::vector<const hdk::ir::Expr*>& targets,
                                       const std::list<hdk::ir::ExprPtr>& quals,
                                       const QueryMemoryDescriptor& query_mem_desc,
                                       bool bigint_count);

@@ -567,7 +567,7 @@ size_t Executor::getNumBytesForFetchedRow(const std::set<int>& table_ids_to_fetc
 }
 
 bool Executor::hasLazyFetchColumns(
-    const std::vector<hdk::ir::Expr*>& target_exprs) const {
+    const std::vector<const hdk::ir::Expr*>& target_exprs) const {
   CHECK(plan_state_);
   for (const auto target_expr : target_exprs) {
     if (plan_state_->isLazyFetchColumn(target_expr)) {
@@ -578,7 +578,7 @@ bool Executor::hasLazyFetchColumns(
 }
 
 std::vector<ColumnLazyFetchInfo> Executor::getColLazyFetchInfo(
-    const std::vector<hdk::ir::Expr*>& target_exprs) const {
+    const std::vector<const hdk::ir::Expr*>& target_exprs) const {
   CHECK(plan_state_);
   std::vector<ColumnLazyFetchInfo> col_lazy_fetch_info;
   for (const auto target_expr : target_exprs) {
@@ -2229,7 +2229,7 @@ int64_t inline_null_val(const hdk::ir::Type* type, const bool float_argument_inp
 
 void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
                                   std::vector<int64_t>& entry,
-                                  const std::vector<hdk::ir::Expr*>& target_exprs,
+                                  const std::vector<const hdk::ir::Expr*>& target_exprs,
                                   const QueryMemoryDescriptor& query_mem_desc,
                                   bool bigint_count) {
   for (size_t target_idx = 0; target_idx < target_exprs.size(); ++target_idx) {
@@ -2256,13 +2256,14 @@ void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
   }
 }
 
-ResultSetPtr build_row_for_empty_input(const std::vector<hdk::ir::Expr*>& target_exprs_in,
-                                       const QueryMemoryDescriptor& query_mem_desc,
-                                       const ExecutorDeviceType device_type) {
+ResultSetPtr build_row_for_empty_input(
+    const std::vector<const hdk::ir::Expr*>& target_exprs_in,
+    const QueryMemoryDescriptor& query_mem_desc,
+    const ExecutorDeviceType device_type) {
   std::vector<hdk::ir::ExprPtr> target_exprs_owned_copies;
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   for (const auto target_expr : target_exprs_in) {
-    auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
+    auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
     CHECK(agg_expr);
     hdk::ir::ExprPtr target_expr_copy;
     if (agg_expr->get_arg()) {
@@ -3295,7 +3296,7 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
       for (const auto target_expr : ra_exe_unit.target_exprs) {
         const auto agg_info =
             get_target_info(target_expr, getConfig().exec.group_by.bigint_count);
-        CHECK(agg_info.is_agg || dynamic_cast<hdk::ir::Constant*>(target_expr))
+        CHECK(agg_info.is_agg || target_expr->is<hdk::ir::Constant>())
             << target_expr->toString();
 
         int64_t val1;
@@ -3517,7 +3518,7 @@ void Executor::preloadFragOffsets(const std::vector<InputDescriptor>& input_desc
 }
 
 Executor::JoinHashTableOrError Executor::buildHashTableForQualifier(
-    const std::shared_ptr<hdk::ir::BinOper>& qual_bin_oper,
+    const std::shared_ptr<const hdk::ir::BinOper>& qual_bin_oper,
     const std::vector<InputTableInfo>& query_infos,
     const MemoryLevel memory_level,
     const JoinType join_type,

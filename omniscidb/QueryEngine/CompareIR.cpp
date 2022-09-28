@@ -120,7 +120,7 @@ std::string string_cmp_func(const SQLOps optype) {
   }
 }
 
-std::shared_ptr<hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_eq) {
+std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_eq) {
   auto& ctx = bw_eq->ctx();
   const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->type(),
                                                           bw_eq->get_contains_agg(),
@@ -134,19 +134,19 @@ std::shared_ptr<hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_eq) {
       ctx.boolean(false), kISNULL, bw_eq->get_own_right_operand());
   const auto both_are_null =
       Analyzer::normalizeOperExpr(kAND, kONE, lhs_is_null, rhs_is_null);
-  const auto bw_eq_oper = std::dynamic_pointer_cast<hdk::ir::BinOper>(
+  const auto bw_eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
       Analyzer::normalizeOperExpr(kOR, kONE, eq_oper, both_are_null));
   CHECK(bw_eq_oper);
   return bw_eq_oper;
 }
 
-std::shared_ptr<hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
-                                          const hdk::ir::ExprPtr& rhs,
-                                          const SQLOps optype) {
+std::shared_ptr<const hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
+                                                const hdk::ir::ExprPtr& rhs,
+                                                const SQLOps optype) {
   CHECK(IS_EQUIVALENCE(optype));
   // Sides of a tuple equality are stripped of cast operators to simplify the logic
   // in the hash table construction algorithm. Add them back here.
-  auto eq_oper = std::dynamic_pointer_cast<hdk::ir::BinOper>(
+  auto eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
       Analyzer::normalizeOperExpr(optype, kONE, lhs, rhs));
   CHECK(eq_oper);
   return optype == kBW_EQ ? lower_bw_eq(eq_oper.get()) : eq_oper;
@@ -154,7 +154,7 @@ std::shared_ptr<hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
 
 // Convert a column tuple equality expression back to a conjunction of comparisons
 // so that it can be handled by the regular code generation methods.
-std::shared_ptr<hdk::ir::BinOper> lower_multicol_compare(
+std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
     const hdk::ir::BinOper* multicol_compare) {
   const auto left_tuple_expr =
       dynamic_cast<const hdk::ir::ExpressionTuple*>(multicol_compare->get_left_operand());

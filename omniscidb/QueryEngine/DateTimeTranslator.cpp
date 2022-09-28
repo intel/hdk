@@ -175,7 +175,7 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
                              " from TIME.");
   }
   auto type = expr_type->ctx().int64(expr_type->nullable());
-  auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(from_expr);
+  auto constant = from_expr->as<hdk::ir::Constant>();
   if (constant != nullptr) {
     Datum d;
     d.bigintval = field == kEPOCH
@@ -253,7 +253,7 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
   auto unit = expr_type->isTimestamp() ? expr_type->as<hdk::ir::TimestampType>()->unit()
                                        : hdk::ir::TimeUnit::kSecond;
   auto type = expr_type->ctx().timestamp(unit, expr_type->nullable());
-  auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(from_expr);
+  auto constant = from_expr->as<hdk::ir::Constant>();
   if (constant) {
     Datum d{0};
     d.bigintval =

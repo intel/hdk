@@ -50,7 +50,7 @@ class Expr;
 
 // Compute the slot index where the target given by target_idx is stored, where
 // target_exprs is the list all projected expressions.
-size_t get_heap_key_slot_index(const std::vector<hdk::ir::Expr*>& target_exprs,
+size_t get_heap_key_slot_index(const std::vector<const hdk::ir::Expr*>& target_exprs,
                                const size_t target_idx,
                                bool bigint_count);
 

@@ -209,8 +209,8 @@ DatetruncField to_datediff_field(const std::string& field) {
   return fieldno;
 }
 
-std::shared_ptr<hdk::ir::Constant> make_fp_constant(const int64_t val,
-                                                    const hdk::ir::Type* type) {
+std::shared_ptr<const hdk::ir::Constant> make_fp_constant(const int64_t val,
+                                                          const hdk::ir::Type* type) {
   Datum d;
   if (type->isFp32()) {
     d.floatval = val;

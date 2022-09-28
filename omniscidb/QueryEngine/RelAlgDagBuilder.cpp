@@ -1129,7 +1129,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
   auto interval_type = interval->type()->as<hdk::ir::IntervalType>();
   CHECK(interval_type);
   auto bigint_type = type->ctx().int64(false);
-  const auto interval_lit = std::dynamic_pointer_cast<hdk::ir::Constant>(interval);
+  const auto interval_lit = interval->as<hdk::ir::Constant>();
   if (interval_type->unit() == hdk::ir::TimeUnit::kMilli) {
     hdk::ir::ExprPtr interval_sec;
     if (interval_lit) {
@@ -1800,7 +1800,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
     CHECK_EQ(args.size(), ext_func_args.size());
     for (size_t i = 0; i < args.size(); i++) {
       // fold casts on constants
-      if (auto constant = std::dynamic_pointer_cast<hdk::ir::Constant>(args[i])) {
+      if (auto constant = args[i]->as<hdk::ir::Constant>()) {
         auto ext_func_arg_type = ext_arg_type_to_type(type->ctx(), ext_func_args[i]);
         if (!ext_func_arg_type->equal(args[i]->type())) {
           args[i] = constant->add_cast(ext_func_arg_type);
@@ -1855,7 +1855,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
   }
 
   hdk::ir::ExprPtr arg_expr;
-  std::shared_ptr<hdk::ir::Constant> arg1;  // 2nd aggregate parameter
+  std::shared_ptr<const hdk::ir::Constant> arg1;  // 2nd aggregate parameter
   if (operands.size() > 0) {
     const auto operand = operands[0];
     CHECK_LT(operand, sources.size());
@@ -1863,7 +1863,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
     arg_expr = sources[operand];
 
     if (agg_kind == kAPPROX_COUNT_DISTINCT && operands.size() == 2) {
-      arg1 = std::dynamic_pointer_cast<hdk::ir::Constant>(sources[operands[1]]);
+      arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(sources[operands[1]]);
       if (!arg1 || !arg1->type()->isInt32() || arg1->get_constval().intval < 1 ||
           arg1->get_constval().intval > 100) {
         throw std::runtime_error(
@@ -1873,9 +1873,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
     } else if (agg_kind == kAPPROX_QUANTILE) {
       // If second parameter is not given then APPROX_MEDIAN is assumed.
       if (operands.size() == 2) {
-        arg1 = std::dynamic_pointer_cast<hdk::ir::Constant>(
-            std::dynamic_pointer_cast<hdk::ir::Constant>(sources[operands[1]])
-                ->add_cast(ctx.fp64()));
+        arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(
+            sources[operands[1]]->add_cast(ctx.fp64()));
       } else {
         Datum median;
         median.doubleval = 0.5;

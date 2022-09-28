@@ -112,7 +112,7 @@ class RelAlgExecutor {
 
   std::shared_ptr<RelAlgTranslator> getRelAlgTranslator(const RelAlgNode* root_node);
 
-  const std::vector<std::shared_ptr<hdk::ir::ScalarSubquery>>& getSubqueries()
+  const std::vector<std::shared_ptr<const hdk::ir::ScalarSubquery>>& getSubqueries()
       const noexcept {
     CHECK(query_dag_);
     return query_dag_->getSubqueries();
@@ -180,7 +180,7 @@ class RelAlgExecutor {
   // Creates the window context for the given window function.
   std::unique_ptr<WindowFunctionContext> createWindowFunctionContext(
       const hdk::ir::WindowFunction* window_func,
-      const std::shared_ptr<hdk::ir::BinOper>& partition_key_cond,
+      const std::shared_ptr<const hdk::ir::BinOper>& partition_key_cond,
       const RelAlgExecutionUnit& ra_exe_unit,
       const std::vector<InputTableInfo>& query_infos,
       const CompilationOptions& co,

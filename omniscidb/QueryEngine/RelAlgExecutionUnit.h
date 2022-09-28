@@ -138,7 +138,7 @@ struct RelAlgExecutionUnit {
   std::list<hdk::ir::ExprPtr> quals;
   const JoinQualsPerNestingLevel join_quals;
   const std::list<hdk::ir::ExprPtr> groupby_exprs;
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   const std::shared_ptr<Analyzer::Estimator> estimator;
   const SortInfo sort_info;
   size_t scan_limit;
@@ -157,9 +157,9 @@ std::string ra_exec_unit_desc_for_caching(const RelAlgExecutionUnit& ra_exe_unit
 struct TableFunctionExecutionUnit {
   const std::vector<InputDescriptor> input_descs;
   std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
-  std::vector<hdk::ir::Expr*> input_exprs;
-  std::vector<hdk::ir::ColumnVar*> table_func_inputs;
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> input_exprs;
+  std::vector<const hdk::ir::ColumnVar*> table_func_inputs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   const size_t output_buffer_size_param;
   const table_functions::TableFunction table_func;
 

@@ -67,11 +67,11 @@ RowFuncBuilder::RowFuncBuilder(const RelAlgExecutionUnit& ra_exe_unit,
 
 namespace {
 
-int32_t get_agg_count(const std::vector<hdk::ir::Expr*>& target_exprs) {
+int32_t get_agg_count(const std::vector<const hdk::ir::Expr*>& target_exprs) {
   int32_t agg_count{0};
   for (auto target_expr : target_exprs) {
     CHECK(target_expr);
-    const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
+    const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
     if (!agg_expr || agg_expr->get_aggtype() == kSAMPLE) {
       auto type = target_expr->type();
       if (type->isBuffer()) {

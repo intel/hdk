@@ -22,9 +22,10 @@
 
 SpeculativeTopNMap::SpeculativeTopNMap() : unknown_(0) {}
 
-SpeculativeTopNMap::SpeculativeTopNMap(const ResultSet& rows,
-                                       const std::vector<hdk::ir::Expr*>& target_exprs,
-                                       const size_t truncate_n)
+SpeculativeTopNMap::SpeculativeTopNMap(
+    const ResultSet& rows,
+    const std::vector<const hdk::ir::Expr*>& target_exprs,
+    const size_t truncate_n)
     : unknown_(0) {
   CHECK_EQ(rows.colCount(), target_exprs.size());
   const bool count_first = dynamic_cast<const hdk::ir::AggExpr*>(target_exprs[0]);

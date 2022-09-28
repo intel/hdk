@@ -34,9 +34,9 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
       crt_bin->get_optype() != prev_bin->get_optype()) {
     return false;
   }
-  const auto crt_inner = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(
+  const auto crt_inner = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(
       remove_cast(crt_bin->get_own_right_operand()));
-  const auto prev_inner = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(
+  const auto prev_inner = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(
       remove_cast(prev_bin->get_own_right_operand()));
   AllRangeTableIndexVisitor visitor;
   const auto crt_outer_rte_set = visitor.visit(crt_bin->get_left_operand());
@@ -61,7 +61,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
   std::vector<hdk::ir::ExprPtr> rhs_tuple;
   bool nullable{false};
   for (const auto& qual : crt_coalesced_quals) {
-    const auto qual_binary = std::dynamic_pointer_cast<hdk::ir::BinOper>(qual);
+    const auto qual_binary = qual->as<hdk::ir::BinOper>();
     CHECK(qual_binary);
     nullable = nullable || qual_binary->type()->nullable();
     const auto lhs_col = remove_cast(qual_binary->get_own_left_operand());
@@ -77,8 +77,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
     }
   }
   CHECK(!crt_coalesced_quals.empty());
-  const auto first_qual =
-      std::dynamic_pointer_cast<hdk::ir::BinOper>(crt_coalesced_quals.front());
+  const auto first_qual = crt_coalesced_quals.front()->as<hdk::ir::BinOper>();
   CHECK(first_qual);
   CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
   if (lhs_tuple.size() > 0) {
@@ -135,7 +134,7 @@ std::list<hdk::ir::ExprPtr> combine_equi_join_conditions(
 }
 
 std::list<hdk::ir::ExprPtr> coalesce_singleton_equi_join(
-    const std::shared_ptr<hdk::ir::BinOper>& join_qual) {
+    const std::shared_ptr<const hdk::ir::BinOper>& join_qual) {
   std::vector<hdk::ir::ExprPtr> singleton_qual_list;
   singleton_qual_list.push_back(join_qual);
   return make_composite_equals_impl(singleton_qual_list);

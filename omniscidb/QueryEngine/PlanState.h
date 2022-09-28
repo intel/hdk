@@ -25,12 +25,13 @@
 class Executor;
 
 struct JoinInfo {
-  JoinInfo(const std::vector<std::shared_ptr<hdk::ir::BinOper>>& equi_join_tautologies,
-           const std::vector<std::shared_ptr<HashJoin>>& join_hash_tables)
+  JoinInfo(
+      const std::vector<std::shared_ptr<const hdk::ir::BinOper>>& equi_join_tautologies,
+      const std::vector<std::shared_ptr<HashJoin>>& join_hash_tables)
       : equi_join_tautologies_(equi_join_tautologies)
       , join_hash_tables_(join_hash_tables) {}
 
-  std::vector<std::shared_ptr<hdk::ir::BinOper>>
+  std::vector<std::shared_ptr<const hdk::ir::BinOper>>
       equi_join_tautologies_;  // expressions we equi-join on are true by
                                // definition when using a hash join; we'll
                                // fold them to true during code generation
@@ -56,12 +57,12 @@ struct PlanState {
             const std::vector<InputTableInfo>& query_infos,
             const Executor* executor)
       : allow_lazy_fetch_(allow_lazy_fetch)
-      , join_info_({std::vector<std::shared_ptr<hdk::ir::BinOper>>{}, {}})
+      , join_info_({std::vector<std::shared_ptr<const hdk::ir::BinOper>>{}, {}})
       , query_infos_(query_infos)
       , executor_(executor) {}
 
   std::vector<int64_t> init_agg_vals_;
-  std::vector<hdk::ir::Expr*> target_exprs_;
+  std::vector<const hdk::ir::Expr*> target_exprs_;
   HoistedFiltersSet hoisted_filters_;
   std::unordered_map<InputColDescriptor, size_t> global_to_local_col_ids_;
   InputColDescriptorSet columns_to_fetch_;

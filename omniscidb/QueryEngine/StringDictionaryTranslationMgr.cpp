@@ -116,7 +116,7 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_
     const int64_t translation_map_handle =
         reinterpret_cast<int64_t>(kernel_translation_map);
     const auto translation_map_handle_literal =
-        std::dynamic_pointer_cast<hdk::ir::Constant>(
+        std::dynamic_pointer_cast<const hdk::ir::Constant>(
             Analyzer::analyzeIntValue(translation_map_handle));
     CHECK(translation_map_handle_literal);
     constants_owned.push_back(translation_map_handle_literal);

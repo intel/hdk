@@ -50,7 +50,8 @@ bool is_sum_kind(const SqlWindowFunctionKind kind) {
 
 }  // namespace
 
-std::shared_ptr<hdk::ir::WindowFunction> rewrite_sum_window(const hdk::ir::Expr* expr) {
+std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
+    const hdk::ir::Expr* expr) {
   const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
   if (!case_expr || !matches_else_null(case_expr)) {
     return nullptr;
@@ -65,8 +66,8 @@ std::shared_ptr<hdk::ir::WindowFunction> rewrite_sum_window(const hdk::ir::Expr*
   if (!window_gt_zero || !matches_gt_bigint_zero(window_gt_zero)) {
     return nullptr;
   }
-  const auto sum_window_expr =
-      std::dynamic_pointer_cast<hdk::ir::WindowFunction>(remove_cast(expr_pair.second));
+  const auto sum_window_expr = std::dynamic_pointer_cast<const hdk::ir::WindowFunction>(
+      remove_cast(expr_pair.second));
   if (!sum_window_expr || !is_sum_kind(sum_window_expr->getKind())) {
     return nullptr;
   }
@@ -92,7 +93,8 @@ std::shared_ptr<hdk::ir::WindowFunction> rewrite_sum_window(const hdk::ir::Expr*
                                                     sum_window_expr->getCollation());
 }
 
-std::shared_ptr<hdk::ir::WindowFunction> rewrite_avg_window(const hdk::ir::Expr* expr) {
+std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
+    const hdk::ir::Expr* expr) {
   const auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr);
   const auto div_expr = dynamic_cast<const hdk::ir::BinOper*>(
       cast_expr && cast_expr->get_optype() == kCAST ? cast_expr->get_operand() : expr);

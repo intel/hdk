@@ -53,20 +53,20 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
 }
 
 bool should_defer_eval(const hdk::ir::ExprPtr expr) {
-  if (std::dynamic_pointer_cast<hdk::ir::LikeExpr>(expr)) {
+  if (expr->is<hdk::ir::LikeExpr>()) {
     return true;
   }
-  if (std::dynamic_pointer_cast<hdk::ir::RegexpExpr>(expr)) {
+  if (expr->is<hdk::ir::RegexpExpr>()) {
     return true;
   }
-  if (std::dynamic_pointer_cast<hdk::ir::FunctionOper>(expr)) {
+  if (expr->is<hdk::ir::FunctionOper>()) {
     return true;
   }
-  if (!std::dynamic_pointer_cast<hdk::ir::BinOper>(expr)) {
+  if (!expr->is<hdk::ir::BinOper>()) {
     return false;
   }
-  const auto bin_expr = std::static_pointer_cast<hdk::ir::BinOper>(expr);
-  if (contains_unsafe_division(bin_expr.get())) {
+  const auto bin_expr = expr->as<hdk::ir::BinOper>();
+  if (contains_unsafe_division(bin_expr)) {
     return true;
   }
   const auto rhs = bin_expr->get_right_operand();
@@ -153,8 +153,8 @@ Weight get_weight(const hdk::ir::Expr* expr, int depth = 0) {
 }  // namespace
 
 bool CodeGenerator::prioritizeQuals(const RelAlgExecutionUnit& ra_exe_unit,
-                                    std::vector<hdk::ir::Expr*>& primary_quals,
-                                    std::vector<hdk::ir::Expr*>& deferred_quals,
+                                    std::vector<const hdk::ir::Expr*>& primary_quals,
+                                    std::vector<const hdk::ir::Expr*>& deferred_quals,
                                     const PlanState::HoistedFiltersSet& hoisted_quals) {
   for (auto expr : ra_exe_unit.simple_quals) {
     if (hoisted_quals.find(expr) != hoisted_quals.end()) {

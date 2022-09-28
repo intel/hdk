@@ -20,8 +20,10 @@
 
 // Sum window function come from Calcite with a redundant case expression. We don't
 // support complex expressions involving window functions, rewrite to just a sum.
-std::shared_ptr<hdk::ir::WindowFunction> rewrite_sum_window(const hdk::ir::Expr* expr);
+std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
+    const hdk::ir::Expr* expr);
 
 // Same as above, but for average. Additionally, replace the sum divided by count
 // expression with an explicit average.
-std::shared_ptr<hdk::ir::WindowFunction> rewrite_avg_window(const hdk::ir::Expr* expr);
+std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
+    const hdk::ir::Expr* expr);

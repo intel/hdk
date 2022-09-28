@@ -168,9 +168,9 @@ inline const hdk::ir::Type* get_column_type(const int col_id,
 }
 
 // TODO(alex): Adjust interfaces downstream and make this not needed.
-inline std::vector<hdk::ir::Expr*> get_exprs_not_owned(
+inline std::vector<const hdk::ir::Expr*> get_exprs_not_owned(
     const std::vector<hdk::ir::ExprPtr>& exprs) {
-  std::vector<hdk::ir::Expr*> exprs_not_owned;
+  std::vector<const hdk::ir::Expr*> exprs_not_owned;
   for (const auto& expr : exprs) {
     exprs_not_owned.push_back(expr.get());
   }
@@ -376,9 +376,9 @@ class Executor {
 
   size_t getNumBytesForFetchedRow(const std::set<int>& table_ids_to_fetch) const;
 
-  bool hasLazyFetchColumns(const std::vector<hdk::ir::Expr*>& target_exprs) const;
+  bool hasLazyFetchColumns(const std::vector<const hdk::ir::Expr*>& target_exprs) const;
   std::vector<ColumnLazyFetchInfo> getColLazyFetchInfo(
-      const std::vector<hdk::ir::Expr*>& target_exprs) const;
+      const std::vector<const hdk::ir::Expr*>& target_exprs) const;
 
   void registerActiveModule(void* module, const int device_id) const;
   void unregisterActiveModule(void* module, const int device_id) const;
@@ -797,7 +797,7 @@ class Executor {
   };
 
   JoinHashTableOrError buildHashTableForQualifier(
-      const std::shared_ptr<hdk::ir::BinOper>& qual_bin_oper,
+      const std::shared_ptr<const hdk::ir::BinOper>& qual_bin_oper,
       const std::vector<InputTableInfo>& query_infos,
       const MemoryLevel memory_level,
       const JoinType join_type,
@@ -831,7 +831,7 @@ class Executor {
     llvm::Value* original_value;
   };
 
-  GroupColLLVMValue groupByColumnCodegen(hdk::ir::Expr* group_by_col,
+  GroupColLLVMValue groupByColumnCodegen(const hdk::ir::Expr* group_by_col,
                                          const size_t col_width,
                                          const CompilationOptions&,
                                          const bool translate_null_val,

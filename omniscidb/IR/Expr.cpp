@@ -257,40 +257,39 @@ void TargetEntry::print() const {
 ExprPtr Expr::decompress() const {
   if (type_->id() == Type::kExtDictionary) {
     auto new_type = static_cast<const ExtDictionaryType*>(type_)->elemType();
-    return makeExpr<UOper>(
-        new_type, contains_agg, kCAST, const_cast<Expr*>(this)->shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
   } else if (type_->id() == Type::kDate && type_->size() != 8) {
     auto date_type = static_cast<const DateType*>(type_);
     return makeExpr<UOper>(type_->ctx().date64(TimeUnit::kSecond, date_type->nullable()),
                            contains_agg,
                            kCAST,
-                           const_cast<Expr*>(this)->shared_from_this());
+                           shared_from_this());
   } else if (type_->id() == Type::kTime && type_->size() != 8) {
     auto time_type = static_cast<const TimeType*>(type_);
     return makeExpr<UOper>(type_->ctx().time64(time_type->unit(), time_type->nullable()),
                            contains_agg,
                            kCAST,
-                           const_cast<Expr*>(this)->shared_from_this());
+                           shared_from_this());
   } else if (type_->id() == Type::kInterval && type_->size() != 8) {
     auto interval_type = static_cast<const TimestampType*>(type_);
     return makeExpr<UOper>(
         type_->ctx().interval64(interval_type->unit(), interval_type->nullable()),
         contains_agg,
         kCAST,
-        const_cast<Expr*>(this)->shared_from_this());
+        shared_from_this());
   }
-  return const_cast<Expr*>(this)->shared_from_this();
+  return shared_from_this();
 }
 
 ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {
   if (type_->equal(new_type)) {
-    return const_cast<Expr*>(this)->shared_from_this();
+    return shared_from_this();
   }
   if (type_->id() == Type::kExtDictionary && new_type->id() == Type::kExtDictionary) {
     auto dict_id = type_->as<ExtDictionaryType>()->dictId();
     auto new_dict_id = new_type->as<ExtDictionaryType>()->dictId();
     if (dict_id == new_dict_id || dict_id == TRANSIENT_DICT(new_dict_id)) {
-      return const_cast<Expr*>(this)->shared_from_this();
+      return shared_from_this();
     }
   }
   if (!isCastAllowed(type_, new_type)) {
@@ -309,17 +308,16 @@ ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {
         "expression "
         "yet.");
   }
-  return makeExpr<UOper>(
-      new_type, contains_agg, kCAST, const_cast<Expr*>(this)->shared_from_this());
+  return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
 }
 
 ExprPtr Expr::withType(const Type* type) const {
   if (!type_->equal(type)) {
     auto res = deep_copy();
-    res->type_ = type;
+    const_cast<Expr*>(res.get())->type_ = type;
     return res;
   }
-  return const_cast<Expr*>(this)->shared_from_this();
+  return shared_from_this();
 }
 
 std::string ColumnRef::toString() const {
@@ -394,15 +392,14 @@ ExprPtr ColumnVar::withType(const Type* type) const {
                                                  col_info_->is_rowid);
     return makeExpr<ColumnVar>(col_info, rte_idx);
   }
-  return const_cast<ColumnVar*>(this)->shared_from_this();
+  return shared_from_this();
 }
 
 ExprPtr ExpressionTuple::deep_copy() const {
   std::vector<ExprPtr> tuple_deep_copy;
   for (const auto& column : tuple_) {
-    const auto column_deep_copy =
-        std::dynamic_pointer_cast<ColumnVar>(column->deep_copy());
-    CHECK(column_deep_copy);
+    const auto column_deep_copy = column->deep_copy();
+    CHECK(column_deep_copy->is<ColumnVar>());
     tuple_deep_copy.push_back(column_deep_copy);
   }
   return makeExpr<ExpressionTuple>(tuple_deep_copy);
@@ -422,7 +419,7 @@ ExprPtr Var::withType(const Type* type) const {
                                                  col_info_->is_rowid);
     return makeExpr<Var>(col_info, rte_idx, which_row, varno);
   }
-  return const_cast<Var*>(this)->shared_from_this();
+  return shared_from_this();
 }
 
 ExprPtr Constant::deep_copy() const {
@@ -776,7 +773,7 @@ ExprPtr Constant::cast_to_string(const Type* str_type) const {
 
 ExprPtr Constant::do_cast(const Type* new_type) const {
   if (type_->equal(new_type)) {
-    return const_cast<Constant*>(this)->shared_from_this();
+    return shared_from_this();
   }
   if (is_null && new_type->nullable()) {
   } else if ((new_type->isNumber() || new_type->isTimestamp()) &&
@@ -814,7 +811,7 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
     auto new_elem_type = new_type->as<ArrayBaseType>()->elemType();
     ExprPtrList new_value_list;
     for (auto& v : value_list) {
-      auto c = std::dynamic_pointer_cast<Constant>(v);
+      auto c = v->as<Constant>();
       if (!c) {
         throw std::runtime_error("Invalid array cast.");
       }
@@ -903,8 +900,7 @@ ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) cons
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
-    return makeExpr<UOper>(
-        new_type, contains_agg, kCAST, const_cast<Constant*>(this)->shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
   }
   return do_cast(new_type);
 }

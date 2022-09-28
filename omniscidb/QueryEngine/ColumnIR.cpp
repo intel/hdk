@@ -512,7 +512,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
   return nullptr;
 }
 
-std::shared_ptr<hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
+std::shared_ptr<const hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
     const hdk::ir::ColumnVar* rhs,
     const hdk::ir::BinOper* tautological_eq) const {
   const auto lhs_tuple_expr =
@@ -525,7 +525,8 @@ std::shared_ptr<hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
   CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
   for (size_t i = 0; i < lhs_tuple.size(); ++i) {
     if (*rhs_tuple[i] == *rhs) {
-      const auto lhs_col = std::static_pointer_cast<hdk::ir::ColumnVar>(lhs_tuple[i]);
+      const auto lhs_col =
+          std::static_pointer_cast<const hdk::ir::ColumnVar>(lhs_tuple[i]);
       return lhs_col->get_rte_idx() == 0 ? lhs_col : nullptr;
     }
   }

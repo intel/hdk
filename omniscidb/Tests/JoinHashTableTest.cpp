@@ -97,7 +97,7 @@ std::shared_ptr<HashJoin> buildPerfect(std::string_view table1,
                                         executor);
 }
 
-std::shared_ptr<HashJoin> buildKeyed(std::shared_ptr<hdk::ir::BinOper> op,
+std::shared_ptr<HashJoin> buildKeyed(std::shared_ptr<const hdk::ir::BinOper> op,
                                      Executor* executor) {
   CHECK(executor);
   auto storage = getStorage();
@@ -121,7 +121,7 @@ std::shared_ptr<HashJoin> buildKeyed(std::shared_ptr<hdk::ir::BinOper> op,
 }
 
 std::pair<std::string, std::shared_ptr<HashJoin>> checkProperQualDetection(
-    std::vector<std::shared_ptr<hdk::ir::BinOper>> quals) {
+    std::vector<std::shared_ptr<const hdk::ir::BinOper>> quals) {
   auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
   CHECK(executor);
   auto storage = getStorage();
@@ -319,8 +319,8 @@ TEST(Build, detectProperJoinQual) {
     auto t21 = getSyntheticColumnVar(TEST_DB_ID, "table2", "t21", 1, executor.get());
     auto qual2 = std::make_shared<hdk::ir::BinOper>(ctx().boolean(), kEQ, kONE, t11, t21);
     auto create_join_qual = [&c, &executor](int case_num) {
-      std::shared_ptr<hdk::ir::ColumnVar> q1_lhs;
-      std::shared_ptr<hdk::ir::BinOper> qual1;
+      std::shared_ptr<const hdk::ir::ColumnVar> q1_lhs;
+      std::shared_ptr<const hdk::ir::BinOper> qual1;
       switch (case_num) {
         case 1: {
           q1_lhs = getSyntheticColumnVar(TEST_DB_ID, "table1", "t12", 0, executor.get());
@@ -354,7 +354,7 @@ TEST(Build, detectProperJoinQual) {
 
     for (int i = 1; i <= 4; ++i) {
       auto qual1 = create_join_qual(i);
-      std::vector<std::shared_ptr<hdk::ir::BinOper>> quals;
+      std::vector<std::shared_ptr<const hdk::ir::BinOper>> quals;
       quals.push_back(qual1);
       quals.push_back(qual2);
       auto res = checkProperQualDetection(quals);

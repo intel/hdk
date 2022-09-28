@@ -27,7 +27,7 @@ class UsedColumnExpressions : public ScalarExprVisitor<ScalarCodeGenerator::Colu
     ScalarCodeGenerator::ColumnMap m;
     InputColDescriptor input_desc(column->get_column_info(), column->get_rte_idx());
     m.emplace(input_desc,
-              std::static_pointer_cast<hdk::ir::ColumnVar>(column->deep_copy()));
+              std::static_pointer_cast<const hdk::ir::ColumnVar>(column->deep_copy()));
     return m;
   }
 
@@ -73,7 +73,7 @@ ScalarCodeGenerator::CompiledExpression ScalarCodeGenerator::compile(
   plan_state_ = own_plan_state_.get();
   const auto used_columns = prepare(expr);
   std::vector<llvm::Type*> arg_types(plan_state_->global_to_local_col_ids_.size() + 1);
-  std::vector<std::shared_ptr<hdk::ir::ColumnVar>> inputs(arg_types.size() - 1);
+  std::vector<std::shared_ptr<const hdk::ir::ColumnVar>> inputs(arg_types.size() - 1);
   auto& ctx = module_->getContext();
   for (const auto& kv : plan_state_->global_to_local_col_ids_) {
     size_t arg_idx = kv.second;

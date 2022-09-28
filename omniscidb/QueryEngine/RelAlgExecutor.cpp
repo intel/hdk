@@ -1188,14 +1188,14 @@ QualsConjunctiveForm translate_quals(const RelCompound* compound,
   return {};
 }
 
-std::vector<hdk::ir::Expr*> translate_targets(
+std::vector<const hdk::ir::Expr*> translate_targets(
     std::vector<hdk::ir::ExprPtr>& target_exprs_owned,
     const std::list<hdk::ir::ExprPtr>& groupby_exprs,
     const RelCompound* compound,
     const RelAlgTranslator& translator,
     const ExecutorType executor_type,
     bool bigint_count) {
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   for (size_t i = 0; i < compound->size(); ++i) {
     const auto* expr = compound->getExprs()[i].get();
     hdk::ir::ExprPtr target_expr;
@@ -1215,14 +1215,14 @@ std::vector<hdk::ir::Expr*> translate_targets(
   return target_exprs;
 }
 
-std::vector<hdk::ir::Expr*> translate_targets(
+std::vector<const hdk::ir::Expr*> translate_targets(
     std::vector<hdk::ir::ExprPtr>& target_exprs_owned,
     const std::vector<hdk::ir::ExprPtr>& scalar_sources,
     const std::list<hdk::ir::ExprPtr>& groupby_exprs,
     const RelAggregate* aggregate,
     const RelAlgTranslator& translator,
     bool bigint_count) {
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   size_t group_key_idx = 1;
   for (const auto& groupby_expr : groupby_exprs) {
     auto target_expr =
@@ -1271,7 +1271,7 @@ inline const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
 template <class RA>
 std::vector<TargetMetaInfo> get_targets_meta(
     const RA* ra_node,
-    const std::vector<hdk::ir::Expr*>& target_exprs) {
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
   std::vector<TargetMetaInfo> targets_meta;
   CHECK_EQ(ra_node->size(), target_exprs.size());
   for (size_t i = 0; i < ra_node->size(); ++i) {
@@ -1286,7 +1286,7 @@ std::vector<TargetMetaInfo> get_targets_meta(
 template <>
 std::vector<TargetMetaInfo> get_targets_meta(
     const RelFilter* filter,
-    const std::vector<hdk::ir::Expr*>& target_exprs) {
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
   RelAlgNode const* input0 = filter->getInput(0);
   if (auto const* input = dynamic_cast<RelCompound const*>(input0)) {
     return get_targets_meta(input, target_exprs);
@@ -1468,7 +1468,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
     }
     // Always use baseline layout hash tables for now, make the expression a tuple.
     const auto& partition_keys = window_func->getPartitionKeys();
-    std::shared_ptr<hdk::ir::BinOper> partition_key_cond;
+    std::shared_ptr<const hdk::ir::BinOper> partition_key_cond;
     if (partition_keys.size() >= 1) {
       hdk::ir::ExprPtr partition_key_tuple;
       if (partition_keys.size() > 1) {
@@ -1501,7 +1501,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
 
 std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionContext(
     const hdk::ir::WindowFunction* window_func,
-    const std::shared_ptr<hdk::ir::BinOper>& partition_key_cond,
+    const std::shared_ptr<const hdk::ir::BinOper>& partition_key_cond,
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<InputTableInfo>& query_infos,
     const CompilationOptions& co,
@@ -1874,8 +1874,8 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     if (agg_info.agg_kind != kAPPROX_COUNT_DISTINCT) {
       continue;
     }
-    CHECK(dynamic_cast<const hdk::ir::AggExpr*>(target_expr));
-    const auto arg = static_cast<hdk::ir::AggExpr*>(target_expr)->get_own_arg();
+    CHECK(target_expr->is<hdk::ir::AggExpr>());
+    const auto arg = target_expr->as<hdk::ir::AggExpr>()->get_own_arg();
     CHECK(arg);
     auto arg_type = arg->type();
     // Avoid calling getExpressionRange for variable length types (string and array),
@@ -1899,7 +1899,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     const auto sub_bitmap_count =
         get_count_distinct_sub_bitmap_count(bitmap_sz_bits, ra_exe_unit, device_type);
     int64_t approx_bitmap_sz_bits{0};
-    const auto error_rate = static_cast<hdk::ir::AggExpr*>(target_expr)->get_arg1();
+    const auto error_rate = target_expr->as<hdk::ir::AggExpr>()->get_arg1();
     if (error_rate) {
       CHECK(error_rate->type()->isInt32());
       CHECK_GE(error_rate->get_constval().intval, 1);
@@ -2961,7 +2961,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
 
   RelAlgTranslator translator(
       executor_, input_to_nest_level, join_types, now_, eo.just_explain);
-  std::vector<hdk::ir::Expr*> target_exprs;
+  std::vector<const hdk::ir::Expr*> target_exprs;
   for (auto& expr : project->getExprs()) {
     auto target_expr = translate(expr.get(), translator, eo.executor_type);
     target_exprs.push_back(target_expr.get());
@@ -3220,7 +3220,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
     UNREACHABLE();
   }
 
-  std::vector<hdk::ir::ColumnVar*> input_col_exprs;
+  std::vector<const hdk::ir::ColumnVar*> input_col_exprs;
   size_t input_index = 0;
   size_t arg_index = 0;
   const auto table_func_args = table_function_impl.getInputArgs();
@@ -3231,25 +3231,23 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
         auto& input_expr = input_exprs[input_index];
         auto input_type = type->ctx().columnList(
             input_expr->type(), type->as<hdk::ir::ColumnListType>()->length());
-        auto col_var = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(
-            input_expr->withType(input_type));
-        CHECK(col_var);
+        auto col_var = input_expr->withType(input_type);
+        CHECK(col_var->is<hdk::ir::ColumnVar>());
 
         target_exprs_owned_.push_back(col_var);
         input_exprs[input_index] = col_var.get();
-        input_col_exprs.push_back(col_var.get());
+        input_col_exprs.push_back(col_var->as<hdk::ir::ColumnVar>());
         input_index++;
       }
     } else if (type->isColumn()) {
       auto& input_expr = input_exprs[input_index];
       auto input_type = type->ctx().column(input_expr->type());
-      auto col_var =
-          std::dynamic_pointer_cast<hdk::ir::ColumnVar>(input_expr->withType(input_type));
-      CHECK(col_var);
+      auto col_var = input_expr->withType(input_type);
+      CHECK(col_var->is<hdk::ir::ColumnVar>());
 
       target_exprs_owned_.push_back(col_var);
       input_exprs[input_index] = col_var.get();
-      input_col_exprs.push_back(col_var.get());
+      input_col_exprs.push_back(col_var->as<hdk::ir::ColumnVar>());
       input_index++;
     } else {
       auto input_expr = input_exprs[input_index];
@@ -3264,7 +3262,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
     arg_index++;
   }
   CHECK_EQ(input_col_exprs.size(), rel_table_func->getColInputsSize());
-  std::vector<hdk::ir::Expr*> table_func_outputs;
+  std::vector<const hdk::ir::Expr*> table_func_outputs;
   for (size_t i = 0; i < table_function_impl.getOutputsSize(); i++) {
     auto type = table_function_impl.getOutputType(i);
     if (type->isExtDictionary()) {

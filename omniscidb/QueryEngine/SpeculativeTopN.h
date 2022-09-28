@@ -61,7 +61,7 @@ class SpeculativeTopNMap {
   SpeculativeTopNMap();
 
   SpeculativeTopNMap(const ResultSet& rows,
-                     const std::vector<hdk::ir::Expr*>& target_exprs,
+                     const std::vector<const hdk::ir::Expr*>& target_exprs,
                      const size_t truncate_n);
 
   void reduce(SpeculativeTopNMap& that);

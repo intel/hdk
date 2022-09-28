@@ -411,9 +411,7 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
       // Handle the highly unlikely case when the InIntegerSet ended up being tiny.
       // Just let it fall through the usual InValues path at the end of this method,
       // its codegen knows to use inline comparisons for few values.
-      if (expr && std::static_pointer_cast<hdk::ir::InIntegerSet>(expr)
-                          ->get_value_list()
-                          .size() <= 100) {
+      if (expr && expr->as<hdk::ir::InIntegerSet>()->get_value_list().size() <= 100) {
         expr = nullptr;
       }
     } else {
@@ -601,7 +599,7 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
                                       const hdk::ir::ExprPtr const_operand) {
   if (hdk::ir::expr_is<hdk::ir::UOper>(cast_operand) &&
       hdk::ir::expr_is<hdk::ir::Constant>(const_operand)) {
-    auto u_expr = std::dynamic_pointer_cast<hdk::ir::UOper>(cast_operand);
+    auto u_expr = cast_operand->as<hdk::ir::UOper>();
     if (u_expr->get_optype() != kCAST) {
       return false;
     }
@@ -639,15 +637,15 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
   auto right_operand = bin_oper->get_own_right_operand();
   if (hdk::ir::expr_is<hdk::ir::UOper>(left_operand)) {
     if (simple_predicate_has_simple_cast(left_operand, right_operand)) {
-      auto uo = std::dynamic_pointer_cast<hdk::ir::UOper>(left_operand);
-      auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(uo->get_own_operand());
+      auto uo = left_operand->as<hdk::ir::UOper>();
+      auto cv = uo->get_own_operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->get_rte_idx();
       return bin_oper->deep_copy();
     }
   } else if (hdk::ir::expr_is<hdk::ir::UOper>(right_operand)) {
     if (simple_predicate_has_simple_cast(right_operand, left_operand)) {
-      auto uo = std::dynamic_pointer_cast<hdk::ir::UOper>(right_operand);
-      auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(uo->get_own_operand());
+      auto uo = right_operand->as<hdk::ir::UOper>();
+      auto cv = uo->get_own_operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->get_rte_idx();
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bin_oper->type(),
@@ -660,13 +658,13 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
   } else if (hdk::ir::expr_is<hdk::ir::ColumnVar>(left_operand) &&
              !hdk::ir::expr_is<hdk::ir::Var>(left_operand) &&
              hdk::ir::expr_is<hdk::ir::Constant>(right_operand)) {
-    auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(left_operand);
+    auto cv = left_operand->as<hdk::ir::ColumnVar>();
     rte_idx = cv->get_rte_idx();
     return bin_oper->deep_copy();
   } else if (hdk::ir::expr_is<hdk::ir::Constant>(left_operand) &&
              hdk::ir::expr_is<hdk::ir::ColumnVar>(right_operand) &&
              !hdk::ir::expr_is<hdk::ir::Var>(right_operand)) {
-    auto cv = std::dynamic_pointer_cast<hdk::ir::ColumnVar>(right_operand);
+    auto cv = right_operand->as<hdk::ir::ColumnVar>();
     rte_idx = cv->get_rte_idx();
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->get_contains_agg(),

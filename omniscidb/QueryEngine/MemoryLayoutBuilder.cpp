@@ -573,11 +573,11 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
     CHECK_GE(order_entry.tle_no, 1);
     CHECK_LE(static_cast<size_t>(order_entry.tle_no), ra_exe_unit.target_exprs.size());
     const auto target_expr = ra_exe_unit.target_exprs[order_entry.tle_no - 1];
-    if (!dynamic_cast<hdk::ir::AggExpr*>(target_expr)) {
+    if (!target_expr->is<hdk::ir::AggExpr>()) {
       return false;
     }
     // TODO(alex): relax the restrictions
-    auto agg_expr = static_cast<hdk::ir::AggExpr*>(target_expr);
+    auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
     if (agg_expr->get_is_distinct() || agg_expr->get_aggtype() == kAVG ||
         agg_expr->get_aggtype() == kMIN || agg_expr->get_aggtype() == kMAX ||
         agg_expr->get_aggtype() == kAPPROX_COUNT_DISTINCT) {

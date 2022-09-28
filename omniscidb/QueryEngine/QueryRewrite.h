@@ -33,16 +33,16 @@ class QueryRewriter {
 
   RelAlgExecutionUnit rewriteConstrainedByInImpl(
       const RelAlgExecutionUnit& ra_exe_unit_in,
-      const std::shared_ptr<hdk::ir::CaseExpr>,
+      const std::shared_ptr<const hdk::ir::CaseExpr>,
       const hdk::ir::InValues*) const;
 
-  static std::shared_ptr<hdk::ir::CaseExpr> generateCaseForDomainValues(
+  static std::shared_ptr<const hdk::ir::CaseExpr> generateCaseForDomainValues(
       const hdk::ir::InValues*);
 
   std::pair<bool, std::set<size_t>> is_all_groupby_exprs_are_col_var(
       const std::list<hdk::ir::ExprPtr>& groupby_exprs) const;
 
-  std::shared_ptr<hdk::ir::CaseExpr> generateCaseExprForCountDistinctOnGroupByCol(
+  std::shared_ptr<const hdk::ir::CaseExpr> generateCaseExprForCountDistinctOnGroupByCol(
       hdk::ir::ExprPtr expr,
       const hdk::ir::Type* type) const;
 

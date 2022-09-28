@@ -694,15 +694,16 @@ void bind_query(llvm::Function* query_func,
   }
 }
 
-std::vector<std::string> get_agg_fnames(const std::vector<hdk::ir::Expr*>& target_exprs,
-                                        const bool is_group_by) {
+std::vector<std::string> get_agg_fnames(
+    const std::vector<const hdk::ir::Expr*>& target_exprs,
+    const bool is_group_by) {
   std::vector<std::string> result;
   for (size_t target_idx = 0, agg_col_idx = 0; target_idx < target_exprs.size();
        ++target_idx, ++agg_col_idx) {
     const auto target_expr = target_exprs[target_idx];
     CHECK(target_expr);
     auto target_type = target_expr->type();
-    const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
+    const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
     const bool is_varlen =
         target_type->isString() ||
         target_type->isArray();  // TODO: should it use is_varlen_array() ?
@@ -1906,8 +1907,8 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
   }
 
   // generate the code for the filter
-  std::vector<hdk::ir::Expr*> primary_quals;
-  std::vector<hdk::ir::Expr*> deferred_quals;
+  std::vector<const hdk::ir::Expr*> primary_quals;
+  std::vector<const hdk::ir::Expr*> deferred_quals;
   bool short_circuited = CodeGenerator::prioritizeQuals(
       ra_exe_unit, primary_quals, deferred_quals, plan_state_->hoisted_filters_);
   if (short_circuited) {

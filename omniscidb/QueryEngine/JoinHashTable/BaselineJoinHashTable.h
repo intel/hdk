@@ -50,7 +50,7 @@ class BaselineJoinHashTable : public HashJoin {
  public:
   //! Make hash table from an in-flight SQL query's parse tree etc.
   static std::shared_ptr<BaselineJoinHashTable> getInstance(
-      const std::shared_ptr<hdk::ir::BinOper> condition,
+      const std::shared_ptr<const hdk::ir::BinOper> condition,
       const std::vector<InputTableInfo>& query_infos,
       const Data_Namespace::MemoryLevel memory_level,
       const JoinType join_type,
@@ -120,7 +120,7 @@ class BaselineJoinHashTable : public HashJoin {
   virtual ~BaselineJoinHashTable() {}
 
  protected:
-  BaselineJoinHashTable(const std::shared_ptr<hdk::ir::BinOper> condition,
+  BaselineJoinHashTable(const std::shared_ptr<const hdk::ir::BinOper> condition,
                         const JoinType join_type,
                         const std::vector<InputTableInfo>& query_infos,
                         const Data_Namespace::MemoryLevel memory_level,
@@ -223,7 +223,7 @@ class BaselineJoinHashTable : public HashJoin {
     return hash;
   }
 
-  const std::shared_ptr<hdk::ir::BinOper> condition_;
+  const std::shared_ptr<const hdk::ir::BinOper> condition_;
   const JoinType join_type_;
   const std::vector<InputTableInfo>& query_infos_;
   const Data_Namespace::MemoryLevel memory_level_;

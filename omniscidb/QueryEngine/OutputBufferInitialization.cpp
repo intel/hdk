@@ -254,7 +254,7 @@ int64_t get_agg_initial_val(const SQLAgg agg,
   }
 }
 
-std::vector<int64_t> init_agg_val_vec(const std::vector<hdk::ir::Expr*>& targets,
+std::vector<int64_t> init_agg_val_vec(const std::vector<const hdk::ir::Expr*>& targets,
                                       const std::list<hdk::ir::ExprPtr>& quals,
                                       const QueryMemoryDescriptor& query_mem_desc,
                                       bool bigint_count) {
@@ -292,13 +292,13 @@ const hdk::ir::Expr* agg_arg(const hdk::ir::Expr* expr) {
 bool constrained_not_null(const hdk::ir::Expr* expr,
                           const std::list<hdk::ir::ExprPtr>& quals) {
   for (const auto& qual : quals) {
-    auto uoper = std::dynamic_pointer_cast<hdk::ir::UOper>(qual);
+    auto uoper = qual->as<hdk::ir::UOper>();
     if (!uoper) {
       continue;
     }
     bool is_negated{false};
     if (uoper->get_optype() == kNOT) {
-      uoper = std::dynamic_pointer_cast<hdk::ir::UOper>(uoper->get_own_operand());
+      uoper = uoper->get_own_operand()->as<hdk::ir::UOper>();
       is_negated = true;
     }
     if (uoper && (uoper->get_optype() == kISNOTNULL ||

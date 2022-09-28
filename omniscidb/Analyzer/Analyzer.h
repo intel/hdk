@@ -83,9 +83,9 @@ hdk::ir::ExprPtr getTimestampLiteral(const int64_t);
 
 }  // namespace Analyzer
 
-inline std::shared_ptr<hdk::ir::Var> var_ref(const hdk::ir::Expr* expr,
-                                             const hdk::ir::Var::WhichRow which_row,
-                                             const int varno) {
+inline std::shared_ptr<const hdk::ir::Var> var_ref(const hdk::ir::Expr* expr,
+                                                   const hdk::ir::Var::WhichRow which_row,
+                                                   const int varno) {
   if (const auto col_expr = dynamic_cast<const hdk::ir::ColumnVar*>(expr)) {
     return hdk::ir::makeExpr<hdk::ir::Var>(
         col_expr->get_column_info(), col_expr->get_rte_idx(), which_row, varno);

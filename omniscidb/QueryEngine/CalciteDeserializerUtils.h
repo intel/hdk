@@ -142,7 +142,7 @@ DateaddField to_dateadd_field(const std::string&);
 
 DatetruncField to_datediff_field(const std::string&);
 
-std::shared_ptr<hdk::ir::Constant> make_fp_constant(const int64_t val,
-                                                    const hdk::ir::Type* type);
+std::shared_ptr<const hdk::ir::Constant> make_fp_constant(const int64_t val,
+                                                          const hdk::ir::Type* type);
 
 #endif  // QUERYENGINE_CALCITEDESERIALIZERUTILS_H

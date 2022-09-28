@@ -216,7 +216,7 @@ llvm::Value* HashJoin::codegenHashTableLoad(const size_t table_idx, Executor* ex
 
 //! Make hash table from an in-flight SQL query's parse tree etc.
 std::shared_ptr<HashJoin> HashJoin::getInstance(
-    const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+    const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
     const std::vector<InputTableInfo>& query_infos,
     const Data_Namespace::MemoryLevel memory_level,
     const JoinType join_type,
@@ -262,7 +262,7 @@ std::shared_ptr<HashJoin> HashJoin::getInstance(
       const auto join_quals = coalesce_singleton_equi_join(qual_bin_oper);
       CHECK_EQ(join_quals.size(), size_t(1));
       const auto join_qual =
-          std::dynamic_pointer_cast<hdk::ir::BinOper>(join_quals.front());
+          std::dynamic_pointer_cast<const hdk::ir::BinOper>(join_quals.front());
       VLOG(1) << "Trying to build keyed hash table after perfect hash table:";
       join_hash_table = BaselineJoinHashTable::getInstance(join_qual,
                                                            query_infos,
@@ -414,11 +414,11 @@ HashJoin::translateCompositeStrDictProxies(const CompositeKeyInfo& composite_key
   return proxy_translation_maps;
 }
 
-std::shared_ptr<hdk::ir::ColumnVar> getSyntheticColumnVar(int db_id,
-                                                          std::string_view table,
-                                                          std::string_view column,
-                                                          int rte_idx,
-                                                          Executor* executor) {
+std::shared_ptr<const hdk::ir::ColumnVar> getSyntheticColumnVar(int db_id,
+                                                                std::string_view table,
+                                                                std::string_view column,
+                                                                int rte_idx,
+                                                                Executor* executor) {
   auto schema_provider = executor->getSchemaProvider();
   auto table_info = schema_provider->getTableInfo(db_id, std::string(table));
   CHECK(table_info);
@@ -537,7 +537,7 @@ std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
 
 //! Make hash table from named tables and columns (such as for testing).
 std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
-    const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+    const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
     const Data_Namespace::MemoryLevel memory_level,
     const HashType preferred_hash_type,
     const int device_count,
@@ -566,7 +566,7 @@ std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
 }
 
 std::pair<std::string, std::shared_ptr<HashJoin>> HashJoin::getSyntheticInstance(
-    std::vector<std::shared_ptr<hdk::ir::BinOper>> qual_bin_opers,
+    std::vector<std::shared_ptr<const hdk::ir::BinOper>> qual_bin_opers,
     const Data_Namespace::MemoryLevel memory_level,
     const HashType preferred_hash_type,
     const int device_count,

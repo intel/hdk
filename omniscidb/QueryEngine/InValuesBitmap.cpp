@@ -127,7 +127,7 @@ llvm::Value* InValuesBitmap::codegen(llvm::Value* needle, Executor* executor) co
   std::vector<const hdk::ir::Constant*> constants;
   for (const auto bitset : bitsets_) {
     const int64_t bitset_handle = reinterpret_cast<int64_t>(bitset);
-    const auto bitset_handle_literal = std::dynamic_pointer_cast<hdk::ir::Constant>(
+    const auto bitset_handle_literal = std::dynamic_pointer_cast<const hdk::ir::Constant>(
         Analyzer::analyzeIntValue(bitset_handle));
     CHECK(bitset_handle_literal);
     constants_owned.push_back(bitset_handle_literal);

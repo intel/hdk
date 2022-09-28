@@ -503,7 +503,7 @@ void check_if_loop_join_is_allowed(RelAlgExecutionUnit& ra_exe_unit,
   }
 }
 
-void check_valid_join_qual(std::shared_ptr<hdk::ir::BinOper>& bin_oper) {
+void check_valid_join_qual(std::shared_ptr<const hdk::ir::BinOper>& bin_oper) {
   // check whether a join qual is valid before entering the hashtable build and codegen
 
   auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
@@ -860,7 +860,7 @@ std::shared_ptr<HashJoin> Executor::buildCurrentLevelHashTable(
     }
   };
   for (const auto& join_qual : current_level_join_conditions.quals) {
-    auto qual_bin_oper = std::dynamic_pointer_cast<hdk::ir::BinOper>(join_qual);
+    auto qual_bin_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(join_qual);
     if (current_level_hash_table || !qual_bin_oper ||
         !IS_EQUIVALENCE(qual_bin_oper->get_optype())) {
       handleNonHashtableQual(current_level_join_conditions.type, join_qual);
@@ -1196,7 +1196,7 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
 }
 
 Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
-    hdk::ir::Expr* group_by_col,
+    const hdk::ir::Expr* group_by_col,
     const size_t col_width,
     const CompilationOptions& co,
     const bool translate_null_val,
@@ -1209,8 +1209,8 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
   CodeGenerator code_generator(this);
   auto group_key = code_generator.codegen(group_by_col, true, co).front();
   auto key_to_cache = group_key;
-  if (dynamic_cast<hdk::ir::UOper*>(group_by_col) &&
-      static_cast<hdk::ir::UOper*>(group_by_col)->get_optype() == kUNNEST) {
+  if (group_by_col->is<hdk::ir::UOper>() &&
+      group_by_col->as<hdk::ir::UOper>()->get_optype() == kUNNEST) {
     auto preheader = cgen_state_->ir_builder_.GetInsertBlock();
     auto array_loop_head = llvm::BasicBlock::Create(cgen_state_->context_,
                                                     "array_loop_head",
@@ -1221,7 +1221,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     auto array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
     CHECK(array_idx_ptr);
     cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
-    const auto arr_expr = static_cast<hdk::ir::UOper*>(group_by_col)->get_operand();
+    const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->get_operand();
     auto array_type = arr_expr->type();
     CHECK(array_type->isArray());
     auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();

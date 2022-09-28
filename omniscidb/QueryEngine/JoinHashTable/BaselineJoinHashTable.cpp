@@ -37,7 +37,7 @@ std::once_flag BaselineJoinHashTable::init_caches_flag_;
 
 //! Make hash table from an in-flight SQL query's parse tree etc.
 std::shared_ptr<BaselineJoinHashTable> BaselineJoinHashTable::getInstance(
-    const std::shared_ptr<hdk::ir::BinOper> condition,
+    const std::shared_ptr<const hdk::ir::BinOper> condition,
     const std::vector<InputTableInfo>& query_infos,
     const Data_Namespace::MemoryLevel memory_level,
     const JoinType join_type,
@@ -122,7 +122,7 @@ void BaselineJoinHashTable::initCaches(ConfigPtr config) {
 }
 
 BaselineJoinHashTable::BaselineJoinHashTable(
-    const std::shared_ptr<hdk::ir::BinOper> condition,
+    const std::shared_ptr<const hdk::ir::BinOper> condition,
     const JoinType join_type,
     const std::vector<InputTableInfo>& query_infos,
     const Data_Namespace::MemoryLevel memory_level,

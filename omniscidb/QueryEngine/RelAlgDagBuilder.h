@@ -1220,7 +1220,7 @@ class RelAlgDag {
    * Registers a subquery with a root DAG builder. Should only be called during DAG
    * building and registration should only occur on the root.
    */
-  void registerSubquery(std::shared_ptr<hdk::ir::ScalarSubquery> subquery_expr) {
+  void registerSubquery(std::shared_ptr<const hdk::ir::ScalarSubquery> subquery_expr) {
     subqueries_.emplace_back(std::move(subquery_expr));
   }
 
@@ -1229,7 +1229,8 @@ class RelAlgDag {
   /**
    * Gets all registered subqueries. Only the root DAG can contain subqueries.
    */
-  const std::vector<std::shared_ptr<hdk::ir::ScalarSubquery>>& getSubqueries() const {
+  const std::vector<std::shared_ptr<const hdk::ir::ScalarSubquery>>& getSubqueries()
+      const {
     return subqueries_;
   }
 
@@ -1256,7 +1257,7 @@ class RelAlgDag {
   RelAlgNodePtr root_;
   // All nodes including the root one.
   std::vector<RelAlgNodePtr> nodes_;
-  std::vector<std::shared_ptr<hdk::ir::ScalarSubquery>> subqueries_;
+  std::vector<std::shared_ptr<const hdk::ir::ScalarSubquery>> subqueries_;
   std::unordered_map<size_t, RegisteredQueryHint> query_hint_;
 };
 

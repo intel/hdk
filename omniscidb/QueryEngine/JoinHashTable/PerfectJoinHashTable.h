@@ -51,7 +51,7 @@ class PerfectJoinHashTable : public HashJoin {
  public:
   //! Make hash table from an in-flight SQL query's parse tree etc.
   static std::shared_ptr<PerfectJoinHashTable> getInstance(
-      const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+      const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
       const std::vector<InputTableInfo>& query_infos,
       const Data_Namespace::MemoryLevel memory_level,
       const JoinType join_type,
@@ -151,7 +151,7 @@ class PerfectJoinHashTable : public HashJoin {
 
   std::vector<InnerOuter> inner_outer_pairs_;
 
-  PerfectJoinHashTable(const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+  PerfectJoinHashTable(const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
                        const hdk::ir::ColumnVar* col_var,
                        const std::vector<InputTableInfo>& query_infos,
                        const Data_Namespace::MemoryLevel memory_level,
@@ -169,7 +169,8 @@ class PerfectJoinHashTable : public HashJoin {
       : HashJoin(data_provider)
       , qual_bin_oper_(qual_bin_oper)
       , join_type_(join_type)
-      , col_var_(std::dynamic_pointer_cast<hdk::ir::ColumnVar>(col_var->deep_copy()))
+      , col_var_(
+            std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(col_var->deep_copy()))
       , query_infos_(query_infos)
       , memory_level_(memory_level)
       , hash_type_(preferred_hash_type)
@@ -240,9 +241,9 @@ class PerfectJoinHashTable : public HashJoin {
     return hash;
   }
 
-  std::shared_ptr<hdk::ir::BinOper> qual_bin_oper_;
+  std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper_;
   const JoinType join_type_;
-  std::shared_ptr<hdk::ir::ColumnVar> col_var_;
+  std::shared_ptr<const hdk::ir::ColumnVar> col_var_;
   const std::vector<InputTableInfo>& query_infos_;
   const Data_Namespace::MemoryLevel memory_level_;
   HashType hash_type_;

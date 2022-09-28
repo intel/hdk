@@ -26,7 +26,7 @@ namespace hdk::ir {
 class Type;
 class Expr;
 
-using ExprPtr = std::shared_ptr<Expr>;
+using ExprPtr = std::shared_ptr<const Expr>;
 using ExprPtrList = std::list<ExprPtr>;
 using ExprPtrVector = std::vector<ExprPtr>;
 
@@ -39,17 +39,17 @@ inline
 
 template <class T>
 bool expr_is(const ExprPtr& expr) {
-  return std::dynamic_pointer_cast<T>(expr) != nullptr;
+  return std::dynamic_pointer_cast<const T>(expr) != nullptr;
 }
 
 template <typename T>
 bool isOneOf(const ExprPtr& expr) {
-  return std::dynamic_pointer_cast<T>(expr) != nullptr;
+  return std::dynamic_pointer_cast<const T>(expr) != nullptr;
 }
 
 template <typename T1, typename T2, typename... Ts>
 bool isOneOf(const ExprPtr& expr) {
-  return std::dynamic_pointer_cast<T1>(expr) != nullptr || isOneOf<T2, Ts...>(expr);
+  return std::dynamic_pointer_cast<const T1>(expr) != nullptr || isOneOf<T2, Ts...>(expr);
 }
 
 template <typename T>
@@ -75,7 +75,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
   Expr(const Type* type, bool has_agg = false);
   virtual ~Expr() {}
 
-  ExprPtr get_shared_ptr() { return shared_from_this(); }
+  ExprPtr get_shared_ptr() const { return shared_from_this(); }
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool get_contains_agg() const { return contains_agg; }
@@ -96,6 +96,16 @@ class Expr : public std::enable_shared_from_this<Expr> {
   ExprPtr decompress() const;
 
   virtual size_t hash() const;
+
+  template <typename T>
+  const T* as() const {
+    return dynamic_cast<const T*>(this);
+  }
+
+  template <typename T>
+  bool is() const {
+    return as<T>() != nullptr;
+  }
 
  protected:
   const Type* type_;
@@ -798,13 +808,17 @@ class LikelihoodExpr : public Expr {
  */
 class AggExpr : public Expr {
  public:
-  AggExpr(const Type* type, SQLAgg a, ExprPtr g, bool d, std::shared_ptr<Constant> e)
+  AggExpr(const Type* type,
+          SQLAgg a,
+          ExprPtr g,
+          bool d,
+          std::shared_ptr<const Constant> e)
       : Expr(type, true), aggtype(a), arg(g), is_distinct(d), arg1(e) {}
   SQLAgg get_aggtype() const { return aggtype; }
-  Expr* get_arg() const { return arg.get(); }
+  const Expr* get_arg() const { return arg.get(); }
   ExprPtr get_own_arg() const { return arg; }
   bool get_is_distinct() const { return is_distinct; }
-  std::shared_ptr<Constant> get_arg1() const { return arg1; }
+  std::shared_ptr<const Constant> get_arg1() const { return arg1; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -816,7 +830,7 @@ class AggExpr : public Expr {
   ExprPtr arg;       // argument to aggregate
   bool is_distinct;  // true only if it is for COUNT(DISTINCT x)
   // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile
-  std::shared_ptr<Constant> arg1;
+  std::shared_ptr<const Constant> arg1;
 };
 
 /*
@@ -1118,8 +1132,8 @@ class TargetEntry {
   virtual ~TargetEntry() {}
   const std::string& get_resname() const { return resname; }
   void set_resname(const std::string& name) { resname = name; }
-  Expr* get_expr() const { return expr.get(); }
-  std::shared_ptr<Expr> get_own_expr() const { return expr; }
+  const Expr* get_expr() const { return expr.get(); }
+  ExprPtr get_own_expr() const { return expr; }
   void set_expr(ExprPtr e) { expr = e; }
   bool get_unnest() const { return unnest; }
   std::string toString() const;

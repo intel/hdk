@@ -83,7 +83,7 @@ HashEntryInfo get_bucketized_hash_entry_info(const hdk::ir::Type* context_type,
 
 //! Make hash table from an in-flight SQL query's parse tree etc.
 std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
-    const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+    const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
     const std::vector<InputTableInfo>& query_infos,
     const Data_Namespace::MemoryLevel memory_level,
     const JoinType join_type,

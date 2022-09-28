@@ -48,7 +48,7 @@ class ColSlotContext {
  public:
   ColSlotContext() {}
 
-  ColSlotContext(const std::vector<hdk::ir::Expr*>& col_expr_list,
+  ColSlotContext(const std::vector<const hdk::ir::Expr*>& col_expr_list,
                  const std::vector<int64_t>& col_exprs_to_not_project,
                  bool bigint_count);
 

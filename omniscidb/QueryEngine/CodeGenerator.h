@@ -84,8 +84,8 @@ class CodeGenerator {
                               llvm::Linker::Flags flags = llvm::Linker::Flags::None);
 
   static bool prioritizeQuals(const RelAlgExecutionUnit& ra_exe_unit,
-                              std::vector<hdk::ir::Expr*>& primary_quals,
-                              std::vector<hdk::ir::Expr*>& deferred_quals,
+                              std::vector<const hdk::ir::Expr*>& primary_quals,
+                              std::vector<const hdk::ir::Expr*>& deferred_quals,
                               const PlanState::HoistedFiltersSet& hoisted_quals);
 
   struct ExecutorRequired : public std::runtime_error {
@@ -386,7 +386,7 @@ class CodeGenerator {
 
   hdk::ir::ExprPtr hashJoinLhs(const hdk::ir::ColumnVar* rhs) const;
 
-  std::shared_ptr<hdk::ir::ColumnVar> hashJoinLhsTuple(
+  std::shared_ptr<const hdk::ir::ColumnVar> hashJoinLhsTuple(
       const hdk::ir::ColumnVar* rhs,
       const hdk::ir::BinOper* tautological_eq) const;
 
@@ -476,7 +476,7 @@ class ScalarCodeGenerator : public CodeGenerator {
   struct CompiledExpression {
     llvm::Function* func;
     llvm::Function* wrapper_func;
-    std::vector<std::shared_ptr<hdk::ir::ColumnVar>> inputs;
+    std::vector<std::shared_ptr<const hdk::ir::ColumnVar>> inputs;
   };
 
   // Compiles the given scalar expression to IR and the list of columns in the expression,
@@ -497,7 +497,7 @@ class ScalarCodeGenerator : public CodeGenerator {
   GpuMgr* getGpuMgr() const { return gpu_mgr_.get(); }
 
   using ColumnMap =
-      std::unordered_map<InputColDescriptor, std::shared_ptr<hdk::ir::ColumnVar>>;
+      std::unordered_map<InputColDescriptor, std::shared_ptr<const hdk::ir::ColumnVar>>;
 
  private:
   std::vector<llvm::Value*> codegenColumn(const hdk::ir::ColumnVar*,

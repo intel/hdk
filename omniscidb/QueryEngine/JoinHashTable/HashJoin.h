@@ -173,7 +173,7 @@ class HashJoin {
 
   //! Make hash table from an in-flight SQL query's parse tree etc.
   static std::shared_ptr<HashJoin> getInstance(
-      const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+      const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
       const std::vector<InputTableInfo>& query_infos,
       const Data_Namespace::MemoryLevel memory_level,
       const JoinType join_type,
@@ -202,7 +202,7 @@ class HashJoin {
 
   //! Make hash table from named tables and columns (such as for testing).
   static std::shared_ptr<HashJoin> getSyntheticInstance(
-      const std::shared_ptr<hdk::ir::BinOper> qual_bin_oper,
+      const std::shared_ptr<const hdk::ir::BinOper> qual_bin_oper,
       const Data_Namespace::MemoryLevel memory_level,
       const HashType preferred_hash_type,
       const int device_count,
@@ -211,7 +211,7 @@ class HashJoin {
       Executor* executor);
 
   static std::pair<std::string, std::shared_ptr<HashJoin>> getSyntheticInstance(
-      std::vector<std::shared_ptr<hdk::ir::BinOper>>,
+      std::vector<std::shared_ptr<const hdk::ir::BinOper>>,
       const Data_Namespace::MemoryLevel memory_level,
       const HashType preferred_hash_type,
       const int device_count,
@@ -313,8 +313,8 @@ std::ostream& operator<<(std::ostream& os, const DecodedJoinHashBufferEntry& e);
 
 std::ostream& operator<<(std::ostream& os, const DecodedJoinHashBufferSet& s);
 
-std::shared_ptr<hdk::ir::ColumnVar> getSyntheticColumnVar(int db_id,
-                                                          std::string_view table,
-                                                          std::string_view column,
-                                                          int rte_idx,
-                                                          Executor* executor);
+std::shared_ptr<const hdk::ir::ColumnVar> getSyntheticColumnVar(int db_id,
+                                                                std::string_view table,
+                                                                std::string_view column,
+                                                                int rte_idx,
+                                                                Executor* executor);

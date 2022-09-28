@@ -30,6 +30,6 @@ std::list<hdk::ir::ExprPtr> combine_equi_join_conditions(
     const std::list<hdk::ir::ExprPtr>& join_quals);
 
 std::list<hdk::ir::ExprPtr> coalesce_singleton_equi_join(
-    const std::shared_ptr<hdk::ir::BinOper>& join_qual);
+    const std::shared_ptr<const hdk::ir::BinOper>& join_qual);
 
 #endif  // QUERYENGINE_EQUIJOINCONDITION_H

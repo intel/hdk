@@ -41,7 +41,7 @@ bool is_valid_int32_range(const ExpressionRange& range) {
 
 std::vector<int64_t> target_expr_group_by_indices(
     const std::list<hdk::ir::ExprPtr>& groupby_exprs,
-    const std::vector<hdk::ir::Expr*>& target_exprs) {
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
   std::vector<int64_t> indices(target_exprs.size(), -1);
   for (size_t target_idx = 0; target_idx < target_exprs.size(); ++target_idx) {
     const auto target_expr = target_exprs[target_idx];
@@ -310,7 +310,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
         bool has_varlen_sample_agg = false;
         for (const auto& target_expr : ra_exe_unit.target_exprs) {
           if (target_expr->get_contains_agg()) {
-            const auto agg_expr = dynamic_cast<hdk::ir::AggExpr*>(target_expr);
+            const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
             CHECK(agg_expr);
             if (agg_expr->get_aggtype() == kSAMPLE &&
                 (agg_expr->type()->isString() || agg_expr->type()->isArray())) {
@@ -400,7 +400,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
 }
 
 namespace {
-bool anyOf(std::vector<hdk::ir::Expr*> const& target_exprs, SQLAgg const agg_kind) {
+bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs, SQLAgg const agg_kind) {
   return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
     auto const* const agg = dynamic_cast<hdk::ir::AggExpr const*>(expr);
     return agg && agg->get_aggtype() == agg_kind;
@@ -676,7 +676,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
   auto const end = ra_exe_unit.input_col_descs.end();
   int unnest_array_col_id{std::numeric_limits<int>::min()};
   for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
-    const auto uoper = dynamic_cast<hdk::ir::UOper*>(groupby_expr.get());
+    const auto uoper = dynamic_cast<const hdk::ir::UOper*>(groupby_expr.get());
     if (uoper && uoper->get_optype() == kUNNEST) {
       auto arg_type = uoper->get_operand()->type();
       CHECK(arg_type->isArray());
@@ -701,7 +701,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
     std::advance(col_it, ra_exe_unit.groupby_exprs.size());
     for (const auto target : ra_exe_unit.target_exprs) {
       auto type = target->type();
-      const auto agg = dynamic_cast<const hdk::ir::AggExpr*>(target);
+      const auto agg = target->as<hdk::ir::AggExpr>();
       if (agg && agg->get_arg()) {
         compact_width = crt_min_byte_width;
         break;
@@ -723,7 +723,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
         continue;
       }
 
-      const auto uoper = dynamic_cast<hdk::ir::UOper*>(target);
+      const auto uoper = target->as<hdk::ir::UOper>();
       if (uoper && uoper->get_optype() == kUNNEST &&
           (*col_it)->getColId() == unnest_array_col_id) {
         auto arg_type = uoper->get_operand()->type();
@@ -1205,9 +1205,10 @@ std::string QueryMemoryDescriptor::reductionKey() const {
   return str;
 }
 
-std::vector<TargetInfo> target_exprs_to_infos(const std::vector<hdk::ir::Expr*>& targets,
-                                              const QueryMemoryDescriptor& query_mem_desc,
-                                              bool bigint_count) {
+std::vector<TargetInfo> target_exprs_to_infos(
+    const std::vector<const hdk::ir::Expr*>& targets,
+    const QueryMemoryDescriptor& query_mem_desc,
+    bool bigint_count) {
   std::vector<TargetInfo> target_infos;
   for (const auto target_expr : targets) {
     auto target = get_target_info(target_expr, bigint_count);
