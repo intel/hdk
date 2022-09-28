@@ -357,7 +357,7 @@ CompositeKeyInfo HashJoin::getCompositeKeyInfo(
     auto inner_type = inner_col->type();
     auto outer_type = outer_col->type();
     ChunkKey cache_key_chunks_for_column{
-        inner_col->get_db_id(), inner_col->get_table_id(), inner_col->get_column_id()};
+        inner_col->dbId(), inner_col->get_table_id(), inner_col->get_column_id()};
     auto inner_dict_id = inner_type->isExtDictionary()
                              ? inner_type->as<hdk::ir::ExtDictionaryType>()->dictId()
                              : -1;
@@ -462,7 +462,7 @@ void setupSyntheticCaching(DataProvider* data_provider,
                            Executor* executor) {
   std::unordered_set<std::pair<int, int>> phys_table_ids;
   for (auto cv : cvs) {
-    phys_table_ids.insert({cv->get_db_id(), cv->get_table_id()});
+    phys_table_ids.insert({cv->dbId(), cv->get_table_id()});
   }
 
   std::unordered_set<InputColDescriptor> col_descs;
@@ -478,7 +478,7 @@ std::vector<InputTableInfo> getSyntheticInputTableInfo(
     Executor* executor) {
   std::unordered_set<std::pair<int, int>> phys_table_ids;
   for (auto cv : cvs) {
-    phys_table_ids.insert({cv->get_db_id(), cv->get_table_id()});
+    phys_table_ids.insert({cv->dbId(), cv->get_table_id()});
   }
 
   // NOTE(sy): This vector ordering seems to work for now, but maybe we need to

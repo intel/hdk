@@ -704,7 +704,7 @@ ChunkKey PerfectJoinHashTable::genChunkKey(const std::vector<FragmentInfo>& frag
                                            const hdk::ir::Expr* outer_col_expr,
                                            const hdk::ir::ColumnVar* inner_col) const {
   ChunkKey chunk_key{
-      inner_col->get_db_id(), inner_col->get_table_id(), inner_col->get_column_id()};
+      inner_col->dbId(), inner_col->get_table_id(), inner_col->get_column_id()};
   auto type = inner_col->type();
   if (type->isExtDictionary()) {
     size_t outer_elem_count = 0;
