@@ -48,7 +48,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
       throw std::runtime_error(
           "NULL type literals are not currently supported in this context.");
     }
-    if (constant->get_is_null()) {
+    if (constant->isNull()) {
       return {
           type->isFloatingPoint()
               ? static_cast<llvm::Value*>(executor_->cgen_state_->inlineFpNull(type))

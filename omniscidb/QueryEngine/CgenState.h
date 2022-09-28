@@ -53,7 +53,7 @@ struct CgenState {
     auto type = constant->type();
     switch (type->id()) {
       case hdk::ir::Type::kBoolean:
-        return getOrAddLiteral(constant->get_is_null()
+        return getOrAddLiteral(constant->isNull()
                                    ? int8_t(inline_int_null_value(type))
                                    : int8_t(constant->get_constval().boolval ? 1 : 0),
                                device_id);
@@ -61,22 +61,22 @@ struct CgenState {
       case hdk::ir::Type::kDecimal:
         switch (type->size()) {
           case 1:
-            return getOrAddLiteral(constant->get_is_null()
+            return getOrAddLiteral(constant->isNull()
                                        ? int8_t(inline_int_null_value(type))
                                        : constant->get_constval().tinyintval,
                                    device_id);
           case 2:
-            return getOrAddLiteral(constant->get_is_null()
+            return getOrAddLiteral(constant->isNull()
                                        ? int16_t(inline_int_null_value(type))
                                        : constant->get_constval().smallintval,
                                    device_id);
           case 4:
-            return getOrAddLiteral(constant->get_is_null()
+            return getOrAddLiteral(constant->isNull()
                                        ? int32_t(inline_int_null_value(type))
                                        : constant->get_constval().intval,
                                    device_id);
           case 8:
-            return getOrAddLiteral(constant->get_is_null()
+            return getOrAddLiteral(constant->isNull()
                                        ? int64_t(inline_int_null_value(type))
                                        : constant->get_constval().bigintval,
                                    device_id);
@@ -87,12 +87,11 @@ struct CgenState {
       case hdk::ir::Type::kFloatingPoint:
         switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
           case hdk::ir::FloatingPointType::kFloat:
-            return getOrAddLiteral(constant->get_is_null()
-                                       ? float(inline_fp_null_value(type))
-                                       : constant->get_constval().floatval,
+            return getOrAddLiteral(constant->isNull() ? float(inline_fp_null_value(type))
+                                                      : constant->get_constval().floatval,
                                    device_id);
           case hdk::ir::FloatingPointType::kDouble:
-            return getOrAddLiteral(constant->get_is_null()
+            return getOrAddLiteral(constant->isNull()
                                        ? inline_fp_null_value(type)
                                        : constant->get_constval().doubleval,
                                    device_id);
@@ -104,13 +103,13 @@ struct CgenState {
       case hdk::ir::Type::kText:
       case hdk::ir::Type::kVarChar:
         if (use_dict_encoding) {
-          if (constant->get_is_null()) {
+          if (constant->isNull()) {
             return getOrAddLiteral((int32_t)inline_int_null_value<int32_t>(), device_id);
           }
           return getOrAddLiteral(
               std::make_pair(*constant->get_constval().stringval, dict_id), device_id);
         }
-        if (constant->get_is_null()) {
+        if (constant->isNull()) {
           throw std::runtime_error(
               "CHAR / VARCHAR NULL literal not supported in this context");  // TODO(alex):
                                                                              // support

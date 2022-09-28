@@ -1294,7 +1294,7 @@ hdk::ir::ExprPtr parseUnlikely(const hdk::ir::ExprPtrVector& operands) {
 }
 
 inline void validateDatetimeDatepartArgument(const hdk::ir::Constant* literal_expr) {
-  if (!literal_expr || literal_expr->get_is_null()) {
+  if (!literal_expr || literal_expr->isNull()) {
     throw std::runtime_error("The 'DatePart' argument must be a not 'null' literal.");
   }
 }
@@ -1322,7 +1322,7 @@ hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   validateDatetimeDatepartArgument(timeunit_lit);
   auto& number_units = operands[1];
   auto number_units_const = dynamic_cast<const hdk::ir::Constant*>(number_units.get());
-  if (number_units_const && number_units_const->get_is_null()) {
+  if (number_units_const && number_units_const->isNull()) {
     throw std::runtime_error("The 'Interval' argument literal must not be 'null'.");
   }
   auto cast_number_units = number_units->cast(ctx.int64());
@@ -1520,7 +1520,7 @@ hdk::ir::ExprPtr parseDatetime(const hdk::ir::ExprPtrVector& operands, time_t no
   CHECK_EQ(operands.size(), size_t(1));
   auto arg_lit = dynamic_cast<const hdk::ir::Constant*>(operands[0].get());
   const std::string datetime_err{R"(Only DATETIME('NOW') supported for now.)"};
-  if (!arg_lit || arg_lit->get_is_null()) {
+  if (!arg_lit || arg_lit->isNull()) {
     throw std::runtime_error(datetime_err);
   }
   CHECK(arg_lit->type()->isString() || arg_lit->type()->isExtDictionary());

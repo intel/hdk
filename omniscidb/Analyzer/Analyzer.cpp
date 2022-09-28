@@ -43,7 +43,7 @@ bool expr_is_null(const hdk::ir::Expr* expr) {
     return true;
   }
   const auto const_expr = dynamic_cast<const hdk::ir::Constant*>(expr);
-  return const_expr && const_expr->get_is_null();
+  return const_expr && const_expr->isNull();
 }
 
 void check_like_expr(const std::string& like_str, char escape_char) {

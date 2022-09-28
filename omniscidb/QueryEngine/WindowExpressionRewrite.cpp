@@ -22,7 +22,7 @@ namespace {
 bool matches_else_null(const hdk::ir::CaseExpr* case_expr) {
   const auto else_null =
       dynamic_cast<const hdk::ir::Constant*>(case_expr->get_else_expr());
-  return else_null && else_null->get_is_null();
+  return else_null && else_null->isNull();
 }
 
 // Returns true iff the expression is a big integer greater than 0.

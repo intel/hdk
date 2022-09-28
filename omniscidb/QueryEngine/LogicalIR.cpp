@@ -29,7 +29,7 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
     if (bin_oper && bin_oper->get_optype() == kDIVIDE) {
       auto rhs = bin_oper->get_right_operand();
       auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
-      if (!rhs_constant || rhs_constant->get_is_null()) {
+      if (!rhs_constant || rhs_constant->isNull()) {
         return true;
       }
       const auto& datum = rhs_constant->get_constval();
@@ -380,7 +380,7 @@ llvm::Value* CodeGenerator::codegenIsNull(const hdk::ir::UOper* uoper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto operand = uoper->get_operand();
   if (dynamic_cast<const hdk::ir::Constant*>(operand) &&
-      dynamic_cast<const hdk::ir::Constant*>(operand)->get_is_null()) {
+      dynamic_cast<const hdk::ir::Constant*>(operand)->isNull()) {
     // for null constants, short-circuit to true
     return llvm::ConstantInt::get(get_int_type(1, cgen_state_->context_), 1);
   }

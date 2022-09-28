@@ -50,8 +50,8 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
       }
     case hdk::ir::Type::kVarChar:
     case hdk::ir::Type::kText: {
-      CHECK(constant->get_constval().stringval || constant->get_is_null());
-      if (constant->get_is_null()) {
+      CHECK(constant->get_constval().stringval || constant->isNull());
+      if (constant->isNull()) {
         if (use_dict_encoding) {
           return {
               cgen_state_->llInt(static_cast<int32_t>(inline_int_null_value(cst_type)))};
@@ -82,7 +82,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
 llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* constant,
                                                   CgenState* cgen_state) {
   auto type = constant->type();
-  if (constant->get_is_null()) {
+  if (constant->isNull()) {
     return cgen_state->inlineIntNull(type);
   }
   switch (type->id()) {

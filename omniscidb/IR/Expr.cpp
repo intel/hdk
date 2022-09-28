@@ -178,7 +178,7 @@ inline bool is_null_value(const Type* type, const Datum& constval) {
 bool is_expr_nullable(const Expr* expr) {
   const auto const_expr = dynamic_cast<const Constant*>(expr);
   if (const_expr) {
-    return const_expr->get_is_null();
+    return const_expr->isNull();
   }
   return expr->type()->nullable();
 }
@@ -818,8 +818,8 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
       new_value_list.push_back(c->do_cast(new_elem_type));
     }
     return makeExpr<Constant>(new_type, is_null, new_value_list, cacheable_);
-  } else if (get_is_null() && (new_type->isNumber() || new_type->isTime() ||
-                               new_type->isString() || new_type->isBoolean())) {
+  } else if (isNull() && (new_type->isNumber() || new_type->isTime() ||
+                          new_type->isString() || new_type->isBoolean())) {
   } else if (!is_null_value(type_, constval) &&
              type_->withNullable(true)->equal(new_type)) {
     CHECK(!is_null);
@@ -978,10 +978,10 @@ bool Constant::operator==(const Expr& rhs) const {
     return false;
   }
   const Constant& rhs_c = dynamic_cast<const Constant&>(rhs);
-  if (!type_->equal(rhs_c.type()) || is_null != rhs_c.get_is_null()) {
+  if (!type_->equal(rhs_c.type()) || is_null != rhs_c.isNull()) {
     return false;
   }
-  if (is_null && rhs_c.get_is_null()) {
+  if (is_null && rhs_c.isNull()) {
     return true;
   }
   if (type_->isArray()) {

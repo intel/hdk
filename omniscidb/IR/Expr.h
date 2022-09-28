@@ -261,7 +261,7 @@ class Constant : public Expr {
       , constval(Datum{0})
       , value_list(l) {}
   ~Constant() override;
-  bool get_is_null() const { return is_null; }
+  bool isNull() const { return is_null; }
   bool cacheable() const { return cacheable_; }
   Datum get_constval() const { return constval; }
   int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }

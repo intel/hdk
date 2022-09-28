@@ -560,7 +560,7 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
 
   auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
   auto rhs_cast = dynamic_cast<const hdk::ir::UOper*>(rhs);
-  if (rhs_constant && !rhs_constant->get_is_null() &&
+  if (rhs_constant && !rhs_constant->isNull() &&
       rhs_constant->get_constval().bigintval != 0LL &&
       (rhs_constant->get_constval().bigintval % exp_to_scale(scale)) == 0LL) {
     // can safely downscale a scaled constant

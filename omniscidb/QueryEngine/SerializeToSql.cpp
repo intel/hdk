@@ -35,7 +35,7 @@ std::string ScalarExprToSql::visitColumnVar(const hdk::ir::ColumnVar* col_var) c
 }
 
 std::string ScalarExprToSql::visitConstant(const hdk::ir::Constant* constant) const {
-  if (constant->get_is_null()) {
+  if (constant->isNull()) {
     return "NULL";
   }
   auto constant_type = constant->type();

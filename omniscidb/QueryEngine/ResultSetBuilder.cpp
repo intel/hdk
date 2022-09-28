@@ -113,7 +113,7 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
         const auto constant = dynamic_cast<const hdk::ir::Constant*>(expr);
         CHECK(constant);
 
-        if (constant->get_is_null()) {
+        if (constant->isNull()) {
           CHECK(!targets[j].type->isString() && !targets[j].type->isArray());
           *reinterpret_cast<int64_t*>(ptr) = inline_int_null_value(targets[j].type);
         } else {

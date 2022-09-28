@@ -418,7 +418,7 @@ ExpressionRange getExpressionRange(
 }
 
 ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
-  if (constant_expr->get_is_null()) {
+  if (constant_expr->isNull()) {
     return ExpressionRange::makeInvalidRange();
   }
   const auto constant_type = constant_expr->type();
@@ -673,7 +673,7 @@ ExpressionRange getExpressionRange(const hdk::ir::CaseExpr* case_expr,
   const auto else_expr = case_expr->get_else_expr();
   CHECK(else_expr);
   const auto else_null_expr = dynamic_cast<const hdk::ir::Constant*>(else_expr);
-  if (else_null_expr && else_null_expr->get_is_null()) {
+  if (else_null_expr && else_null_expr->isNull()) {
     expr_range.setHasNulls();
     return expr_range;
   }
@@ -764,7 +764,7 @@ ExpressionRange getExpressionRange(
       return ExpressionRange::makeInvalidRange();
     }
 
-    if (const_operand->get_is_null()) {
+    if (const_operand->isNull()) {
       return ExpressionRange::makeNullRange();
     }
     CHECK(const_operand->get_constval().stringval);
@@ -954,7 +954,7 @@ ExpressionRange getExpressionRange(
       target_value_range.getType() != ExpressionRangeType::Invalid) {
     auto const_target_value = dynamic_cast<const hdk::ir::Constant*>(target_value_expr);
     if (const_target_value) {
-      if (const_target_value->get_is_null()) {
+      if (const_target_value->isNull()) {
         // null constant, return default width_bucket range
         return ExpressionRange::makeIntRange(
             0, width_bucket_expr->get_partition_count_val(), 0, true);

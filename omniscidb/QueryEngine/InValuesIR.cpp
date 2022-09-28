@@ -152,7 +152,7 @@ std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(
           if (type->isExtDictionary()) {
             CHECK(sdp);
             const auto string_id =
-                in_val_const->get_is_null()
+                in_val_const->isNull()
                     ? needle_null_val
                     : sdp->getIdOfString(*in_val_const->get_constval().stringval);
             if (string_id != StringDictionary::INVALID_STR_ID) {
