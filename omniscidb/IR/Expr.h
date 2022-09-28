@@ -196,7 +196,7 @@ class ExpressionTuple : public Expr {
   ExpressionTuple(const ExprPtrVector& tuple)
       : Expr(hdk::ir::Context::defaultCtx().null()), tuple_(tuple){};
 
-  const ExprPtrVector& getTuple() const { return tuple_; }
+  const ExprPtrVector& tuple() const { return tuple_; }
 
   ExprPtr deep_copy() const override;
 

@@ -55,8 +55,8 @@ std::vector<InnerOuterOrLoopQual> QueryPlanDagExtractor::normalizeColumnsPair(
     }
   };
   if (lhs_tuple_expr) {
-    const auto& lhs_tuple = lhs_tuple_expr->getTuple();
-    const auto& rhs_tuple = rhs_tuple_expr->getTuple();
+    const auto& lhs_tuple = lhs_tuple_expr->tuple();
+    const auto& rhs_tuple = rhs_tuple_expr->tuple();
     CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
     for (size_t i = 0; i < lhs_tuple.size(); ++i) {
       do_normalize_inner_outer_pair(

@@ -518,8 +518,8 @@ std::shared_ptr<const hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
   const auto rhs_tuple_expr =
       dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->get_right_operand());
   CHECK(lhs_tuple_expr && rhs_tuple_expr);
-  const auto& lhs_tuple = lhs_tuple_expr->getTuple();
-  const auto& rhs_tuple = rhs_tuple_expr->getTuple();
+  const auto& lhs_tuple = lhs_tuple_expr->tuple();
+  const auto& rhs_tuple = rhs_tuple_expr->tuple();
   CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
   for (size_t i = 0; i < lhs_tuple.size(); ++i) {
     if (*rhs_tuple[i] == *rhs) {

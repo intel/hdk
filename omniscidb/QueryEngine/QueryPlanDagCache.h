@@ -49,8 +49,8 @@ class ColumnVarsVisitor
       const hdk::ir::ExpressionTuple* expr_tuple) const override {
     ColumnVarsVisitor visitor;
     std::vector<const hdk::ir::ColumnVar*> result;
-    for (size_t i = 0; i < expr_tuple->getTuple().size(); ++i) {
-      const auto col_vars = visitor.visit(expr_tuple->getTuple()[i].get());
+    for (size_t i = 0; i < expr_tuple->tuple().size(); ++i) {
+      const auto col_vars = visitor.visit(expr_tuple->tuple()[i].get());
       for (const auto col_var : col_vars) {
         result.push_back(col_var);
       }

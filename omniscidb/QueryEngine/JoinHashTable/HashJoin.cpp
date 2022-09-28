@@ -441,7 +441,7 @@ class AllColumnVarsVisitor
       const hdk::ir::ExpressionTuple* expr_tuple) const override {
     AllColumnVarsVisitor visitor;
     std::set<const hdk::ir::ColumnVar*> result;
-    for (const auto& expr_component : expr_tuple->getTuple()) {
+    for (const auto& expr_component : expr_tuple->tuple()) {
       const auto component_rte_set = visitor.visit(expr_component.get());
       result.insert(component_rte_set.begin(), component_rte_set.end());
     }
@@ -737,8 +737,8 @@ std::vector<InnerOuter> HashJoin::normalizeColumnPairs(
 
   CHECK_EQ(static_cast<bool>(lhs_tuple_expr), static_cast<bool>(rhs_tuple_expr));
   if (lhs_tuple_expr) {
-    const auto& lhs_tuple = lhs_tuple_expr->getTuple();
-    const auto& rhs_tuple = rhs_tuple_expr->getTuple();
+    const auto& lhs_tuple = lhs_tuple_expr->tuple();
+    const auto& rhs_tuple = rhs_tuple_expr->tuple();
     CHECK_EQ(lhs_tuple.size(), rhs_tuple.size());
     for (size_t i = 0; i < lhs_tuple.size(); ++i) {
       result.push_back(normalizeColumnPair(

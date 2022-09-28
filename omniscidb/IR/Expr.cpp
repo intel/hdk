@@ -970,7 +970,7 @@ bool ExpressionTuple::operator==(const Expr& rhs) const {
   if (!rhs_tuple) {
     return false;
   }
-  const auto& rhs_tuple_cols = rhs_tuple->getTuple();
+  const auto& rhs_tuple_cols = rhs_tuple->tuple();
   return expr_list_match(tuple_, rhs_tuple_cols);
 }
 

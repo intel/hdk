@@ -29,7 +29,7 @@ class MaxRangeTableIndexVisitor : public ScalarExprVisitor<int> {
   int visitColumnVarTuple(const hdk::ir::ExpressionTuple* expr_tuple) const override {
     MaxRangeTableIndexVisitor visitor;
     int max_range_table_idx = 0;
-    for (const auto& expr_component : expr_tuple->getTuple()) {
+    for (const auto& expr_component : expr_tuple->tuple()) {
       max_range_table_idx =
           std::max(max_range_table_idx, visitor.visit(expr_component.get()));
     }
@@ -51,7 +51,7 @@ class AllRangeTableIndexVisitor : public ScalarExprVisitor<std::set<int>> {
       const hdk::ir::ExpressionTuple* expr_tuple) const override {
     AllRangeTableIndexVisitor visitor;
     std::set<int> result;
-    for (const auto& expr_component : expr_tuple->getTuple()) {
+    for (const auto& expr_component : expr_tuple->tuple()) {
       const auto component_rte_set = visitor.visit(expr_component.get());
       result.insert(component_rte_set.begin(), component_rte_set.end());
     }

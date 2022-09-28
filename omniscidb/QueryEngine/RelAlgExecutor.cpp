@@ -1429,7 +1429,7 @@ hdk::ir::ExprPtr transform_to_inner(const hdk::ir::Expr* expr) {
   const auto tuple = dynamic_cast<const hdk::ir::ExpressionTuple*>(expr);
   if (tuple) {
     std::vector<hdk::ir::ExprPtr> transformed_tuple;
-    for (const auto& element : tuple->getTuple()) {
+    for (const auto& element : tuple->tuple()) {
       transformed_tuple.push_back(transform_to_inner(element.get()));
     }
     return hdk::ir::makeExpr<hdk::ir::ExpressionTuple>(transformed_tuple);

@@ -161,8 +161,8 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
   const auto right_tuple_expr = dynamic_cast<const hdk::ir::ExpressionTuple*>(
       multicol_compare->get_right_operand());
   CHECK(left_tuple_expr && right_tuple_expr);
-  const auto& left_tuple = left_tuple_expr->getTuple();
-  const auto& right_tuple = right_tuple_expr->getTuple();
+  const auto& left_tuple = left_tuple_expr->tuple();
+  const auto& right_tuple = right_tuple_expr->tuple();
   CHECK_EQ(left_tuple.size(), right_tuple.size());
   CHECK_GT(left_tuple.size(), size_t(1));
   auto acc =
