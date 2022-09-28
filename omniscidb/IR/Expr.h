@@ -264,7 +264,6 @@ class Constant : public Expr {
   bool get_is_null() const { return is_null; }
   bool cacheable() const { return cacheable_; }
   Datum get_constval() const { return constval; }
-  void set_constval(Datum d) { constval = d; }
   int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }
   double fpVal() const { return extract_fp_type_from_datum(constval, type_); }
   const ExprPtrList& get_value_list() const { return value_list; }
