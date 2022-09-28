@@ -244,7 +244,7 @@ void OrderEntry::print() const {
   std::cout << toString() << std::endl;
 }
 
-Expr::Expr(const Type* type, bool has_agg) : type_(type), contains_agg(has_agg) {}
+Expr::Expr(const Type* type, bool has_agg) : type_(type), contains_agg_(has_agg) {}
 
 void Expr::print() const {
   std::cout << toString() << std::endl;
@@ -257,24 +257,24 @@ void TargetEntry::print() const {
 ExprPtr Expr::decompress() const {
   if (type_->id() == Type::kExtDictionary) {
     auto new_type = static_cast<const ExtDictionaryType*>(type_)->elemType();
-    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
   } else if (type_->id() == Type::kDate && type_->size() != 8) {
     auto date_type = static_cast<const DateType*>(type_);
     return makeExpr<UOper>(type_->ctx().date64(TimeUnit::kSecond, date_type->nullable()),
-                           contains_agg,
+                           contains_agg_,
                            kCAST,
                            shared_from_this());
   } else if (type_->id() == Type::kTime && type_->size() != 8) {
     auto time_type = static_cast<const TimeType*>(type_);
     return makeExpr<UOper>(type_->ctx().time64(time_type->unit(), time_type->nullable()),
-                           contains_agg,
+                           contains_agg_,
                            kCAST,
                            shared_from_this());
   } else if (type_->id() == Type::kInterval && type_->size() != 8) {
     auto interval_type = static_cast<const TimestampType*>(type_);
     return makeExpr<UOper>(
         type_->ctx().interval64(interval_type->unit(), interval_type->nullable()),
-        contains_agg,
+        contains_agg_,
         kCAST,
         shared_from_this());
   }
@@ -308,7 +308,7 @@ ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {
         "expression "
         "yet.");
   }
-  return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+  return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
 }
 
 ExprPtr Expr::withType(const Type* type) const {
@@ -435,12 +435,12 @@ ExprPtr Constant::deep_copy() const {
 
 ExprPtr UOper::deep_copy() const {
   return makeExpr<UOper>(
-      type_, contains_agg, optype, operand->deep_copy(), is_dict_intersection_);
+      type_, contains_agg_, optype, operand->deep_copy(), is_dict_intersection_);
 }
 
 ExprPtr BinOper::deep_copy() const {
   return makeExpr<BinOper>(type_,
-                           contains_agg,
+                           contains_agg_,
                            optype,
                            qualifier,
                            left_operand->deep_copy(),
@@ -518,13 +518,13 @@ ExprPtr CaseExpr::deep_copy() const {
     new_list.emplace_back(p.first->deep_copy(), p.second->deep_copy());
   }
   return makeExpr<CaseExpr>(type_,
-                            contains_agg,
+                            contains_agg_,
                             new_list,
                             else_expr == nullptr ? nullptr : else_expr->deep_copy());
 }
 
 ExprPtr ExtractExpr::deep_copy() const {
-  return makeExpr<ExtractExpr>(type_, contains_agg, field_, from_expr_->deep_copy());
+  return makeExpr<ExtractExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
 }
 
 ExprPtr DateaddExpr::deep_copy() const {
@@ -537,7 +537,7 @@ ExprPtr DatediffExpr::deep_copy() const {
 }
 
 ExprPtr DatetruncExpr::deep_copy() const {
-  return makeExpr<DatetruncExpr>(type_, contains_agg, field_, from_expr_->deep_copy());
+  return makeExpr<DatetruncExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
 }
 
 ExprPtr OffsetInFragment::deep_copy() const {
@@ -900,7 +900,7 @@ ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) cons
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
-    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
   }
   return do_cast(new_type);
 }
@@ -931,7 +931,7 @@ ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) cons
 
   return makeExpr<CaseExpr>(
       new_type,
-      contains_agg,
+      contains_agg_,
       std::move(new_expr_pair_list),
       else_expr ? else_expr->add_cast(new_type, is_dict_intersection) : nullptr);
 }
@@ -1807,7 +1807,7 @@ size_t Expr::hash() const {
   if (!hash_) {
     hash_ = typeid(*this).hash_code();
     boost::hash_combine(*hash_, type_->toString());
-    boost::hash_combine(*hash_, contains_agg);
+    boost::hash_combine(*hash_, contains_agg_);
   }
   return *hash_;
 }

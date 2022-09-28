@@ -77,7 +77,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
 
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
-  bool containsAgg() const { return contains_agg; }
+  bool containsAgg() const { return contains_agg_; }
   virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false) const;
 
   // Make a deep copy of self
@@ -108,7 +108,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
 
  protected:
   const Type* type_;
-  bool contains_agg;
+  bool contains_agg_;
   mutable std::optional<size_t> hash_;
 };
 
