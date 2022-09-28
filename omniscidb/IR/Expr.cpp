@@ -327,7 +327,7 @@ std::string ColumnRef::toString() const {
 }
 
 Constant::~Constant() {
-  if (type_->isString() && !is_null) {
+  if (type_->isString() && !is_null_) {
     delete constval.stringval;
   }
 }
@@ -424,13 +424,13 @@ ExprPtr Var::withType(const Type* type) const {
 
 ExprPtr Constant::deep_copy() const {
   Datum d = constval;
-  if (type_->isString() && !is_null) {
+  if (type_->isString() && !is_null_) {
     d.stringval = new std::string(*constval.stringval);
   }
   if (type_->isArray()) {
-    return makeExpr<Constant>(type_, is_null, value_list, cacheable_);
+    return makeExpr<Constant>(type_, is_null_, value_list, cacheable_);
   }
-  return makeExpr<Constant>(type_, is_null, d, cacheable_);
+  return makeExpr<Constant>(type_, is_null_, d, cacheable_);
 }
 
 ExprPtr UOper::deep_copy() const {
@@ -732,7 +732,7 @@ ExprPtr Constant::cast_number(const Type* new_type) const {
     default:
       CHECK(false);
   }
-  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
+  return makeExpr<Constant>(new_type, is_null_, new_constval, cacheable_);
 }
 
 ExprPtr Constant::cast_string(const Type* new_type) const {
@@ -749,12 +749,12 @@ ExprPtr Constant::cast_string(const Type* new_type) const {
   } else {
     new_constval.stringval = nullptr;
   }
-  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
+  return makeExpr<Constant>(new_type, is_null_, new_constval, cacheable_);
 }
 
 ExprPtr Constant::cast_from_string(const Type* new_type) const {
   Datum new_constval = StringToDatum(*constval.stringval, new_type);
-  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
+  return makeExpr<Constant>(new_type, is_null_, new_constval, cacheable_);
 }
 
 ExprPtr Constant::cast_to_string(const Type* str_type) const {
@@ -768,14 +768,14 @@ ExprPtr Constant::cast_to_string(const Type* str_type) const {
       *new_constval.stringval = new_constval.stringval->substr(0, max_length);
     }
   }
-  return makeExpr<Constant>(str_type, is_null, new_constval, cacheable_);
+  return makeExpr<Constant>(str_type, is_null_, new_constval, cacheable_);
 }
 
 ExprPtr Constant::do_cast(const Type* new_type) const {
   if (type_->equal(new_type)) {
     return shared_from_this();
   }
-  if (is_null && new_type->nullable()) {
+  if (is_null_ && new_type->nullable()) {
   } else if ((new_type->isNumber() || new_type->isTimestamp()) &&
              (!new_type->isTimestamp() || !type_->isTimestamp()) &&
              (type_->isNumber() || type_->isTimestamp() || type_->isBoolean())) {
@@ -797,7 +797,7 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
                   constval.bigintval,
                   hdk::ir::unitsPerSecond(type_->as<TimestampType>()->unit()))
             : DateTruncate(dtDAY, constval.bigintval);
-    return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
+    return makeExpr<Constant>(new_type, is_null_, new_constval, cacheable_);
   } else if ((type_->isTimestamp() || type_->isDate()) && new_type->isTimestamp()) {
     auto old_unit = type_->as<DateTimeBaseType>()->unit();
     auto new_unit = new_type->as<DateTimeBaseType>()->unit();
@@ -805,7 +805,7 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
       Datum new_constval;
       new_constval.bigintval = DateTimeUtils::get_datetime_scaled_epoch(
           constval.bigintval, old_unit, new_unit);
-      return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
+      return makeExpr<Constant>(new_type, is_null_, new_constval, cacheable_);
     }
   } else if (new_type->isArray() && type_->isArray()) {
     auto new_elem_type = new_type->as<ArrayBaseType>()->elemType();
@@ -817,12 +817,12 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
       }
       new_value_list.push_back(c->do_cast(new_elem_type));
     }
-    return makeExpr<Constant>(new_type, is_null, new_value_list, cacheable_);
+    return makeExpr<Constant>(new_type, is_null_, new_value_list, cacheable_);
   } else if (isNull() && (new_type->isNumber() || new_type->isTime() ||
                           new_type->isString() || new_type->isBoolean())) {
   } else if (!is_null_value(type_, constval) &&
              type_->withNullable(true)->equal(new_type)) {
-    CHECK(!is_null);
+    CHECK(!is_null_);
     // relax nullability
   } else {
     throw std::runtime_error("Cast from " + type_->toString() + " to " +
@@ -891,7 +891,7 @@ void Constant::set_null_value() {
 
 ExprPtr Constant::cast(const Type* new_type, bool is_dict_intersection) const {
   CHECK(!is_dict_intersection);
-  if (is_null) {
+  if (is_null_) {
     return makeExpr<Constant>(new_type, true, constval, cacheable_);
   }
   if (new_type->isExtDictionary()) {
@@ -978,10 +978,10 @@ bool Constant::operator==(const Expr& rhs) const {
     return false;
   }
   const Constant& rhs_c = dynamic_cast<const Constant&>(rhs);
-  if (!type_->equal(rhs_c.type()) || is_null != rhs_c.isNull()) {
+  if (!type_->equal(rhs_c.type()) || is_null_ != rhs_c.isNull()) {
     return false;
   }
-  if (is_null && rhs_c.isNull()) {
+  if (is_null_ && rhs_c.isNull()) {
     return true;
   }
   if (type_->isArray()) {
@@ -1300,7 +1300,7 @@ std::string Var::toString() const {
 
 std::string Constant::toString() const {
   std::string str{"(Const "};
-  if (is_null) {
+  if (is_null_) {
     str += "NULL";
   } else if (type_->isArray()) {
     str += type_->toString();
@@ -1858,8 +1858,8 @@ size_t Var::hash() const {
 size_t Constant::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, is_null);
-    if (!is_null) {
+    boost::hash_combine(*hash_, is_null_);
+    if (!is_null_) {
       if (type_->isArray()) {
         for (auto& expr : value_list) {
           boost::hash_combine(*hash_, expr->hash());

@@ -246,22 +246,22 @@ class Var : public ColumnVar {
  */
 class Constant : public Expr {
  public:
-  Constant(const Type* type, bool n, Datum v, bool cacheable = true)
-      : Expr(type), is_null(n), cacheable_(cacheable), constval(v) {
-    if (n) {
+  Constant(const Type* type, bool is_null, Datum v, bool cacheable = true)
+      : Expr(type), is_null_(is_null), cacheable_(cacheable), constval(v) {
+    if (is_null) {
       set_null_value();
     } else {
       type_ = type_->withNullable(false);
     }
   }
-  Constant(const Type* type, bool n, const ExprPtrList& l, bool cacheable = true)
+  Constant(const Type* type, bool is_null, const ExprPtrList& l, bool cacheable = true)
       : Expr(type)
-      , is_null(n)
+      , is_null_(is_null)
       , cacheable_(cacheable)
       , constval(Datum{0})
       , value_list(l) {}
   ~Constant() override;
-  bool isNull() const { return is_null; }
+  bool isNull() const { return is_null_; }
   bool cacheable() const { return cacheable_; }
   Datum value() const { return constval; }
   int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }
@@ -278,7 +278,7 @@ class Constant : public Expr {
 
  protected:
   // Constant is NULL
-  bool is_null;
+  bool is_null_;
   // A hint for DAG caches. Cache hit is unlikely, when set to true
   // (e.g. constant expression represents NOW datetime).
   bool cacheable_;
