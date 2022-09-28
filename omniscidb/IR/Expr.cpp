@@ -406,7 +406,7 @@ ExprPtr ExpressionTuple::deep_copy() const {
 }
 
 ExprPtr Var::deep_copy() const {
-  return makeExpr<Var>(col_info_, rte_idx_, which_row, varno);
+  return makeExpr<Var>(col_info_, rte_idx_, which_row_, varno);
 }
 
 ExprPtr Var::withType(const Type* type) const {
@@ -417,7 +417,7 @@ ExprPtr Var::withType(const Type* type) const {
                                                  col_info_->name,
                                                  type,
                                                  col_info_->is_rowid);
-    return makeExpr<Var>(col_info, rte_idx_, which_row, varno);
+    return makeExpr<Var>(col_info, rte_idx_, which_row_, varno);
   }
   return shared_from_this();
 }
@@ -1294,8 +1294,8 @@ std::string ExpressionTuple::toString() const {
 std::string Var::toString() const {
   return "(Var table: " + std::to_string(tableId()) +
          " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx_) +
-         " which_row: " + std::to_string(which_row) + " varno: " + std::to_string(varno) +
-         ") ";
+         " which_row: " + std::to_string(which_row_) +
+         " varno: " + std::to_string(varno) + ") ";
 }
 
 std::string Constant::toString() const {
@@ -1849,7 +1849,7 @@ size_t ExpressionTuple::hash() const {
 size_t Var::hash() const {
   if (!hash_) {
     hash_ = ColumnVar::hash();
-    boost::hash_combine(*hash_, which_row);
+    boost::hash_combine(*hash_, which_row_);
     boost::hash_combine(*hash_, varno);
   }
   return *hash_;

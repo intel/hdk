@@ -222,10 +222,10 @@ class Var : public ColumnVar {
  public:
   enum WhichRow { kINPUT_OUTER, kINPUT_INNER, kOUTPUT, kGROUPBY };
   Var(ColumnInfoPtr col_info, int i, WhichRow o, int v)
-      : ColumnVar(col_info, i), which_row(o), varno(v) {}
+      : ColumnVar(col_info, i), which_row_(o), varno(v) {}
   Var(const hdk::ir::Type* type, WhichRow o, int v)
-      : ColumnVar(type), which_row(o), varno(v) {}
-  WhichRow whichRow() const { return which_row; }
+      : ColumnVar(type), which_row_(o), varno(v) {}
+  WhichRow whichRow() const { return which_row_; }
   int varNo() const { return varno; }
   ExprPtr deep_copy() const override;
   ExprPtr withType(const Type* type) const override;
@@ -234,10 +234,10 @@ class Var : public ColumnVar {
   size_t hash() const override;
 
  private:
-  WhichRow which_row;  // indicate which row this Var should project from.  It can be from
-                       // the outer input plan or the inner input plan (for joins) or the
-                       // output row in the current plan.
-  int varno;           // the column number in the row.  1-based
+  WhichRow which_row_;  // indicate which row this Var should project from.  It can be
+                        // from the outer input plan or the inner input plan (for joins)
+                        // or the output row in the current plan.
+  int varno;  // the column number in the row.  1-based
 };
 
 /*
