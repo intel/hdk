@@ -655,7 +655,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
     left_expr = left_expr->decompress();
     right_expr = right_expr->decompress();
   }
-  bool has_agg = (left_expr->get_contains_agg() || right_expr->get_contains_agg());
+  bool has_agg = (left_expr->containsAgg() || right_expr->containsAgg());
   return hdk::ir::makeExpr<hdk::ir::BinOper>(
       result_type, has_agg, optype, qual, left_expr, right_expr);
 }
@@ -682,7 +682,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
     auto e1 = p.first;
     CHECK(e1->type()->isBoolean());
     auto e2 = p.second;
-    if (e2->get_contains_agg()) {
+    if (e2->containsAgg()) {
       has_agg = true;
     }
     const auto& e2_type = e2->type();
@@ -718,7 +718,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
   auto else_e = else_e_in;
   if (else_e) {
     const auto& else_type = else_e->type();
-    if (else_e->get_contains_agg()) {
+    if (else_e->containsAgg()) {
       has_agg = true;
     }
     if (else_type->isString() &&

@@ -171,7 +171,7 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
     auto rewritten_lhs = visit(lhs.get());
     auto rewritten_rhs = visit(rhs.get());
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
-                                               bin_oper->get_contains_agg(),
+                                               bin_oper->containsAgg(),
                                                bin_oper->get_optype(),
                                                bin_oper->get_qualifier(),
                                                rewritten_lhs ? rewritten_lhs : lhs,
@@ -512,7 +512,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     }
 
     return hdk::ir::makeExpr<hdk::ir::UOper>(
-        uoper->type(), uoper->get_contains_agg(), optype, operand);
+        uoper->type(), uoper->containsAgg(), optype, operand);
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
@@ -657,7 +657,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       }
       if (recip_rhs) {
         return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
-                                                   bin_oper->get_contains_agg(),
+                                                   bin_oper->containsAgg(),
                                                    kMULTIPLY,
                                                    bin_oper->get_qualifier(),
                                                    lhs,
@@ -666,7 +666,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     }
 
     return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
-                                               bin_oper->get_contains_agg(),
+                                               bin_oper->containsAgg(),
                                                bin_oper->get_optype(),
                                                bin_oper->get_qualifier(),
                                                lhs,

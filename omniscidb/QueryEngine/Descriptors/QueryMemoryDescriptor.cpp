@@ -309,7 +309,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
 
         bool has_varlen_sample_agg = false;
         for (const auto& target_expr : ra_exe_unit.target_exprs) {
-          if (target_expr->get_contains_agg()) {
+          if (target_expr->containsAgg()) {
             const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
             CHECK(agg_expr);
             if (agg_expr->get_aggtype() == kSAMPLE &&

@@ -44,14 +44,14 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
 
   RetType visitUOper(const hdk::ir::UOper* uoper) const override {
     return hdk::ir::makeExpr<hdk::ir::UOper>(uoper->type(),
-                                             uoper->get_contains_agg(),
+                                             uoper->containsAgg(),
                                              uoper->get_optype(),
                                              visit(uoper->get_operand()));
   }
 
   RetType visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
-                                               bin_oper->get_contains_agg(),
+                                               bin_oper->containsAgg(),
                                                bin_oper->get_optype(),
                                                bin_oper->get_qualifier(),
                                                visit(bin_oper->get_left_operand()),
@@ -139,21 +139,21 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     auto else_expr = case_expr->get_else_expr();
     return hdk::ir::makeExpr<hdk::ir::CaseExpr>(
         case_expr->type(),
-        case_expr->get_contains_agg(),
+        case_expr->containsAgg(),
         new_list,
         else_expr == nullptr ? nullptr : visit(else_expr));
   }
 
   RetType visitDatetruncExpr(const hdk::ir::DatetruncExpr* datetrunc) const override {
     return hdk::ir::makeExpr<hdk::ir::DatetruncExpr>(datetrunc->type(),
-                                                     datetrunc->get_contains_agg(),
+                                                     datetrunc->containsAgg(),
                                                      datetrunc->get_field(),
                                                      visit(datetrunc->get_from_expr()));
   }
 
   RetType visitExtractExpr(const hdk::ir::ExtractExpr* extract) const override {
     return hdk::ir::makeExpr<hdk::ir::ExtractExpr>(extract->type(),
-                                                   extract->get_contains_agg(),
+                                                   extract->containsAgg(),
                                                    extract->get_field(),
                                                    visit(extract->get_from_expr()));
   }

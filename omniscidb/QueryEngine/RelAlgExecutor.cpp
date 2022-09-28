@@ -1247,7 +1247,7 @@ bool is_count_distinct(const hdk::ir::Expr* expr) {
 
 bool is_agg(const hdk::ir::Expr* expr) {
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr);
-  if (agg_expr && agg_expr->get_contains_agg()) {
+  if (agg_expr && agg_expr->containsAgg()) {
     auto agg_type = agg_expr->get_aggtype();
     if (agg_type == SQLAgg::kMIN || agg_type == SQLAgg::kMAX ||
         agg_type == SQLAgg::kSUM || agg_type == SQLAgg::kAVG) {

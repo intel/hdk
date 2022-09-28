@@ -241,7 +241,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
     if (bin_oper->get_optype() == kARRAY_AT) {
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bin_oper->type(),
-          lhs->get_contains_agg() || rhs->get_contains_agg(),
+          lhs->containsAgg() || rhs->containsAgg(),
           bin_oper->get_optype(),
           bin_oper->get_qualifier(),
           std::move(lhs),
@@ -262,7 +262,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
         return op;
       }
       return hdk::ir::makeExpr<hdk::ir::UOper>(
-          uoper->type(), op->get_contains_agg(), kCAST, op);
+          uoper->type(), op->containsAgg(), kCAST, op);
     }
     return DeepCopyVisitor::visitUOper(uoper);
   }
@@ -649,7 +649,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
       rte_idx = cv->get_rte_idx();
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bin_oper->type(),
-          bin_oper->get_contains_agg(),
+          bin_oper->containsAgg(),
           COMMUTE_COMPARISON(bin_oper->get_optype()),
           bin_oper->get_qualifier(),
           right_operand->deep_copy(),
@@ -667,7 +667,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
     auto cv = right_operand->as<hdk::ir::ColumnVar>();
     rte_idx = cv->get_rte_idx();
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
-                                               bin_oper->get_contains_agg(),
+                                               bin_oper->containsAgg(),
                                                COMMUTE_COMPARISON(bin_oper->get_optype()),
                                                bin_oper->get_qualifier(),
                                                right_operand->deep_copy(),

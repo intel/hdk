@@ -188,7 +188,7 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
         type, constant->get_is_null(), d, constant->cacheable());
   }
   return hdk::ir::makeExpr<hdk::ir::ExtractExpr>(
-      type, from_expr->get_contains_agg(), field, from_expr->decompress());
+      type, from_expr->containsAgg(), field, from_expr->decompress());
 }
 
 DatetruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
@@ -262,5 +262,5 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
         type, constant->get_is_null(), d, constant->cacheable());
   }
   return hdk::ir::makeExpr<hdk::ir::DatetruncExpr>(
-      type, from_expr->get_contains_agg(), field, from_expr->decompress());
+      type, from_expr->containsAgg(), field, from_expr->decompress());
 }
