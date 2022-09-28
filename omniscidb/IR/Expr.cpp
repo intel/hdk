@@ -281,15 +281,15 @@ ExprPtr Expr::decompress() {
   return shared_from_this();
 }
 
-ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) {
+ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {
   if (type_->equal(new_type)) {
-    return shared_from_this();
+    return const_cast<Expr*>(this)->shared_from_this();
   }
   if (type_->id() == Type::kExtDictionary && new_type->id() == Type::kExtDictionary) {
     auto dict_id = type_->as<ExtDictionaryType>()->dictId();
     auto new_dict_id = new_type->as<ExtDictionaryType>()->dictId();
     if (dict_id == new_dict_id || dict_id == TRANSIENT_DICT(new_dict_id)) {
-      return shared_from_this();
+      return const_cast<Expr*>(this)->shared_from_this();
     }
   }
   if (!isCastAllowed(type_, new_type)) {
@@ -308,7 +308,8 @@ ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) {
         "expression "
         "yet.");
   }
-  return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+  return makeExpr<UOper>(
+      new_type, contains_agg, kCAST, const_cast<Expr*>(this)->shared_from_this());
 }
 
 ExprPtr Expr::withType(const Type* type) const {
@@ -570,7 +571,8 @@ ExprPtr ArrayExpr::deep_copy() const {
   return makeExpr<ArrayExpr>(type_, new_contained_expressions, is_null_, local_alloc_);
 }
 
-void Constant::cast_number(const Type* new_type) {
+ExprPtr Constant::cast_number(const Type* new_type) const {
+  Datum new_constval = constval;
   switch (type_->id()) {
     case Type::kBoolean:
     case Type::kInteger:
@@ -583,31 +585,31 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kInteger:
           switch (new_type->size()) {
             case 1:
-              constval.tinyintval = safeNarrow<int8_t>(old_value);
+              new_constval.tinyintval = safeNarrow<int8_t>(old_value);
               break;
             case 2:
-              constval.smallintval = safeNarrow<int16_t>(old_value);
+              new_constval.smallintval = safeNarrow<int16_t>(old_value);
               break;
             case 4:
-              constval.intval = safeNarrow<int32_t>(old_value);
+              new_constval.intval = safeNarrow<int32_t>(old_value);
               break;
             case 8:
-              constval.bigintval = old_value;
+              new_constval.bigintval = old_value;
               break;
             default:
               abort();
           }
           break;
         case Type::kTimestamp:
-          constval.bigintval = old_value;
+          new_constval.bigintval = old_value;
           break;
         case Type::kFloatingPoint:
           switch (new_type->as<FloatingPointType>()->precision()) {
             case FloatingPointType::kFloat:
-              constval.floatval = (float)old_value;
+              new_constval.floatval = (float)old_value;
               break;
             case FloatingPointType::kDouble:
-              constval.doubleval = (double)old_value;
+              new_constval.doubleval = (double)old_value;
               break;
             default:
               UNREACHABLE();
@@ -616,7 +618,7 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kDecimal:
           switch (new_type->size()) {
             case 8:
-              constval.bigintval =
+              new_constval.bigintval =
                   safeScale(old_value, new_type->as<DecimalType>()->scale());
               break;
             default:
@@ -633,31 +635,31 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kInteger:
           switch (new_type->size()) {
             case 1:
-              constval.tinyintval = safeRound<int8_t>(old_value);
+              new_constval.tinyintval = safeRound<int8_t>(old_value);
               break;
             case 2:
-              constval.smallintval = safeRound<int16_t>(old_value);
+              new_constval.smallintval = safeRound<int16_t>(old_value);
               break;
             case 4:
-              constval.intval = safeRound<int32_t>(old_value);
+              new_constval.intval = safeRound<int32_t>(old_value);
               break;
             case 8:
-              constval.bigintval = safeRound<int64_t>(old_value);
+              new_constval.bigintval = safeRound<int64_t>(old_value);
               break;
             default:
               abort();
           }
           break;
         case Type::kTimestamp:
-          constval.bigintval = safeRound<int64_t>(old_value);
+          new_constval.bigintval = safeRound<int64_t>(old_value);
           break;
         case Type::kFloatingPoint:
           switch (new_type->as<FloatingPointType>()->precision()) {
             case FloatingPointType::kFloat:
-              constval.floatval = (float)old_value;
+              new_constval.floatval = (float)old_value;
               break;
             case FloatingPointType::kDouble:
-              constval.doubleval = (double)old_value;
+              new_constval.doubleval = (double)old_value;
               break;
             default:
               UNREACHABLE();
@@ -666,7 +668,7 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kDecimal:
           switch (new_type->size()) {
             case 8:
-              constval.bigintval =
+              new_constval.bigintval =
                   safeScale(old_value, new_type->as<DecimalType>()->scale());
               break;
             default:
@@ -685,31 +687,31 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kInteger:
           switch (new_type->size()) {
             case 1:
-              constval.tinyintval = roundDecimal<int8_t>(old_value, old_scale);
+              new_constval.tinyintval = roundDecimal<int8_t>(old_value, old_scale);
               break;
             case 2:
-              constval.smallintval = roundDecimal<int16_t>(old_value, old_scale);
+              new_constval.smallintval = roundDecimal<int16_t>(old_value, old_scale);
               break;
             case 4:
-              constval.intval = roundDecimal<int32_t>(old_value, old_scale);
+              new_constval.intval = roundDecimal<int32_t>(old_value, old_scale);
               break;
             case 8:
-              constval.bigintval = roundDecimal<int64_t>(old_value, old_scale);
+              new_constval.bigintval = roundDecimal<int64_t>(old_value, old_scale);
               break;
             default:
               abort();
           }
           break;
         case Type::kTimestamp:
-          constval.bigintval = roundDecimal<int64_t>(old_value, old_scale);
+          new_constval.bigintval = roundDecimal<int64_t>(old_value, old_scale);
           break;
         case Type::kFloatingPoint:
           switch (new_type->as<FloatingPointType>()->precision()) {
             case FloatingPointType::kFloat:
-              constval.floatval = floatFromDecimal<float>(old_value, old_scale);
+              new_constval.floatval = floatFromDecimal<float>(old_value, old_scale);
               break;
             case FloatingPointType::kDouble:
-              constval.doubleval = floatFromDecimal<double>(old_value, old_scale);
+              new_constval.doubleval = floatFromDecimal<double>(old_value, old_scale);
               break;
             default:
               UNREACHABLE();
@@ -718,7 +720,7 @@ void Constant::cast_number(const Type* new_type) {
         case Type::kDecimal:
           switch (new_type->size()) {
             case 8:
-              constval.bigintval =
+              new_constval.bigintval =
                   convert_decimal_value_to_scale(old_value, type_, new_type);
               break;
             default:
@@ -732,83 +734,92 @@ void Constant::cast_number(const Type* new_type) {
     default:
       CHECK(false);
   }
-  type_ = new_type;
+  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
 }
 
-void Constant::cast_string(const Type* new_type) {
-  std::string* s = constval.stringval;
-  if (s != nullptr && new_type->isVarChar()) {
-    auto max_length = static_cast<size_t>(new_type->as<VarCharType>()->maxLength());
-    if (max_length < s->length()) {
-      // truncate string
-      constval.stringval = new std::string(s->substr(0, max_length));
-      delete s;
+ExprPtr Constant::cast_string(const Type* new_type) const {
+  Datum new_constval;
+  if (constval.stringval) {
+    new_constval.stringval = new std::string(*constval.stringval);
+    if (new_type->isVarChar()) {
+      auto max_length = static_cast<size_t>(new_type->as<VarCharType>()->maxLength());
+      if (max_length < new_constval.stringval->length()) {
+        // truncate string
+        new_constval.stringval->resize(max_length);
+      }
     }
+  } else {
+    new_constval.stringval = nullptr;
   }
-  type_ = new_type;
+  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
 }
 
-void Constant::cast_from_string(const Type* new_type) {
-  std::string* s = constval.stringval;
-  constval = StringToDatum(*s, new_type);
-  delete s;
-  type_ = new_type;
+ExprPtr Constant::cast_from_string(const Type* new_type) const {
+  Datum new_constval = StringToDatum(*constval.stringval, new_type);
+  return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
 }
 
-void Constant::cast_to_string(const Type* str_type) {
+ExprPtr Constant::cast_to_string(const Type* str_type) const {
   const auto str_val = DatumToString(constval, type_);
-  constval.stringval = new std::string(str_val);
+  Datum new_constval;
+  new_constval.stringval = new std::string(str_val);
   if (str_type->isVarChar()) {
     // truncate the string
     auto max_length = str_type->as<hdk::ir::VarCharType>()->maxLength();
-    if (constval.stringval->length() > static_cast<size_t>(max_length)) {
-      *constval.stringval = constval.stringval->substr(0, max_length);
+    if (new_constval.stringval->length() > static_cast<size_t>(max_length)) {
+      *new_constval.stringval = new_constval.stringval->substr(0, max_length);
     }
   }
-  type_ = str_type;
+  return makeExpr<Constant>(str_type, is_null, new_constval, cacheable_);
 }
 
-void Constant::do_cast(const Type* new_type) {
+ExprPtr Constant::do_cast(const Type* new_type) const {
   if (type_->equal(new_type)) {
-    return;
+    return const_cast<Constant*>(this)->shared_from_this();
   }
   if (is_null && new_type->nullable()) {
   } else if ((new_type->isNumber() || new_type->isTimestamp()) &&
              (!new_type->isTimestamp() || !type_->isTimestamp()) &&
              (type_->isNumber() || type_->isTimestamp() || type_->isBoolean())) {
-    cast_number(new_type);
+    return cast_number(new_type);
   } else if (new_type->isBoolean() && type_->isBoolean()) {
   } else if (new_type->isString() && type_->isString()) {
-    cast_string(new_type);
+    return cast_string(new_type);
   } else if (type_->isString()) {
-    cast_from_string(new_type);
+    return cast_from_string(new_type);
   } else if (new_type->isString()) {
-    cast_to_string(new_type);
+    return cast_to_string(new_type);
   } else if (new_type->isDate() && type_->isDate()) {
     CHECK(type_->as<DateType>()->unit() == new_type->as<DateType>()->unit());
   } else if (new_type->isDate() && type_->isTimestamp()) {
-    constval.bigintval =
+    Datum new_constval;
+    new_constval.bigintval =
         (type_->isTimestamp() && type_->as<TimestampType>()->unit() > TimeUnit::kSecond)
             ? truncate_high_precision_timestamp_to_date(
                   constval.bigintval,
                   hdk::ir::unitsPerSecond(type_->as<TimestampType>()->unit()))
             : DateTruncate(dtDAY, constval.bigintval);
+    return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
   } else if ((type_->isTimestamp() || type_->isDate()) && new_type->isTimestamp()) {
     auto old_unit = type_->as<DateTimeBaseType>()->unit();
     auto new_unit = new_type->as<DateTimeBaseType>()->unit();
     if (old_unit != new_unit) {
-      constval.bigintval = DateTimeUtils::get_datetime_scaled_epoch(
+      Datum new_constval;
+      new_constval.bigintval = DateTimeUtils::get_datetime_scaled_epoch(
           constval.bigintval, old_unit, new_unit);
+      return makeExpr<Constant>(new_type, is_null, new_constval, cacheable_);
     }
   } else if (new_type->isArray() && type_->isArray()) {
     auto new_elem_type = new_type->as<ArrayBaseType>()->elemType();
+    ExprPtrList new_value_list;
     for (auto& v : value_list) {
       auto c = std::dynamic_pointer_cast<Constant>(v);
       if (!c) {
         throw std::runtime_error("Invalid array cast.");
       }
-      c->do_cast(new_elem_type);
+      new_value_list.push_back(c->do_cast(new_elem_type));
     }
+    return makeExpr<Constant>(new_type, is_null, new_value_list, cacheable_);
   } else if (get_is_null() && (new_type->isNumber() || new_type->isTime() ||
                                new_type->isString() || new_type->isBoolean())) {
   } else if (!is_null_value(type_, constval) &&
@@ -819,10 +830,7 @@ void Constant::do_cast(const Type* new_type) {
     throw std::runtime_error("Cast from " + type_->toString() + " to " +
                              new_type->toString() + " not supported");
   }
-  type_ = new_type;
-  if (is_null) {
-    set_null_value();
-  }
+  return withType(new_type);
 }
 
 void Constant::set_null_value() {
@@ -883,26 +891,24 @@ void Constant::set_null_value() {
   }
 }
 
-ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) {
+ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) const {
   CHECK(!is_dict_intersection);
   if (is_null) {
-    type_ = new_type;
-    set_null_value();
-    return shared_from_this();
+    return makeExpr<Constant>(new_type, true, constval, cacheable_);
   }
   if (new_type->isExtDictionary()) {
-    do_cast(new_type->as<ExtDictionaryType>()->elemType());
-    return Expr::add_cast(new_type);
+    auto new_cst = do_cast(new_type->as<ExtDictionaryType>()->elemType());
+    return new_cst->Expr::add_cast(new_type);
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
-    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+    return makeExpr<UOper>(
+        new_type, contains_agg, kCAST, const_cast<Constant*>(this)->shared_from_this());
   }
-  do_cast(new_type);
-  return shared_from_this();
+  return do_cast(new_type);
 }
 
-ExprPtr UOper::add_cast(const Type* new_type, bool is_dict_intersection) {
+ExprPtr UOper::add_cast(const Type* new_type, bool is_dict_intersection) const {
   if (optype != kCAST) {
     return Expr::add_cast(new_type, is_dict_intersection);
   }
@@ -919,22 +925,18 @@ ExprPtr UOper::add_cast(const Type* new_type, bool is_dict_intersection) {
   return Expr::add_cast(new_type, is_dict_intersection);
 }
 
-ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) {
+ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) const {
   std::list<std::pair<ExprPtr, ExprPtr>> new_expr_pair_list;
   for (auto& p : expr_pair_list) {
     new_expr_pair_list.emplace_back(
         std::make_pair(p.first, p.second->add_cast(new_type, is_dict_intersection)));
   }
 
-  if (else_expr != nullptr) {
-    else_expr = else_expr->add_cast(new_type, is_dict_intersection);
-  }
-  // Replace the current WHEN THEN pair list once we are sure all casts have succeeded
-  expr_pair_list = new_expr_pair_list;
-
-  type_ = new_type;
-
-  return shared_from_this();
+  return makeExpr<CaseExpr>(
+      new_type,
+      contains_agg,
+      std::move(new_expr_pair_list),
+      else_expr ? else_expr->add_cast(new_type, is_dict_intersection) : nullptr);
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
