@@ -379,7 +379,7 @@ ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
 }
 
 ExprPtr ColumnVar::deep_copy() const {
-  return makeExpr<ColumnVar>(col_info_, rte_idx);
+  return makeExpr<ColumnVar>(col_info_, rte_idx_);
 }
 
 ExprPtr ColumnVar::withType(const Type* type) const {
@@ -390,7 +390,7 @@ ExprPtr ColumnVar::withType(const Type* type) const {
                                                  col_info_->name,
                                                  type,
                                                  col_info_->is_rowid);
-    return makeExpr<ColumnVar>(col_info, rte_idx);
+    return makeExpr<ColumnVar>(col_info, rte_idx_);
   }
   return shared_from_this();
 }
@@ -406,7 +406,7 @@ ExprPtr ExpressionTuple::deep_copy() const {
 }
 
 ExprPtr Var::deep_copy() const {
-  return makeExpr<Var>(col_info_, rte_idx, which_row, varno);
+  return makeExpr<Var>(col_info_, rte_idx_, which_row, varno);
 }
 
 ExprPtr Var::withType(const Type* type) const {
@@ -417,7 +417,7 @@ ExprPtr Var::withType(const Type* type) const {
                                                  col_info_->name,
                                                  type,
                                                  col_info_->is_rowid);
-    return makeExpr<Var>(col_info, rte_idx, which_row, varno);
+    return makeExpr<Var>(col_info, rte_idx_, which_row, varno);
   }
   return shared_from_this();
 }
@@ -949,9 +949,9 @@ bool ColumnVar::operator==(const Expr& rhs) const {
     return false;
   }
   const ColumnVar& rhs_cv = dynamic_cast<const ColumnVar&>(rhs);
-  if (rte_idx != -1) {
+  if (rte_idx_ != -1) {
     return (tableId() == rhs_cv.tableId()) && (columnId() == rhs_cv.columnId()) &&
-           (rte_idx == rhs_cv.rteIdx());
+           (rte_idx_ == rhs_cv.rteIdx());
   }
   const Var* v = dynamic_cast<const Var*>(this);
   if (v == nullptr) {
@@ -1279,7 +1279,7 @@ bool ArrayExpr::operator==(Expr const& rhs) const {
 
 std::string ColumnVar::toString() const {
   return "(ColumnVar table: " + std::to_string(tableId()) +
-         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx) +
+         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx_) +
          " " + type()->toString() + ") ";
 }
 
@@ -1294,7 +1294,7 @@ std::string ExpressionTuple::toString() const {
 
 std::string Var::toString() const {
   return "(Var table: " + std::to_string(tableId()) +
-         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx) +
+         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx_) +
          " which_row: " + std::to_string(which_row) + " varno: " + std::to_string(varno) +
          ") ";
 }
@@ -1831,7 +1831,7 @@ size_t GroupColumnRef::hash() const {
 size_t ColumnVar::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, rte_idx);
+    boost::hash_combine(*hash_, rte_idx_);
     boost::hash_combine(*hash_, col_info_->hash());
   }
   return *hash_;

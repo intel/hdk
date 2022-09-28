@@ -152,10 +152,10 @@ class GroupColumnRef : public Expr {
 class ColumnVar : public Expr {
  public:
   ColumnVar(ColumnInfoPtr col_info, int nest_level)
-      : Expr(col_info->type), rte_idx(nest_level), col_info_(std::move(col_info)) {}
+      : Expr(col_info->type), rte_idx_(nest_level), col_info_(std::move(col_info)) {}
   ColumnVar(const hdk::ir::Type* type)
       : Expr(type)
-      , rte_idx(-1)
+      , rte_idx_(-1)
       , col_info_(std::make_shared<ColumnInfo>(-1, 0, 0, "", type_, false)) {}
   ColumnVar(const hdk::ir::Type* type,
             int table_id,
@@ -163,13 +163,13 @@ class ColumnVar : public Expr {
             int nest_level,
             bool is_virtual = false)
       : Expr(type)
-      , rte_idx(nest_level)
+      , rte_idx_(nest_level)
       , col_info_(
             std::make_shared<ColumnInfo>(-1, table_id, col_id, "", type_, is_virtual)) {}
   int dbId() const { return col_info_->db_id; }
   int tableId() const { return col_info_->table_id; }
   int columnId() const { return col_info_->column_id; }
-  int rteIdx() const { return rte_idx; }
+  int rteIdx() const { return rte_idx_; }
   ColumnInfoPtr columnInfo() const { return col_info_; }
   bool is_virtual() const { return col_info_->is_rowid; }
 
@@ -182,7 +182,7 @@ class ColumnVar : public Expr {
   size_t hash() const override;
 
  protected:
-  int rte_idx;  // 0-based range table index, used for table ordering in multi-joins
+  int rte_idx_;  // 0-based range table index, used for table ordering in multi-joins
   ColumnInfoPtr col_info_;
 };
 
