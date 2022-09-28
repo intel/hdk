@@ -909,7 +909,7 @@ hdk::ir::ExprPtr parseLiteral(const rapidjson::Value& expr) {
       }
       auto lit_expr = scale ? Analyzer::analyzeFixedPtValue(val, scale, precision)
                             : Analyzer::analyzeIntValue(val);
-      return lit_type->equal(target_type) ? lit_expr : lit_expr->add_cast(target_type);
+      return lit_type->equal(target_type) ? lit_expr : lit_expr->cast(target_type);
     }
     case hdk::ir::Type::kText: {
       return Analyzer::analyzeStringValue(json_str(literal));
@@ -931,7 +931,7 @@ hdk::ir::ExprPtr parseLiteral(const rapidjson::Value& expr) {
         UNREACHABLE() << "Unhandled type: " << literal.GetType();
       }
       auto lit_expr = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.fp64(false), false, d);
-      return lit_type->equal(target_type) ? lit_expr : lit_expr->add_cast(target_type);
+      return lit_type->equal(target_type) ? lit_expr : lit_expr->cast(target_type);
     }
     case hdk::ir::Type::kInterval: {
       Datum d;
@@ -1032,13 +1032,13 @@ hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type*
         // Do not propogate encoding on small dates
         if (type->isDate() &&
             type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) {
-          return arg->add_cast(ctx.time64(hdk::ir::TimeUnit::kSecond));
+          return arg->cast(ctx.time64(hdk::ir::TimeUnit::kSecond));
         }
-        return arg->add_cast(type);
+        return arg->cast(type);
       }
       if (!(arg_type->isString() || arg_type->isExtDictionary()) &&
           (type->isString() || type->isExtDictionary())) {
-        return arg->add_cast(type);
+        return arg->cast(type);
       }
       return std::make_shared<hdk::ir::UOper>(type, false, op, arg);
     }
@@ -1325,7 +1325,7 @@ hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   if (number_units_const && number_units_const->get_is_null()) {
     throw std::runtime_error("The 'Interval' argument literal must not be 'null'.");
   }
-  auto cast_number_units = number_units->add_cast(ctx.int64());
+  auto cast_number_units = number_units->cast(ctx.int64());
   auto& datetime = operands[2];
   auto datetime_type = datetime->type();
   if (datetime_type->isTime()) {
@@ -1410,7 +1410,7 @@ hdk::ir::ExprPtr parseWidthBucket(const hdk::ir::ExprPtrVector& operands) {
   auto cast_to_double_if_necessary = [](hdk::ir::ExprPtr arg) {
     const auto& arg_type = arg->type();
     if (!arg_type->isFp64()) {
-      return arg->add_cast(arg_type->ctx().fp64(arg_type->nullable()));
+      return arg->cast(arg_type->ctx().fp64(arg_type->nullable()));
     }
     return arg;
   };
@@ -1426,7 +1426,7 @@ hdk::ir::ExprPtr parseSampleRatio(const hdk::ir::ExprPtrVector& operands) {
   auto arg = operands[0];
   auto arg_type = operands[0]->type();
   if (!arg_type->isFp64()) {
-    arg = arg->add_cast(arg_type->ctx().fp64(arg_type->nullable()));
+    arg = arg->cast(arg_type->ctx().fp64(arg_type->nullable()));
   }
   return hdk::ir::makeExpr<hdk::ir::SampleRatioExpr>(arg);
 }
@@ -1554,7 +1554,7 @@ hdk::ir::ExprPtr parseHPTLiteral(const hdk::ir::ExprPtrVector& operands,
         "Cast target type should be TIMESTAMP(6|9). Input type is: " + type->toString());
   }
 
-  return arg->add_cast(type);
+  return arg->cast(type);
 }
 
 hdk::ir::ExprPtr parseAbs(const hdk::ir::ExprPtrVector& operands) {
@@ -1803,7 +1803,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
       if (auto constant = args[i]->as<hdk::ir::Constant>()) {
         auto ext_func_arg_type = ext_arg_type_to_type(type->ctx(), ext_func_args[i]);
         if (!ext_func_arg_type->equal(args[i]->type())) {
-          args[i] = constant->add_cast(ext_func_arg_type);
+          args[i] = constant->cast(ext_func_arg_type);
         }
       }
     }
@@ -1874,7 +1874,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
       // If second parameter is not given then APPROX_MEDIAN is assumed.
       if (operands.size() == 2) {
         arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(
-            sources[operands[1]]->add_cast(ctx.fp64()));
+            sources[operands[1]]->cast(ctx.fp64()));
       } else {
         Datum median;
         median.doubleval = 0.5;

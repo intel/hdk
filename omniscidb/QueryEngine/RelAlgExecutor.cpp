@@ -1103,7 +1103,7 @@ hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr) {
     return expr;
   }
   auto transient_dict_type = type->ctx().extDict(type, TRANSIENT_DICT_ID);
-  return expr->add_cast(transient_dict_type);
+  return expr->cast(transient_dict_type);
 }
 
 hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
@@ -1117,7 +1117,7 @@ hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
 hdk::ir::ExprPtr cast_dict_to_none(const hdk::ir::ExprPtr& input) {
   auto input_type = input->type();
   if (input_type->isExtDictionary()) {
-    return input->add_cast(input_type->ctx().text(input_type->nullable()));
+    return input->cast(input_type->ctx().text(input_type->nullable()));
   }
   return input;
 }
@@ -3254,7 +3254,7 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
       auto ext_func_arg_type =
           ext_arg_type_to_type(input_expr->ctx(), table_func_args[arg_index]);
       if (!ext_func_arg_type->equal(input_expr->type())) {
-        target_exprs_owned_.push_back(input_expr->add_cast(ext_func_arg_type));
+        target_exprs_owned_.push_back(input_expr->cast(ext_func_arg_type));
         input_exprs[input_index] = target_exprs_owned_.back().get();
       }
       input_index++;

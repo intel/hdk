@@ -44,7 +44,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
         }
         const auto arg = bin_oper->get_own_left_operand();
         auto arg_type = arg->type();
-        auto rhs = rhs_no_cast->deep_copy()->add_cast(arg_type);
+        auto rhs = rhs_no_cast->cast(arg_type);
         return hdk::ir::makeExpr<hdk::ir::InValues>(arg,
                                                     std::list<hdk::ir::ExprPtr>{rhs});
       }
@@ -194,7 +194,7 @@ class ArrayElementStringLiteralEncodingVisitor : public DeepCopyVisitor {
       } else {
         auto transient_dict_type =
             element_expr_type->ctx().extDict(element_expr_type, TRANSIENT_DICT_ID);
-        args_copy.push_back(element_expr_ptr->add_cast(transient_dict_type));
+        args_copy.push_back(element_expr_ptr->cast(transient_dict_type));
       }
     }
 
@@ -498,7 +498,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
             break;
           }
           auto operand_copy = const_operand->deep_copy();
-          auto cast_operand = operand_copy->add_cast(type);
+          auto cast_operand = operand_copy->cast(type);
           auto const_cast_operand =
               std::dynamic_pointer_cast<const hdk::ir::Constant>(cast_operand);
           if (const_cast_operand) {
@@ -532,8 +532,8 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           (optype == kMINUS || optype == kPLUS || optype == kMULTIPLY)) {
         // Before folding, cast the operands to the bigger type to avoid overflows.
         // Currently upcasting smaller integer types to larger integers or double.
-        left_operand = left_operand->deep_copy()->add_cast(cast_type);
-        right_operand = right_operand->deep_copy()->add_cast(cast_type);
+        left_operand = left_operand->cast(cast_type);
+        right_operand = right_operand->cast(cast_type);
         type = cast_type;
       }
     }
@@ -840,7 +840,7 @@ hdk::ir::ExprPtr fold_expr(const hdk::ir::Expr* expr) {
       // Integer expression didn't fold completely the first time due to
       // overflows in smaller type subexpressions, trying again with a cast
       auto type = expr->type()->ctx().int64();
-      auto bigint_expr_no_likelihood = expr_no_likelihood->deep_copy()->add_cast(type);
+      auto bigint_expr_no_likelihood = expr_no_likelihood->cast(type);
       auto rewritten_expr_take2 = visitor.visit(bigint_expr_no_likelihood.get());
       if (rewritten_expr_take2->is<hdk::ir::Constant>()) {
         // Managed to fold, switch to the new constant

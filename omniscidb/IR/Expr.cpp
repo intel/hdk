@@ -281,7 +281,7 @@ ExprPtr Expr::decompress() const {
   return shared_from_this();
 }
 
-ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {
+ExprPtr Expr::cast(const Type* new_type, bool is_dict_intersection) const {
   if (type_->equal(new_type)) {
     return shared_from_this();
   }
@@ -889,14 +889,14 @@ void Constant::set_null_value() {
   }
 }
 
-ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) const {
+ExprPtr Constant::cast(const Type* new_type, bool is_dict_intersection) const {
   CHECK(!is_dict_intersection);
   if (is_null) {
     return makeExpr<Constant>(new_type, true, constval, cacheable_);
   }
   if (new_type->isExtDictionary()) {
     auto new_cst = do_cast(new_type->as<ExtDictionaryType>()->elemType());
-    return new_cst->Expr::add_cast(new_type);
+    return new_cst->Expr::cast(new_type);
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
@@ -905,9 +905,9 @@ ExprPtr Constant::add_cast(const Type* new_type, bool is_dict_intersection) cons
   return do_cast(new_type);
 }
 
-ExprPtr UOper::add_cast(const Type* new_type, bool is_dict_intersection) const {
+ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
   if (optype != kCAST) {
-    return Expr::add_cast(new_type, is_dict_intersection);
+    return Expr::cast(new_type, is_dict_intersection);
   }
   if (type_->isString() && new_type->isExtDictionary()) {
     auto otype = operand->type();
@@ -919,21 +919,21 @@ ExprPtr UOper::add_cast(const Type* new_type, bool is_dict_intersection) const {
       }
     }
   }
-  return Expr::add_cast(new_type, is_dict_intersection);
+  return Expr::cast(new_type, is_dict_intersection);
 }
 
-ExprPtr CaseExpr::add_cast(const Type* new_type, bool is_dict_intersection) const {
+ExprPtr CaseExpr::cast(const Type* new_type, bool is_dict_intersection) const {
   std::list<std::pair<ExprPtr, ExprPtr>> new_expr_pair_list;
   for (auto& p : expr_pair_list) {
     new_expr_pair_list.emplace_back(
-        std::make_pair(p.first, p.second->add_cast(new_type, is_dict_intersection)));
+        std::make_pair(p.first, p.second->cast(new_type, is_dict_intersection)));
   }
 
   return makeExpr<CaseExpr>(
       new_type,
       contains_agg_,
       std::move(new_expr_pair_list),
-      else_expr ? else_expr->add_cast(new_type, is_dict_intersection) : nullptr);
+      else_expr ? else_expr->cast(new_type, is_dict_intersection) : nullptr);
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
@@ -1754,7 +1754,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
 double WidthBucketExpr::get_bound_val(const Expr* bound_expr) const {
   CHECK(bound_expr);
   auto copied_expr = bound_expr->deep_copy();
-  auto casted_expr = copied_expr->add_cast(ctx().fp64());
+  auto casted_expr = copied_expr->cast(ctx().fp64());
   CHECK(casted_expr);
   auto casted_constant = std::dynamic_pointer_cast<const Constant>(casted_expr);
   CHECK(casted_constant);

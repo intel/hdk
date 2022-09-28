@@ -78,7 +78,8 @@ class Expr : public std::enable_shared_from_this<Expr> {
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool containsAgg() const { return contains_agg_; }
-  virtual ExprPtr add_cast(const Type* new_type, bool is_dict_intersection = false) const;
+
+  virtual ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const;
 
   // Make a deep copy of self
   virtual ExprPtr deep_copy() const = 0;
@@ -300,9 +301,7 @@ class Constant : public Expr {
   double fpVal() const { return extract_fp_type_from_datum(constval, type_); }
   const ExprPtrList& get_value_list() const { return value_list; }
   ExprPtr deep_copy() const override;
-  ExprPtr add_cast(const Type* new_type,
-                   bool is_dict_intersection = false) const override;
-  using Expr::add_cast;
+  ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -351,8 +350,7 @@ class UOper : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  ExprPtr add_cast(const Type* new_type,
-                   bool is_dict_intersection = false) const override;
+  ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
 
   size_t hash() const override;
 
@@ -850,7 +848,7 @@ class CaseExpr : public Expr {
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  ExprPtr add_cast(const Type* new_type, bool is_dict_intersection) const override;
+  ExprPtr cast(const Type* new_type, bool is_dict_intersection) const override;
 
   size_t hash() const override;
 

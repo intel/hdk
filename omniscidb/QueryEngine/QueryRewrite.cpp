@@ -237,7 +237,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
               auto agg_expr_type = agg_expr->type();
               auto target_expr = agg_expr->get_own_arg();
               if (!agg_expr_type->equal(target_expr->type())) {
-                target_expr = target_expr->add_cast(agg_expr_type);
+                target_expr = target_expr->cast(agg_expr_type);
               }
               new_target_exprs.push_back(target_expr.get());
               target_exprs_owned_.emplace_back(target_expr);

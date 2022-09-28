@@ -586,13 +586,13 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
   // operations.
   if (executor) {
     if (!left_type->equal(new_left_type)) {
-      left_expr = left_expr->add_cast(new_left_type);
+      left_expr = left_expr->cast(new_left_type);
     }
     if (!right_type->equal(new_right_type)) {
       if (qual == kONE) {
-        right_expr = right_expr->add_cast(new_right_type);
+        right_expr = right_expr->cast(new_right_type);
       } else {
-        right_expr = right_expr->add_cast(
+        right_expr = right_expr->cast(
             ctx.arrayVarLen(new_right_type, 4, new_right_type->nullable()));
       }
     }
@@ -617,7 +617,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
           // otherwise the largest dictionary in terms of number of entries
           auto type = get_str_dict_cast_type(new_left_type, new_right_type, executor);
           auto& expr_to_cast = type->equal(new_left_type) ? right_expr : left_expr;
-          expr_to_cast = expr_to_cast->add_cast(type, true);
+          expr_to_cast = expr_to_cast->cast(type, true);
         } else {  // Ordered comparison operator
           // We do not currently support ordered (i.e. >, <=) comparisons between
           // dictionary-encoded columns, and need to decompress when translation
@@ -641,12 +641,12 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
       CHECK(new_right_type->isString());
       auto type = ctx.extDict(
           new_right_type, new_left_type->as<hdk::ir::ExtDictionaryType>()->dictId(), 4);
-      right_expr = right_expr->add_cast(type);
+      right_expr = right_expr->cast(type);
     } else if (new_right_type->isExtDictionary() && !new_left_type->isExtDictionary()) {
       CHECK(new_left_type->isString());
       auto type = ctx.extDict(
           new_left_type, new_right_type->as<hdk::ir::ExtDictionaryType>()->dictId(), 4);
-      left_expr = left_expr->add_cast(type);
+      left_expr = left_expr->cast(type);
     } else {
       left_expr = left_expr->decompress();
       right_expr = right_expr->decompress();
@@ -770,11 +770,11 @@ hdk::ir::ExprPtr normalizeCaseExpr(
 
   if (executor) {
     for (auto& p : cast_expr_pair_list) {
-      p.second = p.second->add_cast(type);
+      p.second = p.second->cast(type);
     }
   }
   if (else_e != nullptr) {
-    else_e = executor ? else_e->add_cast(type) : else_e;
+    else_e = executor ? else_e->cast(type) : else_e;
   } else {
     Datum d;
     // always create an else expr so that executor doesn't need to worry about it
