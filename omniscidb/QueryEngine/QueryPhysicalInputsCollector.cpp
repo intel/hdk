@@ -119,7 +119,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
 
   ResultType visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override {
     PhysicalInputsNodeVisitor<Derived, ResultType> visitor;
-    auto node_res = visitor.visit(in_subquery->getNode());
+    auto node_res = visitor.visit(in_subquery->node());
     auto arg_res = ScalarExprVisitor<ResultType>::visit(in_subquery->getArg().get());
     return aggregateResult(node_res, arg_res);
   }
@@ -193,7 +193,7 @@ class SubqueryVisitorBase : public ScalarExprVisitor<ResultType> {
 
   ResultType visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override {
     RelAlgVisitor visitor;
-    return visitor.visit(in_subquery->getNode());
+    return visitor.visit(in_subquery->node());
   }
 
  protected:

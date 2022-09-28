@@ -120,7 +120,7 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
   }
 
   void* visitInSubquery(const hdk::ir::InSubquery* subquery) const override {
-    const_cast<ExprDagVisitor*>(this)->visit(subquery->getNode());
+    const_cast<ExprDagVisitor*>(this)->visit(subquery->node());
     return nullptr;
   }
 };

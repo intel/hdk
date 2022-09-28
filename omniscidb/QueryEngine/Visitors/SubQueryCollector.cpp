@@ -30,6 +30,6 @@ void* SubQueryCollector::visitScalarSubquery(
 }
 
 void* SubQueryCollector::visitInSubquery(const hdk::ir::InSubquery* in_subquery) const {
-  subqueries_.insert(in_subquery->getNode());
+  subqueries_.insert(in_subquery->node());
   return ExprDagVisitor::visitInSubquery(in_subquery);
 }
