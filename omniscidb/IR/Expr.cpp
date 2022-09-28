@@ -254,31 +254,32 @@ void TargetEntry::print() const {
   std::cout << toString() << std::endl;
 }
 
-ExprPtr Expr::decompress() {
+ExprPtr Expr::decompress() const {
   if (type_->id() == Type::kExtDictionary) {
     auto new_type = static_cast<const ExtDictionaryType*>(type_)->elemType();
-    return makeExpr<UOper>(new_type, contains_agg, kCAST, shared_from_this());
+    return makeExpr<UOper>(
+        new_type, contains_agg, kCAST, const_cast<Expr*>(this)->shared_from_this());
   } else if (type_->id() == Type::kDate && type_->size() != 8) {
     auto date_type = static_cast<const DateType*>(type_);
     return makeExpr<UOper>(type_->ctx().date64(TimeUnit::kSecond, date_type->nullable()),
                            contains_agg,
                            kCAST,
-                           shared_from_this());
+                           const_cast<Expr*>(this)->shared_from_this());
   } else if (type_->id() == Type::kTime && type_->size() != 8) {
     auto time_type = static_cast<const TimeType*>(type_);
     return makeExpr<UOper>(type_->ctx().time64(time_type->unit(), time_type->nullable()),
                            contains_agg,
                            kCAST,
-                           shared_from_this());
+                           const_cast<Expr*>(this)->shared_from_this());
   } else if (type_->id() == Type::kInterval && type_->size() != 8) {
     auto interval_type = static_cast<const TimestampType*>(type_);
     return makeExpr<UOper>(
         type_->ctx().interval64(interval_type->unit(), interval_type->nullable()),
         contains_agg,
         kCAST,
-        shared_from_this());
+        const_cast<Expr*>(this)->shared_from_this());
   }
-  return shared_from_this();
+  return const_cast<Expr*>(this)->shared_from_this();
 }
 
 ExprPtr Expr::add_cast(const Type* new_type, bool is_dict_intersection) const {

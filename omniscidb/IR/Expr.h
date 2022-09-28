@@ -93,7 +93,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
   /*
    * @brief decompress adds cast operator to decompress encoded result
    */
-  ExprPtr decompress();
+  ExprPtr decompress() const;
 
   virtual size_t hash() const;
 
