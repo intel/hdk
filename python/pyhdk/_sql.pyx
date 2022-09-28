@@ -92,7 +92,11 @@ cdef class RelAlgExecutor:
 
   def execute(self, **kwargs):
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
-    cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
+    cdef CCompilationOptions c_co
+    if config.exec.enable_gpu_offloading:
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU)
+    else:
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef CExecutionOptions c_eo = CExecutionOptions.defaults()

@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from libcpp cimport bool
-from libcpp.memory cimport shared_ptr, make_shared, static_pointer_cast
+from libcpp.memory cimport unique_ptr, shared_ptr, make_unique, make_shared, static_pointer_cast
+from libcpp.pair cimport pair
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.utility cimport move
@@ -193,7 +194,11 @@ cdef class ArrowStorage(Storage):
 cdef class DataMgr:
   def __cinit__(self, Config config):
     cdef CSystemParameters sys_params
-    cdef map[CGpuMgrPlatform, unique_ptr[CGpuMgr]] gpuMgrs = move(map[CGpuMgrPlatform, unique_ptr[CGpuMgr]]())
+    cdef map[CGpuMgrPlatform, unique_ptr[CGpuMgr]] gpuMgrs;
+    cdef unique_ptr[CGpuMgr] l0Mgr = <unique_ptr[CGpuMgr]>make_unique[CL0Mgr]()
+    cdef unique_ptr[CGpuMgr] cudaMgr = <unique_ptr[CGpuMgr]>make_unique[CCudaMgr](-1, 0)
+    gpuMgrs.insert(move(pair[CGpuMgrPlatform, unique_ptr[CGpuMgr]](CGpuMgrPlatform.L0, move(l0Mgr))))
+    gpuMgrs.insert(move(pair[CGpuMgrPlatform, unique_ptr[CGpuMgr]](CGpuMgrPlatform.CUDA, move(cudaMgr))))
     self.c_data_mgr = make_shared[CDataMgr](dereference(config.c_config), sys_params, move(gpuMgrs), 1 << 27, 0)
 
   cpdef registerDataProvider(self, Storage storage):

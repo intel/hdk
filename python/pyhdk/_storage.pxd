@@ -140,6 +140,14 @@ cdef extern from "omniscidb/DataMgr/GpuMgr.h":
   cdef cppclass CGpuMgr "GpuMgr":
     pass
 
+  cdef extern from "omniscidb/L0Mgr/L0Mgr.h":
+    cdef cppclass CL0Mgr "l0::L0Manager"(CGpuMgr):
+      pass
+
+  cdef extern from "omniscidb/CudaMgr/CudaMgr.h":
+    cdef cppclass CCudaMgr "CudaMgr_Namespace::CudaMgr"(CGpuMgr):
+      pass
+
 cdef extern from "omniscidb/DataMgr/PersistentStorageMgr/PersistentStorageMgr.h":
   cdef cppclass CPersistentStorageMgr "PersistentStorageMgr"(CAbstractBufferMgr):
     void registerDataProvider(int, shared_ptr[CAbstractBufferMgr]);

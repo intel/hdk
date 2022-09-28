@@ -171,6 +171,7 @@ cdef extern from "omniscidb/Shared/Config.h":
     bool enable_interop
     size_t parallel_linearization_threshold
     bool enable_multifrag_rs
+    bool enable_gpu_offloading
 
   cdef cppclass CFilterPushdownConfig "FilterPushdownConfig":
     bool enable
