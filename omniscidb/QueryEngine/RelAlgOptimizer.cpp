@@ -1348,8 +1348,8 @@ void sink_projected_boolean_expr_to_join(
     bool discarded = false;
     for (size_t i = 0; i < project->size(); ++i) {
       auto expr = project->getExpr(i);
-      if (expr->type()->isBoolean() && (hdk::ir::expr_is<hdk::ir::UOper>(expr) ||
-                                        hdk::ir::expr_is<hdk::ir::BinOper>(expr))) {
+      if (expr->type()->isBoolean() && (expr->is<hdk::ir::UOper>() ||
+                                        expr->is<hdk::ir::BinOper>())) {
         boolean_expr_indicies.insert(i);
       } else {
         // TODO(miyu): relax?

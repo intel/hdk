@@ -37,11 +37,6 @@ inline
   return std::make_shared<Tp>(std::forward<Args>(args)...);
 }
 
-template <class T>
-bool expr_is(const ExprPtr& expr) {
-  return std::dynamic_pointer_cast<const T>(expr) != nullptr;
-}
-
 template <typename T>
 bool isOneOf(const ExprPtr& expr) {
   return std::dynamic_pointer_cast<const T>(expr) != nullptr;

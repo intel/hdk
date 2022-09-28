@@ -430,7 +430,7 @@ void RelTableFunction::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
 int32_t RelTableFunction::countConstantArgs() const {
   int32_t literal_args = 0;
   for (const auto& arg : table_func_input_exprs_) {
-    if (hdk::ir::expr_is<hdk::ir::Constant>(arg)) {
+    if (arg->is<hdk::ir::Constant>()) {
       literal_args += 1;
     }
   }
