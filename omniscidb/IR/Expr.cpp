@@ -950,8 +950,7 @@ bool ColumnVar::operator==(const Expr& rhs) const {
   }
   const ColumnVar& rhs_cv = dynamic_cast<const ColumnVar&>(rhs);
   if (rte_idx != -1) {
-    return (tableId() == rhs_cv.tableId()) &&
-           (get_column_id() == rhs_cv.get_column_id()) &&
+    return (tableId() == rhs_cv.tableId()) && (columnId() == rhs_cv.columnId()) &&
            (rte_idx == rhs_cv.get_rte_idx());
   }
   const Var* v = dynamic_cast<const Var*>(this);
@@ -1280,8 +1279,8 @@ bool ArrayExpr::operator==(Expr const& rhs) const {
 
 std::string ColumnVar::toString() const {
   return "(ColumnVar table: " + std::to_string(tableId()) +
-         " column: " + std::to_string(get_column_id()) +
-         " rte: " + std::to_string(rte_idx) + " " + type()->toString() + ") ";
+         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx) +
+         " " + type()->toString() + ") ";
 }
 
 std::string ExpressionTuple::toString() const {
@@ -1295,9 +1294,9 @@ std::string ExpressionTuple::toString() const {
 
 std::string Var::toString() const {
   return "(Var table: " + std::to_string(tableId()) +
-         " column: " + std::to_string(get_column_id()) +
-         " rte: " + std::to_string(rte_idx) + " which_row: " + std::to_string(which_row) +
-         " varno: " + std::to_string(varno) + ") ";
+         " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx) +
+         " which_row: " + std::to_string(which_row) + " varno: " + std::to_string(varno) +
+         ") ";
 }
 
 std::string Constant::toString() const {

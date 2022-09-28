@@ -702,7 +702,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
 ChunkKey PerfectJoinHashTable::genChunkKey(const std::vector<FragmentInfo>& fragments,
                                            const hdk::ir::Expr* outer_col_expr,
                                            const hdk::ir::ColumnVar* inner_col) const {
-  ChunkKey chunk_key{inner_col->dbId(), inner_col->tableId(), inner_col->get_column_id()};
+  ChunkKey chunk_key{inner_col->dbId(), inner_col->tableId(), inner_col->columnId()};
   auto type = inner_col->type();
   if (type->isExtDictionary()) {
     size_t outer_elem_count = 0;

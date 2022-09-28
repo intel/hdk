@@ -22,7 +22,7 @@ class UsedColumnsVisitor : public ScalarExprVisitor<std::unordered_set<int>> {
  protected:
   std::unordered_set<int> visitColumnVar(
       const hdk::ir::ColumnVar* column) const override {
-    return {column->get_column_id()};
+    return {column->columnId()};
   }
 
   std::unordered_set<int> aggregateResult(

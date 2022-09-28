@@ -95,7 +95,7 @@ std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_
     if (!col_var) {
       continue;
     }
-    if (used_columns.find(col_var->get_column_id()) == used_columns.end()) {
+    if (used_columns.find(col_var->columnId()) == used_columns.end()) {
       // setting target index to be zero so that later it can be decoded properly (in lazy
       // fetch, the zeroth target index indicates the corresponding rowid column for the
       // projected entry)

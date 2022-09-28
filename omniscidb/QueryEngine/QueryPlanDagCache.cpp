@@ -63,12 +63,12 @@ JoinColumnsInfo QueryPlanDagCache::translateColVarsToInfoString(
   std::sort(col_vars.begin(),
             col_vars.end(),
             [](const hdk::ir::ColumnVar* lhs, const hdk::ir::ColumnVar* rhs) {
-              return lhs->get_column_id() < rhs->get_column_id();
+              return lhs->columnId() < rhs->columnId();
             });
   if (col_id_only) {
     std::vector<int> sorted_col_ids;
     for (auto cv : col_vars) {
-      sorted_col_ids.push_back(cv->get_column_id());
+      sorted_col_ids.push_back(cv->columnId());
     }
     return ::toString(sorted_col_ids);
   } else {

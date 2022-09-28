@@ -3705,7 +3705,7 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
     const hdk::ir::ColumnVar* lhs_col,
     const FragmentInfo& fragment,
     const hdk::ir::Constant* rhs_const) const {
-  const int col_id = lhs_col->get_column_id();
+  const int col_id = lhs_col->columnId();
   auto chunk_meta_it = fragment.getChunkMetadataMap().find(col_id);
   if (chunk_meta_it == fragment.getChunkMetadataMap().end()) {
     return FragmentSkipStatus::NOT_SKIPPABLE;
@@ -3819,7 +3819,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     // Everything below is logic for integer and integer-backed timestamps
     // TODO: Factor out into separate function per canSkipFragmentForFpQual above
 
-    const int col_id = lhs_col->get_column_id();
+    const int col_id = lhs_col->columnId();
     auto chunk_meta_it = fragment.getChunkMetadataMap().find(col_id);
     int64_t chunk_min{0};
     int64_t chunk_max{0};

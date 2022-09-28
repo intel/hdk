@@ -357,7 +357,7 @@ CompositeKeyInfo HashJoin::getCompositeKeyInfo(
     auto inner_type = inner_col->type();
     auto outer_type = outer_col->type();
     ChunkKey cache_key_chunks_for_column{
-        inner_col->dbId(), inner_col->tableId(), inner_col->get_column_id()};
+        inner_col->dbId(), inner_col->tableId(), inner_col->columnId()};
     auto inner_dict_id = inner_type->isExtDictionary()
                              ? inner_type->as<hdk::ir::ExtDictionaryType>()->dictId()
                              : -1;
@@ -693,7 +693,7 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   const auto inner_col_info =
       schema_provider->getColumnInfo(*inner_col->get_column_info());
   const auto inner_col_real_type = get_column_type(
-      inner_col->get_column_id(), inner_col->tableId(), inner_col_info, temporary_tables);
+      inner_col->columnId(), inner_col->tableId(), inner_col_info, temporary_tables);
   auto outer_col_type = !(dynamic_cast<const hdk::ir::FunctionOper*>(lhs)) && outer_col
                             ? outer_col->type()
                             : outer_type;

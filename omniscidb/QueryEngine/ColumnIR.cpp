@@ -389,7 +389,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenOuterJoinNullPlaceholder(
 
 llvm::Value* CodeGenerator::resolveGroupedColumnReference(
     const hdk::ir::ColumnVar* col_var) {
-  auto col_id = col_var->get_column_id();
+  auto col_id = col_var->columnId();
   if (col_var->get_rte_idx() >= 0) {
     return nullptr;
   }

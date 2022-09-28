@@ -94,11 +94,11 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
        knew how to predict the zero values, calling
        getChunkMetadataMap could be avoided to skip
        synthesize_metadata calls. */
-    auto chunk_meta_it = fragment.getChunkMetadataMap().find(hash_col.get_column_id());
+    auto chunk_meta_it = fragment.getChunkMetadataMap().find(hash_col.columnId());
     CHECK(chunk_meta_it != fragment.getChunkMetadataMap().end());
     ChunkKey chunk_key{col_info->db_id,
                        fragment.physicalTableId,
-                       hash_col.get_column_id(),
+                       hash_col.columnId(),
                        fragment.fragmentId};
     const auto chunk = data_provider->getChunk(
         col_info,
@@ -138,7 +138,7 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
     }
     col_buff = transferColumnIfNeeded(
         col_frag,
-        hash_col.get_column_id(),
+        hash_col.columnId(),
         effective_mem_lvl,
         effective_mem_lvl == Data_Namespace::CPU_LEVEL ? 0 : device_id,
         device_allocator);

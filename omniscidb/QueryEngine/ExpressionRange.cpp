@@ -166,7 +166,7 @@ ExpressionRange apply_simple_quals(
       }
     }
     if (qual_col->tableId() != col_expr->tableId() ||
-        qual_col->get_column_id() != col_expr->get_column_id()) {
+        qual_col->columnId() != col_expr->columnId()) {
       continue;
     }
     const hdk::ir::Expr* right_operand = qual_bin_oper->get_right_operand();
@@ -523,7 +523,7 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
                                    const Executor* executor,
                                    const bool is_outer_join_proj) {
   bool has_nulls = is_outer_join_proj;
-  int col_id = col_expr->get_column_id();
+  int col_id = col_expr->columnId();
   const auto& col_phys_type =
       col_expr->type()->isArray()
           ? col_expr->type()->as<hdk::ir::ArrayBaseType>()->elemType()
@@ -628,8 +628,8 @@ ExpressionRange getExpressionRange(
   CHECK_LT(static_cast<size_t>(rte_idx), query_infos.size());
   bool is_outer_join_proj = rte_idx > 0 && executor->containsLeftDeepOuterJoin();
   if (col_expr->tableId() > 0) {
-    auto col_range = executor->getColRange(
-        PhysicalInput{col_expr->get_column_id(), col_expr->tableId()});
+    auto col_range =
+        executor->getColRange(PhysicalInput{col_expr->columnId(), col_expr->tableId()});
     if (is_outer_join_proj) {
       col_range.setHasNulls();
     }
