@@ -943,7 +943,7 @@ int BaselineJoinHashTable::getInnerTableId(
     const std::vector<InnerOuter>& inner_outer_pairs) {
   CHECK(!inner_outer_pairs.empty());
   const auto first_inner_col = inner_outer_pairs.front().first;
-  return first_inner_col->get_table_id();
+  return first_inner_col->tableId();
 }
 
 std::shared_ptr<HashTable> BaselineJoinHashTable::initHashTableOnCpuFromCache(

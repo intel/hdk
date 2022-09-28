@@ -167,7 +167,7 @@ class ColumnVar : public Expr {
       , col_info_(
             std::make_shared<ColumnInfo>(-1, table_id, col_id, "", type_, is_virtual)) {}
   int dbId() const { return col_info_->db_id; }
-  int get_table_id() const { return col_info_->table_id; }
+  int tableId() const { return col_info_->table_id; }
   int get_column_id() const { return col_info_->column_id; }
   int get_rte_idx() const { return rte_idx; }
   ColumnInfoPtr get_column_info() const { return col_info_; }

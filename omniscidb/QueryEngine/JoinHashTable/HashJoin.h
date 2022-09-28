@@ -222,7 +222,7 @@ class HashJoin {
   static int getInnerTableId(const std::vector<InnerOuter>& inner_outer_pairs) {
     CHECK(!inner_outer_pairs.empty());
     const auto first_inner_col = inner_outer_pairs.front().first;
-    return first_inner_col->get_table_id();
+    return first_inner_col->tableId();
   }
 
   // Swap the columns if needed and make the inner column the first component.

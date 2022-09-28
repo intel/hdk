@@ -165,7 +165,7 @@ ExpressionRange apply_simple_quals(
         continue;
       }
     }
-    if (qual_col->get_table_id() != col_expr->get_table_id() ||
+    if (qual_col->tableId() != col_expr->tableId() ||
         qual_col->get_column_id() != col_expr->get_column_id()) {
       continue;
     }
@@ -540,7 +540,7 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
     case hdk::ir::Type::kFloatingPoint: {
       std::optional<size_t> ti_idx;
       for (size_t i = 0; i < query_infos.size(); ++i) {
-        if (col_expr->get_table_id() == query_infos[i].table_id) {
+        if (col_expr->tableId() == query_infos[i].table_id) {
           ti_idx = i;
           break;
         }
@@ -627,9 +627,9 @@ ExpressionRange getExpressionRange(
   CHECK_GE(rte_idx, 0);
   CHECK_LT(static_cast<size_t>(rte_idx), query_infos.size());
   bool is_outer_join_proj = rte_idx > 0 && executor->containsLeftDeepOuterJoin();
-  if (col_expr->get_table_id() > 0) {
+  if (col_expr->tableId() > 0) {
     auto col_range = executor->getColRange(
-        PhysicalInput{col_expr->get_column_id(), col_expr->get_table_id()});
+        PhysicalInput{col_expr->get_column_id(), col_expr->tableId()});
     if (is_outer_join_proj) {
       col_range.setHasNulls();
     }

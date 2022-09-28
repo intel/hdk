@@ -75,9 +75,7 @@ class PerfectJoinHashTable : public HashJoin {
   HashJoinMatchingSet codegenMatchingSet(const CompilationOptions&,
                                          const size_t) override;
 
-  int getInnerTableId() const noexcept override {
-    return col_var_.get()->get_table_id();
-  };
+  int getInnerTableId() const noexcept override { return col_var_.get()->tableId(); };
 
   int getInnerTableRteIdx() const noexcept override {
     return col_var_.get()->get_rte_idx();

@@ -83,7 +83,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
   const bool hoist_literals = co.hoist_literals;
   const int rte_idx = adjusted_range_table_index(col_var);
   CHECK_LT(static_cast<size_t>(rte_idx), cgen_state_->frag_offsets_.size());
-  if (col_var->get_table_id() > 0) {
+  if (col_var->tableId() > 0) {
     if (col_var->is_virtual()) {
       return {codegenRowId(col_var, co)};
     }
@@ -258,7 +258,7 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto offset_lv = cgen_state_->frag_offsets_[adjusted_range_table_index(col_var)];
   llvm::Value* start_rowid_lv{nullptr};
-  const auto& table_generation = executor()->getTableGeneration(col_var->get_table_id());
+  const auto& table_generation = executor()->getTableGeneration(col_var->tableId());
   if (table_generation.start_rowid > 0) {
     // Handle the multi-node case: each leaf receives a start rowid used
     // to offset the local rowid and generate a cluster-wide unique rowid.
@@ -393,7 +393,7 @@ llvm::Value* CodeGenerator::resolveGroupedColumnReference(
   if (col_var->get_rte_idx() >= 0) {
     return nullptr;
   }
-  CHECK((col_id == 0) || (col_var->get_rte_idx() >= 0 && col_var->get_table_id() > 0));
+  CHECK((col_id == 0) || (col_var->get_rte_idx() >= 0 && col_var->tableId() > 0));
   const auto var = dynamic_cast<const hdk::ir::Var*>(col_var);
   CHECK(var);
   col_id = var->get_varno();

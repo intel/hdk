@@ -146,7 +146,7 @@ ResultSetPtr TableFunctionExecutionContext::execute(
       CHECK_EQ(col_index, -1);
     }
     if (auto col_var = input_expr->as<hdk::ir::ColumnVar>()) {
-      auto table_id = col_var->get_table_id();
+      auto table_id = col_var->tableId();
       auto table_info_it = std::find_if(
           table_infos.begin(), table_infos.end(), [&table_id](const auto& table_info) {
             return table_info.table_id == table_id;

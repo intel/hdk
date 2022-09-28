@@ -25,10 +25,10 @@ bool PlanState::isLazyFetchColumn(const hdk::ir::Expr* target_expr) const {
   if (!do_not_fetch_column || dynamic_cast<const hdk::ir::Var*>(do_not_fetch_column)) {
     return false;
   }
-  if (do_not_fetch_column->get_table_id() > 0) {
+  if (do_not_fetch_column->tableId() > 0) {
     auto col_info = executor_->getSchemaProvider()->getColumnInfo(
         do_not_fetch_column->dbId(),
-        do_not_fetch_column->get_table_id(),
+        do_not_fetch_column->tableId(),
         do_not_fetch_column->get_column_id());
     CHECK(col_info);
     if (col_info->is_rowid) {

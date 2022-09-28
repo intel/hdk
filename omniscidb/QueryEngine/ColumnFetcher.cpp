@@ -85,7 +85,7 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
   if (fragment.isEmptyPhysicalFragment()) {
     return {nullptr, 0};
   }
-  const auto table_id = hash_col.get_table_id();
+  const auto table_id = hash_col.tableId();
   const auto col_info = hash_col.get_column_info();
   const int8_t* col_buff = nullptr;
   if (table_id >= 0) {  // real table
@@ -124,7 +124,7 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
       auto& frag_id_to_result = column_cache[table_id];
       if (frag_id_to_result.empty() || !frag_id_to_result.count(frag_id)) {
         auto& tmp_table =
-            get_temporary_table(executor->temporary_tables_, hash_col.get_table_id());
+            get_temporary_table(executor->temporary_tables_, hash_col.tableId());
         frag_id_to_result.insert(
             std::make_pair(frag_id,
                            std::shared_ptr<const ColumnarResults>(

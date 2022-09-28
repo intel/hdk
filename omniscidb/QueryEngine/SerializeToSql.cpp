@@ -28,10 +28,10 @@ std::string ScalarExprToSql::visitVar(const hdk::ir::Var* var) const {
 }
 
 std::string ScalarExprToSql::visitColumnVar(const hdk::ir::ColumnVar* col_var) const {
-  return serialize_table_ref(col_var->dbId(), col_var->get_table_id(), schema_provider_) +
+  return serialize_table_ref(col_var->dbId(), col_var->tableId(), schema_provider_) +
          "." +
          serialize_column_ref(col_var->dbId(),
-                              col_var->get_table_id(),
+                              col_var->tableId(),
                               col_var->get_column_id(),
                               schema_provider_);
 }

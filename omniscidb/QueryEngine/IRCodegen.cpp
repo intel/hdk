@@ -700,7 +700,7 @@ namespace {
 class ExprTableIdVisitor : public ScalarExprVisitor<std::set<int>> {
  protected:
   std::set<int> visitColumnVar(const hdk::ir::ColumnVar* col_expr) const final {
-    return {col_expr->get_table_id()};
+    return {col_expr->tableId()};
   }
 
   std::set<int> visitFunctionOper(const hdk::ir::FunctionOper* func_expr) const final {
@@ -751,14 +751,14 @@ JoinLoop::HoistedFiltersCallback Executor::buildHoistLeftHandSideFiltersCb(
         dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
     const auto lhs =
         dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
-    if (lhs && rhs && lhs->get_table_id() != rhs->get_table_id()) {
+    if (lhs && rhs && lhs->tableId() != rhs->tableId()) {
       const hdk::ir::ColumnVar* selected_lhs{nullptr};
       // grab the left hand side column -- this is somewhat similar to normalize column
       // pair, and a better solution may be to hoist that function out of the join
       // framework and normalize columns at the top of build join loops
-      if (lhs->get_table_id() == inner_table_id) {
+      if (lhs->tableId() == inner_table_id) {
         selected_lhs = rhs;
-      } else if (rhs->get_table_id() == inner_table_id) {
+      } else if (rhs->tableId() == inner_table_id) {
         selected_lhs = lhs;
       }
       if (selected_lhs) {
@@ -774,10 +774,10 @@ JoinLoop::HoistedFiltersCallback Executor::buildHoistLeftHandSideFiltersCb(
           }
         };
         for (const auto& qual : ra_exe_unit.simple_quals) {
-          should_hoist_qual(qual, selected_lhs->get_table_id());
+          should_hoist_qual(qual, selected_lhs->tableId());
         }
         for (const auto& qual : ra_exe_unit.quals) {
-          should_hoist_qual(qual, selected_lhs->get_table_id());
+          should_hoist_qual(qual, selected_lhs->tableId());
         }
 
         // build the filters callback and return it

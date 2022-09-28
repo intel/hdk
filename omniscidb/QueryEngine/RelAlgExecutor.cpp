@@ -2170,7 +2170,7 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
     }
     const auto lhs = comp_expr->get_left_operand();
     const auto lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
-    if (!lhs_col || !lhs_col->get_table_id() || lhs_col->get_rte_idx()) {
+    if (!lhs_col || !lhs_col->tableId() || lhs_col->get_rte_idx()) {
       return false;
     }
     const auto rhs = comp_expr->get_right_operand();

@@ -148,8 +148,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
   // We don't want to build huge and very sparse tables
   // to consume lots of memory.
   if (bucketized_entry_count > executor->getConfig().exec.join.huge_join_hash_threshold) {
-    const auto& query_info =
-        get_inner_query_info(inner_col->get_table_id(), query_infos).info;
+    const auto& query_info = get_inner_query_info(inner_col->tableId(), query_infos).info;
     if (query_info.getNumTuplesUpperBound() * 100 <
         executor->getConfig().exec.join.huge_join_hash_min_load *
             bucketized_entry_count) {
@@ -521,7 +520,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
   const int32_t hash_join_invalid_val{-1};
   auto hashtable_layout = layout;
   auto allow_hashtable_recycling = HashtableRecycler::isSafeToCacheHashtable(
-      table_id_to_node_map_, needs_dict_translation_, inner_col->get_table_id());
+      table_id_to_node_map_, needs_dict_translation_, inner_col->tableId());
   if (allow_hashtable_recycling) {
     auto cached_hashtable_layout_type = hash_table_layout_cache_->getItemFromCache(
         hashtable_cache_key_,
@@ -703,8 +702,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
 ChunkKey PerfectJoinHashTable::genChunkKey(const std::vector<FragmentInfo>& fragments,
                                            const hdk::ir::Expr* outer_col_expr,
                                            const hdk::ir::ColumnVar* inner_col) const {
-  ChunkKey chunk_key{
-      inner_col->dbId(), inner_col->get_table_id(), inner_col->get_column_id()};
+  ChunkKey chunk_key{inner_col->dbId(), inner_col->tableId(), inner_col->get_column_id()};
   auto type = inner_col->type();
   if (type->isExtDictionary()) {
     size_t outer_elem_count = 0;
@@ -995,7 +993,7 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
 
 const InputTableInfo& PerfectJoinHashTable::getInnerQueryInfo(
     const hdk::ir::ColumnVar* inner_col) const {
-  return get_inner_query_info(inner_col->get_table_id(), query_infos_);
+  return get_inner_query_info(inner_col->tableId(), query_infos_);
 }
 
 const InputTableInfo& get_inner_query_info(

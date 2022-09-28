@@ -451,11 +451,11 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
                 found_valid_col_vars = true;
                 if (inner_input_idx == -1) {
                   inner_input_idx =
-                      get_input_idx(rel_left_deep_join, lhs_col_var->get_table_id());
+                      get_input_idx(rel_left_deep_join, lhs_col_var->tableId());
                 }
                 if (outer_input_idx == -1) {
                   outer_input_idx =
-                      get_input_idx(rel_left_deep_join, rhs_col_var->get_table_id());
+                      get_input_idx(rel_left_deep_join, rhs_col_var->tableId());
                 }
                 inner_join_cols.push_back(lhs_col_var);
                 outer_join_cols.push_back(rhs_col_var);

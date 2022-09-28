@@ -174,7 +174,7 @@ bool is_temporary_column(const hdk::ir::Expr* expr) {
   if (!col_expr) {
     return false;
   }
-  return col_expr->get_table_id() < 0;
+  return col_expr->tableId() < 0;
 }
 
 }  // namespace
