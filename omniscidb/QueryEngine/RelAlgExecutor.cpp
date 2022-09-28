@@ -1030,7 +1030,7 @@ void collect_used_input_desc(
   for (const auto col_ref : source_used_inputs) {
     const auto source = col_ref.node();
     const int table_id = table_id_from_ra(source);
-    const auto col_id = col_ref.getIndex();
+    const auto col_id = col_ref.index();
     auto it = input_to_nest_level.find(source);
     if (it != input_to_nest_level.end()) {
       const int nest_level = it->second;

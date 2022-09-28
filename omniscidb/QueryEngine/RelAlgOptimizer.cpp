@@ -38,7 +38,7 @@ class ProjectInputRedirector : public DeepCopyVisitor {
     if (source && crt_projects_.count(source)) {
       auto new_source = source->getInput(0);
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(
-          source->getExpr(col_ref->getIndex()).get());
+          source->getExpr(col_ref->index()).get());
       if (new_col_ref) {
         if (auto join = dynamic_cast<const RelJoin*>(new_source)) {
           CHECK(new_col_ref->node() == join->getInput(0) ||
@@ -64,7 +64,7 @@ class InputSimpleRenumberVisitor : public DeepCopyVisitor {
       : old_to_new_idx_(new_numbering) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    auto renum_it = old_to_new_idx_.find(col_ref->getIndex());
+    auto renum_it = old_to_new_idx_.find(col_ref->index());
     if constexpr (bAllowMissing) {
       if (renum_it != old_to_new_idx_.end()) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
@@ -91,7 +91,7 @@ class RebindInputsVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     if (col_ref->node() == old_input_) {
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->type(), new_input_, col_ref->getIndex());
+          col_ref->type(), new_input_, col_ref->index());
     }
     return col_ref->deep_copy();
   }
@@ -203,7 +203,7 @@ bool is_identical_copy(
   for (size_t i = 0; i < project->size(); ++i) {
     auto target = dynamic_cast<const hdk::ir::ColumnRef*>(project->getExpr(i).get());
     CHECK(target);
-    if (i != target->getIndex()) {
+    if (i != target->index()) {
       identical = false;
       break;
     }
@@ -238,8 +238,8 @@ void propagate_rex_input_renumber(
         indirect_join_src->getInput(1) == col_ref->node()) {
       src_base = indirect_join_src->getInput(0)->size();
     }
-    old_to_new_idx.insert(std::make_pair(i, src_base + col_ref->getIndex()));
-    old_to_new_idx.insert(std::make_pair(i, col_ref->getIndex()));
+    old_to_new_idx.insert(std::make_pair(i, src_base + col_ref->index()));
+    old_to_new_idx.insert(std::make_pair(i, col_ref->index()));
   }
   CHECK(old_to_new_idx.size());
   InputSimpleRenumberVisitor<false> visitor(old_to_new_idx);
@@ -432,7 +432,7 @@ bool is_distinct(const size_t input_idx, const RelAlgNode* node) {
     if (auto input =
             dynamic_cast<const hdk::ir::ColumnRef*>(project->getExpr(input_idx).get())) {
       CHECK_EQ(size_t(1), node->inputCount());
-      return is_distinct(input->getIndex(), project->getInput(0));
+      return is_distinct(input->index(), project->getInput(0));
     }
     return false;
   }
@@ -618,14 +618,14 @@ class InputCollector : public ScalarExprVisitor<InputSet> {
         CHECK_EQ(join->inputCount(), size_t(2));
         const auto src2_in_offset = join->getInput(0)->size();
         if (col_ref->node() == join->getInput(1)) {
-          result.emplace(src, col_ref->getIndex() + src2_in_offset);
+          result.emplace(src, col_ref->index() + src2_in_offset);
         } else {
-          result.emplace(src, col_ref->getIndex());
+          result.emplace(src, col_ref->index());
         }
         return result;
       }
     }
-    result.emplace(col_ref->node(), col_ref->getIndex());
+    result.emplace(col_ref->node(), col_ref->index());
     return result;
   }
 };
@@ -903,7 +903,7 @@ class InputRenumberVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     auto node_it = node_to_input_renum_.find(col_ref->node());
     if (node_it != node_to_input_renum_.end()) {
-      auto idx_it = node_it->second.find(col_ref->getIndex());
+      auto idx_it = node_it->second.find(col_ref->index());
       if (idx_it != node_it->second.end()) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
             col_ref->type(), col_ref->node(), idx_it->second);
@@ -1289,7 +1289,7 @@ class InputSinker : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     CHECK_EQ(target_->inputCount(), size_t(1));
     CHECK_EQ(target_->getInput(0), col_ref->node());
-    auto idx_it = old_to_new_in_idx_.find(col_ref->getIndex());
+    auto idx_it = old_to_new_in_idx_.find(col_ref->index());
     CHECK(idx_it != old_to_new_in_idx_.end());
     return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
         getColumnType(target_, idx_it->second), target_, idx_it->second);
@@ -1307,7 +1307,7 @@ class ConditionReplacer : public DeepCopyVisitor {
       : idx_to_subcond_(idx_to_sub_condition) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    auto subcond_it = idx_to_subcond_.find(col_ref->getIndex());
+    auto subcond_it = idx_to_subcond_.find(col_ref->index());
     if (subcond_it != idx_to_subcond_.end()) {
       return visit(subcond_it->second.get());
     }
@@ -1354,7 +1354,7 @@ void sink_projected_boolean_expr_to_join(
       } else {
         // TODO(miyu): relax?
         if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(expr.get())) {
-          in_to_out_index.insert(std::make_pair(col_ref->getIndex(), i));
+          in_to_out_index.insert(std::make_pair(col_ref->index(), i));
         } else {
           discarded = true;
         }
@@ -1430,7 +1430,7 @@ class InputRedirector : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     CHECK_EQ(old_src_, col_ref->node());
-    auto idx = col_ref->getIndex();
+    auto idx = col_ref->index();
     auto ti = getColumnType(new_src_, idx);
     if (auto join = dynamic_cast<const RelJoin*>(new_src_)) {
       auto lhs_size = join->getInput(0)->size();
@@ -1568,7 +1568,7 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
     }
   } else if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(condition)) {
     if (col_ref->node() == source) {
-      const auto col_idx = col_ref->getIndex();
+      const auto col_idx = col_ref->index();
       return {col_idx >= first_col_idx && col_idx <= last_col_idx ? condition : nullptr};
     }
   }
@@ -1582,7 +1582,7 @@ class JoinTargetRebaseVisitor : public DeepCopyVisitor {
       : join_(join), old_base_(old_base), inp0_size_(join->getInput(0)->size()) {}
 
   RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    auto cur_idx = col_ref->getIndex();
+    auto cur_idx = col_ref->index();
     CHECK_GE(cur_idx, old_base_);
     auto new_idx = cur_idx - old_base_;
     auto ti = getColumnType(join_, new_idx);

@@ -135,7 +135,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
           // source for all partition keys, so we can access string dictionaries for the
           // partition keys while we build the partition (hash) table
           auto parent_node = filter->getInput(0);
-          auto input = getNodeColumnRef(parent_node, col_ref->getIndex());
+          auto input = getNodeColumnRef(parent_node, col_ref->index());
           result = aggregateResult(result, this->visit(input.get()));
         }
         result = aggregateResult(result, this->visitColumnRef(col_ref));
@@ -169,13 +169,13 @@ class PhysicalInputsVisitor
     if (!scan) {
       const auto join = dynamic_cast<const RelJoin*>(source);
       if (join) {
-        auto input = getNodeColumnRef(join, col_ref->getIndex());
+        auto input = getNodeColumnRef(join, col_ref->index());
         return visit(input.get());
       }
       return InputColDescriptorSet{};
     }
 
-    auto col_info = scan->getColumnInfo(col_ref->getIndex());
+    auto col_info = scan->getColumnInfo(col_ref->index());
     CHECK_GT(col_info->table_id, 0);
     return {{col_info, 0}};
   }

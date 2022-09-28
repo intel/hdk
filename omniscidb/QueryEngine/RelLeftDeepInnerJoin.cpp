@@ -81,12 +81,12 @@ class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
     if (left_deep_join_->coversOriginalNode(node)) {
       const auto it = std::lower_bound(input_size_prefix_sums_.begin(),
                                        input_size_prefix_sums_.end(),
-                                       col_ref->getIndex(),
+                                       col_ref->index(),
                                        std::less_equal<size_t>());
       CHECK(it != input_size_prefix_sums_.end());
       auto new_node =
           left_deep_join_->getInput(std::distance(input_size_prefix_sums_.begin(), it));
-      auto new_index = col_ref->getIndex();
+      auto new_index = col_ref->index();
       if (it != input_size_prefix_sums_.begin()) {
         const auto prev_input_count = *(it - 1);
         CHECK_LE(prev_input_count, new_index);

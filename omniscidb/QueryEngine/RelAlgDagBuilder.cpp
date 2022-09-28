@@ -66,7 +66,7 @@ class RebindInputsVisitor : public DeepCopyVisitor {
         return rebind_inputs_from_left_deep_join(col_ref, left_deep_join);
       }
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->type(), new_input_, col_ref->getIndex());
+          col_ref->type(), new_input_, col_ref->index());
     }
     return col_ref->deep_copy();
   }
@@ -89,7 +89,7 @@ class RebindReindexInputsVisitor : public RebindInputsVisitor {
     if (mapping_) {
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(res.get());
       CHECK(new_col_ref);
-      auto it = mapping_->find(new_col_ref->getIndex());
+      auto it = mapping_->find(new_col_ref->index());
       CHECK(it != mapping_->end());
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
           new_col_ref->type(), new_col_ref->node(), it->second);
@@ -244,8 +244,8 @@ bool RelProject::isIdentity() const {
     const auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(exprs_[i].get());
     CHECK(col_ref);
     CHECK_EQ(source, col_ref->node());
-    // We should add the additional check that input->getIndex() !=
-    // source_shape[i].getIndex(), but Calcite doesn't generate the right
+    // We should add the additional check that input->index() !=
+    // source_shape[i].index(), but Calcite doesn't generate the right
     // Sort-Project-Sort sequence when joins are involved.
     if (col_ref->node() !=
         dynamic_cast<const hdk::ir::ColumnRef*>(source_shape[i].get())->node()) {
@@ -308,7 +308,7 @@ bool RelProject::isRenaming() const {
   for (size_t i = 0; i < fields_.size(); ++i) {
     auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(exprs_[i].get());
     CHECK(col_ref);
-    if (isRenamedInput(col_ref->node(), col_ref->getIndex(), fields_[i])) {
+    if (isRenamedInput(col_ref->node(), col_ref->index(), fields_[i])) {
       return true;
     }
   }
@@ -475,12 +475,12 @@ std::set<std::pair<const RelAlgNode*, int>> get_equiv_cols(const RelAlgNode* nod
         if (join_source) {
           CHECK_EQ(size_t(2), join_source->inputCount());
           auto lhs = join_source->getInput(0);
-          CHECK((col_ref->getIndex() < lhs->size() && lhs == col_ref->node()) ||
+          CHECK((col_ref->index() < lhs->size() && lhs == col_ref->node()) ||
                 join_source->getInput(1) == col_ref->node());
         } else {
           CHECK_EQ(col_ref->node(), only_source);
         }
-        curr_col = col_ref->getIndex();
+        curr_col = col_ref->index();
       } else {
         break;
       }
@@ -2050,8 +2050,8 @@ hdk::ir::ExprPtrVector reprojectExprs(const RelProject* simple_project,
     const auto col_ref =
         dynamic_cast<const hdk::ir::ColumnRef*>(simple_project->getExpr(i).get());
     CHECK(col_ref);
-    CHECK_LT(static_cast<size_t>(col_ref->getIndex()), exprs.size());
-    result.push_back(exprs[col_ref->getIndex()]);
+    CHECK_LT(static_cast<size_t>(col_ref->index()), exprs.size());
+    result.push_back(exprs[col_ref->index()]);
   }
   return result;
 }
@@ -2070,7 +2070,7 @@ class InputReplacementVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     if (col_ref->node() == node_to_keep_) {
-      const auto index = col_ref->getIndex();
+      const auto index = col_ref->index();
       CHECK_LT(index, exprs_.size());
       return visit(exprs_[index].get());
     }
@@ -2154,7 +2154,7 @@ void create_compound(
           for (size_t i = 0; i < ra_project->size(); ++i) {
             auto expr = ra_project->getExpr(i);
             if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(expr.get())) {
-              const auto index = col_ref->getIndex();
+              const auto index = col_ref->index();
               CHECK_LT(index, exprs.size());
               new_exprs.push_back(exprs[index]);
             } else {
@@ -2323,7 +2323,7 @@ class CoalesceSecondaryProjectVisitor : public ScalarExprVisitor<bool> {
     // The top level expression node is checked before we apply the visitor. If we get
     // here, this input rex is a child of another rex node, and we handle the can be
     // coalesced check slightly differently
-    return input_can_be_coalesced(col_ref->node(), col_ref->getIndex(), false);
+    return input_can_be_coalesced(col_ref->node(), col_ref->index(), false);
   }
 
   bool visitConstant(const hdk::ir::Constant*) const final { return false; }
@@ -2465,7 +2465,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
             for (auto& expr : project_node->getExprs()) {
               // If the top level scalar rex is an input node, we can bypass the visitor
               if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(expr.get())) {
-                if (!input_can_be_coalesced(col_ref->node(), col_ref->getIndex(), true)) {
+                if (!input_can_be_coalesced(col_ref->node(), col_ref->index(), true)) {
                   is_simple_project = false;
                   break;
                 }
@@ -2539,7 +2539,7 @@ class InputBackpropagationVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     if (col_ref->node() != node_) {
-      auto cur_index = col_ref->getIndex();
+      auto cur_index = col_ref->index();
       auto cur_source_node = col_ref->node();
       auto it = replacements_.find(std::make_pair(cur_source_node, cur_index));
       if (it != replacements_.end()) {
@@ -2717,7 +2717,7 @@ class InputCollector : public ScalarExprVisitor<InputSet> {
  public:
   InputSet visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     InputSet result;
-    result.emplace(col_ref->node(), col_ref->getIndex());
+    result.emplace(col_ref->node(), col_ref->index());
     return result;
   }
 

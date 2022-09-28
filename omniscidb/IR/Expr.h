@@ -107,7 +107,7 @@ class ColumnRef : public Expr {
 
   const RelAlgNode* node() const { return node_; }
 
-  unsigned getIndex() const { return idx_; }
+  unsigned index() const { return idx_; }
 
   size_t hash() const override;
 
