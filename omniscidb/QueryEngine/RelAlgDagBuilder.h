@@ -1311,7 +1311,7 @@ class RelAlgDagBuilder : public RelAlgDag, public boost::noncopyable {
 std::string tree_string(const RelAlgNode*, const size_t depth = 0);
 
 inline InputColDescriptor column_var_to_descriptor(const hdk::ir::ColumnVar* var) {
-  return InputColDescriptor(var->get_column_info(), var->rteIdx());
+  return InputColDescriptor(var->columnInfo(), var->rteIdx());
 }
 
 const hdk::ir::Type* getColumnType(const RelAlgNode* node, size_t col_idx);

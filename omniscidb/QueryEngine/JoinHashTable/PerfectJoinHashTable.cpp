@@ -237,8 +237,7 @@ bool needs_dictionary_translation(const hdk::ir::ColumnVar* inner_col,
                                   const Executor* executor) {
   auto schema_provider = executor->getSchemaProvider();
   CHECK(schema_provider);
-  const auto inner_col_info =
-      schema_provider->getColumnInfo(*inner_col->get_column_info());
+  const auto inner_col_info = schema_provider->getColumnInfo(*inner_col->columnInfo());
   const auto& inner_type = inner_col->type();
   // Only strings may need dictionary translation.
   if (!inner_type->isExtDictionary() && !inner_type->isString()) {
@@ -246,8 +245,7 @@ bool needs_dictionary_translation(const hdk::ir::ColumnVar* inner_col,
   }
   const auto outer_col = dynamic_cast<const hdk::ir::ColumnVar*>(outer_col_expr);
   CHECK(outer_col);
-  const auto outer_col_info =
-      schema_provider->getColumnInfo(*outer_col->get_column_info());
+  const auto outer_col_info = schema_provider->getColumnInfo(*outer_col->columnInfo());
   // Don't want to deal with temporary tables for now, require translation.
   if (!inner_col_info || !outer_col_info) {
     return true;

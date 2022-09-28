@@ -86,7 +86,7 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
     return {nullptr, 0};
   }
   const auto table_id = hash_col.tableId();
-  const auto col_info = hash_col.get_column_info();
+  const auto col_info = hash_col.columnInfo();
   const int8_t* col_buff = nullptr;
   if (table_id >= 0) {  // real table
     /* chunk_meta_it is used here to retrieve chunk numBytes and

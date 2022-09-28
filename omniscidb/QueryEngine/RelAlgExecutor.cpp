@@ -1438,7 +1438,7 @@ hdk::ir::ExprPtr transform_to_inner(const hdk::ir::Expr* expr) {
   if (!col) {
     throw std::runtime_error("Only columns supported in the window partition for now");
   }
-  return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col->get_column_info(), 1);
+  return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col->columnInfo(), 1);
 }
 
 }  // namespace

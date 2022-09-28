@@ -22,7 +22,7 @@ namespace {
 
 class BindFilterToOutermostVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitColumnVar(const hdk::ir::ColumnVar* col_var) const override {
-    return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col_var->get_column_info(), 0);
+    return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col_var->columnInfo(), 0);
   }
 };
 
@@ -30,7 +30,7 @@ class CollectInputColumnsVisitor
     : public ScalarExprVisitor<std::unordered_set<InputColDescriptor>> {
   std::unordered_set<InputColDescriptor> visitColumnVar(
       const hdk::ir::ColumnVar* col_var) const override {
-    return {InputColDescriptor(col_var->get_column_info(), 0)};
+    return {InputColDescriptor(col_var->columnInfo(), 0)};
   }
 
  public:

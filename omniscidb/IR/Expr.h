@@ -170,7 +170,7 @@ class ColumnVar : public Expr {
   int tableId() const { return col_info_->table_id; }
   int columnId() const { return col_info_->column_id; }
   int rteIdx() const { return rte_idx; }
-  ColumnInfoPtr get_column_info() const { return col_info_; }
+  ColumnInfoPtr columnInfo() const { return col_info_; }
   bool is_virtual() const { return col_info_->is_rowid; }
 
   ExprPtr deep_copy() const override;
