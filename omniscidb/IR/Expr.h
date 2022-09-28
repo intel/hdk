@@ -227,7 +227,6 @@ class Var : public ColumnVar {
       : ColumnVar(type), which_row(o), varno(v) {}
   WhichRow whichRow() const { return which_row; }
   int varNo() const { return varno; }
-  void set_varno(int n) { varno = n; }
   ExprPtr deep_copy() const override;
   ExprPtr withType(const Type* type) const override;
   std::string toString() const override;
