@@ -247,7 +247,7 @@ class Var : public ColumnVar {
 class Constant : public Expr {
  public:
   Constant(const Type* type, bool is_null, Datum v, bool cacheable = true)
-      : Expr(type), is_null_(is_null), cacheable_(cacheable), constval(v) {
+      : Expr(type), is_null_(is_null), cacheable_(cacheable), value_(v) {
     if (is_null) {
       set_null_value();
     } else {
@@ -258,14 +258,14 @@ class Constant : public Expr {
       : Expr(type)
       , is_null_(is_null)
       , cacheable_(cacheable)
-      , constval(Datum{0})
+      , value_(Datum{0})
       , value_list(l) {}
   ~Constant() override;
   bool isNull() const { return is_null_; }
   bool cacheable() const { return cacheable_; }
-  Datum value() const { return constval; }
-  int64_t intVal() const { return extract_int_type_from_datum(constval, type_); }
-  double fpVal() const { return extract_fp_type_from_datum(constval, type_); }
+  Datum value() const { return value_; }
+  int64_t intVal() const { return extract_int_type_from_datum(value_, type_); }
+  double fpVal() const { return extract_fp_type_from_datum(value_, type_); }
   const ExprPtrList& valueList() const { return value_list; }
   ExprPtr deep_copy() const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
@@ -282,7 +282,7 @@ class Constant : public Expr {
   // A hint for DAG caches. Cache hit is unlikely, when set to true
   // (e.g. constant expression represents NOW datetime).
   bool cacheable_;
-  Datum constval;  // the constant value
+  Datum value_;  // the constant value
   const ExprPtrList value_list;
   ExprPtr cast_number(const Type* new_type) const;
   ExprPtr cast_string(const Type* new_type) const;
