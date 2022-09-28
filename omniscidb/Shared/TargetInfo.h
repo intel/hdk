@@ -83,7 +83,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
   const auto agg_expr = cast_to_agg_expr(target_expr);
   bool nullable = target_expr->type()->nullable();
   if (!agg_expr) {
-    auto target_type = hdk::ir::logicalType(target_expr->type());
+    auto target_type = target_expr->type()->canonicalize();
     return {false, kMIN, target_type, nullptr, false, false};
   }
   const auto agg_type = agg_expr->get_aggtype();

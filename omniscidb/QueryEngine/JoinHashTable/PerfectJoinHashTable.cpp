@@ -782,7 +782,7 @@ std::vector<llvm::Value*> PerfectJoinHashTable::getHashJoinArgs(
       executor_->cgen_state_->castToTypeIn(key_lvs.front(), 64),
       executor_->cgen_state_->llInt(col_range_.getIntMin()),
       executor_->cgen_state_->llInt(col_range_.getIntMax())};
-  auto key_col_logical_type = hdk::ir::logicalType(key_col->type());
+  auto key_col_logical_type = key_col->type()->canonicalize();
   if (key_col_logical_type->nullable() || isBitwiseEq()) {
     hash_join_idx_args.push_back(executor_->cgen_state_->llInt(
         inline_fixed_encoding_null_value(key_col_logical_type)));

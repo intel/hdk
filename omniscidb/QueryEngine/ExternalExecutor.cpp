@@ -463,7 +463,7 @@ std::unique_ptr<ResultSet> SqliteMemDatabase::runSelect(
             throw std::runtime_error(overflow_message);
           }
           if (!connector.isNull(row_idx, col_idx)) {
-            const auto limits = inline_int_max_min(hdk::ir::logicalSize(col_type));
+            const auto limits = inline_int_max_min(col_type->canonicalSize());
             const auto val = connector.getData<int64_t>(row_idx, col_idx);
             if (val > limits.first || val < limits.second) {
               throw std::runtime_error(overflow_message);

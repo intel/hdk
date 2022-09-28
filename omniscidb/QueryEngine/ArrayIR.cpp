@@ -45,13 +45,13 @@ llvm::Value* CodeGenerator::codegenArrayAt(const hdk::ir::BinOper* array_at,
       elem_type->isFloatingPoint()
           ? "array_at_" +
                 std::string(elem_type->isFp64() ? "double_checked" : "float_checked")
-          : "array_at_int" + std::to_string(hdk::ir::logicalSize(elem_type) * 8) +
+          : "array_at_int" + std::to_string(elem_type->canonicalSize() * 8) +
                 "_t_checked"};
   const auto ret_ty =
       elem_type->isFloatingPoint()
           ? (elem_type->isFp64() ? llvm::Type::getDoubleTy(cgen_state_->context_)
                                  : llvm::Type::getFloatTy(cgen_state_->context_))
-          : get_int_type(hdk::ir::logicalSize(elem_type) * 8, cgen_state_->context_);
+          : get_int_type(elem_type->canonicalSize() * 8, cgen_state_->context_);
   const auto arr_lvs = codegen(arr_expr, true, co);
   CHECK_EQ(size_t(1), arr_lvs.size());
   return cgen_state_->emitExternalCall(
@@ -78,7 +78,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CardinalityExpr* expr,
   std::vector<llvm::Value*> array_size_args{
       arr_lv.front(),
       posArg(arr_expr),
-      cgen_state_->llInt(log2_bytes(hdk::ir::logicalSize(elem_type)))};
+      cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))};
   if (array_type->nullable()) {
     fn_name += "_nullable";
     array_size_args.push_back(cgen_state_->inlineIntNull(expr->type()));
@@ -109,7 +109,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
     }
   }
 
-  auto array_element_size_bytes = hdk::ir::logicalSize(elem_type);
+  auto array_element_size_bytes = elem_type->canonicalSize();
   auto* array_index_type =
       get_int_type(array_element_size_bytes * 8, cgen_state_->context_);
   auto* array_type = get_int_array_type(

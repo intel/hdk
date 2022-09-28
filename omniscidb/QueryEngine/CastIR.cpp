@@ -375,7 +375,7 @@ void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};
   std::tie(chosen_max, chosen_min) =
-      cgen_state_->inlineIntMaxMin(hdk::ir::logicalSize(type), true);
+      cgen_state_->inlineIntMaxMin(type->canonicalSize(), true);
 
   cgen_state_->needs_error_check_ = true;
   auto cast_ok = llvm::BasicBlock::Create(
@@ -385,14 +385,13 @@ void CodeGenerator::codegenCastBetweenIntTypesOverflowChecks(
   auto operand_max = static_cast<llvm::ConstantInt*>(chosen_max)->getSExtValue() / scale;
   auto operand_min = static_cast<llvm::ConstantInt*>(chosen_min)->getSExtValue() / scale;
   const auto ti_llvm_type =
-      get_int_type(8 * hdk::ir::logicalSize(type), cgen_state_->context_);
+      get_int_type(8 * type->canonicalSize(), cgen_state_->context_);
   llvm::Value* operand_max_lv = llvm::ConstantInt::get(ti_llvm_type, operand_max);
   llvm::Value* operand_min_lv = llvm::ConstantInt::get(ti_llvm_type, operand_min);
-  const bool is_narrowing =
-      hdk::ir::logicalSize(operand_type) > hdk::ir::logicalSize(type);
+  const bool is_narrowing = operand_type->canonicalSize() > type->canonicalSize();
   if (is_narrowing) {
     const auto operand_ti_llvm_type =
-        get_int_type(8 * hdk::ir::logicalSize(operand_type), cgen_state_->context_);
+        get_int_type(8 * operand_type->canonicalSize(), cgen_state_->context_);
     operand_max_lv =
         cgen_state_->ir_builder_.CreateSExt(operand_max_lv, operand_ti_llvm_type);
     operand_min_lv =

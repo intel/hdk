@@ -1151,7 +1151,7 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
     if (LIKELY(lhs_v.isInt())) {
       CHECK(rhs_v.isInt());
       if (UNLIKELY(entry_type->isExtDictionary())) {
-        CHECK_EQ(4, hdk::ir::logicalSize(entry_type));
+        CHECK_EQ(4, entry_type->canonicalSize());
         CHECK(executor_);
         const auto string_dict_proxy = executor_->getStringDictionaryProxy(
             entry_type->as<hdk::ir::ExtDictionaryType>()->dictId(),

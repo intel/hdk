@@ -1109,17 +1109,17 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         const auto i8p_ty =
             llvm::PointerType::get(get_int_type(8, executor_->cgen_state_->context_), 0);
         auto elem_type = target_type->as<hdk::ir::ArrayBaseType>()->elemType();
-        return {executor_->cgen_state_->emitExternalCall(
-                    "array_buff",
-                    i8p_ty,
-                    {target_lvs.front(), code_generator.posArg(target_expr)}),
-                executor_->cgen_state_->emitExternalCall(
-                    "array_size",
-                    i32_ty,
-                    {target_lvs.front(),
-                     code_generator.posArg(target_expr),
-                     executor_->cgen_state_->llInt(
-                         log2_bytes(hdk::ir::logicalSize(elem_type)))})};
+        return {
+            executor_->cgen_state_->emitExternalCall(
+                "array_buff",
+                i8p_ty,
+                {target_lvs.front(), code_generator.posArg(target_expr)}),
+            executor_->cgen_state_->emitExternalCall(
+                "array_size",
+                i32_ty,
+                {target_lvs.front(),
+                 code_generator.posArg(target_expr),
+                 executor_->cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))})};
       } else {
         if (agg_expr) {
           throw std::runtime_error(

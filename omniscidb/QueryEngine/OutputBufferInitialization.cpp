@@ -120,8 +120,8 @@ int64_t get_agg_initial_val(const SQLAgg agg,
           ? compact_byte_width(static_cast<unsigned>(get_bit_width(type) >> 3),
                                unsigned(min_byte_width_to_compact))
           : sizeof(int64_t);
-  CHECK(hdk::ir::logicalSize(type) < 0 ||
-        byte_width >= static_cast<unsigned>(hdk::ir::logicalSize(type)));
+  CHECK(type->canonicalSize() < 0 ||
+        byte_width >= static_cast<unsigned>(type->canonicalSize()));
   switch (agg) {
     case kSUM: {
       if (type->nullable()) {

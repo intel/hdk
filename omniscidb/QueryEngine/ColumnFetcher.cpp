@@ -38,7 +38,7 @@ inline const ColumnarResults* columnarize_result(
 
   std::vector<const hdk::ir::Type*> col_types;
   for (size_t i = 0; i < result->colCount(); ++i) {
-    col_types.push_back(hdk::ir::logicalType(result->colType(i)));
+    col_types.push_back(result->colType(i)->canonicalize());
   }
   return new ColumnarResults(
       row_set_mem_owner, *result, result->colCount(), col_types, thread_idx, executor);

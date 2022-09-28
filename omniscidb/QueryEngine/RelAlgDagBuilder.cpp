@@ -1459,7 +1459,7 @@ hdk::ir::ExprPtr parseCardinality(const std::string& fn_name,
     throw std::runtime_error(fn_name + " expects one-dimension array expression.");
   }
   auto array_size = arg_type->size();
-  auto array_elem_size = elem_type->isString() ? 4 : hdk::ir::logicalSize(elem_type);
+  auto array_elem_size = elem_type->isString() ? 4 : elem_type->canonicalSize();
 
   if (array_size > 0) {
     if (array_elem_size <= 0) {
@@ -1636,23 +1636,21 @@ hdk::ir::ExprPtr parseArrayFunction(const hdk::ir::ExprPtrVector& operands,
     // FIX-ME:  Deal with NULL arrays
     if (operands.size() > 0) {
       const auto first_element_logical_type =
-          hdk::ir::logicalType(operands[0]->type())->withNullable(true);
+          operands[0]->type()->canonicalize()->withNullable(true);
 
       auto diff_elem_itr =
           std::find_if(operands.begin(),
                        operands.end(),
                        [first_element_logical_type](const auto expr) {
                          return !first_element_logical_type->equal(
-                             hdk::ir::logicalType(expr->type())->withNullable(true));
+                             expr->type()->canonicalize()->withNullable(true));
                        });
       if (diff_elem_itr != operands.end()) {
         throw std::runtime_error(
             "Element " + std::to_string(diff_elem_itr - operands.begin()) +
             " is not of the same type as other elements of the array. Consider casting "
             "to force this condition.\nElement Type: " +
-            hdk::ir::logicalType((*diff_elem_itr)->type())
-                ->withNullable(true)
-                ->toString() +
+            (*diff_elem_itr)->type()->canonicalize()->withNullable(true)->toString() +
             "\nArray type: " + first_element_logical_type->toString());
       }
 

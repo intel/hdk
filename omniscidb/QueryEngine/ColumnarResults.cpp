@@ -29,7 +29,7 @@
 namespace {
 
 inline int64_t fixed_encoding_nullable_val(const int64_t val, const hdk::ir::Type* type) {
-  auto logical_type = hdk::ir::logicalType(type);
+  auto logical_type = type->canonicalize();
   if (val == inline_int_null_value(logical_type)) {
     return inline_fixed_encoding_null_value(type);
   }

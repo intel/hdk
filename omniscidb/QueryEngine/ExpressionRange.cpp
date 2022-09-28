@@ -528,7 +528,7 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       col_expr->type()->isArray()
           ? col_expr->type()->as<hdk::ir::ArrayBaseType>()->elemType()
           : col_expr->type();
-  const auto col_type = logicalType(col_phys_type);
+  const auto col_type = col_phys_type->canonicalize();
   switch (col_type->id()) {
     case hdk::ir::Type::kBoolean:
     case hdk::ir::Type::kInteger:

@@ -497,8 +497,8 @@ size_t BaselineJoinHashTable::getKeyComponentWidth() const {
   for (const auto& inner_outer_pair : inner_outer_pairs_) {
     const auto inner_col = inner_outer_pair.first;
     auto inner_col_type = inner_col->type();
-    if (hdk::ir::logicalSize(inner_col_type) > 4) {
-      CHECK_EQ(8, hdk::ir::logicalSize(inner_col_type));
+    if (inner_col_type->canonicalSize() > 4) {
+      CHECK_EQ(8, inner_col_type->canonicalSize());
       return 8;
     }
   }

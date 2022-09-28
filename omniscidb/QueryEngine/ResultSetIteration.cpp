@@ -488,7 +488,7 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
       return result_set_->getVarlenOrderEntry(i1, str_len);
     }
     return InternalTargetValue(
-        type->isFloatingPoint() ? i1 : int_resize_cast(i1, hdk::ir::logicalSize(type)));
+        type->isFloatingPoint() ? i1 : int_resize_cast(i1, type->canonicalSize()));
   }
 }
 
@@ -617,7 +617,7 @@ InternalTargetValue ResultSet::ColumnWiseTargetAccessor::getColumnInternal(
       return result_set_->getVarlenOrderEntry(i1, i2);
     }
     return InternalTargetValue(
-        type->isFloatingPoint() ? i1 : int_resize_cast(i1, hdk::ir::logicalSize(type)));
+        type->isFloatingPoint() ? i1 : int_resize_cast(i1, type->canonicalSize()));
   }
 }
 
@@ -1209,7 +1209,7 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
   auto length = read_int_from_buff(ptr2, compact_sz2);
   if (target_info.type->isArray()) {
     auto elem_type = target_info.type->as<hdk::ir::ArrayBaseType>()->elemType();
-    length *= elem_type->isString() ? 4 : hdk::ir::logicalSize(elem_type);
+    length *= elem_type->isString() ? 4 : elem_type->canonicalSize();
   }
   std::vector<int8_t> cpu_buffer;
   if (varlen_ptr && device_type_ == ExecutorDeviceType::GPU) {
@@ -1320,7 +1320,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
     // TODO(alex): remove int_resize_cast, make read_int_from_buff return the
     // right type instead
     if (inline_int_null_value(chosen_type) ==
-        int_resize_cast(ival, hdk::ir::logicalSize(chosen_type))) {
+        int_resize_cast(ival, chosen_type->canonicalSize())) {
       return inline_int_null_value(type);
     }
     return ival;

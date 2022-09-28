@@ -29,14 +29,12 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::CaseExpr* case_e
     case_llvm_type = case_type->isFp32() ? llvm::Type::getFloatTy(cgen_state_->context_)
                                          : llvm::Type::getDoubleTy(cgen_state_->context_);
   } else if (case_type->isExtDictionary()) {
-    case_llvm_type =
-        get_int_type(8 * hdk::ir::logicalSize(case_type), cgen_state_->context_);
+    case_llvm_type = get_int_type(8 * case_type->canonicalSize(), cgen_state_->context_);
   } else if (case_type->isString()) {
     is_real_str = true;
     case_llvm_type = get_int_type(64, cgen_state_->context_);
   } else if (case_type->isBoolean()) {
-    case_llvm_type =
-        get_int_type(8 * hdk::ir::logicalSize(case_type), cgen_state_->context_);
+    case_llvm_type = get_int_type(8 * case_type->canonicalSize(), cgen_state_->context_);
   }
   CHECK(case_llvm_type);
   const auto& else_type = case_expr->get_else_expr()->type();

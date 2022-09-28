@@ -727,7 +727,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
           type = common_numeric_type(type, else_type);
         } else if (type->isBoolean() && else_type->isBoolean()) {
           type = common_numeric_type(type, else_type);
-        } else if (!logicalType(type)->equal(logicalType(else_type))) {
+        } else if (!type->canonicalize()->equal(else_type->canonicalize())) {
           throw std::runtime_error(
               // types differing by encoding will be resolved at decode
               "Expressions in ELSE clause must be of the same or compatible types as "

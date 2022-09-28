@@ -152,7 +152,7 @@ struct JoinColumnTypeInfo {
 };
 
 inline bool is_unsigned_type(const hdk::ir::Type* type) {
-  return type->isExtDictionary() && type->size() < hdk::ir::logicalSize(type);
+  return type->isExtDictionary() && type->size() < type->canonicalSize();
 }
 
 inline ColumnType get_join_column_type_kind(const hdk::ir::Type* type) {

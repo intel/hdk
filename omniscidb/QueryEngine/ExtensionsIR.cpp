@@ -679,14 +679,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
                                     llvm::Type::getInt8PtrTy(cgen_state_->context_),
                                     {orig_arg_lvs[k], posArg(arg)});
       const auto len_lv =
-          (const_arr)
-              ? const_arr_size.at(orig_arg_lvs[k])
-              : cgen_state_->emitExternalCall(
-                    "array_size",
-                    get_int_type(32, cgen_state_->context_),
-                    {orig_arg_lvs[k],
-                     posArg(arg),
-                     cgen_state_->llInt(log2_bytes(hdk::ir::logicalSize(elem_type)))});
+          (const_arr) ? const_arr_size.at(orig_arg_lvs[k])
+                      : cgen_state_->emitExternalCall(
+                            "array_size",
+                            get_int_type(32, cgen_state_->context_),
+                            {orig_arg_lvs[k],
+                             posArg(arg),
+                             cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))});
 
       if (is_ext_arg_type_pointer(ext_func_arg)) {
         args.push_back(castArrayPointer(ptr_lv, elem_type));

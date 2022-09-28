@@ -101,7 +101,7 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
   // Columnar Conversion:
   std::vector<const hdk::ir::Type*> col_types;
   for (size_t i = 0; i < result_set.colCount(); ++i) {
-    col_types.push_back(hdk::ir::logicalType(result_set.colType(i)));
+    col_types.push_back(result_set.colType(i)->canonicalize());
   }
   ColumnarResultsTester columnar_results(
       row_set_mem_owner, result_set, col_types.size(), col_types, is_parallel_conversion);

@@ -1233,7 +1233,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
                   ret_ty,
                   {group_key,
                    code_generator.posArg(arr_expr),
-                   cgen_state_->llInt(log2_bytes(hdk::ir::logicalSize(elem_type)))});
+                   cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))});
     cgen_state_->ir_builder_.CreateBr(array_loop_head);
     cgen_state_->ir_builder_.SetInsertPoint(array_loop_head);
     CHECK(array_len);
@@ -1262,7 +1262,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
         elem_type->isFloatingPoint()
             ? (elem_type->isFp64() ? llvm::Type::getDoubleTy(cgen_state_->context_)
                                    : llvm::Type::getFloatTy(cgen_state_->context_))
-            : get_int_type(hdk::ir::logicalSize(elem_type) * 8, cgen_state_->context_);
+            : get_int_type(elem_type->canonicalSize() * 8, cgen_state_->context_);
     group_key = cgen_state_->emitExternalCall(
         array_at_fname,
         ar_ret_ty,
@@ -1282,8 +1282,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     const std::string translator_func_name(
         col_width == sizeof(int32_t) ? "translate_null_key_i32_" : "translate_null_key_");
     auto type = group_by_col->type();
-    const auto key_type =
-        get_int_type(hdk::ir::logicalSize(type) * 8, cgen_state_->context_);
+    const auto key_type = get_int_type(type->canonicalSize() * 8, cgen_state_->context_);
     orig_group_key = group_key;
     group_key = cgen_state_->emitCall(
         translator_func_name + numeric_type_name(type),

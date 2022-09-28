@@ -259,6 +259,13 @@ const Type* DateType::withNullable(bool nullable) const {
   return make(ctx_, size_, unit_, nullable);
 }
 
+const Type* DateType::canonicalize() const {
+  if (unit_ != TimeUnit::kSecond || size_ != 8) {
+    return ctx_.date64(TimeUnit::kSecond, nullable_);
+  }
+  return this;
+}
+
 std::string DateType::toString() const {
   std::stringstream ss;
   ss << "DATE" << (size() * 8) << unitStr() << nullableStr();
@@ -274,6 +281,13 @@ const TimeType* TimeType::make(Context& ctx, int size, TimeUnit unit, bool nulla
 
 const Type* TimeType::withNullable(bool nullable) const {
   return make(ctx_, size_, unit_, nullable);
+}
+
+const Type* TimeType::canonicalize() const {
+  if (size_ != 8) {
+    return ctx_.time64(unit_, nullable_);
+  }
+  return this;
 }
 
 std::string TimeType::toString() const {
@@ -311,6 +325,13 @@ const IntervalType* IntervalType::make(Context& ctx,
 
 const Type* IntervalType::withNullable(bool nullable) const {
   return make(ctx_, size_, unit_, nullable);
+}
+
+const Type* IntervalType::canonicalize() const {
+  if (size_ != 8) {
+    return ctx_.interval64(unit_, nullable_);
+  }
+  return this;
 }
 
 std::string IntervalType::toString() const {
@@ -426,6 +447,13 @@ const ExtDictionaryType* ExtDictionaryType::make(Context& ctx,
 
 const Type* ExtDictionaryType::withNullable(bool nullable) const {
   return make(ctx_, elem_type_->withNullable(nullable), dict_id_, size_);
+}
+
+const Type* ExtDictionaryType::canonicalize() const {
+  if (size_ != 4) {
+    return ctx_.extDict(elem_type_, dict_id_, 4);
+  }
+  return this;
 }
 
 bool ExtDictionaryType::equal(const Type& other) const {

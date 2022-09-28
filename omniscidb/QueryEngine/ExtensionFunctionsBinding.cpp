@@ -616,8 +616,10 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
       if ((size_t)pos == ext_func_args.size()) {
         CHECK_EQ(args_are_constants.size(), original_input_idx);
         // prefer smaller return types
-        penalty_score += hdk::ir::logicalSize(
-            ext_arg_type_to_type(hdk::ir::Context::defaultCtx(), ext_func.getRet()));
+        penalty_score +=
+            ext_arg_type_to_type(hdk::ir::Context::defaultCtx(), ext_func.getRet())
+                ->canonicalize()
+                ->size();
         if (penalty_score < minimal_score) {
           optimal = index;
           minimal_score = penalty_score;

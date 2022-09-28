@@ -140,14 +140,14 @@ int64_t result_set::lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
                             : fixed_width_small_date_decode_noinline(
                                   byte_stream, 4, NULL_INT, NULL_BIGINT, pos);
   } else {
-    val = (type->isExtDictionary() && type->size() < hdk::ir::logicalSize(type) &&
+    val = (type->isExtDictionary() && type->size() < type->canonicalSize() &&
            type->as<hdk::ir::ExtDictionaryType>()->dictId())
               ? fixed_width_unsigned_decode_noinline(byte_stream, type_bitwidth / 8, pos)
               : fixed_width_int_decode_noinline(byte_stream, type_bitwidth / 8, pos);
   }
   if (!date_in_days &&
-      ((type->size() < hdk::ir::logicalSize(type)) || type->isExtDictionary())) {
-    auto col_logical_type = hdk::ir::logicalType(type);
+      ((type->size() < type->canonicalSize()) || type->isExtDictionary())) {
+    auto col_logical_type = type->canonicalize();
 
     if (val == inline_fixed_encoding_null_value(type)) {
       return inline_int_null_value(col_logical_type);

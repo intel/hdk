@@ -39,7 +39,7 @@ std::shared_ptr<Decoder> get_col_decoder(const hdk::ir::ColumnVar* col_var) {
     case hdk::ir::Type::kFloatingPoint:
       return std::make_shared<FixedWidthReal>(type->isFp64());
     case hdk::ir::Type::kExtDictionary:
-      if (type->size() < hdk::ir::logicalSize(type)) {
+      if (type->size() < type->canonicalSize()) {
         return std::make_shared<FixedWidthUnsigned>(type->size());
       }
       return std::make_shared<FixedWidthInt>(type->size());
@@ -190,12 +190,12 @@ llvm::Value* CodeGenerator::codegenFixedLengthColVar(const hdk::ir::ColumnVar* c
                                                    : llvm::Instruction::CastOps::Trunc,
         dec_val,
         get_int_type(col_width, cgen_state_->context_));
-    if (col_type->size() < hdk::ir::logicalSize(col_type) && !col_type->isDate() &&
+    if (col_type->size() < col_type->canonicalSize() && !col_type->isDate() &&
         col_type->nullable()) {
       dec_val_cast = codgenAdjustFixedEncNull(dec_val_cast, col_type);
     }
   } else {
-    CHECK(col_type->size() == hdk::ir::logicalSize(col_type));
+    CHECK(col_type->size() == col_type->canonicalSize());
     CHECK(dec_type->isFloatTy() || dec_type->isDoubleTy());
     if (dec_type->isDoubleTy()) {
       CHECK(col_type->isFp64());
@@ -293,7 +293,7 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
 llvm::Value* CodeGenerator::codgenAdjustFixedEncNull(llvm::Value* val,
                                                      const hdk::ir::Type* col_type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK_LT(col_type->size(), hdk::ir::logicalSize(col_type));
+  CHECK_LT(col_type->size(), col_type->canonicalSize());
   const auto col_phys_width = col_type->size() * 8;
   auto from_typename = "int" + std::to_string(col_phys_width) + "_t";
   auto adjusted = cgen_state_->ir_builder_.CreateCast(

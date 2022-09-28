@@ -1279,11 +1279,11 @@ bool is_agg(const hdk::ir::Expr* expr) {
   return false;
 }
 
-inline const hdk::ir::Type* logicalTypeForExpr(const hdk::ir::Expr& expr) {
+inline const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
   if (is_count_distinct(&expr)) {
     return expr.type()->ctx().int64();
   }
-  auto res = hdk::ir::logicalType(expr.type());
+  auto res = expr.type()->canonicalize();
   if (is_agg(&expr)) {
     res = res->withNullable(true);
   }
@@ -1300,7 +1300,7 @@ std::vector<TargetMetaInfo> get_targets_meta(
     CHECK(target_exprs[i]);
     // TODO(alex): remove the count distinct type fixup.
     targets_meta.emplace_back(ra_node->getFieldName(i),
-                              logicalTypeForExpr(*target_exprs[i]));
+                              canonicalTypeForExpr(*target_exprs[i]));
   }
   return targets_meta;
 }

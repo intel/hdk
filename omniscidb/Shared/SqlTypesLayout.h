@@ -74,7 +74,7 @@ inline uint64_t exp_to_scale(const unsigned exp) {
 }
 
 inline size_t get_bit_width(const hdk::ir::Type* type) {
-  size_t res = type->isString() ? 32 : hdk::ir::logicalSize(type) * 8;
+  size_t res = type->isString() ? 32 : type->canonicalSize() * 8;
   if (res < 0) {
     throw std::runtime_error("Unexpected type: " + type->toString());
   }

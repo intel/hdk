@@ -91,6 +91,20 @@ class Type {
 
   virtual const Type* withNullable(bool nullable) const = 0;
 
+  /**
+   * Returns a canonical type version. Canonical type is a type version
+   * which is used for processing in HDK execution engine and execution
+   * result. In most cases the method returns self, but for datetime
+   * and dictionary types a version with a fixed size and/or unit is
+   * returned.
+   */
+  virtual const Type* canonicalize() const { return this; }
+
+  /**
+   * Returns a size of a canonical type version.
+   */
+  int canonicalSize() const { return canonicalize()->size(); }
+
   virtual bool equal(const Type& other) const;
   bool equal(const Type* other) const { return equal(*other); }
 
@@ -278,6 +292,8 @@ class DateType : public DateTimeBaseType {
 
   const Type* withNullable(bool nullable) const override;
 
+  const Type* canonicalize() const override;
+
   std::string toString() const override;
 
  protected:
@@ -294,6 +310,8 @@ class TimeType : public DateTimeBaseType {
                               bool nullable = true);
 
   const Type* withNullable(bool nullable) const override;
+
+  const Type* canonicalize() const override;
 
   std::string toString() const override;
 
@@ -325,6 +343,8 @@ class IntervalType : public DateTimeBaseType {
                                   bool nullable = true);
 
   const Type* withNullable(bool nullable) const override;
+
+  const Type* canonicalize() const override;
 
   std::string toString() const override;
 
@@ -414,6 +434,8 @@ class ExtDictionaryType : public Type {
   int dictId() const { return dict_id_; }
 
   const Type* withNullable(bool nullable) const override;
+
+  const Type* canonicalize() const override;
 
   bool equal(const Type& other) const override;
 
