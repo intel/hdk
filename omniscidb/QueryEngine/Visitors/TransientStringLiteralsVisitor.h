@@ -28,8 +28,8 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
 
   void* visitConstant(const hdk::ir::Constant* constant) const override {
     if (constant->type()->isString() && !constant->isNull()) {
-      CHECK(constant->get_constval().stringval);
-      sdp_->getOrAddTransient(*constant->get_constval().stringval);
+      CHECK(constant->value().stringval);
+      sdp_->getOrAddTransient(*constant->value().stringval);
     }
     return defaultResult();
   }

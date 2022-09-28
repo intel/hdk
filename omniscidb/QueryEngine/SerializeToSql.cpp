@@ -39,7 +39,7 @@ std::string ScalarExprToSql::visitConstant(const hdk::ir::Constant* constant) co
     return "NULL";
   }
   auto constant_type = constant->type();
-  const auto result = DatumToString(constant->get_constval(), constant_type);
+  const auto result = DatumToString(constant->value(), constant_type);
   if (constant_type->isString() || constant_type->isExtDictionary()) {
     return "'" + result + "'";
   } else {

@@ -3719,7 +3719,7 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
     return FragmentSkipStatus::INVALID;
   }
 
-  const auto datum_fp = rhs_const->get_constval();
+  const auto datum_fp = rhs_const->value();
   const auto rhs_type = rhs_const->type();
   CHECK(rhs_type->isFloatingPoint());
 

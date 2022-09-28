@@ -32,7 +32,7 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
       if (!rhs_constant || rhs_constant->isNull()) {
         return true;
       }
-      const auto& datum = rhs_constant->get_constval();
+      const auto& datum = rhs_constant->value();
       auto type = rhs_constant->type();
       if ((type->isBoolean() && datum.boolval == 0) ||
           (type->isInt8() && datum.tinyintval == 0) ||

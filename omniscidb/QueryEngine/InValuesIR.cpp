@@ -154,7 +154,7 @@ std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(
             const auto string_id =
                 in_val_const->isNull()
                     ? needle_null_val
-                    : sdp->getIdOfString(*in_val_const->get_constval().stringval);
+                    : sdp->getIdOfString(*in_val_const->value().stringval);
             if (string_id != StringDictionary::INVALID_STR_ID) {
               out_vals.push_back(string_id);
             }

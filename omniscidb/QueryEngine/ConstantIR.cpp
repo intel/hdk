@@ -31,7 +31,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
   switch (cst_type->id()) {
     case hdk::ir::Type::kBoolean:
       return {llvm::ConstantInt::get(get_int_type(8, cgen_state_->context_),
-                                     constant->get_constval().boolval)};
+                                     constant->value().boolval)};
     case hdk::ir::Type::kInteger:
     case hdk::ir::Type::kDecimal:
     case hdk::ir::Type::kTime:
@@ -42,15 +42,15 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
     case hdk::ir::Type::kFloatingPoint:
       if (cst_type->isFp32()) {
         return {llvm::ConstantFP::get(llvm::Type::getFloatTy(cgen_state_->context_),
-                                      constant->get_constval().floatval)};
+                                      constant->value().floatval)};
       } else {
         CHECK(cst_type->isFp64());
         return {llvm::ConstantFP::get(llvm::Type::getDoubleTy(cgen_state_->context_),
-                                      constant->get_constval().doubleval)};
+                                      constant->value().doubleval)};
       }
     case hdk::ir::Type::kVarChar:
     case hdk::ir::Type::kText: {
-      CHECK(constant->get_constval().stringval || constant->isNull());
+      CHECK(constant->value().stringval || constant->isNull());
       if (constant->isNull()) {
         if (use_dict_encoding) {
           return {
@@ -61,7 +61,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
                     llvm::PointerType::get(get_int_type(8, cgen_state_->context_), 0)),
                 cgen_state_->llInt(int32_t(0))};
       }
-      const auto& str_const = *constant->get_constval().stringval;
+      const auto& str_const = *constant->value().stringval;
       if (use_dict_encoding) {
         return {
             cgen_state_->llInt(executor()
@@ -90,13 +90,13 @@ llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* const
     case hdk::ir::Type::kDecimal:
       switch (type->size()) {
         case 1:
-          return cgen_state->llInt(constant->get_constval().tinyintval);
+          return cgen_state->llInt(constant->value().tinyintval);
         case 2:
-          return cgen_state->llInt(constant->get_constval().smallintval);
+          return cgen_state->llInt(constant->value().smallintval);
         case 4:
-          return cgen_state->llInt(constant->get_constval().intval);
+          return cgen_state->llInt(constant->value().intval);
         case 8:
-          return cgen_state->llInt(constant->get_constval().bigintval);
+          return cgen_state->llInt(constant->value().bigintval);
         default:
           UNREACHABLE();
       }
@@ -104,7 +104,7 @@ llvm::ConstantInt* CodeGenerator::codegenIntConst(const hdk::ir::Constant* const
     case hdk::ir::Type::kTimestamp:
     case hdk::ir::Type::kDate:
     case hdk::ir::Type::kInterval:
-      return cgen_state->llInt(constant->get_constval().bigintval);
+      return cgen_state->llInt(constant->value().bigintval);
     default:
       UNREACHABLE();
   }

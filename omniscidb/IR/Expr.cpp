@@ -987,7 +987,7 @@ bool Constant::operator==(const Expr& rhs) const {
   if (type_->isArray()) {
     return false;
   }
-  return DatumEqual(constval, rhs_c.get_constval(), type_);
+  return DatumEqual(constval, rhs_c.value(), type_);
 }
 
 bool UOper::operator==(const Expr& rhs) const {
@@ -1756,7 +1756,7 @@ double WidthBucketExpr::get_bound_val(const Expr* bound_expr) const {
   CHECK(casted_expr);
   auto casted_constant = std::dynamic_pointer_cast<const Constant>(casted_expr);
   CHECK(casted_constant);
-  return casted_constant->get_constval().doubleval;
+  return casted_constant->value().doubleval;
 }
 
 int32_t WidthBucketExpr::get_partition_count_val() const {
@@ -1764,7 +1764,7 @@ int32_t WidthBucketExpr::get_partition_count_val() const {
   if (!const_partition_count_expr) {
     return -1;
   }
-  auto d = const_partition_count_expr->get_constval();
+  auto d = const_partition_count_expr->value();
   switch (const_partition_count_expr->type()->id()) {
     case hdk::ir::Type::kInteger:
       switch (const_partition_count_expr->type()->size()) {

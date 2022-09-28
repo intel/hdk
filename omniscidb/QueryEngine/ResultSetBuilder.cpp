@@ -118,7 +118,7 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
           *reinterpret_cast<int64_t*>(ptr) = inline_int_null_value(targets[j].type);
         } else {
           auto type = constant->type();
-          const auto datum = constant->get_constval();
+          const auto datum = constant->value();
 
           if (type->isString() || type->isExtDictionary()) {
             // get string from datum and push to vector

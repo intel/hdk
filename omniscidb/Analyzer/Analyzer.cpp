@@ -803,15 +803,15 @@ hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
       throw std::runtime_error("expression after ESCAPE must be of a string type.");
     }
     auto c = escape_expr->as<hdk::ir::Constant>();
-    if (c != nullptr && c->get_constval().stringval->length() > 1) {
+    if (c != nullptr && c->value().stringval->length() > 1) {
       throw std::runtime_error("String after ESCAPE must have a single character.");
     }
-    escape_char = (*c->get_constval().stringval)[0];
+    escape_char = (*c->value().stringval)[0];
   }
   auto c = like_expr->as<hdk::ir::Constant>();
   bool is_simple = false;
   if (c != nullptr) {
-    std::string& pattern = *c->get_constval().stringval;
+    std::string& pattern = *c->value().stringval;
     if (is_ilike) {
       std::transform(pattern.begin(), pattern.end(), pattern.begin(), ::tolower);
     }
@@ -849,17 +849,17 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
       throw std::runtime_error("expression after ESCAPE must be of a string type.");
     }
     auto c = escape_expr->as<hdk::ir::Constant>();
-    if (c != nullptr && c->get_constval().stringval->length() > 1) {
+    if (c != nullptr && c->value().stringval->length() > 1) {
       throw std::runtime_error("String after ESCAPE must have a single character.");
     }
-    escape_char = (*c->get_constval().stringval)[0];
+    escape_char = (*c->value().stringval)[0];
     if (escape_char != '\\') {
       throw std::runtime_error("Only supporting '\\' escape character.");
     }
   }
   auto c = pattern_expr->as<hdk::ir::Constant>();
   if (c != nullptr) {
-    std::string& pattern = *c->get_constval().stringval;
+    std::string& pattern = *c->value().stringval;
     if (translate_to_like_pattern(pattern, escape_char)) {
       return getLikeExpr(arg_expr, pattern_expr, escape_expr, false, is_not);
     }

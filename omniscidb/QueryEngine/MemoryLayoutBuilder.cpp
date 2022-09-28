@@ -419,8 +419,8 @@ CountDistinctDescriptors init_count_distinct_descriptors(
         const auto error_rate = agg_expr->get_arg1();
         if (error_rate) {
           CHECK(error_rate->type()->isInt32());
-          CHECK_GE(error_rate->get_constval().intval, 1);
-          bitmap_sz_bits = hll_size_for_rate(error_rate->get_constval().smallintval);
+          CHECK_GE(error_rate->value().intval, 1);
+          bitmap_sz_bits = hll_size_for_rate(error_rate->value().smallintval);
         } else {
           bitmap_sz_bits = executor->getConfig().exec.group_by.hll_precision_bits;
         }

@@ -122,7 +122,7 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
 
     bool cond_is_not_const_true = !condition_true ||
                                   !condition_true->type()->isBoolean() ||
-                                  !condition_true->get_constval().boolval;
+                                  !condition_true->value().boolval;
     if (cond_is_not_const_true) {
       switch (original_join->getJoinType()) {
         case JoinType::INNER:

@@ -224,11 +224,11 @@ size_t get_int_constant_from_expr(const hdk::ir::Expr* expr) {
   }
   auto lag_type = lag_constant->type();
   if (lag_type->isInt16()) {
-    return lag_constant->get_constval().smallintval;
+    return lag_constant->value().smallintval;
   } else if (lag_type->isInt32()) {
-    return lag_constant->get_constval().intval;
+    return lag_constant->value().intval;
   } else if (lag_type->isInt64()) {
-    return lag_constant->get_constval().bigintval;
+    return lag_constant->value().bigintval;
   }
   LOG(FATAL) << "Invalid type for the lag argument";
   return 0;

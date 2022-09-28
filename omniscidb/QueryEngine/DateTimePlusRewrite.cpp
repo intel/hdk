@@ -47,7 +47,7 @@ bool match_const_integer(const hdk::ir::Expr* expr, const int64_t v) {
   if (!const_type->isInteger()) {
     return false;
   }
-  const auto& datum = const_expr->get_constval();
+  const auto& datum = const_expr->value();
   switch (const_type->size()) {
     case 1:
       return v == datum.tinyintval;
@@ -128,7 +128,7 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_ar
       interval_type->as<hdk::ir::IntervalType>()->unit() != hdk::ir::TimeUnit::kMilli) {
     return dtINVALID;
   }
-  const auto& datum = interval->get_constval();
+  const auto& datum = interval->value();
   switch (datum.bigintval) {
     case 86400000:
       return get_dt_field(ts, interval_multiplier, false);

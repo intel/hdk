@@ -334,7 +334,7 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
   }
 
   auto scale_diff = lhs_scale - operand_scale - 1;
-  int64_t bigintval = rhs_constant->get_constval().bigintval;
+  int64_t bigintval = rhs_constant->value().bigintval;
   bool negative = false;
   if (bigintval < 0) {
     negative = true;

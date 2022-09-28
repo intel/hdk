@@ -179,11 +179,11 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
   if (constant != nullptr) {
     Datum d;
     d.bigintval = field == kEPOCH
-                      ? floor_div(constant->get_constval().bigintval,
+                      ? floor_div(constant->value().bigintval,
                                   hdk::ir::unitsPerSecond(
                                       expr_type->as<hdk::ir::DateTimeBaseType>()->unit()))
                       : getExtractFromTimeConstantValue(
-                            constant->get_constval().bigintval, field, expr_type);
+                            constant->value().bigintval, field, expr_type);
     return hdk::ir::makeExpr<hdk::ir::Constant>(
         type, constant->isNull(), d, constant->cacheable());
   }
@@ -257,7 +257,7 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
   if (constant) {
     Datum d{0};
     d.bigintval =
-        getDateTruncConstantValue(constant->get_constval().bigintval, field, expr_type);
+        getDateTruncConstantValue(constant->value().bigintval, field, expr_type);
     return hdk::ir::makeExpr<hdk::ir::Constant>(
         type, constant->isNull(), d, constant->cacheable());
   }

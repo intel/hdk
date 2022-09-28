@@ -32,7 +32,7 @@ bool matches_gt_bigint_zero(const hdk::ir::BinOper* window_gt_zero) {
   }
   const auto zero =
       dynamic_cast<const hdk::ir::Constant*>(window_gt_zero->get_right_operand());
-  return zero && zero->type()->isInt64() && zero->get_constval().bigintval == 0;
+  return zero && zero->type()->isInt64() && zero->value().bigintval == 0;
 }
 
 // Returns true iff the sum and the count match in type and arguments. Used to replace

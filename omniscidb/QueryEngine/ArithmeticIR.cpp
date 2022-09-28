@@ -560,9 +560,8 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
 
   auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
   auto rhs_cast = dynamic_cast<const hdk::ir::UOper*>(rhs);
-  if (rhs_constant && !rhs_constant->isNull() &&
-      rhs_constant->get_constval().bigintval != 0LL &&
-      (rhs_constant->get_constval().bigintval % exp_to_scale(scale)) == 0LL) {
+  if (rhs_constant && !rhs_constant->isNull() && rhs_constant->value().bigintval != 0LL &&
+      (rhs_constant->value().bigintval % exp_to_scale(scale)) == 0LL) {
     // can safely downscale a scaled constant
   } else if (rhs_cast && rhs_cast->get_optype() == kCAST &&
              rhs_cast->get_operand()->type()->isInteger()) {
@@ -574,8 +573,8 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
   auto lhs_lv = codegen(lhs, true, co).front();
   llvm::Value* rhs_lv{nullptr};
   if (rhs_constant) {
-    const auto rhs_lit = Analyzer::analyzeIntValue(
-        rhs_constant->get_constval().bigintval / exp_to_scale(scale));
+    const auto rhs_lit =
+        Analyzer::analyzeIntValue(rhs_constant->value().bigintval / exp_to_scale(scale));
     auto rhs_lit_lv = CodeGenerator::codegenIntConst(
         dynamic_cast<const hdk::ir::Constant*>(rhs_lit.get()), cgen_state_);
     rhs_lv = codegenCastBetweenIntTypes(

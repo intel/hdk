@@ -176,20 +176,20 @@ ExpressionRange apply_simple_quals(
     }
     if (qual_range.getType() == ExpressionRangeType::Float ||
         qual_range.getType() == ExpressionRangeType::Double) {
-      apply_fp_qual(qual_const->get_constval(),
+      apply_fp_qual(qual_const->value(),
                     qual_const->type(),
                     qual_bin_oper->get_optype(),
                     qual_range);
     } else if (qual_col->type()->isTimestamp() || qual_const->type()->isTimestamp()) {
       CHECK(qual_const->type()->isDateTime());
       CHECK(qual_col->type()->isDateTime());
-      apply_hpt_qual(qual_const->get_constval(),
+      apply_hpt_qual(qual_const->value(),
                      qual_const->type(),
                      qual_col->type(),
                      qual_bin_oper->get_optype(),
                      qual_range);
     } else {
-      apply_int_qual(qual_const->get_constval(),
+      apply_int_qual(qual_const->value(),
                      qual_const->type(),
                      qual_bin_oper->get_optype(),
                      qual_range);
@@ -422,7 +422,7 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
     return ExpressionRange::makeInvalidRange();
   }
   const auto constant_type = constant_expr->type();
-  const auto datum = constant_expr->get_constval();
+  const auto datum = constant_expr->value();
   switch (constant_type->id()) {
     case hdk::ir::Type::kInteger:
     case hdk::ir::Type::kDecimal:
@@ -767,8 +767,8 @@ ExpressionRange getExpressionRange(
     if (const_operand->isNull()) {
       return ExpressionRange::makeNullRange();
     }
-    CHECK(const_operand->get_constval().stringval);
-    const int64_t v = sdp->getIdOfString(*const_operand->get_constval().stringval);
+    CHECK(const_operand->value().stringval);
+    const int64_t v = sdp->getIdOfString(*const_operand->value().stringval);
     return ExpressionRange::makeIntRange(v, v, 0, false);
   }
   const auto arg_range =

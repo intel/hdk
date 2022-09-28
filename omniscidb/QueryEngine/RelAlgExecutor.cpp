@@ -1902,8 +1902,8 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     const auto error_rate = target_expr->as<hdk::ir::AggExpr>()->get_arg1();
     if (error_rate) {
       CHECK(error_rate->type()->isInt32());
-      CHECK_GE(error_rate->get_constval().intval, 1);
-      approx_bitmap_sz_bits = hll_size_for_rate(error_rate->get_constval().intval);
+      CHECK_GE(error_rate->value().intval, 1);
+      approx_bitmap_sz_bits = hll_size_for_rate(error_rate->value().intval);
     } else {
       approx_bitmap_sz_bits = executor->getConfig().exec.group_by.hll_precision_bits;
     }

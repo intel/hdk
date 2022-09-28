@@ -55,7 +55,7 @@ struct CgenState {
       case hdk::ir::Type::kBoolean:
         return getOrAddLiteral(constant->isNull()
                                    ? int8_t(inline_int_null_value(type))
-                                   : int8_t(constant->get_constval().boolval ? 1 : 0),
+                                   : int8_t(constant->value().boolval ? 1 : 0),
                                device_id);
       case hdk::ir::Type::kInteger:
       case hdk::ir::Type::kDecimal:
@@ -63,22 +63,22 @@ struct CgenState {
           case 1:
             return getOrAddLiteral(constant->isNull()
                                        ? int8_t(inline_int_null_value(type))
-                                       : constant->get_constval().tinyintval,
+                                       : constant->value().tinyintval,
                                    device_id);
           case 2:
             return getOrAddLiteral(constant->isNull()
                                        ? int16_t(inline_int_null_value(type))
-                                       : constant->get_constval().smallintval,
+                                       : constant->value().smallintval,
                                    device_id);
           case 4:
             return getOrAddLiteral(constant->isNull()
                                        ? int32_t(inline_int_null_value(type))
-                                       : constant->get_constval().intval,
+                                       : constant->value().intval,
                                    device_id);
           case 8:
             return getOrAddLiteral(constant->isNull()
                                        ? int64_t(inline_int_null_value(type))
-                                       : constant->get_constval().bigintval,
+                                       : constant->value().bigintval,
                                    device_id);
           default:
             abort();
@@ -88,12 +88,11 @@ struct CgenState {
         switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
           case hdk::ir::FloatingPointType::kFloat:
             return getOrAddLiteral(constant->isNull() ? float(inline_fp_null_value(type))
-                                                      : constant->get_constval().floatval,
+                                                      : constant->value().floatval,
                                    device_id);
           case hdk::ir::FloatingPointType::kDouble:
-            return getOrAddLiteral(constant->isNull()
-                                       ? inline_fp_null_value(type)
-                                       : constant->get_constval().doubleval,
+            return getOrAddLiteral(constant->isNull() ? inline_fp_null_value(type)
+                                                      : constant->value().doubleval,
                                    device_id);
           default:
             abort();
@@ -106,8 +105,8 @@ struct CgenState {
           if (constant->isNull()) {
             return getOrAddLiteral((int32_t)inline_int_null_value<int32_t>(), device_id);
           }
-          return getOrAddLiteral(
-              std::make_pair(*constant->get_constval().stringval, dict_id), device_id);
+          return getOrAddLiteral(std::make_pair(*constant->value().stringval, dict_id),
+                                 device_id);
         }
         if (constant->isNull()) {
           throw std::runtime_error(
@@ -115,13 +114,13 @@ struct CgenState {
                                                                              // support
                                                                              // null
         }
-        return getOrAddLiteral(*constant->get_constval().stringval, device_id);
+        return getOrAddLiteral(*constant->value().stringval, device_id);
       case hdk::ir::Type::kTime:
       case hdk::ir::Type::kTimestamp:
       case hdk::ir::Type::kDate:
       case hdk::ir::Type::kInterval:
         // TODO(alex): support null
-        return getOrAddLiteral(constant->get_constval().bigintval, device_id);
+        return getOrAddLiteral(constant->value().bigintval, device_id);
       case hdk::ir::Type::kFixedLenArray:
       case hdk::ir::Type::kVarLenArray: {
         if (!use_dict_encoding) {
@@ -131,7 +130,7 @@ struct CgenState {
             for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
-              double d = c->get_constval().doubleval;
+              double d = c->value().doubleval;
               double_array_literal.push_back(d);
             }
             return getOrAddLiteral(double_array_literal, device_id);
@@ -141,7 +140,7 @@ struct CgenState {
             for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
-              int32_t i = c->get_constval().intval;
+              int32_t i = c->value().intval;
               int32_array_literal.push_back(i);
             }
             return getOrAddLiteral(int32_array_literal, device_id);
@@ -151,7 +150,7 @@ struct CgenState {
             for (const auto& value : constant->valueList()) {
               const auto c = dynamic_cast<const hdk::ir::Constant*>(value.get());
               CHECK(c);
-              int8_t i = c->get_constval().tinyintval;
+              int8_t i = c->value().tinyintval;
               int8_array_literal.push_back(i);
             }
             return getOrAddLiteral(int8_array_literal, device_id);

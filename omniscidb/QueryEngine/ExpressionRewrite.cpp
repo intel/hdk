@@ -452,7 +452,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         std::dynamic_pointer_cast<const hdk::ir::Constant>(operand);
 
     if (const_operand) {
-      const auto operand_datum = const_operand->get_constval();
+      const auto operand_datum = const_operand->value();
       Datum zero_datum = {};
       Datum result_datum = {};
       const hdk::ir::Type* result_type;
@@ -502,7 +502,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
           auto const_cast_operand =
               std::dynamic_pointer_cast<const hdk::ir::Constant>(cast_operand);
           if (const_cast_operand) {
-            auto const_cast_datum = const_cast_operand->get_constval();
+            auto const_cast_datum = const_cast_operand->value();
             return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, const_cast_datum);
           }
         }
@@ -548,8 +548,8 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
     if (const_lhs && const_rhs && lhs_type->id() == rhs_type->id() && lhs_type->size() &&
         rhs_type->size()) {
-      auto lhs_datum = const_lhs->get_constval();
-      auto rhs_datum = const_rhs->get_constval();
+      auto lhs_datum = const_lhs->value();
+      auto rhs_datum = const_rhs->value();
       Datum result_datum = {};
       const hdk::ir::Type* result_type;
       if (foldOper(optype, lhs_type, lhs_datum, rhs_datum, result_datum, result_type)) {
@@ -567,7 +567,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
     if (optype == kAND && lhs_type == rhs_type && lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->isNull()) {
-        auto rhs_datum = const_rhs->get_constval();
+        auto rhs_datum = const_rhs->value();
         if (rhs_datum.boolval == false) {
           Datum d;
           d.boolval = false;
@@ -578,7 +578,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         return lhs;
       }
       if (const_lhs && !const_lhs->isNull()) {
-        auto lhs_datum = const_lhs->get_constval();
+        auto lhs_datum = const_lhs->value();
         if (lhs_datum.boolval == false) {
           Datum d;
           d.boolval = false;
@@ -591,7 +591,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     }
     if (optype == kOR && lhs_type == rhs_type && lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->isNull()) {
-        auto rhs_datum = const_rhs->get_constval();
+        auto rhs_datum = const_rhs->value();
         if (rhs_datum.boolval == true) {
           Datum d;
           d.boolval = true;
@@ -602,7 +602,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         return lhs;
       }
       if (const_lhs && !const_lhs->isNull()) {
-        auto lhs_datum = const_lhs->get_constval();
+        auto lhs_datum = const_lhs->value();
         if (lhs_datum.boolval == true) {
           Datum d;
           d.boolval = true;
@@ -634,7 +634,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     }
     // Convert fp division by a constant to multiplication by 1/constant
     if (optype == kDIVIDE && const_rhs && rhs_type->isFloatingPoint()) {
-      auto rhs_datum = const_rhs->get_constval();
+      auto rhs_datum = const_rhs->value();
       hdk::ir::ExprPtr recip_rhs = nullptr;
       if (rhs_type->isFp32()) {
         if (rhs_datum.floatval == 1.0) {
@@ -678,7 +678,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         dynamic_cast<const hdk::ir::Constant*>(lower_expr->get_arg());
     if (constant_arg_expr) {
       return Analyzer::analyzeStringValue(
-          boost::locale::to_lower(*constant_arg_expr->get_constval().stringval));
+          boost::locale::to_lower(*constant_arg_expr->value().stringval));
     }
     return hdk::ir::makeExpr<hdk::ir::LowerExpr>(lower_expr->get_own_arg());
   }

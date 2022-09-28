@@ -140,8 +140,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
         dynamic_cast<const hdk::ir::Constant*>(expr->get_escape_expr());
     CHECK(escape_char_expr);
     CHECK(escape_char_expr->type()->isString());
-    CHECK_EQ(size_t(1), escape_char_expr->get_constval().stringval->size());
-    escape_char = (*escape_char_expr->get_constval().stringval)[0];
+    CHECK_EQ(size_t(1), escape_char_expr->value().stringval->size());
+    escape_char = (*escape_char_expr->value().stringval)[0];
   }
   auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_like_expr());
   CHECK(pattern);
@@ -216,7 +216,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
   }
   const auto& pattern_type = pattern->type();
   CHECK(pattern_type->isString());
-  const auto& pattern_datum = pattern->get_constval();
+  const auto& pattern_datum = pattern->value();
   const auto& pattern_str = *pattern_datum.stringval;
   const auto matching_ids = sdp->getLike(pattern_str, ilike, is_simple, escape_char);
   // InIntegerSet requires 64-bit values
@@ -319,7 +319,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
     // between two encoded columns. Which we currently do not handle.
     return nullptr;
   }
-  const auto& const_val = const_expr->get_constval();
+  const auto& const_val = const_expr->value();
 
   const auto col_type = col_var->type();
   CHECK(col_type->isExtDictionary());
@@ -357,8 +357,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
         dynamic_cast<const hdk::ir::Constant*>(expr->get_escape_expr());
     CHECK(escape_char_expr);
     CHECK(escape_char_expr->type()->isString());
-    CHECK_EQ(size_t(1), escape_char_expr->get_constval().stringval->size());
-    escape_char = (*escape_char_expr->get_constval().stringval)[0];
+    CHECK_EQ(size_t(1), escape_char_expr->value().stringval->size());
+    escape_char = (*escape_char_expr->value().stringval)[0];
   }
   auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_pattern_expr());
   CHECK(pattern);
@@ -423,7 +423,7 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
   }
   const auto& pattern_type = pattern->type();
   CHECK(pattern_type->isString());
-  const auto& pattern_datum = pattern->get_constval();
+  const auto& pattern_datum = pattern->value();
   const auto& pattern_str = *pattern_datum.stringval;
   const auto matching_ids = sdp->getRegexpLike(pattern_str, escape_char);
   // InIntegerSet requires 64-bit values

@@ -1133,11 +1133,11 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
   if (interval_type->unit() == hdk::ir::TimeUnit::kMilli) {
     hdk::ir::ExprPtr interval_sec;
     if (interval_lit) {
-      interval_sec = hdk::ir::Constant::make(
-          bigint_type,
-          (op == kMINUS ? -interval_lit->get_constval().bigintval
-                        : interval_lit->get_constval().bigintval) /
-              1000);
+      interval_sec =
+          hdk::ir::Constant::make(bigint_type,
+                                  (op == kMINUS ? -interval_lit->value().bigintval
+                                                : interval_lit->value().bigintval) /
+                                      1000);
     } else {
       interval_sec =
           hdk::ir::makeExpr<hdk::ir::BinOper>(bigint_type,
@@ -1307,10 +1307,10 @@ hdk::ir::ExprPtr parseExtract(const std::string& fn_name,
   validateDatetimeDatepartArgument(timeunit_lit);
   auto& from_expr = operands[1];
   if (fn_name == "PG_DATE_TRUNC"sv) {
-    return DateTruncExpr::generate(from_expr, *timeunit_lit->get_constval().stringval);
+    return DateTruncExpr::generate(from_expr, *timeunit_lit->value().stringval);
   } else {
     CHECK(fn_name == "PG_EXTRACT"sv);
-    return ExtractExpr::generate(from_expr, *timeunit_lit->get_constval().stringval);
+    return ExtractExpr::generate(from_expr, *timeunit_lit->value().stringval);
   }
 }
 
@@ -1331,7 +1331,7 @@ hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   if (datetime_type->isTime()) {
     throw std::runtime_error("DateAdd operation not supported for TIME.");
   }
-  auto field = to_dateadd_field(*timeunit_lit->get_constval().stringval);
+  auto field = to_dateadd_field(*timeunit_lit->value().stringval);
   auto unit = datetime_type->isTimestamp()
                   ? datetime_type->as<hdk::ir::TimestampType>()->unit()
                   : hdk::ir::TimeUnit::kSecond;
@@ -1346,7 +1346,7 @@ hdk::ir::ExprPtr parseDatediff(const hdk::ir::ExprPtrVector& operands) {
   validateDatetimeDatepartArgument(timeunit_lit);
   auto& start = operands[1];
   auto& end = operands[2];
-  auto field = to_datediff_field(*timeunit_lit->get_constval().stringval);
+  auto field = to_datediff_field(*timeunit_lit->value().stringval);
   return hdk::ir::makeExpr<hdk::ir::DatediffExpr>(
       start->type()->ctx().int64(), field, start, end);
 }
@@ -1357,8 +1357,8 @@ hdk::ir::ExprPtr parseDatepart(const hdk::ir::ExprPtrVector& operands) {
   auto timeunit_lit = dynamic_cast<const hdk::ir::Constant*>(timeunit.get());
   validateDatetimeDatepartArgument(timeunit_lit);
   auto& from_expr = operands[1];
-  return ExtractExpr::generate(
-      from_expr, to_datepart_field(*timeunit_lit->get_constval().stringval));
+  return ExtractExpr::generate(from_expr,
+                               to_datepart_field(*timeunit_lit->value().stringval));
 }
 
 hdk::ir::ExprPtr parseLength(const std::string& fn_name,
@@ -1524,7 +1524,7 @@ hdk::ir::ExprPtr parseDatetime(const hdk::ir::ExprPtrVector& operands, time_t no
     throw std::runtime_error(datetime_err);
   }
   CHECK(arg_lit->type()->isString() || arg_lit->type()->isExtDictionary());
-  if (*arg_lit->get_constval().stringval != "NOW"sv) {
+  if (*arg_lit->value().stringval != "NOW"sv) {
     throw std::runtime_error(datetime_err);
   }
   return parseCurrentTimestamp(now);
@@ -1864,8 +1864,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
 
     if (agg_kind == kAPPROX_COUNT_DISTINCT && operands.size() == 2) {
       arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(sources[operands[1]]);
-      if (!arg1 || !arg1->type()->isInt32() || arg1->get_constval().intval < 1 ||
-          arg1->get_constval().intval > 100) {
+      if (!arg1 || !arg1->type()->isInt32() || arg1->value().intval < 1 ||
+          arg1->value().intval > 100) {
         throw std::runtime_error(
             "APPROX_COUNT_DISTINCT's second parameter should be SMALLINT literal between "
             "1 and 100");

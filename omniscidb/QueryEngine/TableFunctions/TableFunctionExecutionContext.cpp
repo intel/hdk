@@ -193,7 +193,7 @@ ResultSetPtr TableFunctionExecutionContext::execute(
       // TODO(adb): Unify literal handling with rest of system, either in Codegen or as a
       // separate serialization component
       col_sizes.push_back(0);
-      const auto const_val_datum = constant_val->get_constval();
+      const auto const_val_datum = constant_val->value();
       auto type = constant_val->type();
       if (type->isFloatingPoint()) {
         switch (get_bit_width(type)) {
