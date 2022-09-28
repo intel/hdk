@@ -249,7 +249,7 @@ class Constant : public Expr {
   Constant(const Type* type, bool is_null, Datum v, bool cacheable = true)
       : Expr(type), is_null_(is_null), cacheable_(cacheable), value_(v) {
     if (is_null) {
-      set_null_value();
+      setNullValue();
     } else {
       type_ = type_->withNullable(false);
     }
@@ -284,12 +284,12 @@ class Constant : public Expr {
   bool cacheable_;
   Datum value_;  // the constant value
   const ExprPtrList value_list;
-  ExprPtr cast_number(const Type* new_type) const;
-  ExprPtr cast_string(const Type* new_type) const;
-  ExprPtr cast_from_string(const Type* new_type) const;
-  ExprPtr cast_to_string(const Type* new_type) const;
-  ExprPtr do_cast(const Type* new_type) const;
-  void set_null_value();
+  ExprPtr castNumber(const Type* new_type) const;
+  ExprPtr castString(const Type* new_type) const;
+  ExprPtr castFromString(const Type* new_type) const;
+  ExprPtr castToString(const Type* new_type) const;
+  ExprPtr doCast(const Type* new_type) const;
+  void setNullValue();
 };
 
 /*

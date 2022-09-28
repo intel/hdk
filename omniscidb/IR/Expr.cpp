@@ -569,7 +569,7 @@ ExprPtr ArrayExpr::deep_copy() const {
   return makeExpr<ArrayExpr>(type_, new_contained_expressions, is_null_, local_alloc_);
 }
 
-ExprPtr Constant::cast_number(const Type* new_type) const {
+ExprPtr Constant::castNumber(const Type* new_type) const {
   Datum new_value = value_;
   switch (type_->id()) {
     case Type::kBoolean:
@@ -735,7 +735,7 @@ ExprPtr Constant::cast_number(const Type* new_type) const {
   return makeExpr<Constant>(new_type, is_null_, new_value, cacheable_);
 }
 
-ExprPtr Constant::cast_string(const Type* new_type) const {
+ExprPtr Constant::castString(const Type* new_type) const {
   Datum new_value;
   if (value_.stringval) {
     new_value.stringval = new std::string(*value_.stringval);
@@ -752,12 +752,12 @@ ExprPtr Constant::cast_string(const Type* new_type) const {
   return makeExpr<Constant>(new_type, is_null_, new_value, cacheable_);
 }
 
-ExprPtr Constant::cast_from_string(const Type* new_type) const {
+ExprPtr Constant::castFromString(const Type* new_type) const {
   Datum new_value = StringToDatum(*value_.stringval, new_type);
   return makeExpr<Constant>(new_type, is_null_, new_value, cacheable_);
 }
 
-ExprPtr Constant::cast_to_string(const Type* str_type) const {
+ExprPtr Constant::castToString(const Type* str_type) const {
   const auto str_val = DatumToString(value_, type_);
   Datum new_value;
   new_value.stringval = new std::string(str_val);
@@ -771,7 +771,7 @@ ExprPtr Constant::cast_to_string(const Type* str_type) const {
   return makeExpr<Constant>(str_type, is_null_, new_value, cacheable_);
 }
 
-ExprPtr Constant::do_cast(const Type* new_type) const {
+ExprPtr Constant::doCast(const Type* new_type) const {
   if (type_->equal(new_type)) {
     return shared_from_this();
   }
@@ -779,14 +779,14 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
   } else if ((new_type->isNumber() || new_type->isTimestamp()) &&
              (!new_type->isTimestamp() || !type_->isTimestamp()) &&
              (type_->isNumber() || type_->isTimestamp() || type_->isBoolean())) {
-    return cast_number(new_type);
+    return castNumber(new_type);
   } else if (new_type->isBoolean() && type_->isBoolean()) {
   } else if (new_type->isString() && type_->isString()) {
-    return cast_string(new_type);
+    return castString(new_type);
   } else if (type_->isString()) {
-    return cast_from_string(new_type);
+    return castFromString(new_type);
   } else if (new_type->isString()) {
-    return cast_to_string(new_type);
+    return castToString(new_type);
   } else if (new_type->isDate() && type_->isDate()) {
     CHECK(type_->as<DateType>()->unit() == new_type->as<DateType>()->unit());
   } else if (new_type->isDate() && type_->isTimestamp()) {
@@ -815,7 +815,7 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
       if (!c) {
         throw std::runtime_error("Invalid array cast.");
       }
-      new_value_list.push_back(c->do_cast(new_elem_type));
+      new_value_list.push_back(c->doCast(new_elem_type));
     }
     return makeExpr<Constant>(new_type, is_null_, new_value_list, cacheable_);
   } else if (isNull() && (new_type->isNumber() || new_type->isTime() ||
@@ -831,7 +831,7 @@ ExprPtr Constant::do_cast(const Type* new_type) const {
   return withType(new_type);
 }
 
-void Constant::set_null_value() {
+void Constant::setNullValue() {
   switch (type_->id()) {
     case Type::kBoolean:
       value_.boolval = NULL_BOOLEAN;
@@ -895,14 +895,14 @@ ExprPtr Constant::cast(const Type* new_type, bool is_dict_intersection) const {
     return makeExpr<Constant>(new_type, true, value_, cacheable_);
   }
   if (new_type->isExtDictionary()) {
-    auto new_cst = do_cast(new_type->as<ExtDictionaryType>()->elemType());
+    auto new_cst = doCast(new_type->as<ExtDictionaryType>()->elemType());
     return new_cst->Expr::cast(new_type);
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
     return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
   }
-  return do_cast(new_type);
+  return doCast(new_type);
 }
 
 ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
