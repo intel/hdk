@@ -176,11 +176,6 @@ class ColumnVar : public Expr {
   ExprPtr deep_copy() const override;
   ExprPtr withType(const Type* type) const override;
 
-  static bool colvar_comp(const ColumnVar* l, const ColumnVar* r) {
-    return l->get_table_id() < r->get_table_id() ||
-           (l->get_table_id() == r->get_table_id() &&
-            l->get_column_id() < r->get_column_id());
-  }
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
