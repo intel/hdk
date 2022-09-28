@@ -233,11 +233,9 @@ void QueryPlanDagExtractor::visit(const RelAlgNode* parent_node,
     // Thus, this RelLeftDeepInnerJoin object itself is useless when recycling data
     // but sometimes it has inner condition that has to consider so we add an extra
     // RelFilter node containing the condition to keep query semantic correctly
-    if (hdk::ir::isOneOf<hdk::ir::UOper,
-                         hdk::ir::BinOper,
-                         hdk::ir::InValues,
-                         hdk::ir::InIntegerSet,
-                         hdk::ir::InSubquery>(inner_cond)) {
+    if (inner_cond->is<hdk::ir::UOper>() || inner_cond->is<hdk::ir::BinOper>() ||
+        inner_cond->is<hdk::ir::InValues>() || inner_cond->is<hdk::ir::InIntegerSet>() ||
+        inner_cond->is<hdk::ir::InSubquery>()) {
       auto dummy_filter = std::make_shared<RelFilter>(inner_cond);
       register_and_visit(parent_node, dummy_filter.get());
       handleLeftDeepJoinTree(dummy_filter.get(), left_deep_joins);
