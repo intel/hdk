@@ -1270,7 +1270,7 @@ void eliminate_dead_subqueries(
     auto live_subqueries = SubQueryCollector::getLiveSubQueries(root);
     int live_count = 0;
     for (size_t i = 0; i < subqueries.size(); ++i) {
-      if (live_subqueries.count(subqueries[i]->getNode())) {
+      if (live_subqueries.count(subqueries[i]->node())) {
         subqueries[live_count++] = std::move(subqueries[i]);
       }
     }

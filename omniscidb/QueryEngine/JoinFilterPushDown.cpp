@@ -169,7 +169,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryWithFilterPushDown(
     for (auto& subquery : subqueries) {
       // Execute the subquery and cache the result.
       RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
-      const auto subquery_ra = subquery->getNode();
+      const auto subquery_ra = subquery->node();
       CHECK(subquery_ra);
       RaExecutionSequence subquery_seq(subquery_ra);
       auto result = ra_executor.executeRelAlgSeq(subquery_seq, co, eo_modified, 0);

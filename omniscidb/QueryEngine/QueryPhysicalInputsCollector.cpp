@@ -114,7 +114,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
 
   ResultType visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) const override {
     PhysicalInputsNodeVisitor<Derived, ResultType> visitor;
-    return visitor.visit(subquery->getNode());
+    return visitor.visit(subquery->node());
   }
 
   ResultType visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override {
@@ -188,7 +188,7 @@ class SubqueryVisitorBase : public ScalarExprVisitor<ResultType> {
 
   ResultType visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) const override {
     RelAlgVisitor visitor;
-    return visitor.visit(subquery->getNode());
+    return visitor.visit(subquery->node());
   }
 
   ResultType visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override {

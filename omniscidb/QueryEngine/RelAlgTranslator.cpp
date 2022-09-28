@@ -277,7 +277,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitScalarSubquery(
       const hdk::ir::ScalarSubquery* subquery) const override {
-    return translateScalarSubqueryResult(subquery->getNode()->getResult());
+    return translateScalarSubqueryResult(subquery->node()->getResult());
   }
 
   hdk::ir::ExprPtr visitInSubquery(const hdk::ir::InSubquery* subquery) const override {

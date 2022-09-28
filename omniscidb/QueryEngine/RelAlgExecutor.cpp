@@ -427,7 +427,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
       ss << "Subqueries: "
          << "\n";
       for (const auto& subquery : subqueries) {
-        const auto ra = subquery->getNode();
+        const auto ra = subquery->node();
         ss << "\t" << ra->toString() << "\n";
       }
     }
@@ -444,7 +444,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
 
   // Dispatch the subqueries first
   for (auto& subquery : getSubqueries()) {
-    auto subquery_ra = subquery->getNode();
+    auto subquery_ra = subquery->node();
     CHECK(subquery_ra);
     if (subquery_ra->hasContextData()) {
       continue;

@@ -25,7 +25,7 @@ std::unordered_set<const RelAlgNode*> SubQueryCollector::getLiveSubQueries(
 
 void* SubQueryCollector::visitScalarSubquery(
     const hdk::ir::ScalarSubquery* subquery) const {
-  subqueries_.insert(subquery->getNode());
+  subqueries_.insert(subquery->node());
   return ExprDagVisitor::visitScalarSubquery(subquery);
 }
 
