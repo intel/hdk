@@ -107,6 +107,129 @@ add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
+option(ENABLE_L0 "Enable level zero support" OFF)
+if(ENABLE_L0)
+  find_package(LevelZero REQUIRED COMPONENTS ${LevelZero_COMPONENTS})
+  include_directories(${LevelZero_INCLUDE_DIRS})
+  add_definitions("-DHAVE_L0")
+endif()
+
+set(CUDA_USE_STATIC_CUDA_RUNTIME ON CACHE STRING "Use static CUDA runtime")
+
+option(ENABLE_CUDA "Enable CUDA support" ON)
+if(ENABLE_CUDA)
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
+  # A temporary workaround for non-conda envs
+  include_directories(${CUDAToolkit_INCLUDE_DIRS})
+  list(APPEND CUDA_LIBRARIES CUDA::cudart CUDA::cuda_driver)
+  add_definitions("-DHAVE_CUDA")
+
+else()
+  set(CUDA_LIBRARIES "")
+  set(MAPD_PACKAGE_FLAGS "${MAPD_PACKAGE_FLAGS}-cpu")
+endif()
+
+# CUDA architecture flags
+if("${CMAKE_BUILD_TYPE_LOWER}" STREQUAL "debug")
+  option(ENABLE_ONLY_ONE_ARCH "Enable quicker building for only one GPU arch" ON)
+else()
+  option(ENABLE_ONLY_ONE_ARCH "Enable quicker building for only one GPU arch" OFF)
+endif()
+if(ENABLE_CUDA)
+  set(MAPD_CUDA_OPTIONS)
+  # Set Thrust debug mode for CUDA compilation project-wide
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPERCASE)
+  if(CMAKE_BUILD_TYPE_UPPERCASE MATCHES DEBUG)
+    list(APPEND MAPD_CUDA_OPTIONS -DTHRUST_DEBUG --debug)
+  else()
+    list(APPEND MAPD_CUDA_OPTIONS -O3)
+  endif()
+
+  list(APPEND MAPD_CUDA_OPTIONS -Xcompiler -fPIC -D_FORCE_INLINES -std=c++17)
+
+  if(ENABLE_ONLY_ONE_ARCH)
+    execute_process(
+      COMMAND cmake -S ${CMAKE_SOURCE_DIR}/NvidiaComputeCapability -B NvidiaComputeCapability
+      OUTPUT_QUIET
+      ERROR_QUIET
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    execute_process(
+      COMMAND cmake --build NvidiaComputeCapability
+      OUTPUT_FILE ${CMAKE_BINARY_DIR}/NvidiaComputeCapability/build.out.txt
+      ERROR_FILE ${CMAKE_BINARY_DIR}/NvidiaComputeCapability/build.err.txt
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    set(NVIDIA_COMPUTE_CAPABILITY "")
+    if (EXISTS ${CMAKE_BINARY_DIR}/NvidiaComputeCapability.txt)
+      file(STRINGS ${CMAKE_BINARY_DIR}/NvidiaComputeCapability.txt NVIDIA_COMPUTE_CAPABILITY)
+    endif()
+  endif()
+  if (ENABLE_ONLY_ONE_ARCH AND NOT "${NVIDIA_COMPUTE_CAPABILITY}" STREQUAL "")
+    if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.18.0")
+      set(CMAKE_CUDA_ARCHITECTURES ${NVIDIA_COMPUTE_CAPABILITY}-virtual)
+      list(APPEND MAPD_CUDA_OPTIONS -Wno-deprecated-gpu-targets)
+      message(STATUS "CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
+    else()
+      set (CUDA_COMPILATION_ARCH
+        -gencode=arch=compute_${NVIDIA_COMPUTE_CAPABILITY},code=compute_${NVIDIA_COMPUTE_CAPABILITY}
+        -Wno-deprecated-gpu-targets
+      )
+      message(STATUS "CUDA_COMPILATION_ARCH: ${CUDA_COMPILATION_ARCH}")
+      add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_COMPILATION_ARCH}>")
+    endif()
+    add_custom_target(clean_nvidia_compute_capability
+      COMMAND ${CMAKE_BUILD_TOOL} clean
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/NvidiaComputeCapability
+    )
+    add_dependencies(clean-all clean_nvidia_compute_capability)
+  else()
+    if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.18.0")
+      message(STATUS "CMake 3.18+, Setting CUDA_ARCHITECTURES.")
+      set(CMAKE_CUDA_ARCHITECTURES
+          35-virtual
+          50-virtual
+          60-virtual
+          70-virtual
+          75-virtual
+          80-virtual)
+      list(APPEND MAPD_CUDA_OPTIONS -Wno-deprecated-gpu-targets)
+      message(STATUS "CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
+    else()
+      message(STATUS "CMake 3.17 or under, setting CUDA architecture flags manually.")
+      set(CUDA_COMPILATION_ARCH
+        -gencode=arch=compute_35,code=compute_35;
+        -gencode=arch=compute_50,code=compute_50;
+        -gencode=arch=compute_60,code=compute_60;
+        -gencode=arch=compute_70,code=compute_70;
+        -gencode=arch=compute_75,code=compute_75;
+        -gencode=arch=compute_80,code=compute_80;
+        -Wno-deprecated-gpu-targets)
+      message(STATUS "CUDA_COMPILATION_ARCH: ${CUDA_COMPILATION_ARCH}")
+      list(APPEND MAPD_CUDA_OPTIONS ${CUDA_COMPILATION_ARCH})
+    endif()
+    if(ENABLE_ONLY_ONE_ARCH)
+      message(STATUS "ENABLE_ONLY_ONE_ARCH ignored because NvidiaComputeCapability.txt not found or not readable")
+    endif()
+  endif()
+  if("${CMAKE_CUDA_COMPILER_ID}" STREQUAL "NVIDIA")
+    include(ProcessorCount)
+    ProcessorCount(N)
+    if(CMAKE_CUDA_COMPILER_VERSION GREATER_EQUAL 11.3 AND NOT N EQUAL 0)
+      message(STATUS "Enabling NVCC multi-threaded compilation with ${N} threads.")
+      list(APPEND MAPD_CUDA_OPTIONS --threads ${N})
+      set(NVCC_THREADS --threads ${N})
+    endif()
+  endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:${MAPD_CUDA_OPTIONS}>")
+endif()
+
+if (ENABLE_CUDA)
+  list(INSERT Arrow_LIBRARIES 0 ${Arrow_GPU_CUDA_LIBRARIES})
+endif()
+
 # LLVM
 find_package(LLVM CONFIG REQUIRED)
 
@@ -199,6 +322,10 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
 endif()
 
 install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryEngine Analyzer IR ConfigBuilder SqliteConnector RUNTIME)
+if(ENABLE_CUDA)
+  install(FILES ${CMAKE_BINARY_DIR}/omniscidb/QueryEngine/cuda_mapd_rt.fatbin DESTINATION QueryEngine COMPONENT "exe")
+endif()
+
 
 add_executable(TestDriver apps/TestDriver.cpp)
 
