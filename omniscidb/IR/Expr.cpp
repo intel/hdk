@@ -961,7 +961,7 @@ bool ColumnVar::operator==(const Expr& rhs) const {
   if (rv == nullptr) {
     return false;
   }
-  return (v->whichRow() == rv->whichRow()) && (v->get_varno() == rv->get_varno());
+  return (v->whichRow() == rv->whichRow()) && (v->varNo() == rv->varNo());
 }
 
 bool ExpressionTuple::operator==(const Expr& rhs) const {

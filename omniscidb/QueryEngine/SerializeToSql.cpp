@@ -23,7 +23,7 @@ ScalarExprToSql::ScalarExprToSql(const RelAlgExecutionUnit* ra_exe_unit,
 
 std::string ScalarExprToSql::visitVar(const hdk::ir::Var* var) const {
   auto it = ra_exe_unit_->groupby_exprs.begin();
-  std::advance(it, var->get_varno() - 1);
+  std::advance(it, var->varNo() - 1);
   return visit(it->get());
 }
 

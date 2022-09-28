@@ -395,7 +395,7 @@ llvm::Value* CodeGenerator::resolveGroupedColumnReference(
   CHECK((col_id == 0) || (col_var->rteIdx() >= 0 && col_var->tableId() > 0));
   const auto var = dynamic_cast<const hdk::ir::Var*>(col_var);
   CHECK(var);
-  col_id = var->get_varno();
+  col_id = var->varNo();
   CHECK_GE(col_id, 1);
   if (var->whichRow() == hdk::ir::Var::kGROUPBY) {
     CHECK_LE(static_cast<size_t>(col_id), cgen_state_->group_by_expr_cache_.size());
