@@ -2178,7 +2178,7 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
     if (!rhs_const) {
       return false;
     }
-    return lhs_col->is_virtual();
+    return lhs_col->isVirtual();
   }
   return false;
 }

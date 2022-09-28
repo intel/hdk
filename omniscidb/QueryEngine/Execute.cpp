@@ -3826,7 +3826,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     bool is_rowid{false};
     size_t start_rowid{0};
     if (chunk_meta_it == fragment.getChunkMetadataMap().end()) {
-      if (lhs_col->is_virtual()) {
+      if (lhs_col->isVirtual()) {
         const auto& table_generation = getTableGeneration(table_id);
         start_rowid = table_generation.start_rowid;
         chunk_min = frag_offsets[frag_idx] + start_rowid;

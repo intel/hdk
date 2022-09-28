@@ -83,7 +83,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
   const int rte_idx = adjusted_range_table_index(col_var);
   CHECK_LT(static_cast<size_t>(rte_idx), cgen_state_->frag_offsets_.size());
   if (col_var->tableId() > 0) {
-    if (col_var->is_virtual()) {
+    if (col_var->isVirtual()) {
       return {codegenRowId(col_var, co)};
     }
   }

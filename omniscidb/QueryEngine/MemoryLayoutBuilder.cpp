@@ -81,7 +81,7 @@ bool expr_is_rowid(const hdk::ir::Expr* expr) {
   if (!col) {
     return false;
   }
-  return col->is_virtual();
+  return col->isVirtual();
 }
 
 ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,

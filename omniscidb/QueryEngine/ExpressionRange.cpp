@@ -548,7 +548,7 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       CHECK(ti_idx);
       const auto& query_info = query_infos[*ti_idx].info;
       const auto& fragments = query_info.fragments;
-      if (col_expr->is_virtual()) {
+      if (col_expr->isVirtual()) {
         CHECK(col_type->isInt64());
         const int64_t num_tuples = query_info.getNumTuples();
         return ExpressionRange::makeIntRange(

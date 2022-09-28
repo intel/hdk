@@ -76,7 +76,7 @@ std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_
   }
   for (const auto& target : ra_exe_unit.target_exprs) {
     const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target);
-    if (col_var && !col_var->is_virtual()) {
+    if (col_var && !col_var->isVirtual()) {
       continue;
     }
     const auto crt_used_columns = columns_visitor.visit(target);

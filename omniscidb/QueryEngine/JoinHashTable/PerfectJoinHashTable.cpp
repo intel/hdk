@@ -433,7 +433,7 @@ ColumnsForDevice PerfectJoinHashTable::fetchColumnsForDevice(
   std::vector<std::shared_ptr<void>> malloc_owner;
   for (const auto& inner_outer_pair : inner_outer_pairs_) {
     const auto inner_col = inner_outer_pair.first;
-    if (inner_col->is_virtual()) {
+    if (inner_col->isVirtual()) {
       throw FailedToJoinOnVirtualColumn();
     }
     join_columns.emplace_back(fetchJoinColumn(inner_col,
