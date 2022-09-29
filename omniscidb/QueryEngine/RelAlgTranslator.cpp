@@ -631,7 +631,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
     return nullptr;
   }
 
-  auto left_operand = bin_oper->get_own_left_operand();
+  auto left_operand = bin_oper->leftOperandShared();
   auto right_operand = bin_oper->get_own_right_operand();
   if (left_operand->is<hdk::ir::UOper>()) {
     if (simple_predicate_has_simple_cast(left_operand, right_operand)) {
@@ -684,7 +684,7 @@ QualsConjunctiveForm qual_to_conjunctive_form(const hdk::ir::ExprPtr qual_expr) 
   }
 
   if (bin_oper->isAnd()) {
-    const auto lhs_cf = qual_to_conjunctive_form(bin_oper->get_own_left_operand());
+    const auto lhs_cf = qual_to_conjunctive_form(bin_oper->leftOperandShared());
     const auto rhs_cf = qual_to_conjunctive_form(bin_oper->get_own_right_operand());
     auto simple_quals = lhs_cf.simple_quals;
     simple_quals.insert(
@@ -708,7 +708,7 @@ std::vector<hdk::ir::ExprPtr> qual_to_disjunctive_form(
     return {rewritten_qual_expr ? rewritten_qual_expr : qual_expr};
   }
   if (bin_oper->isOr()) {
-    const auto lhs_df = qual_to_disjunctive_form(bin_oper->get_own_left_operand());
+    const auto lhs_df = qual_to_disjunctive_form(bin_oper->leftOperandShared());
     const auto rhs_df = qual_to_disjunctive_form(bin_oper->get_own_right_operand());
     auto quals = lhs_df;
     quals.insert(quals.end(), rhs_df.begin(), rhs_df.end());

@@ -380,7 +380,7 @@ class BinOper : public Expr {
   SQLQualifier qualifier() const { return qualifier_; }
   const Expr* leftOperand() const { return left_operand_.get(); }
   const Expr* rightOperand() const { return right_operand_.get(); }
-  const ExprPtr get_own_left_operand() const { return left_operand_; }
+  ExprPtr leftOperandShared() const { return left_operand_; }
   const ExprPtr get_own_right_operand() const { return right_operand_; }
 
   ExprPtr deep_copy() const override;

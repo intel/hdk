@@ -63,7 +63,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
     const auto qual_binary = qual->as<hdk::ir::BinOper>();
     CHECK(qual_binary);
     nullable = nullable || qual_binary->type()->nullable();
-    const auto lhs_col = remove_cast(qual_binary->get_own_left_operand());
+    const auto lhs_col = remove_cast(qual_binary->leftOperandShared());
     const auto rhs_col = remove_cast(qual_binary->get_own_right_operand());
     const auto lhs_type = lhs_col->type();
     // Coalesce cols for integers, bool, and dict encoded strings. Forces baseline hash

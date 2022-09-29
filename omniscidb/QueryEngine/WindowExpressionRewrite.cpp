@@ -72,7 +72,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
     return nullptr;
   }
   const auto count_window_expr = std::dynamic_pointer_cast<const hdk::ir::WindowFunction>(
-      remove_cast(window_gt_zero->get_own_left_operand()));
+      remove_cast(window_gt_zero->leftOperandShared()));
   if (!count_window_expr ||
       count_window_expr->getKind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
