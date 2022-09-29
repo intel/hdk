@@ -1122,10 +1122,8 @@ class TargetEntry {
   TargetEntry(const std::string& n, ExprPtr e, bool u) : resname(n), expr(e), unnest(u) {}
   virtual ~TargetEntry() {}
   const std::string& get_resname() const { return resname; }
-  void set_resname(const std::string& name) { resname = name; }
   const Expr* get_expr() const { return expr.get(); }
   ExprPtr get_own_expr() const { return expr; }
-  void set_expr(ExprPtr e) { expr = e; }
   bool get_unnest() const { return unnest; }
   std::string toString() const;
   void print() const;
