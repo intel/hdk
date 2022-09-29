@@ -225,7 +225,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
-  auto upper_bound_expr = expr->get_upper_bound();
+  auto upper_bound_expr = expr->upperBound();
   auto partition_count_expr = expr->get_partition_count();
   CHECK(target_value_expr);
   CHECK(lower_bound_expr);
@@ -280,7 +280,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     const CompilationOptions& co) {
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
-  auto upper_bound_expr = expr->get_upper_bound();
+  auto upper_bound_expr = expr->upperBound();
   auto partition_count_expr = expr->get_partition_count();
 
   auto num_partitions = expr->get_partition_count_val();
@@ -361,7 +361,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
                                                    const CompilationOptions& co) {
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
-  auto upper_bound_expr = expr->get_upper_bound();
+  auto upper_bound_expr = expr->upperBound();
   auto partition_count_expr = expr->get_partition_count();
 
   std::string func_name = "width_bucket_expr";
