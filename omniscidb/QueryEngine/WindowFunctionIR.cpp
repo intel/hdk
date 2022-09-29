@@ -48,7 +48,7 @@ llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
     case SqlWindowFunctionKind::FIRST_VALUE:
     case SqlWindowFunctionKind::LAST_VALUE: {
       CHECK(WindowProjectNodeContext::get(this));
-      const auto& args = window_func->getArgs();
+      const auto& args = window_func->args();
       CHECK(!args.empty());
       const auto arg_lvs = code_generator.codegen(args.front().get(), true, co);
       CHECK_EQ(arg_lvs.size(), size_t(1));
@@ -105,7 +105,7 @@ std::string get_window_agg_name(const SqlWindowFunctionKind kind,
 
 const hdk::ir::Type* get_adjusted_window_type(
     const hdk::ir::WindowFunction* window_func) {
-  const auto& args = window_func->getArgs();
+  const auto& args = window_func->args();
   return ((window_func->kind() == SqlWindowFunctionKind::COUNT && !args.empty()) ||
           window_func->kind() == SqlWindowFunctionKind::AVG)
              ? args.front()->type()
@@ -231,7 +231,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
       window_func_type->isFloatingPoint()
           ? cgen_state_->inlineFpNull(window_func_type)
           : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_type), 64);
-  const auto& args = window_func->getArgs();
+  const auto& args = window_func->args();
   llvm::Value* crt_val;
   if (args.empty()) {
     CHECK(window_func->kind() == SqlWindowFunctionKind::COUNT);

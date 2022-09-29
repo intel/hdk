@@ -316,7 +316,7 @@ class ScalarExprVisitor {
 
   virtual T visitWindowFunction(const hdk::ir::WindowFunction* window_func) const {
     T result = defaultResult();
-    for (const auto& arg : window_func->getArgs()) {
+    for (const auto& arg : window_func->args()) {
       result = aggregateResult(result, visit(arg.get()));
     }
     for (const auto& partition_key : window_func->getPartitionKeys()) {

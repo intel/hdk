@@ -167,7 +167,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
 
   RetType visitWindowFunction(const hdk::ir::WindowFunction* window_func) const override {
     std::vector<hdk::ir::ExprPtr> args_copy;
-    for (const auto& arg : window_func->getArgs()) {
+    for (const auto& arg : window_func->args()) {
       args_copy.push_back(visit(arg.get()));
     }
     std::vector<hdk::ir::ExprPtr> partition_keys_copy;

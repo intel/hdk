@@ -1059,7 +1059,7 @@ class WindowFunction : public Expr {
 
   SqlWindowFunctionKind kind() const { return kind_; }
 
-  const ExprPtrVector& getArgs() const { return args_; }
+  const ExprPtrVector& args() const { return args_; }
 
   const ExprPtrVector& getPartitionKeys() const { return partition_keys_; }
 

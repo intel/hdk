@@ -141,7 +141,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
         result = aggregateResult(result, this->visitColumnRef(col_ref));
       }
     }
-    for (const auto& arg : window_func->getArgs()) {
+    for (const auto& arg : window_func->args()) {
       result = aggregateResult(result, this->visit(arg.get()));
     }
     // TODO: order keys are ignored here to get the same result as for Rex.

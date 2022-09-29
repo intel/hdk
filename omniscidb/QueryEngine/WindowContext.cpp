@@ -238,7 +238,7 @@ size_t get_int_constant_from_expr(const hdk::ir::Expr* expr) {
 int64_t get_lag_or_lead_argument(const hdk::ir::WindowFunction* window_func) {
   CHECK(window_func->kind() == SqlWindowFunctionKind::LAG ||
         window_func->kind() == SqlWindowFunctionKind::LEAD);
-  const auto& args = window_func->getArgs();
+  const auto& args = window_func->args();
   if (args.size() == 3) {
     throw std::runtime_error("LAG with default not supported yet");
   }
@@ -809,7 +809,7 @@ void WindowFunctionContext::computePartitionBuffer(
       break;
     }
     case SqlWindowFunctionKind::NTILE: {
-      const auto& args = window_func->getArgs();
+      const auto& args = window_func->args();
       CHECK_EQ(args.size(), size_t(1));
       const auto n = get_int_constant_from_expr(args.front().get());
       const auto ntile = index_to_ntile(output_for_partition_buff, partition_size, n);
