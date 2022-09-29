@@ -456,7 +456,7 @@ ExprPtr RangeOper::deep_copy() const {
 
 ExprPtr InValues::deep_copy() const {
   std::list<ExprPtr> new_value_list;
-  for (auto p : value_list) {
+  for (auto p : value_list_) {
     new_value_list.push_back(p->deep_copy());
   }
   return makeExpr<InValues>(arg_->deep_copy(), new_value_list);
@@ -937,7 +937,7 @@ ExprPtr CaseExpr::cast(const Type* new_type, bool is_dict_intersection) const {
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
-    : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg_(a), value_list(l) {}
+    : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg_(a), value_list_(l) {}
 
 InIntegerSet::InIntegerSet(const std::shared_ptr<const Expr> a,
                            const std::vector<int64_t>& l,
@@ -1151,11 +1151,11 @@ bool InValues::operator==(const Expr& rhs) const {
   if (!(*arg_ == *rhs_iv.get_arg())) {
     return false;
   }
-  if (value_list.size() != rhs_iv.get_value_list().size()) {
+  if (value_list_.size() != rhs_iv.get_value_list().size()) {
     return false;
   }
   auto q = rhs_iv.get_value_list().begin();
-  for (auto p : value_list) {
+  for (auto p : value_list_) {
     if (!(*p == **q)) {
       return false;
     }
@@ -1420,7 +1420,7 @@ std::string InValues::toString() const {
   str += "(";
   int cnt = 0;
   bool shorted_value_list_str = false;
-  for (auto e : value_list) {
+  for (auto e : value_list_) {
     str += e->toString();
     cnt++;
     if (cnt > 4) {
@@ -1431,7 +1431,7 @@ std::string InValues::toString() const {
   if (shorted_value_list_str) {
     str += "... | ";
     str += "Total # values: ";
-    str += std::to_string(value_list.size());
+    str += std::to_string(value_list_.size());
   }
   str += ") ";
   return str;
@@ -1915,7 +1915,7 @@ size_t InValues::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, arg_->hash());
-    for (auto& expr : value_list) {
+    for (auto& expr : value_list_) {
       boost::hash_combine(*hash_, expr->hash());
     }
   }

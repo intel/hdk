@@ -462,7 +462,7 @@ class InValues : public Expr {
   InValues(ExprPtr a, const ExprPtrList& l);
   const Expr* get_arg() const { return arg_.get(); }
   const ExprPtr get_own_arg() const { return arg_; }
-  const ExprPtrList& get_value_list() const { return value_list; }
+  const ExprPtrList& get_value_list() const { return value_list_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -470,8 +470,8 @@ class InValues : public Expr {
   size_t hash() const override;
 
  private:
-  ExprPtr arg_;                  // the argument left of IN
-  const ExprPtrList value_list;  // the list of values right of IN
+  ExprPtr arg_;                   // the argument left of IN
+  const ExprPtrList value_list_;  // the list of values right of IN
 };
 
 /*
