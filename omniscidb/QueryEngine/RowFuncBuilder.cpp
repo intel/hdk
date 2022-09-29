@@ -72,7 +72,7 @@ int32_t get_agg_count(const std::vector<const hdk::ir::Expr*>& target_exprs) {
   for (auto target_expr : target_exprs) {
     CHECK(target_expr);
     const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-    if (!agg_expr || agg_expr->get_aggtype() == kSAMPLE) {
+    if (!agg_expr || agg_expr->aggType() == kSAMPLE) {
       auto type = target_expr->type();
       if (type->isBuffer()) {
         agg_count += 2;
@@ -81,7 +81,7 @@ int32_t get_agg_count(const std::vector<const hdk::ir::Expr*>& target_exprs) {
       }
       continue;
     }
-    if (agg_expr && agg_expr->get_aggtype() == kAVG) {
+    if (agg_expr && agg_expr->aggType() == kAVG) {
       agg_count += 2;
     } else {
       ++agg_count;
@@ -1112,7 +1112,7 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         }
         CHECK(target_type->isArray());
         CHECK_EQ(size_t(1), target_lvs.size());
-        CHECK(!agg_expr || agg_expr->get_aggtype() == kSAMPLE);
+        CHECK(!agg_expr || agg_expr->aggType() == kSAMPLE);
         const auto i32_ty = get_int_type(32, executor_->cgen_state_->context_);
         const auto i8p_ty =
             llvm::PointerType::get(get_int_type(8, executor_->cgen_state_->context_), 0);

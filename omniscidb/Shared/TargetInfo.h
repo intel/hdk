@@ -86,7 +86,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
     auto target_type = target_expr->type()->canonicalize();
     return {false, kMIN, target_type, nullptr, false, false};
   }
-  const auto agg_type = agg_expr->get_aggtype();
+  const auto agg_type = agg_expr->aggType();
   const auto agg_arg = agg_expr->get_arg();
   if (!agg_arg) {
     CHECK_EQ(kCOUNT, agg_type);
@@ -97,7 +97,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
 
   auto agg_arg_type = agg_arg->type();
   bool is_distinct{false};
-  if (agg_expr->get_aggtype() == kCOUNT) {
+  if (agg_expr->aggType() == kCOUNT) {
     is_distinct = agg_expr->get_is_distinct();
   }
 
@@ -106,7 +106,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
     // sum
     return {
         true,
-        agg_expr->get_aggtype(),
+        agg_expr->aggType(),
         agg_arg_type->isInteger() ? ctx.int64(agg_arg_type->nullable()) : agg_arg_type,
         agg_arg_type,
         agg_arg_type->nullable(),
@@ -114,7 +114,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
   }
 
   return {true,
-          agg_expr->get_aggtype(),
+          agg_expr->aggType(),
           agg_type == kCOUNT
               ? ctx.integer((is_distinct || bigint_count) ? 8 : 4, nullable)
               : agg_expr->type(),

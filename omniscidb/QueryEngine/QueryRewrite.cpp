@@ -213,11 +213,10 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
         // we have some issues when this rewriting is applied to float_type groupby column
         // in subquery, i.e., SELECT MIN(v1) FROM (SELECT v1, AGG(v1) FROM T GROUP BY v1);
         if (target_expr && !target_expr->type()->isFp32()) {
-          switch (agg_expr->get_aggtype()) {
+          switch (agg_expr->aggType()) {
             case SQLAgg::kCOUNT:
             case SQLAgg::kAPPROX_COUNT_DISTINCT: {
-              if (agg_expr->get_aggtype() == SQLAgg::kCOUNT &&
-                  !agg_expr->get_is_distinct()) {
+              if (agg_expr->aggType() == SQLAgg::kCOUNT && !agg_expr->get_is_distinct()) {
                 break;
               }
               auto case_expr = generateCaseExprForCountDistinctOnGroupByCol(

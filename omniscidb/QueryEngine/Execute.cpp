@@ -2179,8 +2179,7 @@ void Executor::addTransientStringLiterals(
     }
     const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr);
     if (agg_expr) {
-      if (agg_expr->get_aggtype() == kSINGLE_VALUE ||
-          agg_expr->get_aggtype() == kSAMPLE) {
+      if (agg_expr->aggType() == kSINGLE_VALUE || agg_expr->aggType() == kSAMPLE) {
         visit_expr(agg_expr->get_arg());
       }
     } else {
@@ -2270,7 +2269,7 @@ ResultSetPtr build_row_for_empty_input(
       auto arg_type = agg_expr->get_arg()->type()->withNullable(true);
       target_expr_copy =
           hdk::ir::makeExpr<hdk::ir::AggExpr>(agg_expr->type()->withNullable(true),
-                                              agg_expr->get_aggtype(),
+                                              agg_expr->aggType(),
                                               agg_expr->get_arg()->withType(arg_type),
                                               agg_expr->get_is_distinct(),
                                               agg_expr->get_arg1());

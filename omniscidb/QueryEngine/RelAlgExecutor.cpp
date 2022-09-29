@@ -1137,7 +1137,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
       if (agg->get_arg()) {
         auto new_arg = set_transient_dict_maybe(agg->get_own_arg());
         res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
-                                                  agg->get_aggtype(),
+                                                  agg->aggType(),
                                                   new_arg,
                                                   agg->get_is_distinct(),
                                                   agg->get_arg1());
@@ -1248,7 +1248,7 @@ bool is_count_distinct(const hdk::ir::Expr* expr) {
 bool is_agg(const hdk::ir::Expr* expr) {
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr);
   if (agg_expr && agg_expr->containsAgg()) {
-    auto agg_type = agg_expr->get_aggtype();
+    auto agg_type = agg_expr->aggType();
     if (agg_type == SQLAgg::kMIN || agg_type == SQLAgg::kMAX ||
         agg_type == SQLAgg::kSUM || agg_type == SQLAgg::kAVG) {
       return true;

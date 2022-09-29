@@ -312,7 +312,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
           if (target_expr->containsAgg()) {
             const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
             CHECK(agg_expr);
-            if (agg_expr->get_aggtype() == kSAMPLE &&
+            if (agg_expr->aggType() == kSAMPLE &&
                 (agg_expr->type()->isString() || agg_expr->type()->isArray())) {
               has_varlen_sample_agg = true;
               break;
@@ -403,7 +403,7 @@ namespace {
 bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs, SQLAgg const agg_kind) {
   return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
     auto const* const agg = dynamic_cast<hdk::ir::AggExpr const*>(expr);
-    return agg && agg->get_aggtype() == agg_kind;
+    return agg && agg->aggType() == agg_kind;
   });
 }
 }  // namespace
@@ -708,7 +708,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
       }
 
       if (agg) {
-        CHECK_EQ(kCOUNT, agg->get_aggtype());
+        CHECK_EQ(kCOUNT, agg->aggType());
         CHECK(!agg->get_is_distinct());
         if (col_it != end) {
           ++col_it;

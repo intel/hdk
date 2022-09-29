@@ -877,7 +877,7 @@ QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_
   for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
     auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
     if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
-      if (agg_expr->get_aggtype() == kAPPROX_QUANTILE) {
+      if (agg_expr->aggType() == kAPPROX_QUANTILE) {
         size_t const agg_col_idx =
             query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
         CHECK_LT(agg_col_idx, slot_count);

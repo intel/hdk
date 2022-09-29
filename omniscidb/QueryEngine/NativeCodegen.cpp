@@ -707,14 +707,14 @@ std::vector<std::string> get_agg_fnames(
     const bool is_varlen =
         target_type->isString() ||
         target_type->isArray();  // TODO: should it use is_varlen_array() ?
-    if (!agg_expr || agg_expr->get_aggtype() == kSAMPLE) {
+    if (!agg_expr || agg_expr->aggType() == kSAMPLE) {
       result.emplace_back(target_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
       if (is_varlen) {
         result.emplace_back("agg_id");
       }
       continue;
     }
-    const auto agg = agg_expr->get_aggtype();
+    const auto agg = agg_expr->aggType();
     auto agg_type = agg != kCOUNT ? agg_expr->get_arg()->type() : target_type;
     switch (agg) {
       case kAVG: {
