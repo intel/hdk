@@ -1061,7 +1061,7 @@ class WindowFunction : public Expr {
 
   const ExprPtrVector& args() const { return args_; }
 
-  const ExprPtrVector& getPartitionKeys() const { return partition_keys_; }
+  const ExprPtrVector& partitionKeys() const { return partition_keys_; }
 
   const ExprPtrVector& getOrderKeys() const { return order_keys_; }
 

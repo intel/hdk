@@ -156,7 +156,7 @@ std::string ScalarExprToSql::visitWindowFunction(
   }
   result += " OVER (";
   {
-    const auto partition_strs = visitList(window_func->getPartitionKeys());
+    const auto partition_strs = visitList(window_func->partitionKeys());
     if (!partition_strs.empty()) {
       result += "PARTITION BY " + boost::algorithm::join(partition_strs, ",");
     }

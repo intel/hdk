@@ -1464,7 +1464,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
       continue;
     }
     // Always use baseline layout hash tables for now, make the expression a tuple.
-    const auto& partition_keys = window_func->getPartitionKeys();
+    const auto& partition_keys = window_func->partitionKeys();
     std::shared_ptr<const hdk::ir::BinOper> partition_key_cond;
     if (partition_keys.size() >= 1) {
       hdk::ir::ExprPtr partition_key_tuple;

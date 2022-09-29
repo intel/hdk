@@ -319,7 +319,7 @@ class ScalarExprVisitor {
     for (const auto& arg : window_func->args()) {
       result = aggregateResult(result, visit(arg.get()));
     }
-    for (const auto& partition_key : window_func->getPartitionKeys()) {
+    for (const auto& partition_key : window_func->partitionKeys()) {
       result = aggregateResult(result, visit(partition_key.get()));
     }
     for (const auto& order_key : window_func->getOrderKeys()) {

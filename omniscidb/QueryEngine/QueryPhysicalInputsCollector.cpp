@@ -127,7 +127,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
   ResultType visitWindowFunction(
       const hdk::ir::WindowFunction* window_func) const override {
     ResultType result;
-    for (auto& part_key : window_func->getPartitionKeys()) {
+    for (auto& part_key : window_func->partitionKeys()) {
       if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(part_key.get())) {
         if (auto filter = dynamic_cast<const RelFilter*>(col_ref->node())) {
           // Partitions utilize string dictionary translation in the hash join framework

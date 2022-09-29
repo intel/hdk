@@ -86,7 +86,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(sum_type,
                                                     SqlWindowFunctionKind::SUM,
                                                     sum_window_expr->args(),
-                                                    sum_window_expr->getPartitionKeys(),
+                                                    sum_window_expr->partitionKeys(),
                                                     sum_window_expr->getOrderKeys(),
                                                     sum_window_expr->getCollation());
 }
@@ -125,7 +125,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(expr->ctx().fp64(),
                                                     SqlWindowFunctionKind::AVG,
                                                     sum_window_expr->args(),
-                                                    sum_window_expr->getPartitionKeys(),
+                                                    sum_window_expr->partitionKeys(),
                                                     sum_window_expr->getOrderKeys(),
                                                     sum_window_expr->getCollation());
 }
