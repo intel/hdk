@@ -1065,7 +1065,7 @@ class WindowFunction : public Expr {
 
   const ExprPtrVector& orderKeys() const { return order_keys_; }
 
-  const std::vector<OrderEntry>& getCollation() const { return collation_; }
+  const std::vector<OrderEntry>& collation() const { return collation_; }
 
   size_t hash() const override;
 

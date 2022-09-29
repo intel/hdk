@@ -455,7 +455,7 @@ void WindowFunctionContext::computePartition(const size_t partition_idx,
       output_for_partition_buff, output_for_partition_buff + partition_size, int64_t(0));
   std::vector<Comparator> comparators;
   const auto& order_keys = window_func_->orderKeys();
-  const auto& collation = window_func_->getCollation();
+  const auto& collation = window_func_->collation();
   CHECK_EQ(order_keys.size(), collation.size());
   for (size_t order_column_idx = 0; order_column_idx < order_columns_.size();
        ++order_column_idx) {

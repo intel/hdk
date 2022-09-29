@@ -184,7 +184,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
                                                       args_copy,
                                                       partition_keys_copy,
                                                       order_keys_copy,
-                                                      window_func->getCollation());
+                                                      window_func->collation());
   }
 
   RetType visitFunctionOper(const hdk::ir::FunctionOper* func_oper) const override {

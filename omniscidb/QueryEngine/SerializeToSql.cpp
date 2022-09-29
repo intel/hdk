@@ -164,7 +164,7 @@ std::string ScalarExprToSql::visitWindowFunction(
   {
     std::vector<std::string> order_strs;
     const auto& order_keys = window_func->orderKeys();
-    const auto& collation = window_func->getCollation();
+    const auto& collation = window_func->collation();
     CHECK_EQ(order_keys.size(), collation.size());
     for (size_t i = 0; i < order_keys.size(); ++i) {
       std::string order_str = visit(order_keys[i].get());

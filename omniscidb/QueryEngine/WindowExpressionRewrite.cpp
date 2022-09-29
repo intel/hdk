@@ -88,7 +88,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
                                                     sum_window_expr->args(),
                                                     sum_window_expr->partitionKeys(),
                                                     sum_window_expr->orderKeys(),
-                                                    sum_window_expr->getCollation());
+                                                    sum_window_expr->collation());
 }
 
 std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
@@ -127,5 +127,5 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
                                                     sum_window_expr->args(),
                                                     sum_window_expr->partitionKeys(),
                                                     sum_window_expr->orderKeys(),
-                                                    sum_window_expr->getCollation());
+                                                    sum_window_expr->collation());
 }
