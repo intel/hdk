@@ -489,6 +489,7 @@ class InIntegerSet : public Expr {
                const bool not_null);
 
   const Expr* arg() const { return arg_.get(); }
+  ExprPtr argShared() const { return arg_; }
 
   const std::vector<int64_t>& valueList() const { return value_list_; }
 
@@ -523,6 +524,7 @@ class InSubquery : public Expr {
   std::string toString() const override;
 
   const hdk::ir::Expr* arg() const { return arg_.get(); }
+  ExprPtr argShared() const { return arg_; }
 
   const RelAlgNode* node() const { return node_.get(); }
   std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
