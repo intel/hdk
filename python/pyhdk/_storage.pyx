@@ -194,11 +194,11 @@ cdef class ArrowStorage(Storage):
 cdef class DataMgr:
   def __cinit__(self, Config config):
     cdef CSystemParameters sys_params
-    cdef map[CGpuMgrPlatform, unique_ptr[CGpuMgr]] gpuMgrs;
-    cdef unique_ptr[CGpuMgr] l0Mgr = <unique_ptr[CGpuMgr]>make_unique[CL0Mgr]()
-    cdef unique_ptr[CGpuMgr] cudaMgr = <unique_ptr[CGpuMgr]>make_unique[CCudaMgr](-1, 0)
-    gpuMgrs.insert(move(pair[CGpuMgrPlatform, unique_ptr[CGpuMgr]](CGpuMgrPlatform.L0, move(l0Mgr))))
-    gpuMgrs.insert(move(pair[CGpuMgrPlatform, unique_ptr[CGpuMgr]](CGpuMgrPlatform.CUDA, move(cudaMgr))))
+    cdef map[CGpuMgrPlatform, unique_ptr[CGpuMgr]] gpuMgrs
+    cdef unique_ptr[CGpuMgr] l0Mgr
+    if dereference(config.c_config).exec.enable_gpu_offloading:
+      l0Mgr = <unique_ptr[CGpuMgr]>make_unique[CL0Mgr]()
+      gpuMgrs.insert(move(pair[CGpuMgrPlatform, unique_ptr[CGpuMgr]](CGpuMgrPlatform.L0, move(l0Mgr))))
     self.c_data_mgr = make_shared[CDataMgr](dereference(config.c_config), sys_params, move(gpuMgrs), 1 << 27, 0)
 
   cpdef registerDataProvider(self, Storage storage):

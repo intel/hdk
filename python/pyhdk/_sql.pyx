@@ -104,6 +104,7 @@ cdef class RelAlgExecutor:
     c_eo.with_watchdog = kwargs.get("enable_watchdog", config.exec.watchdog.enable)
     c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     c_eo.just_explain = kwargs.get("just_explain", False)
+    c_eo.gpu_input_mem_limit_percent = 0.9 
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, c_eo, False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)
