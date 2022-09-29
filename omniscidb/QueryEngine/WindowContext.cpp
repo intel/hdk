@@ -430,7 +430,7 @@ bool window_function_requires_peer_handling(const hdk::ir::WindowFunction* windo
   if (!window_function_is_aggregate(window_func->kind())) {
     return false;
   }
-  if (window_func->getOrderKeys().empty()) {
+  if (window_func->orderKeys().empty()) {
     return true;
   }
   switch (window_func->kind()) {
@@ -454,7 +454,7 @@ void WindowFunctionContext::computePartition(const size_t partition_idx,
   std::iota(
       output_for_partition_buff, output_for_partition_buff + partition_size, int64_t(0));
   std::vector<Comparator> comparators;
-  const auto& order_keys = window_func_->getOrderKeys();
+  const auto& order_keys = window_func_->orderKeys();
   const auto& collation = window_func_->getCollation();
   CHECK_EQ(order_keys.size(), collation.size());
   for (size_t order_column_idx = 0; order_column_idx < order_columns_.size();

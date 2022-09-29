@@ -175,7 +175,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
       partition_keys_copy.push_back(visit(partition_key.get()));
     }
     std::vector<hdk::ir::ExprPtr> order_keys_copy;
-    for (const auto& order_key : window_func->getOrderKeys()) {
+    for (const auto& order_key : window_func->orderKeys()) {
       order_keys_copy.push_back(visit(order_key.get()));
     }
     const auto& type = window_func->type();

@@ -1063,7 +1063,7 @@ class WindowFunction : public Expr {
 
   const ExprPtrVector& partitionKeys() const { return partition_keys_; }
 
-  const ExprPtrVector& getOrderKeys() const { return order_keys_; }
+  const ExprPtrVector& orderKeys() const { return order_keys_; }
 
   const std::vector<OrderEntry>& getCollation() const { return collation_; }
 

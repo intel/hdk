@@ -1535,7 +1535,7 @@ std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionConte
     context = std::make_unique<WindowFunctionContext>(
         window_func, config_, elem_count, co.device_type, row_set_mem_owner);
   }
-  const auto& order_keys = window_func->getOrderKeys();
+  const auto& order_keys = window_func->orderKeys();
   std::vector<std::shared_ptr<Chunk_NS::Chunk>> chunks_owner;
   for (const auto& order_key : order_keys) {
     const auto order_col = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(order_key);
