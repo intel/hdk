@@ -692,7 +692,7 @@ class RegexpExpr : public Expr {
       , pattern_expr_(p)
       , escape_expr_(e) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr get_own_arg() const { return arg_; }
+  const ExprPtr argShared() const { return arg_; }
   const Expr* get_pattern_expr() const { return pattern_expr_.get(); }
   const Expr* get_escape_expr() const { return escape_expr_.get(); }
   ExprPtr deep_copy() const override;

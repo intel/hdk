@@ -358,7 +358,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
   auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_pattern_expr());
   CHECK(pattern);
   auto fast_dict_pattern_lv =
-      codegenDictRegexp(expr->get_own_arg(), pattern, escape_char, co);
+      codegenDictRegexp(expr->argShared(), pattern, escape_char, co);
   if (fast_dict_pattern_lv) {
     return fast_dict_pattern_lv;
   }
