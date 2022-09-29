@@ -738,7 +738,7 @@ ExtensionFunction bind_function(const hdk::ir::FunctionOper* function_oper,
   auto name = function_oper->name();
   hdk::ir::ExprPtrVector func_args = {};
   for (size_t i = 0; i < function_oper->arity(); ++i) {
-    func_args.push_back(function_oper->getOwnArg(i));
+    func_args.push_back(function_oper->argShared(i));
   }
   return bind_function(name, func_args, is_gpu);
 }

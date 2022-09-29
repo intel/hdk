@@ -966,7 +966,7 @@ class FunctionOper : public Expr {
     return args_[i].get();
   }
 
-  ExprPtr getOwnArg(const size_t i) const {
+  ExprPtr argShared(const size_t i) const {
     CHECK_LT(i, args_.size());
     return args_[i];
   }
