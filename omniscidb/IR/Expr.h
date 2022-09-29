@@ -878,12 +878,12 @@ class ExtractExpr : public Expr {
 };
 
 /*
- * @type DateaddExpr
+ * @type DateAddExpr
  * @brief the DATEADD expression
  */
-class DateaddExpr : public Expr {
+class DateAddExpr : public Expr {
  public:
-  DateaddExpr(const hdk::ir::Type* type,
+  DateAddExpr(const hdk::ir::Type* type,
               const DateaddField f,
               const ExprPtr number,
               const ExprPtr datetime)

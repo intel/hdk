@@ -178,7 +178,7 @@ int32_t unitToDimension(hdk::ir::TimeUnit unit) {
 
 }  // namespace
 
-llvm::Value* CodeGenerator::codegen(const hdk::ir::DateaddExpr* dateadd_expr,
+llvm::Value* CodeGenerator::codegen(const hdk::ir::DateAddExpr* dateadd_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto dateadd_expr_type = dateadd_expr->type();

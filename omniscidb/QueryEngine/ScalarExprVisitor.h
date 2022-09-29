@@ -143,9 +143,9 @@ class ScalarExprVisitor {
     if (datediff) {
       return visitDatediffExpr(datediff);
     }
-    const auto dateadd = dynamic_cast<const hdk::ir::DateaddExpr*>(expr);
+    const auto dateadd = dynamic_cast<const hdk::ir::DateAddExpr*>(expr);
     if (dateadd) {
-      return visitDateaddExpr(dateadd);
+      return visitDateAddExpr(dateadd);
     }
     const auto likelihood = dynamic_cast<const hdk::ir::LikelihoodExpr*>(expr);
     if (likelihood) {
@@ -335,7 +335,7 @@ class ScalarExprVisitor {
     return result;
   }
 
-  virtual T visitDateaddExpr(const hdk::ir::DateaddExpr* dateadd) const {
+  virtual T visitDateAddExpr(const hdk::ir::DateAddExpr* dateadd) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(dateadd->number()));
     result = aggregateResult(result, visit(dateadd->datetime()));

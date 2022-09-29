@@ -527,8 +527,8 @@ ExprPtr ExtractExpr::deep_copy() const {
   return makeExpr<ExtractExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
 }
 
-ExprPtr DateaddExpr::deep_copy() const {
-  return makeExpr<DateaddExpr>(
+ExprPtr DateAddExpr::deep_copy() const {
+  return makeExpr<DateAddExpr>(
       type_, field_, number_->deep_copy(), datetime_->deep_copy());
 }
 
@@ -1211,11 +1211,11 @@ bool ExtractExpr::operator==(const Expr& rhs) const {
   return field_ == rhs_ee.field() && *from_expr_ == *rhs_ee.from();
 }
 
-bool DateaddExpr::operator==(const Expr& rhs) const {
-  if (typeid(rhs) != typeid(DateaddExpr)) {
+bool DateAddExpr::operator==(const Expr& rhs) const {
+  if (typeid(rhs) != typeid(DateAddExpr)) {
     return false;
   }
-  const DateaddExpr& rhs_ee = dynamic_cast<const DateaddExpr&>(rhs);
+  const DateAddExpr& rhs_ee = dynamic_cast<const DateAddExpr&>(rhs);
   return field_ == rhs_ee.field() && *number_ == *rhs_ee.number() &&
          *datetime_ == *rhs_ee.datetime();
 }
@@ -1616,7 +1616,7 @@ std::string ExtractExpr::toString() const {
   return "EXTRACT(" + std::to_string(field_) + " FROM " + from_expr_->toString() + ") ";
 }
 
-std::string DateaddExpr::toString() const {
+std::string DateAddExpr::toString() const {
   return "DATEADD(" + std::to_string(field_) + " NUMBER " + number_->toString() +
          " DATETIME " + datetime_->toString() + ") ";
 }
@@ -2086,7 +2086,7 @@ size_t ExtractExpr::hash() const {
   return *hash_;
 }
 
-size_t DateaddExpr::hash() const {
+size_t DateAddExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, field_);

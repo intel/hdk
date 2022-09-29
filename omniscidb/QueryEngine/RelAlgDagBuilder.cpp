@@ -1150,13 +1150,13 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
             std::make_shared<hdk::ir::UOper>(bigint_type, false, kUMINUS, interval_sec);
       }
     }
-    return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_type, daSECOND, interval_sec, lhs);
+    return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daSECOND, interval_sec, lhs);
   }
   CHECK(interval_type->unit() == hdk::ir::TimeUnit::kMonth);
   const auto interval_months = op == kMINUS ? std::make_shared<hdk::ir::UOper>(
                                                   bigint_type, false, kUMINUS, interval)
                                             : interval;
-  return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(lhs_type, daMONTH, interval_months, lhs);
+  return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daMONTH, interval_months, lhs);
 }
 
 std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
@@ -1335,7 +1335,7 @@ hdk::ir::ExprPtr parseDateadd(const hdk::ir::ExprPtrVector& operands) {
   auto unit = datetime_type->isTimestamp()
                   ? datetime_type->as<hdk::ir::TimestampType>()->unit()
                   : hdk::ir::TimeUnit::kSecond;
-  return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(
+  return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(
       ctx.timestamp(unit), field, cast_number_units, datetime);
 }
 
