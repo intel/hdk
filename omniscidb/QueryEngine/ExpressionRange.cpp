@@ -945,7 +945,7 @@ ExpressionRange getExpressionRange(
   auto target_value_expr = width_bucket_expr->get_target_value();
   auto target_value_range = getExpressionRange(target_value_expr, query_infos, executor);
   auto target_type = target_value_expr->type();
-  if (width_bucket_expr->is_constant_expr() &&
+  if (width_bucket_expr->isConstantExpr() &&
       target_value_range.getType() != ExpressionRangeType::Invalid) {
     auto const_target_value = dynamic_cast<const hdk::ir::Constant*>(target_value_expr);
     if (const_target_value) {

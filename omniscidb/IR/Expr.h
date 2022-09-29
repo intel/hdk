@@ -721,9 +721,7 @@ class WidthBucketExpr : public Expr {
       , target_value_(target_value)
       , lower_bound_(lower_bound)
       , upper_bound_(upper_bound)
-      , partition_count_(partition_count)
-      , constant_expr_(false)
-      , skip_out_of_bound_check_(false) {}
+      , partition_count_(partition_count) {}
   const Expr* get_target_value() const { return target_value_.get(); }
   const Expr* get_lower_bound() const { return lower_bound_.get(); }
   const Expr* get_upper_bound() const { return upper_bound_.get(); }
@@ -763,12 +761,10 @@ class WidthBucketExpr : public Expr {
     }
     return res;
   }
+  // Returns true if lower, upper and partition count exprs are constant
+  bool isConstantExpr() const;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
-  bool can_skip_out_of_bound_check() const { return skip_out_of_bound_check_; }
-  void skip_out_of_bound_check() const { skip_out_of_bound_check_ = true; }
-  void set_constant_expr() const { constant_expr_ = true; }
-  bool is_constant_expr() const { return constant_expr_; }
 
   size_t hash() const override;
 
@@ -777,10 +773,6 @@ class WidthBucketExpr : public Expr {
   ExprPtr lower_bound_;      // lower_bound
   ExprPtr upper_bound_;      // upper_bound
   ExprPtr partition_count_;  // partition_count
-  // true if lower, upper and partition count exprs are constant
-  mutable bool constant_expr_;
-  // true if we can skip oob check and is determined within compile time
-  mutable bool skip_out_of_bound_check_;
 };
 
 /*

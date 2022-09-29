@@ -172,9 +172,11 @@ class CodeGenerator {
   llvm::Value* codegen(const hdk::ir::WidthBucketExpr*, const CompilationOptions&);
 
   llvm::Value* codegenConstantWidthBucketExpr(const hdk::ir::WidthBucketExpr*,
+                                              bool,
                                               const CompilationOptions&);
 
   llvm::Value* codegenWidthBucketExpr(const hdk::ir::WidthBucketExpr*,
+                                      bool,
                                       const CompilationOptions&);
 
   llvm::Value* codegen(const hdk::ir::LowerExpr*, const CompilationOptions&);

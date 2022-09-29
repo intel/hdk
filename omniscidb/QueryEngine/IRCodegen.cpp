@@ -233,26 +233,6 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
   CHECK(partition_count_expr);
 
   llvm::Value* computed_bucket_lv{nullptr};
-  auto is_constant_expr = [](const hdk::ir::Expr* expr) {
-    auto target_expr = expr;
-    if (auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr)) {
-      if (cast_expr->isCast()) {
-        target_expr = cast_expr->operand();
-      }
-    }
-    // there are more complex constant expr like 1+2, 1/2*3, and so on
-    // but when considering a typical usage of width_bucket function
-    // it is sufficient to consider a singleton constant expr
-    auto constant_expr = dynamic_cast<const hdk::ir::Constant*>(target_expr);
-    if (constant_expr) {
-      return true;
-    }
-    return false;
-  };
-  if (is_constant_expr(lower_bound_expr) && is_constant_expr(upper_bound_expr) &&
-      is_constant_expr(partition_count_expr)) {
-    expr->set_constant_expr();
-  }
   // compute width_bucket's expresn range and check the possibility of avoiding oob check
   auto col_range =
       getExpressionRange(expr,
@@ -260,8 +240,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
                          executor_,
                          boost::make_optional(plan_state_->getSimpleQuals()));
   // check whether target_expr is valid
-  if (col_range.getType() == ExpressionRangeType::Integer &&
-      !expr->can_skip_out_of_bound_check() && col_range.getIntMin() > 0 &&
+  bool skip_out_of_bound_check = false;
+  if (col_range.getType() == ExpressionRangeType::Integer && col_range.getIntMin() > 0 &&
       col_range.getIntMax() <= expr->get_partition_count_val()) {
     // check whether target_col is not-nullable or has filter expr on it
     if (!col_range.hasNulls()) {
@@ -273,13 +253,14 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
       // of the filter expression based on them. Also, is (not) null is located in
       // FilterNode, so we cannot trace it in here.
       // todo (yoonmin): relax this to allow skipping oob check more cases
-      expr->skip_out_of_bound_check();
+      skip_out_of_bound_check = true;
     }
   }
-  if (expr->is_constant_expr()) {
-    computed_bucket_lv = codegenConstantWidthBucketExpr(expr, co);
+  if (expr->isConstantExpr()) {
+    computed_bucket_lv =
+        codegenConstantWidthBucketExpr(expr, skip_out_of_bound_check, co);
   } else {
-    computed_bucket_lv = codegenWidthBucketExpr(expr, co);
+    computed_bucket_lv = codegenWidthBucketExpr(expr, skip_out_of_bound_check, co);
   }
   CHECK(computed_bucket_lv);
   // return the largest integer equal to or less than the computed bucket number
@@ -295,6 +276,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
 
 llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     const hdk::ir::WidthBucketExpr* expr,
+    bool skip_out_of_bound_check,
     const CompilationOptions& co) {
   auto target_value_expr = expr->get_target_value();
   auto lower_bound_expr = expr->get_lower_bound();
@@ -350,7 +332,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
 
   std::vector<llvm::Value*> width_bucket_args{target_value_expr_lvs[0],
                                               lower_expr_lvs[0]};
-  if (expr->can_skip_out_of_bound_check()) {
+  if (skip_out_of_bound_check) {
     func_name += "_no_oob_check";
     width_bucket_args.push_back(scale_factor_lvs[0]);
   } else {
@@ -375,6 +357,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
 }
 
 llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExpr* expr,
+                                                   bool skip_out_of_bound_check,
                                                    const CompilationOptions& co) {
   auto target_value_expr = expr->get_target_value();
   auto lower_bound_expr = expr->get_lower_bound();
@@ -383,7 +366,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
 
   std::string func_name = "width_bucket_expr";
   bool nullable_expr = false;
-  if (expr->can_skip_out_of_bound_check()) {
+  if (skip_out_of_bound_check) {
     func_name += "_no_oob_check";
   } else if (target_value_expr->type()->nullable()) {
     func_name += "_nullable";

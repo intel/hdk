@@ -1789,6 +1789,27 @@ int32_t WidthBucketExpr::get_partition_count_val() const {
   }
 }
 
+bool WidthBucketExpr::isConstantExpr() const {
+  auto is_constant_expr = [](const hdk::ir::Expr* expr) {
+    auto target_expr = expr;
+    if (auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr)) {
+      if (cast_expr->isCast()) {
+        target_expr = cast_expr->operand();
+      }
+    }
+    // there are more complex constant expr like 1+2, 1/2*3, and so on
+    // but when considering a typical usage of width_bucket function
+    // it is sufficient to consider a singleton constant expr
+    auto constant_expr = dynamic_cast<const hdk::ir::Constant*>(target_expr);
+    if (constant_expr) {
+      return true;
+    }
+    return false;
+  };
+  return is_constant_expr(lower_bound_.get()) && is_constant_expr(upper_bound_.get()) &&
+         is_constant_expr(partition_count_.get());
+}
+
 bool expr_list_match(const std::vector<ExprPtr>& lhs, const std::vector<ExprPtr>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
@@ -2014,8 +2035,6 @@ size_t WidthBucketExpr::hash() const {
     boost::hash_combine(*hash_, lower_bound_->hash());
     boost::hash_combine(*hash_, upper_bound_->hash());
     boost::hash_combine(*hash_, partition_count_->hash());
-    boost::hash_combine(*hash_, constant_expr_);
-    boost::hash_combine(*hash_, skip_out_of_bound_check_);
   }
   return *hash_;
 }
