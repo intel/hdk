@@ -663,7 +663,7 @@ class LikeExpr : public Expr {
   const Expr* likeExpr() const { return like_expr_.get(); }
   const Expr* get_escape_expr() const { return escape_expr_.get(); }
   bool isIlike() const { return is_ilike_; }
-  bool get_is_simple() const { return is_simple_; }
+  bool isSimple() const { return is_simple_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

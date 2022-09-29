@@ -145,12 +145,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   }
   auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->likeExpr());
   CHECK(pattern);
-  auto fast_dict_like_lv = codegenDictLike(expr->argShared(),
-                                           pattern,
-                                           expr->isIlike(),
-                                           expr->get_is_simple(),
-                                           escape_char,
-                                           co);
+  auto fast_dict_like_lv = codegenDictLike(
+      expr->argShared(), pattern, expr->isIlike(), expr->isSimple(), escape_char, co);
   if (fast_dict_like_lv) {
     return fast_dict_like_lv;
   }
@@ -176,7 +172,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   std::vector<llvm::Value*> str_like_args{
       str_lv[1], str_lv[2], like_expr_arg_lvs[1], like_expr_arg_lvs[2]};
   std::string fn_name{expr->isIlike() ? "string_ilike" : "string_like"};
-  if (expr->get_is_simple()) {
+  if (expr->isSimple()) {
     fn_name += "_simple";
   } else {
     str_like_args.push_back(cgen_state_->llInt(int8_t(escape_char)));

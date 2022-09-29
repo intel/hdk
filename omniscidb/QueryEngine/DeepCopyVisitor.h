@@ -108,7 +108,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
         visit(like->likeExpr()),
         escape_expr ? visit(escape_expr) : nullptr,
         like->isIlike(),
-        like->get_is_simple());
+        like->isSimple());
   }
 
   RetType visitRegexpExpr(const hdk::ir::RegexpExpr* regexp) const override {

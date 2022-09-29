@@ -116,7 +116,7 @@ Weight get_weight(const hdk::ir::Expr* expr, int depth = 0) {
   auto like_expr = dynamic_cast<const hdk::ir::LikeExpr*>(expr);
   if (like_expr) {
     // heavy weight expr, start valid weight propagation
-    return Weight((like_expr->get_is_simple()) ? 200 : 1000);
+    return Weight((like_expr->isSimple()) ? 200 : 1000);
   }
   auto regexp_expr = dynamic_cast<const hdk::ir::RegexpExpr*>(expr);
   if (regexp_expr) {
