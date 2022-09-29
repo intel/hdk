@@ -1170,7 +1170,7 @@ std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
     }
   } else if (auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr.get())) {
     if (uoper->isCast()) {
-      return getQuantifiedBinOperRhs(uoper->get_own_operand(), orig_expr);
+      return getQuantifiedBinOperRhs(uoper->operandShared(), orig_expr);
     }
   }
 

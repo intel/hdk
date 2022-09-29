@@ -897,5 +897,5 @@ hdk::ir::ExprPtr remove_cast(const hdk::ir::ExprPtr& expr) {
   if (!uoper || !uoper->isCast()) {
     return expr;
   }
-  return uoper->get_own_operand();
+  return uoper->operandShared();
 }

@@ -298,11 +298,11 @@ bool constrained_not_null(const hdk::ir::Expr* expr,
     }
     bool is_negated{false};
     if (uoper->isNot()) {
-      uoper = uoper->get_own_operand()->as<hdk::ir::UOper>();
+      uoper = uoper->operand()->as<hdk::ir::UOper>();
       is_negated = true;
     }
     if (uoper && (uoper->isIsNotNull() || (is_negated && uoper->isIsNull()))) {
-      if (*uoper->get_own_operand() == *expr) {
+      if (*uoper->operand() == *expr) {
         return true;
       }
     }

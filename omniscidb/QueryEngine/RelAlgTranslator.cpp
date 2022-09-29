@@ -601,8 +601,8 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
     if (!u_expr->isCast()) {
       return false;
     }
-    if (!(u_expr->get_own_operand()->is<hdk::ir::ColumnVar>() &&
-          !u_expr->get_own_operand()->is<hdk::ir::Var>())) {
+    if (!(u_expr->operand()->is<hdk::ir::ColumnVar>() &&
+          !u_expr->operand()->is<hdk::ir::Var>())) {
       return false;
     }
     auto type = u_expr->type();
@@ -636,14 +636,14 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
   if (left_operand->is<hdk::ir::UOper>()) {
     if (simple_predicate_has_simple_cast(left_operand, right_operand)) {
       auto uo = left_operand->as<hdk::ir::UOper>();
-      auto cv = uo->get_own_operand()->as<hdk::ir::ColumnVar>();
+      auto cv = uo->operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->rteIdx();
       return bin_oper->deep_copy();
     }
   } else if (right_operand->is<hdk::ir::UOper>()) {
     if (simple_predicate_has_simple_cast(right_operand, left_operand)) {
       auto uo = right_operand->as<hdk::ir::UOper>();
-      auto cv = uo->get_own_operand()->as<hdk::ir::ColumnVar>();
+      auto cv = uo->operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->rteIdx();
       return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                  bin_oper->containsAgg(),

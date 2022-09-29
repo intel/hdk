@@ -201,7 +201,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
   }
   CHECK(cast_oper);
   CHECK(cast_oper->isCast());
-  const auto dict_like_arg = cast_oper->get_own_operand();
+  const auto dict_like_arg = cast_oper->operandShared();
   const auto& dict_like_arg_type = dict_like_arg->type();
   if (!dict_like_arg_type->isExtDictionary()) {
     throw(std::runtime_error("Cast from " + dict_like_arg_type->toString() + " to " +
@@ -412,7 +412,7 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
   }
   CHECK(cast_oper);
   CHECK(cast_oper->isCast());
-  const auto dict_regexp_arg = cast_oper->get_own_operand();
+  const auto dict_regexp_arg = cast_oper->operandShared();
   const auto& dict_regexp_arg_type = dict_regexp_arg->type();
   CHECK(dict_regexp_arg_type->isExtDictionary());
   const auto dict_id = dict_regexp_arg_type->as<hdk::ir::ExtDictionaryType>()->dictId();

@@ -153,7 +153,7 @@ hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
   if (!operand_type->isTimestamp() || !target_type->isDate()) {
     return nullptr;
   }
-  return uoper->get_own_operand();
+  return uoper->operandShared();
 }
 
 }  // namespace
