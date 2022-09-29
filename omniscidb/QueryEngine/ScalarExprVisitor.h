@@ -338,7 +338,7 @@ class ScalarExprVisitor {
   virtual T visitDateaddExpr(const hdk::ir::DateaddExpr* dateadd) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(dateadd->number()));
-    result = aggregateResult(result, visit(dateadd->get_datetime_expr()));
+    result = aggregateResult(result, visit(dateadd->datetime()));
     return result;
   }
 

@@ -890,7 +890,7 @@ class DateaddExpr : public Expr {
       : Expr(type, false), field_(f), number_(number), datetime_(datetime) {}
   DateaddField field() const { return field_; }
   const Expr* number() const { return number_.get(); }
-  const Expr* get_datetime_expr() const { return datetime_.get(); }
+  const Expr* datetime() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

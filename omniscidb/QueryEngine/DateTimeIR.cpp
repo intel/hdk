@@ -186,11 +186,11 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateaddExpr* dateadd_expr,
   auto dateadd_unit = dateadd_expr_type->isTimestamp()
                           ? dateadd_expr_type->as<hdk::ir::TimestampType>()->unit()
                           : hdk::ir::TimeUnit::kSecond;
-  auto datetime = codegen(dateadd_expr->get_datetime_expr(), true, co).front();
+  auto datetime = codegen(dateadd_expr->datetime(), true, co).front();
   CHECK(datetime->getType()->isIntegerTy(64));
   auto number = codegen(dateadd_expr->number(), true, co).front();
 
-  auto datetime_type = dateadd_expr->get_datetime_expr()->type();
+  auto datetime_type = dateadd_expr->datetime()->type();
   auto datetime_unit = datetime_type->isTimestamp()
                            ? datetime_type->as<hdk::ir::TimestampType>()->unit()
                            : hdk::ir::TimeUnit::kSecond;
