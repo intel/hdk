@@ -347,9 +347,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
     throw std::runtime_error("REGEXP not supported for unnested expressions");
   }
   char escape_char{'\\'};
-  if (expr->get_escape_expr()) {
-    auto escape_char_expr =
-        dynamic_cast<const hdk::ir::Constant*>(expr->get_escape_expr());
+  if (expr->escapeExpr()) {
+    auto escape_char_expr = dynamic_cast<const hdk::ir::Constant*>(expr->escapeExpr());
     CHECK(escape_char_expr);
     CHECK(escape_char_expr->type()->isString());
     CHECK_EQ(size_t(1), escape_char_expr->value().stringval->size());

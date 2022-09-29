@@ -694,7 +694,7 @@ class RegexpExpr : public Expr {
   const Expr* arg() const { return arg_.get(); }
   const ExprPtr argShared() const { return arg_; }
   const Expr* patternExpr() const { return pattern_expr_.get(); }
-  const Expr* get_escape_expr() const { return escape_expr_.get(); }
+  const Expr* escapeExpr() const { return escape_expr_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

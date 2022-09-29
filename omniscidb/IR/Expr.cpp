@@ -1098,11 +1098,11 @@ bool RegexpExpr::operator==(const Expr& rhs) const {
   if (!(*arg_ == *rhs_re.arg()) || !(*pattern_expr_ == *rhs_re.patternExpr())) {
     return false;
   }
-  if (escape_expr_.get() == rhs_re.get_escape_expr()) {
+  if (escape_expr_.get() == rhs_re.escapeExpr()) {
     return true;
   }
-  if (escape_expr_ != nullptr && rhs_re.get_escape_expr() != nullptr &&
-      *escape_expr_ == *rhs_re.get_escape_expr()) {
+  if (escape_expr_ != nullptr && rhs_re.escapeExpr() != nullptr &&
+      *escape_expr_ == *rhs_re.escapeExpr()) {
     return true;
   }
   return false;
