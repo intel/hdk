@@ -568,7 +568,7 @@ class KeyForStringExpr : public Expr {
  public:
   KeyForStringExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr get_own_arg() const { return arg_; }
+  const ExprPtr argShared() const { return arg_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
