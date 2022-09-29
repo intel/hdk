@@ -127,11 +127,11 @@ std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_e
                                                           kEQ,
                                                           bw_eq->qualifier(),
                                                           bw_eq->leftOperandShared(),
-                                                          bw_eq->get_own_right_operand());
+                                                          bw_eq->rightOperandShared());
   const auto lhs_is_null = std::make_shared<hdk::ir::UOper>(
       ctx.boolean(false), kISNULL, bw_eq->leftOperandShared());
   const auto rhs_is_null = std::make_shared<hdk::ir::UOper>(
-      ctx.boolean(false), kISNULL, bw_eq->get_own_right_operand());
+      ctx.boolean(false), kISNULL, bw_eq->rightOperandShared());
   const auto both_are_null =
       Analyzer::normalizeOperExpr(kAND, kONE, lhs_is_null, rhs_is_null);
   const auto bw_eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
@@ -250,7 +250,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
     auto cmp_str = codegenStrCmp(optype,
                                  qualifier,
                                  bin_oper->leftOperandShared(),
-                                 bin_oper->get_own_right_operand(),
+                                 bin_oper->rightOperandShared(),
                                  co);
     if (cmp_str) {
       return cmp_str;

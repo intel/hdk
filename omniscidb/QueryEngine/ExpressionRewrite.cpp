@@ -37,7 +37,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
       const hdk::ir::BinOper* bin_oper) const override {
     switch (bin_oper->opType()) {
       case kEQ: {
-        const auto rhs_owned = bin_oper->get_own_right_operand();
+        const auto rhs_owned = bin_oper->rightOperandShared();
         auto rhs_no_cast = extract_cast_arg(rhs_owned.get());
         if (!dynamic_cast<const hdk::ir::Constant*>(rhs_no_cast)) {
           return nullptr;
@@ -167,7 +167,7 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
       }
     }
     auto lhs = bin_oper->leftOperandShared();
-    auto rhs = bin_oper->get_own_right_operand();
+    auto rhs = bin_oper->rightOperandShared();
     auto rewritten_lhs = visit(lhs.get());
     auto rewritten_rhs = visit(rhs.get());
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
@@ -520,7 +520,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     auto type = bin_oper->type();
     auto& ctx = type->ctx();
     auto left_operand = bin_oper->leftOperandShared();
-    auto right_operand = bin_oper->get_own_right_operand();
+    auto right_operand = bin_oper->rightOperandShared();
 
     // Check if bin_oper result is cast to a larger int or fp type
     if (casts_.find(bin_oper) != casts_.end()) {

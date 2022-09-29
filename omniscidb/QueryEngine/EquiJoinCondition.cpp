@@ -35,9 +35,9 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
     return false;
   }
   const auto crt_inner = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(
-      remove_cast(crt_bin->get_own_right_operand()));
+      remove_cast(crt_bin->rightOperandShared()));
   const auto prev_inner = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(
-      remove_cast(prev_bin->get_own_right_operand()));
+      remove_cast(prev_bin->rightOperandShared()));
   AllRangeTableIndexVisitor visitor;
   const auto crt_outer_rte_set = visitor.visit(crt_bin->leftOperand());
   const auto prev_outer_rte_set = visitor.visit(prev_bin->leftOperand());
@@ -64,7 +64,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
     CHECK(qual_binary);
     nullable = nullable || qual_binary->type()->nullable();
     const auto lhs_col = remove_cast(qual_binary->leftOperandShared());
-    const auto rhs_col = remove_cast(qual_binary->get_own_right_operand());
+    const auto rhs_col = remove_cast(qual_binary->rightOperandShared());
     const auto lhs_type = lhs_col->type();
     // Coalesce cols for integers, bool, and dict encoded strings. Forces baseline hash
     // join.

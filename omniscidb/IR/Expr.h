@@ -381,7 +381,7 @@ class BinOper : public Expr {
   const Expr* leftOperand() const { return left_operand_.get(); }
   const Expr* rightOperand() const { return right_operand_.get(); }
   ExprPtr leftOperandShared() const { return left_operand_; }
-  const ExprPtr get_own_right_operand() const { return right_operand_; }
+  const ExprPtr rightOperandShared() const { return right_operand_; }
 
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
