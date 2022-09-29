@@ -259,14 +259,14 @@ class Constant : public Expr {
       , is_null_(is_null)
       , cacheable_(cacheable)
       , value_(Datum{0})
-      , value_list(l) {}
+      , value_list_(l) {}
   ~Constant() override;
   bool isNull() const { return is_null_; }
   bool cacheable() const { return cacheable_; }
   Datum value() const { return value_; }
   int64_t intVal() const { return extract_int_type_from_datum(value_, type_); }
   double fpVal() const { return extract_fp_type_from_datum(value_, type_); }
-  const ExprPtrList& valueList() const { return value_list; }
+  const ExprPtrList& valueList() const { return value_list_; }
   ExprPtr deep_copy() const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
   bool operator==(const Expr& rhs) const override;
@@ -283,7 +283,7 @@ class Constant : public Expr {
   // (e.g. constant expression represents NOW datetime).
   bool cacheable_;
   Datum value_;  // the constant value
-  const ExprPtrList value_list;
+  const ExprPtrList value_list_;
   ExprPtr castNumber(const Type* new_type) const;
   ExprPtr castString(const Type* new_type) const;
   ExprPtr castFromString(const Type* new_type) const;

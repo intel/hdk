@@ -428,7 +428,7 @@ ExprPtr Constant::deep_copy() const {
     d.stringval = new std::string(*value_.stringval);
   }
   if (type_->isArray()) {
-    return makeExpr<Constant>(type_, is_null_, value_list, cacheable_);
+    return makeExpr<Constant>(type_, is_null_, value_list_, cacheable_);
   }
   return makeExpr<Constant>(type_, is_null_, d, cacheable_);
 }
@@ -810,7 +810,7 @@ ExprPtr Constant::doCast(const Type* new_type) const {
   } else if (new_type->isArray() && type_->isArray()) {
     auto new_elem_type = new_type->as<ArrayBaseType>()->elemType();
     ExprPtrList new_value_list;
-    for (auto& v : value_list) {
+    for (auto& v : value_list_) {
       auto c = v->as<Constant>();
       if (!c) {
         throw std::runtime_error("Invalid array cast.");
@@ -1862,7 +1862,7 @@ size_t Constant::hash() const {
     boost::hash_combine(*hash_, is_null_);
     if (!is_null_) {
       if (type_->isArray()) {
-        for (auto& expr : value_list) {
+        for (auto& expr : value_list_) {
           boost::hash_combine(*hash_, expr->hash());
         }
       } else {
