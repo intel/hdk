@@ -811,7 +811,7 @@ class AggExpr : public Expr {
       : Expr(type, true), agg_type_(a), arg_(g), is_distinct_(d), arg1_(e) {}
   SQLAgg aggType() const { return agg_type_; }
   const Expr* arg() const { return arg_.get(); }
-  ExprPtr get_own_arg() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   bool get_is_distinct() const { return is_distinct_; }
   std::shared_ptr<const Constant> get_arg1() const { return arg1_; }
   ExprPtr deep_copy() const override;

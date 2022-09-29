@@ -1135,7 +1135,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     // TODO: remove when rex are not used anymore
     if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
       if (agg->arg()) {
-        auto new_arg = set_transient_dict_maybe(agg->get_own_arg());
+        auto new_arg = set_transient_dict_maybe(agg->argShared());
         res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
                                                   agg->aggType(),
                                                   new_arg,
@@ -1875,7 +1875,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
       continue;
     }
     CHECK(target_expr->is<hdk::ir::AggExpr>());
-    const auto arg = target_expr->as<hdk::ir::AggExpr>()->get_own_arg();
+    const auto arg = target_expr->as<hdk::ir::AggExpr>()->argShared();
     CHECK(arg);
     auto arg_type = arg->type();
     // Avoid calling getExpressionRange for variable length types (string and array),

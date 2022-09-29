@@ -220,7 +220,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
                 break;
               }
               auto case_expr = generateCaseExprForCountDistinctOnGroupByCol(
-                  agg_expr->get_own_arg(), agg_expr->type());
+                  agg_expr->argShared(), agg_expr->type());
               new_target_exprs.push_back(case_expr.get());
               target_exprs_owned_.emplace_back(case_expr);
               rewritten = true;
@@ -234,7 +234,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
               // we just replace the agg_expr into a plain expr
               // i.e, avg(x1) --> x1
               auto agg_expr_type = agg_expr->type();
-              auto target_expr = agg_expr->get_own_arg();
+              auto target_expr = agg_expr->argShared();
               if (!agg_expr_type->equal(target_expr->type())) {
                 target_expr = target_expr->cast(agg_expr_type);
               }
