@@ -17,6 +17,7 @@
 #include "CodeGenerator.h"
 #include "Execute.h"
 #include "ExternalExecutor.h"
+#include "IR/ExprCollector.h"
 #include "MaxwellCodegenPatch.h"
 #include "RelAlgTranslator.h"
 
@@ -679,37 +680,11 @@ std::vector<JoinLoop> Executor::buildJoinLoops(
 
 namespace {
 
-class ExprTableIdVisitor : public ScalarExprVisitor<std::set<int>> {
+class ExprTableIdCollector
+    : public hdk::ir::ExprCollector<std::set<int>, ExprTableIdCollector> {
  protected:
-  std::set<int> visitColumnVar(const hdk::ir::ColumnVar* col_expr) const final {
-    return {col_expr->tableId()};
-  }
-
-  std::set<int> visitFunctionOper(const hdk::ir::FunctionOper* func_expr) const final {
-    std::set<int> ret;
-    for (size_t i = 0; i < func_expr->arity(); i++) {
-      ret = aggregateResult(ret, visit(func_expr->arg(i)));
-    }
-    return ret;
-  }
-
-  std::set<int> visitBinOper(const hdk::ir::BinOper* bin_oper) const final {
-    std::set<int> ret;
-    ret = aggregateResult(ret, visit(bin_oper->leftOperand()));
-    return aggregateResult(ret, visit(bin_oper->rightOperand()));
-  }
-
-  std::set<int> visitUOper(const hdk::ir::UOper* u_oper) const final {
-    return visit(u_oper->operand());
-  }
-
-  std::set<int> aggregateResult(const std::set<int>& aggregate,
-                                const std::set<int>& next_result) const final {
-    auto ret = aggregate;  // copy
-    for (const auto& el : next_result) {
-      ret.insert(el);
-    }
-    return ret;
+  void visitColumnVar(const hdk::ir::ColumnVar* col_expr) final {
+    result_.insert(col_expr->tableId());
   }
 };
 
@@ -747,8 +722,7 @@ JoinLoop::HoistedFiltersCallback Executor::buildHoistLeftHandSideFiltersCb(
         auto should_hoist_qual = [&hoisted_quals](const auto& qual, const int table_id) {
           CHECK(qual);
 
-          ExprTableIdVisitor visitor;
-          const auto table_ids = visitor.visit(qual.get());
+          const auto table_ids = ExprTableIdCollector::collect(qual.get());
           if (table_ids.size() == 1 && table_ids.find(table_id) != table_ids.end()) {
             hoisted_quals.push_back(qual);
           }
