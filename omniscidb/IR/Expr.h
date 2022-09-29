@@ -838,11 +838,11 @@ class CaseExpr : public Expr {
            bool has_agg,
            std::list<std::pair<ExprPtr, ExprPtr>> expr_pairs,
            ExprPtr e)
-      : Expr(type, has_agg), expr_pair_list(std::move(expr_pairs)), else_expr(e) {}
+      : Expr(type, has_agg), expr_pairs_(std::move(expr_pairs)), else_expr_(e) {}
   const std::list<std::pair<ExprPtr, ExprPtr>>& get_expr_pair_list() const {
-    return expr_pair_list;
+    return expr_pairs_;
   }
-  const Expr* get_else_expr() const { return else_expr.get(); }
+  const Expr* get_else_expr() const { return else_expr_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -852,10 +852,10 @@ class CaseExpr : public Expr {
 
  private:
   std::list<std::pair<ExprPtr, ExprPtr>>
-      expr_pair_list;  // a pair of expressions for each WHEN expr1 THEN expr2.  expr1
+      expr_pairs_;     // a pair of expressions for each WHEN expr1 THEN expr2.  expr1
                        // must be of boolean type.  all expr2's must be of compatible
                        // types and will be promoted to the common type.
-  ExprPtr else_expr;   // expression for ELSE.  nullptr if omitted.
+  ExprPtr else_expr_;  // expression for ELSE.  nullptr if omitted.
 };
 
 /*

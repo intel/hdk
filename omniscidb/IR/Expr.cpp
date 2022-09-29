@@ -514,13 +514,13 @@ ExprPtr AggExpr::deep_copy() const {
 
 ExprPtr CaseExpr::deep_copy() const {
   std::list<std::pair<ExprPtr, ExprPtr>> new_list;
-  for (auto p : expr_pair_list) {
+  for (auto p : expr_pairs_) {
     new_list.emplace_back(p.first->deep_copy(), p.second->deep_copy());
   }
   return makeExpr<CaseExpr>(type_,
                             contains_agg_,
                             new_list,
-                            else_expr == nullptr ? nullptr : else_expr->deep_copy());
+                            else_expr_ == nullptr ? nullptr : else_expr_->deep_copy());
 }
 
 ExprPtr ExtractExpr::deep_copy() const {
@@ -924,7 +924,7 @@ ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
 
 ExprPtr CaseExpr::cast(const Type* new_type, bool is_dict_intersection) const {
   std::list<std::pair<ExprPtr, ExprPtr>> new_expr_pair_list;
-  for (auto& p : expr_pair_list) {
+  for (auto& p : expr_pairs_) {
     new_expr_pair_list.emplace_back(
         std::make_pair(p.first, p.second->cast(new_type, is_dict_intersection)));
   }
@@ -933,7 +933,7 @@ ExprPtr CaseExpr::cast(const Type* new_type, bool is_dict_intersection) const {
       new_type,
       contains_agg_,
       std::move(new_expr_pair_list),
-      else_expr ? else_expr->cast(new_type, is_dict_intersection) : nullptr);
+      else_expr_ ? else_expr_->cast(new_type, is_dict_intersection) : nullptr);
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
@@ -1185,22 +1185,22 @@ bool CaseExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CaseExpr& rhs_ce = dynamic_cast<const CaseExpr&>(rhs);
-  if (expr_pair_list.size() != rhs_ce.get_expr_pair_list().size()) {
+  if (expr_pairs_.size() != rhs_ce.get_expr_pair_list().size()) {
     return false;
   }
-  if ((else_expr == nullptr && rhs_ce.get_else_expr() != nullptr) ||
-      (else_expr != nullptr && rhs_ce.get_else_expr() == nullptr)) {
+  if ((else_expr_ == nullptr && rhs_ce.get_else_expr() != nullptr) ||
+      (else_expr_ != nullptr && rhs_ce.get_else_expr() == nullptr)) {
     return false;
   }
   auto it = rhs_ce.get_expr_pair_list().cbegin();
-  for (auto p : expr_pair_list) {
+  for (auto p : expr_pairs_) {
     if (!(*p.first == *it->first) || !(*p.second == *it->second)) {
       return false;
     }
     ++it;
   }
-  return else_expr == nullptr ||
-         (else_expr != nullptr && *else_expr == *rhs_ce.get_else_expr());
+  return else_expr_ == nullptr ||
+         (else_expr_ != nullptr && *else_expr_ == *rhs_ce.get_else_expr());
 }
 
 bool ExtractExpr::operator==(const Expr& rhs) const {
@@ -1597,16 +1597,16 @@ std::string AggExpr::toString() const {
 
 std::string CaseExpr::toString() const {
   std::string str{"CASE "};
-  for (auto p : expr_pair_list) {
+  for (auto p : expr_pairs_) {
     str += "(";
     str += p.first->toString();
     str += ", ";
     str += p.second->toString();
     str += ") ";
   }
-  if (else_expr) {
+  if (else_expr_) {
     str += "ELSE ";
-    str += else_expr->toString();
+    str += else_expr_->toString();
   }
   str += " END ";
   return str;
@@ -2066,12 +2066,12 @@ size_t AggExpr::hash() const {
 size_t CaseExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    for (auto& pr : expr_pair_list) {
+    for (auto& pr : expr_pairs_) {
       boost::hash_combine(*hash_, pr.first->hash());
       boost::hash_combine(*hash_, pr.second->hash());
     }
-    if (else_expr) {
-      boost::hash_combine(*hash_, else_expr->hash());
+    if (else_expr_) {
+      boost::hash_combine(*hash_, else_expr_->hash());
     }
   }
   return *hash_;
