@@ -479,7 +479,7 @@ ExprPtr LowerExpr::deep_copy() const {
 }
 
 ExprPtr CardinalityExpr::deep_copy() const {
-  return makeExpr<CardinalityExpr>(arg->deep_copy());
+  return makeExpr<CardinalityExpr>(arg_->deep_copy());
 }
 
 ExprPtr LikeExpr::deep_copy() const {
@@ -1065,7 +1065,7 @@ bool CardinalityExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CardinalityExpr& rhs_ca = dynamic_cast<const CardinalityExpr&>(rhs);
-  if (!(*arg == *rhs_ca.get_arg())) {
+  if (!(*arg_ == *rhs_ca.get_arg())) {
     return false;
   }
   return true;
@@ -1510,7 +1510,7 @@ std::string LowerExpr::toString() const {
 
 std::string CardinalityExpr::toString() const {
   std::string str{"CARDINALITY("};
-  str += arg->toString();
+  str += arg_->toString();
   str += ") ";
   return str;
 }
@@ -1976,7 +1976,7 @@ size_t LowerExpr::hash() const {
 size_t CardinalityExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
   }
   return *hash_;
 }
