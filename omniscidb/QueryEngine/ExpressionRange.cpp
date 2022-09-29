@@ -952,7 +952,7 @@ ExpressionRange getExpressionRange(
       if (const_target_value->isNull()) {
         // null constant, return default width_bucket range
         return ExpressionRange::makeIntRange(
-            0, width_bucket_expr->get_partition_count_val(), 0, true);
+            0, width_bucket_expr->partitionCountVal(), 0, true);
       } else {
         CHECK(target_value_range.getFpMax() == target_value_range.getFpMin());
         auto target_value_bucket =

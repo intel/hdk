@@ -1759,7 +1759,7 @@ double WidthBucketExpr::boundVal(const Expr* bound_expr) const {
   return casted_constant->value().doubleval;
 }
 
-int32_t WidthBucketExpr::get_partition_count_val() const {
+int32_t WidthBucketExpr::partitionCountVal() const {
   auto const_partition_count_expr = dynamic_cast<const Constant*>(partition_count_.get());
   if (!const_partition_count_expr) {
     return -1;

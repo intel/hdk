@@ -242,7 +242,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
   // check whether target_expr is valid
   bool skip_out_of_bound_check = false;
   if (col_range.getType() == ExpressionRangeType::Integer && col_range.getIntMin() > 0 &&
-      col_range.getIntMax() <= expr->get_partition_count_val()) {
+      col_range.getIntMax() <= expr->partitionCountVal()) {
     // check whether target_col is not-nullable or has filter expr on it
     if (!col_range.hasNulls()) {
       // Even if the target_expr has its filter expression, target_col_range may exactly
@@ -283,7 +283,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
   auto upper_bound_expr = expr->upperBound();
   auto partition_count_expr = expr->partitionCount();
 
-  auto num_partitions = expr->get_partition_count_val();
+  auto num_partitions = expr->partitionCountVal();
   if (num_partitions < 1 || num_partitions > INT32_MAX) {
     throw std::runtime_error(
         "PARTITION_COUNT expression of width_bucket function should be in a valid "
