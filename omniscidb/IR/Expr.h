@@ -1096,7 +1096,7 @@ class ArrayExpr : public Expr {
   ExprPtr deep_copy() const override;
   std::string toString() const override;
   bool operator==(Expr const& rhs) const override;
-  size_t getElementCount() const { return contained_expressions_.size(); }
+  size_t elementCount() const { return contained_expressions_.size(); }
   bool isLocalAlloc() const { return local_alloc_; }
   bool isNull() const { return is_null_; }
 

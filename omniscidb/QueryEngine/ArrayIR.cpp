@@ -98,7 +98,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
   auto return_type = array_expr->type();
   CHECK(return_type->isArray());
   auto elem_type = return_type->as<hdk::ir::ArrayBaseType>()->elemType();
-  for (size_t i = 0; i < array_expr->getElementCount(); i++) {
+  for (size_t i = 0; i < array_expr->elementCount(); i++) {
     const auto arg = array_expr->getElement(i);
     const auto arg_lvs = codegen(arg, true, co);
     if (arg_lvs.size() == 1) {
@@ -113,7 +113,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
   auto* array_index_type =
       get_int_type(array_element_size_bytes * 8, cgen_state_->context_);
   auto* array_type = get_int_array_type(
-      array_element_size_bytes * 8, array_expr->getElementCount(), cgen_state_->context_);
+      array_element_size_bytes * 8, array_expr->elementCount(), cgen_state_->context_);
 
   if (array_expr->isNull()) {
     return {llvm::ConstantPointerNull::get(
@@ -121,7 +121,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
             cgen_state_->llInt(0)};
   }
 
-  if (0 == array_expr->getElementCount()) {
+  if (0 == array_expr->elementCount()) {
     llvm::Constant* dead_const = cgen_state_->llInt(0xdead);
     llvm::Value* dead_pointer = llvm::ConstantExpr::getIntToPtr(
         dead_const, llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0));
@@ -139,7 +139,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
     allocated_target_buffer =
         cgen_state_->emitExternalCall("allocate_varlen_buffer",
                                       llvm::Type::getInt8PtrTy(cgen_state_->context_),
-                                      {cgen_state_->llInt(array_expr->getElementCount()),
+                                      {cgen_state_->llInt(array_expr->elementCount()),
                                        cgen_state_->llInt(array_element_size_bytes)});
     cgen_state_->emitExternalCall(
         "register_buffer_with_executor_rsm",
@@ -150,7 +150,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
   llvm::Value* casted_allocated_target_buffer =
       ir_builder.CreatePointerCast(allocated_target_buffer, array_type->getPointerTo());
 
-  for (size_t i = 0; i < array_expr->getElementCount(); i++) {
+  for (size_t i = 0; i < array_expr->elementCount(); i++) {
     auto* element = argument_list[i];
     auto* element_ptr = ir_builder.CreateGEP(
         array_type,
@@ -191,5 +191,5 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
 
   return {ir_builder.CreateGEP(
               array_type, casted_allocated_target_buffer, cgen_state_->llInt(0)),
-          cgen_state_->llInt(array_expr->getElementCount())};
+          cgen_state_->llInt(array_expr->elementCount())};
 }

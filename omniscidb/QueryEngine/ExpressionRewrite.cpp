@@ -184,7 +184,7 @@ class ArrayElementStringLiteralEncodingVisitor : public DeepCopyVisitor {
 
   RetType visitArrayOper(const hdk::ir::ArrayExpr* array_expr) const override {
     std::vector<hdk::ir::ExprPtr> args_copy;
-    for (size_t i = 0; i < array_expr->getElementCount(); ++i) {
+    for (size_t i = 0; i < array_expr->elementCount(); ++i) {
       auto const element_expr_ptr = visit(array_expr->getElement(i));
       auto element_expr_type = element_expr_ptr->type();
 
