@@ -606,11 +606,11 @@ class SampleRatioExpr : public Expr {
  */
 class LowerExpr : public Expr {
  public:
-  LowerExpr(ExprPtr arg) : Expr(arg->type()), arg(arg) {}
+  LowerExpr(ExprPtr arg) : Expr(arg->type()), arg_(arg) {}
 
-  const Expr* get_arg() const { return arg.get(); }
+  const Expr* get_arg() const { return arg_.get(); }
 
-  const ExprPtr get_own_arg() const { return arg; }
+  const ExprPtr get_own_arg() const { return arg_; }
 
   ExprPtr deep_copy() const override;
 
@@ -621,7 +621,7 @@ class LowerExpr : public Expr {
   size_t hash() const override;
 
  private:
-  ExprPtr arg;
+  ExprPtr arg_;
 };
 
 /*

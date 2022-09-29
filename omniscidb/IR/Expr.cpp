@@ -475,7 +475,7 @@ ExprPtr SampleRatioExpr::deep_copy() const {
 }
 
 ExprPtr LowerExpr::deep_copy() const {
-  return makeExpr<LowerExpr>(arg->deep_copy());
+  return makeExpr<LowerExpr>(arg_->deep_copy());
 }
 
 ExprPtr CardinalityExpr::deep_copy() const {
@@ -1057,7 +1057,7 @@ bool LowerExpr::operator==(const Expr& rhs) const {
     return false;
   }
 
-  return *arg == *dynamic_cast<const LowerExpr&>(rhs).get_arg();
+  return *arg_ == *dynamic_cast<const LowerExpr&>(rhs).get_arg();
 }
 
 bool CardinalityExpr::operator==(const Expr& rhs) const {
@@ -1505,7 +1505,7 @@ std::string SampleRatioExpr::toString() const {
 }
 
 std::string LowerExpr::toString() const {
-  return "LOWER(" + arg->toString() + ") ";
+  return "LOWER(" + arg_->toString() + ") ";
 }
 
 std::string CardinalityExpr::toString() const {
@@ -1968,7 +1968,7 @@ size_t SampleRatioExpr::hash() const {
 size_t LowerExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
   }
   return *hash_;
 }
