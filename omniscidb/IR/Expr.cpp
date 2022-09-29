@@ -463,7 +463,7 @@ ExprPtr InValues::deep_copy() const {
 }
 
 ExprPtr CharLengthExpr::deep_copy() const {
-  return makeExpr<CharLengthExpr>(arg_->deep_copy(), calc_encoded_length);
+  return makeExpr<CharLengthExpr>(arg_->deep_copy(), calc_encoded_length_);
 }
 
 ExprPtr KeyForStringExpr::deep_copy() const {
@@ -1024,7 +1024,7 @@ bool CharLengthExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CharLengthExpr& rhs_cl = dynamic_cast<const CharLengthExpr&>(rhs);
-  if (!(*arg_ == *rhs_cl.arg()) || calc_encoded_length != rhs_cl.calcEncodedLength()) {
+  if (!(*arg_ == *rhs_cl.arg()) || calc_encoded_length_ != rhs_cl.calcEncodedLength()) {
     return false;
   }
   return true;
@@ -1480,7 +1480,7 @@ std::string InSubquery::toString() const {
 
 std::string CharLengthExpr::toString() const {
   std::string str;
-  if (calc_encoded_length) {
+  if (calc_encoded_length_) {
     str += "CHAR_LENGTH(";
   } else {
     str += "LENGTH(";
@@ -1944,7 +1944,7 @@ size_t CharLengthExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, arg_->hash());
-    boost::hash_combine(*hash_, calc_encoded_length);
+    boost::hash_combine(*hash_, calc_encoded_length_);
   }
   return *hash_;
 }

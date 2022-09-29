@@ -542,10 +542,10 @@ class InSubquery : public Expr {
 class CharLengthExpr : public Expr {
  public:
   CharLengthExpr(ExprPtr a, bool e)
-      : Expr(a->ctx().int32(a->type()->nullable())), arg_(a), calc_encoded_length(e) {}
+      : Expr(a->ctx().int32(a->type()->nullable())), arg_(a), calc_encoded_length_(e) {}
   const Expr* arg() const { return arg_.get(); }
   const ExprPtr get_own_arg() const { return arg_; }
-  bool calcEncodedLength() const { return calc_encoded_length; }
+  bool calcEncodedLength() const { return calc_encoded_length_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -554,7 +554,7 @@ class CharLengthExpr : public Expr {
 
  private:
   ExprPtr arg_;
-  bool calc_encoded_length;
+  bool calc_encoded_length_;
 };
 
 /*
