@@ -483,11 +483,11 @@ ExprPtr CardinalityExpr::deep_copy() const {
 }
 
 ExprPtr LikeExpr::deep_copy() const {
-  return makeExpr<LikeExpr>(arg->deep_copy(),
-                            like_expr->deep_copy(),
-                            escape_expr ? escape_expr->deep_copy() : nullptr,
-                            is_ilike,
-                            is_simple);
+  return makeExpr<LikeExpr>(arg_->deep_copy(),
+                            like_expr_->deep_copy(),
+                            escape_expr_ ? escape_expr_->deep_copy() : nullptr,
+                            is_ilike_,
+                            is_simple_);
 }
 
 ExprPtr RegexpExpr::deep_copy() const {
@@ -1076,15 +1076,15 @@ bool LikeExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const LikeExpr& rhs_lk = dynamic_cast<const LikeExpr&>(rhs);
-  if (!(*arg == *rhs_lk.get_arg()) || !(*like_expr == *rhs_lk.get_like_expr()) ||
-      is_ilike != rhs_lk.get_is_ilike()) {
+  if (!(*arg_ == *rhs_lk.get_arg()) || !(*like_expr_ == *rhs_lk.get_like_expr()) ||
+      is_ilike_ != rhs_lk.get_is_ilike()) {
     return false;
   }
-  if (escape_expr.get() == rhs_lk.get_escape_expr()) {
+  if (escape_expr_.get() == rhs_lk.get_escape_expr()) {
     return true;
   }
-  if (escape_expr != nullptr && rhs_lk.get_escape_expr() != nullptr &&
-      *escape_expr == *rhs_lk.get_escape_expr()) {
+  if (escape_expr_ != nullptr && rhs_lk.get_escape_expr() != nullptr &&
+      *escape_expr_ == *rhs_lk.get_escape_expr()) {
     return true;
   }
   return false;
@@ -1517,10 +1517,10 @@ std::string CardinalityExpr::toString() const {
 
 std::string LikeExpr::toString() const {
   std::string str{"(LIKE "};
-  str += arg->toString();
-  str += like_expr->toString();
-  if (escape_expr) {
-    str += escape_expr->toString();
+  str += arg_->toString();
+  str += like_expr_->toString();
+  if (escape_expr_) {
+    str += escape_expr_->toString();
   }
   str += ") ";
   return str;
@@ -1984,13 +1984,13 @@ size_t CardinalityExpr::hash() const {
 size_t LikeExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
-    boost::hash_combine(*hash_, like_expr->hash());
-    if (escape_expr) {
-      boost::hash_combine(*hash_, escape_expr->hash());
+    boost::hash_combine(*hash_, arg_->hash());
+    boost::hash_combine(*hash_, like_expr_->hash());
+    if (escape_expr_) {
+      boost::hash_combine(*hash_, escape_expr_->hash());
     }
-    boost::hash_combine(*hash_, is_ilike);
-    boost::hash_combine(*hash_, is_simple);
+    boost::hash_combine(*hash_, is_ilike_);
+    boost::hash_combine(*hash_, is_simple_);
   }
   return *hash_;
 }

@@ -653,17 +653,17 @@ class LikeExpr : public Expr {
  public:
   LikeExpr(ExprPtr a, ExprPtr l, ExprPtr e, bool i, bool s)
       : Expr(a->ctx().boolean(a->type()->nullable()))
-      , arg(a)
-      , like_expr(l)
-      , escape_expr(e)
-      , is_ilike(i)
-      , is_simple(s) {}
-  const Expr* get_arg() const { return arg.get(); }
-  const ExprPtr get_own_arg() const { return arg; }
-  const Expr* get_like_expr() const { return like_expr.get(); }
-  const Expr* get_escape_expr() const { return escape_expr.get(); }
-  bool get_is_ilike() const { return is_ilike; }
-  bool get_is_simple() const { return is_simple; }
+      , arg_(a)
+      , like_expr_(l)
+      , escape_expr_(e)
+      , is_ilike_(i)
+      , is_simple_(s) {}
+  const Expr* get_arg() const { return arg_.get(); }
+  const ExprPtr get_own_arg() const { return arg_; }
+  const Expr* get_like_expr() const { return like_expr_.get(); }
+  const Expr* get_escape_expr() const { return escape_expr_.get(); }
+  bool get_is_ilike() const { return is_ilike_; }
+  bool get_is_simple() const { return is_simple_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -671,12 +671,12 @@ class LikeExpr : public Expr {
   size_t hash() const override;
 
  private:
-  ExprPtr arg;          // the argument to the left of LIKE
-  ExprPtr like_expr;    // expression that evaluates to like string
-  ExprPtr escape_expr;  // expression that evaluates to escape string, can be nullptr
-  bool is_ilike;        // is this ILIKE?
-  bool is_simple;  // is this simple, meaning we can use fast path search (fits '%str%'
-                   // pattern with no inner '%','_','[',']'
+  ExprPtr arg_;          // the argument to the left of LIKE
+  ExprPtr like_expr_;    // expression that evaluates to like string
+  ExprPtr escape_expr_;  // expression that evaluates to escape string, can be nullptr
+  bool is_ilike_;        // is this ILIKE?
+  bool is_simple_;  // is this simple, meaning we can use fast path search (fits '%str%'
+                    // pattern with no inner '%','_','[',']'
 };
 
 /*
