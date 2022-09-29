@@ -210,7 +210,7 @@ class ScalarExprVisitor {
   }
 
   virtual T visitInSubquery(const hdk::ir::InSubquery* in_subquery) const {
-    return visit(in_subquery->getArg().get());
+    return visit(in_subquery->arg());
   }
 
   virtual T visitCharLength(const hdk::ir::CharLengthExpr* char_length) const {

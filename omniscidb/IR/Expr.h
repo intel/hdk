@@ -522,7 +522,7 @@ class InSubquery : public Expr {
 
   std::string toString() const override;
 
-  hdk::ir::ExprPtr getArg() const { return arg_; }
+  const hdk::ir::Expr* arg() const { return arg_.get(); }
 
   const RelAlgNode* node() const { return node_.get(); }
   std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
