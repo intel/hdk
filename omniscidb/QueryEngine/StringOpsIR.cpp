@@ -143,7 +143,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
     CHECK_EQ(size_t(1), escape_char_expr->value().stringval->size());
     escape_char = (*escape_char_expr->value().stringval)[0];
   }
-  auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_like_expr());
+  auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->likeExpr());
   CHECK(pattern);
   auto fast_dict_like_lv = codegenDictLike(expr->argShared(),
                                            pattern,
@@ -170,7 +170,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
       throw QueryMustRunOnCpu();
     }
   }
-  auto like_expr_arg_lvs = codegen(expr->get_like_expr(), true, co);
+  auto like_expr_arg_lvs = codegen(expr->likeExpr(), true, co);
   CHECK_EQ(size_t(3), like_expr_arg_lvs.size());
   const bool is_nullable{expr->arg()->type()->nullable()};
   std::vector<llvm::Value*> str_like_args{

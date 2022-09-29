@@ -244,7 +244,7 @@ class ScalarExprVisitor {
   virtual T visitLikeExpr(const hdk::ir::LikeExpr* like) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(like->arg()));
-    result = aggregateResult(result, visit(like->get_like_expr()));
+    result = aggregateResult(result, visit(like->likeExpr()));
     if (like->get_escape_expr()) {
       result = aggregateResult(result, visit(like->get_escape_expr()));
     }

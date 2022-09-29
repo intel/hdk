@@ -660,7 +660,7 @@ class LikeExpr : public Expr {
       , is_simple_(s) {}
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  const Expr* get_like_expr() const { return like_expr_.get(); }
+  const Expr* likeExpr() const { return like_expr_.get(); }
   const Expr* get_escape_expr() const { return escape_expr_.get(); }
   bool get_is_ilike() const { return is_ilike_; }
   bool get_is_simple() const { return is_simple_; }
