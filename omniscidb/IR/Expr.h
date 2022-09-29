@@ -939,7 +939,6 @@ class DateTruncExpr : public Expr {
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
   DateTruncField field() const { return field_; }
   const Expr* get_from_expr() const { return from_expr_.get(); }
-  const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
