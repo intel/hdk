@@ -1116,7 +1116,7 @@ bool WidthBucketExpr::operator==(const Expr& rhs) const {
   if (!(*target_value_ == *rhs_l.targetValue())) {
     return false;
   }
-  if (!(*lower_bound_ == *rhs_l.get_lower_bound())) {
+  if (!(*lower_bound_ == *rhs_l.lowerBound())) {
     return false;
   }
   if (!(*upper_bound_ == *rhs_l.get_upper_bound())) {

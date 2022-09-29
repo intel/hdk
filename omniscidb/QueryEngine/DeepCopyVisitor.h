@@ -123,7 +123,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
       const hdk::ir::WidthBucketExpr* width_bucket_expr) const override {
     return hdk::ir::makeExpr<hdk::ir::WidthBucketExpr>(
         visit(width_bucket_expr->targetValue()),
-        visit(width_bucket_expr->get_lower_bound()),
+        visit(width_bucket_expr->lowerBound()),
         visit(width_bucket_expr->get_upper_bound()),
         visit(width_bucket_expr->get_partition_count()));
   }

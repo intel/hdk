@@ -224,7 +224,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto target_value_expr = expr->targetValue();
-  auto lower_bound_expr = expr->get_lower_bound();
+  auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->get_upper_bound();
   auto partition_count_expr = expr->get_partition_count();
   CHECK(target_value_expr);
@@ -279,7 +279,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
     bool skip_out_of_bound_check,
     const CompilationOptions& co) {
   auto target_value_expr = expr->targetValue();
-  auto lower_bound_expr = expr->get_lower_bound();
+  auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->get_upper_bound();
   auto partition_count_expr = expr->get_partition_count();
 
@@ -360,7 +360,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
                                                    bool skip_out_of_bound_check,
                                                    const CompilationOptions& co) {
   auto target_value_expr = expr->targetValue();
-  auto lower_bound_expr = expr->get_lower_bound();
+  auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->get_upper_bound();
   auto partition_count_expr = expr->get_partition_count();
 
