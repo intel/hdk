@@ -1095,7 +1095,7 @@ bool RegexpExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const RegexpExpr& rhs_re = dynamic_cast<const RegexpExpr&>(rhs);
-  if (!(*arg_ == *rhs_re.get_arg()) || !(*pattern_expr_ == *rhs_re.get_pattern_expr())) {
+  if (!(*arg_ == *rhs_re.arg()) || !(*pattern_expr_ == *rhs_re.get_pattern_expr())) {
     return false;
   }
   if (escape_expr_.get() == rhs_re.get_escape_expr()) {
