@@ -87,7 +87,7 @@ inline TargetInfo get_target_info(const PointerType target_expr,
     return {false, kMIN, target_type, nullptr, false, false};
   }
   const auto agg_type = agg_expr->aggType();
-  const auto agg_arg = agg_expr->get_arg();
+  const auto agg_arg = agg_expr->arg();
   if (!agg_arg) {
     CHECK_EQ(kCOUNT, agg_type);
     CHECK(!agg_expr->get_is_distinct());

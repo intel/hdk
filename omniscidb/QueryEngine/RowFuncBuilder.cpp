@@ -973,7 +973,7 @@ void RowFuncBuilder::codegenCountDistinct(const size_t target_idx,
                                           const ExecutorDeviceType device_type) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   const auto agg_info = get_target_info(target_expr, config_.exec.group_by.bigint_count);
-  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->type();
+  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->arg()->type();
   if (arg_type->isFloatingPoint()) {
     agg_args.back() = executor_->cgen_state_->ir_builder_.CreateBitCast(
         agg_args.back(), get_int_type(64, executor_->cgen_state_->context_));
@@ -1044,7 +1044,7 @@ void RowFuncBuilder::codegenApproxQuantile(const size_t target_idx,
   }
   llvm::BasicBlock *calc, *skip;
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
-  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->get_arg()->type();
+  auto arg_type = static_cast<const hdk::ir::AggExpr*>(target_expr)->arg()->type();
   bool const nullable = arg_type->nullable();
 
   auto* cs = executor_->cgen_state_.get();
@@ -1100,7 +1100,7 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
     if (target_type->isBuffer() &&
         !executor_->plan_state_->isLazyFetchColumn(target_expr)) {
       const auto target_lvs =
-          agg_expr ? code_generator.codegen(agg_expr->get_arg(), true, co)
+          agg_expr ? code_generator.codegen(agg_expr->arg(), true, co)
                    : code_generator.codegen(
                          target_expr, !executor_->plan_state_->allow_lazy_fetch_, co);
       if (!func_expr && !arr_expr) {
@@ -1185,7 +1185,7 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
       }
     }
   }
-  return agg_expr ? code_generator.codegen(agg_expr->get_arg(), true, co)
+  return agg_expr ? code_generator.codegen(agg_expr->arg(), true, co)
                   : code_generator.codegen(
                         target_expr, !executor_->plan_state_->allow_lazy_fetch_, co);
 }

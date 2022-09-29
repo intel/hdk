@@ -123,8 +123,7 @@ std::string agg_to_string(const hdk::ir::AggExpr* agg_expr,
                           SchemaProviderPtr schema_provider) {
   ScalarExprToSql scalar_expr_to_sql(ra_exe_unit, schema_provider);
   const auto agg_type = ::toString(agg_expr->aggType());
-  const auto arg =
-      agg_expr->get_arg() ? scalar_expr_to_sql.visit(agg_expr->get_arg()) : "*";
+  const auto arg = agg_expr->arg() ? scalar_expr_to_sql.visit(agg_expr->arg()) : "*";
   const auto distinct = agg_expr->get_is_distinct() ? "DISTINCT " : "";
   return agg_type + "(" + distinct + arg + ")";
 }

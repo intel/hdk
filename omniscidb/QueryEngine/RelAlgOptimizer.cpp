@@ -705,7 +705,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
           dynamic_cast<const hdk::ir::AggExpr*>(aggregate->getAgg(agg_idx).get());
       CHECK(agg_expr);
 
-      if (!agg_expr->get_arg()) {
+      if (!agg_expr->arg()) {
         has_count_star_only = true;
       } else {
         auto inputs = collector.visit(agg_expr);

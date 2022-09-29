@@ -293,14 +293,14 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           break;
         }
         case kMIN: {
-          CHECK(agg_expr && agg_expr->get_arg());
-          auto arg_type = agg_expr->get_arg()->type();
+          CHECK(agg_expr && agg_expr->arg());
+          auto arg_type = agg_expr->arg()->type();
           if (arg_type->isString() || arg_type->isExtDictionary() ||
               arg_type->isBuffer()) {
             break;
           }
           auto expr_range_info =
-              getExpressionRange(agg_expr->get_arg(), query_infos, executor);
+              getExpressionRange(agg_expr->arg(), query_infos, executor);
           auto init_max = get_agg_initial_val(agg_info.agg_kind,
                                               chosen_type,
                                               is_group_by || float_argument_input,
@@ -326,14 +326,14 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           break;
         }
         case kMAX: {
-          CHECK(agg_expr && agg_expr->get_arg());
-          auto arg_type = agg_expr->get_arg()->type();
+          CHECK(agg_expr && agg_expr->arg());
+          auto arg_type = agg_expr->arg()->type();
           if (arg_type->isString() || arg_type->isExtDictionary() ||
               arg_type->isBuffer()) {
             break;
           }
           auto expr_range_info =
-              getExpressionRange(agg_expr->get_arg(), query_infos, executor);
+              getExpressionRange(agg_expr->arg(), query_infos, executor);
           // NULL sentinel and init value for kMAX are identical, which results in
           // ambiguity in detecting empty keys in presence of nulls.
           if (expr_range_info.getType() == ExpressionRangeType::Invalid ||
@@ -399,7 +399,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       CHECK(agg_info.is_agg);
       CHECK(agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT);
       const auto agg_expr = static_cast<const hdk::ir::AggExpr*>(target_expr);
-      auto arg_type = agg_expr->get_arg()->type();
+      auto arg_type = agg_expr->arg()->type();
       if (arg_type->isText()) {
         throw std::runtime_error(
             "Strings must be dictionary-encoded for COUNT(DISTINCT).");
@@ -411,8 +411,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       auto arg_range_info =
           arg_type->isFloatingPoint()
               ? no_range_info
-              : get_expr_range_info(
-                    ra_exe_unit, query_infos, agg_expr->get_arg(), executor);
+              : get_expr_range_info(ra_exe_unit, query_infos, agg_expr->arg(), executor);
       CountDistinctImplType count_distinct_impl_type{CountDistinctImplType::HashSet};
       int64_t bitmap_sz_bits{0};
       if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
@@ -583,13 +582,13 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
         agg_expr->aggType() == kAPPROX_COUNT_DISTINCT) {
       return false;
     }
-    if (agg_expr->get_arg()) {
-      auto arg_type = agg_expr->get_arg()->type();
+    if (agg_expr->arg()) {
+      auto arg_type = agg_expr->arg()->type();
       if (arg_type->isFloatingPoint()) {
         return false;
       }
       auto expr_range_info =
-          get_expr_range_info(ra_exe_unit, query_infos, agg_expr->get_arg(), executor);
+          get_expr_range_info(ra_exe_unit, query_infos, agg_expr->arg(), executor);
       // TOD(adb): QMD not actually initialized here?
       if ((!(expr_range_info.hash_type_ == QueryDescriptionType::GroupByPerfectHash &&
              /* query_mem_desc.getGroupbyColCount() == 1 */ false) ||

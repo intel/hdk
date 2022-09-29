@@ -286,7 +286,7 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<const hdk::ir::Expr*>& t
 
 const hdk::ir::Expr* agg_arg(const hdk::ir::Expr* expr) {
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr);
-  return agg_expr ? agg_expr->get_arg() : nullptr;
+  return agg_expr ? agg_expr->arg() : nullptr;
 }
 
 bool constrained_not_null(const hdk::ir::Expr* expr,

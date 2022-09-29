@@ -702,7 +702,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
     for (const auto target : ra_exe_unit.target_exprs) {
       auto type = target->type();
       const auto agg = target->as<hdk::ir::AggExpr>();
-      if (agg && agg->get_arg()) {
+      if (agg && agg->arg()) {
         compact_width = crt_min_byte_width;
         break;
       }

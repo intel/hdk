@@ -715,7 +715,7 @@ std::vector<std::string> get_agg_fnames(
       continue;
     }
     const auto agg = agg_expr->aggType();
-    auto agg_type = agg != kCOUNT ? agg_expr->get_arg()->type() : target_type;
+    auto agg_type = agg != kCOUNT ? agg_expr->arg()->type() : target_type;
     switch (agg) {
       case kAVG: {
         if (!agg_type->isInteger() && !agg_type->isDecimal() &&

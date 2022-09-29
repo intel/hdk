@@ -351,8 +351,8 @@ class ScalarExprVisitor {
   }
 
   virtual T visitAggExpr(const hdk::ir::AggExpr* agg) const {
-    if (agg->get_arg()) {
-      return visit(agg->get_arg());
+    if (agg->arg()) {
+      return visit(agg->arg());
     }
     return defaultResult();
   }

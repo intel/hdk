@@ -891,8 +891,8 @@ ColumnRefSet get_used_inputs(const RelAggregate* aggregate) {
   for (const auto& expr : aggregate->getAggs()) {
     auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr.get());
     CHECK(agg_expr);
-    if (agg_expr->get_arg()) {
-      auto used_inputs = visitor.visit(agg_expr->get_arg());
+    if (agg_expr->arg()) {
+      auto used_inputs = visitor.visit(agg_expr->arg());
       res.insert(used_inputs.begin(), used_inputs.end());
     }
   }
@@ -1134,7 +1134,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     // and shouldn't have any effect on functionality and performance.
     // TODO: remove when rex are not used anymore
     if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
-      if (agg->get_arg()) {
+      if (agg->arg()) {
         auto new_arg = set_transient_dict_maybe(agg->get_own_arg());
         res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
                                                   agg->aggType(),

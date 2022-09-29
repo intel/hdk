@@ -1171,13 +1171,13 @@ bool AggExpr::operator==(const Expr& rhs) const {
   if (agg_type_ != rhs_ae.aggType() || is_distinct_ != rhs_ae.get_is_distinct()) {
     return false;
   }
-  if (arg_.get() == rhs_ae.get_arg()) {
+  if (arg_.get() == rhs_ae.arg()) {
     return true;
   }
-  if (arg_ == nullptr || rhs_ae.get_arg() == nullptr) {
+  if (arg_ == nullptr || rhs_ae.arg() == nullptr) {
     return false;
   }
-  return *arg_ == *rhs_ae.get_arg();
+  return *arg_ == *rhs_ae.arg();
 }
 
 bool CaseExpr::operator==(const Expr& rhs) const {

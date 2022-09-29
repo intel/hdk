@@ -228,7 +228,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitAggExpr(const hdk::ir::AggExpr* agg) const override {
-    RetType arg = agg->get_arg() ? visit(agg->get_arg()) : nullptr;
+    RetType arg = agg->arg() ? visit(agg->arg()) : nullptr;
     return hdk::ir::makeExpr<hdk::ir::AggExpr>(
         agg->type(), agg->aggType(), arg, agg->get_is_distinct(), agg->get_arg1());
   }

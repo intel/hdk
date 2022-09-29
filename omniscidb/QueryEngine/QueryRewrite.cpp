@@ -186,9 +186,9 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
   auto check_precond = is_all_groupby_exprs_are_col_var(ra_exe_unit_in.groupby_exprs);
   auto is_expr_on_gby_col = [&check_precond](const hdk::ir::AggExpr* agg_expr) {
     CHECK(agg_expr);
-    if (agg_expr->get_arg()) {
+    if (agg_expr->arg()) {
       // some expr does not have its own arg, i.e., count(*)
-      auto agg_expr_hash = boost::hash_value(agg_expr->get_arg()->toString());
+      auto agg_expr_hash = boost::hash_value(agg_expr->arg()->toString());
       // a valid expr should have hashed value > 0
       CHECK_GT(agg_expr_hash, 0u);
       if (check_precond.second.count(agg_expr_hash)) {
@@ -209,7 +209,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
     bool rewritten = false;
     if (auto agg_expr = expr->as<hdk::ir::AggExpr>()) {
       if (is_expr_on_gby_col(agg_expr)) {
-        auto target_expr = agg_expr->get_arg();
+        auto target_expr = agg_expr->arg();
         // we have some issues when this rewriting is applied to float_type groupby column
         // in subquery, i.e., SELECT MIN(v1) FROM (SELECT v1, AGG(v1) FROM T GROUP BY v1);
         if (target_expr && !target_expr->type()->isFp32()) {
