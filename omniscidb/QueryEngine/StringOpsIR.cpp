@@ -110,7 +110,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LowerExpr* expr,
     throw QueryMustRunOnCpu();
   }
 
-  auto str_id_lv = codegen(expr->get_arg(), true, co);
+  auto str_id_lv = codegen(expr->arg(), true, co);
   CHECK_EQ(size_t(1), str_id_lv.size());
 
   CHECK(expr->type()->isExtDictionary());

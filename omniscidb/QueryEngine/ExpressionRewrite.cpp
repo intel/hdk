@@ -674,7 +674,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitLower(const hdk::ir::LowerExpr* lower_expr) const override {
     const auto constant_arg_expr =
-        dynamic_cast<const hdk::ir::Constant*>(lower_expr->get_arg());
+        dynamic_cast<const hdk::ir::Constant*>(lower_expr->arg());
     if (constant_arg_expr) {
       return Analyzer::analyzeStringValue(
           boost::locale::to_lower(*constant_arg_expr->value().stringval));

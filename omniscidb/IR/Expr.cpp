@@ -1057,7 +1057,7 @@ bool LowerExpr::operator==(const Expr& rhs) const {
     return false;
   }
 
-  return *arg_ == *dynamic_cast<const LowerExpr&>(rhs).get_arg();
+  return *arg_ == *dynamic_cast<const LowerExpr&>(rhs).arg();
 }
 
 bool CardinalityExpr::operator==(const Expr& rhs) const {

@@ -232,7 +232,7 @@ class ScalarExprVisitor {
   }
 
   virtual T visitLower(const hdk::ir::LowerExpr* lower_expr) const {
-    return visit(lower_expr->get_arg());
+    return visit(lower_expr->arg());
   }
 
   virtual T visitCardinality(const hdk::ir::CardinalityExpr* cardinality) const {

@@ -94,7 +94,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitLower(const hdk::ir::LowerExpr* expr) const override {
-    return hdk::ir::makeExpr<hdk::ir::LowerExpr>(visit(expr->get_arg()));
+    return hdk::ir::makeExpr<hdk::ir::LowerExpr>(visit(expr->arg()));
   }
 
   RetType visitCardinality(const hdk::ir::CardinalityExpr* cardinality) const override {
