@@ -914,7 +914,7 @@ class DatediffExpr : public Expr {
                const ExprPtr start,
                const ExprPtr end)
       : Expr(type, false), field_(f), start_(start), end_(end) {}
-  DatetruncField get_field() const { return field_; }
+  DatetruncField field() const { return field_; }
   const Expr* get_start_expr() const { return start_.get(); }
   const Expr* get_end_expr() const { return end_.get(); }
   ExprPtr deep_copy() const override;

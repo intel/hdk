@@ -224,7 +224,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DatediffExpr* datediff_expr,
   auto start_type = datediff_expr->get_start_expr()->type();
   auto end_type = datediff_expr->get_end_expr()->type();
   std::vector<llvm::Value*> datediff_args{
-      cgen_state_->llInt(static_cast<int32_t>(datediff_expr->get_field())), start, end};
+      cgen_state_->llInt(static_cast<int32_t>(datediff_expr->field())), start, end};
   std::string datediff_fname{"DateDiff"};
   auto start_unit = start_type->isTimestamp()
                         ? start_type->as<hdk::ir::TimestampType>()->unit()
