@@ -709,7 +709,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
 
       if (agg) {
         CHECK_EQ(kCOUNT, agg->aggType());
-        CHECK(!agg->get_is_distinct());
+        CHECK(!agg->isDistinct());
         if (col_it != end) {
           ++col_it;
         }

@@ -2271,7 +2271,7 @@ ResultSetPtr build_row_for_empty_input(
           hdk::ir::makeExpr<hdk::ir::AggExpr>(agg_expr->type()->withNullable(true),
                                               agg_expr->aggType(),
                                               agg_expr->arg()->withType(arg_type),
-                                              agg_expr->get_is_distinct(),
+                                              agg_expr->isDistinct(),
                                               agg_expr->get_arg1());
     } else {
       target_expr_copy = agg_expr->withType(agg_expr->type()->withNullable(true));

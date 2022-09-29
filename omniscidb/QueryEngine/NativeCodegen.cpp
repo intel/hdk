@@ -759,8 +759,7 @@ std::vector<std::string> get_agg_fnames(
         break;
       }
       case kCOUNT:
-        result.emplace_back(agg_expr->get_is_distinct() ? "agg_count_distinct"
-                                                        : "agg_count");
+        result.emplace_back(agg_expr->isDistinct() ? "agg_count_distinct" : "agg_count");
         break;
       case kSINGLE_VALUE: {
         result.emplace_back(agg_type->isFloatingPoint() ? "agg_id_double" : "agg_id");

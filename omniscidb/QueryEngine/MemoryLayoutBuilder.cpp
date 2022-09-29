@@ -577,7 +577,7 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
     }
     // TODO(alex): relax the restrictions
     auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-    if (agg_expr->get_is_distinct() || agg_expr->aggType() == kAVG ||
+    if (agg_expr->isDistinct() || agg_expr->aggType() == kAVG ||
         agg_expr->aggType() == kMIN || agg_expr->aggType() == kMAX ||
         agg_expr->aggType() == kAPPROX_COUNT_DISTINCT) {
       return false;

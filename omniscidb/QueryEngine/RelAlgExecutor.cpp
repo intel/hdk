@@ -1136,11 +1136,8 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
       if (agg->arg()) {
         auto new_arg = set_transient_dict_maybe(agg->argShared());
-        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
-                                                  agg->aggType(),
-                                                  new_arg,
-                                                  agg->get_is_distinct(),
-                                                  agg->get_arg1());
+        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(
+            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->get_arg1());
       }
     } else {
       res = set_transient_dict_maybe(res);
@@ -1242,7 +1239,7 @@ std::vector<const hdk::ir::Expr*> translate_targets(
 
 bool is_count_distinct(const hdk::ir::Expr* expr) {
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr);
-  return agg_expr && agg_expr->get_is_distinct();
+  return agg_expr && agg_expr->isDistinct();
 }
 
 bool is_agg(const hdk::ir::Expr* expr) {

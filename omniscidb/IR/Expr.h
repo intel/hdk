@@ -812,7 +812,7 @@ class AggExpr : public Expr {
   SQLAgg aggType() const { return agg_type_; }
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  bool get_is_distinct() const { return is_distinct_; }
+  bool isDistinct() const { return is_distinct_; }
   std::shared_ptr<const Constant> get_arg1() const { return arg1_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;

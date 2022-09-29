@@ -1168,7 +1168,7 @@ bool AggExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const AggExpr& rhs_ae = dynamic_cast<const AggExpr&>(rhs);
-  if (agg_type_ != rhs_ae.aggType() || is_distinct_ != rhs_ae.get_is_distinct()) {
+  if (agg_type_ != rhs_ae.aggType() || is_distinct_ != rhs_ae.isDistinct()) {
     return false;
   }
   if (arg_.get() == rhs_ae.arg()) {
