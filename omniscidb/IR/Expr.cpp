@@ -532,8 +532,8 @@ ExprPtr DateAddExpr::deep_copy() const {
       type_, field_, number_->deep_copy(), datetime_->deep_copy());
 }
 
-ExprPtr DatediffExpr::deep_copy() const {
-  return makeExpr<DatediffExpr>(type_, field_, start_->deep_copy(), end_->deep_copy());
+ExprPtr DateDiffExpr::deep_copy() const {
+  return makeExpr<DateDiffExpr>(type_, field_, start_->deep_copy(), end_->deep_copy());
 }
 
 ExprPtr DatetruncExpr::deep_copy() const {
@@ -1220,11 +1220,11 @@ bool DateAddExpr::operator==(const Expr& rhs) const {
          *datetime_ == *rhs_ee.datetime();
 }
 
-bool DatediffExpr::operator==(const Expr& rhs) const {
-  if (typeid(rhs) != typeid(DatediffExpr)) {
+bool DateDiffExpr::operator==(const Expr& rhs) const {
+  if (typeid(rhs) != typeid(DateDiffExpr)) {
     return false;
   }
-  const DatediffExpr& rhs_ee = dynamic_cast<const DatediffExpr&>(rhs);
+  const DateDiffExpr& rhs_ee = dynamic_cast<const DateDiffExpr&>(rhs);
   return field_ == rhs_ee.field() && *start_ == *rhs_ee.get_start_expr() &&
          *end_ == *rhs_ee.get_end_expr();
 }
@@ -1621,7 +1621,7 @@ std::string DateAddExpr::toString() const {
          " DATETIME " + datetime_->toString() + ") ";
 }
 
-std::string DatediffExpr::toString() const {
+std::string DateDiffExpr::toString() const {
   return "DATEDIFF(" + std::to_string(field_) + " START " + start_->toString() + " END " +
          end_->toString() + ") ";
 }
@@ -2096,7 +2096,7 @@ size_t DateAddExpr::hash() const {
   return *hash_;
 }
 
-size_t DatediffExpr::hash() const {
+size_t DateDiffExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, field_);

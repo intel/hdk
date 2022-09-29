@@ -139,9 +139,9 @@ class ScalarExprVisitor {
     if (array) {
       return visitArrayOper(array);
     }
-    const auto datediff = dynamic_cast<const hdk::ir::DatediffExpr*>(expr);
+    const auto datediff = dynamic_cast<const hdk::ir::DateDiffExpr*>(expr);
     if (datediff) {
-      return visitDatediffExpr(datediff);
+      return visitDateDiffExpr(datediff);
     }
     const auto dateadd = dynamic_cast<const hdk::ir::DateAddExpr*>(expr);
     if (dateadd) {
@@ -328,7 +328,7 @@ class ScalarExprVisitor {
     return result;
   }
 
-  virtual T visitDatediffExpr(const hdk::ir::DatediffExpr* datediff) const {
+  virtual T visitDateDiffExpr(const hdk::ir::DateDiffExpr* datediff) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(datediff->get_start_expr()));
     result = aggregateResult(result, visit(datediff->get_end_expr()));

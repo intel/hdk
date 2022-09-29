@@ -214,7 +214,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateAddExpr* dateadd_expr,
                                         llvm::Attribute::Speculatable});
 }
 
-llvm::Value* CodeGenerator::codegen(const hdk::ir::DatediffExpr* datediff_expr,
+llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto start = codegen(datediff_expr->get_start_expr(), true, co).front();

@@ -904,12 +904,12 @@ class DateAddExpr : public Expr {
 };
 
 /*
- * @type DatediffExpr
+ * @type DateDiffExpr
  * @brief the DATEDIFF expression
  */
-class DatediffExpr : public Expr {
+class DateDiffExpr : public Expr {
  public:
-  DatediffExpr(const hdk::ir::Type* type,
+  DateDiffExpr(const hdk::ir::Type* type,
                const DatetruncField f,
                const ExprPtr start,
                const ExprPtr end)

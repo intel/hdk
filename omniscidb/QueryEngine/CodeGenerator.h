@@ -159,7 +159,7 @@ class CodeGenerator {
 
   llvm::Value* codegen(const hdk::ir::DateAddExpr*, const CompilationOptions&);
 
-  llvm::Value* codegen(const hdk::ir::DatediffExpr*, const CompilationOptions&);
+  llvm::Value* codegen(const hdk::ir::DateDiffExpr*, const CompilationOptions&);
 
   llvm::Value* codegen(const hdk::ir::DatetruncExpr*, const CompilationOptions&);
 

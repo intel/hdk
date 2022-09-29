@@ -113,8 +113,8 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
     return nullptr;
   }
 
-  std::shared_ptr<const hdk::ir::InValues> visitDatediffExpr(
-      const hdk::ir::DatediffExpr*) const override {
+  std::shared_ptr<const hdk::ir::InValues> visitDateDiffExpr(
+      const hdk::ir::DateDiffExpr*) const override {
     return nullptr;
   }
 

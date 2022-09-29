@@ -1101,7 +1101,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
     auto res_unit = type->as<hdk::ir::IntervalType>()->unit();
     if (res_unit == hdk::ir::TimeUnit::kMilli) {
       auto result =
-          hdk::ir::makeExpr<hdk::ir::DatediffExpr>(bigint_type, dtSECOND, rhs, lhs);
+          hdk::ir::makeExpr<hdk::ir::DateDiffExpr>(bigint_type, dtSECOND, rhs, lhs);
       // multiply 1000 to result since expected result should be in millisecond precision.
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bigint_type,
@@ -1111,7 +1111,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
           hdk::ir::Constant::make(bigint_type, 1000));
 
     } else if (res_unit == hdk::ir::TimeUnit::kMilli) {
-      return hdk::ir::makeExpr<hdk::ir::DatediffExpr>(bigint_type, dtMONTH, rhs, lhs);
+      return hdk::ir::makeExpr<hdk::ir::DateDiffExpr>(bigint_type, dtMONTH, rhs, lhs);
 
     } else {
       throw std::runtime_error("Unexpected DATEDIFF result type" + type->toString());
@@ -1347,7 +1347,7 @@ hdk::ir::ExprPtr parseDatediff(const hdk::ir::ExprPtrVector& operands) {
   auto& start = operands[1];
   auto& end = operands[2];
   auto field = to_datediff_field(*timeunit_lit->value().stringval);
-  return hdk::ir::makeExpr<hdk::ir::DatediffExpr>(
+  return hdk::ir::makeExpr<hdk::ir::DateDiffExpr>(
       start->type()->ctx().int64(), field, start, end);
 }
 
