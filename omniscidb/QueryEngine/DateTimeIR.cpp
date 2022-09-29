@@ -217,11 +217,11 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateAddExpr* dateadd_expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto start = codegen(datediff_expr->get_start_expr(), true, co).front();
+  auto start = codegen(datediff_expr->start(), true, co).front();
   CHECK(start->getType()->isIntegerTy(64));
   auto end = codegen(datediff_expr->get_end_expr(), true, co).front();
   CHECK(end->getType()->isIntegerTy(32) || end->getType()->isIntegerTy(64));
-  auto start_type = datediff_expr->get_start_expr()->type();
+  auto start_type = datediff_expr->start()->type();
   auto end_type = datediff_expr->get_end_expr()->type();
   std::vector<llvm::Value*> datediff_args{
       cgen_state_->llInt(static_cast<int32_t>(datediff_expr->field())), start, end};
