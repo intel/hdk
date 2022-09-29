@@ -942,7 +942,7 @@ InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
 InIntegerSet::InIntegerSet(const std::shared_ptr<const Expr> a,
                            const std::vector<int64_t>& l,
                            const bool not_null)
-    : Expr(a->ctx().boolean(!not_null)), arg_(a), value_list(l) {}
+    : Expr(a->ctx().boolean(!not_null)), arg_(a), value_list_(l) {}
 
 bool ColumnVar::operator==(const Expr& rhs) const {
   if (typeid(rhs) != typeid(ColumnVar) && typeid(rhs) != typeid(Var)) {
@@ -1439,7 +1439,7 @@ std::string InValues::toString() const {
 
 ExprPtr InIntegerSet::deep_copy() const {
   return std::make_shared<InIntegerSet>(
-      arg_->deep_copy(), value_list, !type()->nullable());
+      arg_->deep_copy(), value_list_, !type()->nullable());
 }
 
 bool InIntegerSet::operator==(const Expr& rhs) const {
@@ -1447,7 +1447,8 @@ bool InIntegerSet::operator==(const Expr& rhs) const {
     return false;
   }
   const auto& rhs_in_integer_set = static_cast<const InIntegerSet&>(rhs);
-  return *arg_ == *rhs_in_integer_set.arg_ && value_list == rhs_in_integer_set.value_list;
+  return *arg_ == *rhs_in_integer_set.arg_ &&
+         value_list_ == rhs_in_integer_set.value_list_;
 }
 
 std::string InIntegerSet::toString() const {
@@ -1456,7 +1457,7 @@ std::string InIntegerSet::toString() const {
   str += "( ";
   int cnt = 0;
   bool shorted_value_list_str = false;
-  for (const auto e : value_list) {
+  for (const auto e : value_list_) {
     str += std::to_string(e) + " ";
     cnt++;
     if (cnt > 4) {
@@ -1467,7 +1468,7 @@ std::string InIntegerSet::toString() const {
   if (shorted_value_list_str) {
     str += "... | ";
     str += "Total # values: ";
-    str += std::to_string(value_list.size());
+    str += std::to_string(value_list_.size());
   }
   str += ") ";
   return str;
@@ -1926,7 +1927,7 @@ size_t InIntegerSet::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, arg_->hash());
-    boost::hash_combine(*hash_, value_list);
+    boost::hash_combine(*hash_, value_list_);
   }
   return *hash_;
 }

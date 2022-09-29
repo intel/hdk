@@ -490,7 +490,7 @@ class InIntegerSet : public Expr {
 
   const Expr* get_arg() const { return arg_.get(); }
 
-  const std::vector<int64_t>& get_value_list() const { return value_list; }
+  const std::vector<int64_t>& get_value_list() const { return value_list_; }
 
   ExprPtr deep_copy() const override;
 
@@ -501,7 +501,7 @@ class InIntegerSet : public Expr {
 
  private:
   const std::shared_ptr<const Expr> arg_;  // the argument left of IN
-  const std::vector<int64_t> value_list;   // the list of values right of IN
+  const std::vector<int64_t> value_list_;  // the list of values right of IN
 };
 
 class InSubquery : public Expr {
