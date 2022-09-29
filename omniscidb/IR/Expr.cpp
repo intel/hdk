@@ -942,7 +942,7 @@ InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
 InIntegerSet::InIntegerSet(const std::shared_ptr<const Expr> a,
                            const std::vector<int64_t>& l,
                            const bool not_null)
-    : Expr(a->ctx().boolean(!not_null)), arg(a), value_list(l) {}
+    : Expr(a->ctx().boolean(!not_null)), arg_(a), value_list(l) {}
 
 bool ColumnVar::operator==(const Expr& rhs) const {
   if (typeid(rhs) != typeid(ColumnVar) && typeid(rhs) != typeid(Var)) {
@@ -1439,7 +1439,7 @@ std::string InValues::toString() const {
 
 ExprPtr InIntegerSet::deep_copy() const {
   return std::make_shared<InIntegerSet>(
-      arg->deep_copy(), value_list, !type()->nullable());
+      arg_->deep_copy(), value_list, !type()->nullable());
 }
 
 bool InIntegerSet::operator==(const Expr& rhs) const {
@@ -1447,12 +1447,12 @@ bool InIntegerSet::operator==(const Expr& rhs) const {
     return false;
   }
   const auto& rhs_in_integer_set = static_cast<const InIntegerSet&>(rhs);
-  return *arg == *rhs_in_integer_set.arg && value_list == rhs_in_integer_set.value_list;
+  return *arg_ == *rhs_in_integer_set.arg_ && value_list == rhs_in_integer_set.value_list;
 }
 
 std::string InIntegerSet::toString() const {
   std::string str{"(IN_INTEGER_SET "};
-  str += arg->toString();
+  str += arg_->toString();
   str += "( ";
   int cnt = 0;
   bool shorted_value_list_str = false;
@@ -1925,7 +1925,7 @@ size_t InValues::hash() const {
 size_t InIntegerSet::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
     boost::hash_combine(*hash_, value_list);
   }
   return *hash_;

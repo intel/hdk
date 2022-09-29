@@ -488,7 +488,7 @@ class InIntegerSet : public Expr {
                const std::vector<int64_t>& values,
                const bool not_null);
 
-  const Expr* get_arg() const { return arg.get(); }
+  const Expr* get_arg() const { return arg_.get(); }
 
   const std::vector<int64_t>& get_value_list() const { return value_list; }
 
@@ -500,8 +500,8 @@ class InIntegerSet : public Expr {
   size_t hash() const override;
 
  private:
-  const std::shared_ptr<const Expr> arg;  // the argument left of IN
-  const std::vector<int64_t> value_list;  // the list of values right of IN
+  const std::shared_ptr<const Expr> arg_;  // the argument left of IN
+  const std::vector<int64_t> value_list;   // the list of values right of IN
 };
 
 class InSubquery : public Expr {
