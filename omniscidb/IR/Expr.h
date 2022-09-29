@@ -444,7 +444,7 @@ class ScalarSubquery : public Expr {
   std::string toString() const override;
 
   const RelAlgNode* node() const { return node_.get(); }
-  std::shared_ptr<const RelAlgNode> getNodeShared() const { return node_; }
+  std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
 
   size_t hash() const override;
 
@@ -525,7 +525,7 @@ class InSubquery : public Expr {
   hdk::ir::ExprPtr getArg() const { return arg_; }
 
   const RelAlgNode* node() const { return node_.get(); }
-  std::shared_ptr<const RelAlgNode> getNodeShared() const { return node_; }
+  std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
 
   size_t hash() const override;
 

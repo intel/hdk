@@ -78,7 +78,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override {
     return hdk::ir::makeExpr<hdk::ir::InSubquery>(in_subquery->type(),
                                                   visit(in_subquery->getArg().get()),
-                                                  in_subquery->getNodeShared());
+                                                  in_subquery->nodeShared());
   }
 
   RetType visitCharLength(const hdk::ir::CharLengthExpr* char_length) const override {

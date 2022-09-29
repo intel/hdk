@@ -1917,7 +1917,7 @@ hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
     return hdk::ir::makeExpr<hdk::ir::InSubquery>(
         type->ctx().boolean(),
         operands[0],
-        dynamic_cast<const hdk::ir::ScalarSubquery*>(subquery.get())->getNodeShared());
+        dynamic_cast<const hdk::ir::ScalarSubquery*>(subquery.get())->nodeShared());
   } else if (json_expr.FindMember("partition_keys") != json_expr.MemberEnd()) {
     return parseWindowFunction(json_expr,
                                op_name,
