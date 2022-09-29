@@ -66,7 +66,7 @@ extern "C" RUNTIME_EXPORT int32_t lower_encoded(int32_t string_id,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto str_lv = codegen(expr->get_arg(), true, co);
+  auto str_lv = codegen(expr->arg(), true, co);
   if (str_lv.size() != 3) {
     CHECK_EQ(size_t(1), str_lv.size());
     if (config_.exec.watchdog.enable) {
@@ -84,7 +84,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
   if (expr->get_calc_encoded_length()) {
     fn_name += "_encoded";
   }
-  const bool is_nullable{expr->get_arg()->type()->nullable()};
+  const bool is_nullable{expr->arg()->type()->nullable()};
   if (is_nullable) {
     fn_name += "_nullable";
     charlength_args.push_back(cgen_state_->inlineIntNull(expr->type()));

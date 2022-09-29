@@ -215,7 +215,7 @@ class ScalarExprVisitor {
 
   virtual T visitCharLength(const hdk::ir::CharLengthExpr* char_length) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(char_length->get_arg()));
+    result = aggregateResult(result, visit(char_length->arg()));
     return result;
   }
 
