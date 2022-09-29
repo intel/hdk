@@ -688,13 +688,13 @@ class RegexpExpr : public Expr {
  public:
   RegexpExpr(ExprPtr a, ExprPtr p, ExprPtr e)
       : Expr(a->ctx().boolean(a->type()->nullable()))
-      , arg(a)
-      , pattern_expr(p)
-      , escape_expr(e) {}
-  const Expr* get_arg() const { return arg.get(); }
-  const ExprPtr get_own_arg() const { return arg; }
-  const Expr* get_pattern_expr() const { return pattern_expr.get(); }
-  const Expr* get_escape_expr() const { return escape_expr.get(); }
+      , arg_(a)
+      , pattern_expr_(p)
+      , escape_expr_(e) {}
+  const Expr* get_arg() const { return arg_.get(); }
+  const ExprPtr get_own_arg() const { return arg_; }
+  const Expr* get_pattern_expr() const { return pattern_expr_.get(); }
+  const Expr* get_escape_expr() const { return escape_expr_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -702,9 +702,9 @@ class RegexpExpr : public Expr {
   size_t hash() const override;
 
  private:
-  ExprPtr arg;           // the argument to the left of REGEXP
-  ExprPtr pattern_expr;  // expression that evaluates to pattern string
-  ExprPtr escape_expr;   // expression that evaluates to escape string, can be nullptr
+  ExprPtr arg_;           // the argument to the left of REGEXP
+  ExprPtr pattern_expr_;  // expression that evaluates to pattern string
+  ExprPtr escape_expr_;   // expression that evaluates to escape string, can be nullptr
 };
 
 /*

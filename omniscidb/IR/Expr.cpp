@@ -491,9 +491,9 @@ ExprPtr LikeExpr::deep_copy() const {
 }
 
 ExprPtr RegexpExpr::deep_copy() const {
-  return makeExpr<RegexpExpr>(arg->deep_copy(),
-                              pattern_expr->deep_copy(),
-                              escape_expr ? escape_expr->deep_copy() : nullptr);
+  return makeExpr<RegexpExpr>(arg_->deep_copy(),
+                              pattern_expr_->deep_copy(),
+                              escape_expr_ ? escape_expr_->deep_copy() : nullptr);
 }
 
 ExprPtr WidthBucketExpr::deep_copy() const {
@@ -1095,14 +1095,14 @@ bool RegexpExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const RegexpExpr& rhs_re = dynamic_cast<const RegexpExpr&>(rhs);
-  if (!(*arg == *rhs_re.get_arg()) || !(*pattern_expr == *rhs_re.get_pattern_expr())) {
+  if (!(*arg_ == *rhs_re.get_arg()) || !(*pattern_expr_ == *rhs_re.get_pattern_expr())) {
     return false;
   }
-  if (escape_expr.get() == rhs_re.get_escape_expr()) {
+  if (escape_expr_.get() == rhs_re.get_escape_expr()) {
     return true;
   }
-  if (escape_expr != nullptr && rhs_re.get_escape_expr() != nullptr &&
-      *escape_expr == *rhs_re.get_escape_expr()) {
+  if (escape_expr_ != nullptr && rhs_re.get_escape_expr() != nullptr &&
+      *escape_expr_ == *rhs_re.get_escape_expr()) {
     return true;
   }
   return false;
@@ -1528,10 +1528,10 @@ std::string LikeExpr::toString() const {
 
 std::string RegexpExpr::toString() const {
   std::string str{"(REGEXP "};
-  str += arg->toString();
-  str += pattern_expr->toString();
-  if (escape_expr) {
-    str += escape_expr->toString();
+  str += arg_->toString();
+  str += pattern_expr_->toString();
+  if (escape_expr_) {
+    str += escape_expr_->toString();
   }
   str += ") ";
   return str;
@@ -1998,10 +1998,10 @@ size_t LikeExpr::hash() const {
 size_t RegexpExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
-    boost::hash_combine(*hash_, pattern_expr->hash());
-    if (escape_expr) {
-      boost::hash_combine(*hash_, escape_expr->hash());
+    boost::hash_combine(*hash_, arg_->hash());
+    boost::hash_combine(*hash_, pattern_expr_->hash());
+    if (escape_expr_) {
+      boost::hash_combine(*hash_, escape_expr_->hash());
     }
   }
   return *hash_;
