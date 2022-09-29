@@ -289,8 +289,8 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
         "PARTITION_COUNT expression of width_bucket function should be in a valid "
         "range: 0 < PARTITION_COUNT <= 2147483647");
   }
-  double lower = expr->get_bound_val(lower_bound_expr);
-  double upper = expr->get_bound_val(upper_bound_expr);
+  double lower = expr->boundVal(lower_bound_expr);
+  double upper = expr->boundVal(upper_bound_expr);
   if (lower == upper) {
     throw std::runtime_error(
         "LOWER_BOUND and UPPER_BOUND expressions of width_bucket function cannot have "

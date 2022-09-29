@@ -727,7 +727,7 @@ class WidthBucketExpr : public Expr {
   const Expr* upperBound() const { return upper_bound_.get(); }
   const Expr* partitionCount() const { return partition_count_.get(); }
   ExprPtr deep_copy() const override;
-  double get_bound_val(const Expr* bound_expr) const;
+  double boundVal(const Expr* bound_expr) const;
   int32_t get_partition_count_val() const;
   template <typename T>
   int32_t compute_bucket(T target_const_val, const hdk::ir::Type* type) const {
@@ -735,8 +735,8 @@ class WidthBucketExpr : public Expr {
     // for an expression depending on width_bucket expr
     T null_val =
         type->isInteger() ? inline_int_null_value(type) : inline_fp_null_value(type);
-    double lower_bound_val = get_bound_val(lower_bound_.get());
-    double upper_bound_val = get_bound_val(upper_bound_.get());
+    double lower_bound_val = boundVal(lower_bound_.get());
+    double upper_bound_val = boundVal(upper_bound_.get());
     auto partition_count_val = get_partition_count_val();
     if (target_const_val == null_val) {
       return INT32_MIN;

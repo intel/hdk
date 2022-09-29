@@ -1749,7 +1749,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
   return true;
 }
 
-double WidthBucketExpr::get_bound_val(const Expr* bound_expr) const {
+double WidthBucketExpr::boundVal(const Expr* bound_expr) const {
   CHECK(bound_expr);
   auto copied_expr = bound_expr->deep_copy();
   auto casted_expr = copied_expr->cast(ctx().fp64());
