@@ -308,7 +308,7 @@ class ScalarExprVisitor {
 
   virtual T visitFunctionOper(const hdk::ir::FunctionOper* func_oper) const {
     T result = defaultResult();
-    for (size_t i = 0; i < func_oper->getArity(); ++i) {
+    for (size_t i = 0; i < func_oper->arity(); ++i) {
       result = aggregateResult(result, visit(func_oper->getArg(i)));
     }
     return result;

@@ -687,7 +687,7 @@ class ExprTableIdVisitor : public ScalarExprVisitor<std::set<int>> {
 
   std::set<int> visitFunctionOper(const hdk::ir::FunctionOper* func_expr) const final {
     std::set<int> ret;
-    for (size_t i = 0; i < func_expr->getArity(); i++) {
+    for (size_t i = 0; i < func_expr->arity(); i++) {
       ret = aggregateResult(ret, visit(func_expr->getArg(i)));
     }
     return ret;

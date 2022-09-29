@@ -32,7 +32,7 @@ const hdk::ir::Expr* remove_truncate_int(const hdk::ir::Expr* expr) {
   if (!func_oper || func_oper->name() != "TRUNCATE") {
     return nullptr;
   }
-  CHECK_EQ(size_t(2), func_oper->getArity());
+  CHECK_EQ(size_t(2), func_oper->arity());
   const auto arg = func_oper->getArg(0);
   auto arg_type = arg->type();
   return arg_type->isInteger() ? arg : nullptr;
@@ -157,7 +157,7 @@ hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
 
 hdk::ir::ExprPtr rewrite_to_date_trunc(const hdk::ir::FunctionOper* dt_plus) {
   CHECK_EQ("DATETIME_PLUS", dt_plus->name());
-  CHECK_EQ(size_t(2), dt_plus->getArity());
+  CHECK_EQ(size_t(2), dt_plus->arity());
   const auto ts = remove_cast_to_date(dt_plus->getArg(0));
   if (!ts) {
     return nullptr;

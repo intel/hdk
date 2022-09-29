@@ -959,7 +959,7 @@ class FunctionOper : public Expr {
 
   const std::string& name() const { return name_; }
 
-  size_t getArity() const { return args_.size(); }
+  size_t arity() const { return args_.size(); }
 
   const Expr* getArg(const size_t i) const {
     CHECK_LT(i, args_.size());

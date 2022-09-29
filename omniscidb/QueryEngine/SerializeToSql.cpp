@@ -134,14 +134,14 @@ std::string ScalarExprToSql::visitFunctionOper(
     const hdk::ir::FunctionOper* func_oper) const {
   std::string result = func_oper->name();
   if (result == "||") {
-    CHECK_EQ(func_oper->getArity(), size_t(2));
+    CHECK_EQ(func_oper->arity(), size_t(2));
     return visit(func_oper->getArg(0)) + "||" + visit(func_oper->getArg(1));
   }
   if (result == "SUBSTRING") {
     result = "SUBSTR";
   }
   std::vector<std::string> arg_strs;
-  for (size_t i = 0; i < func_oper->getArity(); ++i) {
+  for (size_t i = 0; i < func_oper->arity(); ++i) {
     arg_strs.push_back(visit(func_oper->getArg(i)));
   }
   return result + "(" + boost::algorithm::join(arg_strs, ",") + ")";

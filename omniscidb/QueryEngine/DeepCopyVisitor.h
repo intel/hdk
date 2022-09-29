@@ -189,7 +189,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
 
   RetType visitFunctionOper(const hdk::ir::FunctionOper* func_oper) const override {
     std::vector<hdk::ir::ExprPtr> args_copy;
-    for (size_t i = 0; i < func_oper->getArity(); ++i) {
+    for (size_t i = 0; i < func_oper->arity(); ++i) {
       args_copy.push_back(visit(func_oper->getArg(i)));
     }
     const auto& type = func_oper->type();
@@ -213,7 +213,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitFunctionOperWithCustomTypeHandling(
       const hdk::ir::FunctionOperWithCustomTypeHandling* func_oper) const override {
     std::vector<hdk::ir::ExprPtr> args_copy;
-    for (size_t i = 0; i < func_oper->getArity(); ++i) {
+    for (size_t i = 0; i < func_oper->arity(); ++i) {
       args_copy.push_back(visit(func_oper->getArg(i)));
     }
     const auto& type = func_oper->type();

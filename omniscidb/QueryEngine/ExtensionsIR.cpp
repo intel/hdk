@@ -202,7 +202,7 @@ inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
 
 bool ext_func_call_requires_nullcheck(const hdk::ir::FunctionOper* function_oper) {
   const auto& func_type = function_oper->type();
-  for (size_t i = 0; i < function_oper->getArity(); ++i) {
+  for (size_t i = 0; i < function_oper->arity(); ++i) {
     const auto arg = function_oper->getArg(i);
     const auto& arg_type = arg->type();
     if ((func_type->isArray() && arg_type->isArray()) ||
@@ -279,7 +279,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
   std::vector<size_t> orig_arg_lvs_index;
   std::unordered_map<llvm::Value*, llvm::Value*> const_arr_size;
 
-  for (size_t i = 0; i < function_oper->getArity(); ++i) {
+  for (size_t i = 0; i < function_oper->arity(); ++i) {
     orig_arg_lvs_index.push_back(orig_arg_lvs.size());
     const auto arg = function_oper->getArg(i);
     const auto arg_cast = dynamic_cast<const hdk::ir::UOper*>(arg);
@@ -321,7 +321,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
   // code to do the check at the call site: if any argument is NULL, return NULL
   // without calling the function at all.
   const auto [bbs, null_buffer_ptr] = beginArgsNullcheck(function_oper, orig_arg_lvs);
-  CHECK_GE(orig_arg_lvs.size(), function_oper->getArity());
+  CHECK_GE(orig_arg_lvs.size(), function_oper->arity());
   // Arguments must be converted to the types the extension function can handle.
   auto args = codegenFunctionOperCastArgs(
       function_oper, &ext_func_sig, orig_arg_lvs, orig_arg_lvs_index, const_arr_size, co);
@@ -473,7 +473,7 @@ bool call_requires_custom_type_handling(const hdk::ir::FunctionOper* function_op
   if (!ret_type->isInteger() && !ret_type->isFloatingPoint()) {
     return true;
   }
-  for (size_t i = 0; i < function_oper->getArity(); ++i) {
+  for (size_t i = 0; i < function_oper->arity(); ++i) {
     const auto arg = function_oper->getArg(i);
     const auto& arg_type = arg->type();
     if (!arg_type->isInteger() && !arg_type->isFloatingPoint()) {
@@ -492,7 +492,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
   if (call_requires_custom_type_handling(function_oper)) {
     // Some functions need the return type to be the same as the input type.
     if (function_oper->name() == "FLOOR" || function_oper->name() == "CEIL") {
-      CHECK_EQ(size_t(1), function_oper->getArity());
+      CHECK_EQ(size_t(1), function_oper->arity());
       const auto arg = function_oper->getArg(0);
       auto arg_type = arg->type();
       CHECK(arg_type->isDecimal());
@@ -515,7 +515,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       return endArgsNullcheck(bbs, result_lv, nullptr, function_oper);
     } else if (function_oper->name() == "ROUND" &&
                function_oper->getArg(0)->type()->isDecimal()) {
-      CHECK_EQ(size_t(2), function_oper->getArity());
+      CHECK_EQ(size_t(2), function_oper->arity());
 
       const auto arg0 = function_oper->getArg(0);
       auto arg0_type = arg0->type();
@@ -563,7 +563,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperNullArg(
   AUTOMATIC_IR_METADATA(cgen_state_);
   llvm::Value* one_arg_null =
       llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(cgen_state_->context_), false);
-  for (size_t i = 0; i < function_oper->getArity(); ++i) {
+  for (size_t i = 0; i < function_oper->arity(); ++i) {
     const auto arg = function_oper->getArg(i);
     auto arg_type = arg->type();
     if (!arg_type->nullable()) {
@@ -628,7 +628,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(ext_func_sig);
   const auto& ext_func_args = ext_func_sig->getArgs();
-  CHECK_LE(function_oper->getArity(), ext_func_args.size());
+  CHECK_LE(function_oper->arity(), ext_func_args.size());
   auto func_type = function_oper->type();
   std::vector<llvm::Value*> args;
   /*
@@ -639,7 +639,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
     dj: offset when UDF implementation first argument corresponds to return value
    */
   for (size_t i = 0, j = 0, dj = (func_type->isBuffer() ? 1 : 0);
-       i < function_oper->getArity();
+       i < function_oper->arity();
        ++i) {
     size_t k = orig_arg_lvs_index[i];
     size_t ij = i + j;
