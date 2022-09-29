@@ -918,12 +918,12 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  const auto arg_range = getExpressionRange(
-      datetrunc_expr->get_from_expr(), query_infos, executor, simple_quals);
+  const auto arg_range =
+      getExpressionRange(datetrunc_expr->from(), query_infos, executor, simple_quals);
   if (arg_range.getType() == ExpressionRangeType::Invalid) {
     return ExpressionRange::makeInvalidRange();
   }
-  auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
+  auto datetrunc_expr_type = datetrunc_expr->from()->type();
   auto unit = datetrunc_expr_type->isTimestamp()
                   ? datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit()
                   : hdk::ir::TimeUnit::kSecond;

@@ -248,8 +248,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto from_expr = codegen(datetrunc_expr->get_from_expr(), true, co).front();
-  auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
+  auto from_expr = codegen(datetrunc_expr->from(), true, co).front();
+  auto datetrunc_expr_type = datetrunc_expr->from()->type();
   CHECK(from_expr->getType()->isIntegerTy(64));
   DateTruncField const field = datetrunc_expr->field();
   if (datetrunc_expr_type->isTimestamp() &&

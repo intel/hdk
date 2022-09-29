@@ -283,7 +283,7 @@ class ScalarExprVisitor {
 
   virtual T visitDateTruncExpr(const hdk::ir::DateTruncExpr* datetrunc) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(datetrunc->get_from_expr()));
+    result = aggregateResult(result, visit(datetrunc->from()));
     return result;
   }
 
