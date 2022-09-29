@@ -725,7 +725,7 @@ class WidthBucketExpr : public Expr {
   const Expr* targetValue() const { return target_value_.get(); }
   const Expr* lowerBound() const { return lower_bound_.get(); }
   const Expr* upperBound() const { return upper_bound_.get(); }
-  const Expr* get_partition_count() const { return partition_count_.get(); }
+  const Expr* partitionCount() const { return partition_count_.get(); }
   ExprPtr deep_copy() const override;
   double get_bound_val(const Expr* bound_expr) const;
   int32_t get_partition_count_val() const;

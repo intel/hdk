@@ -125,7 +125,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
         visit(width_bucket_expr->targetValue()),
         visit(width_bucket_expr->lowerBound()),
         visit(width_bucket_expr->upperBound()),
-        visit(width_bucket_expr->get_partition_count()));
+        visit(width_bucket_expr->partitionCount()));
   }
 
   RetType visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {

@@ -989,7 +989,7 @@ ExpressionRange getExpressionRange(
     const bool has_nulls = target_value_range.getType() == ExpressionRangeType::Invalid ||
                            target_value_range.hasNulls();
     auto partition_expr_range = getExpressionRange(
-        width_bucket_expr->get_partition_count(), query_infos, executor, simple_quals);
+        width_bucket_expr->partitionCount(), query_infos, executor, simple_quals);
     auto res = ExpressionRange::makeIntRange(0, INT32_MAX, 0, has_nulls);
     switch (partition_expr_range.getType()) {
       case ExpressionRangeType::Integer: {

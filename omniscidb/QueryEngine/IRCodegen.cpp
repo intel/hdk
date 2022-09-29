@@ -226,7 +226,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->upperBound();
-  auto partition_count_expr = expr->get_partition_count();
+  auto partition_count_expr = expr->partitionCount();
   CHECK(target_value_expr);
   CHECK(lower_bound_expr);
   CHECK(upper_bound_expr);
@@ -281,7 +281,7 @@ llvm::Value* CodeGenerator::codegenConstantWidthBucketExpr(
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->upperBound();
-  auto partition_count_expr = expr->get_partition_count();
+  auto partition_count_expr = expr->partitionCount();
 
   auto num_partitions = expr->get_partition_count_val();
   if (num_partitions < 1 || num_partitions > INT32_MAX) {
@@ -362,7 +362,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
   auto target_value_expr = expr->targetValue();
   auto lower_bound_expr = expr->lowerBound();
   auto upper_bound_expr = expr->upperBound();
-  auto partition_count_expr = expr->get_partition_count();
+  auto partition_count_expr = expr->partitionCount();
 
   std::string func_name = "width_bucket_expr";
   bool nullable_expr = false;

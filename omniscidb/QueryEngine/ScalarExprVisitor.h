@@ -266,7 +266,7 @@ class ScalarExprVisitor {
     result = aggregateResult(result, visit(width_bucket_expr->targetValue()));
     result = aggregateResult(result, visit(width_bucket_expr->lowerBound()));
     result = aggregateResult(result, visit(width_bucket_expr->upperBound()));
-    result = aggregateResult(result, visit(width_bucket_expr->get_partition_count()));
+    result = aggregateResult(result, visit(width_bucket_expr->partitionCount()));
     return result;
   }
 

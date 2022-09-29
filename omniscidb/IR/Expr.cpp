@@ -1122,7 +1122,7 @@ bool WidthBucketExpr::operator==(const Expr& rhs) const {
   if (!(*upper_bound_ == *rhs_l.upperBound())) {
     return false;
   }
-  if (!(*partition_count_ == *rhs_l.get_partition_count())) {
+  if (!(*partition_count_ == *rhs_l.partitionCount())) {
     return false;
   }
   return true;
