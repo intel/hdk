@@ -1148,7 +1148,7 @@ bool InValues::operator==(const Expr& rhs) const {
     return false;
   }
   const InValues& rhs_iv = dynamic_cast<const InValues&>(rhs);
-  if (!(*arg_ == *rhs_iv.get_arg())) {
+  if (!(*arg_ == *rhs_iv.arg())) {
     return false;
   }
   if (value_list_.size() != rhs_iv.get_value_list().size()) {

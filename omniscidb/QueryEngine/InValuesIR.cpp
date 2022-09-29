@@ -23,7 +23,7 @@
 llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto in_arg = expr->get_arg();
+  const auto in_arg = expr->arg();
   if (is_unnest(in_arg)) {
     throw std::runtime_error("IN not supported for unnested expressions");
   }
@@ -112,7 +112,7 @@ std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto& value_list = in_values->get_value_list();
   const auto val_count = value_list.size();
-  auto type = in_values->get_arg()->type();
+  auto type = in_values->arg()->type();
   if (!(type->isInteger() || type->isExtDictionary())) {
     return nullptr;
   }

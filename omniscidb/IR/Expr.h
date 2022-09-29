@@ -460,7 +460,7 @@ class ScalarSubquery : public Expr {
 class InValues : public Expr {
  public:
   InValues(ExprPtr a, const ExprPtrList& l);
-  const Expr* get_arg() const { return arg_.get(); }
+  const Expr* arg() const { return arg_.get(); }
   const ExprPtr get_own_arg() const { return arg_; }
   const ExprPtrList& get_value_list() const { return value_list_; }
   ExprPtr deep_copy() const override;

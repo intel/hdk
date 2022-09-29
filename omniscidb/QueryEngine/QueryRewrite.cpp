@@ -61,7 +61,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByIn(
       break;
     }
   }
-  if (dynamic_cast<const hdk::ir::CaseExpr*>(in_vals->get_arg())) {
+  if (dynamic_cast<const hdk::ir::CaseExpr*>(in_vals->arg())) {
     return ra_exe_unit_in;
   }
   auto case_expr = generateCaseForDomainValues(in_vals.get());
@@ -80,7 +80,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
   for (const auto& group_expr : ra_exe_unit_in.groupby_exprs) {
     CHECK(group_expr);
     ++groupby_idx;
-    if (*group_expr == *in_vals->get_arg()) {
+    if (*group_expr == *in_vals->arg()) {
       const auto expr_range = getExpressionRange(it->get(), query_infos_, executor_);
       if (expr_range.getType() != ExpressionRangeType::Integer) {
         ++it;
@@ -95,7 +95,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
       new_groupby_list.push_back(case_expr);
       for (size_t i = 0; i < ra_exe_unit_in.target_exprs.size(); ++i) {
         const auto target = ra_exe_unit_in.target_exprs[i];
-        if (*target == *in_vals->get_arg()) {
+        if (*target == *in_vals->arg()) {
           auto var_case_expr = hdk::ir::makeExpr<hdk::ir::Var>(
               case_expr->type(), hdk::ir::Var::kGROUPBY, groupby_idx);
           target_exprs_owned_.push_back(var_case_expr);
@@ -132,7 +132,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
 std::shared_ptr<const hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainValues(
     const hdk::ir::InValues* in_vals) {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
-  auto in_val_arg = in_vals->get_arg()->deep_copy();
+  auto in_val_arg = in_vals->arg()->deep_copy();
   for (const auto& in_val : in_vals->get_value_list()) {
     auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
         in_vals->ctx().boolean(false), false, kEQ, kONE, in_val_arg, in_val);
