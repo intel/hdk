@@ -305,12 +305,12 @@ class UOper : public Expr {
         ExprPtr p,
         bool is_dict_intersection = false)
       : Expr(type, has_agg)
-      , optype(o)
+      , op_type_(o)
       , operand(p)
       , is_dict_intersection_(is_dict_intersection) {}
   UOper(const Type* type, SQLOps o, ExprPtr p)
-      : Expr(type), optype(o), operand(p), is_dict_intersection_(false) {}
-  SQLOps get_optype() const { return optype; }
+      : Expr(type), op_type_(o), operand(p), is_dict_intersection_(false) {}
+  SQLOps get_optype() const { return op_type_; }
   const Expr* get_operand() const { return operand.get(); }
   const ExprPtr get_own_operand() const { return operand; }
   bool is_dict_intersection() const { return is_dict_intersection_; }
@@ -322,7 +322,7 @@ class UOper : public Expr {
   size_t hash() const override;
 
  protected:
-  SQLOps optype;    // operator type, e.g., kUMINUS, kISNULL, kEXISTS
+  SQLOps op_type_;  // operator type, e.g., kUMINUS, kISNULL, kEXISTS
   ExprPtr operand;  // operand expression
   bool is_dict_intersection_;
 };
@@ -336,10 +336,14 @@ class UOper : public Expr {
 class BinOper : public Expr {
  public:
   BinOper(const Type* type, bool has_agg, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
-      : Expr(type, has_agg), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
+      : Expr(type, has_agg)
+      , op_type_(o)
+      , qualifier(q)
+      , left_operand(l)
+      , right_operand(r) {}
   BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
-      : Expr(type), optype(o), qualifier(q), left_operand(l), right_operand(r) {}
-  SQLOps get_optype() const { return optype; }
+      : Expr(type), op_type_(o), qualifier(q), left_operand(l), right_operand(r) {}
+  SQLOps get_optype() const { return op_type_; }
   SQLQualifier get_qualifier() const { return qualifier; }
   const Expr* get_left_operand() const { return left_operand.get(); }
   const Expr* get_right_operand() const { return right_operand.get(); }
@@ -353,7 +357,7 @@ class BinOper : public Expr {
   size_t hash() const override;
 
  private:
-  SQLOps optype;           // operator type, e.g., kLT, kAND, kPLUS, etc.
+  SQLOps op_type_;         // operator type, e.g., kLT, kAND, kPLUS, etc.
   SQLQualifier qualifier;  // qualifier kANY, kALL or kONE.  Only relevant with
                            // right_operand is Subquery
   ExprPtr left_operand;    // the left operand expression

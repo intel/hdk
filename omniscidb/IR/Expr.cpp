@@ -435,13 +435,13 @@ ExprPtr Constant::deep_copy() const {
 
 ExprPtr UOper::deep_copy() const {
   return makeExpr<UOper>(
-      type_, contains_agg_, optype, operand->deep_copy(), is_dict_intersection_);
+      type_, contains_agg_, op_type_, operand->deep_copy(), is_dict_intersection_);
 }
 
 ExprPtr BinOper::deep_copy() const {
   return makeExpr<BinOper>(type_,
                            contains_agg_,
-                           optype,
+                           op_type_,
                            qualifier,
                            left_operand->deep_copy(),
                            right_operand->deep_copy());
@@ -906,7 +906,7 @@ ExprPtr Constant::cast(const Type* new_type, bool is_dict_intersection) const {
 }
 
 ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
-  if (optype != kCAST) {
+  if (op_type_ != kCAST) {
     return Expr::cast(new_type, is_dict_intersection);
   }
   if (type_->isString() && new_type->isExtDictionary()) {
@@ -995,7 +995,7 @@ bool UOper::operator==(const Expr& rhs) const {
     return false;
   }
   const UOper& rhs_uo = dynamic_cast<const UOper&>(rhs);
-  return optype == rhs_uo.get_optype() && *operand == *rhs_uo.get_operand() &&
+  return op_type_ == rhs_uo.get_optype() && *operand == *rhs_uo.get_operand() &&
          is_dict_intersection_ == rhs_uo.is_dict_intersection_;
 }
 
@@ -1004,7 +1004,7 @@ bool BinOper::operator==(const Expr& rhs) const {
     return false;
   }
   const BinOper& rhs_bo = dynamic_cast<const BinOper&>(rhs);
-  return optype == rhs_bo.get_optype() && *left_operand == *rhs_bo.get_left_operand() &&
+  return op_type_ == rhs_bo.get_optype() && *left_operand == *rhs_bo.get_left_operand() &&
          *right_operand == *rhs_bo.get_right_operand();
 }
 
@@ -1313,7 +1313,7 @@ std::string Constant::toString() const {
 
 std::string UOper::toString() const {
   std::string op;
-  switch (optype) {
+  switch (op_type_) {
     case kNOT:
       op = "NOT ";
       break;
@@ -1341,7 +1341,7 @@ std::string UOper::toString() const {
 
 std::string BinOper::toString() const {
   std::string op;
-  switch (optype) {
+  switch (op_type_) {
     case kEQ:
       op = "= ";
       break;
@@ -1875,7 +1875,7 @@ size_t Constant::hash() const {
 size_t UOper::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, optype);
+    boost::hash_combine(*hash_, op_type_);
     boost::hash_combine(*hash_, operand->hash());
   }
   return *hash_;
@@ -1884,7 +1884,7 @@ size_t UOper::hash() const {
 size_t BinOper::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, optype);
+    boost::hash_combine(*hash_, op_type_);
     boost::hash_combine(*hash_, qualifier);
     boost::hash_combine(*hash_, left_operand->hash());
     boost::hash_combine(*hash_, right_operand->hash());
