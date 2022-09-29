@@ -942,7 +942,7 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  auto target_value_expr = width_bucket_expr->get_target_value();
+  auto target_value_expr = width_bucket_expr->targetValue();
   auto target_value_range = getExpressionRange(target_value_expr, query_infos, executor);
   auto target_type = target_value_expr->type();
   if (width_bucket_expr->isConstantExpr() &&

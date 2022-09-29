@@ -722,7 +722,7 @@ class WidthBucketExpr : public Expr {
       , lower_bound_(lower_bound)
       , upper_bound_(upper_bound)
       , partition_count_(partition_count) {}
-  const Expr* get_target_value() const { return target_value_.get(); }
+  const Expr* targetValue() const { return target_value_.get(); }
   const Expr* get_lower_bound() const { return lower_bound_.get(); }
   const Expr* get_upper_bound() const { return upper_bound_.get(); }
   const Expr* get_partition_count() const { return partition_count_.get(); }

@@ -1113,7 +1113,7 @@ bool WidthBucketExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const WidthBucketExpr& rhs_l = dynamic_cast<const WidthBucketExpr&>(rhs);
-  if (!(*target_value_ == *rhs_l.get_target_value())) {
+  if (!(*target_value_ == *rhs_l.targetValue())) {
     return false;
   }
   if (!(*lower_bound_ == *rhs_l.get_lower_bound())) {
