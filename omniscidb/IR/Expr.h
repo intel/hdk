@@ -322,7 +322,7 @@ class UOper : public Expr {
   bool isUnnest() const { return op_type_ == SQLOps::kUNNEST; }
 
   const Expr* operand() const { return operand_.get(); }
-  const ExprPtr operandShared() const { return operand_; }
+  ExprPtr operandShared() const { return operand_; }
   bool isDictIntersection() const { return is_dict_intersection_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
@@ -381,7 +381,7 @@ class BinOper : public Expr {
   const Expr* leftOperand() const { return left_operand_.get(); }
   const Expr* rightOperand() const { return right_operand_.get(); }
   ExprPtr leftOperandShared() const { return left_operand_; }
-  const ExprPtr rightOperandShared() const { return right_operand_; }
+  ExprPtr rightOperandShared() const { return right_operand_; }
 
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
@@ -461,7 +461,7 @@ class InValues : public Expr {
  public:
   InValues(ExprPtr a, const ExprPtrList& l);
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr argShared() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   const ExprPtrList& valueList() const { return value_list_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
@@ -568,7 +568,7 @@ class KeyForStringExpr : public Expr {
  public:
   KeyForStringExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr argShared() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -588,7 +588,7 @@ class SampleRatioExpr : public Expr {
  public:
   SampleRatioExpr(ExprPtr a) : Expr(a->ctx().boolean(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr argShared() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -610,7 +610,7 @@ class LowerExpr : public Expr {
 
   const Expr* arg() const { return arg_.get(); }
 
-  const ExprPtr argShared() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
 
   ExprPtr deep_copy() const override;
 
@@ -633,7 +633,7 @@ class CardinalityExpr : public Expr {
  public:
   CardinalityExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr argShared() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -659,7 +659,7 @@ class LikeExpr : public Expr {
       , is_ilike_(i)
       , is_simple_(s) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr get_own_arg() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   const Expr* get_like_expr() const { return like_expr_.get(); }
   const Expr* get_escape_expr() const { return escape_expr_.get(); }
   bool get_is_ilike() const { return is_ilike_; }

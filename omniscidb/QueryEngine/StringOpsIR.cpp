@@ -145,7 +145,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   }
   auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_like_expr());
   CHECK(pattern);
-  auto fast_dict_like_lv = codegenDictLike(expr->get_own_arg(),
+  auto fast_dict_like_lv = codegenDictLike(expr->argShared(),
                                            pattern,
                                            expr->get_is_ilike(),
                                            expr->get_is_simple(),
