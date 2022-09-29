@@ -1076,7 +1076,7 @@ bool LikeExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const LikeExpr& rhs_lk = dynamic_cast<const LikeExpr&>(rhs);
-  if (!(*arg_ == *rhs_lk.get_arg()) || !(*like_expr_ == *rhs_lk.get_like_expr()) ||
+  if (!(*arg_ == *rhs_lk.arg()) || !(*like_expr_ == *rhs_lk.get_like_expr()) ||
       is_ilike_ != rhs_lk.get_is_ilike()) {
     return false;
   }

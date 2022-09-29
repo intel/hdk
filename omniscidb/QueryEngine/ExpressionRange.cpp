@@ -637,7 +637,7 @@ ExpressionRange getExpressionRange(
 ExpressionRange getExpressionRange(const hdk::ir::LikeExpr* like_expr) {
   const auto& type = like_expr->type();
   CHECK(type->isBoolean());
-  const auto& arg_type = like_expr->get_arg()->type();
+  const auto& arg_type = like_expr->arg()->type();
   return ExpressionRange::makeIntRange(
       arg_type->nullable() ? inline_null_value<bool>() : 0, 1, 0, false);
 }

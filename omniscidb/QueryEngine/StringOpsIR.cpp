@@ -131,7 +131,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LowerExpr* expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  if (is_unnest(extract_cast_arg(expr->get_arg()))) {
+  if (is_unnest(extract_cast_arg(expr->arg()))) {
     throw std::runtime_error("LIKE not supported for unnested expressions");
   }
   char escape_char{'\\'};
@@ -154,14 +154,14 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   if (fast_dict_like_lv) {
     return fast_dict_like_lv;
   }
-  const auto& type = expr->get_arg()->type();
+  const auto& type = expr->arg()->type();
   CHECK(type->isString() || type->isExtDictionary());
   if (config_.exec.watchdog.enable && type->isExtDictionary()) {
     throw WatchdogException(
         "Cannot do LIKE / ILIKE on this dictionary encoded column, its cardinality is "
         "too high");
   }
-  auto str_lv = codegen(expr->get_arg(), true, co);
+  auto str_lv = codegen(expr->arg(), true, co);
   if (str_lv.size() != 3) {
     CHECK_EQ(size_t(1), str_lv.size());
     str_lv.push_back(cgen_state_->emitCall("extract_str_ptr", {str_lv.front()}));
@@ -172,7 +172,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::LikeExpr* expr,
   }
   auto like_expr_arg_lvs = codegen(expr->get_like_expr(), true, co);
   CHECK_EQ(size_t(3), like_expr_arg_lvs.size());
-  const bool is_nullable{expr->get_arg()->type()->nullable()};
+  const bool is_nullable{expr->arg()->type()->nullable()};
   std::vector<llvm::Value*> str_like_args{
       str_lv[1], str_lv[2], like_expr_arg_lvs[1], like_expr_arg_lvs[2]};
   std::string fn_name{expr->get_is_ilike() ? "string_ilike" : "string_like"};

@@ -95,7 +95,7 @@ std::string ScalarExprToSql::visitInValues(const hdk::ir::InValues* in_values) c
 }
 
 std::string ScalarExprToSql::visitLikeExpr(const hdk::ir::LikeExpr* like) const {
-  const auto str = visit(like->get_arg());
+  const auto str = visit(like->arg());
   const auto pattern = visit(like->get_like_expr());
   const auto result = str + " LIKE " + pattern;
   if (like->get_escape_expr()) {

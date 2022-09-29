@@ -104,7 +104,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitLikeExpr(const hdk::ir::LikeExpr* like) const override {
     auto escape_expr = like->get_escape_expr();
     return hdk::ir::makeExpr<hdk::ir::LikeExpr>(
-        visit(like->get_arg()),
+        visit(like->arg()),
         visit(like->get_like_expr()),
         escape_expr ? visit(escape_expr) : nullptr,
         like->get_is_ilike(),

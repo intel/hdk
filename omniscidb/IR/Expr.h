@@ -658,7 +658,7 @@ class LikeExpr : public Expr {
       , escape_expr_(e)
       , is_ilike_(i)
       , is_simple_(s) {}
-  const Expr* get_arg() const { return arg_.get(); }
+  const Expr* arg() const { return arg_.get(); }
   const ExprPtr get_own_arg() const { return arg_; }
   const Expr* get_like_expr() const { return like_expr_.get(); }
   const Expr* get_escape_expr() const { return escape_expr_.get(); }
