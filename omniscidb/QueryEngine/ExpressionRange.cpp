@@ -848,7 +848,7 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  const int32_t extract_field{extract_expr->get_field()};
+  const int32_t extract_field{extract_expr->field()};
   const auto arg_range = getExpressionRange(
       extract_expr->get_from_expr(), query_infos, executor, simple_quals);
   const bool has_nulls =

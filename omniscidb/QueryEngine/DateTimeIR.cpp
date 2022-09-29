@@ -74,7 +74,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto from_expr = codegen(extract_expr->get_from_expr(), true, co).front();
-  const int32_t extract_field{extract_expr->get_field()};
+  const int32_t extract_field{extract_expr->field()};
   auto extract_expr_type = extract_expr->get_from_expr()->type();
   if (extract_field == kEPOCH) {
     CHECK(extract_expr_type->isTimestamp() || extract_expr_type->isDate());
@@ -92,23 +92,23 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
                     hdk::ir::TimeUnit::kSecond;
   if (is_hpt) {
     from_expr = codegenExtractHighPrecisionTimestamps(
-        from_expr, extract_expr_type, extract_expr->get_field());
+        from_expr, extract_expr_type, extract_expr->field());
   }
-  if (!is_hpt && is_subsecond_extract_field(extract_expr->get_field())) {
+  if (!is_hpt && is_subsecond_extract_field(extract_expr->field())) {
     from_expr =
         !extract_expr_type->nullable()
             ? cgen_state_->ir_builder_.CreateMul(
                   from_expr,
                   cgen_state_->llInt(
-                      get_extract_timestamp_precision_scale(extract_expr->get_field())))
+                      get_extract_timestamp_precision_scale(extract_expr->field())))
             : cgen_state_->emitCall(
                   "mul_int64_t_nullable_lhs",
                   {from_expr,
                    cgen_state_->llInt(
-                       get_extract_timestamp_precision_scale(extract_expr->get_field())),
+                       get_extract_timestamp_precision_scale(extract_expr->field())),
                    cgen_state_->inlineIntNull(extract_expr_type)});
   }
-  const auto extract_fname = get_extract_function_name(extract_expr->get_field());
+  const auto extract_fname = get_extract_function_name(extract_expr->field());
   if (extract_expr_type->nullable()) {
     llvm::BasicBlock* extract_nullcheck_bb{nullptr};
     llvm::PHINode* extract_nullcheck_value{nullptr};

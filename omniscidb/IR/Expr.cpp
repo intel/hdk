@@ -1208,7 +1208,7 @@ bool ExtractExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const ExtractExpr& rhs_ee = dynamic_cast<const ExtractExpr&>(rhs);
-  return field_ == rhs_ee.get_field() && *from_expr_ == *rhs_ee.get_from_expr();
+  return field_ == rhs_ee.field() && *from_expr_ == *rhs_ee.get_from_expr();
 }
 
 bool DateaddExpr::operator==(const Expr& rhs) const {
