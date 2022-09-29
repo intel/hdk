@@ -223,7 +223,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitLikelihood(const hdk::ir::LikelihoodExpr* likelihood) const override {
-    return hdk::ir::makeExpr<hdk::ir::LikelihoodExpr>(visit(likelihood->get_arg()),
+    return hdk::ir::makeExpr<hdk::ir::LikelihoodExpr>(visit(likelihood->arg()),
                                                       likelihood->get_likelihood());
   }
 

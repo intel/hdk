@@ -783,7 +783,7 @@ class LikelihoodExpr : public Expr {
  public:
   LikelihoodExpr(ExprPtr a, float l = 0.5)
       : Expr(a->ctx().boolean(a->type()->nullable())), arg_(a), likelihood_(l) {}
-  const Expr* get_arg() const { return arg_.get(); }
+  const Expr* arg() const { return arg_.get(); }
   const ExprPtr get_own_arg() const { return arg_; }
   float get_likelihood() const { return likelihood_; }
   ExprPtr deep_copy() const override;

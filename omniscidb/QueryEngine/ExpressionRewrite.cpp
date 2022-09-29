@@ -697,7 +697,7 @@ const hdk::ir::Expr* strip_likelihood(const hdk::ir::Expr* expr) {
   if (!with_likelihood) {
     return expr;
   }
-  return with_likelihood->get_arg();
+  return with_likelihood->arg();
 }
 
 }  // namespace

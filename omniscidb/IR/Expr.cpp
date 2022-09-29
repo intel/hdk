@@ -1133,7 +1133,7 @@ bool LikelihoodExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const LikelihoodExpr& rhs_l = dynamic_cast<const LikelihoodExpr&>(rhs);
-  if (!(*arg_ == *rhs_l.get_arg())) {
+  if (!(*arg_ == *rhs_l.arg())) {
     return false;
   }
   if (likelihood_ != rhs_l.get_likelihood()) {

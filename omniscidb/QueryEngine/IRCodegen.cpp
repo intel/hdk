@@ -117,7 +117,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
   }
   auto likelihood_expr = dynamic_cast<const hdk::ir::LikelihoodExpr*>(expr);
   if (likelihood_expr) {
-    return {codegen(likelihood_expr->get_arg(), fetch_columns, co)};
+    return {codegen(likelihood_expr->arg(), fetch_columns, co)};
   }
   auto in_expr = dynamic_cast<const hdk::ir::InValues*>(expr);
   if (in_expr) {

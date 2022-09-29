@@ -343,7 +343,7 @@ class ScalarExprVisitor {
   }
 
   virtual T visitLikelihood(const hdk::ir::LikelihoodExpr* likelihood) const {
-    return visit(likelihood->get_arg());
+    return visit(likelihood->arg());
   }
 
   virtual T visitOffsetInFragment(const hdk::ir::OffsetInFragment*) const {
