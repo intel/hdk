@@ -415,7 +415,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       CountDistinctImplType count_distinct_impl_type{CountDistinctImplType::HashSet};
       int64_t bitmap_sz_bits{0};
       if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
-        const auto error_rate = agg_expr->get_arg1();
+        const auto error_rate = agg_expr->arg1();
         if (error_rate) {
           CHECK(error_rate->type()->isInt32());
           CHECK_GE(error_rate->value().intval, 1);

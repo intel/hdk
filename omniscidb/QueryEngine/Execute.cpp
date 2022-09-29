@@ -2272,7 +2272,7 @@ ResultSetPtr build_row_for_empty_input(
                                               agg_expr->aggType(),
                                               agg_expr->arg()->withType(arg_type),
                                               agg_expr->isDistinct(),
-                                              agg_expr->get_arg1());
+                                              agg_expr->arg1());
     } else {
       target_expr_copy = agg_expr->withType(agg_expr->type()->withNullable(true));
     }

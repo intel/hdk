@@ -813,7 +813,7 @@ class AggExpr : public Expr {
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   bool isDistinct() const { return is_distinct_; }
-  std::shared_ptr<const Constant> get_arg1() const { return arg1_; }
+  std::shared_ptr<const Constant> arg1() const { return arg1_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

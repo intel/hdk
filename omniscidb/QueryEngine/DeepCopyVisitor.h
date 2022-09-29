@@ -230,7 +230,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitAggExpr(const hdk::ir::AggExpr* agg) const override {
     RetType arg = agg->arg() ? visit(agg->arg()) : nullptr;
     return hdk::ir::makeExpr<hdk::ir::AggExpr>(
-        agg->type(), agg->aggType(), arg, agg->isDistinct(), agg->get_arg1());
+        agg->type(), agg->aggType(), arg, agg->isDistinct(), agg->arg1());
   }
 
   RetType visitOffsetInFragment(const hdk::ir::OffsetInFragment*) const override {
