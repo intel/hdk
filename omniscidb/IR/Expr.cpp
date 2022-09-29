@@ -509,7 +509,7 @@ ExprPtr LikelihoodExpr::deep_copy() const {
 
 ExprPtr AggExpr::deep_copy() const {
   return makeExpr<AggExpr>(
-      type_, aggtype, arg ? arg->deep_copy() : nullptr, is_distinct, arg1);
+      type_, agg_type_, arg_ ? arg_->deep_copy() : nullptr, is_distinct_, arg1_);
 }
 
 ExprPtr CaseExpr::deep_copy() const {
@@ -1168,16 +1168,16 @@ bool AggExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const AggExpr& rhs_ae = dynamic_cast<const AggExpr&>(rhs);
-  if (aggtype != rhs_ae.get_aggtype() || is_distinct != rhs_ae.get_is_distinct()) {
+  if (agg_type_ != rhs_ae.get_aggtype() || is_distinct_ != rhs_ae.get_is_distinct()) {
     return false;
   }
-  if (arg.get() == rhs_ae.get_arg()) {
+  if (arg_.get() == rhs_ae.get_arg()) {
     return true;
   }
-  if (arg == nullptr || rhs_ae.get_arg() == nullptr) {
+  if (arg_ == nullptr || rhs_ae.get_arg() == nullptr) {
     return false;
   }
-  return *arg == *rhs_ae.get_arg();
+  return *arg_ == *rhs_ae.get_arg();
 }
 
 bool CaseExpr::operator==(const Expr& rhs) const {
@@ -1554,7 +1554,7 @@ std::string LikelihoodExpr::toString() const {
 
 std::string AggExpr::toString() const {
   std::string agg;
-  switch (aggtype) {
+  switch (agg_type_) {
     case kAVG:
       agg = "AVG ";
       break;
@@ -1584,11 +1584,11 @@ std::string AggExpr::toString() const {
       break;
   }
   std::string str{"(" + agg};
-  if (is_distinct) {
+  if (is_distinct_) {
     str += "DISTINCT ";
   }
-  if (arg) {
-    str += arg->toString();
+  if (arg_) {
+    str += arg_->toString();
   } else {
     str += "*";
   }
@@ -2051,13 +2051,13 @@ size_t LikelihoodExpr::hash() const {
 size_t AggExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, aggtype);
-    if (arg) {
-      boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, agg_type_);
+    if (arg_) {
+      boost::hash_combine(*hash_, arg_->hash());
     }
-    boost::hash_combine(*hash_, is_distinct);
-    if (arg1) {
-      boost::hash_combine(*hash_, arg1->hash());
+    boost::hash_combine(*hash_, is_distinct_);
+    if (arg1_) {
+      boost::hash_combine(*hash_, arg1_->hash());
     }
   }
   return *hash_;

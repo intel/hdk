@@ -808,12 +808,12 @@ class AggExpr : public Expr {
           ExprPtr g,
           bool d,
           std::shared_ptr<const Constant> e)
-      : Expr(type, true), aggtype(a), arg(g), is_distinct(d), arg1(e) {}
-  SQLAgg get_aggtype() const { return aggtype; }
-  const Expr* get_arg() const { return arg.get(); }
-  ExprPtr get_own_arg() const { return arg; }
-  bool get_is_distinct() const { return is_distinct; }
-  std::shared_ptr<const Constant> get_arg1() const { return arg1; }
+      : Expr(type, true), agg_type_(a), arg_(g), is_distinct_(d), arg1_(e) {}
+  SQLAgg get_aggtype() const { return agg_type_; }
+  const Expr* get_arg() const { return arg_.get(); }
+  ExprPtr get_own_arg() const { return arg_; }
+  bool get_is_distinct() const { return is_distinct_; }
+  std::shared_ptr<const Constant> get_arg1() const { return arg1_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -821,11 +821,11 @@ class AggExpr : public Expr {
   size_t hash() const override;
 
  private:
-  SQLAgg aggtype;    // aggregate type: kAVG, kMIN, kMAX, kSUM, kCOUNT
-  ExprPtr arg;       // argument to aggregate
-  bool is_distinct;  // true only if it is for COUNT(DISTINCT x)
+  SQLAgg agg_type_;   // aggregate type: kAVG, kMIN, kMAX, kSUM, kCOUNT
+  ExprPtr arg_;       // argument to aggregate
+  bool is_distinct_;  // true only if it is for COUNT(DISTINCT x)
   // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile
-  std::shared_ptr<const Constant> arg1;
+  std::shared_ptr<const Constant> arg1_;
 };
 
 /*
