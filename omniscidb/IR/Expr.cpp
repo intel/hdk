@@ -1046,7 +1046,7 @@ bool SampleRatioExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const SampleRatioExpr& rhs_cl = dynamic_cast<const SampleRatioExpr&>(rhs);
-  if (!(*arg_ == *rhs_cl.get_arg())) {
+  if (!(*arg_ == *rhs_cl.arg())) {
     return false;
   }
   return true;

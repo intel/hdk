@@ -227,7 +227,7 @@ class ScalarExprVisitor {
 
   virtual T visitSampleRatio(const hdk::ir::SampleRatioExpr* sample_ratio) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(sample_ratio->get_arg()));
+    result = aggregateResult(result, visit(sample_ratio->arg()));
     return result;
   }
 

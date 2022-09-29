@@ -196,7 +196,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::UOper* u_oper,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::SampleRatioExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto input_expr = expr->get_arg();
+  auto input_expr = expr->arg();
   CHECK(input_expr);
 
   auto double_lv = codegen(input_expr, true, co);
