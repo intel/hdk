@@ -471,7 +471,7 @@ ExprPtr KeyForStringExpr::deep_copy() const {
 }
 
 ExprPtr SampleRatioExpr::deep_copy() const {
-  return makeExpr<SampleRatioExpr>(arg->deep_copy());
+  return makeExpr<SampleRatioExpr>(arg_->deep_copy());
 }
 
 ExprPtr LowerExpr::deep_copy() const {
@@ -1046,7 +1046,7 @@ bool SampleRatioExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const SampleRatioExpr& rhs_cl = dynamic_cast<const SampleRatioExpr&>(rhs);
-  if (!(*arg == *rhs_cl.get_arg())) {
+  if (!(*arg_ == *rhs_cl.get_arg())) {
     return false;
   }
   return true;
@@ -1499,7 +1499,7 @@ std::string KeyForStringExpr::toString() const {
 
 std::string SampleRatioExpr::toString() const {
   std::string str{"SAMPLE_RATIO("};
-  str += arg->toString();
+  str += arg_->toString();
   str += ") ";
   return str;
 }
@@ -1960,7 +1960,7 @@ size_t KeyForStringExpr::hash() const {
 size_t SampleRatioExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
   }
   return *hash_;
 }
