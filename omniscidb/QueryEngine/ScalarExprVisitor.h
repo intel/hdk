@@ -245,8 +245,8 @@ class ScalarExprVisitor {
     T result = defaultResult();
     result = aggregateResult(result, visit(like->arg()));
     result = aggregateResult(result, visit(like->likeExpr()));
-    if (like->get_escape_expr()) {
-      result = aggregateResult(result, visit(like->get_escape_expr()));
+    if (like->escapeExpr()) {
+      result = aggregateResult(result, visit(like->escapeExpr()));
     }
     return result;
   }

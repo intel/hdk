@@ -661,7 +661,7 @@ class LikeExpr : public Expr {
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   const Expr* likeExpr() const { return like_expr_.get(); }
-  const Expr* get_escape_expr() const { return escape_expr_.get(); }
+  const Expr* escapeExpr() const { return escape_expr_.get(); }
   bool isIlike() const { return is_ilike_; }
   bool isSimple() const { return is_simple_; }
   ExprPtr deep_copy() const override;

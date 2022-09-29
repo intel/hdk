@@ -1080,11 +1080,11 @@ bool LikeExpr::operator==(const Expr& rhs) const {
       is_ilike_ != rhs_lk.isIlike()) {
     return false;
   }
-  if (escape_expr_.get() == rhs_lk.get_escape_expr()) {
+  if (escape_expr_.get() == rhs_lk.escapeExpr()) {
     return true;
   }
-  if (escape_expr_ != nullptr && rhs_lk.get_escape_expr() != nullptr &&
-      *escape_expr_ == *rhs_lk.get_escape_expr()) {
+  if (escape_expr_ != nullptr && rhs_lk.escapeExpr() != nullptr &&
+      *escape_expr_ == *rhs_lk.escapeExpr()) {
     return true;
   }
   return false;

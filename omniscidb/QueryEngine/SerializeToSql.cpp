@@ -98,8 +98,8 @@ std::string ScalarExprToSql::visitLikeExpr(const hdk::ir::LikeExpr* like) const 
   const auto str = visit(like->arg());
   const auto pattern = visit(like->likeExpr());
   const auto result = str + " LIKE " + pattern;
-  if (like->get_escape_expr()) {
-    const auto escape = visit(like->get_escape_expr());
+  if (like->escapeExpr()) {
+    const auto escape = visit(like->escapeExpr());
     return result + " ESCAPE " + escape;
   }
   return result;
