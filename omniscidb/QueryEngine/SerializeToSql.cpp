@@ -132,7 +132,7 @@ std::string agg_to_string(const hdk::ir::AggExpr* agg_expr,
 
 std::string ScalarExprToSql::visitFunctionOper(
     const hdk::ir::FunctionOper* func_oper) const {
-  std::string result = func_oper->getName();
+  std::string result = func_oper->name();
   if (result == "||") {
     CHECK_EQ(func_oper->getArity(), size_t(2));
     return visit(func_oper->getArg(0)) + "||" + visit(func_oper->getArg(1));

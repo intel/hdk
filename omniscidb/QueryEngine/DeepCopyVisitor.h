@@ -193,8 +193,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
       args_copy.push_back(visit(func_oper->getArg(i)));
     }
     const auto& type = func_oper->type();
-    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(
-        type, func_oper->getName(), args_copy);
+    return hdk::ir::makeExpr<hdk::ir::FunctionOper>(type, func_oper->name(), args_copy);
   }
 
   RetType visitDateDiffExpr(const hdk::ir::DateDiffExpr* datediff) const override {
@@ -219,7 +218,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     }
     const auto& type = func_oper->type();
     return hdk::ir::makeExpr<hdk::ir::FunctionOperWithCustomTypeHandling>(
-        type, func_oper->getName(), args_copy);
+        type, func_oper->name(), args_copy);
   }
 
   RetType visitLikelihood(const hdk::ir::LikelihoodExpr* likelihood) const override {

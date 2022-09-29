@@ -1683,7 +1683,7 @@ ExprPtr FunctionOper::deep_copy() const {
   for (size_t i = 0; i < getArity(); ++i) {
     args_copy.push_back(getArg(i)->deep_copy());
   }
-  return makeExpr<FunctionOper>(type_, getName(), args_copy);
+  return makeExpr<FunctionOper>(type_, name(), args_copy);
 }
 
 bool FunctionOper::operator==(const Expr& rhs) const {
@@ -1694,7 +1694,7 @@ bool FunctionOper::operator==(const Expr& rhs) const {
   if (!rhs_func_oper) {
     return false;
   }
-  if (getName() != rhs_func_oper->getName()) {
+  if (name() != rhs_func_oper->name()) {
     return false;
   }
   if (getArity() != rhs_func_oper->getArity()) {
@@ -1722,7 +1722,7 @@ ExprPtr FunctionOperWithCustomTypeHandling::deep_copy() const {
   for (size_t i = 0; i < getArity(); ++i) {
     args_copy.push_back(getArg(i)->deep_copy());
   }
-  return makeExpr<FunctionOperWithCustomTypeHandling>(type_, getName(), args_copy);
+  return makeExpr<FunctionOperWithCustomTypeHandling>(type_, name(), args_copy);
 }
 
 bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
@@ -1734,7 +1734,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
   if (!rhs_func_oper) {
     return false;
   }
-  if (getName() != rhs_func_oper->getName()) {
+  if (name() != rhs_func_oper->name()) {
     return false;
   }
   if (getArity() != rhs_func_oper->getArity()) {

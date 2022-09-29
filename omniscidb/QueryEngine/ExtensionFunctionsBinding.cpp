@@ -735,7 +735,7 @@ ExtensionFunction bind_function(std::string name,
 ExtensionFunction bind_function(const hdk::ir::FunctionOper* function_oper,
                                 const bool is_gpu) {
   // used in ExtensionsIR.cpp
-  auto name = function_oper->getName();
+  auto name = function_oper->name();
   hdk::ir::ExprPtrVector func_args = {};
   for (size_t i = 0; i < function_oper->getArity(); ++i) {
     func_args.push_back(function_oper->getOwnArg(i));

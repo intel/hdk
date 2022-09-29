@@ -241,7 +241,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         return bind_function(function_oper, /* is_gpu= */ true);
       } catch (ExtensionFunctionBindingError& e) {
         LOG(WARNING) << "codegenFunctionOper[GPU]: " << e.what() << " Redirecting "
-                     << function_oper->getName() << " to run on CPU.";
+                     << function_oper->name() << " to run on CPU.";
         throw QueryMustRunOnCpu();
       }
     } else {
@@ -333,7 +333,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
     ret_ty = llvm::Type::getVoidTy(cgen_state_->context_);
     const auto struct_ty = get_buffer_struct_type(
         cgen_state_,
-        function_oper->getName(),
+        function_oper->name(),
         0,
         get_llvm_type_from_array_type(ret_type, cgen_state_->context_),
         /* has_is_null = */ ret_type->isArray() || ret_type->isText());
@@ -357,7 +357,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         // during type deserialization to 'handle' NULL returns, hence i1-->i8.
         // ST_ functions can't return NULLs, we just need to check arg nullness
         // and if any args are NULL then ST_ function is not called
-        function_oper->getName().substr(0, 3) != std::string("ST_")) {
+        function_oper->name().substr(0, 3) != std::string("ST_")) {
       ext_call_nullcheck = codegenCast(ext_call_nullcheck,
                                        extension_ret_type,
                                        function_oper->type(),
@@ -386,7 +386,7 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
     if (func_type->isBuffer()) {
       const auto arr_struct_ty = get_buffer_struct_type(
           cgen_state_,
-          function_oper->getName(),
+          function_oper->name(),
           0,
           get_llvm_type_from_array_type(func_type, cgen_state_->context_),
           func_type->isArray() || func_type->isText());
@@ -437,7 +437,7 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
     } else {
       const auto arr_struct_ty = get_buffer_struct_type(
           cgen_state_,
-          function_oper->getName(),
+          function_oper->name(),
           0,
           get_llvm_type_from_array_type(func_type, cgen_state_->context_),
           true);
@@ -491,7 +491,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
   AUTOMATIC_IR_METADATA(cgen_state_);
   if (call_requires_custom_type_handling(function_oper)) {
     // Some functions need the return type to be the same as the input type.
-    if (function_oper->getName() == "FLOOR" || function_oper->getName() == "CEIL") {
+    if (function_oper->name() == "FLOOR" || function_oper->name() == "CEIL") {
       CHECK_EQ(size_t(1), function_oper->getArity());
       const auto arg = function_oper->getArg(0);
       auto arg_type = arg->type();
@@ -504,7 +504,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       CodeGenerator::ArgNullcheckBBs bbs;
       std::tie(bbs, std::ignore) = beginArgsNullcheck(function_oper, {arg_lvs});
       const std::string func_name =
-          (function_oper->getName() == "FLOOR") ? "decimal_floor" : "decimal_ceil";
+          (function_oper->name() == "FLOOR") ? "decimal_floor" : "decimal_ceil";
       const auto covar_result_lv = cgen_state_->emitCall(
           func_name, {arg_lv, cgen_state_->llInt(exp_to_scale(arg_scale))});
       auto ret_type = function_oper->type();
@@ -513,7 +513,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       const auto result_lv = cgen_state_->ir_builder_.CreateSDiv(
           covar_result_lv, cgen_state_->llInt(exp_to_scale(arg_scale)));
       return endArgsNullcheck(bbs, result_lv, nullptr, function_oper);
-    } else if (function_oper->getName() == "ROUND" &&
+    } else if (function_oper->name() == "ROUND" &&
                function_oper->getArg(0)->type()->isDecimal()) {
       CHECK_EQ(size_t(2), function_oper->getArity());
 
@@ -551,7 +551,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       return endArgsNullcheck(bbs0, result_lv, nullptr, function_oper);
     }
     throw std::runtime_error("Type combination not supported for function " +
-                             function_oper->getName());
+                             function_oper->name());
   }
   return codegenFunctionOper(function_oper, co);
 }

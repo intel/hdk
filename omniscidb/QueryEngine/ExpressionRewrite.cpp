@@ -786,7 +786,7 @@ class JoinCoveredQualVisitor : public ScalarExprVisitor<bool> {
   }
 
   bool visitFunctionOper(const hdk::ir::FunctionOper* func_oper) const override {
-    if (overlaps_supported_functions.find(func_oper->getName()) !=
+    if (overlaps_supported_functions.find(func_oper->name()) !=
         overlaps_supported_functions.end()) {
       const auto lhs = func_oper->getArg(2);
       const auto rhs = func_oper->getArg(1);

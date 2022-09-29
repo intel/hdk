@@ -957,7 +957,7 @@ class FunctionOper : public Expr {
                const ExprPtrVector& args)
       : Expr(type, false), name_(name), args_(args) {}
 
-  const std::string& getName() const { return name_; }
+  const std::string& name() const { return name_; }
 
   size_t getArity() const { return args_.size(); }
 

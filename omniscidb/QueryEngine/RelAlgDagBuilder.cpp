@@ -1163,7 +1163,7 @@ std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
     const hdk::ir::ExprPtr& expr,
     hdk::ir::ExprPtr orig_expr) {
   if (auto fn_oper = dynamic_cast<const hdk::ir::FunctionOper*>(expr.get())) {
-    auto& fn_name = fn_oper->getName();
+    auto& fn_name = fn_oper->name();
     if (fn_name == "PG_ANY" || fn_name == "PG_ALL") {
       CHECK_EQ(fn_oper->getArity(), (size_t)1);
       return std::make_pair(fn_oper->getOwnArg(0), (fn_name == "PG_ANY") ? kANY : kALL);
