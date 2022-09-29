@@ -81,7 +81,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
   }
   std::vector<llvm::Value*> charlength_args{str_lv[1], str_lv[2]};
   std::string fn_name("char_length");
-  if (expr->get_calc_encoded_length()) {
+  if (expr->calcEncodedLength()) {
     fn_name += "_encoded";
   }
   const bool is_nullable{expr->arg()->type()->nullable()};
@@ -89,7 +89,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
     fn_name += "_nullable";
     charlength_args.push_back(cgen_state_->inlineIntNull(expr->type()));
   }
-  return expr->get_calc_encoded_length()
+  return expr->calcEncodedLength()
              ? cgen_state_->emitExternalCall(
                    fn_name, get_int_type(32, cgen_state_->context_), charlength_args)
              : cgen_state_->emitCall(fn_name, charlength_args);

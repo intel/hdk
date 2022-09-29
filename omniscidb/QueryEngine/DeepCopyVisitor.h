@@ -81,8 +81,8 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitCharLength(const hdk::ir::CharLengthExpr* char_length) const override {
-    return hdk::ir::makeExpr<hdk::ir::CharLengthExpr>(
-        visit(char_length->arg()), char_length->get_calc_encoded_length());
+    return hdk::ir::makeExpr<hdk::ir::CharLengthExpr>(visit(char_length->arg()),
+                                                      char_length->calcEncodedLength());
   }
 
   RetType visitKeyForString(const hdk::ir::KeyForStringExpr* expr) const override {

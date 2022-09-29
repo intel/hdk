@@ -1024,8 +1024,7 @@ bool CharLengthExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CharLengthExpr& rhs_cl = dynamic_cast<const CharLengthExpr&>(rhs);
-  if (!(*arg_ == *rhs_cl.arg()) ||
-      calc_encoded_length != rhs_cl.get_calc_encoded_length()) {
+  if (!(*arg_ == *rhs_cl.arg()) || calc_encoded_length != rhs_cl.calcEncodedLength()) {
     return false;
   }
   return true;
