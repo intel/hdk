@@ -504,7 +504,7 @@ ExprPtr WidthBucketExpr::deep_copy() const {
 }
 
 ExprPtr LikelihoodExpr::deep_copy() const {
-  return makeExpr<LikelihoodExpr>(arg->deep_copy(), likelihood);
+  return makeExpr<LikelihoodExpr>(arg_->deep_copy(), likelihood_);
 }
 
 ExprPtr AggExpr::deep_copy() const {
@@ -1133,10 +1133,10 @@ bool LikelihoodExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const LikelihoodExpr& rhs_l = dynamic_cast<const LikelihoodExpr&>(rhs);
-  if (!(*arg == *rhs_l.get_arg())) {
+  if (!(*arg_ == *rhs_l.get_arg())) {
     return false;
   }
-  if (likelihood != rhs_l.get_likelihood()) {
+  if (likelihood_ != rhs_l.get_likelihood()) {
     return false;
   }
   return true;
@@ -1548,8 +1548,8 @@ std::string WidthBucketExpr::toString() const {
 
 std::string LikelihoodExpr::toString() const {
   std::string str{"(LIKELIHOOD "};
-  str += arg->toString();
-  return str + " " + std::to_string(likelihood) + ") ";
+  str += arg_->toString();
+  return str + " " + std::to_string(likelihood_) + ") ";
 }
 
 std::string AggExpr::toString() const {
@@ -2042,8 +2042,8 @@ size_t WidthBucketExpr::hash() const {
 size_t LikelihoodExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
-    boost::hash_combine(*hash_, likelihood);
+    boost::hash_combine(*hash_, arg_->hash());
+    boost::hash_combine(*hash_, likelihood_);
   }
   return *hash_;
 }

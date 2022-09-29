@@ -782,10 +782,10 @@ class WidthBucketExpr : public Expr {
 class LikelihoodExpr : public Expr {
  public:
   LikelihoodExpr(ExprPtr a, float l = 0.5)
-      : Expr(a->ctx().boolean(a->type()->nullable())), arg(a), likelihood(l) {}
-  const Expr* get_arg() const { return arg.get(); }
-  const ExprPtr get_own_arg() const { return arg; }
-  float get_likelihood() const { return likelihood; }
+      : Expr(a->ctx().boolean(a->type()->nullable())), arg_(a), likelihood_(l) {}
+  const Expr* get_arg() const { return arg_.get(); }
+  const ExprPtr get_own_arg() const { return arg_; }
+  float get_likelihood() const { return likelihood_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -793,8 +793,8 @@ class LikelihoodExpr : public Expr {
   size_t hash() const override;
 
  private:
-  ExprPtr arg;  // the argument to LIKELY, UNLIKELY
-  float likelihood;
+  ExprPtr arg_;  // the argument to LIKELY, UNLIKELY
+  float likelihood_;
 };
 
 /*
