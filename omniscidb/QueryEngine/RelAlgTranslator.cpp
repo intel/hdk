@@ -271,7 +271,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
     for (auto& pr : case_expr->exprPairs()) {
       expr_list.emplace_back(visit(pr.first.get()), visit(pr.second.get()));
     }
-    auto else_expr = visit(case_expr->get_else_expr());
+    auto else_expr = visit(case_expr->elseExpr());
     return Analyzer::normalizeCaseExpr(expr_list, else_expr, executor_);
   }
 

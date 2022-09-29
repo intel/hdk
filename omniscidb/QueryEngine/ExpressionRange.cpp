@@ -666,7 +666,7 @@ ExpressionRange getExpressionRange(const hdk::ir::CaseExpr* case_expr,
   if (has_nulls && !(expr_range.getType() == ExpressionRangeType::Invalid)) {
     expr_range.setHasNulls();
   }
-  const auto else_expr = case_expr->get_else_expr();
+  const auto else_expr = case_expr->elseExpr();
   CHECK(else_expr);
   const auto else_null_expr = dynamic_cast<const hdk::ir::Constant*>(else_expr);
   if (else_null_expr && else_null_expr->isNull()) {

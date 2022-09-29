@@ -37,7 +37,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::CaseExpr* case_e
     case_llvm_type = get_int_type(8 * case_type->canonicalSize(), cgen_state_->context_);
   }
   CHECK(case_llvm_type);
-  const auto& else_type = case_expr->get_else_expr()->type();
+  const auto& else_type = case_expr->elseExpr()->type();
   CHECK_EQ(else_type->id(), case_type->id());
   llvm::Value* case_val = codegenCase(case_expr, case_llvm_type, is_real_str, co);
   std::vector<llvm::Value*> ret_vals{case_val};
@@ -92,7 +92,7 @@ llvm::Value* CodeGenerator::codegenCase(const hdk::ir::CaseExpr* case_expr,
     cgen_state_->ir_builder_.CreateCondBr(when_lv, then_bb, when_bb);
     cgen_state_->ir_builder_.SetInsertPoint(when_bb);
   }
-  const auto else_expr = case_expr->get_else_expr();
+  const auto else_expr = case_expr->elseExpr();
   CHECK(else_expr);
   auto else_lvs = codegen(else_expr, true, co);
   llvm::Value* else_lv{nullptr};

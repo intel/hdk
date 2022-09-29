@@ -1188,8 +1188,8 @@ bool CaseExpr::operator==(const Expr& rhs) const {
   if (expr_pairs_.size() != rhs_ce.exprPairs().size()) {
     return false;
   }
-  if ((else_expr_ == nullptr && rhs_ce.get_else_expr() != nullptr) ||
-      (else_expr_ != nullptr && rhs_ce.get_else_expr() == nullptr)) {
+  if ((else_expr_ == nullptr && rhs_ce.elseExpr() != nullptr) ||
+      (else_expr_ != nullptr && rhs_ce.elseExpr() == nullptr)) {
     return false;
   }
   auto it = rhs_ce.exprPairs().cbegin();
@@ -1200,7 +1200,7 @@ bool CaseExpr::operator==(const Expr& rhs) const {
     ++it;
   }
   return else_expr_ == nullptr ||
-         (else_expr_ != nullptr && *else_expr_ == *rhs_ce.get_else_expr());
+         (else_expr_ != nullptr && *else_expr_ == *rhs_ce.elseExpr());
 }
 
 bool ExtractExpr::operator==(const Expr& rhs) const {

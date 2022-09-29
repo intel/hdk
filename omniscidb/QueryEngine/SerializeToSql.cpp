@@ -113,7 +113,7 @@ std::string ScalarExprToSql::visitCaseExpr(const hdk::ir::CaseExpr* case_) const
     const auto then = " THEN " + visit(expr_pair.second.get());
     case_str += when + then;
   }
-  return case_str + " ELSE " + visit(case_->get_else_expr()) + " END";
+  return case_str + " ELSE " + visit(case_->elseExpr()) + " END";
 }
 
 namespace {

@@ -840,7 +840,7 @@ class CaseExpr : public Expr {
            ExprPtr e)
       : Expr(type, has_agg), expr_pairs_(std::move(expr_pairs)), else_expr_(e) {}
   const std::list<std::pair<ExprPtr, ExprPtr>>& exprPairs() const { return expr_pairs_; }
-  const Expr* get_else_expr() const { return else_expr_.get(); }
+  const Expr* elseExpr() const { return else_expr_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
