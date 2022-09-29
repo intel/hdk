@@ -24,6 +24,7 @@
 
 #include "Analyzer/Analyzer.h"
 #include "DataProvider/DataProvider.h"
+#include "IR/ExprCollector.h"
 #include "IR/TypeUtils.h"
 #include "QueryEngine/DateTimeUtils.h"
 #include "QueryEngine/Execute.h"  // TODO: remove
@@ -463,22 +464,14 @@ hdk::ir::ExprPtr analyzeStringValue(const std::string& stringval) {
   return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
 }
 
-class RteIdxCollector : public ScalarExprVisitor<void*> {
+class RteIdxCollector : public hdk::ir::ExprCollector<std::set<int>, RteIdxCollector> {
  public:
-  const std::set<int>& getRteIdxSet() const { return rte_idx_set_; }
-
  protected:
-  virtual void* visitVar(const hdk::ir::Var*) const {
-    rte_idx_set_.insert(-1);
-    return nullptr;
-  }
+  virtual void visitVar(const hdk::ir::Var*) { result_.insert(-1); }
 
-  virtual void* visitColumnVar(const hdk::ir::ColumnVar* col_var) const {
-    rte_idx_set_.insert(col_var->rteIdx());
-    return nullptr;
+  virtual void visitColumnVar(const hdk::ir::ColumnVar* col_var) {
+    result_.insert(col_var->rteIdx());
   }
-
-  mutable std::set<int> rte_idx_set_;
 };
 
 bool exprs_share_one_and_same_rte_idx(const hdk::ir::ExprPtr& lhs_expr,
@@ -486,7 +479,7 @@ bool exprs_share_one_and_same_rte_idx(const hdk::ir::ExprPtr& lhs_expr,
   RteIdxCollector collector;
   collector.visit(lhs_expr.get());
   collector.visit(rhs_expr.get());
-  return collector.getRteIdxSet().size() == 1ULL;
+  return collector.result().size() == 1ULL;
 }
 
 const hdk::ir::Type* get_str_dict_cast_type(const hdk::ir::Type* lhs_type,
