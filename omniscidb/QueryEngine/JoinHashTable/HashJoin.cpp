@@ -16,6 +16,7 @@
 
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 
+#include "IR/ExprCollector.h"
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/EquiJoinCondition.h"
 #include "QueryEngine/Execute.h"
@@ -23,7 +24,6 @@
 #include "QueryEngine/JoinHashTable/PerfectJoinHashTable.h"
 #include "QueryEngine/RangeTableIndexVisitor.h"
 #include "QueryEngine/RuntimeFunctions.h"
-#include "QueryEngine/ScalarExprVisitor.h"
 
 //! fetchJoinColumn() calls ColumnFetcher::makeJoinColumn(), then copies the
 //! JoinColumn's col_chunks_buff memory onto the GPU if required by the
@@ -429,31 +429,12 @@ std::shared_ptr<const hdk::ir::ColumnVar> getSyntheticColumnVar(int db_id,
   return cv;
 }
 
-class AllColumnVarsVisitor
-    : public ScalarExprVisitor<std::set<const hdk::ir::ColumnVar*>> {
+class AllColumnVarsCollector
+    : public hdk::ir::ExprCollector<std::set<const hdk::ir::ColumnVar*>,
+                                    AllColumnVarsCollector> {
  protected:
-  std::set<const hdk::ir::ColumnVar*> visitColumnVar(
-      const hdk::ir::ColumnVar* column) const override {
-    return {column};
-  }
-
-  std::set<const hdk::ir::ColumnVar*> visitColumnVarTuple(
-      const hdk::ir::ExpressionTuple* expr_tuple) const override {
-    AllColumnVarsVisitor visitor;
-    std::set<const hdk::ir::ColumnVar*> result;
-    for (const auto& expr_component : expr_tuple->tuple()) {
-      const auto component_rte_set = visitor.visit(expr_component.get());
-      result.insert(component_rte_set.begin(), component_rte_set.end());
-    }
-    return result;
-  }
-
-  std::set<const hdk::ir::ColumnVar*> aggregateResult(
-      const std::set<const hdk::ir::ColumnVar*>& aggregate,
-      const std::set<const hdk::ir::ColumnVar*>& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
+    result_.insert(column);
   }
 };
 
@@ -515,7 +496,7 @@ std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
       std::make_shared<hdk::ir::BinOper>(a1->ctx().boolean(), kEQ, kONE, a1, a2);
 
   std::set<const hdk::ir::ColumnVar*> cvs =
-      AllColumnVarsVisitor().visit(qual_bin_oper.get());
+      AllColumnVarsCollector::collect(qual_bin_oper.get());
   auto query_infos = getSyntheticInputTableInfo(cvs, executor);
   setupSyntheticCaching(data_provider, cvs, executor);
   RegisteredQueryHint query_hint = RegisteredQueryHint::fromConfig(executor->getConfig());
@@ -545,7 +526,7 @@ std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
     ColumnCacheMap& column_cache,
     Executor* executor) {
   std::set<const hdk::ir::ColumnVar*> cvs =
-      AllColumnVarsVisitor().visit(qual_bin_oper.get());
+      AllColumnVarsCollector::collect(qual_bin_oper.get());
   auto query_infos = getSyntheticInputTableInfo(cvs, executor);
   setupSyntheticCaching(data_provider, cvs, executor);
   RegisteredQueryHint query_hint = RegisteredQueryHint::fromConfig(executor->getConfig());
@@ -575,7 +556,7 @@ std::pair<std::string, std::shared_ptr<HashJoin>> HashJoin::getSyntheticInstance
     Executor* executor) {
   std::set<const hdk::ir::ColumnVar*> cvs;
   for (auto& qual : qual_bin_opers) {
-    auto cv = AllColumnVarsVisitor().visit(qual.get());
+    auto cv = AllColumnVarsCollector::collect(qual.get());
     cvs.insert(cv.begin(), cv.end());
   }
   auto query_infos = getSyntheticInputTableInfo(cvs, executor);
