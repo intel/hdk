@@ -39,7 +39,7 @@
  * week
  * quarterday
  */
-enum DateaddField {
+enum DateAddField {
   daYEAR,
   daQUARTER,
   daMONTH,

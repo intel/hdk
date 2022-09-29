@@ -79,7 +79,7 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
   if (datediff_expr) {
     return {codegen(datediff_expr, co)};
   }
-  auto datetrunc_expr = dynamic_cast<const hdk::ir::DatetruncExpr*>(expr);
+  auto datetrunc_expr = dynamic_cast<const hdk::ir::DateTruncExpr*>(expr);
   if (datetrunc_expr) {
     return {codegen(datetrunc_expr, co)};
   }

@@ -63,7 +63,7 @@ bool match_const_integer(const hdk::ir::Expr* expr, const int64_t v) {
   return false;
 }
 
-DatetruncField get_dt_field(const hdk::ir::Expr* ts,
+DateTruncField get_dt_field(const hdk::ir::Expr* ts,
                             const hdk::ir::Expr* interval_multiplier,
                             const bool dt_hour) {
   if (dt_hour) {
@@ -106,7 +106,7 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts,
   return dtINVALID;
 }
 
-DatetruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_arg) {
+DateTruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_arg) {
   const auto mul_by_interval = dynamic_cast<const hdk::ir::BinOper*>(off_arg);
   if (!mul_by_interval) {
     return dtINVALID;

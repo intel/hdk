@@ -259,7 +259,7 @@ DATE_TRUNC_FUNC_JIT(datetrunc_millennium)
 /*
  * @brief support the SQL DATE_TRUNC function in internal (non-JITed) code
  */
-int64_t DateTruncate(DatetruncField field, const int64_t timeval) {
+int64_t DateTruncate(DateTruncField field, const int64_t timeval) {
   switch (field) {
     case dtNANOSECOND:
     case dtMICROSECOND:
@@ -384,7 +384,7 @@ struct EraTime {
     }
   }
 
-  DEVICE int64_t count(DatetruncField const field) const {
+  DEVICE int64_t count(DateTruncField const field) const {
     int const sgn = sign(ERA);
     EraTime const ut = sgn == -1 ? -*this : *this;  // Unsigned time
     switch (field) {
@@ -425,7 +425,7 @@ struct EraTime {
 
 }  // namespace
 
-extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const DatetruncField datepart,
+extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const DateTruncField datepart,
                                                   const int64_t startdate,
                                                   const int64_t enddate) {
   switch (datepart) {
@@ -455,7 +455,7 @@ extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const DatetruncField datepart,
 }
 
 extern "C" RUNTIME_EXPORT DEVICE int64_t
-DateDiffHighPrecision(const DatetruncField datepart,
+DateDiffHighPrecision(const DateTruncField datepart,
                       const int64_t startdate,
                       const int64_t enddate,
                       const int32_t start_dim,
@@ -491,7 +491,7 @@ DateDiffHighPrecision(const DatetruncField datepart,
   }
 }
 
-extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiffNullable(const DatetruncField datepart,
+extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiffNullable(const DateTruncField datepart,
                                                           const int64_t startdate,
                                                           const int64_t enddate,
                                                           const int64_t null_val) {
@@ -502,7 +502,7 @@ extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiffNullable(const DatetruncField d
 }
 
 extern "C" RUNTIME_EXPORT DEVICE int64_t
-DateDiffHighPrecisionNullable(const DatetruncField datepart,
+DateDiffHighPrecisionNullable(const DateTruncField datepart,
                               const int64_t startdate,
                               const int64_t enddate,
                               const int32_t start_dim,

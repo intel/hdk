@@ -536,8 +536,8 @@ ExprPtr DateDiffExpr::deep_copy() const {
   return makeExpr<DateDiffExpr>(type_, field_, start_->deep_copy(), end_->deep_copy());
 }
 
-ExprPtr DatetruncExpr::deep_copy() const {
-  return makeExpr<DatetruncExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
+ExprPtr DateTruncExpr::deep_copy() const {
+  return makeExpr<DateTruncExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
 }
 
 ExprPtr OffsetInFragment::deep_copy() const {
@@ -1228,11 +1228,11 @@ bool DateDiffExpr::operator==(const Expr& rhs) const {
   return field_ == rhs_ee.field() && *start_ == *rhs_ee.start() && *end_ == *rhs_ee.end();
 }
 
-bool DatetruncExpr::operator==(const Expr& rhs) const {
-  if (typeid(rhs) != typeid(DatetruncExpr)) {
+bool DateTruncExpr::operator==(const Expr& rhs) const {
+  if (typeid(rhs) != typeid(DateTruncExpr)) {
     return false;
   }
-  const DatetruncExpr& rhs_ee = dynamic_cast<const DatetruncExpr&>(rhs);
+  const DateTruncExpr& rhs_ee = dynamic_cast<const DateTruncExpr&>(rhs);
   return field_ == rhs_ee.get_field() && *from_expr_ == *rhs_ee.get_from_expr();
 }
 
@@ -1625,7 +1625,7 @@ std::string DateDiffExpr::toString() const {
          end_->toString() + ") ";
 }
 
-std::string DatetruncExpr::toString() const {
+std::string DateTruncExpr::toString() const {
   return "DATE_TRUNC(" + std::to_string(field_) + " , " + from_expr_->toString() + ") ";
 }
 
@@ -2105,7 +2105,7 @@ size_t DateDiffExpr::hash() const {
   return *hash_;
 }
 
-size_t DatetruncExpr::hash() const {
+size_t DateTruncExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, field_);

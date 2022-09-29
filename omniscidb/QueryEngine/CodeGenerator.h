@@ -161,7 +161,7 @@ class CodeGenerator {
 
   llvm::Value* codegen(const hdk::ir::DateDiffExpr*, const CompilationOptions&);
 
-  llvm::Value* codegen(const hdk::ir::DatetruncExpr*, const CompilationOptions&);
+  llvm::Value* codegen(const hdk::ir::DateTruncExpr*, const CompilationOptions&);
 
   llvm::Value* codegen(const hdk::ir::CharLengthExpr*, const CompilationOptions&);
 
@@ -335,7 +335,7 @@ class CodeGenerator {
 
   llvm::Value* codegenDateTruncHighPrecisionTimestamps(llvm::Value*,
                                                        const hdk::ir::Type*,
-                                                       const DatetruncField&);
+                                                       const DateTruncField&);
 
   llvm::Value* codegenCmpDecimalConst(const SQLOps,
                                       const SQLQualifier,

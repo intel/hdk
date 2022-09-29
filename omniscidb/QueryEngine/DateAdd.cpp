@@ -75,7 +75,7 @@ class MonthDaySecond {
 
 }  // namespace
 
-extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t DateAdd(DateaddField field,
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t DateAdd(DateAddField field,
                                                                const int64_t number,
                                                                const int64_t timeval) {
   switch (field) {
@@ -114,7 +114,7 @@ extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t DateAdd(DateaddField fiel
 
 // The dimension of the return value is always equal to the timeval dimension.
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddHighPrecision(DateaddField field,
+DateAddHighPrecision(DateAddField field,
                      const int64_t number,
                      const int64_t timeval,
                      const int32_t dim) {
@@ -143,7 +143,7 @@ DateAddHighPrecision(DateaddField field,
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddNullable(const DateaddField field,
+DateAddNullable(const DateAddField field,
                 const int64_t number,
                 const int64_t timeval,
                 const int64_t null_val) {
@@ -154,7 +154,7 @@ DateAddNullable(const DateaddField field,
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddHighPrecisionNullable(const DateaddField field,
+DateAddHighPrecisionNullable(const DateAddField field,
                              const int64_t number,
                              const int64_t timeval,
                              const int32_t dim,

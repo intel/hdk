@@ -245,13 +245,13 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
       datediff_fname, get_int_type(64, cgen_state_->context_), datediff_args);
 }
 
-llvm::Value* CodeGenerator::codegen(const hdk::ir::DatetruncExpr* datetrunc_expr,
+llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto from_expr = codegen(datetrunc_expr->get_from_expr(), true, co).front();
   auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
   CHECK(from_expr->getType()->isIntegerTy(64));
-  DatetruncField const field = datetrunc_expr->get_field();
+  DateTruncField const field = datetrunc_expr->get_field();
   if (datetrunc_expr_type->isTimestamp() &&
       datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit() >
           hdk::ir::TimeUnit::kSecond) {
@@ -325,7 +325,7 @@ llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
 llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
     llvm::Value* ts_lv,
     const hdk::ir::Type* type,
-    const DatetruncField& field) {
+    const DateTruncField& field) {
   // Only needed for i in { 0, 3, 6, 9 }.
   constexpr int64_t pow10[10]{1, 0, 0, 1000, 0, 0, 1000000, 0, 0, 1000000000};
   AUTOMATIC_IR_METADATA(cgen_state_);

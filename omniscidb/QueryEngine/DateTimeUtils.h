@@ -48,7 +48,7 @@ static const std::map<std::pair<hdk::ir::TimeUnit, ExtractField>,
         {{hdk::ir::TimeUnit::kNano, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
         {{hdk::ir::TimeUnit::kNano, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
 
-static const std::map<std::pair<hdk::ir::TimeUnit, DatetruncField>, int64_t>
+static const std::map<std::pair<hdk::ir::TimeUnit, DateTruncField>, int64_t>
     datetrunc_precision_lookup = {
         {{hdk::ir::TimeUnit::kMicro, dtMILLISECOND}, kMilliSecsPerSec},
         {{hdk::ir::TimeUnit::kNano, dtMICROSECOND}, kMilliSecsPerSec},
@@ -77,7 +77,7 @@ constexpr inline int64_t get_timestamp_precision_scale(const int32_t dimen) {
   return -1;
 }
 
-constexpr inline int64_t get_dateadd_timestamp_precision_scale(const DateaddField field) {
+constexpr inline int64_t get_dateadd_timestamp_precision_scale(const DateAddField field) {
   switch (field) {
     case daMILLISECOND:
       return kMilliSecsPerSec;
@@ -109,16 +109,16 @@ constexpr inline bool is_subsecond_extract_field(const ExtractField& field) {
   return field == kMILLISECOND || field == kMICROSECOND || field == kNANOSECOND;
 }
 
-constexpr inline bool is_subsecond_dateadd_field(const DateaddField field) {
+constexpr inline bool is_subsecond_dateadd_field(const DateAddField field) {
   return field == daMILLISECOND || field == daMICROSECOND || field == daNANOSECOND;
 }
 
-constexpr inline bool is_subsecond_datetrunc_field(const DatetruncField field) {
+constexpr inline bool is_subsecond_datetrunc_field(const DateTruncField field) {
   return field == dtMILLISECOND || field == dtMICROSECOND || field == dtNANOSECOND;
 }
 
 const inline std::pair<SQLOps, int64_t> get_dateadd_high_precision_adjusted_scale(
-    const DateaddField field,
+    const DateAddField field,
     int32_t dimen) {
   switch (field) {
     case daNANOSECOND:
@@ -170,7 +170,7 @@ const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scal
   return {};
 }
 
-const inline int64_t get_datetrunc_high_precision_scale(const DatetruncField& field,
+const inline int64_t get_datetrunc_high_precision_scale(const DateTruncField& field,
                                                         const hdk::ir::TimeUnit unit) {
   const auto result = datetrunc_precision_lookup.find(std::make_pair(unit, field));
   if (result != datetrunc_precision_lookup.end()) {

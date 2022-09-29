@@ -114,9 +114,9 @@ class ScalarExprVisitor {
     if (case_) {
       return visitCaseExpr(case_);
     }
-    const auto datetrunc = dynamic_cast<const hdk::ir::DatetruncExpr*>(expr);
+    const auto datetrunc = dynamic_cast<const hdk::ir::DateTruncExpr*>(expr);
     if (datetrunc) {
-      return visitDatetruncExpr(datetrunc);
+      return visitDateTruncExpr(datetrunc);
     }
     const auto extract = dynamic_cast<const hdk::ir::ExtractExpr*>(expr);
     if (extract) {
@@ -281,7 +281,7 @@ class ScalarExprVisitor {
     return result;
   }
 
-  virtual T visitDatetruncExpr(const hdk::ir::DatetruncExpr* datetrunc) const {
+  virtual T visitDateTruncExpr(const hdk::ir::DateTruncExpr* datetrunc) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(datetrunc->get_from_expr()));
     return result;

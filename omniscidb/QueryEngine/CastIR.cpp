@@ -97,10 +97,10 @@ llvm::Value* CodeGenerator::codegenCast(llvm::Value* operand_lv,
       return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
     }
     if (operand_type->isTimestamp() && type->isDate()) {
-      // Maybe we should instead generate DatetruncExpr directly from RelAlgTranslator
-      // for this pattern. However, DatetruncExpr is supposed to return a timestamp,
+      // Maybe we should instead generate DateTruncExpr directly from RelAlgTranslator
+      // for this pattern. However, DateTruncExpr is supposed to return a timestamp,
       // whereas this cast returns a date. The underlying type for both is still the same,
-      // but it still doesn't look like a good idea to misuse DatetruncExpr.
+      // but it still doesn't look like a good idea to misuse DateTruncExpr.
       // Date will have default precision of day, but TIMESTAMP dimension would
       // matter but while converting date through seconds
       return codegenCastTimestampToDate(

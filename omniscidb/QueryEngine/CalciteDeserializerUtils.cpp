@@ -107,8 +107,8 @@ ExtractField to_datepart_field(const std::string& field) {
   return fieldno;
 }
 
-DateaddField to_dateadd_field(const std::string& field) {
-  DateaddField fieldno;
+DateAddField to_dateadd_field(const std::string& field) {
+  DateAddField fieldno;
   if (boost::iequals(field, "year") || boost::iequals(field, "yy") ||
       boost::iequals(field, "yyyy") || boost::iequals(field, "sql_tsi_year")) {
     fieldno = daYEAR;
@@ -156,8 +156,8 @@ DateaddField to_dateadd_field(const std::string& field) {
   return fieldno;
 }
 
-DatetruncField to_datediff_field(const std::string& field) {
-  DatetruncField fieldno;
+DateTruncField to_datediff_field(const std::string& field) {
+  DateTruncField fieldno;
   if (boost::iequals(field, "year") || boost::iequals(field, "yy") ||
       boost::iequals(field, "yyyy") || boost::iequals(field, "sql_tsi_year")) {
     fieldno = dtYEAR;

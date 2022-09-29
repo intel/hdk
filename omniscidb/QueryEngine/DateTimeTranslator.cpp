@@ -66,7 +66,7 @@ std::string from_extract_field(const ExtractField& fieldno) {
   return "";
 }
 
-std::string from_datetrunc_field(const DatetruncField& fieldno) {
+std::string from_datetrunc_field(const DateTruncField& fieldno) {
   switch (fieldno) {
     case dtYEAR:
       return "year";
@@ -191,8 +191,8 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
       type, from_expr->containsAgg(), field, from_expr->decompress());
 }
 
-DatetruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
-  DatetruncField fieldno;
+DateTruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
+  DateTruncField fieldno;
   if (boost::iequals(field, "year")) {
     fieldno = dtYEAR;
   } else if (boost::iequals(field, "quarter")) {
@@ -240,7 +240,7 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
 }
 
 hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
-                                         const DatetruncField& field) {
+                                         const DateTruncField& field) {
   auto expr_type = from_expr->type();
   if (!expr_type->isDateTime()) {
     throw std::runtime_error(
@@ -261,6 +261,6 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
     return hdk::ir::makeExpr<hdk::ir::Constant>(
         type, constant->isNull(), d, constant->cacheable());
   }
-  return hdk::ir::makeExpr<hdk::ir::DatetruncExpr>(
+  return hdk::ir::makeExpr<hdk::ir::DateTruncExpr>(
       type, from_expr->containsAgg(), field, from_expr->decompress());
 }

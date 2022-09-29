@@ -309,7 +309,7 @@ ExpressionRange getExpressionRange(
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals);
 
 ExpressionRange getExpressionRange(
-    const hdk::ir::DatetruncExpr* datetrunc_expr,
+    const hdk::ir::DateTruncExpr* datetrunc_expr,
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals);
@@ -356,7 +356,7 @@ ExpressionRange getExpressionRange(
   if (extract_expr) {
     return getExpressionRange(extract_expr, query_infos, executor, simple_quals);
   }
-  auto datetrunc_expr = dynamic_cast<const hdk::ir::DatetruncExpr*>(expr);
+  auto datetrunc_expr = dynamic_cast<const hdk::ir::DateTruncExpr*>(expr);
   if (datetrunc_expr) {
     return getExpressionRange(datetrunc_expr, query_infos, executor, simple_quals);
   }
@@ -479,7 +479,7 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
 
 namespace {
 
-int64_t get_conservative_datetrunc_bucket(const DatetruncField datetrunc_field) {
+int64_t get_conservative_datetrunc_bucket(const DateTruncField datetrunc_field) {
   const int64_t day_seconds{24 * 3600};
   const int64_t year_days{365};
   switch (datetrunc_field) {
@@ -914,7 +914,7 @@ ExpressionRange getExpressionRange(
 }
 
 ExpressionRange getExpressionRange(
-    const hdk::ir::DatetruncExpr* datetrunc_expr,
+    const hdk::ir::DateTruncExpr* datetrunc_expr,
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {

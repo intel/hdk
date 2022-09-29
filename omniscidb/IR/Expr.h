@@ -884,11 +884,11 @@ class ExtractExpr : public Expr {
 class DateAddExpr : public Expr {
  public:
   DateAddExpr(const hdk::ir::Type* type,
-              const DateaddField f,
+              const DateAddField f,
               const ExprPtr number,
               const ExprPtr datetime)
       : Expr(type, false), field_(f), number_(number), datetime_(datetime) {}
-  DateaddField field() const { return field_; }
+  DateAddField field() const { return field_; }
   const Expr* number() const { return number_.get(); }
   const Expr* datetime() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
@@ -898,7 +898,7 @@ class DateAddExpr : public Expr {
   size_t hash() const override;
 
  private:
-  const DateaddField field_;
+  const DateAddField field_;
   const ExprPtr number_;
   const ExprPtr datetime_;
 };
@@ -910,11 +910,11 @@ class DateAddExpr : public Expr {
 class DateDiffExpr : public Expr {
  public:
   DateDiffExpr(const hdk::ir::Type* type,
-               const DatetruncField f,
+               const DateTruncField f,
                const ExprPtr start,
                const ExprPtr end)
       : Expr(type, false), field_(f), start_(start), end_(end) {}
-  DatetruncField field() const { return field_; }
+  DateTruncField field() const { return field_; }
   const Expr* start() const { return start_.get(); }
   const Expr* end() const { return end_.get(); }
   ExprPtr deep_copy() const override;
@@ -924,20 +924,20 @@ class DateDiffExpr : public Expr {
   size_t hash() const override;
 
  private:
-  const DatetruncField field_;
+  const DateTruncField field_;
   const ExprPtr start_;
   const ExprPtr end_;
 };
 
 /*
- * @type DatetruncExpr
+ * @type DateTruncExpr
  * @brief the DATE_TRUNC expression
  */
-class DatetruncExpr : public Expr {
+class DateTruncExpr : public Expr {
  public:
-  DatetruncExpr(const hdk::ir::Type* type, bool has_agg, DatetruncField f, ExprPtr e)
+  DateTruncExpr(const hdk::ir::Type* type, bool has_agg, DateTruncField f, ExprPtr e)
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
-  DatetruncField get_field() const { return field_; }
+  DateTruncField get_field() const { return field_; }
   const Expr* get_from_expr() const { return from_expr_.get(); }
   const ExprPtr get_own_from_expr() const { return from_expr_; }
   ExprPtr deep_copy() const override;
@@ -947,7 +947,7 @@ class DatetruncExpr : public Expr {
   size_t hash() const override;
 
  private:
-  DatetruncField field_;
+  DateTruncField field_;
   ExprPtr from_expr_;
 };
 

@@ -23,8 +23,8 @@
 #include "../Shared/funcannotations.h"
 #include "ExtractFromTime.h"
 
-// DatetruncField must be synced with datetrunc_fname
-enum DatetruncField {
+// DateTruncField must be synced with datetrunc_fname
+enum DateTruncField {
   dtYEAR = 0,
   dtQUARTER,
   dtMONTH,
@@ -69,7 +69,7 @@ static_assert(dtSECOND + 1 == dtMILLISECOND, "Please keep these consecutive.");
 static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
 static_assert(dtMICROSECOND + 1 == dtNANOSECOND, "Please keep these consecutive.");
 
-int64_t DateTruncate(DatetruncField field, const int64_t timeval);
+int64_t DateTruncate(DateTruncField field, const int64_t timeval);
 
 // for usage in compiled and linked modules in the binary
 int64_t truncate_high_precision_timestamp_to_date(const int64_t timeval,
