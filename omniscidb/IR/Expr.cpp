@@ -1004,8 +1004,8 @@ bool BinOper::operator==(const Expr& rhs) const {
     return false;
   }
   const BinOper& rhs_bo = dynamic_cast<const BinOper&>(rhs);
-  return op_type_ == rhs_bo.opType() && *left_operand_ == *rhs_bo.get_left_operand() &&
-         *right_operand_ == *rhs_bo.get_right_operand();
+  return op_type_ == rhs_bo.opType() && *left_operand_ == *rhs_bo.leftOperand() &&
+         *right_operand_ == *rhs_bo.rightOperand();
 }
 
 bool RangeOper::operator==(const Expr& rhs) const {

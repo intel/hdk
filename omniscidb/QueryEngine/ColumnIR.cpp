@@ -465,27 +465,26 @@ const hdk::ir::Expr* remove_cast_to_int(const hdk::ir::Expr* expr) {
 hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const {
   for (const auto& tautological_eq : plan_state_->join_info_.equi_join_tautologies_) {
     CHECK(tautological_eq->isEquivalence());
-    if (dynamic_cast<const hdk::ir::ExpressionTuple*>(
-            tautological_eq->get_left_operand())) {
+    if (dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->leftOperand())) {
       auto lhs_col = hashJoinLhsTuple(rhs, tautological_eq.get());
       if (lhs_col) {
         return lhs_col;
       }
     } else {
-      auto eq_right_op = tautological_eq->get_right_operand();
+      auto eq_right_op = tautological_eq->rightOperand();
       if (!(rhs->type()->isString() || rhs->type()->isExtDictionary())) {
         eq_right_op = remove_cast_to_int(eq_right_op);
       }
       if (!eq_right_op) {
-        eq_right_op = tautological_eq->get_right_operand();
+        eq_right_op = tautological_eq->rightOperand();
       }
       if (*eq_right_op == *rhs) {
-        auto eq_left_op = tautological_eq->get_left_operand();
+        auto eq_left_op = tautological_eq->leftOperand();
         if (!(eq_left_op->type()->isString() || eq_left_op->type()->isExtDictionary())) {
           eq_left_op = remove_cast_to_int(eq_left_op);
         }
         if (!eq_left_op) {
-          eq_left_op = tautological_eq->get_left_operand();
+          eq_left_op = tautological_eq->leftOperand();
         }
         const auto eq_left_op_col = dynamic_cast<const hdk::ir::ColumnVar*>(eq_left_op);
         CHECK(eq_left_op_col);
@@ -514,9 +513,9 @@ std::shared_ptr<const hdk::ir::ColumnVar> CodeGenerator::hashJoinLhsTuple(
     const hdk::ir::ColumnVar* rhs,
     const hdk::ir::BinOper* tautological_eq) const {
   const auto lhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->get_left_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->leftOperand());
   const auto rhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->get_right_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(tautological_eq->rightOperand());
   CHECK(lhs_tuple_expr && rhs_tuple_expr);
   const auto& lhs_tuple = lhs_tuple_expr->tuple();
   const auto& rhs_tuple = rhs_tuple_expr->tuple();

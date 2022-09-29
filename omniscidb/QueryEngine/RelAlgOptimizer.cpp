@@ -1533,12 +1533,12 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
     switch (bin_op->opType()) {
       case kAND: {
         auto lhs_conditions = find_hoistable_conditions(
-            bin_op->get_left_operand(), source, first_col_idx, last_col_idx);
+            bin_op->leftOperand(), source, first_col_idx, last_col_idx);
         auto rhs_conditions = find_hoistable_conditions(
-            bin_op->get_right_operand(), source, first_col_idx, last_col_idx);
+            bin_op->rightOperand(), source, first_col_idx, last_col_idx);
         if (lhs_conditions.size() == 1 && rhs_conditions.size() == 1 &&
-            lhs_conditions.front() == bin_op->get_left_operand() &&
-            rhs_conditions.front() == bin_op->get_right_operand()) {
+            lhs_conditions.front() == bin_op->leftOperand() &&
+            rhs_conditions.front() == bin_op->rightOperand()) {
           return {condition};
         }
         lhs_conditions.insert(
@@ -1547,9 +1547,9 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
       }
       case kEQ: {
         auto lhs_conditions = find_hoistable_conditions(
-            bin_op->get_left_operand(), source, first_col_idx, last_col_idx);
+            bin_op->leftOperand(), source, first_col_idx, last_col_idx);
         auto rhs_conditions = find_hoistable_conditions(
-            bin_op->get_right_operand(), source, first_col_idx, last_col_idx);
+            bin_op->rightOperand(), source, first_col_idx, last_col_idx);
         auto lhs_in =
             lhs_conditions.size() == 1
                 ? dynamic_cast<const hdk::ir::ColumnRef*>(lhs_conditions.front())

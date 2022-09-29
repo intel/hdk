@@ -2381,10 +2381,9 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
   // (CASE WHEN count > 0 THEN sum ELSE 0) / COUNT
   const auto div = dynamic_cast<const hdk::ir::BinOper*>(expr);
   if (div && div->isDivide()) {
-    const auto case_expr =
-        dynamic_cast<const hdk::ir::CaseExpr*>(div->get_left_operand());
+    const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(div->leftOperand());
     const auto second_window =
-        dynamic_cast<const hdk::ir::WindowFunction*>(div->get_right_operand());
+        dynamic_cast<const hdk::ir::WindowFunction*>(div->rightOperand());
     if (case_expr && second_window &&
         second_window->getKind() == SqlWindowFunctionKind::COUNT) {
       if (is_window_function_sum(case_expr)) {

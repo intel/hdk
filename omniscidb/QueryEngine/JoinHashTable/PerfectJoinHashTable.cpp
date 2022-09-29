@@ -40,8 +40,8 @@ namespace {
 InnerOuter get_cols(const hdk::ir::BinOper* qual_bin_oper,
                     SchemaProviderPtr schema_provider,
                     const TemporaryTables* temporary_tables) {
-  const auto lhs = qual_bin_oper->get_left_operand();
-  const auto rhs = qual_bin_oper->get_right_operand();
+  const auto lhs = qual_bin_oper->leftOperand();
+  const auto rhs = qual_bin_oper->rightOperand();
   return HashJoin::normalizeColumnPair(lhs, rhs, schema_provider, temporary_tables);
 }
 

@@ -505,8 +505,8 @@ void check_if_loop_join_is_allowed(RelAlgExecutionUnit& ra_exe_unit,
 void check_valid_join_qual(std::shared_ptr<const hdk::ir::BinOper>& bin_oper) {
   // check whether a join qual is valid before entering the hashtable build and codegen
 
-  auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
-  auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
+  auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->leftOperand());
+  auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->rightOperand());
   if (lhs_cv && rhs_cv) {
     auto lhs_type = lhs_cv->type();
     auto rhs_type = rhs_cv->type();
@@ -712,8 +712,8 @@ class ExprTableIdVisitor : public ScalarExprVisitor<std::set<int>> {
 
   std::set<int> visitBinOper(const hdk::ir::BinOper* bin_oper) const final {
     std::set<int> ret;
-    ret = aggregateResult(ret, visit(bin_oper->get_left_operand()));
-    return aggregateResult(ret, visit(bin_oper->get_right_operand()));
+    ret = aggregateResult(ret, visit(bin_oper->leftOperand()));
+    return aggregateResult(ret, visit(bin_oper->rightOperand()));
   }
 
   std::set<int> visitUOper(const hdk::ir::UOper* u_oper) const final {
@@ -746,10 +746,8 @@ JoinLoop::HoistedFiltersCallback Executor::buildHoistLeftHandSideFiltersCb(
     const auto& condition = current_level_join_conditions.quals.front();
     const auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(condition.get());
     CHECK(bin_oper) << condition->toString();
-    const auto rhs =
-        dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
-    const auto lhs =
-        dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
+    const auto rhs = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->rightOperand());
+    const auto lhs = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->leftOperand());
     if (lhs && rhs && lhs->tableId() != rhs->tableId()) {
       const hdk::ir::ColumnVar* selected_lhs{nullptr};
       // grab the left hand side column -- this is somewhat similar to normalize column

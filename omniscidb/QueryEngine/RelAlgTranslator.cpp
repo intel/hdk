@@ -234,8 +234,8 @@ class NormalizerVisitor : public DeepCopyVisitor {
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
-    auto lhs = visit(bin_oper->get_left_operand());
-    auto rhs = visit(bin_oper->get_right_operand());
+    auto lhs = visit(bin_oper->leftOperand());
+    auto rhs = visit(bin_oper->rightOperand());
     // Some binary expressions are not results of operation translation. They are
     // not covered in Analyzer normalization.
     if (bin_oper->isArrayAt()) {

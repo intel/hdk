@@ -84,9 +84,8 @@ std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
 }
 
 std::string ScalarExprToSql::visitBinOper(const hdk::ir::BinOper* bin_oper) const {
-  return visit(bin_oper->get_left_operand()) + " " +
-         binOpTypeToString(bin_oper->opType()) + " " +
-         visit(bin_oper->get_right_operand());
+  return visit(bin_oper->leftOperand()) + " " + binOpTypeToString(bin_oper->opType()) +
+         " " + visit(bin_oper->rightOperand());
 }
 
 std::string ScalarExprToSql::visitInValues(const hdk::ir::InValues* in_values) const {

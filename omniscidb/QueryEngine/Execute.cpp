@@ -3774,7 +3774,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
       // is this possible?
       return {false, -1};
     }
-    const auto lhs = comp_expr->get_left_operand();
+    const auto lhs = comp_expr->leftOperand();
     auto lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
     if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
       // See if lhs is a simple cast that was allowed through normalize_simple_predicate
@@ -3789,7 +3789,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
         continue;
       }
     }
-    const auto rhs = comp_expr->get_right_operand();
+    const auto rhs = comp_expr->rightOperand();
     const auto rhs_const = dynamic_cast<const hdk::ir::Constant*>(rhs);
     if (!rhs_const) {
       // is this possible?

@@ -34,9 +34,9 @@ std::vector<InnerOuterOrLoopQual> QueryPlanDagExtractor::normalizeColumnsPair(
     const hdk::ir::BinOper* condition) {
   std::vector<InnerOuterOrLoopQual> result;
   const auto lhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->get_left_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->leftOperand());
   const auto rhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->get_right_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->rightOperand());
 
   CHECK_EQ(static_cast<bool>(lhs_tuple_expr), static_cast<bool>(rhs_tuple_expr));
   auto do_normalize_inner_outer_pair = [this, &result](
@@ -63,9 +63,8 @@ std::vector<InnerOuterOrLoopQual> QueryPlanDagExtractor::normalizeColumnsPair(
           lhs_tuple[i].get(), rhs_tuple[i].get(), &temporary_tables_);
     }
   } else {
-    do_normalize_inner_outer_pair(condition->get_left_operand(),
-                                  condition->get_right_operand(),
-                                  &temporary_tables_);
+    do_normalize_inner_outer_pair(
+        condition->leftOperand(), condition->rightOperand(), &temporary_tables_);
   }
   return result;
 }

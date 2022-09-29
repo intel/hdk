@@ -52,8 +52,8 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
                                                bin_oper->containsAgg(),
                                                bin_oper->opType(),
                                                bin_oper->qualifier(),
-                                               visit(bin_oper->get_left_operand()),
-                                               visit(bin_oper->get_right_operand()));
+                                               visit(bin_oper->leftOperand()),
+                                               visit(bin_oper->rightOperand()));
   }
 
   RetType visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) const override {

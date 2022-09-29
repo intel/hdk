@@ -27,7 +27,7 @@ bool contains_unsafe_division(const hdk::ir::Expr* expr) {
   auto is_div = [](const hdk::ir::Expr* e) -> bool {
     auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(e);
     if (bin_oper && bin_oper->isDivide()) {
-      auto rhs = bin_oper->get_right_operand();
+      auto rhs = bin_oper->rightOperand();
       auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
       if (!rhs_constant || rhs_constant->isNull()) {
         return true;
@@ -69,7 +69,7 @@ bool should_defer_eval(const hdk::ir::ExprPtr expr) {
   if (contains_unsafe_division(bin_expr)) {
     return true;
   }
-  const auto rhs = bin_expr->get_right_operand();
+  const auto rhs = bin_expr->rightOperand();
   return rhs->type()->isArray();
 }
 
@@ -92,8 +92,8 @@ Likelihood get_likelihood(const hdk::ir::Expr* expr) {
   }
   auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(expr);
   if (bin_oper) {
-    auto lhs = bin_oper->get_left_operand();
-    auto rhs = bin_oper->get_right_operand();
+    auto lhs = bin_oper->leftOperand();
+    auto rhs = bin_oper->rightOperand();
     Likelihood lhs_likelihood = get_likelihood(lhs);
     Likelihood rhs_likelihood = get_likelihood(rhs);
     if (lhs_likelihood.isInvalid() && rhs_likelihood.isInvalid()) {
@@ -130,8 +130,8 @@ Weight get_weight(const hdk::ir::Expr* expr, int depth = 0) {
   }
   auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(expr);
   if (bin_oper) {
-    auto lhs = bin_oper->get_left_operand();
-    auto rhs = bin_oper->get_right_operand();
+    auto lhs = bin_oper->leftOperand();
+    auto rhs = bin_oper->rightOperand();
     auto lhs_weight = get_weight(lhs, depth + 1);
     auto rhs_weight = get_weight(rhs, depth + 1);
     if (rhs->type()->isArray()) {
@@ -194,8 +194,8 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
                                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto optype = bin_oper->opType();
-  auto lhs = bin_oper->get_left_operand();
-  auto rhs = bin_oper->get_right_operand();
+  auto lhs = bin_oper->leftOperand();
+  auto rhs = bin_oper->rightOperand();
 
   if (contains_unsafe_division(rhs)) {
     // rhs contains a possible div-by-0: short-circuit
@@ -302,8 +302,8 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
     return short_circuit;
   }
 
-  const auto lhs = bin_oper->get_left_operand();
-  const auto rhs = bin_oper->get_right_operand();
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
   auto lhs_lv = codegen(lhs, true, co).front();
   auto rhs_lv = codegen(rhs, true, co).front();
   auto type = bin_oper->type();

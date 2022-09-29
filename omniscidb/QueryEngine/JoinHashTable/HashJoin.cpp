@@ -231,7 +231,7 @@ std::shared_ptr<HashJoin> HashJoin::getInstance(
   auto timer = DEBUG_TIMER(__func__);
   std::shared_ptr<HashJoin> join_hash_table;
   CHECK_GT(device_count, 0);
-  if (dynamic_cast<const hdk::ir::ExpressionTuple*>(qual_bin_oper->get_left_operand())) {
+  if (dynamic_cast<const hdk::ir::ExpressionTuple*>(qual_bin_oper->leftOperand())) {
     VLOG(1) << "Trying to build keyed hash table:";
     join_hash_table = BaselineJoinHashTable::getInstance(qual_bin_oper,
                                                          query_infos,
@@ -730,9 +730,9 @@ std::vector<InnerOuter> HashJoin::normalizeColumnPairs(
     const TemporaryTables* temporary_tables) {
   std::vector<InnerOuter> result;
   const auto lhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->get_left_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->leftOperand());
   const auto rhs_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->get_right_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(condition->rightOperand());
 
   CHECK_EQ(static_cast<bool>(lhs_tuple_expr), static_cast<bool>(rhs_tuple_expr));
   if (lhs_tuple_expr) {
@@ -745,8 +745,8 @@ std::vector<InnerOuter> HashJoin::normalizeColumnPairs(
     }
   } else {
     CHECK(!lhs_tuple_expr && !rhs_tuple_expr);
-    result.push_back(normalizeColumnPair(condition->get_left_operand(),
-                                         condition->get_right_operand(),
+    result.push_back(normalizeColumnPair(condition->leftOperand(),
+                                         condition->rightOperand(),
                                          schema_provider,
                                          temporary_tables));
   }

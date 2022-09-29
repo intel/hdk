@@ -82,17 +82,17 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts,
   const auto interval_multiplier_mul =
       dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_fn);
   if (!interval_multiplier_mul || !interval_multiplier_mul->isMul() ||
-      !match_const_integer(interval_multiplier_mul->get_left_operand(), -1)) {
+      !match_const_integer(interval_multiplier_mul->leftOperand(), -1)) {
     return dtINVALID;
   }
   const auto extract_minus_one =
-      dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_mul->get_right_operand());
+      dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_mul->rightOperand());
   if (!extract_minus_one || !extract_minus_one->isMinus() ||
-      !match_const_integer(extract_minus_one->get_right_operand(), 1)) {
+      !match_const_integer(extract_minus_one->rightOperand(), 1)) {
     return dtINVALID;
   }
   const auto extract_fn =
-      dynamic_cast<const hdk::ir::ExtractExpr*>(extract_minus_one->get_left_operand());
+      dynamic_cast<const hdk::ir::ExtractExpr*>(extract_minus_one->leftOperand());
   if (!extract_fn || !(*extract_fn->get_from_expr() == *ts)) {
     return dtINVALID;
   }
@@ -112,16 +112,14 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_ar
   if (!mul_by_interval) {
     return dtINVALID;
   }
-  auto interval =
-      dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->get_right_operand());
-  auto interval_multiplier = mul_by_interval->get_left_operand();
+  auto interval = dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->rightOperand());
+  auto interval_multiplier = mul_by_interval->leftOperand();
   if (!interval) {
-    interval =
-        dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->get_left_operand());
+    interval = dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->leftOperand());
     if (!interval) {
       return dtINVALID;
     }
-    interval_multiplier = mul_by_interval->get_right_operand();
+    interval_multiplier = mul_by_interval->rightOperand();
   }
   auto interval_type = interval->type();
   if (!interval_type->isInterval() ||

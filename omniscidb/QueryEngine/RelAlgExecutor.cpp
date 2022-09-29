@@ -2168,12 +2168,12 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
     if (!comp_expr || !comp_expr->isEq()) {
       return false;
     }
-    const auto lhs = comp_expr->get_left_operand();
+    const auto lhs = comp_expr->leftOperand();
     const auto lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
     if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
       return false;
     }
-    const auto rhs = comp_expr->get_right_operand();
+    const auto rhs = comp_expr->rightOperand();
     const auto rhs_const = dynamic_cast<const hdk::ir::Constant*>(rhs);
     if (!rhs_const) {
       return false;
@@ -2426,8 +2426,7 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
   const hdk::ir::BinOper* equi_join_condition = nullptr;
   const hdk::ir::BinOper* both_are_null_condition = nullptr;
 
-  if (auto bin_oper =
-          dynamic_cast<const hdk::ir::BinOper*>(condition->get_left_operand())) {
+  if (auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(condition->leftOperand())) {
     if (bin_oper->isEq()) {
       equi_join_condition = bin_oper;
     } else if (bin_oper->isAnd()) {
@@ -2435,8 +2434,7 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
     }
   }
 
-  if (auto bin_oper =
-          dynamic_cast<const hdk::ir::BinOper*>(condition->get_right_operand())) {
+  if (auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(condition->rightOperand())) {
     if (bin_oper->isEq()) {
       equi_join_condition = bin_oper;
     } else if (bin_oper->isAnd()) {
@@ -2449,24 +2447,24 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
   }
 
   auto lhs_is_null =
-      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->get_left_operand());
+      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->leftOperand());
   auto rhs_is_null =
-      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->get_right_operand());
+      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->rightOperand());
   if (!lhs_is_null || !rhs_is_null || !lhs_is_null->isIsNull() ||
       !rhs_is_null->isIsNull()) {
     return nullptr;
   }
 
   auto eq_lhs =
-      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->get_left_operand());
+      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->leftOperand());
   auto eq_rhs =
-      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->get_right_operand());
+      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->rightOperand());
   if (auto cast =
-          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->get_left_operand())) {
+          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->leftOperand())) {
     eq_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
   }
   if (auto cast =
-          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->get_right_operand())) {
+          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->rightOperand())) {
     eq_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
   }
 
@@ -2481,8 +2479,8 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
         expr->ctx().boolean(),
         kBW_EQ,
         kONE,
-        equi_join_condition->get_left_operand()->deep_copy(),
-        equi_join_condition->get_right_operand()->deep_copy());
+        equi_join_condition->leftOperand()->deep_copy(),
+        equi_join_condition->rightOperand()->deep_copy());
   }
   return nullptr;
 }
@@ -2490,7 +2488,7 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
 hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
   const auto condition = dynamic_cast<const hdk::ir::BinOper*>(expr);
   if (condition && condition->isAnd()) {
-    auto acc = get_bitwise_equals(condition->get_left_operand());
+    auto acc = get_bitwise_equals(condition->leftOperand());
     if (!acc) {
       return nullptr;
     }
@@ -2499,7 +2497,7 @@ hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
         kAND,
         kONE,
         acc,
-        get_bitwise_equals_conjunction(condition->get_right_operand()));
+        get_bitwise_equals_conjunction(condition->rightOperand()));
   }
   return get_bitwise_equals(expr);
 }

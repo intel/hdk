@@ -150,7 +150,7 @@ ExpressionRange apply_simple_quals(
     if (!qual_bin_oper) {
       continue;
     }
-    const hdk::ir::Expr* left_operand = qual_bin_oper->get_left_operand();
+    const hdk::ir::Expr* left_operand = qual_bin_oper->leftOperand();
     auto qual_col = left_operand->as<hdk::ir::ColumnVar>();
     if (!qual_col) {
       // Check for possibility that column is wrapped in a cast
@@ -169,7 +169,7 @@ ExpressionRange apply_simple_quals(
         qual_col->columnId() != col_expr->columnId()) {
       continue;
     }
-    const hdk::ir::Expr* right_operand = qual_bin_oper->get_right_operand();
+    const hdk::ir::Expr* right_operand = qual_bin_oper->rightOperand();
     auto qual_const = right_operand->as<hdk::ir::Constant>();
     if (!qual_const) {
       continue;
@@ -382,9 +382,9 @@ ExpressionRange getExpressionRange(
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
   const auto& lhs =
-      getExpressionRange(expr->get_left_operand(), query_infos, executor, simple_quals);
+      getExpressionRange(expr->leftOperand(), query_infos, executor, simple_quals);
   const auto& rhs =
-      getExpressionRange(expr->get_right_operand(), query_infos, executor, simple_quals);
+      getExpressionRange(expr->rightOperand(), query_infos, executor, simple_quals);
   switch (expr->opType()) {
     case kPLUS:
       return lhs + rhs;
@@ -394,7 +394,7 @@ ExpressionRange getExpressionRange(
       return lhs * rhs;
     case kDIVIDE: {
       bool null_div_by_zero = executor->getConfig().exec.codegen.null_div_by_zero;
-      auto lhs_type = expr->get_left_operand()->type();
+      auto lhs_type = expr->leftOperand()->type();
       if (lhs_type->isDecimal() && lhs.getType() != ExpressionRangeType::Invalid) {
         CHECK(lhs.getType() == ExpressionRangeType::Integer);
         auto dec_type = lhs_type->as<hdk::ir::DecimalType>();

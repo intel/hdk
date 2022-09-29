@@ -101,17 +101,17 @@ JoinColumnsInfo QueryPlanDagCache::getJoinColumnsInfoString(
   if (target_side == JoinColumnSide::kQual) {
     auto qual_bin_oper = reinterpret_cast<const hdk::ir::BinOper*>(join_expr);
     CHECK(qual_bin_oper);
-    auto inner_join_col_info = get_sorted_col_info(qual_bin_oper->get_left_operand());
-    auto outer_join_col_info = get_sorted_col_info(qual_bin_oper->get_right_operand());
+    auto inner_join_col_info = get_sorted_col_info(qual_bin_oper->leftOperand());
+    auto outer_join_col_info = get_sorted_col_info(qual_bin_oper->rightOperand());
     return outer_join_col_info + "|" + inner_join_col_info;
   } else if (target_side == JoinColumnSide::kInner) {
     auto qual_bin_oper = reinterpret_cast<const hdk::ir::BinOper*>(join_expr);
     CHECK(qual_bin_oper);
-    return get_sorted_col_info(qual_bin_oper->get_left_operand());
+    return get_sorted_col_info(qual_bin_oper->leftOperand());
   } else if (target_side == JoinColumnSide::kOuter) {
     auto qual_bin_oper = reinterpret_cast<const hdk::ir::BinOper*>(join_expr);
     CHECK(qual_bin_oper);
-    return get_sorted_col_info(qual_bin_oper->get_right_operand());
+    return get_sorted_col_info(qual_bin_oper->rightOperand());
   } else {
     CHECK(target_side == JoinColumnSide::kDirect);
     return get_sorted_col_info(join_expr);

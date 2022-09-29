@@ -49,8 +49,8 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
                                                     std::list<hdk::ir::ExprPtr>{rhs});
       }
       case kOR: {
-        return aggregateResult(visit(bin_oper->get_left_operand()),
-                               visit(bin_oper->get_right_operand()));
+        return aggregateResult(visit(bin_oper->leftOperand()),
+                               visit(bin_oper->rightOperand()));
       }
       default:
         break;
@@ -525,7 +525,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     // Check if bin_oper result is cast to a larger int or fp type
     if (casts_.find(bin_oper) != casts_.end()) {
       auto cast_type = casts_[bin_oper];
-      auto lhs_type = bin_oper->get_left_operand()->type();
+      auto lhs_type = bin_oper->leftOperand()->type();
       // Propagate cast down to the operands for folding
       if ((cast_type->isInteger() || cast_type->isFloatingPoint()) &&
           lhs_type->isInteger() && cast_type->size() > lhs_type->size() &&
@@ -779,8 +779,8 @@ class JoinCoveredQualVisitor : public ScalarExprVisitor<bool> {
       for (const auto& qual : join_condition.quals) {
         auto qual_bin_oper = qual->as<hdk::ir::BinOper>();
         if (qual_bin_oper) {
-          join_qual_pairs.emplace_back(qual_bin_oper->get_left_operand(),
-                                       qual_bin_oper->get_right_operand());
+          join_qual_pairs.emplace_back(qual_bin_oper->leftOperand(),
+                                       qual_bin_oper->rightOperand());
         }
       }
     }

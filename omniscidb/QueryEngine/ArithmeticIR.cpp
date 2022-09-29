@@ -35,8 +35,8 @@ llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto optype = bin_oper->opType();
   CHECK(IS_ARITHMETIC(optype));
-  const auto lhs = bin_oper->get_left_operand();
-  const auto rhs = bin_oper->get_right_operand();
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
   const auto& lhs_type = lhs->type();
   const auto& rhs_type = rhs->type();
 
@@ -74,8 +74,8 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                                             llvm::Value* rhs_lv,
                                             const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto lhs = bin_oper->get_left_operand();
-  const auto rhs = bin_oper->get_right_operand();
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
   const auto& lhs_type = lhs->type();
   const auto& rhs_type = rhs->type();
   const auto int_typename = numeric_or_time_interval_type_name(lhs_type, rhs_type);
@@ -130,8 +130,8 @@ llvm::Value* CodeGenerator::codegenFpArith(const hdk::ir::BinOper* bin_oper,
                                            llvm::Value* lhs_lv,
                                            llvm::Value* rhs_lv) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto lhs = bin_oper->get_left_operand();
-  const auto rhs = bin_oper->get_right_operand();
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
   const auto& lhs_type = lhs->type();
   const auto& rhs_type = rhs->type();
   const auto fp_typename = numeric_type_name(lhs_type);
@@ -183,8 +183,8 @@ bool is_temporary_column(const hdk::ir::Expr* expr) {
 bool CodeGenerator::checkExpressionRanges(const hdk::ir::BinOper* bin_oper,
                                           int64_t min,
                                           int64_t max) {
-  if (is_temporary_column(bin_oper->get_left_operand()) ||
-      is_temporary_column(bin_oper->get_right_operand())) {
+  if (is_temporary_column(bin_oper->leftOperand()) ||
+      is_temporary_column(bin_oper->rightOperand())) {
     // Computing the range for temporary columns is a lot more expensive than the overflow
     // check.
     return false;
@@ -550,8 +550,8 @@ llvm::Value* CodeGenerator::codegenDiv(llvm::Value* lhs_lv,
 llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
                                            const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto lhs = bin_oper->get_left_operand();
-  auto rhs = bin_oper->get_right_operand();
+  auto lhs = bin_oper->leftOperand();
+  auto rhs = bin_oper->rightOperand();
   const auto& lhs_type = lhs->type();
   const auto& rhs_type = rhs->type();
   CHECK(lhs_type->isDecimal() && rhs_type->isDecimal());

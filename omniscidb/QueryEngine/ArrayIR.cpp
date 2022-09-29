@@ -26,8 +26,8 @@ llvm::Value* CodeGenerator::codegenUnnest(const hdk::ir::UOper* uoper,
 llvm::Value* CodeGenerator::codegenArrayAt(const hdk::ir::BinOper* array_at,
                                            const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto arr_expr = array_at->get_left_operand();
-  const auto idx_expr = array_at->get_right_operand();
+  const auto arr_expr = array_at->leftOperand();
+  const auto idx_expr = array_at->rightOperand();
   auto idx_type = idx_expr->type();
   CHECK(idx_type->isInteger());
   auto idx_lvs = codegen(idx_expr, true, co);

@@ -378,8 +378,8 @@ class BinOper : public Expr {
   bool isArithmetic() const { return IS_ARITHMETIC(op_type_); }
 
   SQLQualifier qualifier() const { return qualifier_; }
-  const Expr* get_left_operand() const { return left_operand_.get(); }
-  const Expr* get_right_operand() const { return right_operand_.get(); }
+  const Expr* leftOperand() const { return left_operand_.get(); }
+  const Expr* rightOperand() const { return right_operand_.get(); }
   const ExprPtr get_own_left_operand() const { return left_operand_; }
   const ExprPtr get_own_right_operand() const { return right_operand_; }
 
@@ -413,8 +413,8 @@ class RangeOper : public Expr {
     CHECK(right_operand_);
   }
 
-  const Expr* get_left_operand() const { return left_operand_.get(); }
-  const Expr* get_right_operand() const { return right_operand_.get(); }
+  const Expr* leftOperand() const { return left_operand_.get(); }
+  const Expr* rightOperand() const { return right_operand_.get(); }
 
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;

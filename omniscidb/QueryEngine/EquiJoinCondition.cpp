@@ -39,8 +39,8 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
   const auto prev_inner = std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(
       remove_cast(prev_bin->get_own_right_operand()));
   AllRangeTableIndexVisitor visitor;
-  const auto crt_outer_rte_set = visitor.visit(crt_bin->get_left_operand());
-  const auto prev_outer_rte_set = visitor.visit(prev_bin->get_left_operand());
+  const auto crt_outer_rte_set = visitor.visit(crt_bin->leftOperand());
+  const auto prev_outer_rte_set = visitor.visit(prev_bin->leftOperand());
   // We shouldn't treat mixed nesting levels columns as a composite key tuple.
   if (crt_outer_rte_set.size() != 1 || prev_outer_rte_set.size() != 1 ||
       crt_outer_rte_set != prev_outer_rte_set) {

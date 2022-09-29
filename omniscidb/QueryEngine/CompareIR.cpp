@@ -157,9 +157,9 @@ std::shared_ptr<const hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
 std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
     const hdk::ir::BinOper* multicol_compare) {
   const auto left_tuple_expr =
-      dynamic_cast<const hdk::ir::ExpressionTuple*>(multicol_compare->get_left_operand());
-  const auto right_tuple_expr = dynamic_cast<const hdk::ir::ExpressionTuple*>(
-      multicol_compare->get_right_operand());
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(multicol_compare->leftOperand());
+  const auto right_tuple_expr =
+      dynamic_cast<const hdk::ir::ExpressionTuple*>(multicol_compare->rightOperand());
   CHECK(left_tuple_expr && right_tuple_expr);
   const auto& left_tuple = left_tuple_expr->tuple();
   const auto& right_tuple = right_tuple_expr->tuple();
@@ -176,8 +176,8 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
 }
 
 void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
-  auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
-  auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
+  auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->leftOperand());
+  auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->rightOperand());
   auto comp_op = bin_oper->isComparison();
   if (lhs_cv && rhs_cv && comp_op) {
     auto lhs_type = lhs_cv->type();
@@ -190,9 +190,8 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
           "(i.e., arr1[1] {<, <=, >, >=} arr2[1]).");
     }
   }
-  auto lhs_bin_oper = dynamic_cast<const hdk::ir::BinOper*>(bin_oper->get_left_operand());
-  auto rhs_bin_oper =
-      dynamic_cast<const hdk::ir::BinOper*>(bin_oper->get_right_operand());
+  auto lhs_bin_oper = dynamic_cast<const hdk::ir::BinOper*>(bin_oper->leftOperand());
+  auto rhs_bin_oper = dynamic_cast<const hdk::ir::BinOper*>(bin_oper->rightOperand());
   // we can do (non-)equivalence check of two encoded string
   // even if they are (indexed) array cols
   auto theta_comp =
@@ -200,13 +199,13 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
   if (lhs_bin_oper && rhs_bin_oper && theta_comp && lhs_bin_oper->isArrayAt() &&
       rhs_bin_oper->isArrayAt()) {
     auto lhs_arr_cv =
-        dynamic_cast<const hdk::ir::ColumnVar*>(lhs_bin_oper->get_left_operand());
+        dynamic_cast<const hdk::ir::ColumnVar*>(lhs_bin_oper->leftOperand());
     auto lhs_arr_idx =
-        dynamic_cast<const hdk::ir::Constant*>(lhs_bin_oper->get_right_operand());
+        dynamic_cast<const hdk::ir::Constant*>(lhs_bin_oper->rightOperand());
     auto rhs_arr_cv =
-        dynamic_cast<const hdk::ir::ColumnVar*>(rhs_bin_oper->get_left_operand());
+        dynamic_cast<const hdk::ir::ColumnVar*>(rhs_bin_oper->leftOperand());
     auto rhs_arr_idx =
-        dynamic_cast<const hdk::ir::Constant*>(rhs_bin_oper->get_right_operand());
+        dynamic_cast<const hdk::ir::Constant*>(rhs_bin_oper->rightOperand());
     if (lhs_arr_cv && rhs_arr_cv && lhs_arr_idx && rhs_arr_idx &&
         ((lhs_arr_cv->type()->isArray() &&
           lhs_arr_cv->type()->as<hdk::ir::ArrayBaseType>()->elemType()->isText()) ||
@@ -224,8 +223,8 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto qualifier = bin_oper->qualifier();
-  const auto lhs = bin_oper->get_left_operand();
-  const auto rhs = bin_oper->get_right_operand();
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
   if (dynamic_cast<const hdk::ir::ExpressionTuple*>(lhs)) {
     CHECK(dynamic_cast<const hdk::ir::ExpressionTuple*>(rhs));
     const auto lowered = lower_multicol_compare(bin_oper);

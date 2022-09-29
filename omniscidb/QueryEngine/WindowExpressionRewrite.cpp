@@ -31,7 +31,7 @@ bool matches_gt_bigint_zero(const hdk::ir::BinOper* window_gt_zero) {
     return false;
   }
   const auto zero =
-      dynamic_cast<const hdk::ir::Constant*>(window_gt_zero->get_right_operand());
+      dynamic_cast<const hdk::ir::Constant*>(window_gt_zero->rightOperand());
   return zero && zero->type()->isInt64() && zero->value().bigintval == 0;
 }
 
@@ -101,17 +101,17 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
   if (!div_expr || !div_expr->isDivide()) {
     return nullptr;
   }
-  const auto sum_window_expr = rewrite_sum_window(div_expr->get_left_operand());
+  const auto sum_window_expr = rewrite_sum_window(div_expr->leftOperand());
   if (!sum_window_expr) {
     return nullptr;
   }
   const auto cast_count_window =
-      dynamic_cast<const hdk::ir::UOper*>(div_expr->get_right_operand());
+      dynamic_cast<const hdk::ir::UOper*>(div_expr->rightOperand());
   if (cast_count_window && !cast_count_window->isCast()) {
     return nullptr;
   }
   const auto count_window = dynamic_cast<const hdk::ir::WindowFunction*>(
-      cast_count_window ? cast_count_window->operand() : div_expr->get_right_operand());
+      cast_count_window ? cast_count_window->operand() : div_expr->rightOperand());
   if (!count_window || count_window->getKind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
   }

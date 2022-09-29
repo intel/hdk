@@ -187,8 +187,8 @@ class ScalarExprVisitor {
 
   virtual T visitBinOper(const hdk::ir::BinOper* bin_oper) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(bin_oper->get_left_operand()));
-    result = aggregateResult(result, visit(bin_oper->get_right_operand()));
+    result = aggregateResult(result, visit(bin_oper->leftOperand()));
+    result = aggregateResult(result, visit(bin_oper->rightOperand()));
     return result;
   }
 
