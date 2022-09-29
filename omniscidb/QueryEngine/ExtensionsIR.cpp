@@ -284,7 +284,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
     const auto arg = function_oper->getArg(i);
     const auto arg_cast = dynamic_cast<const hdk::ir::UOper*>(arg);
     const auto arg0 =
-        (arg_cast && arg_cast->get_optype() == kCAST) ? arg_cast->get_operand() : arg;
+        (arg_cast && arg_cast->isCast()) ? arg_cast->get_operand() : arg;
     const auto array_expr_arg = dynamic_cast<const hdk::ir::ArrayExpr*>(arg0);
     auto is_local_alloc =
         ret_type->isBuffer() || (array_expr_arg && array_expr_arg->isLocalAlloc());

@@ -501,7 +501,7 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
     return;
   }
   if (dynamic_cast<const hdk::ir::UOper*>(target_expr) &&
-      static_cast<const hdk::ir::UOper*>(target_expr)->get_optype() == kUNNEST) {
+      static_cast<const hdk::ir::UOper*>(target_expr)->isUnnest()) {
     throw std::runtime_error("UNNEST not supported in the projection list yet.");
   }
   if ((executor->plan_state_->isLazyFetchColumn(target_expr) || !is_group_by) &&

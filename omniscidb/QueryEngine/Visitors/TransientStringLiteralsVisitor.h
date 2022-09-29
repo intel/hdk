@@ -49,7 +49,7 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
     visit(uoper->get_operand());
     auto uoper_type = uoper->type();
     auto operand_type = uoper->get_operand()->type();
-    if (!(uoper->get_optype() == kCAST && uoper_type->isExtDictionary() &&
+    if (!(uoper->isCast() && uoper_type->isExtDictionary() &&
           operand_type->isExtDictionary())) {
       // If we are not casting from a dictionary-encoded string
       // to a dictionary-encoded string
@@ -91,7 +91,7 @@ class TransientDictIdVisitor : public ScalarExprVisitor<int> {
  public:
   int visitUOper(const hdk::ir::UOper* uoper) const override {
     auto expr_type = uoper->type();
-    if (uoper->get_optype() == kCAST && expr_type->isExtDictionary()) {
+    if (uoper->isCast() && expr_type->isExtDictionary()) {
       return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     }
     return ScalarExprVisitor::visitUOper(uoper);

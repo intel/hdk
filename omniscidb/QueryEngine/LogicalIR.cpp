@@ -26,7 +26,7 @@ namespace {
 bool contains_unsafe_division(const hdk::ir::Expr* expr) {
   auto is_div = [](const hdk::ir::Expr* e) -> bool {
     auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(e);
-    if (bin_oper && bin_oper->get_optype() == kDIVIDE) {
+    if (bin_oper && bin_oper->isDivide()) {
       auto rhs = bin_oper->get_right_operand();
       auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
       if (!rhs_constant || rhs_constant->isNull()) {
@@ -85,7 +85,7 @@ Likelihood get_likelihood(const hdk::ir::Expr* expr) {
     if (oper_likelihood.isInvalid()) {
       return Likelihood();
     }
-    if (u_oper->get_optype() == kNOT) {
+    if (u_oper->isNot()) {
       return truth - oper_likelihood;
     }
     return oper_likelihood;
@@ -99,12 +99,11 @@ Likelihood get_likelihood(const hdk::ir::Expr* expr) {
     if (lhs_likelihood.isInvalid() && rhs_likelihood.isInvalid()) {
       return Likelihood();
     }
-    const auto optype = bin_oper->get_optype();
-    if (optype == kOR) {
+    if (bin_oper->isOr()) {
       auto both_false = (truth - lhs_likelihood) * (truth - rhs_likelihood);
       return truth - both_false;
     }
-    if (optype == kAND) {
+    if (bin_oper->isAnd()) {
       return lhs_likelihood * rhs_likelihood;
     }
     return (lhs_likelihood + rhs_likelihood) / 2.0;
@@ -194,7 +193,7 @@ bool CodeGenerator::prioritizeQuals(const RelAlgExecutionUnit& ra_exe_unit,
 llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* bin_oper,
                                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = bin_oper->get_optype();
+  const auto optype = bin_oper->opType();
   auto lhs = bin_oper->get_left_operand();
   auto rhs = bin_oper->get_right_operand();
 
@@ -296,8 +295,8 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
 llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
                                            const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = bin_oper->get_optype();
-  CHECK(IS_LOGIC(optype));
+  const auto optype = bin_oper->opType();
+  CHECK(bin_oper->isLogic());
 
   if (llvm::Value* short_circuit = codegenLogicalShortCircuit(bin_oper, co)) {
     return short_circuit;
@@ -360,8 +359,7 @@ bool is_qualified_bin_oper(const hdk::ir::Expr* expr) {
 llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::UOper* uoper,
                                            const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = uoper->get_optype();
-  CHECK_EQ(kNOT, optype);
+  CHECK(uoper->isNot());
   const auto operand = uoper->get_operand();
   auto operand_type = operand->type();
   CHECK(operand_type->isBoolean());

@@ -3728,7 +3728,7 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
 
   // Todo: dedup the following comparison code with the integer/timestamp path, it is
   // slightly tricky due to do cleanly as we do not have rowid on this path
-  switch (comp_expr->get_optype()) {
+  switch (comp_expr->opType()) {
     case kGE:
       if (chunk_max < rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
@@ -3780,8 +3780,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
       // See if lhs is a simple cast that was allowed through normalize_simple_predicate
       auto lhs_uexpr = dynamic_cast<const hdk::ir::UOper*>(lhs);
       if (lhs_uexpr) {
-        CHECK(lhs_uexpr->get_optype() ==
-              kCAST);  // We should have only been passed a cast expression
+        CHECK(lhs_uexpr->isCast());  // We should have only been passed a cast expression
         lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs_uexpr->get_operand());
         if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
           continue;
@@ -3890,7 +3889,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     const auto rhs_val =
         CodeGenerator::codegenIntConst(rhs_const, &local_cgen_state)->getSExtValue();
 
-    switch (comp_expr->get_optype()) {
+    switch (comp_expr->opType()) {
       case kGE:
         if (chunk_max < rhs_val) {
           return {true, -1};

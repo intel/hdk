@@ -81,13 +81,13 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts,
   }
   const auto interval_multiplier_mul =
       dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_fn);
-  if (!interval_multiplier_mul || interval_multiplier_mul->get_optype() != kMULTIPLY ||
+  if (!interval_multiplier_mul || !interval_multiplier_mul->isMul() ||
       !match_const_integer(interval_multiplier_mul->get_left_operand(), -1)) {
     return dtINVALID;
   }
   const auto extract_minus_one =
       dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_mul->get_right_operand());
-  if (!extract_minus_one || extract_minus_one->get_optype() != kMINUS ||
+  if (!extract_minus_one || !extract_minus_one->isMinus() ||
       !match_const_integer(extract_minus_one->get_right_operand(), 1)) {
     return dtINVALID;
   }
@@ -145,7 +145,7 @@ hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
     return nullptr;
   }
   const auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr);
-  if (!uoper || uoper->get_optype() != kCAST) {
+  if (!uoper || !uoper->isCast()) {
     return nullptr;
   }
   auto operand_type = uoper->get_operand()->type();

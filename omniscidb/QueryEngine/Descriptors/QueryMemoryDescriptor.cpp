@@ -677,7 +677,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
   int unnest_array_col_id{std::numeric_limits<int>::min()};
   for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
     const auto uoper = dynamic_cast<const hdk::ir::UOper*>(groupby_expr.get());
-    if (uoper && uoper->get_optype() == kUNNEST) {
+    if (uoper && uoper->isUnnest()) {
       auto arg_type = uoper->get_operand()->type();
       CHECK(arg_type->isArray());
       auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
@@ -724,8 +724,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
       }
 
       const auto uoper = target->as<hdk::ir::UOper>();
-      if (uoper && uoper->get_optype() == kUNNEST &&
-          (*col_it)->getColId() == unnest_array_col_id) {
+      if (uoper && uoper->isUnnest() && (*col_it)->getColId() == unnest_array_col_id) {
         auto arg_type = uoper->get_operand()->type();
         CHECK(arg_type->isArray());
         auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();

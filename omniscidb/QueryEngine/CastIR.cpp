@@ -21,7 +21,7 @@
 llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
                                         const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK_EQ(uoper->get_optype(), kCAST);
+  CHECK(uoper->isCast());
   const auto& type = uoper->type();
   const auto operand = uoper->get_operand();
   const auto operand_as_const = dynamic_cast<const hdk::ir::Constant*>(operand);

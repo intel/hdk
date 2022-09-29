@@ -23,7 +23,7 @@ namespace {
 struct IsEquivBinOp {
   bool operator()(hdk::ir::ExprPtr const& qual) {
     if (auto oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(qual)) {
-      return IS_EQUIVALENCE(oper->get_optype());
+      return oper->isEquivalence();
     }
     return false;
   }
@@ -427,7 +427,7 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
       if (qual_bin_oper) {
         if (join_qual == current_level_join_conditions.quals.front()) {
           // set op_info based on the first qual
-          op_info = OpInfo{::toString(qual_bin_oper->get_optype()),
+          op_info = OpInfo{::toString(qual_bin_oper->opType()),
                            ::toString(qual_bin_oper->get_qualifier()),
                            qual_bin_oper->type()->toString()};
         }

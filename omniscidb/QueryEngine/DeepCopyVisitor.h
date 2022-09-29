@@ -45,14 +45,14 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitUOper(const hdk::ir::UOper* uoper) const override {
     return hdk::ir::makeExpr<hdk::ir::UOper>(uoper->type(),
                                              uoper->containsAgg(),
-                                             uoper->get_optype(),
+                                             uoper->opType(),
                                              visit(uoper->get_operand()));
   }
 
   RetType visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->containsAgg(),
-                                               bin_oper->get_optype(),
+                                               bin_oper->opType(),
                                                bin_oper->get_qualifier(),
                                                visit(bin_oper->get_left_operand()),
                                                visit(bin_oper->get_right_operand()));

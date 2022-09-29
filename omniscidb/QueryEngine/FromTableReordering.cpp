@@ -36,7 +36,7 @@ std::pair<cost_t, cost_t> get_join_qual_cost(const hdk::ir::Expr* qual,
     return {200, 200};
   }
   const auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(qual);
-  if (!bin_oper || !IS_EQUIVALENCE(bin_oper->get_optype())) {
+  if (!bin_oper || !bin_oper->isEquivalence()) {
     return {200, 200};
   }
   if (executor) {

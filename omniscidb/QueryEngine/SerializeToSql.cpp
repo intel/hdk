@@ -50,7 +50,7 @@ std::string ScalarExprToSql::visitConstant(const hdk::ir::Constant* constant) co
 std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
   const auto operand = uoper->get_operand();
   const auto operand_str = visit(operand);
-  const auto optype = uoper->get_optype();
+  const auto optype = uoper->opType();
   switch (optype) {
     case kNOT: {
       return "NOT (" + operand_str + ")";
@@ -85,7 +85,7 @@ std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
 
 std::string ScalarExprToSql::visitBinOper(const hdk::ir::BinOper* bin_oper) const {
   return visit(bin_oper->get_left_operand()) + " " +
-         binOpTypeToString(bin_oper->get_optype()) + " " +
+         binOpTypeToString(bin_oper->opType()) + " " +
          visit(bin_oper->get_right_operand());
 }
 

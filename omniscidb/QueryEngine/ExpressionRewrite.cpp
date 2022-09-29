@@ -35,7 +35,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
  protected:
   std::shared_ptr<const hdk::ir::InValues> visitBinOper(
       const hdk::ir::BinOper* bin_oper) const override {
-    switch (bin_oper->get_optype()) {
+    switch (bin_oper->opType()) {
       case kEQ: {
         const auto rhs_owned = bin_oper->get_own_right_operand();
         auto rhs_no_cast = extract_cast_arg(rhs_owned.get());
@@ -160,7 +160,7 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
  protected:
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
     OrToInVisitor simple_visitor;
-    if (bin_oper->get_optype() == kOR) {
+    if (bin_oper->isOr()) {
       auto rewritten = simple_visitor.visit(bin_oper);
       if (rewritten) {
         return rewritten;
@@ -172,7 +172,7 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
     auto rewritten_rhs = visit(rhs.get());
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->containsAgg(),
-                                               bin_oper->get_optype(),
+                                               bin_oper->opType(),
                                                bin_oper->get_qualifier(),
                                                rewritten_lhs ? rewritten_lhs : lhs,
                                                rewritten_rhs ? rewritten_rhs : rhs);
@@ -439,7 +439,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
     const auto unvisited_operand = uoper->get_operand();
-    const auto optype = uoper->get_optype();
+    const auto optype = uoper->opType();
     auto type = uoper->type();
     if (optype == kCAST) {
       // Cache the cast type so it could be used in operand rewriting/folding
@@ -516,7 +516,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
-    const auto optype = bin_oper->get_optype();
+    const auto optype = bin_oper->opType();
     auto type = bin_oper->type();
     auto& ctx = type->ctx();
     auto left_operand = bin_oper->get_own_left_operand();
@@ -667,7 +667,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
 
     return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
                                                bin_oper->containsAgg(),
-                                               bin_oper->get_optype(),
+                                               bin_oper->opType(),
                                                bin_oper->get_qualifier(),
                                                lhs,
                                                rhs);

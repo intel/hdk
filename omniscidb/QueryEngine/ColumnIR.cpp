@@ -452,7 +452,7 @@ llvm::Value* CodeGenerator::posArg(const hdk::ir::Expr* expr) const {
 
 const hdk::ir::Expr* remove_cast_to_int(const hdk::ir::Expr* expr) {
   const auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr);
-  if (!uoper || uoper->get_optype() != kCAST) {
+  if (!uoper || !uoper->isCast()) {
     return nullptr;
   }
   const auto& target_type = uoper->type();
@@ -464,7 +464,7 @@ const hdk::ir::Expr* remove_cast_to_int(const hdk::ir::Expr* expr) {
 
 hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const {
   for (const auto& tautological_eq : plan_state_->join_info_.equi_join_tautologies_) {
-    CHECK(IS_EQUIVALENCE(tautological_eq->get_optype()));
+    CHECK(tautological_eq->isEquivalence());
     if (dynamic_cast<const hdk::ir::ExpressionTuple*>(
             tautological_eq->get_left_operand())) {
       auto lhs_col = hashJoinLhsTuple(rhs, tautological_eq.get());

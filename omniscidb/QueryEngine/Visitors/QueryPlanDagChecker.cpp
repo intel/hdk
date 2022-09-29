@@ -83,13 +83,13 @@ void* QueryPlanDagChecker::visitConstant(const hdk::ir::Constant* constant) cons
 }
 
 void* QueryPlanDagChecker::visitBinOper(const hdk::ir::BinOper* bin_oper) const {
-  if (bin_oper->get_optype() == kARRAY_AT) {
+  if (bin_oper->isArrayAt()) {
     detectNonSupportedNode("Detect ARRAY_AT operation");
     return nullptr;
   }
 
   // Detect heavy IN-clause pattern as a deep OR tree.
-  if (bin_oper->get_optype() == kOR) {
+  if (bin_oper->isOr()) {
     if (deep_or_ >= 19) {
       detectNonSupportedNode("Detect heavy IN-clause having more than 20 values");
       return nullptr;
@@ -98,7 +98,7 @@ void* QueryPlanDagChecker::visitBinOper(const hdk::ir::BinOper* bin_oper) const 
   }
 
   ExprDagVisitor::visitBinOper(bin_oper);
-  if (bin_oper->get_optype() == kOR) {
+  if (bin_oper->isOr()) {
     --deep_or_;
   }
   return nullptr;

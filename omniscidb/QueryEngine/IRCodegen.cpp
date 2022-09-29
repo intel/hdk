@@ -153,17 +153,16 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Expr* expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::BinOper* bin_oper,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = bin_oper->get_optype();
-  if (IS_ARITHMETIC(optype)) {
+  if (bin_oper->isArithmetic()) {
     return codegenArith(bin_oper, co);
   }
-  if (IS_COMPARISON(optype)) {
+  if (bin_oper->isComparison()) {
     return codegenCmp(bin_oper, co);
   }
-  if (IS_LOGIC(optype)) {
+  if (bin_oper->isLogic()) {
     return codegenLogical(bin_oper, co);
   }
-  if (optype == kARRAY_AT) {
+  if (bin_oper->isArrayAt()) {
     return codegenArrayAt(bin_oper, co);
   }
   abort();
@@ -172,7 +171,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::BinOper* bin_oper,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::UOper* u_oper,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = u_oper->get_optype();
+  const auto optype = u_oper->opType();
   switch (optype) {
     case kNOT: {
       return codegenLogical(u_oper, co);
@@ -237,7 +236,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
   auto is_constant_expr = [](const hdk::ir::Expr* expr) {
     auto target_expr = expr;
     if (auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr)) {
-      if (cast_expr->get_optype() == SQLOps::kCAST) {
+      if (cast_expr->isCast()) {
         target_expr = cast_expr->get_operand();
       }
     }
@@ -861,8 +860,7 @@ std::shared_ptr<HashJoin> Executor::buildCurrentLevelHashTable(
   };
   for (const auto& join_qual : current_level_join_conditions.quals) {
     auto qual_bin_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(join_qual);
-    if (current_level_hash_table || !qual_bin_oper ||
-        !IS_EQUIVALENCE(qual_bin_oper->get_optype())) {
+    if (current_level_hash_table || !qual_bin_oper || !qual_bin_oper->isEquivalence()) {
       handleNonHashtableQual(current_level_join_conditions.type, join_qual);
       if (!current_level_hash_table) {
         fail_reasons.emplace_back("No equijoin expression found");
@@ -1210,7 +1208,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
   auto group_key = code_generator.codegen(group_by_col, true, co).front();
   auto key_to_cache = group_key;
   if (group_by_col && group_by_col->is<hdk::ir::UOper>() &&
-      group_by_col->as<hdk::ir::UOper>()->get_optype() == kUNNEST) {
+      group_by_col->as<hdk::ir::UOper>()->isUnnest()) {
     auto preheader = cgen_state_->ir_builder_.GetInsertBlock();
     auto array_loop_head = llvm::BasicBlock::Create(cgen_state_->context_,
                                                     "array_loop_head",

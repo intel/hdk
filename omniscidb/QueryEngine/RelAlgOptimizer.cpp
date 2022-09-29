@@ -1530,7 +1530,7 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
     const size_t first_col_idx,
     const size_t last_col_idx) {
   if (auto bin_op = dynamic_cast<const hdk::ir::BinOper*>(condition)) {
-    switch (bin_op->get_optype()) {
+    switch (bin_op->opType()) {
       case kAND: {
         auto lhs_conditions = find_hoistable_conditions(
             bin_op->get_left_operand(), source, first_col_idx, last_col_idx);

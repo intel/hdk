@@ -96,7 +96,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
     const TableIdToNodeMap& table_id_to_node_map) {
   initCaches(executor->getConfigPtr());
 
-  CHECK(IS_EQUIVALENCE(qual_bin_oper->get_optype()));
+  CHECK(qual_bin_oper->isEquivalence());
   const auto cols = get_cols(
       qual_bin_oper.get(), executor->getSchemaProvider(), executor->temporary_tables_);
   const auto inner_col = cols.first;
@@ -137,8 +137,8 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
           ? static_cast<size_t>(std::numeric_limits<int32_t>::max() / sizeof(int32_t))
           : static_cast<size_t>(std::numeric_limits<int32_t>::max());
 
-  auto bucketized_entry_count_info = get_bucketized_hash_entry_info(
-      type, col_range, qual_bin_oper->get_optype() == kBW_EQ);
+  auto bucketized_entry_count_info =
+      get_bucketized_hash_entry_info(type, col_range, qual_bin_oper->isBwEq());
   auto bucketized_entry_count = bucketized_entry_count_info.getNormalizedHashEntryCount();
 
   if (bucketized_entry_count > max_hash_entry_count) {
@@ -156,7 +156,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
     }
   }
 
-  if (qual_bin_oper->get_optype() == kBW_EQ &&
+  if (qual_bin_oper->isBwEq() &&
       col_range.getIntMax() >= std::numeric_limits<int64_t>::max()) {
     throw HashJoinFail("Cannot translate null value for kBW_EQ");
   }
@@ -164,7 +164,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
   inner_outer_pairs.emplace_back(inner_col, cols.second);
   auto hashtable_cache_key =
       HashtableRecycler::getHashtableCacheKey(inner_outer_pairs,
-                                              qual_bin_oper->get_optype(),
+                                              qual_bin_oper->opType(),
                                               join_type,
                                               hashtable_build_dag_map,
                                               executor);
@@ -276,7 +276,7 @@ bool PerfectJoinHashTable::isOneToOneHashPossible(
   auto rhs_col_type = inner_outer_pairs_.front().first->type();
   const auto max_unique_hash_input_entries =
       get_bucketized_hash_entry_info(
-          rhs_col_type, rhs_source_col_range_, qual_bin_oper_->get_optype() == kBW_EQ)
+          rhs_col_type, rhs_source_col_range_, qual_bin_oper_->isBwEq())
           .getNormalizedHashEntryCount() +
       rhs_source_col_range_.hasNulls();
   for (const auto& device_columns : columns_per_device) {
@@ -356,7 +356,7 @@ void PerfectJoinHashTable::reify() {
             outer_col ? outer_col : inner_col,
             chunk_key,
             columns_per_device[device_id].join_columns.front().num_elems,
-            qual_bin_oper_->get_optype(),
+            qual_bin_oper_->opType(),
             join_type_};
         hashtable_cache_key_ = getAlternativeCacheKey(cache_key);
         VLOG(2) << "Use alternative hashtable cache key due to unavailable query plan "
@@ -1009,5 +1009,5 @@ const InputTableInfo& get_inner_query_info(
 }
 
 bool PerfectJoinHashTable::isBitwiseEq() const {
-  return qual_bin_oper_->get_optype() == kBW_EQ;
+  return qual_bin_oper_->isBwEq();
 }

@@ -33,7 +33,7 @@ std::string numeric_or_time_interval_type_name(const hdk::ir::Type* type1,
 llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
                                          const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto optype = bin_oper->get_optype();
+  const auto optype = bin_oper->opType();
   CHECK(IS_ARITHMETIC(optype));
   const auto lhs = bin_oper->get_left_operand();
   const auto rhs = bin_oper->get_right_operand();
@@ -81,7 +81,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
   const auto int_typename = numeric_or_time_interval_type_name(lhs_type, rhs_type);
   const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
   const auto& oper_type = rhs_type->isInterval() ? rhs_type : lhs_type;
-  switch (bin_oper->get_optype()) {
+  switch (bin_oper->opType()) {
     case kMINUS:
       return codegenSub(bin_oper,
                         lhs_lv,
@@ -138,7 +138,7 @@ llvm::Value* CodeGenerator::codegenFpArith(const hdk::ir::BinOper* bin_oper,
   const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
   llvm::ConstantFP* fp_null{lhs_type->isFp32() ? cgen_state_->llFp(NULL_FLOAT)
                                                : cgen_state_->llFp(NULL_DOUBLE)};
-  switch (bin_oper->get_optype()) {
+  switch (bin_oper->opType()) {
     case kMINUS:
       return null_check_suffix.empty()
                  ? cgen_state_->ir_builder_.CreateFSub(lhs_lv, rhs_lv)
@@ -563,7 +563,7 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
   if (rhs_constant && !rhs_constant->isNull() && rhs_constant->value().bigintval != 0LL &&
       (rhs_constant->value().bigintval % exp_to_scale(scale)) == 0LL) {
     // can safely downscale a scaled constant
-  } else if (rhs_cast && rhs_cast->get_optype() == kCAST &&
+  } else if (rhs_cast && rhs_cast->isCast() &&
              rhs_cast->get_operand()->type()->isInteger()) {
     // can skip upscale in the int to dec cast
   } else {
@@ -657,7 +657,7 @@ bool CodeGenerator::checkExpressionRanges(const hdk::ir::UOper* uoper,
 llvm::Value* CodeGenerator::codegenUMinus(const hdk::ir::UOper* uoper,
                                           const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK_EQ(uoper->get_optype(), kUMINUS);
+  CHECK(uoper->isUMinus());
   const auto operand_lv = codegen(uoper->get_operand(), true, co).front();
   const auto& type = uoper->type();
   llvm::Value* chosen_max{nullptr};
@@ -709,7 +709,7 @@ llvm::Function* CodeGenerator::getArithWithOverflowIntrinsic(
     const hdk::ir::BinOper* bin_oper,
     llvm::Type* type) {
   llvm::Intrinsic::ID fn_id{llvm::Intrinsic::not_intrinsic};
-  switch (bin_oper->get_optype()) {
+  switch (bin_oper->opType()) {
     case kMINUS:
       fn_id = llvm::Intrinsic::ssub_with_overflow;
       break;

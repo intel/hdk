@@ -995,7 +995,7 @@ bool UOper::operator==(const Expr& rhs) const {
     return false;
   }
   const UOper& rhs_uo = dynamic_cast<const UOper&>(rhs);
-  return op_type_ == rhs_uo.get_optype() && *operand_ == *rhs_uo.get_operand() &&
+  return op_type_ == rhs_uo.opType() && *operand_ == *rhs_uo.get_operand() &&
          is_dict_intersection_ == rhs_uo.is_dict_intersection_;
 }
 
@@ -1004,8 +1004,7 @@ bool BinOper::operator==(const Expr& rhs) const {
     return false;
   }
   const BinOper& rhs_bo = dynamic_cast<const BinOper&>(rhs);
-  return op_type_ == rhs_bo.get_optype() &&
-         *left_operand_ == *rhs_bo.get_left_operand() &&
+  return op_type_ == rhs_bo.opType() && *left_operand_ == *rhs_bo.get_left_operand() &&
          *right_operand_ == *rhs_bo.get_right_operand();
 }
 

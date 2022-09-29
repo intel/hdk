@@ -61,7 +61,7 @@ std::shared_ptr<BaselineJoinHashTable> BaselineJoinHashTable::getInstance(
       condition.get(), executor->getSchemaProvider(), executor->getTemporaryTables());
   auto hashtable_cache_key =
       HashtableRecycler::getHashtableCacheKey(inner_outer_pairs,
-                                              condition->get_optype(),
+                                              condition->opType(),
                                               join_type,
                                               hashtable_build_dag_map,
                                               executor);
@@ -279,7 +279,7 @@ void BaselineJoinHashTable::reifyWithLayout(const HashType layout) {
     AlternativeCacheKeyForBaselineHashJoin cache_key{
         inner_outer_pairs_,
         columns_per_device.front().join_columns.front().num_elems,
-        condition_->get_optype(),
+        condition_->opType(),
         join_type_};
     hashtable_cache_key_ = getAlternativeCacheKey(cache_key);
     VLOG(2) << "Use alternative hashtable cache key due to unavailable query plan dag "
@@ -993,5 +993,5 @@ BaselineJoinHashTable::getApproximateTupleCountFromCache(
 }
 
 bool BaselineJoinHashTable::isBitwiseEq() const {
-  return condition_->get_optype() == kBW_EQ;
+  return condition_->isBwEq();
 }

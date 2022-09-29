@@ -1169,7 +1169,7 @@ std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
       return std::make_pair(fn_oper->getOwnArg(0), (fn_name == "PG_ANY") ? kANY : kALL);
     }
   } else if (auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr.get())) {
-    if (uoper->get_optype() == kCAST) {
+    if (uoper->isCast()) {
       return getQuantifiedBinOperRhs(uoper->get_own_operand(), orig_expr);
     }
   }
@@ -2348,7 +2348,7 @@ bool is_window_function_sum(const hdk::ir::Expr* expr) {
 
     // Allow optional cast.
     const auto cast = dynamic_cast<const hdk::ir::UOper*>(then);
-    if (cast && cast->get_optype() == kCAST) {
+    if (cast && cast->isCast()) {
       then = cast->get_operand();
     }
 
@@ -2369,7 +2369,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
 
   // unwrap from casts, if they exist
   const auto cast = dynamic_cast<const hdk::ir::UOper*>(expr);
-  if (cast && cast->get_optype() == kCAST) {
+  if (cast && cast->isCast()) {
     return is_window_function_expr(cast->get_operand());
   }
 
@@ -2380,7 +2380,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
   // Check for Window Function AVG:
   // (CASE WHEN count > 0 THEN sum ELSE 0) / COUNT
   const auto div = dynamic_cast<const hdk::ir::BinOper*>(expr);
-  if (div && div->get_optype() == kDIVIDE) {
+  if (div && div->isDivide()) {
     const auto case_expr =
         dynamic_cast<const hdk::ir::CaseExpr*>(div->get_left_operand());
     const auto second_window =

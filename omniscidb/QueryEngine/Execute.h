@@ -124,7 +124,7 @@ inline uint32_t log2_bytes(const uint32_t bytes) {
 
 inline const hdk::ir::Expr* extract_cast_arg(const hdk::ir::Expr* expr) {
   const auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr);
-  if (!cast_expr || cast_expr->get_optype() != kCAST) {
+  if (!cast_expr || !cast_expr->isCast()) {
     return expr;
   }
   return cast_expr->get_operand();
@@ -1111,7 +1111,7 @@ inline std::string get_null_check_suffix(const hdk::ir::Type* lhs_type,
 
 inline bool is_unnest(const hdk::ir::Expr* expr) {
   return dynamic_cast<const hdk::ir::UOper*>(expr) &&
-         static_cast<const hdk::ir::UOper*>(expr)->get_optype() == kUNNEST;
+         static_cast<const hdk::ir::UOper*>(expr)->isUnnest();
 }
 
 bool is_trivial_loop_join(const std::vector<InputTableInfo>& query_infos,

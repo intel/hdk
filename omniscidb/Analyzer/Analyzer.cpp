@@ -894,7 +894,7 @@ hdk::ir::ExprPtr getTimestampLiteral(const int64_t timestampval) {
 
 hdk::ir::ExprPtr remove_cast(const hdk::ir::ExprPtr& expr) {
   const auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr.get());
-  if (!uoper || uoper->get_optype() != kCAST) {
+  if (!uoper || !uoper->isCast()) {
     return expr;
   }
   return uoper->get_own_operand();

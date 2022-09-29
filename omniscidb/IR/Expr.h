@@ -310,7 +310,17 @@ class UOper : public Expr {
       , is_dict_intersection_(is_dict_intersection) {}
   UOper(const Type* type, SQLOps o, ExprPtr p)
       : Expr(type), op_type_(o), operand_(p), is_dict_intersection_(false) {}
-  SQLOps get_optype() const { return op_type_; }
+
+  SQLOps opType() const { return op_type_; }
+
+  bool isNot() const { return op_type_ == SQLOps::kNOT; }
+  bool isUMinus() const { return op_type_ == SQLOps::kUMINUS; }
+  bool isIsNull() const { return op_type_ == SQLOps::kISNULL; }
+  bool isIsNotNull() const { return op_type_ == SQLOps::kISNOTNULL; }
+  bool isExists() const { return op_type_ == SQLOps::kEXISTS; }
+  bool isCast() const { return op_type_ == SQLOps::kCAST; }
+  bool isUnnest() const { return op_type_ == SQLOps::kUNNEST; }
+
   const Expr* get_operand() const { return operand_.get(); }
   const ExprPtr get_own_operand() const { return operand_; }
   bool is_dict_intersection() const { return is_dict_intersection_; }
@@ -343,7 +353,30 @@ class BinOper : public Expr {
       , right_operand_(r) {}
   BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type), op_type_(o), qualifier_(q), left_operand_(l), right_operand_(r) {}
-  SQLOps get_optype() const { return op_type_; }
+
+  SQLOps opType() const { return op_type_; }
+
+  bool isEq() const { return op_type_ == SQLOps::kEQ; }
+  bool isBwEq() const { return op_type_ == SQLOps::kBW_EQ; }
+  bool isNe() const { return op_type_ == SQLOps::kNE; }
+  bool isLt() const { return op_type_ == SQLOps::kLT; }
+  bool isGt() const { return op_type_ == SQLOps::kGT; }
+  bool isLe() const { return op_type_ == SQLOps::kLE; }
+  bool isGe() const { return op_type_ == SQLOps::kGE; }
+  bool isAnd() const { return op_type_ == SQLOps::kAND; }
+  bool isOr() const { return op_type_ == SQLOps::kOR; }
+  bool isMinus() const { return op_type_ == SQLOps::kMINUS; }
+  bool isPlus() const { return op_type_ == SQLOps::kPLUS; }
+  bool isMul() const { return op_type_ == SQLOps::kMULTIPLY; }
+  bool isDivide() const { return op_type_ == SQLOps::kDIVIDE; }
+  bool isModulo() const { return op_type_ == SQLOps::kMODULO; }
+  bool isArrayAt() const { return op_type_ == SQLOps::kARRAY_AT; }
+
+  bool isEquivalence() const { return isEq() || isBwEq(); }
+  bool isComparison() const { return IS_COMPARISON(op_type_); }
+  bool isLogic() const { return IS_LOGIC(op_type_); }
+  bool isArithmetic() const { return IS_ARITHMETIC(op_type_); }
+
   SQLQualifier get_qualifier() const { return qualifier_; }
   const Expr* get_left_operand() const { return left_operand_.get(); }
   const Expr* get_right_operand() const { return right_operand_.get(); }

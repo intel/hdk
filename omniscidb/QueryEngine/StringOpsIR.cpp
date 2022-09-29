@@ -200,7 +200,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
     return nullptr;
   }
   CHECK(cast_oper);
-  CHECK_EQ(kCAST, cast_oper->get_optype());
+  CHECK(cast_oper->isCast());
   const auto dict_like_arg = cast_oper->get_own_operand();
   const auto& dict_like_arg_type = dict_like_arg->type();
   if (!dict_like_arg_type->isExtDictionary()) {
@@ -311,7 +311,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   if (!cast_oper || !col_var) {
     return nullptr;
   }
-  CHECK_EQ(kCAST, cast_oper->get_optype());
+  CHECK(cast_oper->isCast());
 
   const auto const_expr = cast_oper->get_operand()->as<hdk::ir::Constant>();
   if (!const_expr) {
@@ -411,7 +411,7 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
     return nullptr;
   }
   CHECK(cast_oper);
-  CHECK_EQ(kCAST, cast_oper->get_optype());
+  CHECK(cast_oper->isCast());
   const auto dict_regexp_arg = cast_oper->get_own_operand();
   const auto& dict_regexp_arg_type = dict_regexp_arg->type();
   CHECK(dict_regexp_arg_type->isExtDictionary());

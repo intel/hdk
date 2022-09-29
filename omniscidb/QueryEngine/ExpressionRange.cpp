@@ -176,23 +176,19 @@ ExpressionRange apply_simple_quals(
     }
     if (qual_range.getType() == ExpressionRangeType::Float ||
         qual_range.getType() == ExpressionRangeType::Double) {
-      apply_fp_qual(qual_const->value(),
-                    qual_const->type(),
-                    qual_bin_oper->get_optype(),
-                    qual_range);
+      apply_fp_qual(
+          qual_const->value(), qual_const->type(), qual_bin_oper->opType(), qual_range);
     } else if (qual_col->type()->isTimestamp() || qual_const->type()->isTimestamp()) {
       CHECK(qual_const->type()->isDateTime());
       CHECK(qual_col->type()->isDateTime());
       apply_hpt_qual(qual_const->value(),
                      qual_const->type(),
                      qual_col->type(),
-                     qual_bin_oper->get_optype(),
+                     qual_bin_oper->opType(),
                      qual_range);
     } else {
-      apply_int_qual(qual_const->value(),
-                     qual_const->type(),
-                     qual_bin_oper->get_optype(),
-                     qual_range);
+      apply_int_qual(
+          qual_const->value(), qual_const->type(), qual_bin_oper->opType(), qual_range);
     }
   }
   return qual_range;
@@ -389,7 +385,7 @@ ExpressionRange getExpressionRange(
       getExpressionRange(expr->get_left_operand(), query_infos, executor, simple_quals);
   const auto& rhs =
       getExpressionRange(expr->get_right_operand(), query_infos, executor, simple_quals);
-  switch (expr->get_optype()) {
+  switch (expr->opType()) {
     case kPLUS:
       return lhs + rhs;
     case kMINUS:
@@ -740,10 +736,10 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  if (u_expr->get_optype() == kUNNEST) {
+  if (u_expr->isUnnest()) {
     return getExpressionRange(u_expr->get_operand(), query_infos, executor, simple_quals);
   }
-  if (u_expr->get_optype() != kCAST) {
+  if (!u_expr->isCast()) {
     return ExpressionRange::makeInvalidRange();
   }
   const auto& type = u_expr->type();

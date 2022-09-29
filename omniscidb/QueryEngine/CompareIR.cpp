@@ -165,10 +165,9 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
   const auto& right_tuple = right_tuple_expr->tuple();
   CHECK_EQ(left_tuple.size(), right_tuple.size());
   CHECK_GT(left_tuple.size(), size_t(1));
-  auto acc =
-      make_eq(left_tuple.front(), right_tuple.front(), multicol_compare->get_optype());
+  auto acc = make_eq(left_tuple.front(), right_tuple.front(), multicol_compare->opType());
   for (size_t i = 1; i < left_tuple.size(); ++i) {
-    auto crt = make_eq(left_tuple[i], right_tuple[i], multicol_compare->get_optype());
+    auto crt = make_eq(left_tuple[i], right_tuple[i], multicol_compare->opType());
     const bool nullable = acc->type()->nullable() || crt->type()->nullable();
     acc = hdk::ir::makeExpr<hdk::ir::BinOper>(
         acc->type()->ctx().boolean(nullable), false, kAND, kONE, acc, crt);
@@ -179,7 +178,7 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
 void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
   auto lhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_left_operand());
   auto rhs_cv = dynamic_cast<const hdk::ir::ColumnVar*>(bin_oper->get_right_operand());
-  auto comp_op = IS_COMPARISON(bin_oper->get_optype());
+  auto comp_op = bin_oper->isComparison();
   if (lhs_cv && rhs_cv && comp_op) {
     auto lhs_type = lhs_cv->type();
     auto rhs_type = rhs_cv->type();
@@ -196,12 +195,10 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
       dynamic_cast<const hdk::ir::BinOper*>(bin_oper->get_right_operand());
   // we can do (non-)equivalence check of two encoded string
   // even if they are (indexed) array cols
-  auto theta_comp = IS_COMPARISON(bin_oper->get_optype()) &&
-                    !IS_EQUIVALENCE(bin_oper->get_optype()) &&
-                    bin_oper->get_optype() != SQLOps::kNE;
-  if (lhs_bin_oper && rhs_bin_oper && theta_comp &&
-      lhs_bin_oper->get_optype() == SQLOps::kARRAY_AT &&
-      rhs_bin_oper->get_optype() == SQLOps::kARRAY_AT) {
+  auto theta_comp =
+      bin_oper->isComparison() && !bin_oper->isEquivalence() && !bin_oper->isNe();
+  if (lhs_bin_oper && rhs_bin_oper && theta_comp && lhs_bin_oper->isArrayAt() &&
+      rhs_bin_oper->isArrayAt()) {
     auto lhs_arr_cv =
         dynamic_cast<const hdk::ir::ColumnVar*>(lhs_bin_oper->get_left_operand());
     auto lhs_arr_idx =
@@ -236,7 +233,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
     CHECK_EQ(size_t(1), lowered_lvs.size());
     return lowered_lvs.front();
   }
-  const auto optype = bin_oper->get_optype();
+  const auto optype = bin_oper->opType();
   if (optype == kBW_EQ) {
     const auto bw_eq_oper = lower_bw_eq(bin_oper);
     return codegenLogical(bw_eq_oper.get(), co);
@@ -312,7 +309,7 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
                                                    const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto u_oper = dynamic_cast<const hdk::ir::UOper*>(lhs);
-  if (!u_oper || u_oper->get_optype() != kCAST) {
+  if (!u_oper || !u_oper->isCast()) {
     return nullptr;
   }
   auto rhs_constant = dynamic_cast<const hdk::ir::Constant*>(rhs);
@@ -464,7 +461,7 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
   const hdk::ir::Expr* arr_expr{rhs};
   if (dynamic_cast<const hdk::ir::UOper*>(rhs)) {
     const auto cast_arr = static_cast<const hdk::ir::UOper*>(rhs);
-    CHECK_EQ(kCAST, cast_arr->get_optype());
+    CHECK(cast_arr->isCast());
     arr_expr = cast_arr->get_operand();
   }
   auto arr_type = arr_expr->type();

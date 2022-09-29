@@ -238,15 +238,15 @@ class NormalizerVisitor : public DeepCopyVisitor {
     auto rhs = visit(bin_oper->get_right_operand());
     // Some binary expressions are not results of operation translation. They are
     // not covered in Analyzer normalization.
-    if (bin_oper->get_optype() == kARRAY_AT) {
+    if (bin_oper->isArrayAt()) {
       return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                  lhs->containsAgg() || rhs->containsAgg(),
-                                                 bin_oper->get_optype(),
+                                                 bin_oper->opType(),
                                                  bin_oper->get_qualifier(),
                                                  std::move(lhs),
                                                  std::move(rhs));
     }
-    return Analyzer::normalizeOperExpr(bin_oper->get_optype(),
+    return Analyzer::normalizeOperExpr(bin_oper->opType(),
                                        bin_oper->get_qualifier(),
                                        std::move(lhs),
                                        std::move(rhs),
@@ -255,7 +255,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
     // Casts introduced on DAG build stage might become NOPs.
-    if (uoper->get_optype() == kCAST) {
+    if (uoper->isCast()) {
       auto op = visit(uoper->get_operand());
       if (uoper->type()->equal(op->type())) {
         return op;
@@ -598,7 +598,7 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
                                       const hdk::ir::ExprPtr const_operand) {
   if (cast_operand->is<hdk::ir::UOper>() && const_operand->is<hdk::ir::Constant>()) {
     auto u_expr = cast_operand->as<hdk::ir::UOper>();
-    if (u_expr->get_optype() != kCAST) {
+    if (!u_expr->isCast()) {
       return false;
     }
     if (!(u_expr->get_own_operand()->is<hdk::ir::ColumnVar>() &&
@@ -627,7 +627,7 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
 hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
                                             int& rte_idx) {
   rte_idx = -1;
-  if (!IS_COMPARISON(bin_oper->get_optype()) || bin_oper->get_qualifier() != kONE) {
+  if (!bin_oper->isComparison() || bin_oper->get_qualifier() != kONE) {
     return nullptr;
   }
 
@@ -645,13 +645,12 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
       auto uo = right_operand->as<hdk::ir::UOper>();
       auto cv = uo->get_own_operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->rteIdx();
-      return hdk::ir::makeExpr<hdk::ir::BinOper>(
-          bin_oper->type(),
-          bin_oper->containsAgg(),
-          COMMUTE_COMPARISON(bin_oper->get_optype()),
-          bin_oper->get_qualifier(),
-          right_operand->deep_copy(),
-          left_operand->deep_copy());
+      return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
+                                                 bin_oper->containsAgg(),
+                                                 COMMUTE_COMPARISON(bin_oper->opType()),
+                                                 bin_oper->get_qualifier(),
+                                                 right_operand->deep_copy(),
+                                                 left_operand->deep_copy());
     }
   } else if (left_operand->is<hdk::ir::ColumnVar>() &&
              !left_operand->is<hdk::ir::Var>() &&
@@ -666,7 +665,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
     rte_idx = cv->rteIdx();
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->containsAgg(),
-                                               COMMUTE_COMPARISON(bin_oper->get_optype()),
+                                               COMMUTE_COMPARISON(bin_oper->opType()),
                                                bin_oper->get_qualifier(),
                                                right_operand->deep_copy(),
                                                left_operand->deep_copy());
@@ -684,7 +683,7 @@ QualsConjunctiveForm qual_to_conjunctive_form(const hdk::ir::ExprPtr qual_expr) 
     return {{}, {rewritten_qual_expr ? rewritten_qual_expr : qual_expr}};
   }
 
-  if (bin_oper->get_optype() == kAND) {
+  if (bin_oper->isAnd()) {
     const auto lhs_cf = qual_to_conjunctive_form(bin_oper->get_own_left_operand());
     const auto rhs_cf = qual_to_conjunctive_form(bin_oper->get_own_right_operand());
     auto simple_quals = lhs_cf.simple_quals;
@@ -708,7 +707,7 @@ std::vector<hdk::ir::ExprPtr> qual_to_disjunctive_form(
     const auto rewritten_qual_expr = rewrite_expr(qual_expr.get());
     return {rewritten_qual_expr ? rewritten_qual_expr : qual_expr};
   }
-  if (bin_oper->get_optype() == kOR) {
+  if (bin_oper->isOr()) {
     const auto lhs_df = qual_to_disjunctive_form(bin_oper->get_own_left_operand());
     const auto rhs_df = qual_to_disjunctive_form(bin_oper->get_own_right_operand());
     auto quals = lhs_df;

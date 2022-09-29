@@ -635,8 +635,7 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   const auto rhs_cast = dynamic_cast<const hdk::ir::UOper*>(rhs);
   if ((lhs_type->isString() || lhs_type->isExtDictionary()) &&
       (static_cast<bool>(lhs_cast) != static_cast<bool>(rhs_cast) ||
-       (lhs_cast && lhs_cast->get_optype() != kCAST) ||
-       (rhs_cast && rhs_cast->get_optype() != kCAST))) {
+       (lhs_cast && !lhs_cast->isCast()) || (rhs_cast && !rhs_cast->isCast()))) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }
   // Casts to decimal are not suported.

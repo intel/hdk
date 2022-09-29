@@ -27,7 +27,7 @@ bool matches_else_null(const hdk::ir::CaseExpr* case_expr) {
 
 // Returns true iff the expression is a big integer greater than 0.
 bool matches_gt_bigint_zero(const hdk::ir::BinOper* window_gt_zero) {
-  if (window_gt_zero->get_optype() != kGT) {
+  if (!window_gt_zero->isGt()) {
     return false;
   }
   const auto zero =
@@ -97,8 +97,8 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
     const hdk::ir::Expr* expr) {
   const auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr);
   const auto div_expr = dynamic_cast<const hdk::ir::BinOper*>(
-      cast_expr && cast_expr->get_optype() == kCAST ? cast_expr->get_operand() : expr);
-  if (!div_expr || div_expr->get_optype() != kDIVIDE) {
+      cast_expr && cast_expr->isCast() ? cast_expr->get_operand() : expr);
+  if (!div_expr || !div_expr->isDivide()) {
     return nullptr;
   }
   const auto sum_window_expr = rewrite_sum_window(div_expr->get_left_operand());
@@ -107,7 +107,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
   }
   const auto cast_count_window =
       dynamic_cast<const hdk::ir::UOper*>(div_expr->get_right_operand());
-  if (cast_count_window && cast_count_window->get_optype() != kCAST) {
+  if (cast_count_window && !cast_count_window->isCast()) {
     return nullptr;
   }
   const auto count_window = dynamic_cast<const hdk::ir::WindowFunction*>(
