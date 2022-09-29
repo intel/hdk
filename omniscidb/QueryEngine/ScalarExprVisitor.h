@@ -237,7 +237,7 @@ class ScalarExprVisitor {
 
   virtual T visitCardinality(const hdk::ir::CardinalityExpr* cardinality) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(cardinality->get_arg()));
+    result = aggregateResult(result, visit(cardinality->arg()));
     return result;
   }
 

@@ -68,7 +68,7 @@ llvm::Value* CodeGenerator::codegenArrayAt(const hdk::ir::BinOper* array_at,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::CardinalityExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto arr_expr = expr->get_arg();
+  const auto arr_expr = expr->arg();
   auto array_type = arr_expr->type();
   CHECK(array_type->isArray());
   auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();

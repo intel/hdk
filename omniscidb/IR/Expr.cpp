@@ -1065,7 +1065,7 @@ bool CardinalityExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CardinalityExpr& rhs_ca = dynamic_cast<const CardinalityExpr&>(rhs);
-  if (!(*arg_ == *rhs_ca.get_arg())) {
+  if (!(*arg_ == *rhs_ca.arg())) {
     return false;
   }
   return true;
