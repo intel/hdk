@@ -39,7 +39,7 @@ bool matches_gt_bigint_zero(const hdk::ir::BinOper* window_gt_zero) {
 bool window_sum_and_count_match(const hdk::ir::WindowFunction* sum_window_expr,
                                 const hdk::ir::WindowFunction* count_window_expr) {
   CHECK(count_window_expr->type()->isInt64());
-  return expr_list_match(sum_window_expr->args(), count_window_expr->args());
+  return exprsEqual(sum_window_expr->args(), count_window_expr->args());
 }
 
 bool is_sum_kind(const SqlWindowFunctionKind kind) {
@@ -119,7 +119,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
        cast_count_window->type()->size() != sum_window_expr->type()->size())) {
     return nullptr;
   }
-  if (!expr_list_match(sum_window_expr.get()->args(), count_window->args())) {
+  if (!exprsEqual(sum_window_expr.get()->args(), count_window->args())) {
     return nullptr;
   }
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(expr->ctx().fp64(),

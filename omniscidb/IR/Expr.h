@@ -1112,8 +1112,8 @@ class ArrayExpr : public Expr {
   bool is_null_;  // constant is NULL
 };
 
-// Returns true iff the two expression lists are equal (same size and each element are
+// Returns true if the two expr vectors are equal (same size and each element are
 // equal).
-bool expr_list_match(const ExprPtrVector& lhs, const ExprPtrVector& rhs);
+bool exprsEqual(const ExprPtrVector& lhs, const ExprPtrVector& rhs);
 
 }  // namespace hdk::ir

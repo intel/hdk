@@ -966,7 +966,7 @@ bool ExpressionTuple::operator==(const Expr& rhs) const {
     return false;
   }
   const auto& rhs_tuple_cols = rhs_tuple->tuple();
-  return expr_list_match(tuple_, rhs_tuple_cols);
+  return exprsEqual(tuple_, rhs_tuple_cols);
 }
 
 bool Constant::operator==(const Expr& rhs) const {
@@ -1246,9 +1246,9 @@ bool WindowFunction::operator==(const Expr& rhs) const {
       order_keys_.size() != rhs_window->order_keys_.size()) {
     return false;
   }
-  return expr_list_match(args_, rhs_window->args_) &&
-         expr_list_match(partition_keys_, rhs_window->partition_keys_) &&
-         expr_list_match(order_keys_, rhs_window->order_keys_);
+  return exprsEqual(args_, rhs_window->args_) &&
+         exprsEqual(partition_keys_, rhs_window->partition_keys_) &&
+         exprsEqual(order_keys_, rhs_window->order_keys_);
 }
 
 bool ArrayExpr::operator==(Expr const& rhs) const {
@@ -1795,7 +1795,7 @@ bool WidthBucketExpr::isConstantExpr() const {
          is_constant_expr(partition_count_.get());
 }
 
-bool expr_list_match(const std::vector<ExprPtr>& lhs, const std::vector<ExprPtr>& rhs) {
+bool exprsEqual(const std::vector<ExprPtr>& lhs, const std::vector<ExprPtr>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
