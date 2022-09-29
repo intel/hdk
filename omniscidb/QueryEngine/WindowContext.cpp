@@ -236,8 +236,8 @@ size_t get_int_constant_from_expr(const hdk::ir::Expr* expr) {
 
 // Gets the lag or lead argument canonicalized as lag (lag = -lead).
 int64_t get_lag_or_lead_argument(const hdk::ir::WindowFunction* window_func) {
-  CHECK(window_func->getKind() == SqlWindowFunctionKind::LAG ||
-        window_func->getKind() == SqlWindowFunctionKind::LEAD);
+  CHECK(window_func->kind() == SqlWindowFunctionKind::LAG ||
+        window_func->kind() == SqlWindowFunctionKind::LEAD);
   const auto& args = window_func->getArgs();
   if (args.size() == 3) {
     throw std::runtime_error("LAG with default not supported yet");
@@ -245,11 +245,10 @@ int64_t get_lag_or_lead_argument(const hdk::ir::WindowFunction* window_func) {
   if (args.size() == 2) {
     const int64_t lag_or_lead =
         static_cast<int64_t>(get_int_constant_from_expr(args[1].get()));
-    return window_func->getKind() == SqlWindowFunctionKind::LAG ? lag_or_lead
-                                                                : -lag_or_lead;
+    return window_func->kind() == SqlWindowFunctionKind::LAG ? lag_or_lead : -lag_or_lead;
   }
   CHECK_EQ(args.size(), size_t(1));
-  return window_func->getKind() == SqlWindowFunctionKind::LAG ? 1 : -1;
+  return window_func->kind() == SqlWindowFunctionKind::LAG ? 1 : -1;
 }
 
 // Redistributes the original_indices according to the permutation given by
@@ -428,13 +427,13 @@ extern "C" RUNTIME_EXPORT void add_window_pending_output(void* pending_output,
 // Returns true iff the aggregate window function requires special multiplicity handling
 // to ensure that peer rows have the same value for the window function.
 bool window_function_requires_peer_handling(const hdk::ir::WindowFunction* window_func) {
-  if (!window_function_is_aggregate(window_func->getKind())) {
+  if (!window_function_is_aggregate(window_func->kind())) {
     return false;
   }
   if (window_func->getOrderKeys().empty()) {
     return true;
   }
-  switch (window_func->getKind()) {
+  switch (window_func->kind()) {
     case SqlWindowFunctionKind::MIN:
     case SqlWindowFunctionKind::MAX: {
       return false;
@@ -523,10 +522,10 @@ void WindowFunctionContext::compute() {
   auto timer = DEBUG_TIMER(__func__);
   CHECK(!output_);
   output_ = static_cast<int8_t*>(row_set_mem_owner_->allocate(
-      elem_count_ * window_function_buffer_element_size(window_func_->getKind()),
+      elem_count_ * window_function_buffer_element_size(window_func_->kind()),
       /*thread_idx=*/0));
   const bool is_window_function_aggregate =
-      window_function_is_aggregate(window_func_->getKind());
+      window_function_is_aggregate(window_func_->kind());
   if (is_window_function_aggregate) {
     fillPartitionStart();
     if (window_function_requires_peer_handling(window_func_)) {
@@ -605,17 +604,17 @@ const int8_t* WindowFunctionContext::output() const {
 }
 
 const int64_t* WindowFunctionContext::aggregateState() const {
-  CHECK(window_function_is_aggregate(window_func_->getKind()));
+  CHECK(window_function_is_aggregate(window_func_->kind()));
   return &aggregate_state_.val;
 }
 
 const int64_t* WindowFunctionContext::aggregateStateCount() const {
-  CHECK(window_function_is_aggregate(window_func_->getKind()));
+  CHECK(window_function_is_aggregate(window_func_->kind()));
   return &aggregate_state_.count;
 }
 
 int64_t WindowFunctionContext::aggregateStatePendingOutputs() const {
-  CHECK(window_function_is_aggregate(window_func_->getKind()));
+  CHECK(window_function_is_aggregate(window_func_->kind()));
   return reinterpret_cast<int64_t>(&aggregate_state_.outputs);
 }
 
@@ -774,7 +773,7 @@ void WindowFunctionContext::computePartitionBuffer(
     const size_t off,
     const hdk::ir::WindowFunction* window_func,
     const std::function<bool(const int64_t lhs, const int64_t rhs)>& comparator) {
-  switch (window_func->getKind()) {
+  switch (window_func->kind()) {
     case SqlWindowFunctionKind::ROW_NUMBER: {
       const auto row_numbers =
           index_to_row_number(output_for_partition_buff, partition_size);
@@ -853,7 +852,7 @@ void WindowFunctionContext::computePartitionBuffer(
     }
     default: {
       throw std::runtime_error("Window function not supported yet: " +
-                               ::toString(window_func->getKind()));
+                               ::toString(window_func->kind()));
     }
   }
 }

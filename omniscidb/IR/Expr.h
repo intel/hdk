@@ -1057,7 +1057,7 @@ class WindowFunction : public Expr {
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
-  SqlWindowFunctionKind getKind() const { return kind_; }
+  SqlWindowFunctionKind kind() const { return kind_; }
 
   const ExprPtrVector& getArgs() const { return args_; }
 

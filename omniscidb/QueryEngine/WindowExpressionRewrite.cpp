@@ -67,13 +67,12 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
   }
   const auto sum_window_expr = std::dynamic_pointer_cast<const hdk::ir::WindowFunction>(
       remove_cast(expr_pair.second));
-  if (!sum_window_expr || !is_sum_kind(sum_window_expr->getKind())) {
+  if (!sum_window_expr || !is_sum_kind(sum_window_expr->kind())) {
     return nullptr;
   }
   const auto count_window_expr = std::dynamic_pointer_cast<const hdk::ir::WindowFunction>(
       remove_cast(window_gt_zero->leftOperandShared()));
-  if (!count_window_expr ||
-      count_window_expr->getKind() != SqlWindowFunctionKind::COUNT) {
+  if (!count_window_expr || count_window_expr->kind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
   }
   if (!window_sum_and_count_match(sum_window_expr.get(), count_window_expr.get())) {
@@ -111,7 +110,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
   }
   const auto count_window = dynamic_cast<const hdk::ir::WindowFunction*>(
       cast_count_window ? cast_count_window->operand() : div_expr->rightOperand());
-  if (!count_window || count_window->getKind() != SqlWindowFunctionKind::COUNT) {
+  if (!count_window || count_window->kind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
   }
   CHECK(count_window->type()->isInt64());

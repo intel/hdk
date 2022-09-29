@@ -117,7 +117,7 @@ void TargetExprCodegen::codegen(
   if (window_row_ptr) {
     agg_out_ptr_w_idx =
         std::make_tuple(window_row_ptr, std::get<1>(agg_out_ptr_w_idx_in));
-    if (window_function_is_aggregate(window_func->getKind())) {
+    if (window_function_is_aggregate(window_func->kind())) {
       out_row_idx = window_row_ptr;
     }
   }

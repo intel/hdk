@@ -2353,7 +2353,7 @@ bool is_window_function_sum(const hdk::ir::Expr* expr) {
     }
 
     const auto then_window = dynamic_cast<const hdk::ir::WindowFunction*>(then);
-    if (then_window && then_window->getKind() == SqlWindowFunctionKind::SUM_INTERNAL) {
+    if (then_window && then_window->kind() == SqlWindowFunctionKind::SUM_INTERNAL) {
       return true;
     }
   }
@@ -2385,7 +2385,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
     const auto second_window =
         dynamic_cast<const hdk::ir::WindowFunction*>(div->rightOperand());
     if (case_expr && second_window &&
-        second_window->getKind() == SqlWindowFunctionKind::COUNT) {
+        second_window->kind() == SqlWindowFunctionKind::COUNT) {
       if (is_window_function_sum(case_expr)) {
         return true;
       }

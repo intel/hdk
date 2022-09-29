@@ -149,7 +149,7 @@ std::string ScalarExprToSql::visitFunctionOper(
 
 std::string ScalarExprToSql::visitWindowFunction(
     const hdk::ir::WindowFunction* window_func) const {
-  std::string result = ::toString(window_func->getKind());
+  std::string result = ::toString(window_func->kind());
   {
     const auto arg_strs = visitList(window_func->getArgs());
     result += "(" + boost::algorithm::join(arg_strs, ",") + ")";

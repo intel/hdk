@@ -730,7 +730,7 @@ llvm::Value* RowFuncBuilder::codegenWindowRowPointer(
   auto arg_it = ROW_FUNC->arg_begin();
   llvm::Value* groups_buffer = arg_it++;
 
-  if (window_func_context && window_function_is_aggregate(window_func->getKind())) {
+  if (window_func_context && window_function_is_aggregate(window_func->kind())) {
     const int32_t row_size_quad = query_mem_desc.didOutputColumnar()
                                       ? 0
                                       : query_mem_desc.getRowSize() / sizeof(int64_t);

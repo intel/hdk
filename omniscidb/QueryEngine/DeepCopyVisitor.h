@@ -180,7 +180,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     }
     const auto& type = window_func->type();
     return hdk::ir::makeExpr<hdk::ir::WindowFunction>(type,
-                                                      window_func->getKind(),
+                                                      window_func->kind(),
                                                       args_copy,
                                                       partition_keys_copy,
                                                       order_keys_copy,
