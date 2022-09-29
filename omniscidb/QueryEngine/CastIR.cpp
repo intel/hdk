@@ -43,12 +43,8 @@ llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
     operand_lv = codegen(operand, true, co).front();
   }
   const auto& operand_type = operand->type();
-  return codegenCast(operand_lv,
-                     operand_type,
-                     type,
-                     operand_as_const,
-                     uoper->is_dict_intersection(),
-                     co);
+  return codegenCast(
+      operand_lv, operand_type, type, operand_as_const, uoper->isDictIntersection(), co);
 }
 
 namespace {

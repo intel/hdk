@@ -323,7 +323,7 @@ class UOper : public Expr {
 
   const Expr* operand() const { return operand_.get(); }
   const ExprPtr operandShared() const { return operand_; }
-  bool is_dict_intersection() const { return is_dict_intersection_; }
+  bool isDictIntersection() const { return is_dict_intersection_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

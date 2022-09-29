@@ -65,7 +65,7 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
       // If cast is inert, i.e. source and destination dict ids are same
       return defaultResult();
     }
-    if (uoper->is_dict_intersection()) {
+    if (uoper->isDictIntersection()) {
       // Intersection translations don't add transients to the dest proxy,
       // and hence can be ignored for the purposes of populating transients
       return defaultResult();
