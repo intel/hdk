@@ -254,7 +254,7 @@ class ScalarExprVisitor {
   virtual T visitRegexpExpr(const hdk::ir::RegexpExpr* regexp) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(regexp->arg()));
-    result = aggregateResult(result, visit(regexp->get_pattern_expr()));
+    result = aggregateResult(result, visit(regexp->patternExpr()));
     if (regexp->get_escape_expr()) {
       result = aggregateResult(result, visit(regexp->get_escape_expr()));
     }

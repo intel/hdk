@@ -115,7 +115,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     auto escape_expr = regexp->get_escape_expr();
     return hdk::ir::makeExpr<hdk::ir::RegexpExpr>(
         visit(regexp->arg()),
-        visit(regexp->get_pattern_expr()),
+        visit(regexp->patternExpr()),
         escape_expr ? visit(escape_expr) : nullptr);
   }
 

@@ -355,7 +355,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
     CHECK_EQ(size_t(1), escape_char_expr->value().stringval->size());
     escape_char = (*escape_char_expr->value().stringval)[0];
   }
-  auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->get_pattern_expr());
+  auto pattern = dynamic_cast<const hdk::ir::Constant*>(expr->patternExpr());
   CHECK(pattern);
   auto fast_dict_pattern_lv =
       codegenDictRegexp(expr->argShared(), pattern, escape_char, co);
@@ -379,7 +379,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::RegexpExpr* expr,
     str_lv.push_back(cgen_state_->emitCall("extract_str_ptr", {str_lv.front()}));
     str_lv.push_back(cgen_state_->emitCall("extract_str_len", {str_lv.front()}));
   }
-  auto regexp_expr_arg_lvs = codegen(expr->get_pattern_expr(), true, co);
+  auto regexp_expr_arg_lvs = codegen(expr->patternExpr(), true, co);
   CHECK_EQ(size_t(3), regexp_expr_arg_lvs.size());
   const bool is_nullable{expr->arg()->type()->nullable()};
   std::vector<llvm::Value*> regexp_args{
