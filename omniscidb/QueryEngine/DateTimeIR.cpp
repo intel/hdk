@@ -251,7 +251,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr
   auto from_expr = codegen(datetrunc_expr->get_from_expr(), true, co).front();
   auto datetrunc_expr_type = datetrunc_expr->get_from_expr()->type();
   CHECK(from_expr->getType()->isIntegerTy(64));
-  DateTruncField const field = datetrunc_expr->get_field();
+  DateTruncField const field = datetrunc_expr->field();
   if (datetrunc_expr_type->isTimestamp() &&
       datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit() >
           hdk::ir::TimeUnit::kSecond) {

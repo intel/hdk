@@ -144,7 +144,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitDateTruncExpr(const hdk::ir::DateTruncExpr* datetrunc) const override {
     return hdk::ir::makeExpr<hdk::ir::DateTruncExpr>(datetrunc->type(),
                                                      datetrunc->containsAgg(),
-                                                     datetrunc->get_field(),
+                                                     datetrunc->field(),
                                                      visit(datetrunc->get_from_expr()));
   }
 

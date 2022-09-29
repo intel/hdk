@@ -928,10 +928,10 @@ ExpressionRange getExpressionRange(
                   ? datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit()
                   : hdk::ir::TimeUnit::kSecond;
   const int64_t min_ts = DateTimeTranslator::getDateTruncConstantValue(
-      arg_range.getIntMin(), datetrunc_expr->get_field(), datetrunc_expr_type);
+      arg_range.getIntMin(), datetrunc_expr->field(), datetrunc_expr_type);
   const int64_t max_ts = DateTimeTranslator::getDateTruncConstantValue(
-      arg_range.getIntMax(), datetrunc_expr->get_field(), datetrunc_expr_type);
-  const int64_t bucket = get_conservative_datetrunc_bucket(datetrunc_expr->get_field()) *
+      arg_range.getIntMax(), datetrunc_expr->field(), datetrunc_expr_type);
+  const int64_t bucket = get_conservative_datetrunc_bucket(datetrunc_expr->field()) *
                          hdk::ir::unitsPerSecond(unit);
 
   return ExpressionRange::makeIntRange(min_ts, max_ts, bucket, arg_range.hasNulls());

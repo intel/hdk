@@ -1233,7 +1233,7 @@ bool DateTruncExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const DateTruncExpr& rhs_ee = dynamic_cast<const DateTruncExpr&>(rhs);
-  return field_ == rhs_ee.get_field() && *from_expr_ == *rhs_ee.get_from_expr();
+  return field_ == rhs_ee.field() && *from_expr_ == *rhs_ee.get_from_expr();
 }
 
 bool OffsetInFragment::operator==(const Expr& rhs) const {
