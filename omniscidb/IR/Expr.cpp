@@ -250,10 +250,6 @@ void Expr::print() const {
   std::cout << toString() << std::endl;
 }
 
-void TargetEntry::print() const {
-  std::cout << toString() << std::endl;
-}
-
 ExprPtr Expr::decompress() const {
   if (type_->id() == Type::kExtDictionary) {
     auto new_type = static_cast<const ExtDictionaryType*>(type_)->elemType();
@@ -1656,16 +1652,6 @@ std::string ArrayExpr::toString() const {
   return str;
 }
 
-std::string TargetEntry::toString() const {
-  std::string str{"(" + resname + " "};
-  str += expr->toString();
-  if (unnest) {
-    str += " UNNEST";
-  }
-  str += ") ";
-  return str;
-}
-
 std::string OrderEntry::toString() const {
   std::string str{std::to_string(tle_no)};
   if (is_desc) {
@@ -2155,14 +2141,6 @@ size_t ArrayExpr::hash() const {
     boost::hash_combine(*hash_, is_null_);
   }
   return *hash_;
-}
-
-size_t TargetEntry::hash() const {
-  size_t res = 0;
-  boost::hash_combine(res, resname);
-  boost::hash_combine(res, expr->hash());
-  boost::hash_combine(res, unnest);
-  return res;
 }
 
 }  // namespace hdk::ir

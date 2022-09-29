@@ -38,7 +38,6 @@ inline
 }
 
 class ColumnVar;
-class TargetEntry;
 using DomainSet = std::list<const Expr*>;
 
 /*
@@ -1111,29 +1110,6 @@ class ArrayExpr : public Expr {
   ExprPtrVector contained_expressions_;
   bool local_alloc_;
   bool is_null_;  // constant is NULL
-};
-
-/*
- * @type TargetEntry
- * @brief Target list defines a relational projection.  It is a list of TargetEntry's.
- */
-class TargetEntry {
- public:
-  TargetEntry(const std::string& n, ExprPtr e, bool u) : resname(n), expr(e), unnest(u) {}
-  virtual ~TargetEntry() {}
-  const std::string& get_resname() const { return resname; }
-  const Expr* get_expr() const { return expr.get(); }
-  ExprPtr get_own_expr() const { return expr; }
-  bool get_unnest() const { return unnest; }
-  std::string toString() const;
-  void print() const;
-
-  size_t hash() const;
-
- private:
-  std::string resname;  // alias name, e.g., SELECT salary + bonus AS compensation,
-  ExprPtr expr;         // expression to evaluate for the value
-  bool unnest;          // unnest a collection type
 };
 
 // Returns true iff the two expression lists are equal (same size and each element are
