@@ -730,7 +730,7 @@ class WidthBucketExpr : public Expr {
   double boundVal(const Expr* bound_expr) const;
   int32_t partitionCountVal() const;
   template <typename T>
-  int32_t compute_bucket(T target_const_val, const hdk::ir::Type* type) const {
+  int32_t computeBucket(T target_const_val, const hdk::ir::Type* type) const {
     // this utility function is useful for optimizing expression range decision
     // for an expression depending on width_bucket expr
     T null_val =

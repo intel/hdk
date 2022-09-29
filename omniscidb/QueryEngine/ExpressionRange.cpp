@@ -956,7 +956,7 @@ ExpressionRange getExpressionRange(
       } else {
         CHECK(target_value_range.getFpMax() == target_value_range.getFpMin());
         auto target_value_bucket =
-            width_bucket_expr->compute_bucket(target_value_range.getFpMax(), target_type);
+            width_bucket_expr->computeBucket(target_value_range.getFpMax(), target_type);
         return ExpressionRange::makeIntRange(
             target_value_bucket, target_value_bucket, 0, target_value_range.hasNulls());
       }
@@ -969,9 +969,9 @@ ExpressionRange getExpressionRange(
                                                      const hdk::ir::Type* type) {
       // we casted bucket bound exprs to double
       auto lower_bound_bucket =
-          width_bucket_expr->compute_bucket<double>(target_range.getFpMin(), type);
+          width_bucket_expr->computeBucket<double>(target_range.getFpMin(), type);
       auto upper_bound_bucket =
-          width_bucket_expr->compute_bucket<double>(target_range.getFpMax(), type);
+          width_bucket_expr->computeBucket<double>(target_range.getFpMax(), type);
       return ExpressionRange::makeIntRange(
           lower_bound_bucket, upper_bound_bucket, 0, target_range.hasNulls());
     };
