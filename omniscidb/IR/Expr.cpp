@@ -459,7 +459,7 @@ ExprPtr InValues::deep_copy() const {
   for (auto p : value_list) {
     new_value_list.push_back(p->deep_copy());
   }
-  return makeExpr<InValues>(arg->deep_copy(), new_value_list);
+  return makeExpr<InValues>(arg_->deep_copy(), new_value_list);
 }
 
 ExprPtr CharLengthExpr::deep_copy() const {
@@ -937,7 +937,7 @@ ExprPtr CaseExpr::cast(const Type* new_type, bool is_dict_intersection) const {
 }
 
 InValues::InValues(ExprPtr a, const std::list<ExprPtr>& l)
-    : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg(a), value_list(l) {}
+    : Expr(a->ctx().boolean(is_in_values_nullable(a, l))), arg_(a), value_list(l) {}
 
 InIntegerSet::InIntegerSet(const std::shared_ptr<const Expr> a,
                            const std::vector<int64_t>& l,
@@ -1148,7 +1148,7 @@ bool InValues::operator==(const Expr& rhs) const {
     return false;
   }
   const InValues& rhs_iv = dynamic_cast<const InValues&>(rhs);
-  if (!(*arg == *rhs_iv.get_arg())) {
+  if (!(*arg_ == *rhs_iv.get_arg())) {
     return false;
   }
   if (value_list.size() != rhs_iv.get_value_list().size()) {
@@ -1416,7 +1416,7 @@ std::string ScalarSubquery::toString() const {
 
 std::string InValues::toString() const {
   std::string str{"(IN "};
-  str += arg->toString();
+  str += arg_->toString();
   str += "(";
   int cnt = 0;
   bool shorted_value_list_str = false;
@@ -1914,7 +1914,7 @@ size_t ScalarSubquery::hash() const {
 size_t InValues::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
     for (auto& expr : value_list) {
       boost::hash_combine(*hash_, expr->hash());
     }
