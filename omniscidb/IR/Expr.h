@@ -462,7 +462,7 @@ class InValues : public Expr {
   InValues(ExprPtr a, const ExprPtrList& l);
   const Expr* arg() const { return arg_.get(); }
   const ExprPtr argShared() const { return arg_; }
-  const ExprPtrList& get_value_list() const { return value_list_; }
+  const ExprPtrList& valueList() const { return value_list_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

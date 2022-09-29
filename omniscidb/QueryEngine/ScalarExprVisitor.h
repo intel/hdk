@@ -198,7 +198,7 @@ class ScalarExprVisitor {
 
   virtual T visitInValues(const hdk::ir::InValues* in_values) const {
     T result = visit(in_values->arg());
-    const auto& value_list = in_values->get_value_list();
+    const auto& value_list = in_values->valueList();
     for (const auto& in_value : value_list) {
       result = aggregateResult(result, visit(in_value.get()));
     }

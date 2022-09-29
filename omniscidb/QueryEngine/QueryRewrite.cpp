@@ -53,10 +53,10 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByIn(
     in_vals = std::dynamic_pointer_cast<const hdk::ir::InValues>(
         rewrite_expr(ra_exe_unit_in.quals.front().get()));
   }
-  if (!in_vals || in_vals->get_value_list().empty()) {
+  if (!in_vals || in_vals->valueList().empty()) {
     return ra_exe_unit_in;
   }
-  for (const auto& in_val : in_vals->get_value_list()) {
+  for (const auto& in_val : in_vals->valueList()) {
     if (!in_val->is<hdk::ir::Constant>()) {
       break;
     }
@@ -87,7 +87,7 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
         continue;
       }
       const size_t range_sz = expr_range.getIntMax() - expr_range.getIntMin() + 1;
-      if (range_sz <= in_vals->get_value_list().size() *
+      if (range_sz <= in_vals->valueList().size() *
                           executor_->getConfig().opts.constrained_by_in_threshold) {
         ++it;
         continue;
@@ -133,7 +133,7 @@ std::shared_ptr<const hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainVal
     const hdk::ir::InValues* in_vals) {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
   auto in_val_arg = in_vals->arg()->deep_copy();
-  for (const auto& in_val : in_vals->get_value_list()) {
+  for (const auto& in_val : in_vals->valueList()) {
     auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
         in_vals->ctx().boolean(false), false, kEQ, kONE, in_val_arg, in_val);
     auto in_val_copy = in_val->deep_copy();

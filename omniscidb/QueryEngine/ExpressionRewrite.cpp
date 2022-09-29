@@ -146,8 +146,8 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
     }
 
     if (lhs->arg()->type()->equal(rhs->arg()->type()) && (*lhs->arg() == *rhs->arg())) {
-      auto union_values = lhs->get_value_list();
-      const auto& rhs_values = rhs->get_value_list();
+      auto union_values = lhs->valueList();
+      const auto& rhs_values = rhs->valueList();
       union_values.insert(union_values.end(), rhs_values.begin(), rhs_values.end());
       return hdk::ir::makeExpr<hdk::ir::InValues>(lhs->argShared(), union_values);
     }

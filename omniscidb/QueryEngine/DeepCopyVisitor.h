@@ -61,7 +61,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitInValues(const hdk::ir::InValues* in_values) const override {
-    const auto& value_list = in_values->get_value_list();
+    const auto& value_list = in_values->valueList();
     std::list<RetType> new_list;
     for (const auto& in_value : value_list) {
       new_list.push_back(visit(in_value.get()));

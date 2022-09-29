@@ -90,7 +90,7 @@ std::string ScalarExprToSql::visitBinOper(const hdk::ir::BinOper* bin_oper) cons
 
 std::string ScalarExprToSql::visitInValues(const hdk::ir::InValues* in_values) const {
   const auto needle = visit(in_values->arg());
-  const auto haystack = visitList(in_values->get_value_list());
+  const auto haystack = visitList(in_values->valueList());
   return needle + " IN (" + boost::algorithm::join(haystack, ", ") + ")";
 }
 

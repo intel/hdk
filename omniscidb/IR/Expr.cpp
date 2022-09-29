@@ -1151,10 +1151,10 @@ bool InValues::operator==(const Expr& rhs) const {
   if (!(*arg_ == *rhs_iv.arg())) {
     return false;
   }
-  if (value_list_.size() != rhs_iv.get_value_list().size()) {
+  if (value_list_.size() != rhs_iv.valueList().size()) {
     return false;
   }
-  auto q = rhs_iv.get_value_list().begin();
+  auto q = rhs_iv.valueList().begin();
   for (auto p : value_list_) {
     if (!(*p == **q)) {
       return false;
