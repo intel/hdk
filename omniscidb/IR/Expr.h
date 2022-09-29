@@ -306,13 +306,13 @@ class UOper : public Expr {
         bool is_dict_intersection = false)
       : Expr(type, has_agg)
       , op_type_(o)
-      , operand(p)
+      , operand_(p)
       , is_dict_intersection_(is_dict_intersection) {}
   UOper(const Type* type, SQLOps o, ExprPtr p)
-      : Expr(type), op_type_(o), operand(p), is_dict_intersection_(false) {}
+      : Expr(type), op_type_(o), operand_(p), is_dict_intersection_(false) {}
   SQLOps get_optype() const { return op_type_; }
-  const Expr* get_operand() const { return operand.get(); }
-  const ExprPtr get_own_operand() const { return operand; }
+  const Expr* get_operand() const { return operand_.get(); }
+  const ExprPtr get_own_operand() const { return operand_; }
   bool is_dict_intersection() const { return is_dict_intersection_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
@@ -322,8 +322,8 @@ class UOper : public Expr {
   size_t hash() const override;
 
  protected:
-  SQLOps op_type_;  // operator type, e.g., kUMINUS, kISNULL, kEXISTS
-  ExprPtr operand;  // operand expression
+  SQLOps op_type_;   // operator type, e.g., kUMINUS, kISNULL, kEXISTS
+  ExprPtr operand_;  // operand expression
   bool is_dict_intersection_;
 };
 

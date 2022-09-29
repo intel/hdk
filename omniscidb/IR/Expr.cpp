@@ -435,7 +435,7 @@ ExprPtr Constant::deep_copy() const {
 
 ExprPtr UOper::deep_copy() const {
   return makeExpr<UOper>(
-      type_, contains_agg_, op_type_, operand->deep_copy(), is_dict_intersection_);
+      type_, contains_agg_, op_type_, operand_->deep_copy(), is_dict_intersection_);
 }
 
 ExprPtr BinOper::deep_copy() const {
@@ -910,12 +910,12 @@ ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
     return Expr::cast(new_type, is_dict_intersection);
   }
   if (type_->isString() && new_type->isExtDictionary()) {
-    auto otype = operand->type();
+    auto otype = operand_->type();
     if (otype->isExtDictionary()) {
       int op_dict_id = otype->as<ExtDictionaryType>()->dictId();
       int new_dict_id = new_type->as<ExtDictionaryType>()->dictId();
       if (op_dict_id == new_dict_id || op_dict_id == TRANSIENT_DICT(new_dict_id)) {
-        return operand;
+        return operand_;
       }
     }
   }
@@ -995,7 +995,7 @@ bool UOper::operator==(const Expr& rhs) const {
     return false;
   }
   const UOper& rhs_uo = dynamic_cast<const UOper&>(rhs);
-  return op_type_ == rhs_uo.get_optype() && *operand == *rhs_uo.get_operand() &&
+  return op_type_ == rhs_uo.get_optype() && *operand_ == *rhs_uo.get_operand() &&
          is_dict_intersection_ == rhs_uo.is_dict_intersection_;
 }
 
@@ -1336,7 +1336,7 @@ std::string UOper::toString() const {
       break;
   }
   std::string dict_int = is_dict_intersection_ ? " DICT_INT" : "";
-  return "(" + op + operand->toString() + dict_int + ") ";
+  return "(" + op + operand_->toString() + dict_int + ") ";
 }
 
 std::string BinOper::toString() const {
@@ -1876,7 +1876,7 @@ size_t UOper::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, op_type_);
-    boost::hash_combine(*hash_, operand->hash());
+    boost::hash_combine(*hash_, operand_->hash());
   }
   return *hash_;
 }
