@@ -125,7 +125,7 @@ std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_e
   const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->type(),
                                                           bw_eq->containsAgg(),
                                                           kEQ,
-                                                          bw_eq->get_qualifier(),
+                                                          bw_eq->qualifier(),
                                                           bw_eq->get_own_left_operand(),
                                                           bw_eq->get_own_right_operand());
   const auto lhs_is_null = std::make_shared<hdk::ir::UOper>(
@@ -223,7 +223,7 @@ void check_array_comp_cond(const hdk::ir::BinOper* bin_oper) {
 llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto qualifier = bin_oper->get_qualifier();
+  const auto qualifier = bin_oper->qualifier();
   const auto lhs = bin_oper->get_left_operand();
   const auto rhs = bin_oper->get_right_operand();
   if (dynamic_cast<const hdk::ir::ExpressionTuple*>(lhs)) {

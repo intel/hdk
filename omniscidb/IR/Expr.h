@@ -377,7 +377,7 @@ class BinOper : public Expr {
   bool isLogic() const { return IS_LOGIC(op_type_); }
   bool isArithmetic() const { return IS_ARITHMETIC(op_type_); }
 
-  SQLQualifier get_qualifier() const { return qualifier_; }
+  SQLQualifier qualifier() const { return qualifier_; }
   const Expr* get_left_operand() const { return left_operand_.get(); }
   const Expr* get_right_operand() const { return right_operand_.get(); }
   const ExprPtr get_own_left_operand() const { return left_operand_; }

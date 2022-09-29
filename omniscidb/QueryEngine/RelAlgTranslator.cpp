@@ -242,12 +242,12 @@ class NormalizerVisitor : public DeepCopyVisitor {
       return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                  lhs->containsAgg() || rhs->containsAgg(),
                                                  bin_oper->opType(),
-                                                 bin_oper->get_qualifier(),
+                                                 bin_oper->qualifier(),
                                                  std::move(lhs),
                                                  std::move(rhs));
     }
     return Analyzer::normalizeOperExpr(bin_oper->opType(),
-                                       bin_oper->get_qualifier(),
+                                       bin_oper->qualifier(),
                                        std::move(lhs),
                                        std::move(rhs),
                                        executor_);
@@ -627,7 +627,7 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
 hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
                                             int& rte_idx) {
   rte_idx = -1;
-  if (!bin_oper->isComparison() || bin_oper->get_qualifier() != kONE) {
+  if (!bin_oper->isComparison() || bin_oper->qualifier() != kONE) {
     return nullptr;
   }
 
@@ -648,7 +648,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
       return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                  bin_oper->containsAgg(),
                                                  COMMUTE_COMPARISON(bin_oper->opType()),
-                                                 bin_oper->get_qualifier(),
+                                                 bin_oper->qualifier(),
                                                  right_operand->deep_copy(),
                                                  left_operand->deep_copy());
     }
@@ -666,7 +666,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->containsAgg(),
                                                COMMUTE_COMPARISON(bin_oper->opType()),
-                                               bin_oper->get_qualifier(),
+                                               bin_oper->qualifier(),
                                                right_operand->deep_copy(),
                                                left_operand->deep_copy());
   }

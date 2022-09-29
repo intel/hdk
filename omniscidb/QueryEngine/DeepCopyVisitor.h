@@ -51,7 +51,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
                                                bin_oper->containsAgg(),
                                                bin_oper->opType(),
-                                               bin_oper->get_qualifier(),
+                                               bin_oper->qualifier(),
                                                visit(bin_oper->get_left_operand()),
                                                visit(bin_oper->get_right_operand()));
   }

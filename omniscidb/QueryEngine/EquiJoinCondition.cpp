@@ -28,8 +28,8 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
   if (!crt_bin || !prev_bin) {
     return false;
   }
-  if (!crt_bin->isEquivalence() || crt_bin->get_qualifier() != kONE ||
-      !prev_bin->isEquivalence() || prev_bin->get_qualifier() != kONE ||
+  if (!crt_bin->isEquivalence() || crt_bin->qualifier() != kONE ||
+      !prev_bin->isEquivalence() || prev_bin->qualifier() != kONE ||
       // We could accept a mix of kEQ and kBW_EQ, but don't bother for now.
       crt_bin->opType() != prev_bin->opType()) {
     return false;

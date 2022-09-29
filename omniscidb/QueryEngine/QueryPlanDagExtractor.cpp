@@ -428,7 +428,7 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
         if (join_qual == current_level_join_conditions.quals.front()) {
           // set op_info based on the first qual
           op_info = OpInfo{::toString(qual_bin_oper->opType()),
-                           ::toString(qual_bin_oper->get_qualifier()),
+                           ::toString(qual_bin_oper->qualifier()),
                            qual_bin_oper->type()->toString()};
         }
         for (auto& col_pair_info : normalizeColumnsPair(qual_bin_oper.get())) {
