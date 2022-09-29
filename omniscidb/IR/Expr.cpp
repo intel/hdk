@@ -467,7 +467,7 @@ ExprPtr CharLengthExpr::deep_copy() const {
 }
 
 ExprPtr KeyForStringExpr::deep_copy() const {
-  return makeExpr<KeyForStringExpr>(arg->deep_copy());
+  return makeExpr<KeyForStringExpr>(arg_->deep_copy());
 }
 
 ExprPtr SampleRatioExpr::deep_copy() const {
@@ -1035,7 +1035,7 @@ bool KeyForStringExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const KeyForStringExpr& rhs_cl = dynamic_cast<const KeyForStringExpr&>(rhs);
-  if (!(*arg == *rhs_cl.get_arg())) {
+  if (!(*arg_ == *rhs_cl.get_arg())) {
     return false;
   }
   return true;
@@ -1492,7 +1492,7 @@ std::string CharLengthExpr::toString() const {
 
 std::string KeyForStringExpr::toString() const {
   std::string str{"KEY_FOR_STRING("};
-  str += arg->toString();
+  str += arg_->toString();
   str += ") ";
   return str;
 }
@@ -1952,7 +1952,7 @@ size_t CharLengthExpr::hash() const {
 size_t KeyForStringExpr::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
-    boost::hash_combine(*hash_, arg->hash());
+    boost::hash_combine(*hash_, arg_->hash());
   }
   return *hash_;
 }
