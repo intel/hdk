@@ -206,7 +206,7 @@ class ScalarExprVisitor {
   }
 
   virtual T visitInIntegerSet(const hdk::ir::InIntegerSet* in_integer_set) const {
-    return visit(in_integer_set->get_arg());
+    return visit(in_integer_set->arg());
   }
 
   virtual T visitInSubquery(const hdk::ir::InSubquery* in_subquery) const {

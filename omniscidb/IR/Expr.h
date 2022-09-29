@@ -488,7 +488,7 @@ class InIntegerSet : public Expr {
                const std::vector<int64_t>& values,
                const bool not_null);
 
-  const Expr* get_arg() const { return arg_.get(); }
+  const Expr* arg() const { return arg_.get(); }
 
   const std::vector<int64_t>& valueList() const { return value_list_; }
 

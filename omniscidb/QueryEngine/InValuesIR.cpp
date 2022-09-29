@@ -70,11 +70,11 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::InIntegerSet* in_integer_set,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto in_arg = in_integer_set->get_arg();
+  const auto in_arg = in_integer_set->arg();
   if (is_unnest(in_arg)) {
     throw std::runtime_error("IN not supported for unnested expressions");
   }
-  auto type = in_integer_set->get_arg()->type();
+  auto type = in_integer_set->arg()->type();
   const auto needle_null_val = inline_int_null_value(type);
   if (!co.hoist_literals) {
     // We never run without literal hoisting in real world scenarios, this avoids a crash
