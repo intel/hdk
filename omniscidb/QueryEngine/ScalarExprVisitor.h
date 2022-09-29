@@ -289,7 +289,7 @@ class ScalarExprVisitor {
 
   virtual T visitExtractExpr(const hdk::ir::ExtractExpr* extract) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(extract->get_from_expr()));
+    result = aggregateResult(result, visit(extract->from()));
     return result;
   }
 

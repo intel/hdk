@@ -152,7 +152,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
     return hdk::ir::makeExpr<hdk::ir::ExtractExpr>(extract->type(),
                                                    extract->containsAgg(),
                                                    extract->field(),
-                                                   visit(extract->get_from_expr()));
+                                                   visit(extract->from()));
   }
 
   RetType visitArrayOper(const hdk::ir::ArrayExpr* array_expr) const override {

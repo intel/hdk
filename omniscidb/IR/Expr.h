@@ -865,7 +865,7 @@ class ExtractExpr : public Expr {
   ExtractExpr(const hdk::ir::Type* type, bool has_agg, ExtractField f, ExprPtr e)
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
   ExtractField field() const { return field_; }
-  const Expr* get_from_expr() const { return from_expr_.get(); }
+  const Expr* from() const { return from_expr_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;

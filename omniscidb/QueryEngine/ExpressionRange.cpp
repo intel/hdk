@@ -849,11 +849,11 @@ ExpressionRange getExpressionRange(
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
   const int32_t extract_field{extract_expr->field()};
-  const auto arg_range = getExpressionRange(
-      extract_expr->get_from_expr(), query_infos, executor, simple_quals);
+  const auto arg_range =
+      getExpressionRange(extract_expr->from(), query_infos, executor, simple_quals);
   const bool has_nulls =
       arg_range.getType() == ExpressionRangeType::Invalid || arg_range.hasNulls();
-  const auto& extract_expr_type = extract_expr->get_from_expr()->type();
+  const auto& extract_expr_type = extract_expr->from()->type();
   auto unit = extract_expr_type->isTimestamp()
                   ? extract_expr_type->as<hdk::ir::TimestampType>()->unit()
                   : hdk::ir::TimeUnit::kSecond;

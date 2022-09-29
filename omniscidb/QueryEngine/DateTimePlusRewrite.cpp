@@ -69,8 +69,7 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts,
   if (dt_hour) {
     const auto extract_fn =
         dynamic_cast<const hdk::ir::ExtractExpr*>(interval_multiplier);
-    return (extract_fn && extract_fn->field() == kHOUR &&
-            *extract_fn->get_from_expr() == *ts)
+    return (extract_fn && extract_fn->field() == kHOUR && *extract_fn->from() == *ts)
                ? dtHOUR
                : dtINVALID;
   }
@@ -93,7 +92,7 @@ DatetruncField get_dt_field(const hdk::ir::Expr* ts,
   }
   const auto extract_fn =
       dynamic_cast<const hdk::ir::ExtractExpr*>(extract_minus_one->leftOperand());
-  if (!extract_fn || !(*extract_fn->get_from_expr() == *ts)) {
+  if (!extract_fn || !(*extract_fn->from() == *ts)) {
     return dtINVALID;
   }
   switch (extract_fn->field()) {

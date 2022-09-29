@@ -73,9 +73,9 @@ const char* get_extract_function_name(ExtractField field) {
 llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto from_expr = codegen(extract_expr->get_from_expr(), true, co).front();
+  auto from_expr = codegen(extract_expr->from(), true, co).front();
   const int32_t extract_field{extract_expr->field()};
-  auto extract_expr_type = extract_expr->get_from_expr()->type();
+  auto extract_expr_type = extract_expr->from()->type();
   if (extract_field == kEPOCH) {
     CHECK(extract_expr_type->isTimestamp() || extract_expr_type->isDate());
     if (from_expr->getType()->isIntegerTy(32)) {
