@@ -438,7 +438,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
   }
 
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
-    const auto unvisited_operand = uoper->get_operand();
+    const auto unvisited_operand = uoper->operand();
     const auto optype = uoper->opType();
     auto type = uoper->type();
     if (optype == kCAST) {

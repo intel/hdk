@@ -127,7 +127,7 @@ inline const hdk::ir::Expr* extract_cast_arg(const hdk::ir::Expr* expr) {
   if (!cast_expr || !cast_expr->isCast()) {
     return expr;
   }
-  return cast_expr->get_operand();
+  return cast_expr->operand();
 }
 
 inline std::string numeric_type_name(const hdk::ir::Type* type) {

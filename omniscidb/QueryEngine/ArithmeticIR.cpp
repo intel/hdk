@@ -563,8 +563,7 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
   if (rhs_constant && !rhs_constant->isNull() && rhs_constant->value().bigintval != 0LL &&
       (rhs_constant->value().bigintval % exp_to_scale(scale)) == 0LL) {
     // can safely downscale a scaled constant
-  } else if (rhs_cast && rhs_cast->isCast() &&
-             rhs_cast->get_operand()->type()->isInteger()) {
+  } else if (rhs_cast && rhs_cast->isCast() && rhs_cast->operand()->type()->isInteger()) {
     // can skip upscale in the int to dec cast
   } else {
     return nullptr;
@@ -580,7 +579,7 @@ llvm::Value* CodeGenerator::codegenDeciDiv(const hdk::ir::BinOper* bin_oper,
     rhs_lv = codegenCastBetweenIntTypes(
         rhs_lit_lv, rhs_lit->type(), lhs_type, /*upscale*/ false);
   } else if (rhs_cast) {
-    auto rhs_cast_oper = rhs_cast->get_operand();
+    auto rhs_cast_oper = rhs_cast->operand();
     const auto& rhs_cast_oper_type = rhs_cast_oper->type();
     auto rhs_cast_oper_lv = codegen(rhs_cast_oper, true, co).front();
     rhs_lv = codegenCastBetweenIntTypes(
@@ -658,7 +657,7 @@ llvm::Value* CodeGenerator::codegenUMinus(const hdk::ir::UOper* uoper,
                                           const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(uoper->isUMinus());
-  const auto operand_lv = codegen(uoper->get_operand(), true, co).front();
+  const auto operand_lv = codegen(uoper->operand(), true, co).front();
   const auto& type = uoper->type();
   llvm::Value* chosen_max{nullptr};
   llvm::Value* chosen_min{nullptr};

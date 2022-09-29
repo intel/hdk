@@ -459,7 +459,7 @@ const hdk::ir::Expr* remove_cast_to_int(const hdk::ir::Expr* expr) {
   if (!target_type->isInteger()) {
     return nullptr;
   }
-  return uoper->get_operand();
+  return uoper->operand();
 }
 
 hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const {

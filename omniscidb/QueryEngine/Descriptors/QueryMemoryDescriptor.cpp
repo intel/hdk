@@ -678,7 +678,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
   for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
     const auto uoper = dynamic_cast<const hdk::ir::UOper*>(groupby_expr.get());
     if (uoper && uoper->isUnnest()) {
-      auto arg_type = uoper->get_operand()->type();
+      auto arg_type = uoper->operand()->type();
       CHECK(arg_type->isArray());
       auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
       if (elem_type->isExtDictionary()) {
@@ -725,7 +725,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
 
       const auto uoper = target->as<hdk::ir::UOper>();
       if (uoper && uoper->isUnnest() && (*col_it)->getColId() == unnest_array_col_id) {
-        auto arg_type = uoper->get_operand()->type();
+        auto arg_type = uoper->operand()->type();
         CHECK(arg_type->isArray());
         auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
         if (elem_type->isExtDictionary()) {

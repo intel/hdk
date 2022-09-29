@@ -160,7 +160,7 @@ ExpressionRange apply_simple_quals(
       if (!u_expr) {
         continue;
       }
-      qual_col = u_expr->get_operand()->as<hdk::ir::ColumnVar>();
+      qual_col = u_expr->operand()->as<hdk::ir::ColumnVar>();
       if (!qual_col) {
         continue;
       }
@@ -737,7 +737,7 @@ ExpressionRange getExpressionRange(
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
   if (u_expr->isUnnest()) {
-    return getExpressionRange(u_expr->get_operand(), query_infos, executor, simple_quals);
+    return getExpressionRange(u_expr->operand(), query_infos, executor, simple_quals);
   }
   if (!u_expr->isCast()) {
     return ExpressionRange::makeInvalidRange();
@@ -749,14 +749,13 @@ ExpressionRange getExpressionRange(
         executor->getRowSetMemoryOwner(),
         true);
     CHECK(sdp);
-    const auto const_operand =
-        dynamic_cast<const hdk::ir::Constant*>(u_expr->get_operand());
+    const auto const_operand = dynamic_cast<const hdk::ir::Constant*>(u_expr->operand());
     if (!const_operand) {
       // casted subquery result. return invalid for now, but we could attempt to pull the
       // range from the subquery result in the future
-      CHECK(u_expr->get_operand());
+      CHECK(u_expr->operand());
       VLOG(1) << "Unable to determine expression range for dictionary encoded expression "
-              << u_expr->get_operand()->toString() << ", proceeding with invalid range.";
+              << u_expr->operand()->toString() << ", proceeding with invalid range.";
       return ExpressionRange::makeInvalidRange();
     }
 
@@ -768,8 +767,8 @@ ExpressionRange getExpressionRange(
     return ExpressionRange::makeIntRange(v, v, 0, false);
   }
   const auto arg_range =
-      getExpressionRange(u_expr->get_operand(), query_infos, executor, simple_quals);
-  const auto& arg_type = u_expr->get_operand()->type();
+      getExpressionRange(u_expr->operand(), query_infos, executor, simple_quals);
+  const auto& arg_type = u_expr->operand()->type();
   // Timestamp to Date OR Date/Timestamp casts with different precision
   auto arg_unit = arg_type->isTimestamp()
                       ? arg_type->as<hdk::ir::DateTimeBaseType>()->unit()

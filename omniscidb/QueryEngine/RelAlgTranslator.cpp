@@ -256,7 +256,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
     // Casts introduced on DAG build stage might become NOPs.
     if (uoper->isCast()) {
-      auto op = visit(uoper->get_operand());
+      auto op = visit(uoper->operand());
       if (uoper->type()->equal(op->type())) {
         return op;
       }
@@ -606,10 +606,10 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
       return false;
     }
     auto type = u_expr->type();
-    if (type->isDateTime() && u_expr->get_operand()->type()->isDateTime()) {
+    if (type->isDateTime() && u_expr->operand()->type()->isDateTime()) {
       // Allow casts between time types to pass through
       return true;
-    } else if (type->isInteger() && u_expr->get_operand()->type()->isInteger()) {
+    } else if (type->isInteger() && u_expr->operand()->type()->isInteger()) {
       // Allow casts between integer types to pass through
       return true;
     }

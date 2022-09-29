@@ -237,7 +237,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::WidthBucketExpr* expr,
     auto target_expr = expr;
     if (auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr)) {
       if (cast_expr->isCast()) {
-        target_expr = cast_expr->get_operand();
+        target_expr = cast_expr->operand();
       }
     }
     // there are more complex constant expr like 1+2, 1/2*3, and so on
@@ -717,7 +717,7 @@ class ExprTableIdVisitor : public ScalarExprVisitor<std::set<int>> {
   }
 
   std::set<int> visitUOper(const hdk::ir::UOper* u_oper) const final {
-    return visit(u_oper->get_operand());
+    return visit(u_oper->operand());
   }
 
   std::set<int> aggregateResult(const std::set<int>& aggregate,
@@ -1219,7 +1219,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     auto array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
     CHECK(array_idx_ptr);
     cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
-    const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->get_operand();
+    const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->operand();
     auto array_type = arr_expr->type();
     CHECK(array_type->isArray());
     auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();

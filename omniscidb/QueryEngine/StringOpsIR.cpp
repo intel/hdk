@@ -313,7 +313,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
   }
   CHECK(cast_oper->isCast());
 
-  const auto const_expr = cast_oper->get_operand()->as<hdk::ir::Constant>();
+  const auto const_expr = cast_oper->operand()->as<hdk::ir::Constant>();
   if (!const_expr) {
     // Analyzer casts dictionary encoded columns to none encoded if there is a comparison
     // between two encoded columns. Which we currently do not handle.

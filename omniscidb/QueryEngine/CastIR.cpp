@@ -23,7 +23,7 @@ llvm::Value* CodeGenerator::codegenCast(const hdk::ir::UOper* uoper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(uoper->isCast());
   const auto& type = uoper->type();
-  const auto operand = uoper->get_operand();
+  const auto operand = uoper->operand();
   const auto operand_as_const = dynamic_cast<const hdk::ir::Constant*>(operand);
   // For dictionary encoded constants, the cast holds the dictionary id
   // information as the compression parameter; handle this case separately.

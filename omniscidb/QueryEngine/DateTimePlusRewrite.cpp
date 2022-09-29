@@ -148,7 +148,7 @@ hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
   if (!uoper || !uoper->isCast()) {
     return nullptr;
   }
-  auto operand_type = uoper->get_operand()->type();
+  auto operand_type = uoper->operand()->type();
   auto target_type = uoper->type();
   if (!operand_type->isTimestamp() || !target_type->isDate()) {
     return nullptr;

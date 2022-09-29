@@ -2463,15 +2463,15 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
       dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->get_right_operand());
   if (auto cast =
           dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->get_left_operand())) {
-    eq_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->get_operand());
+    eq_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
   }
   if (auto cast =
           dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->get_right_operand())) {
-    eq_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->get_operand());
+    eq_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
   }
 
-  auto is_null_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(lhs_is_null->get_operand());
-  auto is_null_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(rhs_is_null->get_operand());
+  auto is_null_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(lhs_is_null->operand());
+  auto is_null_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(rhs_is_null->operand());
   if (!eq_lhs || !eq_rhs || !is_null_lhs || !is_null_rhs) {
     return nullptr;
   }

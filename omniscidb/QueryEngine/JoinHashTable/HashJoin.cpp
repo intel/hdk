@@ -642,12 +642,12 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   if (lhs_type->isDecimal() && (lhs_cast || rhs_cast)) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }
-  const auto lhs_col =
-      lhs_cast ? dynamic_cast<const hdk::ir::ColumnVar*>(lhs_cast->get_operand())
-               : dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
-  const auto rhs_col =
-      rhs_cast ? dynamic_cast<const hdk::ir::ColumnVar*>(rhs_cast->get_operand())
-               : dynamic_cast<const hdk::ir::ColumnVar*>(rhs);
+  const auto lhs_col = lhs_cast
+                           ? dynamic_cast<const hdk::ir::ColumnVar*>(lhs_cast->operand())
+                           : dynamic_cast<const hdk::ir::ColumnVar*>(lhs);
+  const auto rhs_col = rhs_cast
+                           ? dynamic_cast<const hdk::ir::ColumnVar*>(rhs_cast->operand())
+                           : dynamic_cast<const hdk::ir::ColumnVar*>(rhs);
   if (!lhs_col && !rhs_col) {
     throw HashJoinFail("Cannot use hash join for given expression");
   }

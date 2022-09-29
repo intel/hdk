@@ -81,7 +81,7 @@ Likelihood get_likelihood(const hdk::ir::Expr* expr) {
   }
   auto u_oper = dynamic_cast<const hdk::ir::UOper*>(expr);
   if (u_oper) {
-    Likelihood oper_likelihood = get_likelihood(u_oper->get_operand());
+    Likelihood oper_likelihood = get_likelihood(u_oper->operand());
     if (oper_likelihood.isInvalid()) {
       return Likelihood();
     }
@@ -125,7 +125,7 @@ Weight get_weight(const hdk::ir::Expr* expr, int depth = 0) {
   }
   auto u_oper = dynamic_cast<const hdk::ir::UOper*>(expr);
   if (u_oper) {
-    auto weight = get_weight(u_oper->get_operand(), depth + 1);
+    auto weight = get_weight(u_oper->operand(), depth + 1);
     return weight + 1;
   }
   auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(expr);
@@ -360,7 +360,7 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::UOper* uoper,
                                            const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(uoper->isNot());
-  const auto operand = uoper->get_operand();
+  const auto operand = uoper->operand();
   auto operand_type = operand->type();
   CHECK(operand_type->isBoolean());
   const auto operand_lv = codegen(operand, true, co).front();
@@ -376,7 +376,7 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::UOper* uoper,
 llvm::Value* CodeGenerator::codegenIsNull(const hdk::ir::UOper* uoper,
                                           const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  const auto operand = uoper->get_operand();
+  const auto operand = uoper->operand();
   if (dynamic_cast<const hdk::ir::Constant*>(operand) &&
       dynamic_cast<const hdk::ir::Constant*>(operand)->isNull()) {
     // for null constants, short-circuit to true

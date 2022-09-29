@@ -181,7 +181,7 @@ class ScalarExprVisitor {
 
   virtual T visitUOper(const hdk::ir::UOper* uoper) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(uoper->get_operand()));
+    result = aggregateResult(result, visit(uoper->operand()));
     return result;
   }
 

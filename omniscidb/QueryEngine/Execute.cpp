@@ -3781,7 +3781,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
       auto lhs_uexpr = dynamic_cast<const hdk::ir::UOper*>(lhs);
       if (lhs_uexpr) {
         CHECK(lhs_uexpr->isCast());  // We should have only been passed a cast expression
-        lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs_uexpr->get_operand());
+        lhs_col = dynamic_cast<const hdk::ir::ColumnVar*>(lhs_uexpr->operand());
         if (!lhs_col || !lhs_col->tableId() || lhs_col->rteIdx()) {
           continue;
         }

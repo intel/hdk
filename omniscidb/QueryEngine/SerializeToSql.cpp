@@ -48,7 +48,7 @@ std::string ScalarExprToSql::visitConstant(const hdk::ir::Constant* constant) co
 }
 
 std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
-  const auto operand = uoper->get_operand();
+  const auto operand = uoper->operand();
   const auto operand_str = visit(operand);
   const auto optype = uoper->opType();
   switch (optype) {

@@ -97,7 +97,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
     const hdk::ir::Expr* expr) {
   const auto cast_expr = dynamic_cast<const hdk::ir::UOper*>(expr);
   const auto div_expr = dynamic_cast<const hdk::ir::BinOper*>(
-      cast_expr && cast_expr->isCast() ? cast_expr->get_operand() : expr);
+      cast_expr && cast_expr->isCast() ? cast_expr->operand() : expr);
   if (!div_expr || !div_expr->isDivide()) {
     return nullptr;
   }
@@ -111,8 +111,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
     return nullptr;
   }
   const auto count_window = dynamic_cast<const hdk::ir::WindowFunction*>(
-      cast_count_window ? cast_count_window->get_operand()
-                        : div_expr->get_right_operand());
+      cast_count_window ? cast_count_window->operand() : div_expr->get_right_operand());
   if (!count_window || count_window->getKind() != SqlWindowFunctionKind::COUNT) {
     return nullptr;
   }

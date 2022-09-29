@@ -46,9 +46,9 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
   // so the translation happens once and only once
 
   void* visitUOper(const hdk::ir::UOper* uoper) const override {
-    visit(uoper->get_operand());
+    visit(uoper->operand());
     auto uoper_type = uoper->type();
-    auto operand_type = uoper->get_operand()->type();
+    auto operand_type = uoper->operand()->type();
     if (!(uoper->isCast() && uoper_type->isExtDictionary() &&
           operand_type->isExtDictionary())) {
       // If we are not casting from a dictionary-encoded string

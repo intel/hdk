@@ -2349,7 +2349,7 @@ bool is_window_function_sum(const hdk::ir::Expr* expr) {
     // Allow optional cast.
     const auto cast = dynamic_cast<const hdk::ir::UOper*>(then);
     if (cast && cast->isCast()) {
-      then = cast->get_operand();
+      then = cast->operand();
     }
 
     const auto then_window = dynamic_cast<const hdk::ir::WindowFunction*>(then);
@@ -2370,7 +2370,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
   // unwrap from casts, if they exist
   const auto cast = dynamic_cast<const hdk::ir::UOper*>(expr);
   if (cast && cast->isCast()) {
-    return is_window_function_expr(cast->get_operand());
+    return is_window_function_expr(cast->operand());
   }
 
   if (is_window_function_sum(expr)) {

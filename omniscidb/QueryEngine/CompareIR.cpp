@@ -316,7 +316,7 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
   if (!rhs_constant) {
     return nullptr;
   }
-  const auto operand = u_oper->get_operand();
+  const auto operand = u_oper->operand();
   const auto& operand_type = operand->type();
   CHECK(lhs_type->isDecimal());
   auto lhs_scale = lhs_type->as<hdk::ir::DecimalType>()->scale();
@@ -462,7 +462,7 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
   if (dynamic_cast<const hdk::ir::UOper*>(rhs)) {
     const auto cast_arr = static_cast<const hdk::ir::UOper*>(rhs);
     CHECK(cast_arr->isCast());
-    arr_expr = cast_arr->get_operand();
+    arr_expr = cast_arr->operand();
   }
   auto arr_type = arr_expr->type();
   CHECK(arr_type->isArray());

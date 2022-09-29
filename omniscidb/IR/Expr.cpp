@@ -995,7 +995,7 @@ bool UOper::operator==(const Expr& rhs) const {
     return false;
   }
   const UOper& rhs_uo = dynamic_cast<const UOper&>(rhs);
-  return op_type_ == rhs_uo.opType() && *operand_ == *rhs_uo.get_operand() &&
+  return op_type_ == rhs_uo.opType() && *operand_ == *rhs_uo.operand() &&
          is_dict_intersection_ == rhs_uo.is_dict_intersection_;
 }
 

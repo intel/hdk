@@ -321,7 +321,7 @@ class UOper : public Expr {
   bool isCast() const { return op_type_ == SQLOps::kCAST; }
   bool isUnnest() const { return op_type_ == SQLOps::kUNNEST; }
 
-  const Expr* get_operand() const { return operand_.get(); }
+  const Expr* operand() const { return operand_.get(); }
   const ExprPtr get_own_operand() const { return operand_; }
   bool is_dict_intersection() const { return is_dict_intersection_; }
   ExprPtr deep_copy() const override;
