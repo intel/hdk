@@ -679,7 +679,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
       return Analyzer::analyzeStringValue(
           boost::locale::to_lower(*constant_arg_expr->value().stringval));
     }
-    return hdk::ir::makeExpr<hdk::ir::LowerExpr>(lower_expr->get_own_arg());
+    return hdk::ir::makeExpr<hdk::ir::LowerExpr>(lower_expr->argShared());
   }
 
  protected:

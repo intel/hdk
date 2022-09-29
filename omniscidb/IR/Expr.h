@@ -610,7 +610,7 @@ class LowerExpr : public Expr {
 
   const Expr* arg() const { return arg_.get(); }
 
-  const ExprPtr get_own_arg() const { return arg_; }
+  const ExprPtr argShared() const { return arg_; }
 
   ExprPtr deep_copy() const override;
 
