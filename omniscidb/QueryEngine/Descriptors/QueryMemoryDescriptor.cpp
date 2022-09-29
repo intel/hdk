@@ -24,7 +24,7 @@
 #include "QueryEngine/ExpressionRewrite.h"
 #include "QueryEngine/MemoryLayoutBuilder.h"
 #include "QueryEngine/StreamingTopN.h"
-#include "QueryEngine/UsedColumnsVisitor.h"
+#include "QueryEngine/UsedColumnsCollector.h"
 
 namespace {
 
@@ -64,24 +64,21 @@ std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_
     return {};
   }
   std::vector<int64_t> target_indices(ra_exe_unit.target_exprs.size(), -1);
-  UsedColumnsVisitor columns_visitor;
-  std::unordered_set<int> used_columns;
+  UsedColumnsCollector columns_collector;
   for (const auto& simple_qual : ra_exe_unit.simple_quals) {
-    const auto crt_used_columns = columns_visitor.visit(simple_qual.get());
-    used_columns.insert(crt_used_columns.begin(), crt_used_columns.end());
+    columns_collector.visit(simple_qual.get());
   }
   for (const auto& qual : ra_exe_unit.quals) {
-    const auto crt_used_columns = columns_visitor.visit(qual.get());
-    used_columns.insert(crt_used_columns.begin(), crt_used_columns.end());
+    columns_collector.visit(qual.get());
   }
   for (const auto& target : ra_exe_unit.target_exprs) {
     const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target);
     if (col_var && !col_var->isVirtual()) {
       continue;
     }
-    const auto crt_used_columns = columns_visitor.visit(target);
-    used_columns.insert(crt_used_columns.begin(), crt_used_columns.end());
+    columns_collector.visit(target);
   }
+  const auto& used_columns = columns_collector.result();
   for (size_t target_idx = 0; target_idx < ra_exe_unit.target_exprs.size();
        ++target_idx) {
     const auto target_expr = ra_exe_unit.target_exprs[target_idx];

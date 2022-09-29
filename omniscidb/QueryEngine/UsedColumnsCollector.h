@@ -14,22 +14,14 @@
  * limitations under the License.
  */
 
-#include "ScalarExprVisitor.h"
+#include "IR/ExprCollector.h"
 
 #include <unordered_set>
 
-class UsedColumnsVisitor : public ScalarExprVisitor<std::unordered_set<int>> {
+class UsedColumnsCollector
+    : public hdk::ir::ExprCollector<std::unordered_set<int>, UsedColumnsCollector> {
  protected:
-  std::unordered_set<int> visitColumnVar(
-      const hdk::ir::ColumnVar* column) const override {
-    return {column->columnId()};
-  }
-
-  std::unordered_set<int> aggregateResult(
-      const std::unordered_set<int>& aggregate,
-      const std::unordered_set<int>& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
+    result_.insert(column->columnId());
   }
 };
