@@ -338,17 +338,17 @@ class BinOper : public Expr {
   BinOper(const Type* type, bool has_agg, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type, has_agg)
       , op_type_(o)
-      , qualifier(q)
-      , left_operand(l)
-      , right_operand(r) {}
+      , qualifier_(q)
+      , left_operand_(l)
+      , right_operand_(r) {}
   BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
-      : Expr(type), op_type_(o), qualifier(q), left_operand(l), right_operand(r) {}
+      : Expr(type), op_type_(o), qualifier_(q), left_operand_(l), right_operand_(r) {}
   SQLOps get_optype() const { return op_type_; }
-  SQLQualifier get_qualifier() const { return qualifier; }
-  const Expr* get_left_operand() const { return left_operand.get(); }
-  const Expr* get_right_operand() const { return right_operand.get(); }
-  const ExprPtr get_own_left_operand() const { return left_operand; }
-  const ExprPtr get_own_right_operand() const { return right_operand; }
+  SQLQualifier get_qualifier() const { return qualifier_; }
+  const Expr* get_left_operand() const { return left_operand_.get(); }
+  const Expr* get_right_operand() const { return right_operand_.get(); }
+  const ExprPtr get_own_left_operand() const { return left_operand_; }
+  const ExprPtr get_own_right_operand() const { return right_operand_; }
 
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
@@ -357,11 +357,11 @@ class BinOper : public Expr {
   size_t hash() const override;
 
  private:
-  SQLOps op_type_;         // operator type, e.g., kLT, kAND, kPLUS, etc.
-  SQLQualifier qualifier;  // qualifier kANY, kALL or kONE.  Only relevant with
-                           // right_operand is Subquery
-  ExprPtr left_operand;    // the left operand expression
-  ExprPtr right_operand;   // the right operand expression
+  SQLOps op_type_;          // operator type, e.g., kLT, kAND, kPLUS, etc.
+  SQLQualifier qualifier_;  // qualifier kANY, kALL or kONE.  Only relevant with
+                            // right_operand is Subquery
+  ExprPtr left_operand_;    // the left operand expression
+  ExprPtr right_operand_;   // the right operand expression
 };
 
 /**

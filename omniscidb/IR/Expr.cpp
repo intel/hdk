@@ -442,9 +442,9 @@ ExprPtr BinOper::deep_copy() const {
   return makeExpr<BinOper>(type_,
                            contains_agg_,
                            op_type_,
-                           qualifier,
-                           left_operand->deep_copy(),
-                           right_operand->deep_copy());
+                           qualifier_,
+                           left_operand_->deep_copy(),
+                           right_operand_->deep_copy());
 }
 
 ExprPtr RangeOper::deep_copy() const {
@@ -1004,8 +1004,9 @@ bool BinOper::operator==(const Expr& rhs) const {
     return false;
   }
   const BinOper& rhs_bo = dynamic_cast<const BinOper&>(rhs);
-  return op_type_ == rhs_bo.get_optype() && *left_operand == *rhs_bo.get_left_operand() &&
-         *right_operand == *rhs_bo.get_right_operand();
+  return op_type_ == rhs_bo.get_optype() &&
+         *left_operand_ == *rhs_bo.get_left_operand() &&
+         *right_operand_ == *rhs_bo.get_right_operand();
 }
 
 bool RangeOper::operator==(const Expr& rhs) const {
@@ -1392,13 +1393,13 @@ std::string BinOper::toString() const {
   }
   std::string str{"("};
   str += op;
-  if (qualifier == kANY) {
+  if (qualifier_ == kANY) {
     str += "ANY ";
-  } else if (qualifier == kALL) {
+  } else if (qualifier_ == kALL) {
     str += "ALL ";
   }
-  str += left_operand->toString();
-  str += right_operand->toString();
+  str += left_operand_->toString();
+  str += right_operand_->toString();
   str += ") ";
   return str;
 }
@@ -1885,9 +1886,9 @@ size_t BinOper::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
     boost::hash_combine(*hash_, op_type_);
-    boost::hash_combine(*hash_, qualifier);
-    boost::hash_combine(*hash_, left_operand->hash());
-    boost::hash_combine(*hash_, right_operand->hash());
+    boost::hash_combine(*hash_, qualifier_);
+    boost::hash_combine(*hash_, left_operand_->hash());
+    boost::hash_combine(*hash_, right_operand_->hash());
   }
   return *hash_;
 }
