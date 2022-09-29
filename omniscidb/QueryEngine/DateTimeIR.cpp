@@ -195,11 +195,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateaddExpr* dateadd_expr,
                            ? datetime_type->as<hdk::ir::TimestampType>()->unit()
                            : hdk::ir::TimeUnit::kSecond;
   std::vector<llvm::Value*> dateadd_args{
-      cgen_state_->llInt(static_cast<int32_t>(dateadd_expr->get_field())),
-      number,
-      datetime};
+      cgen_state_->llInt(static_cast<int32_t>(dateadd_expr->field())), number, datetime};
   std::string dateadd_fname{"DateAdd"};
-  if (is_subsecond_dateadd_field(dateadd_expr->get_field()) ||
+  if (is_subsecond_dateadd_field(dateadd_expr->field()) ||
       dateadd_unit > hdk::ir::TimeUnit::kSecond) {
     dateadd_fname += "HighPrecision";
     dateadd_args.push_back(cgen_state_->llInt(unitToDimension(datetime_unit)));

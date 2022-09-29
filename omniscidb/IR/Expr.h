@@ -888,7 +888,7 @@ class DateaddExpr : public Expr {
               const ExprPtr number,
               const ExprPtr datetime)
       : Expr(type, false), field_(f), number_(number), datetime_(datetime) {}
-  DateaddField get_field() const { return field_; }
+  DateaddField field() const { return field_; }
   const Expr* get_number_expr() const { return number_.get(); }
   const Expr* get_datetime_expr() const { return datetime_.get(); }
   ExprPtr deep_copy() const override;
