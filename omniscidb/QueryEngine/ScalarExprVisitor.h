@@ -331,7 +331,7 @@ class ScalarExprVisitor {
   virtual T visitDateDiffExpr(const hdk::ir::DateDiffExpr* datediff) const {
     T result = defaultResult();
     result = aggregateResult(result, visit(datediff->start()));
-    result = aggregateResult(result, visit(datediff->get_end_expr()));
+    result = aggregateResult(result, visit(datediff->end()));
     return result;
   }
 

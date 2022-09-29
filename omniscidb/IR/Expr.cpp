@@ -1225,8 +1225,7 @@ bool DateDiffExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const DateDiffExpr& rhs_ee = dynamic_cast<const DateDiffExpr&>(rhs);
-  return field_ == rhs_ee.field() && *start_ == *rhs_ee.start() &&
-         *end_ == *rhs_ee.get_end_expr();
+  return field_ == rhs_ee.field() && *start_ == *rhs_ee.start() && *end_ == *rhs_ee.end();
 }
 
 bool DatetruncExpr::operator==(const Expr& rhs) const {

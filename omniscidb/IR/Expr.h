@@ -916,7 +916,7 @@ class DateDiffExpr : public Expr {
       : Expr(type, false), field_(f), start_(start), end_(end) {}
   DatetruncField field() const { return field_; }
   const Expr* start() const { return start_.get(); }
-  const Expr* get_end_expr() const { return end_.get(); }
+  const Expr* end() const { return end_.get(); }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
