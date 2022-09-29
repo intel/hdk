@@ -158,7 +158,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitArrayOper(const hdk::ir::ArrayExpr* array_expr) const override {
     std::vector<hdk::ir::ExprPtr> args_copy;
     for (size_t i = 0; i < array_expr->elementCount(); ++i) {
-      args_copy.push_back(visit(array_expr->getElement(i)));
+      args_copy.push_back(visit(array_expr->element(i)));
     }
     auto type = array_expr->type();
     return hdk::ir::makeExpr<hdk::ir::ArrayExpr>(

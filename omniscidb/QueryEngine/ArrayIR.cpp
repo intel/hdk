@@ -99,7 +99,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
   CHECK(return_type->isArray());
   auto elem_type = return_type->as<hdk::ir::ArrayBaseType>()->elemType();
   for (size_t i = 0; i < array_expr->elementCount(); i++) {
-    const auto arg = array_expr->getElement(i);
+    const auto arg = array_expr->element(i);
     const auto arg_lvs = codegen(arg, true, co);
     if (arg_lvs.size() == 1) {
       argument_list.push_back(arg_lvs.front());

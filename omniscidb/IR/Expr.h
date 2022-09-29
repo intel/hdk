@@ -1100,7 +1100,7 @@ class ArrayExpr : public Expr {
   bool isLocalAlloc() const { return local_alloc_; }
   bool isNull() const { return is_null_; }
 
-  const Expr* getElement(const size_t i) const {
+  const Expr* element(const size_t i) const {
     CHECK_LT(i, contained_expressions_.size());
     return contained_expressions_[i].get();
   }

@@ -301,7 +301,7 @@ class ScalarExprVisitor {
   virtual T visitArrayOper(hdk::ir::ArrayExpr const* array_expr) const {
     T result = defaultResult();
     for (size_t i = 0; i < array_expr->elementCount(); ++i) {
-      result = aggregateResult(result, visit(array_expr->getElement(i)));
+      result = aggregateResult(result, visit(array_expr->element(i)));
     }
     return result;
   }
