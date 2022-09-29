@@ -203,7 +203,7 @@ inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
 bool ext_func_call_requires_nullcheck(const hdk::ir::FunctionOper* function_oper) {
   const auto& func_type = function_oper->type();
   for (size_t i = 0; i < function_oper->arity(); ++i) {
-    const auto arg = function_oper->getArg(i);
+    const auto arg = function_oper->arg(i);
     const auto& arg_type = arg->type();
     if ((func_type->isArray() && arg_type->isArray()) ||
         (func_type->isText() && arg_type->isText())) {
@@ -281,7 +281,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
 
   for (size_t i = 0; i < function_oper->arity(); ++i) {
     orig_arg_lvs_index.push_back(orig_arg_lvs.size());
-    const auto arg = function_oper->getArg(i);
+    const auto arg = function_oper->arg(i);
     const auto arg_cast = dynamic_cast<const hdk::ir::UOper*>(arg);
     const auto arg0 = (arg_cast && arg_cast->isCast()) ? arg_cast->operand() : arg;
     const auto array_expr_arg = dynamic_cast<const hdk::ir::ArrayExpr*>(arg0);
@@ -474,7 +474,7 @@ bool call_requires_custom_type_handling(const hdk::ir::FunctionOper* function_op
     return true;
   }
   for (size_t i = 0; i < function_oper->arity(); ++i) {
-    const auto arg = function_oper->getArg(i);
+    const auto arg = function_oper->arg(i);
     const auto& arg_type = arg->type();
     if (!arg_type->isInteger() && !arg_type->isFloatingPoint()) {
       return true;
@@ -493,7 +493,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
     // Some functions need the return type to be the same as the input type.
     if (function_oper->name() == "FLOOR" || function_oper->name() == "CEIL") {
       CHECK_EQ(size_t(1), function_oper->arity());
-      const auto arg = function_oper->getArg(0);
+      const auto arg = function_oper->arg(0);
       auto arg_type = arg->type();
       CHECK(arg_type->isDecimal());
       auto arg_scale = arg_type->as<hdk::ir::DecimalType>()->scale();
@@ -514,10 +514,10 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
           covar_result_lv, cgen_state_->llInt(exp_to_scale(arg_scale)));
       return endArgsNullcheck(bbs, result_lv, nullptr, function_oper);
     } else if (function_oper->name() == "ROUND" &&
-               function_oper->getArg(0)->type()->isDecimal()) {
+               function_oper->arg(0)->type()->isDecimal()) {
       CHECK_EQ(size_t(2), function_oper->arity());
 
-      const auto arg0 = function_oper->getArg(0);
+      const auto arg0 = function_oper->arg(0);
       auto arg0_type = arg0->type();
       auto arg0_scale =
           arg0_type->isDecimal() ? arg0_type->as<hdk::ir::DecimalType>()->scale() : 0;
@@ -526,7 +526,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       const auto arg0_lv = arg0_lvs.front();
       CHECK(arg0_lv->getType()->isIntegerTy(64));
 
-      const auto arg1 = function_oper->getArg(1);
+      const auto arg1 = function_oper->arg(1);
       auto arg1_type = arg1->type();
       CHECK(arg1_type->isInteger());
       const auto arg1_lvs = codegen(arg1, true, co);
@@ -564,7 +564,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperNullArg(
   llvm::Value* one_arg_null =
       llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(cgen_state_->context_), false);
   for (size_t i = 0; i < function_oper->arity(); ++i) {
-    const auto arg = function_oper->getArg(i);
+    const auto arg = function_oper->arg(i);
     auto arg_type = arg->type();
     if (!arg_type->nullable()) {
       continue;
@@ -643,7 +643,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
        ++i) {
     size_t k = orig_arg_lvs_index[i];
     size_t ij = i + j;
-    const auto arg = function_oper->getArg(i);
+    const auto arg = function_oper->arg(i);
     const auto ext_func_arg = ext_func_args[ij];
     auto arg_type = arg->type();
     llvm::Value* arg_lv{nullptr};

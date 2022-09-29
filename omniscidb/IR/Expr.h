@@ -961,7 +961,7 @@ class FunctionOper : public Expr {
 
   size_t arity() const { return args_.size(); }
 
-  const Expr* getArg(const size_t i) const {
+  const Expr* arg(const size_t i) const {
     CHECK_LT(i, args_.size());
     return args_[i].get();
   }

@@ -1681,7 +1681,7 @@ std::string OrderEntry::toString() const {
 ExprPtr FunctionOper::deep_copy() const {
   std::vector<ExprPtr> args_copy;
   for (size_t i = 0; i < arity(); ++i) {
-    args_copy.push_back(getArg(i)->deep_copy());
+    args_copy.push_back(arg(i)->deep_copy());
   }
   return makeExpr<FunctionOper>(type_, name(), args_copy);
 }
@@ -1701,7 +1701,7 @@ bool FunctionOper::operator==(const Expr& rhs) const {
     return false;
   }
   for (size_t i = 0; i < arity(); ++i) {
-    if (!(*getArg(i) == *(rhs_func_oper->getArg(i)))) {
+    if (!(*arg(i) == *(rhs_func_oper->arg(i)))) {
       return false;
     }
   }
@@ -1720,7 +1720,7 @@ std::string FunctionOper::toString() const {
 ExprPtr FunctionOperWithCustomTypeHandling::deep_copy() const {
   std::vector<ExprPtr> args_copy;
   for (size_t i = 0; i < arity(); ++i) {
-    args_copy.push_back(getArg(i)->deep_copy());
+    args_copy.push_back(arg(i)->deep_copy());
   }
   return makeExpr<FunctionOperWithCustomTypeHandling>(type_, name(), args_copy);
 }
@@ -1741,7 +1741,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
     return false;
   }
   for (size_t i = 0; i < arity(); ++i) {
-    if (!(*getArg(i) == *(rhs_func_oper->getArg(i)))) {
+    if (!(*arg(i) == *(rhs_func_oper->arg(i)))) {
       return false;
     }
   }
