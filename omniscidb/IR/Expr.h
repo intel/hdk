@@ -544,7 +544,7 @@ class CharLengthExpr : public Expr {
   CharLengthExpr(ExprPtr a, bool e)
       : Expr(a->ctx().int32(a->type()->nullable())), arg_(a), calc_encoded_length_(e) {}
   const Expr* arg() const { return arg_.get(); }
-  const ExprPtr get_own_arg() const { return arg_; }
+  ExprPtr argShared() const { return arg_; }
   bool calcEncodedLength() const { return calc_encoded_length_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
