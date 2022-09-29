@@ -1216,7 +1216,7 @@ bool DateaddExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const DateaddExpr& rhs_ee = dynamic_cast<const DateaddExpr&>(rhs);
-  return field_ == rhs_ee.get_field() && *number_ == *rhs_ee.get_number_expr() &&
+  return field_ == rhs_ee.field() && *number_ == *rhs_ee.number() &&
          *datetime_ == *rhs_ee.get_datetime_expr();
 }
 

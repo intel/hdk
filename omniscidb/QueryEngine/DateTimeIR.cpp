@@ -188,7 +188,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateaddExpr* dateadd_expr,
                           : hdk::ir::TimeUnit::kSecond;
   auto datetime = codegen(dateadd_expr->get_datetime_expr(), true, co).front();
   CHECK(datetime->getType()->isIntegerTy(64));
-  auto number = codegen(dateadd_expr->get_number_expr(), true, co).front();
+  auto number = codegen(dateadd_expr->number(), true, co).front();
 
   auto datetime_type = dateadd_expr->get_datetime_expr()->type();
   auto datetime_unit = datetime_type->isTimestamp()

@@ -207,7 +207,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   RetType visitDateaddExpr(const hdk::ir::DateaddExpr* dateadd) const override {
     return hdk::ir::makeExpr<hdk::ir::DateaddExpr>(dateadd->type(),
                                                    dateadd->field(),
-                                                   visit(dateadd->get_number_expr()),
+                                                   visit(dateadd->number()),
                                                    visit(dateadd->get_datetime_expr()));
   }
 
