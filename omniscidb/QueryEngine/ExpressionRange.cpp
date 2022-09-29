@@ -645,7 +645,7 @@ ExpressionRange getExpressionRange(const hdk::ir::LikeExpr* like_expr) {
 ExpressionRange getExpressionRange(const hdk::ir::CaseExpr* case_expr,
                                    const std::vector<InputTableInfo>& query_infos,
                                    const Executor* executor) {
-  const auto& expr_pair_list = case_expr->get_expr_pair_list();
+  const auto& expr_pair_list = case_expr->exprPairs();
   auto expr_range = ExpressionRange::makeInvalidRange();
   bool has_nulls = false;
   for (const auto& expr_pair : expr_pair_list) {

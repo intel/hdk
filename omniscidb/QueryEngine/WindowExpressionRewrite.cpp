@@ -56,7 +56,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
   if (!case_expr || !matches_else_null(case_expr)) {
     return nullptr;
   }
-  const auto& expr_pair_list = case_expr->get_expr_pair_list();
+  const auto& expr_pair_list = case_expr->exprPairs();
   if (expr_pair_list.size() != 1) {
     return nullptr;
   }

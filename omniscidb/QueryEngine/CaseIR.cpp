@@ -58,7 +58,7 @@ llvm::Value* CodeGenerator::codegenCase(const hdk::ir::CaseExpr* case_expr,
   // to be available once we're done generating the case. Take a snapshot of
   // the cache with FetchCacheAnchor and restore it once we're done with CASE.
   Executor::FetchCacheAnchor anchor(cgen_state_);
-  const auto& expr_pair_list = case_expr->get_expr_pair_list();
+  const auto& expr_pair_list = case_expr->exprPairs();
   std::vector<llvm::Value*> then_lvs;
   std::vector<llvm::BasicBlock*> then_bbs;
   const auto end_bb = llvm::BasicBlock::Create(

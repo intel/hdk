@@ -272,7 +272,7 @@ class ScalarExprVisitor {
 
   virtual T visitCaseExpr(const hdk::ir::CaseExpr* case_) const {
     T result = defaultResult();
-    const auto& expr_pair_list = case_->get_expr_pair_list();
+    const auto& expr_pair_list = case_->exprPairs();
     for (const auto& expr_pair : expr_pair_list) {
       result = aggregateResult(result, visit(expr_pair.first.get()));
       result = aggregateResult(result, visit(expr_pair.second.get()));

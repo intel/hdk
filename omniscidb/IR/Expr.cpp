@@ -1185,14 +1185,14 @@ bool CaseExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const CaseExpr& rhs_ce = dynamic_cast<const CaseExpr&>(rhs);
-  if (expr_pairs_.size() != rhs_ce.get_expr_pair_list().size()) {
+  if (expr_pairs_.size() != rhs_ce.exprPairs().size()) {
     return false;
   }
   if ((else_expr_ == nullptr && rhs_ce.get_else_expr() != nullptr) ||
       (else_expr_ != nullptr && rhs_ce.get_else_expr() == nullptr)) {
     return false;
   }
-  auto it = rhs_ce.get_expr_pair_list().cbegin();
+  auto it = rhs_ce.exprPairs().cbegin();
   for (auto p : expr_pairs_) {
     if (!(*p.first == *it->first) || !(*p.second == *it->second)) {
       return false;

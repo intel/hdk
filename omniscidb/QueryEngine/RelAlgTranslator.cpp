@@ -268,7 +268,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
 
   hdk::ir::ExprPtr visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
     std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> expr_list;
-    for (auto& pr : case_expr->get_expr_pair_list()) {
+    for (auto& pr : case_expr->exprPairs()) {
       expr_list.emplace_back(visit(pr.first.get()), visit(pr.second.get()));
     }
     auto else_expr = visit(case_expr->get_else_expr());

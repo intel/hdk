@@ -130,7 +130,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
 
   RetType visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
     std::list<std::pair<RetType, RetType>> new_list;
-    for (auto p : case_expr->get_expr_pair_list()) {
+    for (auto p : case_expr->exprPairs()) {
       new_list.emplace_back(visit(p.first.get()), visit(p.second.get()));
     }
     auto else_expr = case_expr->get_else_expr();

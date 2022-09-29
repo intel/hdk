@@ -2343,8 +2343,8 @@ class CoalesceSecondaryProjectVisitor : public ScalarExprVisitor<bool> {
 // Detect the window function SUM pattern: CASE WHEN COUNT() > 0 THEN SUM ELSE 0
 bool is_window_function_sum(const hdk::ir::Expr* expr) {
   const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
-  if (case_expr && case_expr->get_expr_pair_list().size() == 1) {
-    const hdk::ir::Expr* then = case_expr->get_expr_pair_list().front().second.get();
+  if (case_expr && case_expr->exprPairs().size() == 1) {
+    const hdk::ir::Expr* then = case_expr->exprPairs().front().second.get();
 
     // Allow optional cast.
     const auto cast = dynamic_cast<const hdk::ir::UOper*>(then);
