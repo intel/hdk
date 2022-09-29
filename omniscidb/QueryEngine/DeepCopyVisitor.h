@@ -71,7 +71,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
 
   RetType visitInIntegerSet(const hdk::ir::InIntegerSet* in_integer_set) const override {
     return hdk::ir::makeExpr<hdk::ir::InIntegerSet>(visit(in_integer_set->get_arg()),
-                                                    in_integer_set->get_value_list(),
+                                                    in_integer_set->valueList(),
                                                     !in_integer_set->type()->nullable());
   }
 

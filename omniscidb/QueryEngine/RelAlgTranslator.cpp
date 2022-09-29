@@ -410,7 +410,7 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
       // Handle the highly unlikely case when the InIntegerSet ended up being tiny.
       // Just let it fall through the usual InValues path at the end of this method,
       // its codegen knows to use inline comparisons for few values.
-      if (expr && expr->as<hdk::ir::InIntegerSet>()->get_value_list().size() <= 100) {
+      if (expr && expr->as<hdk::ir::InIntegerSet>()->valueList().size() <= 100) {
         expr = nullptr;
       }
     } else {

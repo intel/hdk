@@ -490,7 +490,7 @@ class InIntegerSet : public Expr {
 
   const Expr* get_arg() const { return arg_.get(); }
 
-  const std::vector<int64_t>& get_value_list() const { return value_list_; }
+  const std::vector<int64_t>& valueList() const { return value_list_; }
 
   ExprPtr deep_copy() const override;
 

@@ -84,7 +84,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InIntegerSet* in_integer_set,
         "hoisting is disabled");
   }
   auto in_vals_bitmap = std::make_unique<InValuesBitmap>(
-      in_integer_set->get_value_list(),
+      in_integer_set->valueList(),
       needle_null_val,
       co.device_type == ExecutorDeviceType::GPU ? Data_Namespace::GPU_LEVEL
                                                 : Data_Namespace::CPU_LEVEL,
