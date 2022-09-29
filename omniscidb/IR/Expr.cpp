@@ -1035,7 +1035,7 @@ bool KeyForStringExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const KeyForStringExpr& rhs_cl = dynamic_cast<const KeyForStringExpr&>(rhs);
-  if (!(*arg_ == *rhs_cl.get_arg())) {
+  if (!(*arg_ == *rhs_cl.arg())) {
     return false;
   }
   return true;

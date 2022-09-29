@@ -221,7 +221,7 @@ class ScalarExprVisitor {
 
   virtual T visitKeyForString(const hdk::ir::KeyForStringExpr* key_for_string) const {
     T result = defaultResult();
-    result = aggregateResult(result, visit(key_for_string->get_arg()));
+    result = aggregateResult(result, visit(key_for_string->arg()));
     return result;
   }
 

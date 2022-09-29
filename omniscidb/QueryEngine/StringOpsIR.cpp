@@ -98,7 +98,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
 llvm::Value* CodeGenerator::codegen(const hdk::ir::KeyForStringExpr* expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  auto str_lv = codegen(expr->get_arg(), true, co);
+  auto str_lv = codegen(expr->arg(), true, co);
   CHECK_EQ(size_t(1), str_lv.size());
   return cgen_state_->emitCall("key_for_string_encoded", str_lv);
 }

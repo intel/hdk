@@ -86,7 +86,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
   }
 
   RetType visitKeyForString(const hdk::ir::KeyForStringExpr* expr) const override {
-    return hdk::ir::makeExpr<hdk::ir::KeyForStringExpr>(visit(expr->get_arg()));
+    return hdk::ir::makeExpr<hdk::ir::KeyForStringExpr>(visit(expr->arg()));
   }
 
   RetType visitSampleRatio(const hdk::ir::SampleRatioExpr* expr) const override {
