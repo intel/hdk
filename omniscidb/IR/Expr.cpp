@@ -1136,7 +1136,7 @@ bool LikelihoodExpr::operator==(const Expr& rhs) const {
   if (!(*arg_ == *rhs_l.arg())) {
     return false;
   }
-  if (likelihood_ != rhs_l.get_likelihood()) {
+  if (likelihood_ != rhs_l.likelihood()) {
     return false;
   }
   return true;

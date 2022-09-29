@@ -725,8 +725,8 @@ hdk::ir::ExprPtr rewrite_expr(const hdk::ir::Expr* expr) {
       std::dynamic_pointer_cast<const hdk::ir::LikelihoodExpr>(rewritten_expr);
   if (expr_with_likelihood) {
     // Add back likelihood
-    return std::make_shared<hdk::ir::LikelihoodExpr>(
-        rewritten_expr, expr_with_likelihood->get_likelihood());
+    return std::make_shared<hdk::ir::LikelihoodExpr>(rewritten_expr,
+                                                     expr_with_likelihood->likelihood());
   }
   return rewritten_expr;
 }
@@ -850,8 +850,8 @@ hdk::ir::ExprPtr fold_expr(const hdk::ir::Expr* expr) {
   const auto expr_with_likelihood = dynamic_cast<const hdk::ir::LikelihoodExpr*>(expr);
   if (expr_with_likelihood) {
     // Add back likelihood
-    return std::make_shared<hdk::ir::LikelihoodExpr>(
-        rewritten_expr, expr_with_likelihood->get_likelihood());
+    return std::make_shared<hdk::ir::LikelihoodExpr>(rewritten_expr,
+                                                     expr_with_likelihood->likelihood());
   }
   return rewritten_expr;
 }

@@ -77,7 +77,7 @@ Likelihood get_likelihood(const hdk::ir::Expr* expr) {
   Likelihood truth{1.0};
   auto likelihood_expr = dynamic_cast<const hdk::ir::LikelihoodExpr*>(expr);
   if (likelihood_expr) {
-    return Likelihood(likelihood_expr->get_likelihood());
+    return Likelihood(likelihood_expr->likelihood());
   }
   auto u_oper = dynamic_cast<const hdk::ir::UOper*>(expr);
   if (u_oper) {

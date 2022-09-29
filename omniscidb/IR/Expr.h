@@ -785,7 +785,7 @@ class LikelihoodExpr : public Expr {
       : Expr(a->ctx().boolean(a->type()->nullable())), arg_(a), likelihood_(l) {}
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  float get_likelihood() const { return likelihood_; }
+  float likelihood() const { return likelihood_; }
   ExprPtr deep_copy() const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
