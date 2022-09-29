@@ -107,7 +107,7 @@ class DeepCopyVisitor : public ScalarExprVisitor<hdk::ir::ExprPtr> {
         visit(like->arg()),
         visit(like->likeExpr()),
         escape_expr ? visit(escape_expr) : nullptr,
-        like->get_is_ilike(),
+        like->isIlike(),
         like->get_is_simple());
   }
 
