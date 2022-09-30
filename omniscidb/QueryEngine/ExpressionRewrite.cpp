@@ -21,8 +21,8 @@
 #include <unordered_set>
 
 #include "Analyzer/Analyzer.h"
+#include "IR/ExprRewriter.h"
 #include "Logger/Logger.h"
-#include "QueryEngine/DeepCopyVisitor.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/RelAlgTranslator.h"
 #include "QueryEngine/ScalarExprVisitor.h"
@@ -155,9 +155,9 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
   }
 };
 
-class RecursiveOrToInVisitor : public DeepCopyVisitor {
+class RecursiveOrToInVisitor : public hdk::ir::ExprRewriter {
  protected:
-  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
+  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) override {
     OrToInVisitor simple_visitor;
     if (bin_oper->isOr()) {
       auto rewritten = simple_visitor.visit(bin_oper);
@@ -178,11 +178,9 @@ class RecursiveOrToInVisitor : public DeepCopyVisitor {
   }
 };
 
-class ArrayElementStringLiteralEncodingVisitor : public DeepCopyVisitor {
+class ArrayElementStringLiteralEncodingVisitor : public hdk::ir::ExprRewriter {
  protected:
-  using RetType = DeepCopyVisitor::RetType;
-
-  RetType visitArrayOper(const hdk::ir::ArrayExpr* array_expr) const override {
+  hdk::ir::ExprPtr visitArrayOper(const hdk::ir::ArrayExpr* array_expr) override {
     std::vector<hdk::ir::ExprPtr> args_copy;
     for (size_t i = 0; i < array_expr->elementCount(); ++i) {
       auto const element_expr_ptr = visit(array_expr->element(i));
@@ -203,7 +201,7 @@ class ArrayElementStringLiteralEncodingVisitor : public DeepCopyVisitor {
   }
 };
 
-class ConstantFoldingVisitor : public DeepCopyVisitor {
+class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
   template <typename T>
   bool foldComparison(SQLOps optype, T t1, T t2) const {
     switch (optype) {
@@ -436,7 +434,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
     return false;
   }
 
-  hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
+  hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) override {
     const auto unvisited_operand = uoper->operand();
     const auto optype = uoper->opType();
     auto type = uoper->type();
@@ -514,7 +512,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
         uoper->type(), uoper->containsAgg(), optype, operand);
   }
 
-  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
+  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) override {
     const auto optype = bin_oper->opType();
     auto type = bin_oper->type();
     auto& ctx = type->ctx();
@@ -672,7 +670,7 @@ class ConstantFoldingVisitor : public DeepCopyVisitor {
                                                rhs);
   }
 
-  hdk::ir::ExprPtr visitLower(const hdk::ir::LowerExpr* lower_expr) const override {
+  hdk::ir::ExprPtr visitLower(const hdk::ir::LowerExpr* lower_expr) override {
     const auto constant_arg_expr =
         dynamic_cast<const hdk::ir::Constant*>(lower_expr->arg());
     if (constant_arg_expr) {

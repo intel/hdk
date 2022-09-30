@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-#include "RelAlgDagBuilder.h"
+#include "IR/ExprRewriter.h"
+
 #include "CalciteDeserializerUtils.h"
 #include "DateTimePlusRewrite.h"
 #include "DateTimeTranslator.h"
-#include "DeepCopyVisitor.h"
 #include "Descriptors/RelAlgExecutionDescriptor.h"
 #include "ExprByPredicateCollector.h"
 #include "ExpressionRewrite.h"
 #include "ExtensionFunctionsBinding.h"
 #include "ExtensionFunctionsWhitelist.h"
 #include "JsonAccessors.h"
+#include "RelAlgDagBuilder.h"
 #include "RelAlgOptimizer.h"
 #include "RelLeftDeepInnerJoin.h"
+#include "ScalarExprVisitor.h"
 #include "Shared/sqldefs.h"
 
 #include <rapidjson/error/en.h>
@@ -54,12 +56,12 @@ void RelAlgNode::resetRelAlgFirstId() noexcept {
 
 namespace {
 
-class RebindInputsVisitor : public DeepCopyVisitor {
+class RebindInputsVisitor : public hdk::ir::ExprRewriter {
  public:
   RebindInputsVisitor(const RelAlgNode* old_input, const RelAlgNode* new_input)
       : old_input_(old_input), new_input_(new_input) {}
 
-  RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (col_ref->node() == old_input_) {
       auto left_deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(new_input_);
       if (left_deep_join) {
@@ -68,7 +70,7 @@ class RebindInputsVisitor : public DeepCopyVisitor {
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
           col_ref->type(), new_input_, col_ref->index());
     }
-    return col_ref->deep_copy();
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
  protected:
@@ -84,7 +86,7 @@ class RebindReindexInputsVisitor : public RebindInputsVisitor {
       const std::optional<std::unordered_map<unsigned, unsigned>>& old_to_new_index_map)
       : RebindInputsVisitor(old_input, new_input), mapping_(old_to_new_index_map) {}
 
-  RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto res = RebindInputsVisitor::visitColumnRef(col_ref);
     if (mapping_) {
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(res.get());
@@ -2061,24 +2063,23 @@ hdk::ir::ExprPtrVector reprojectExprs(const RelProject* simple_project,
  * expression and replaces the inputs to that expression with inputs from a different
  * node in the RA tree. Used for coalescing nodes with complex expressions.
  */
-class InputReplacementVisitor : public DeepCopyVisitor {
+class InputReplacementVisitor : public hdk::ir::ExprRewriter {
  public:
   InputReplacementVisitor(const RelAlgNode* node_to_keep,
                           const hdk::ir::ExprPtrVector& exprs,
                           const hdk::ir::ExprPtrVector* groupby_exprs = nullptr)
       : node_to_keep_(node_to_keep), exprs_(exprs), groupby_exprs_(groupby_exprs) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (col_ref->node() == node_to_keep_) {
       const auto index = col_ref->index();
       CHECK_LT(index, exprs_.size());
       return visit(exprs_[index].get());
     }
-    return col_ref->deep_copy();
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
-  hdk::ir::ExprPtr visitGroupColumnRef(
-      const hdk::ir::GroupColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitGroupColumnRef(const hdk::ir::GroupColumnRef* col_ref) override {
     CHECK(groupby_exprs_);
     CHECK_LE(col_ref->index(), groupby_exprs_->size());
     return visit((*groupby_exprs_)[col_ref->index() - 1].get());
@@ -2499,7 +2500,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
   }
 }
 
-class ReplacementExprVisitor : public DeepCopyVisitor {
+class ReplacementExprVisitor : public hdk::ir::ExprRewriter {
  public:
   ReplacementExprVisitor() {}
 
@@ -2511,12 +2512,12 @@ class ReplacementExprVisitor : public DeepCopyVisitor {
     replacements_[from] = to;
   }
 
-  hdk::ir::ExprPtr visit(const hdk::ir::Expr* expr) const {
+  hdk::ir::ExprPtr visit(const hdk::ir::Expr* expr) override {
     auto it = replacements_.find(expr);
     if (it != replacements_.end()) {
       return it->second;
     }
-    return DeepCopyVisitor::visit(expr);
+    return ExprRewriter::visit(expr);
   }
 
  private:
@@ -2532,11 +2533,11 @@ class ReplacementExprVisitor : public DeepCopyVisitor {
  * references the input on the source RA node, thereby carrying the input through the
  * intermediate query step.
  */
-class InputBackpropagationVisitor : public DeepCopyVisitor {
+class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
  public:
   InputBackpropagationVisitor(RelProject* node) : node_(node) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (col_ref->node() != node_) {
       auto cur_index = col_ref->index();
       auto cur_source_node = col_ref->node();
@@ -2555,7 +2556,7 @@ class InputBackpropagationVisitor : public DeepCopyVisitor {
         return expr;
       }
     } else {
-      return DeepCopyVisitor::visitColumnRef(col_ref);
+      return ExprRewriter::visitColumnRef(col_ref);
     }
   }
 

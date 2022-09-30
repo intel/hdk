@@ -15,8 +15,8 @@
  */
 
 #include "RelAlgOptimizer.h"
-#include "DeepCopyVisitor.h"
 #include "IR/ExprCollector.h"
+#include "IR/ExprRewriter.h"
 #include "Logger/Logger.h"
 #include "Visitors/SubQueryCollector.h"
 
@@ -29,12 +29,12 @@ extern size_t g_max_log_length;
 
 namespace {
 
-class ProjectInputRedirector : public DeepCopyVisitor {
+class ProjectInputRedirector : public hdk::ir::ExprRewriter {
  public:
   ProjectInputRedirector(const std::unordered_set<const RelProject*>& crt_inputs)
       : crt_projects_(crt_inputs) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto source = dynamic_cast<const RelProject*>(col_ref->node());
     if (source && crt_projects_.count(source)) {
       auto new_source = source->getInput(0);
@@ -50,7 +50,7 @@ class ProjectInputRedirector : public DeepCopyVisitor {
         return new_col_ref->deep_copy();
       }
     }
-    return col_ref->deep_copy();
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
  private:
@@ -59,19 +59,19 @@ class ProjectInputRedirector : public DeepCopyVisitor {
 
 // TODO: use more generic InputRenumberVisitor instead.
 template <bool bAllowMissing>
-class InputSimpleRenumberVisitor : public DeepCopyVisitor {
+class InputSimpleRenumberVisitor : public hdk::ir::ExprRewriter {
  public:
   InputSimpleRenumberVisitor(const std::unordered_map<size_t, size_t>& new_numbering)
       : old_to_new_idx_(new_numbering) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto renum_it = old_to_new_idx_.find(col_ref->index());
     if constexpr (bAllowMissing) {
       if (renum_it != old_to_new_idx_.end()) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
             col_ref->type(), col_ref->node(), renum_it->second);
       } else {
-        return col_ref->deep_copy();
+        return ExprRewriter::visitColumnRef(col_ref);
       }
     } else {
       CHECK(renum_it != old_to_new_idx_.end());
@@ -84,26 +84,26 @@ class InputSimpleRenumberVisitor : public DeepCopyVisitor {
   const std::unordered_map<size_t, size_t>& old_to_new_idx_;
 };
 
-class RebindInputsVisitor : public DeepCopyVisitor {
+class RebindInputsVisitor : public hdk::ir::ExprRewriter {
  public:
   RebindInputsVisitor(const RelAlgNode* old_input, const RelAlgNode* new_input)
       : old_input_(old_input), new_input_(new_input) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (col_ref->node() == old_input_) {
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
           col_ref->type(), new_input_, col_ref->index());
     }
-    return col_ref->deep_copy();
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
-  void visitNode(const RelAlgNode* node) const {
+  void visitNode(const RelAlgNode* node) {
     if (dynamic_cast<const RelAggregate*>(node) || dynamic_cast<const RelSort*>(node)) {
       return;
     }
     if (auto join = const_cast<RelJoin*>(dynamic_cast<const RelJoin*>(node))) {
       if (join->getCondition()) {
-        auto cond = DeepCopyVisitor::visit(join->getCondition());
+        auto cond = ExprRewriter::visit(join->getCondition());
         join->setCondition(std::move(cond));
       }
       return;
@@ -111,13 +111,13 @@ class RebindInputsVisitor : public DeepCopyVisitor {
     if (auto project = const_cast<RelProject*>(dynamic_cast<const RelProject*>(node))) {
       hdk::ir::ExprPtrVector new_exprs;
       for (auto& expr : project->getExprs()) {
-        new_exprs.push_back(DeepCopyVisitor::visit(expr.get()));
+        new_exprs.push_back(ExprRewriter::visit(expr.get()));
       }
       project->setExpressions(std::move(new_exprs));
       return;
     }
     if (auto filter = const_cast<RelFilter*>(dynamic_cast<const RelFilter*>(node))) {
-      auto cond = DeepCopyVisitor::visit(filter->getConditionExpr());
+      auto cond = ExprRewriter::visit(filter->getConditionExpr());
       filter->setCondition(std::move(cond));
       return;
     }
@@ -881,14 +881,14 @@ void add_new_indices_for(
   }
 }
 
-class InputRenumberVisitor : public DeepCopyVisitor {
+class InputRenumberVisitor : public hdk::ir::ExprRewriter {
  public:
   InputRenumberVisitor(
       const std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
           new_numbering)
       : node_to_input_renum_(new_numbering) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto node_it = node_to_input_renum_.find(col_ref->node());
     if (node_it != node_to_input_renum_.end()) {
       auto idx_it = node_it->second.find(col_ref->index());
@@ -897,7 +897,7 @@ class InputRenumberVisitor : public DeepCopyVisitor {
             col_ref->type(), col_ref->node(), idx_it->second);
       }
     }
-    return col_ref->deep_copy();
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
  private:
@@ -1268,13 +1268,13 @@ void eliminate_dead_subqueries(
 
 namespace {
 
-class InputSinker : public DeepCopyVisitor {
+class InputSinker : public hdk::ir::ExprRewriter {
  public:
   InputSinker(const std::unordered_map<size_t, size_t>& old_to_new_idx,
               const RelAlgNode* new_src)
       : old_to_new_in_idx_(old_to_new_idx), target_(new_src) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     CHECK_EQ(target_->inputCount(), size_t(1));
     CHECK_EQ(target_->getInput(0), col_ref->node());
     auto idx_it = old_to_new_in_idx_.find(col_ref->index());
@@ -1288,18 +1288,18 @@ class InputSinker : public DeepCopyVisitor {
   const RelAlgNode* target_;
 };
 
-class ConditionReplacer : public DeepCopyVisitor {
+class ConditionReplacer : public hdk::ir::ExprRewriter {
  public:
   ConditionReplacer(
       const std::unordered_map<size_t, hdk::ir::ExprPtr>& idx_to_sub_condition)
       : idx_to_subcond_(idx_to_sub_condition) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto subcond_it = idx_to_subcond_.find(col_ref->index());
     if (subcond_it != idx_to_subcond_.end()) {
       return visit(subcond_it->second.get());
     }
-    return DeepCopyVisitor::visitColumnRef(col_ref);
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
  private:
@@ -1408,14 +1408,14 @@ void sink_projected_boolean_expr_to_join(
 
 namespace {
 
-class InputRedirector : public DeepCopyVisitor {
+class InputRedirector : public hdk::ir::ExprRewriter {
  public:
   InputRedirector(const RelAlgNode* old_src, const RelAlgNode* new_src)
       : old_src_(old_src), new_src_(new_src) {
     CHECK_NE(old_src_, new_src_);
   }
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     CHECK_EQ(old_src_, col_ref->node());
     auto idx = col_ref->index();
     auto ti = getColumnType(new_src_, idx);
@@ -1563,12 +1563,12 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
   return {};
 }
 
-class JoinTargetRebaseVisitor : public DeepCopyVisitor {
+class JoinTargetRebaseVisitor : public hdk::ir::ExprRewriter {
  public:
   JoinTargetRebaseVisitor(const RelJoin* join, const unsigned old_base)
       : join_(join), old_base_(old_base), inp0_size_(join->getInput(0)->size()) {}
 
-  RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto cur_idx = col_ref->index();
     CHECK_GE(cur_idx, old_base_);
     auto new_idx = cur_idx - old_base_;
@@ -1593,23 +1593,23 @@ hdk::ir::ExprPtr makeConstantExpr(bool val) {
       hdk::ir::Context::defaultCtx().boolean(false), false, d);
 }
 
-class SubConditionRemoveVisitor : public DeepCopyVisitor {
+class SubConditionRemoveVisitor : public hdk::ir::ExprRewriter {
  public:
   SubConditionRemoveVisitor(const std::vector<const hdk::ir::Expr*> sub_conds)
       : sub_conditions_(sub_conds.begin(), sub_conds.end()) {}
 
-  RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (sub_conditions_.count(col_ref)) {
       return makeConstantExpr(true);
     }
-    return DeepCopyVisitor::visitColumnRef(col_ref);
+    return ExprRewriter::visitColumnRef(col_ref);
   }
 
-  RetType visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
+  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) override {
     if (sub_conditions_.count(bin_oper)) {
       return makeConstantExpr(true);
     }
-    return DeepCopyVisitor::visitBinOper(bin_oper);
+    return ExprRewriter::visitBinOper(bin_oper);
   }
 
  private:

@@ -15,7 +15,6 @@
  */
 
 #include "JoinFilterPushDown.h"
-#include "DeepCopyVisitor.h"
 #include "IR/ExprCollector.h"
 #include "IR/ExprRewriter.h"
 #include "RelAlgExecutor.h"

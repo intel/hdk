@@ -15,9 +15,9 @@
  */
 
 #include "RelLeftDeepInnerJoin.h"
-#include "DeepCopyVisitor.h"
 #include "Logger/Logger.h"
 #include "RelAlgDagBuilder.h"
+#include "IR/ExprRewriter.h"
 
 #include <numeric>
 
@@ -61,7 +61,7 @@ create_left_deep_join(const std::shared_ptr<RelAlgNode>& left_deep_join_root) {
           old_root};
 }
 
-class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
+class RebindInputsFromLeftDeepJoinVisitor : public hdk::ir::ExprRewriter {
  public:
   RebindInputsFromLeftDeepJoinVisitor(const RelLeftDeepInnerJoin* left_deep_join)
       : left_deep_join_(left_deep_join) {
@@ -76,7 +76,7 @@ class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
         input_sizes.begin(), input_sizes.end(), input_size_prefix_sums_.begin());
   }
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     const auto node = col_ref->node();
     if (left_deep_join_->coversOriginalNode(node)) {
       const auto it = std::lower_bound(input_size_prefix_sums_.begin(),
@@ -94,7 +94,7 @@ class RebindInputsFromLeftDeepJoinVisitor : public DeepCopyVisitor {
       }
       return hdk::ir::makeExpr<hdk::ir::ColumnRef>(col_ref->type(), new_node, new_index);
     }
-    return col_ref->deep_copy();
+    return defaultResult(col_ref);
   };
 
  private:

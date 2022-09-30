@@ -15,12 +15,12 @@
  */
 
 #include "RelAlgTranslator.h"
-#include "DeepCopyVisitor.h"
 #include "ExpressionRewrite.h"
 #include "RelAlgDagBuilder.h"
 
 #include "Analyzer/Analyzer.h"
 #include "Descriptors/RelAlgExecutionDescriptor.h"
+#include "IR/ExprRewriter.h"
 #include "QueryEngine/SessionInfo.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/likely.h"
@@ -176,7 +176,7 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
   return hdk::ir::makeExpr<hdk::ir::Constant>(type, is_null_const, d);
 }
 
-class NormalizerVisitor : public DeepCopyVisitor {
+class NormalizerVisitor : public hdk::ir::ExprRewriter {
  public:
   NormalizerVisitor(const RelAlgTranslator& translator,
                     const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
@@ -187,7 +187,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
       , join_types_(join_types)
       , executor_(executor) {}
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
+  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto source = col_ref->node();
     auto col_idx = col_ref->index();
     const auto it_rte_idx = input_to_nest_level_.find(source);
@@ -233,7 +233,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
         col_type, -source->getId(), col_idx, rte_idx);
   }
 
-  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) const override {
+  hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) override {
     auto lhs = visit(bin_oper->leftOperand());
     auto rhs = visit(bin_oper->rightOperand());
     // Some binary expressions are not results of operation translation. They are
@@ -253,7 +253,7 @@ class NormalizerVisitor : public DeepCopyVisitor {
                                        executor_);
   }
 
-  hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) const override {
+  hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) override {
     // Casts introduced on DAG build stage might become NOPs.
     if (uoper->isCast()) {
       auto op = visit(uoper->operand());
@@ -263,10 +263,10 @@ class NormalizerVisitor : public DeepCopyVisitor {
       return hdk::ir::makeExpr<hdk::ir::UOper>(
           uoper->type(), op->containsAgg(), kCAST, op);
     }
-    return DeepCopyVisitor::visitUOper(uoper);
+    return ExprRewriter::visitUOper(uoper);
   }
 
-  hdk::ir::ExprPtr visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
+  hdk::ir::ExprPtr visitCaseExpr(const hdk::ir::CaseExpr* case_expr) override {
     std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> expr_list;
     for (auto& pr : case_expr->exprPairs()) {
       expr_list.emplace_back(visit(pr.first.get()), visit(pr.second.get()));
@@ -275,12 +275,11 @@ class NormalizerVisitor : public DeepCopyVisitor {
     return Analyzer::normalizeCaseExpr(expr_list, else_expr, executor_);
   }
 
-  hdk::ir::ExprPtr visitScalarSubquery(
-      const hdk::ir::ScalarSubquery* subquery) const override {
+  hdk::ir::ExprPtr visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) override {
     return translateScalarSubqueryResult(subquery->node()->getResult());
   }
 
-  hdk::ir::ExprPtr visitInSubquery(const hdk::ir::InSubquery* subquery) const override {
+  hdk::ir::ExprPtr visitInSubquery(const hdk::ir::InSubquery* subquery) override {
     return translator_.translateInSubquery(visit(subquery->arg()),
                                            subquery->node()->getResult());
   }
