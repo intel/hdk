@@ -25,12 +25,12 @@
 #include <unordered_map>
 
 // Returns true for value window functions, false otherwise.
-inline bool window_function_is_value(const SqlWindowFunctionKind kind) {
+inline bool window_function_is_value(const hdk::ir::WindowFunctionKind kind) {
   switch (kind) {
-    case SqlWindowFunctionKind::LAG:
-    case SqlWindowFunctionKind::LEAD:
-    case SqlWindowFunctionKind::FIRST_VALUE:
-    case SqlWindowFunctionKind::LAST_VALUE: {
+    case hdk::ir::WindowFunctionKind::Lag:
+    case hdk::ir::WindowFunctionKind::Lead:
+    case hdk::ir::WindowFunctionKind::FirstValue:
+    case hdk::ir::WindowFunctionKind::LastValue: {
       return true;
     }
     default: {
@@ -40,14 +40,14 @@ inline bool window_function_is_value(const SqlWindowFunctionKind kind) {
 }
 
 // Returns true for aggregate window functions, false otherwise.
-inline bool window_function_is_aggregate(const SqlWindowFunctionKind kind) {
+inline bool window_function_is_aggregate(const hdk::ir::WindowFunctionKind kind) {
   switch (kind) {
-    case SqlWindowFunctionKind::AVG:
-    case SqlWindowFunctionKind::MIN:
-    case SqlWindowFunctionKind::MAX:
-    case SqlWindowFunctionKind::SUM:
-    case SqlWindowFunctionKind::COUNT:
-    case SqlWindowFunctionKind::SUM_INTERNAL: {
+    case hdk::ir::WindowFunctionKind::Avg:
+    case hdk::ir::WindowFunctionKind::Min:
+    case hdk::ir::WindowFunctionKind::Max:
+    case hdk::ir::WindowFunctionKind::Sum:
+    case hdk::ir::WindowFunctionKind::Count:
+    case hdk::ir::WindowFunctionKind::SumInternal: {
       return true;
     }
     default: {
@@ -230,6 +230,6 @@ class WindowProjectNodeContext {
   std::unordered_map<size_t, std::unique_ptr<WindowFunctionContext>> window_contexts_;
 };
 
-bool window_function_is_aggregate(const SqlWindowFunctionKind kind);
+bool window_function_is_aggregate(const hdk::ir::WindowFunctionKind kind);
 
 bool window_function_requires_peer_handling(const hdk::ir::WindowFunction* window_func);

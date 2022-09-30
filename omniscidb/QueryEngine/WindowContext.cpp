@@ -212,7 +212,7 @@ std::vector<int64_t> index_to_ntile(const int64_t* index,
 
 // The element size in the result buffer for the given window function kind. Currently
 // it's always 8.
-size_t window_function_buffer_element_size(const SqlWindowFunctionKind /*kind*/) {
+size_t window_function_buffer_element_size(const hdk::ir::WindowFunctionKind /*kind*/) {
   return 8;
 }
 
@@ -236,8 +236,8 @@ size_t get_int_constant_from_expr(const hdk::ir::Expr* expr) {
 
 // Gets the lag or lead argument canonicalized as lag (lag = -lead).
 int64_t get_lag_or_lead_argument(const hdk::ir::WindowFunction* window_func) {
-  CHECK(window_func->kind() == SqlWindowFunctionKind::LAG ||
-        window_func->kind() == SqlWindowFunctionKind::LEAD);
+  CHECK(window_func->kind() == hdk::ir::WindowFunctionKind::Lag ||
+        window_func->kind() == hdk::ir::WindowFunctionKind::Lead);
   const auto& args = window_func->args();
   if (args.size() == 3) {
     throw std::runtime_error("LAG with default not supported yet");
@@ -245,10 +245,11 @@ int64_t get_lag_or_lead_argument(const hdk::ir::WindowFunction* window_func) {
   if (args.size() == 2) {
     const int64_t lag_or_lead =
         static_cast<int64_t>(get_int_constant_from_expr(args[1].get()));
-    return window_func->kind() == SqlWindowFunctionKind::LAG ? lag_or_lead : -lag_or_lead;
+    return window_func->kind() == hdk::ir::WindowFunctionKind::Lag ? lag_or_lead
+                                                                   : -lag_or_lead;
   }
   CHECK_EQ(args.size(), size_t(1));
-  return window_func->kind() == SqlWindowFunctionKind::LAG ? 1 : -1;
+  return window_func->kind() == hdk::ir::WindowFunctionKind::Lag ? 1 : -1;
 }
 
 // Redistributes the original_indices according to the permutation given by
@@ -434,8 +435,8 @@ bool window_function_requires_peer_handling(const hdk::ir::WindowFunction* windo
     return true;
   }
   switch (window_func->kind()) {
-    case SqlWindowFunctionKind::MIN:
-    case SqlWindowFunctionKind::MAX: {
+    case hdk::ir::WindowFunctionKind::Min:
+    case hdk::ir::WindowFunctionKind::Max: {
       return false;
     }
     default: {
@@ -774,25 +775,25 @@ void WindowFunctionContext::computePartitionBuffer(
     const hdk::ir::WindowFunction* window_func,
     const std::function<bool(const int64_t lhs, const int64_t rhs)>& comparator) {
   switch (window_func->kind()) {
-    case SqlWindowFunctionKind::ROW_NUMBER: {
+    case hdk::ir::WindowFunctionKind::RowNumber: {
       const auto row_numbers =
           index_to_row_number(output_for_partition_buff, partition_size);
       std::copy(row_numbers.begin(), row_numbers.end(), output_for_partition_buff);
       break;
     }
-    case SqlWindowFunctionKind::RANK: {
+    case hdk::ir::WindowFunctionKind::Rank: {
       const auto rank =
           index_to_rank(output_for_partition_buff, partition_size, comparator);
       std::copy(rank.begin(), rank.end(), output_for_partition_buff);
       break;
     }
-    case SqlWindowFunctionKind::DENSE_RANK: {
+    case hdk::ir::WindowFunctionKind::DenseRank: {
       const auto dense_rank =
           index_to_dense_rank(output_for_partition_buff, partition_size, comparator);
       std::copy(dense_rank.begin(), dense_rank.end(), output_for_partition_buff);
       break;
     }
-    case SqlWindowFunctionKind::PERCENT_RANK: {
+    case hdk::ir::WindowFunctionKind::PercentRank: {
       const auto percent_rank =
           index_to_percent_rank(output_for_partition_buff, partition_size, comparator);
       std::copy(percent_rank.begin(),
@@ -800,7 +801,7 @@ void WindowFunctionContext::computePartitionBuffer(
                 reinterpret_cast<double*>(may_alias_ptr(output_for_partition_buff)));
       break;
     }
-    case SqlWindowFunctionKind::CUME_DIST: {
+    case hdk::ir::WindowFunctionKind::CumeDist: {
       const auto cume_dist =
           index_to_cume_dist(output_for_partition_buff, partition_size, comparator);
       std::copy(cume_dist.begin(),
@@ -808,7 +809,7 @@ void WindowFunctionContext::computePartitionBuffer(
                 reinterpret_cast<double*>(may_alias_ptr(output_for_partition_buff)));
       break;
     }
-    case SqlWindowFunctionKind::NTILE: {
+    case hdk::ir::WindowFunctionKind::NTile: {
       const auto& args = window_func->args();
       CHECK_EQ(args.size(), size_t(1));
       const auto n = get_int_constant_from_expr(args.front().get());
@@ -816,31 +817,31 @@ void WindowFunctionContext::computePartitionBuffer(
       std::copy(ntile.begin(), ntile.end(), output_for_partition_buff);
       break;
     }
-    case SqlWindowFunctionKind::LAG:
-    case SqlWindowFunctionKind::LEAD: {
+    case hdk::ir::WindowFunctionKind::Lag:
+    case hdk::ir::WindowFunctionKind::Lead: {
       const auto lag_or_lead = get_lag_or_lead_argument(window_func);
       const auto partition_row_offsets = payload() + off;
       apply_lag_to_partition(
           lag_or_lead, partition_row_offsets, output_for_partition_buff, partition_size);
       break;
     }
-    case SqlWindowFunctionKind::FIRST_VALUE: {
+    case hdk::ir::WindowFunctionKind::FirstValue: {
       const auto partition_row_offsets = payload() + off;
       apply_first_value_to_partition(
           partition_row_offsets, output_for_partition_buff, partition_size);
       break;
     }
-    case SqlWindowFunctionKind::LAST_VALUE: {
+    case hdk::ir::WindowFunctionKind::LastValue: {
       const auto partition_row_offsets = payload() + off;
       apply_last_value_to_partition(
           partition_row_offsets, output_for_partition_buff, partition_size);
       break;
     }
-    case SqlWindowFunctionKind::AVG:
-    case SqlWindowFunctionKind::MIN:
-    case SqlWindowFunctionKind::MAX:
-    case SqlWindowFunctionKind::SUM:
-    case SqlWindowFunctionKind::COUNT: {
+    case hdk::ir::WindowFunctionKind::Avg:
+    case hdk::ir::WindowFunctionKind::Min:
+    case hdk::ir::WindowFunctionKind::Max:
+    case hdk::ir::WindowFunctionKind::Sum:
+    case hdk::ir::WindowFunctionKind::Count: {
       const auto partition_row_offsets = payload() + off;
       if (window_function_requires_peer_handling(window_func)) {
         index_to_partition_end(

@@ -27,26 +27,26 @@ llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
                                                                          target_index);
   const auto window_func = window_func_context->getWindowFunction();
   switch (window_func->kind()) {
-    case SqlWindowFunctionKind::ROW_NUMBER:
-    case SqlWindowFunctionKind::RANK:
-    case SqlWindowFunctionKind::DENSE_RANK:
-    case SqlWindowFunctionKind::NTILE: {
+    case hdk::ir::WindowFunctionKind::RowNumber:
+    case hdk::ir::WindowFunctionKind::Rank:
+    case hdk::ir::WindowFunctionKind::DenseRank:
+    case hdk::ir::WindowFunctionKind::NTile: {
       return cgen_state_->emitCall("row_number_window_func",
                                    {cgen_state_->llInt(reinterpret_cast<const int64_t>(
                                         window_func_context->output())),
                                     code_generator.posArg(nullptr)});
     }
-    case SqlWindowFunctionKind::PERCENT_RANK:
-    case SqlWindowFunctionKind::CUME_DIST: {
+    case hdk::ir::WindowFunctionKind::PercentRank:
+    case hdk::ir::WindowFunctionKind::CumeDist: {
       return cgen_state_->emitCall("percent_window_func",
                                    {cgen_state_->llInt(reinterpret_cast<const int64_t>(
                                         window_func_context->output())),
                                     code_generator.posArg(nullptr)});
     }
-    case SqlWindowFunctionKind::LAG:
-    case SqlWindowFunctionKind::LEAD:
-    case SqlWindowFunctionKind::FIRST_VALUE:
-    case SqlWindowFunctionKind::LAST_VALUE: {
+    case hdk::ir::WindowFunctionKind::Lag:
+    case hdk::ir::WindowFunctionKind::Lead:
+    case hdk::ir::WindowFunctionKind::FirstValue:
+    case hdk::ir::WindowFunctionKind::LastValue: {
       CHECK(WindowProjectNodeContext::get(this));
       const auto& args = window_func->args();
       CHECK(!args.empty());
@@ -54,11 +54,11 @@ llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
       CHECK_EQ(arg_lvs.size(), size_t(1));
       return arg_lvs.front();
     }
-    case SqlWindowFunctionKind::AVG:
-    case SqlWindowFunctionKind::MIN:
-    case SqlWindowFunctionKind::MAX:
-    case SqlWindowFunctionKind::SUM:
-    case SqlWindowFunctionKind::COUNT: {
+    case hdk::ir::WindowFunctionKind::Avg:
+    case hdk::ir::WindowFunctionKind::Min:
+    case hdk::ir::WindowFunctionKind::Max:
+    case hdk::ir::WindowFunctionKind::Sum:
+    case hdk::ir::WindowFunctionKind::Count: {
       return codegenWindowFunctionAggregate(co);
     }
     default: {
@@ -70,24 +70,24 @@ llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
 
 namespace {
 
-std::string get_window_agg_name(const SqlWindowFunctionKind kind,
+std::string get_window_agg_name(const hdk::ir::WindowFunctionKind kind,
                                 const hdk::ir::Type* window_func_type) {
   std::string agg_name;
   switch (kind) {
-    case SqlWindowFunctionKind::MIN: {
+    case hdk::ir::WindowFunctionKind::Min: {
       agg_name = "agg_min";
       break;
     }
-    case SqlWindowFunctionKind::MAX: {
+    case hdk::ir::WindowFunctionKind::Max: {
       agg_name = "agg_max";
       break;
     }
-    case SqlWindowFunctionKind::AVG:
-    case SqlWindowFunctionKind::SUM: {
+    case hdk::ir::WindowFunctionKind::Avg:
+    case hdk::ir::WindowFunctionKind::Sum: {
       agg_name = "agg_sum";
       break;
     }
-    case SqlWindowFunctionKind::COUNT: {
+    case hdk::ir::WindowFunctionKind::Count: {
       agg_name = "agg_count";
       break;
     }
@@ -106,8 +106,8 @@ std::string get_window_agg_name(const SqlWindowFunctionKind kind,
 const hdk::ir::Type* get_adjusted_window_type(
     const hdk::ir::WindowFunction* window_func) {
   const auto& args = window_func->args();
-  return ((window_func->kind() == SqlWindowFunctionKind::COUNT && !args.empty()) ||
-          window_func->kind() == SqlWindowFunctionKind::AVG)
+  return ((window_func->kind() == hdk::ir::WindowFunctionKind::Count && !args.empty()) ||
+          window_func->kind() == hdk::ir::WindowFunctionKind::Avg)
              ? args.front()->type()
              : window_func->type();
 }
@@ -138,7 +138,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregate(const CompilationOptions& 
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
-  if (window_func->kind() == SqlWindowFunctionKind::AVG) {
+  if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto aggregate_state_count_i64 = cgen_state_->llInt(
         reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
     const auto pi64_type =
@@ -147,7 +147,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregate(const CompilationOptions& 
         cgen_state_->ir_builder_.CreateIntToPtr(aggregate_state_count_i64, pi64_type);
   }
   codegenWindowFunctionStateInit(aggregate_state);
-  if (window_func->kind() == SqlWindowFunctionKind::AVG) {
+  if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto count_zero = cgen_state_->llInt(int64_t(0));
     cgen_state_->emitCall("agg_id", {aggregate_state_count, count_zero});
   }
@@ -197,7 +197,8 @@ void Executor::codegenWindowFunctionStateInit(llvm::Value* aggregate_state) {
           ? cgen_state_->inlineFpNull(window_func_type)
           : cgen_state_->castToTypeIn(cgen_state_->inlineIntNull(window_func_type), 64);
   llvm::Value* window_func_init_val;
-  if (window_func_context->getWindowFunction()->kind() == SqlWindowFunctionKind::COUNT) {
+  if (window_func_context->getWindowFunction()->kind() ==
+      hdk::ir::WindowFunctionKind::Count) {
     if (window_func_type->isFp32()) {
       window_func_init_val = cgen_state_->llFp(float(0));
     } else if (window_func_type->isFp64()) {
@@ -234,13 +235,13 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
   const auto& args = window_func->args();
   llvm::Value* crt_val;
   if (args.empty()) {
-    CHECK(window_func->kind() == SqlWindowFunctionKind::COUNT);
+    CHECK(window_func->kind() == hdk::ir::WindowFunctionKind::Count);
     crt_val = cgen_state_->llInt(int64_t(1));
   } else {
     CodeGenerator code_generator(this);
     const auto arg_lvs = code_generator.codegen(args.front().get(), true, co);
     CHECK_EQ(arg_lvs.size(), size_t(1));
-    if (window_func->kind() == SqlWindowFunctionKind::SUM &&
+    if (window_func->kind() == hdk::ir::WindowFunctionKind::Sum &&
         !window_func_type->isFloatingPoint()) {
       crt_val = code_generator.codegenCastBetweenIntTypes(
           arg_lvs.front(), args.front()->type(), window_func_type, false);
@@ -258,7 +259,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
     cgen_state_->emitCall(agg_name + "_skip_val",
                           {aggregate_state, crt_val, window_func_null_val});
   }
-  if (window_func->kind() == SqlWindowFunctionKind::AVG) {
+  if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     codegenWindowAvgEpilogue(crt_val, window_func_null_val, multiplicity_lv);
   }
   return codegenAggregateWindowState();
@@ -304,7 +305,7 @@ llvm::Value* Executor::codegenAggregateWindowState() {
   const auto window_func_type = get_adjusted_window_type(window_func);
   const auto aggregate_state_type = window_func_type->isFp32() ? pi32_type : pi64_type;
   auto aggregate_state = aggregateWindowStatePtr();
-  if (window_func->kind() == SqlWindowFunctionKind::AVG) {
+  if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto aggregate_state_count_i64 = cgen_state_->llInt(
         reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
     auto aggregate_state_count = cgen_state_->ir_builder_.CreateIntToPtr(
@@ -329,7 +330,7 @@ llvm::Value* Executor::codegenAggregateWindowState() {
           "load_avg_int", {aggregate_state, aggregate_state_count, double_null_lv});
     }
   }
-  if (window_func->kind() == SqlWindowFunctionKind::COUNT) {
+  if (window_func->kind() == hdk::ir::WindowFunctionKind::Count) {
     return cgen_state_->ir_builder_.CreateLoad(
         aggregate_state->getType()->getPointerElementType(), aggregate_state);
   }

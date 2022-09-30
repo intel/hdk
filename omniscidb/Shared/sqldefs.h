@@ -24,25 +24,6 @@
 #ifndef SQLDEFS_H
 #define SQLDEFS_H
 
-enum class SqlWindowFunctionKind {
-  ROW_NUMBER,
-  RANK,
-  DENSE_RANK,
-  PERCENT_RANK,
-  CUME_DIST,
-  NTILE,
-  LAG,
-  LEAD,
-  FIRST_VALUE,
-  LAST_VALUE,
-  AVG,
-  MIN,
-  MAX,
-  SUM,
-  COUNT,
-  SUM_INTERNAL  // For deserialization from Calcite only. Gets rewritten to a regular SUM.
-};
-
 enum SQLStmtType { kSELECT, kUPDATE, kINSERT, kDELETE, kCREATE_TABLE };
 
 enum StorageOption { kDISK = 0, kGPU = 1, kCPU = 2 };
@@ -69,45 +50,6 @@ inline std::string toString(const JoinType& join_type) {
     default:
       return "INVALID";
   }
-}
-
-inline std::string toString(const SqlWindowFunctionKind& kind) {
-  switch (kind) {
-    case SqlWindowFunctionKind::ROW_NUMBER:
-      return "ROW_NUMBER";
-    case SqlWindowFunctionKind::RANK:
-      return "RANK";
-    case SqlWindowFunctionKind::DENSE_RANK:
-      return "DENSE_RANK";
-    case SqlWindowFunctionKind::PERCENT_RANK:
-      return "PERCENT_RANK";
-    case SqlWindowFunctionKind::CUME_DIST:
-      return "CUME_DIST";
-    case SqlWindowFunctionKind::NTILE:
-      return "NTILE";
-    case SqlWindowFunctionKind::LAG:
-      return "LAG";
-    case SqlWindowFunctionKind::LEAD:
-      return "LEAD";
-    case SqlWindowFunctionKind::FIRST_VALUE:
-      return "FIRST_VALUE";
-    case SqlWindowFunctionKind::LAST_VALUE:
-      return "LAST_VALUE";
-    case SqlWindowFunctionKind::AVG:
-      return "AVG";
-    case SqlWindowFunctionKind::MIN:
-      return "MIN";
-    case SqlWindowFunctionKind::MAX:
-      return "MAX";
-    case SqlWindowFunctionKind::SUM:
-      return "SUM";
-    case SqlWindowFunctionKind::COUNT:
-      return "COUNT";
-    case SqlWindowFunctionKind::SUM_INTERNAL:
-      return "SUM_INTERNAL";
-  }
-  LOG(FATAL) << "Invalid window function kind.";
-  return "";
 }
 
 #endif

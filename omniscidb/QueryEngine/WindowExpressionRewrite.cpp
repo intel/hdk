@@ -42,9 +42,9 @@ bool window_sum_and_count_match(const hdk::ir::WindowFunction* sum_window_expr,
   return exprsEqual(sum_window_expr->args(), count_window_expr->args());
 }
 
-bool is_sum_kind(const SqlWindowFunctionKind kind) {
-  return kind == SqlWindowFunctionKind::SUM_INTERNAL ||
-         kind == SqlWindowFunctionKind::SUM;
+bool is_sum_kind(const hdk::ir::WindowFunctionKind kind) {
+  return kind == hdk::ir::WindowFunctionKind::SumInternal ||
+         kind == hdk::ir::WindowFunctionKind::Sum;
 }
 
 }  // namespace
@@ -72,7 +72,8 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
   }
   const auto count_window_expr = std::dynamic_pointer_cast<const hdk::ir::WindowFunction>(
       remove_cast(window_gt_zero->leftOperandShared()));
-  if (!count_window_expr || count_window_expr->kind() != SqlWindowFunctionKind::COUNT) {
+  if (!count_window_expr ||
+      count_window_expr->kind() != hdk::ir::WindowFunctionKind::Count) {
     return nullptr;
   }
   if (!window_sum_and_count_match(sum_window_expr.get(), count_window_expr.get())) {
@@ -84,7 +85,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_sum_window(
     sum_type = sum_type->ctx().int64(sum_type->nullable());
   }
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(sum_type,
-                                                    SqlWindowFunctionKind::SUM,
+                                                    hdk::ir::WindowFunctionKind::Sum,
                                                     sum_window_expr->args(),
                                                     sum_window_expr->partitionKeys(),
                                                     sum_window_expr->orderKeys(),
@@ -110,7 +111,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
   }
   const auto count_window = dynamic_cast<const hdk::ir::WindowFunction*>(
       cast_count_window ? cast_count_window->operand() : div_expr->rightOperand());
-  if (!count_window || count_window->kind() != SqlWindowFunctionKind::COUNT) {
+  if (!count_window || count_window->kind() != hdk::ir::WindowFunctionKind::Count) {
     return nullptr;
   }
   CHECK(count_window->type()->isInt64());
@@ -123,7 +124,7 @@ std::shared_ptr<const hdk::ir::WindowFunction> rewrite_avg_window(
     return nullptr;
   }
   return hdk::ir::makeExpr<hdk::ir::WindowFunction>(expr->ctx().fp64(),
-                                                    SqlWindowFunctionKind::AVG,
+                                                    hdk::ir::WindowFunctionKind::Avg,
                                                     sum_window_expr->args(),
                                                     sum_window_expr->partitionKeys(),
                                                     sum_window_expr->orderKeys(),

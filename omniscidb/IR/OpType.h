@@ -80,6 +80,25 @@ enum class AggType {
   kSingleValue
 };
 
+enum class WindowFunctionKind {
+  RowNumber,
+  Rank,
+  DenseRank,
+  PercentRank,
+  CumeDist,
+  NTile,
+  Lag,
+  Lead,
+  FirstValue,
+  LastValue,
+  Avg,
+  Min,
+  Max,
+  Sum,
+  Count,
+  SumInternal  // For deserialization from Calcite only. Gets rewritten to a regular SUM.
+};
+
 }  // namespace hdk::ir
 
 inline std::string toString(hdk::ir::OpType op) {
@@ -185,4 +204,47 @@ inline std::string toString(hdk::ir::AggType agg) {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
   return os << toString(agg);
+}
+
+inline std::string toString(hdk::ir::WindowFunctionKind kind) {
+  switch (kind) {
+    case hdk::ir::WindowFunctionKind::RowNumber:
+      return "ROW_NUMBER";
+    case hdk::ir::WindowFunctionKind::Rank:
+      return "RANK";
+    case hdk::ir::WindowFunctionKind::DenseRank:
+      return "DENSE_RANK";
+    case hdk::ir::WindowFunctionKind::PercentRank:
+      return "PERCENT_RANK";
+    case hdk::ir::WindowFunctionKind::CumeDist:
+      return "CUME_DIST";
+    case hdk::ir::WindowFunctionKind::NTile:
+      return "NTILE";
+    case hdk::ir::WindowFunctionKind::Lag:
+      return "LAG";
+    case hdk::ir::WindowFunctionKind::Lead:
+      return "LEAD";
+    case hdk::ir::WindowFunctionKind::FirstValue:
+      return "FIRST_VALUE";
+    case hdk::ir::WindowFunctionKind::LastValue:
+      return "LAST_VALUE";
+    case hdk::ir::WindowFunctionKind::Avg:
+      return "AVG";
+    case hdk::ir::WindowFunctionKind::Min:
+      return "MIN";
+    case hdk::ir::WindowFunctionKind::Max:
+      return "MAX";
+    case hdk::ir::WindowFunctionKind::Sum:
+      return "SUM";
+    case hdk::ir::WindowFunctionKind::Count:
+      return "COUNT";
+    case hdk::ir::WindowFunctionKind::SumInternal:
+      return "SUM_INTERNAL";
+  }
+  LOG(FATAL) << "Invalid window function kind.";
+  return "";
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::WindowFunctionKind kind) {
+  return os << toString(kind);
 }

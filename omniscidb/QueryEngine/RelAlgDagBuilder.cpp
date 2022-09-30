@@ -722,54 +722,54 @@ const hdk::ir::Type* parseType(const rapidjson::Value& type_obj) {
   return buildType(hdk::ir::Context::defaultCtx(), type_name, nullable, precision, scale);
 }
 
-SqlWindowFunctionKind parse_window_function_kind(const std::string& name) {
+hdk::ir::WindowFunctionKind parse_window_function_kind(const std::string& name) {
   if (name == "ROW_NUMBER") {
-    return SqlWindowFunctionKind::ROW_NUMBER;
+    return hdk::ir::WindowFunctionKind::RowNumber;
   }
   if (name == "RANK") {
-    return SqlWindowFunctionKind::RANK;
+    return hdk::ir::WindowFunctionKind::Rank;
   }
   if (name == "DENSE_RANK") {
-    return SqlWindowFunctionKind::DENSE_RANK;
+    return hdk::ir::WindowFunctionKind::DenseRank;
   }
   if (name == "PERCENT_RANK") {
-    return SqlWindowFunctionKind::PERCENT_RANK;
+    return hdk::ir::WindowFunctionKind::PercentRank;
   }
   if (name == "CUME_DIST") {
-    return SqlWindowFunctionKind::CUME_DIST;
+    return hdk::ir::WindowFunctionKind::CumeDist;
   }
   if (name == "NTILE") {
-    return SqlWindowFunctionKind::NTILE;
+    return hdk::ir::WindowFunctionKind::NTile;
   }
   if (name == "LAG") {
-    return SqlWindowFunctionKind::LAG;
+    return hdk::ir::WindowFunctionKind::Lag;
   }
   if (name == "LEAD") {
-    return SqlWindowFunctionKind::LEAD;
+    return hdk::ir::WindowFunctionKind::Lead;
   }
   if (name == "FIRST_VALUE") {
-    return SqlWindowFunctionKind::FIRST_VALUE;
+    return hdk::ir::WindowFunctionKind::FirstValue;
   }
   if (name == "LAST_VALUE") {
-    return SqlWindowFunctionKind::LAST_VALUE;
+    return hdk::ir::WindowFunctionKind::LastValue;
   }
   if (name == "AVG") {
-    return SqlWindowFunctionKind::AVG;
+    return hdk::ir::WindowFunctionKind::Avg;
   }
   if (name == "MIN") {
-    return SqlWindowFunctionKind::MIN;
+    return hdk::ir::WindowFunctionKind::Min;
   }
   if (name == "MAX") {
-    return SqlWindowFunctionKind::MAX;
+    return hdk::ir::WindowFunctionKind::Max;
   }
   if (name == "SUM") {
-    return SqlWindowFunctionKind::SUM;
+    return hdk::ir::WindowFunctionKind::Sum;
   }
   if (name == "COUNT") {
-    return SqlWindowFunctionKind::COUNT;
+    return hdk::ir::WindowFunctionKind::Count;
   }
   if (name == "$SUM0") {
-    return SqlWindowFunctionKind::SUM_INTERNAL;
+    return hdk::ir::WindowFunctionKind::SumInternal;
   }
   throw std::runtime_error("Unsupported window function: " + name);
 }
@@ -1203,16 +1203,16 @@ bool supportedLowerBound(const WindowBound& window_bound) {
 }
 
 bool supportedUpperBound(const WindowBound& window_bound,
-                         SqlWindowFunctionKind kind,
+                         hdk::ir::WindowFunctionKind kind,
                          const hdk::ir::ExprPtrVector& order_keys) {
   const bool to_current_row = !window_bound.unbounded && !window_bound.preceding &&
                               !window_bound.following && window_bound.is_current_row &&
                               !window_bound.offset && window_bound.order_key == 1;
   switch (kind) {
-    case SqlWindowFunctionKind::ROW_NUMBER:
-    case SqlWindowFunctionKind::RANK:
-    case SqlWindowFunctionKind::DENSE_RANK:
-    case SqlWindowFunctionKind::CUME_DIST: {
+    case hdk::ir::WindowFunctionKind::RowNumber:
+    case hdk::ir::WindowFunctionKind::Rank:
+    case hdk::ir::WindowFunctionKind::DenseRank:
+    case hdk::ir::WindowFunctionKind::CumeDist: {
       return to_current_row;
     }
     default: {
@@ -1242,7 +1242,7 @@ hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
   const auto collation = parseWindowOrderCollation(order_keys_arr);
   const auto kind = parse_window_function_kind(op_name);
   // Adjust type for SUM window function.
-  if (kind == SqlWindowFunctionKind::SUM_INTERNAL && type->isInteger()) {
+  if (kind == hdk::ir::WindowFunctionKind::SumInternal && type->isInteger()) {
     type = type->ctx().int64(type->nullable());
   }
   const auto lower_bound = parse_window_bound(field(json_expr, "lower_bound"),
@@ -1260,7 +1260,7 @@ hdk::ir::ExprPtr parseWindowFunction(const rapidjson::Value& json_expr,
 
   if (!supportedLowerBound(lower_bound) ||
       !supportedUpperBound(upper_bound, kind, order_keys) ||
-      ((kind == SqlWindowFunctionKind::ROW_NUMBER) != is_rows)) {
+      ((kind == hdk::ir::WindowFunctionKind::RowNumber) != is_rows)) {
     throw std::runtime_error("Frame specification not supported");
   }
 
@@ -2370,7 +2370,7 @@ bool is_window_function_sum(const hdk::ir::Expr* expr) {
     }
 
     const auto then_window = dynamic_cast<const hdk::ir::WindowFunction*>(then);
-    if (then_window && then_window->kind() == SqlWindowFunctionKind::SUM_INTERNAL) {
+    if (then_window && then_window->kind() == hdk::ir::WindowFunctionKind::SumInternal) {
       return true;
     }
   }
@@ -2402,7 +2402,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
     const auto second_window =
         dynamic_cast<const hdk::ir::WindowFunction*>(div->rightOperand());
     if (case_expr && second_window &&
-        second_window->kind() == SqlWindowFunctionKind::COUNT) {
+        second_window->kind() == hdk::ir::WindowFunctionKind::Count) {
       if (is_window_function_sum(case_expr)) {
         return true;
       }

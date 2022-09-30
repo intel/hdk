@@ -1044,7 +1044,7 @@ struct OrderEntry {
 class WindowFunction : public Expr {
  public:
   WindowFunction(const hdk::ir::Type* type,
-                 const SqlWindowFunctionKind kind,
+                 const WindowFunctionKind kind,
                  const ExprPtrVector& args,
                  const ExprPtrVector& partition_keys,
                  const ExprPtrVector& order_keys,
@@ -1061,7 +1061,7 @@ class WindowFunction : public Expr {
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
-  SqlWindowFunctionKind kind() const { return kind_; }
+  WindowFunctionKind kind() const { return kind_; }
 
   const ExprPtrVector& args() const { return args_; }
 
@@ -1074,7 +1074,7 @@ class WindowFunction : public Expr {
   size_t hash() const override;
 
  private:
-  const SqlWindowFunctionKind kind_;
+  const WindowFunctionKind kind_;
   const ExprPtrVector args_;
   const ExprPtrVector partition_keys_;
   const ExprPtrVector order_keys_;
