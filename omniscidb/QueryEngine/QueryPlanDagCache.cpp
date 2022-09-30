@@ -146,7 +146,7 @@ void QueryPlanDagCache::clearQueryPlanCache() {
 std::vector<const hdk::ir::ColumnVar*> QueryPlanDagCache::collectColVars(
     const hdk::ir::Expr* target) {
   if (target) {
-    return col_var_visitor_.visit(target);
+    return ColumnVarsCollector::collect(target);
   }
   return {};
 }

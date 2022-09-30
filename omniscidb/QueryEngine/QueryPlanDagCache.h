@@ -27,7 +27,8 @@
 
 #include "RelAlgDagBuilder.h"
 #include "RelAlgExecutionUnit.h"
-#include "ScalarExprVisitor.h"
+
+#include "IR/ExprCollector.h"
 
 // we manage the uniqueness of node ID by its explained contents that each rel node has
 using RelNodeMap = std::unordered_map<RelNodeExplainedHash, RelNodeId>;
@@ -37,35 +38,12 @@ using RelNodeMap = std::unordered_map<RelNodeExplainedHash, RelNodeId>;
 // matching and graph isomorphism
 using QueryPlanDag = boost::labeled_graph<AdjacentList, RelNodeId, boost::hash_mapS>;
 
-class ColumnVarsVisitor
-    : public ScalarExprVisitor<std::vector<const hdk::ir::ColumnVar*>> {
+class ColumnVarsCollector
+    : public hdk::ir::ExprCollector<std::vector<const hdk::ir::ColumnVar*>,
+                                    ColumnVarsCollector> {
  protected:
-  std::vector<const hdk::ir::ColumnVar*> visitColumnVar(
-      const hdk::ir::ColumnVar* column) const override {
-    return {column};
-  }
-
-  std::vector<const hdk::ir::ColumnVar*> visitColumnVarTuple(
-      const hdk::ir::ExpressionTuple* expr_tuple) const override {
-    ColumnVarsVisitor visitor;
-    std::vector<const hdk::ir::ColumnVar*> result;
-    for (size_t i = 0; i < expr_tuple->tuple().size(); ++i) {
-      const auto col_vars = visitor.visit(expr_tuple->tuple()[i].get());
-      for (const auto col_var : col_vars) {
-        result.push_back(col_var);
-      }
-    }
-    return result;
-  }
-
-  std::vector<const hdk::ir::ColumnVar*> aggregateResult(
-      const std::vector<const hdk::ir::ColumnVar*>& aggregate,
-      const std::vector<const hdk::ir::ColumnVar*>& next_result) const override {
-    auto result = aggregate;
-    for (const auto col_var : next_result) {
-      result.push_back(col_var);
-    }
-    return result;
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
+    result_.push_back(column);
   }
 };
 
@@ -124,5 +102,4 @@ class QueryPlanDagCache {
   size_t max_node_map_size_;
   // a lock to protect contentions while accessing internal data structure of DAG cache
   std::mutex cache_lock_;
-  ColumnVarsVisitor col_var_visitor_;
 };
