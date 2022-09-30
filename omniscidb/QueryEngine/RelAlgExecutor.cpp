@@ -829,20 +829,11 @@ struct ColumnRefHash {
 
 using ColumnRefSet = std::unordered_set<hdk::ir::ColumnRef, ColumnRefHash>;
 
-class UsedInputsVisitor : public ScalarExprVisitor<ColumnRefSet> {
- public:
-  UsedInputsVisitor() : ScalarExprVisitor() {}
-
-  virtual ColumnRefSet visitColumnRef(const hdk::ir::ColumnRef* col_ref) const {
-    return {*col_ref};
-  }
-
+class UsedInputsCollector
+    : public hdk::ir::ExprCollector<ColumnRefSet, UsedInputsCollector> {
  protected:
-  ColumnRefSet aggregateResult(const ColumnRefSet& aggregate,
-                               const ColumnRefSet& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
+    result_.insert(*col_ref);
   }
 };
 
@@ -864,22 +855,22 @@ const RelAlgNode* get_data_sink(const RelAlgNode* ra_node) {
 }
 
 ColumnRefSet get_used_inputs(const RelCompound* compound) {
-  UsedInputsVisitor visitor;
+  UsedInputsCollector collector;
   const auto filter_expr = compound->getFilter();
-  ColumnRefSet res = filter_expr ? visitor.visit(filter_expr.get()) : ColumnRefSet{};
+  if (filter_expr) {
+    collector.visit(filter_expr.get());
+  }
   for (auto& expr : compound->getGroupByExprs()) {
-    const auto used_inputs = visitor.visit(expr.get());
-    res.insert(used_inputs.begin(), used_inputs.end());
+    collector.visit(expr.get());
   }
   for (auto& expr : compound->getExprs()) {
-    const auto used_inputs = visitor.visit(expr.get());
-    res.insert(used_inputs.begin(), used_inputs.end());
+    collector.visit(expr.get());
   }
-  return res;
+  return std::move(collector.result());
 }
 
 ColumnRefSet get_used_inputs(const RelAggregate* aggregate) {
-  UsedInputsVisitor visitor;
+  UsedInputsCollector collector;
   ColumnRefSet res;
   const auto source = aggregate->getInput(0);
   const auto& in_metainfo = source->getOutputMetainfo();
@@ -892,35 +883,30 @@ ColumnRefSet get_used_inputs(const RelAggregate* aggregate) {
     auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr.get());
     CHECK(agg_expr);
     if (agg_expr->arg()) {
-      auto used_inputs = visitor.visit(agg_expr->arg());
-      res.insert(used_inputs.begin(), used_inputs.end());
+      collector.visit(agg_expr->arg());
     }
   }
+  res.insert(collector.result().begin(), collector.result().end());
   return res;
 }
 
 ColumnRefSet get_used_inputs(const RelProject* project) {
-  UsedInputsVisitor visitor;
-  ColumnRefSet res;
+  UsedInputsCollector collector;
   for (auto& expr : project->getExprs()) {
-    auto used_inputs = visitor.visit(expr.get());
-    res.insert(used_inputs.begin(), used_inputs.end());
+    collector.visit(expr.get());
   }
-  return res;
+  return std::move(collector.result());
 }
 
 ColumnRefSet get_used_inputs(const RelTableFunction* table_func) {
-  UsedInputsVisitor visitor;
-  ColumnRefSet res;
+  UsedInputsCollector collector;
   for (auto& expr : table_func->getTableFuncInputExprs()) {
-    auto used_inputs = visitor.visit(expr.get());
-    res.insert(used_inputs.begin(), used_inputs.end());
+    collector.visit(expr.get());
   }
-  return res;
+  return std::move(collector.result());
 }
 
 ColumnRefSet get_used_inputs(const RelFilter* filter) {
-  UsedInputsVisitor visitor;
   ColumnRefSet res;
   const auto data_sink_node = get_data_sink(filter);
   for (size_t nest_level = 0; nest_level < data_sink_node->inputCount(); ++nest_level) {
@@ -936,7 +922,6 @@ ColumnRefSet get_used_inputs(const RelFilter* filter) {
 }
 
 ColumnRefSet get_used_inputs(const RelLogicalUnion* logical_union) {
-  UsedInputsVisitor visitor;
   ColumnRefSet res;
   auto const n_inputs = logical_union->inputCount();
   for (size_t nest_level = 0; nest_level < n_inputs; ++nest_level) {
@@ -991,23 +976,21 @@ ColumnRefSet get_join_source_used_inputs(const RelAlgNode* ra_node) {
   if (auto join = dynamic_cast<const RelJoin*>(data_sink_node)) {
     CHECK_EQ(join->inputCount(), 2u);
     const auto condition = join->getCondition();
-    UsedInputsVisitor visitor;
-    return visitor.visit(condition);
+    return UsedInputsCollector::collect(condition);
   }
 
   if (auto left_deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(data_sink_node)) {
     CHECK_GE(left_deep_join->inputCount(), 2u);
-    UsedInputsVisitor visitor;
-    auto res = visitor.visit(left_deep_join->getInnerCondition());
+    UsedInputsCollector collector;
+    collector.visit(left_deep_join->getInnerCondition());
     for (size_t nesting_level = 1; nesting_level <= left_deep_join->inputCount() - 1;
          ++nesting_level) {
       const auto outer_condition = left_deep_join->getOuterCondition(nesting_level);
       if (outer_condition) {
-        const auto used_inputs = visitor.visit(outer_condition);
-        res.insert(used_inputs.begin(), used_inputs.end());
+        collector.visit(outer_condition);
       }
     }
-    return res;
+    return std::move(collector.result());
   }
 
   if (dynamic_cast<const RelLogicalUnion*>(ra_node)) {
