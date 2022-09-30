@@ -2712,20 +2712,10 @@ void separate_window_function_expressions(
 using InputSet = std::unordered_set<std::pair<const RelAlgNode*, unsigned>,
                                     boost::hash<std::pair<const RelAlgNode*, unsigned>>>;
 
-class InputCollector : public ScalarExprVisitor<InputSet> {
- public:
-  InputSet visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    InputSet result;
-    result.emplace(col_ref->node(), col_ref->index());
-    return result;
-  }
-
+class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  protected:
-  InputSet aggregateResult(const InputSet& aggregate,
-                           const InputSet& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
+    result_.emplace(col_ref->node(), col_ref->index());
   }
 };
 
@@ -2796,12 +2786,11 @@ void add_window_function_pre_project(
       continue;
     }
 
-    InputSet inputs;
     InputCollector input_collector;
     for (size_t i = 0; i < window_func_project_node->size(); i++) {
-      auto new_inputs = input_collector.visit(window_func_project_node->getExpr(i).get());
-      inputs.insert(new_inputs.begin(), new_inputs.end());
+      input_collector.visit(window_func_project_node->getExpr(i).get());
     }
+    const InputSet& inputs = input_collector.result();
 
     // Note: Technically not required since we are mapping old inputs to new input
     // indices, but makes the re-mapping of inputs easier to follow.
