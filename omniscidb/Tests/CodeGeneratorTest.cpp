@@ -111,7 +111,7 @@ TEST(CodeGeneratorTest, IntegerAdd) {
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
+      ctx.int32(), hdk::ir::OpType::kPlus, hdk::ir::Qualifier::kOne, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -175,7 +175,7 @@ TEST(CodeGeneratorTest, IntegerExpr) {
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
+      ctx.int32(), hdk::ir::OpType::kPlus, hdk::ir::Qualifier::kOne, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -271,7 +271,7 @@ TEST(CodeGeneratorTest, IntegerAddGPU) {
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
+      ctx.int32(), hdk::ir::OpType::kPlus, hdk::ir::Qualifier::kOne, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -388,7 +388,7 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
+      ctx.int32(), hdk::ir::OpType::kPlus, hdk::ir::Qualifier::kOne, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);

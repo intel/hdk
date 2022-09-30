@@ -126,7 +126,7 @@ class CodeGenerator {
   llvm::Value* codegenCmp(const hdk::ir::BinOper*, const CompilationOptions&);
 
   llvm::Value* codegenCmp(hdk::ir::OpType,
-                          const SQLQualifier,
+                          hdk::ir::Qualifier,
                           std::vector<llvm::Value*>,
                           const hdk::ir::Type*,
                           const hdk::ir::Expr*,
@@ -338,20 +338,20 @@ class CodeGenerator {
                                                        const DateTruncField&);
 
   llvm::Value* codegenCmpDecimalConst(hdk::ir::OpType,
-                                      const SQLQualifier,
+                                      hdk::ir::Qualifier,
                                       const hdk::ir::Expr*,
                                       const hdk::ir::Type*,
                                       const hdk::ir::Expr*,
                                       const CompilationOptions&);
 
   llvm::Value* codegenStrCmp(hdk::ir::OpType,
-                             const SQLQualifier,
+                             hdk::ir::Qualifier,
                              const hdk::ir::ExprPtr,
                              const hdk::ir::ExprPtr,
                              const CompilationOptions&);
 
   llvm::Value* codegenQualifierCmp(hdk::ir::OpType,
-                                   const SQLQualifier,
+                                   hdk::ir::Qualifier,
                                    std::vector<llvm::Value*>,
                                    const hdk::ir::Expr*,
                                    const CompilationOptions&);

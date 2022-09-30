@@ -56,7 +56,7 @@ hdk::ir::ExprPtr analyzeFixedPtValue(const int64_t numericval,
 hdk::ir::ExprPtr analyzeStringValue(const std::string& stringval);
 
 hdk::ir::ExprPtr normalizeOperExpr(hdk::ir::OpType optype,
-                                   const SQLQualifier qual,
+                                   hdk::ir::Qualifier qual,
                                    hdk::ir::ExprPtr left_expr,
                                    hdk::ir::ExprPtr right_expr,
                                    const Executor* executor = nullptr);

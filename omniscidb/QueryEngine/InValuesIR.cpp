@@ -53,15 +53,23 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
   }
   if (!expr_type->nullable()) {
     for (auto in_val : expr->valueList()) {
-      result = cgen_state_->ir_builder_.CreateOr(
-          result,
-          toBool(codegenCmp(
-              hdk::ir::OpType::kEq, kONE, lhs_lvs, in_arg->type(), in_val.get(), co)));
+      result =
+          cgen_state_->ir_builder_.CreateOr(result,
+                                            toBool(codegenCmp(hdk::ir::OpType::kEq,
+                                                              hdk::ir::Qualifier::kOne,
+                                                              lhs_lvs,
+                                                              in_arg->type(),
+                                                              in_val.get(),
+                                                              co)));
     }
   } else {
     for (auto in_val : expr->valueList()) {
-      const auto crt = codegenCmp(
-          hdk::ir::OpType::kEq, kONE, lhs_lvs, in_arg->type(), in_val.get(), co);
+      const auto crt = codegenCmp(hdk::ir::OpType::kEq,
+                                  hdk::ir::Qualifier::kOne,
+                                  lhs_lvs,
+                                  in_arg->type(),
+                                  in_val.get(),
+                                  co);
       result = cgen_state_->emitCall(
           "logical_or", {result, crt, cgen_state_->inlineIntNull(expr_type)});
     }

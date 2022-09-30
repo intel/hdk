@@ -435,7 +435,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
   cgen_state_->ir_builder_.SetInsertPoint(width_bucket_bound_check_ok_bb);
   cgen_state_->needs_error_check_ = true;
   auto reversed_expr = toBool(codegenCmp(hdk::ir::OpType::kGt,
-                                         kONE,
+                                         hdk::ir::Qualifier::kOne,
                                          lower_bound_expr_lvs,
                                          lower_bound_expr->type(),
                                          upper_bound_expr,

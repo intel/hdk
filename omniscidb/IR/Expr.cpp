@@ -1405,9 +1405,9 @@ std::string BinOper::toString() const {
   }
   std::string str{"("};
   str += op;
-  if (qualifier_ == kANY) {
+  if (qualifier_ == hdk::ir::Qualifier::kAny) {
     str += "ANY ";
-  } else if (qualifier_ == kALL) {
+  } else if (qualifier_ == hdk::ir::Qualifier::kAll) {
     str += "ALL ";
   }
   str += left_operand_->toString();

@@ -28,8 +28,8 @@ bool can_combine_with(const hdk::ir::Expr* crt, const hdk::ir::Expr* prev) {
   if (!crt_bin || !prev_bin) {
     return false;
   }
-  if (!crt_bin->isEquivalence() || crt_bin->qualifier() != kONE ||
-      !prev_bin->isEquivalence() || prev_bin->qualifier() != kONE ||
+  if (!crt_bin->isEquivalence() || crt_bin->qualifier() != hdk::ir::Qualifier::kOne ||
+      !prev_bin->isEquivalence() || prev_bin->qualifier() != hdk::ir::Qualifier::kOne ||
       // We could accept a mix of kEQ and kBW_EQ, but don't bother for now.
       crt_bin->opType() != prev_bin->opType()) {
     return false;
@@ -85,7 +85,7 @@ std::list<hdk::ir::ExprPtr> make_composite_equals_impl(
         lhs_tuple.front()->ctx().boolean(nullable),
         false,
         first_qual->opType(),
-        kONE,
+        hdk::ir::Qualifier::kOne,
         lhs_tuple.size() > 1 ? std::make_shared<hdk::ir::ExpressionTuple>(lhs_tuple)
                              : lhs_tuple.front(),
         rhs_tuple.size() > 1 ? std::make_shared<hdk::ir::ExpressionTuple>(rhs_tuple)

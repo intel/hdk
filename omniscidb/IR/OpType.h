@@ -66,6 +66,8 @@ inline bool isEquivalence(OpType op) {
   return op == OpType::kEq || op == OpType::kBwEq;
 }
 
+enum class Qualifier { kOne, kAny, kAll };
+
 }  // namespace hdk::ir
 
 inline std::string toString(hdk::ir::OpType op) {
@@ -125,4 +127,21 @@ inline std::string toString(hdk::ir::OpType op) {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::OpType op) {
   return os << toString(op);
+}
+
+inline std::string toString(hdk::ir::Qualifier qualifier) {
+  switch (qualifier) {
+    case hdk::ir::Qualifier::kOne:
+      return "ONE";
+    case hdk::ir::Qualifier::kAny:
+      return "ANY";
+    case hdk::ir::Qualifier::kAll:
+      return "ALL";
+  }
+  LOG(FATAL) << "Invalid Qualifier: " << int(qualifier);
+  return "";
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::Qualifier qualifier) {
+  return os << toString(qualifier);
 }

@@ -626,7 +626,7 @@ bool simple_predicate_has_simple_cast(const hdk::ir::ExprPtr cast_operand,
 hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
                                             int& rte_idx) {
   rte_idx = -1;
-  if (!bin_oper->isComparison() || bin_oper->qualifier() != kONE) {
+  if (!bin_oper->isComparison() || bin_oper->qualifier() != hdk::ir::Qualifier::kOne) {
     return nullptr;
   }
 

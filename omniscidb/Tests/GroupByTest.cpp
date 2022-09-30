@@ -91,7 +91,7 @@ TEST_F(HighCardinalityStringEnv, PerfectHashNoFallback) {
   auto simple_filter_expr = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx().boolean(),
                                                                 false,
                                                                 hdk::ir::OpType::kEq,
-                                                                SQLQualifier::kONE,
+                                                                hdk::ir::Qualifier::kOne,
                                                                 filter_col_expr,
                                                                 filter_val_expr);
   RelAlgExecutionUnit ra_exe_unit{input_descs,
@@ -187,7 +187,7 @@ TEST_F(HighCardinalityStringEnv, BaselineFallbackTest) {
   auto simple_filter_expr = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx().boolean(),
                                                                 false,
                                                                 hdk::ir::OpType::kEq,
-                                                                SQLQualifier::kONE,
+                                                                hdk::ir::Qualifier::kOne,
                                                                 filter_col_expr,
                                                                 filter_val_expr);
   RelAlgExecutionUnit ra_exe_unit{input_descs,

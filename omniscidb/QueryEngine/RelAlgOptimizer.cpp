@@ -1488,7 +1488,7 @@ void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
           hdk::ir::makeExpr<hdk::ir::BinOper>(lhs->type()->ctx().boolean(nullable),
                                               false,
                                               hdk::ir::OpType::kAnd,
-                                              kONE,
+                                              hdk::ir::Qualifier::kOne,
                                               lhs,
                                               rhs);
       folded_filter->setCondition(std::move(new_condition));
@@ -1699,8 +1699,12 @@ void hoist_filter_cond_to_cross_join(
             auto rhs = visitor.visit(join_conditions[i]);
             auto res_type = rhs->type()->ctx().boolean(
                 rhs->type()->nullable() || new_join_condition->type()->nullable());
-            new_join_condition = hdk::ir::makeExpr<hdk::ir::BinOper>(
-                res_type, hdk::ir::OpType::kAnd, kONE, new_join_condition, rhs);
+            new_join_condition =
+                hdk::ir::makeExpr<hdk::ir::BinOper>(res_type,
+                                                    hdk::ir::OpType::kAnd,
+                                                    hdk::ir::Qualifier::kOne,
+                                                    new_join_condition,
+                                                    rhs);
           }
           join->setCondition(new_join_condition);
         }

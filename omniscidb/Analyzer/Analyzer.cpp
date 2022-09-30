@@ -540,7 +540,7 @@ const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
 }
 
 hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
-                                   const SQLQualifier qual,
+                                   hdk::ir::Qualifier qual,
                                    hdk::ir::ExprPtr left_expr,
                                    hdk::ir::ExprPtr right_expr,
                                    const Executor* executor) {
@@ -555,7 +555,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
   auto left_type = left_expr->type();
   auto right_type = right_expr->type();
   auto& ctx = left_type->ctx();
-  if (qual != kONE) {
+  if (qual != hdk::ir::Qualifier::kOne) {
     // subquery not supported yet.
     CHECK(!right_expr->is<hdk::ir::ScalarSubquery>());
     if (!right_type->isArray()) {
@@ -584,7 +584,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
       left_expr = left_expr->cast(new_left_type);
     }
     if (!right_type->equal(new_right_type)) {
-      if (qual == kONE) {
+      if (qual == hdk::ir::Qualifier::kOne) {
         right_expr = right_expr->cast(new_right_type);
       } else {
         right_expr = right_expr->cast(

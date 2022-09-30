@@ -132,10 +132,11 @@ std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_e
       ctx.boolean(false), hdk::ir::OpType::kIsNull, bw_eq->leftOperandShared());
   const auto rhs_is_null = std::make_shared<hdk::ir::UOper>(
       ctx.boolean(false), hdk::ir::OpType::kIsNull, bw_eq->rightOperandShared());
-  const auto both_are_null =
-      Analyzer::normalizeOperExpr(hdk::ir::OpType::kAnd, kONE, lhs_is_null, rhs_is_null);
-  const auto bw_eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
-      Analyzer::normalizeOperExpr(hdk::ir::OpType::kOr, kONE, eq_oper, both_are_null));
+  const auto both_are_null = Analyzer::normalizeOperExpr(
+      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, lhs_is_null, rhs_is_null);
+  const auto bw_eq_oper =
+      std::dynamic_pointer_cast<const hdk::ir::BinOper>(Analyzer::normalizeOperExpr(
+          hdk::ir::OpType::kOr, hdk::ir::Qualifier::kOne, eq_oper, both_are_null));
   CHECK(bw_eq_oper);
   return bw_eq_oper;
 }
@@ -147,7 +148,7 @@ std::shared_ptr<const hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
   // Sides of a tuple equality are stripped of cast operators to simplify the logic
   // in the hash table construction algorithm. Add them back here.
   auto eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
-      Analyzer::normalizeOperExpr(optype, kONE, lhs, rhs));
+      Analyzer::normalizeOperExpr(optype, hdk::ir::Qualifier::kOne, lhs, rhs));
   CHECK(eq_oper);
   return optype == hdk::ir::OpType::kBwEq ? lower_bw_eq(eq_oper.get()) : eq_oper;
 }
@@ -172,7 +173,7 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
     acc = hdk::ir::makeExpr<hdk::ir::BinOper>(acc->type()->ctx().boolean(nullable),
                                               false,
                                               hdk::ir::OpType::kAnd,
-                                              kONE,
+                                              hdk::ir::Qualifier::kOne,
                                               acc,
                                               crt);
   }
@@ -273,7 +274,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
 }
 
 llvm::Value* CodeGenerator::codegenStrCmp(hdk::ir::OpType optype,
-                                          const SQLQualifier qualifier,
+                                          hdk::ir::Qualifier qualifier,
                                           const hdk::ir::ExprPtr lhs,
                                           const hdk::ir::ExprPtr rhs,
                                           const CompilationOptions& co) {
@@ -305,7 +306,7 @@ llvm::Value* CodeGenerator::codegenStrCmp(hdk::ir::OpType optype,
 }
 
 llvm::Value* CodeGenerator::codegenCmpDecimalConst(hdk::ir::OpType optype,
-                                                   const SQLQualifier qualifier,
+                                                   hdk::ir::Qualifier qualifier,
                                                    const hdk::ir::Expr* lhs,
                                                    const hdk::ir::Type* lhs_type,
                                                    const hdk::ir::Expr* rhs,
@@ -360,7 +361,7 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(hdk::ir::OpType optype,
 }
 
 llvm::Value* CodeGenerator::codegenCmp(hdk::ir::OpType optype,
-                                       const SQLQualifier qualifier,
+                                       hdk::ir::Qualifier qualifier,
                                        std::vector<llvm::Value*> lhs_lvs,
                                        const hdk::ir::Type* lhs_type,
                                        const hdk::ir::Expr* rhs,
@@ -372,7 +373,7 @@ llvm::Value* CodeGenerator::codegenCmp(hdk::ir::OpType optype,
     return codegenQualifierCmp(optype, qualifier, lhs_lvs, rhs, co);
   }
   auto rhs_lvs = codegen(rhs, true, co);
-  CHECK_EQ(kONE, qualifier);
+  CHECK_EQ(hdk::ir::Qualifier::kOne, qualifier);
   CHECK((lhs_type->isString() && rhs_type->isString()) ||
         (lhs_type->id() == rhs_type->id()))
       << lhs_type->toString() << " " << rhs_type->toString();
@@ -453,7 +454,7 @@ llvm::Value* CodeGenerator::codegenCmp(hdk::ir::OpType optype,
 }
 
 llvm::Value* CodeGenerator::codegenQualifierCmp(hdk::ir::OpType optype,
-                                                const SQLQualifier qualifier,
+                                                hdk::ir::Qualifier qualifier,
                                                 std::vector<llvm::Value*> lhs_lvs,
                                                 const hdk::ir::Expr* rhs,
                                                 const CompilationOptions& co) {
@@ -471,8 +472,9 @@ llvm::Value* CodeGenerator::codegenQualifierCmp(hdk::ir::OpType optype,
   CHECK(arr_type->isArray());
   auto elem_type = arr_type->as<hdk::ir::ArrayBaseType>()->elemType();
   auto rhs_lvs = codegen(arr_expr, true, co);
-  CHECK_NE(kONE, qualifier);
-  std::string fname{std::string("array_") + (qualifier == kANY ? "any" : "all") + "_" +
+  CHECK_NE(hdk::ir::Qualifier::kOne, qualifier);
+  std::string fname{std::string("array_") +
+                    (qualifier == hdk::ir::Qualifier::kAny ? "any" : "all") + "_" +
                     icmp_arr_name(optype)};
   if (target_type->isString()) {
     if (config_.exec.watchdog.enable) {

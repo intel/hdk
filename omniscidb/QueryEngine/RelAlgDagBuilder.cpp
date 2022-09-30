@@ -1116,7 +1116,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bigint_type,
           hdk::ir::OpType::kMul,
-          kONE,
+          hdk::ir::Qualifier::kOne,
           result,
           hdk::ir::Constant::make(bigint_type, 1000));
 
@@ -1152,7 +1152,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
       interval_sec =
           hdk::ir::makeExpr<hdk::ir::BinOper>(bigint_type,
                                               hdk::ir::OpType::kDiv,
-                                              kONE,
+                                              hdk::ir::Qualifier::kOne,
                                               interval,
                                               hdk::ir::Constant::make(bigint_type, 1000));
       if (op == hdk::ir::OpType::kMinus) {
@@ -1171,14 +1171,16 @@ hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
   return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daMONTH, interval_months, lhs);
 }
 
-std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
+std::pair<hdk::ir::ExprPtr, hdk::ir::Qualifier> getQuantifiedBinOperRhs(
     const hdk::ir::ExprPtr& expr,
     hdk::ir::ExprPtr orig_expr) {
   if (auto fn_oper = dynamic_cast<const hdk::ir::FunctionOper*>(expr.get())) {
     auto& fn_name = fn_oper->name();
     if (fn_name == "PG_ANY" || fn_name == "PG_ALL") {
       CHECK_EQ(fn_oper->arity(), (size_t)1);
-      return std::make_pair(fn_oper->argShared(0), (fn_name == "PG_ANY") ? kANY : kALL);
+      return std::make_pair(
+          fn_oper->argShared(0),
+          (fn_name == "PG_ANY") ? hdk::ir::Qualifier::kAny : hdk::ir::Qualifier::kAll);
     }
   } else if (auto uoper = dynamic_cast<const hdk::ir::UOper*>(expr.get())) {
     if (uoper->isCast()) {
@@ -1186,10 +1188,10 @@ std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
     }
   }
 
-  return std::make_pair(orig_expr, kONE);
+  return std::make_pair(orig_expr, hdk::ir::Qualifier::kOne);
 }
 
-std::pair<hdk::ir::ExprPtr, SQLQualifier> getQuantifiedBinOperRhs(
+std::pair<hdk::ir::ExprPtr, hdk::ir::Qualifier> getQuantifiedBinOperRhs(
     const hdk::ir::ExprPtr& expr) {
   return getQuantifiedBinOperRhs(expr, expr);
 }
@@ -1495,7 +1497,7 @@ hdk::ir::ExprPtr parseItem(const hdk::ir::ExprPtrVector& operands) {
       base->type()->as<hdk::ir::ArrayBaseType>()->elemType(),
       false,
       hdk::ir::OpType::kArrayAt,
-      kONE,
+      hdk::ir::Qualifier::kOne,
       base,
       index);
 }
@@ -1576,7 +1578,8 @@ hdk::ir::ExprPtr parseAbs(const hdk::ir::ExprPtrVector& operands) {
   auto arg_type = arg->type();
   CHECK(arg_type->isNumber());
   auto zero = hdk::ir::Constant::make(arg_type, 0);
-  auto lt_zero = Analyzer::normalizeOperExpr(hdk::ir::OpType::kLt, kONE, arg, zero);
+  auto lt_zero = Analyzer::normalizeOperExpr(
+      hdk::ir::OpType::kLt, hdk::ir::Qualifier::kOne, arg, zero);
   auto uminus_operand =
       hdk::ir::makeExpr<hdk::ir::UOper>(arg_type, false, hdk::ir::OpType::kUMinus, arg);
   expr_list.emplace_back(lt_zero, uminus_operand);
@@ -1596,13 +1599,13 @@ hdk::ir::ExprPtr parseSign(const hdk::ir::ExprPtrVector& operands) {
   const auto zero = hdk::ir::Constant::make(arg_type, 0, false);
   auto bool_type = arg_type->ctx().boolean(arg_type->nullable());
   const auto lt_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      bool_type, hdk::ir::OpType::kLt, kONE, arg, zero);
+      bool_type, hdk::ir::OpType::kLt, hdk::ir::Qualifier::kOne, arg, zero);
   expr_list.emplace_back(lt_zero, hdk::ir::Constant::make(arg_type, -1));
   const auto eq_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      bool_type, hdk::ir::OpType::kEq, kONE, arg, zero);
+      bool_type, hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, arg, zero);
   expr_list.emplace_back(eq_zero, hdk::ir::Constant::make(arg_type, 0));
   const auto gt_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      bool_type, hdk::ir::OpType::kGt, kONE, arg, zero);
+      bool_type, hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, arg, zero);
   expr_list.emplace_back(gt_zero, hdk::ir::Constant::make(arg_type, 1));
   return Analyzer::normalizeCaseExpr(expr_list, nullptr, nullptr);
 }
@@ -1781,7 +1784,7 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   if (fn_name == "/INT"sv) {
     CHECK_EQ(operands.size(), size_t(2));
     return Analyzer::normalizeOperExpr(
-        hdk::ir::OpType::kDiv, kONE, operands[0], operands[1]);
+        hdk::ir::OpType::kDiv, hdk::ir::Qualifier::kOne, operands[0], operands[1]);
   }
   if (fn_name == "Reinterpret"sv) {
     CHECK_EQ(operands.size(), size_t(1));

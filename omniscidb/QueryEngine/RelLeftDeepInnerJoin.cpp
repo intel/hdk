@@ -135,7 +135,7 @@ RelLeftDeepInnerJoin::RelLeftDeepInnerJoin(
               condition_ = hdk::ir::makeExpr<hdk::ir::BinOper>(
                   condition_->ctx().boolean(),
                   hdk::ir::OpType::kAnd,
-                  kONE,
+                  hdk::ir::Qualifier::kOne,
                   condition_,
                   original_join->getConditionShared());
             }

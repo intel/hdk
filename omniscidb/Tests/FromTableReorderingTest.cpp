@@ -33,7 +33,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
     JoinQualsPerNestingLevel nesting_levels;
@@ -52,7 +52,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
     JoinQualsPerNestingLevel nesting_levels;
@@ -73,7 +73,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::INNER};
     JoinQualsPerNestingLevel nesting_levels;
@@ -94,7 +94,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
     JoinQualsPerNestingLevel nesting_levels;
@@ -113,7 +113,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
     JoinQualsPerNestingLevel nesting_levels;
@@ -134,7 +134,7 @@ TEST(Ordering, Basic) {
     auto a1 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 0, 0, 0);
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kGt, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kGt, hdk::ir::Qualifier::kOne, a1, a2);
 
     JoinCondition jc{{op}, JoinType::LEFT};
     JoinQualsPerNestingLevel nesting_levels;
@@ -158,9 +158,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::INNER};
     JoinCondition jc2{{op2}, JoinType::INNER};
@@ -182,9 +182,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::INNER};
     JoinCondition jc2{{op2}, JoinType::INNER};
@@ -209,9 +209,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::INNER};
     JoinCondition jc2{{op2}, JoinType::INNER};
@@ -236,9 +236,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::LEFT};
     JoinCondition jc2{{op2}, JoinType::LEFT};
@@ -260,9 +260,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::LEFT};
     JoinCondition jc2{{op2}, JoinType::LEFT};
@@ -287,9 +287,9 @@ TEST(Ordering, Triple) {
     auto a2 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 1, 1, 1);
     auto a3 = std::make_shared<hdk::ir::ColumnVar>(ctx.int32(false), 2, 2, 2);
     auto op1 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a1, a2);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a1, a2);
     auto op2 = std::make_shared<hdk::ir::BinOper>(
-        ctx.int32(), hdk::ir::OpType::kEq, kONE, a2, a3);
+        ctx.int32(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, a2, a3);
 
     JoinCondition jc1{{op1}, JoinType::LEFT};
     JoinCondition jc2{{op2}, JoinType::LEFT};

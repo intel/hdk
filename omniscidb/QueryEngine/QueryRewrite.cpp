@@ -137,7 +137,7 @@ std::shared_ptr<const hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainVal
     auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(in_vals->ctx().boolean(false),
                                                          false,
                                                          hdk::ir::OpType::kEq,
-                                                         kONE,
+                                                         hdk::ir::Qualifier::kOne,
                                                          in_val_arg,
                                                          in_val);
     auto in_val_copy = in_val;

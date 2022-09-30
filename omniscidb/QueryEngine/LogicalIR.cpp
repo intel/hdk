@@ -352,7 +352,7 @@ namespace {
 
 bool is_qualified_bin_oper(const hdk::ir::Expr* expr) {
   const auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(expr);
-  return bin_oper && bin_oper->qualifier() != kONE;
+  return bin_oper && bin_oper->qualifier() != hdk::ir::Qualifier::kOne;
 }
 
 }  // namespace

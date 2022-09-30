@@ -24,8 +24,6 @@
 #ifndef SQLDEFS_H
 #define SQLDEFS_H
 
-enum SQLQualifier { kONE, kANY, kALL };
-
 enum SQLAgg {
   kAVG,
   kMIN,
@@ -83,19 +81,6 @@ inline std::string toString(const JoinType& join_type) {
     default:
       return "INVALID";
   }
-}
-
-inline std::string toString(const SQLQualifier& qualifier) {
-  switch (qualifier) {
-    case kONE:
-      return "ONE";
-    case kANY:
-      return "ANY";
-    case kALL:
-      return "ALL";
-  }
-  LOG(FATAL) << "Invalid SQLQualifier: " << qualifier;
-  return "";
 }
 
 inline std::string toString(const SQLAgg& kind) {

@@ -318,7 +318,7 @@ TEST(Build, detectProperJoinQual) {
     auto t11 = getSyntheticColumnVar(TEST_DB_ID, "table1", "t11", 0, executor.get());
     auto t21 = getSyntheticColumnVar(TEST_DB_ID, "table2", "t21", 1, executor.get());
     auto qual2 = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, t11, t21);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, t11, t21);
     auto create_join_qual = [&c, &executor](int case_num) {
       std::shared_ptr<const hdk::ir::ColumnVar> q1_lhs;
       std::shared_ptr<const hdk::ir::BinOper> qual1;
@@ -326,25 +326,25 @@ TEST(Build, detectProperJoinQual) {
         case 1: {
           q1_lhs = getSyntheticColumnVar(TEST_DB_ID, "table1", "t12", 0, executor.get());
           qual1 = std::make_shared<hdk::ir::BinOper>(
-              ctx().boolean(), hdk::ir::OpType::kEq, kONE, c, q1_lhs);
+              ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, c, q1_lhs);
           break;
         }
         case 2: {
           q1_lhs = getSyntheticColumnVar(TEST_DB_ID, "table1", "t12", 0, executor.get());
           qual1 = std::make_shared<hdk::ir::BinOper>(
-              ctx().boolean(), hdk::ir::OpType::kEq, kONE, q1_lhs, c);
+              ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, q1_lhs, c);
           break;
         }
         case 3: {
           q1_lhs = getSyntheticColumnVar(TEST_DB_ID, "table2", "t22", 1, executor.get());
           qual1 = std::make_shared<hdk::ir::BinOper>(
-              ctx().boolean(), hdk::ir::OpType::kEq, kONE, c, q1_lhs);
+              ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, c, q1_lhs);
           break;
         }
         case 4: {
           q1_lhs = getSyntheticColumnVar(TEST_DB_ID, "table2", "t22", 1, executor.get());
           qual1 = std::make_shared<hdk::ir::BinOper>(
-              ctx().boolean(), hdk::ir::OpType::kEq, kONE, q1_lhs, c);
+              ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, q1_lhs, c);
           break;
         }
         default:
@@ -402,7 +402,7 @@ TEST(Build, KeyedOneToOne) {
 
     // a1 = b and a2 = b
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table = buildKeyed(op, executor.get());
 
     EXPECT_EQ(hash_table->getHashType(), HashType::OneToOne);
@@ -448,7 +448,7 @@ TEST(Build, KeyedOneToMany) {
 
     // a1 = b and a2 = b
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table = buildKeyed(op, executor.get());
 
     EXPECT_EQ(hash_table->getHashType(), HashType::OneToMany);
@@ -569,7 +569,7 @@ TEST(MultiFragment, KeyedOneToOne) {
 
     // a1 = b and a2 = b
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table1 = buildKeyed(op, executor.get());
     auto baseline = std::dynamic_pointer_cast<BaselineJoinHashTable>(hash_table1);
     CHECK(baseline);
@@ -590,7 +590,7 @@ TEST(MultiFragment, KeyedOneToOne) {
 
     // a1 = b and a2 = b
     op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table2 = buildKeyed(op, executor.get());
     EXPECT_EQ(hash_table2->getHashType(), HashType::OneToOne);
 
@@ -635,7 +635,7 @@ TEST(MultiFragment, KeyedOneToMany) {
 
     // a1 = b and a2 = b
     auto op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table1 = buildKeyed(op, executor.get());
     EXPECT_EQ(hash_table1->getHashType(), HashType::OneToMany);
 
@@ -655,7 +655,7 @@ TEST(MultiFragment, KeyedOneToMany) {
 
     // a1 = b and a2 = b
     op = std::make_shared<hdk::ir::BinOper>(
-        ctx().boolean(), hdk::ir::OpType::kEq, kONE, et1, et2);
+        ctx().boolean(), hdk::ir::OpType::kEq, hdk::ir::Qualifier::kOne, et1, et2);
     auto hash_table2 = buildKeyed(op, executor.get());
     EXPECT_EQ(hash_table2->getHashType(), HashType::OneToMany);
 

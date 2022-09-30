@@ -1461,7 +1461,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
       partition_key_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
           target_expr->ctx().boolean(),
           hdk::ir::OpType::kBwEq,
-          kONE,
+          hdk::ir::Qualifier::kOne,
           partition_key_tuple,
           transform_to_inner(partition_key_tuple.get()));
     }
@@ -2457,7 +2457,7 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
       (*eq_lhs == *is_null_rhs && *eq_rhs == *is_null_lhs)) {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(expr->ctx().boolean(),
                                                hdk::ir::OpType::kBwEq,
-                                               kONE,
+                                               hdk::ir::Qualifier::kOne,
                                                equi_join_condition->leftOperandShared(),
                                                equi_join_condition->rightOperandShared());
   }
@@ -2474,7 +2474,7 @@ hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
     return hdk::ir::makeExpr<hdk::ir::BinOper>(
         expr->ctx().boolean(),
         hdk::ir::OpType::kAnd,
-        kONE,
+        hdk::ir::Qualifier::kOne,
         acc,
         get_bitwise_equals_conjunction(condition->rightOperand()));
   }
@@ -2664,7 +2664,7 @@ hdk::ir::ExprPtr build_logical_expression(const std::vector<hdk::ir::ExprPtr>& f
   CHECK(!factors.empty());
   auto acc = factors.front();
   for (size_t i = 1; i < factors.size(); ++i) {
-    acc = Analyzer::normalizeOperExpr(sql_op, kONE, acc, factors[i]);
+    acc = Analyzer::normalizeOperExpr(sql_op, hdk::ir::Qualifier::kOne, acc, factors[i]);
   }
   return acc;
 }
@@ -2733,7 +2733,7 @@ hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr) {
   const auto remaining_expr =
       build_logical_expression(remaining_terms, hdk::ir::OpType::kOr);
   return Analyzer::normalizeOperExpr(
-      hdk::ir::OpType::kAnd, kONE, common_expr, remaining_expr);
+      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, common_expr, remaining_expr);
 }
 
 }  // namespace

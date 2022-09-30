@@ -347,13 +347,13 @@ class UOper : public Expr {
  */
 class BinOper : public Expr {
  public:
-  BinOper(const Type* type, bool has_agg, OpType o, SQLQualifier q, ExprPtr l, ExprPtr r)
+  BinOper(const Type* type, bool has_agg, OpType o, Qualifier q, ExprPtr l, ExprPtr r)
       : Expr(type, has_agg)
       , op_type_(o)
       , qualifier_(q)
       , left_operand_(l)
       , right_operand_(r) {}
-  BinOper(const Type* type, OpType o, SQLQualifier q, ExprPtr l, ExprPtr r)
+  BinOper(const Type* type, OpType o, Qualifier q, ExprPtr l, ExprPtr r)
       : Expr(type), op_type_(o), qualifier_(q), left_operand_(l), right_operand_(r) {}
 
   OpType opType() const { return op_type_; }
@@ -379,7 +379,7 @@ class BinOper : public Expr {
   bool isLogic() const { return hdk::ir::isLogic(op_type_); }
   bool isArithmetic() const { return hdk::ir::isArithmetic(op_type_); }
 
-  SQLQualifier qualifier() const { return qualifier_; }
+  Qualifier qualifier() const { return qualifier_; }
   const Expr* leftOperand() const { return left_operand_.get(); }
   const Expr* rightOperand() const { return right_operand_.get(); }
   ExprPtr leftOperandShared() const { return left_operand_; }
@@ -392,11 +392,11 @@ class BinOper : public Expr {
   size_t hash() const override;
 
  private:
-  OpType op_type_;          // operator type, e.g., kLT, kAND, kPLUS, etc.
-  SQLQualifier qualifier_;  // qualifier kANY, kALL or kONE.  Only relevant with
-                            // right_operand is Subquery
-  ExprPtr left_operand_;    // the left operand expression
-  ExprPtr right_operand_;   // the right operand expression
+  OpType op_type_;         // operator type, e.g., kLT, kAND, kPLUS, etc.
+  Qualifier qualifier_;    // qualifier kAny, kAll or kOne.  Only relevant with
+                           // right_operand is Subquery
+  ExprPtr left_operand_;   // the left operand expression
+  ExprPtr right_operand_;  // the right operand expression
 };
 
 /**
