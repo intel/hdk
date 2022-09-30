@@ -293,7 +293,7 @@ llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
   CHECK(ts_lv->getType()->isIntegerTy(64));
   if (is_subsecond_extract_field(field)) {
     const auto result = get_extract_high_precision_adjusted_scale(field, unit);
-    if (result.first == kMULTIPLY) {
+    if (result.first == hdk::ir::OpType::kMul) {
       return !type->nullable()
                  ? cgen_state_->ir_builder_.CreateMul(
                        ts_lv, cgen_state_->llInt(static_cast<int64_t>(result.second)))
@@ -302,7 +302,7 @@ llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
                        {ts_lv,
                         cgen_state_->llInt(static_cast<int64_t>(result.second)),
                         cgen_state_->inlineIntNull(type)});
-    } else if (result.first == kDIVIDE) {
+    } else if (result.first == hdk::ir::OpType::kDiv) {
       return !type->nullable()
                  ? cgen_state_->ir_builder_.CreateSDiv(
                        ts_lv, cgen_state_->llInt(static_cast<int64_t>(result.second)))

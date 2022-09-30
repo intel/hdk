@@ -225,27 +225,27 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
 namespace {
 
 std::vector<int32_t> get_compared_ids(const StringDictionaryProxy* dict,
-                                      const SQLOps compare_operator,
+                                      hdk::ir::OpType compare_operator,
                                       const std::string& pattern) {
   std::vector<int> ret;
   switch (compare_operator) {
-    case kLT:
+    case hdk::ir::OpType::kLt:
       ret = dict->getCompare(pattern, "<");
       break;
-    case kLE:
+    case hdk::ir::OpType::kLe:
       ret = dict->getCompare(pattern, "<=");
       break;
-    case kEQ:
-    case kBW_EQ:
+    case hdk::ir::OpType::kEq:
+    case hdk::ir::OpType::kBwEq:
       ret = dict->getCompare(pattern, "=");
       break;
-    case kGT:
+    case hdk::ir::OpType::kGt:
       ret = dict->getCompare(pattern, ">");
       break;
-    case kGE:
+    case hdk::ir::OpType::kGe:
       ret = dict->getCompare(pattern, ">=");
       break;
-    case kNE:
+    case hdk::ir::OpType::kNe:
       ret = dict->getCompare(pattern, "<>");
       break;
     default:
@@ -257,7 +257,7 @@ std::vector<int32_t> get_compared_ids(const StringDictionaryProxy* dict,
 
 llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
                                               const hdk::ir::ExprPtr rhs,
-                                              const SQLOps compare_operator,
+                                              hdk::ir::OpType compare_operator,
                                               const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto rhs_cast_oper = std::dynamic_pointer_cast<const hdk::ir::UOper>(rhs);
@@ -272,7 +272,8 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
     CHECK(rhs_col_var->type()->isExtDictionary());
     if (lhs_col_var->type()->as<hdk::ir::ExtDictionaryType>()->dictId() ==
         rhs_col_var->type()->as<hdk::ir::ExtDictionaryType>()->dictId()) {
-      if (compare_operator == kEQ || compare_operator == kNE) {
+      if (compare_operator == hdk::ir::OpType::kEq ||
+          compare_operator == hdk::ir::OpType::kNe) {
         // TODO (vraj): implement compare between two dictionary encoded columns which
         // share a dictionary
         return nullptr;
@@ -288,17 +289,17 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
     cast_oper.swap(lhs_cast_oper);
     col_var.swap(rhs_col_var);
     switch (compare_operator) {
-      case kLT:
-        compare_opr = kGT;
+      case hdk::ir::OpType::kLt:
+        compare_opr = hdk::ir::OpType::kGt;
         break;
-      case kLE:
-        compare_opr = kGE;
+      case hdk::ir::OpType::kLe:
+        compare_opr = hdk::ir::OpType::kGe;
         break;
-      case kGT:
-        compare_opr = kLT;
+      case hdk::ir::OpType::kGt:
+        compare_opr = hdk::ir::OpType::kLt;
         break;
-      case kGE:
-        compare_opr = kLE;
+      case hdk::ir::OpType::kGe:
+        compare_opr = hdk::ir::OpType::kLe;
       default:
         break;
     }

@@ -37,7 +37,7 @@ class DateTimeTranslator {
       if (is_subsecond_extract_field(field)) {
         const auto result = get_extract_high_precision_adjusted_scale(field, unit);
         return result.second ? ExtractFromTime(field,
-                                               result.first == kDIVIDE
+                                               result.first == hdk::ir::OpType::kDiv
                                                    ? floor_div(timeval, result.second)
                                                    : timeval * result.second)
                              : ExtractFromTime(field, timeval);

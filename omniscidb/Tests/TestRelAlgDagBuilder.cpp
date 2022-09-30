@@ -136,7 +136,7 @@ RelAlgNodePtr TestRelAlgDagBuilder::addEquiJoin(RelAlgNodePtr lhs,
   auto rhs_expr = hdk::ir::makeExpr<hdk::ir::ColumnRef>(
       getColumnType(rhs.get(), rhs_col_idx), rhs.get(), rhs_col_idx);
   auto eq_expr = hdk::ir::makeExpr<hdk::ir::BinOper>(
-      lhs_expr->ctx().boolean(), kEQ, kONE, lhs_expr, rhs_expr);
+      lhs_expr->ctx().boolean(), hdk::ir::OpType::kEq, kONE, lhs_expr, rhs_expr);
   return addJoin(lhs, rhs, join_type, std::move(eq_expr));
 }
 

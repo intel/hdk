@@ -73,19 +73,19 @@ DEF_OPERATOR(ExpressionRange::operator*, *)
 
 void apply_fp_qual(const Datum const_datum,
                    const hdk::ir::Type* const_type,
-                   const SQLOps sql_op,
+                   hdk::ir::OpType op_type,
                    ExpressionRange& qual_range) {
   double const_val = extract_fp_type_from_datum(const_datum, const_type);
-  switch (sql_op) {
-    case kGT:
-    case kGE:
+  switch (op_type) {
+    case hdk::ir::OpType::kGt:
+    case hdk::ir::OpType::kGe:
       qual_range.setFpMin(std::max(qual_range.getFpMin(), const_val));
       break;
-    case kLT:
-    case kLE:
+    case hdk::ir::OpType::kLt:
+    case hdk::ir::OpType::kLe:
       qual_range.setFpMax(std::min(qual_range.getFpMax(), const_val));
       break;
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       qual_range.setFpMin(std::max(qual_range.getFpMin(), const_val));
       qual_range.setFpMax(std::min(qual_range.getFpMax(), const_val));
       break;
@@ -96,23 +96,23 @@ void apply_fp_qual(const Datum const_datum,
 
 void apply_int_qual(const Datum const_datum,
                     const hdk::ir::Type* const_type,
-                    const SQLOps sql_op,
+                    hdk::ir::OpType op_type,
                     ExpressionRange& qual_range) {
   int64_t const_val = extract_int_type_from_datum(const_datum, const_type);
-  switch (sql_op) {
-    case kGT:
+  switch (op_type) {
+    case hdk::ir::OpType::kGt:
       qual_range.setIntMin(std::max(qual_range.getIntMin(), const_val + 1));
       break;
-    case kGE:
+    case hdk::ir::OpType::kGe:
       qual_range.setIntMin(std::max(qual_range.getIntMin(), const_val));
       break;
-    case kLT:
+    case hdk::ir::OpType::kLt:
       qual_range.setIntMax(std::min(qual_range.getIntMax(), const_val - 1));
       break;
-    case kLE:
+    case hdk::ir::OpType::kLe:
       qual_range.setIntMax(std::min(qual_range.getIntMax(), const_val));
       break;
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       qual_range.setIntMin(std::max(qual_range.getIntMin(), const_val));
       qual_range.setIntMax(std::min(qual_range.getIntMax(), const_val));
       break;
@@ -124,7 +124,7 @@ void apply_int_qual(const Datum const_datum,
 void apply_hpt_qual(const Datum const_datum,
                     const hdk::ir::Type* const_type,
                     const hdk::ir::Type* col_type,
-                    const SQLOps sql_op,
+                    hdk::ir::OpType op_type,
                     ExpressionRange& qual_range) {
   auto const_unit = const_type->isTimestamp()
                         ? const_type->as<hdk::ir::TimestampType>()->unit()
@@ -134,7 +134,7 @@ void apply_hpt_qual(const Datum const_datum,
   Datum datum{0};
   datum.bigintval = get_datetime_scaled_epoch(
       extract_int_type_from_datum(const_datum, const_type), const_unit, col_unit);
-  apply_int_qual(datum, const_type, sql_op, qual_range);
+  apply_int_qual(datum, const_type, op_type, qual_range);
 }
 
 ExpressionRange apply_simple_quals(
@@ -386,13 +386,13 @@ ExpressionRange getExpressionRange(
   const auto& rhs =
       getExpressionRange(expr->rightOperand(), query_infos, executor, simple_quals);
   switch (expr->opType()) {
-    case kPLUS:
+    case hdk::ir::OpType::kPlus:
       return lhs + rhs;
-    case kMINUS:
+    case hdk::ir::OpType::kMinus:
       return lhs - rhs;
-    case kMULTIPLY:
+    case hdk::ir::OpType::kMul:
       return lhs * rhs;
-    case kDIVIDE: {
+    case hdk::ir::OpType::kDiv: {
       bool null_div_by_zero = executor->getConfig().exec.codegen.null_div_by_zero;
       auto lhs_type = expr->leftOperand()->type();
       if (lhs_type->isDecimal() && lhs.getType() != ExpressionRangeType::Invalid) {

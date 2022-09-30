@@ -134,8 +134,12 @@ std::shared_ptr<const hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainVal
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
   auto in_val_arg = in_vals->argShared();
   for (const auto& in_val : in_vals->valueList()) {
-    auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
-        in_vals->ctx().boolean(false), false, kEQ, kONE, in_val_arg, in_val);
+    auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(in_vals->ctx().boolean(false),
+                                                         false,
+                                                         hdk::ir::OpType::kEq,
+                                                         kONE,
+                                                         in_val_arg,
+                                                         in_val);
     auto in_val_copy = in_val;
     auto type = in_val_copy->type();
     if (type->isExtDictionary()) {
@@ -158,8 +162,10 @@ QueryRewriter::generateCaseExprForCountDistinctOnGroupByCol(
     const hdk::ir::Type* type) const {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
   auto& ctx = expr->ctx();
-  auto is_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kISNULL, expr);
-  auto is_not_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kNOT, is_null);
+  auto is_null = std::make_shared<hdk::ir::UOper>(
+      ctx.boolean(false), hdk::ir::OpType::kIsNull, expr);
+  auto is_not_null = std::make_shared<hdk::ir::UOper>(
+      ctx.boolean(false), hdk::ir::OpType::kNot, is_null);
   const auto then_constant = hdk::ir::Constant::make(type, 1);
   case_expr_list.emplace_back(is_not_null, then_constant);
   const auto else_constant = hdk::ir::Constant::make(type, 0);

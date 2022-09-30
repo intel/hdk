@@ -19,6 +19,7 @@
 #include "DateAdd.h"
 #include "DateTruncate.h"
 
+#include "IR/OpType.h"
 #include "IR/Type.h"
 
 #include <cstdint>
@@ -30,23 +31,30 @@
 
 namespace {
 
-static const std::map<std::pair<int32_t, ExtractField>, std::pair<SQLOps, int64_t>>
-    orig_extract_precision_lookup = {{{3, kMICROSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-                                     {{3, kNANOSECOND}, {kMULTIPLY, kMicroSecsPerSec}},
-                                     {{6, kMILLISECOND}, {kDIVIDE, kMilliSecsPerSec}},
-                                     {{6, kNANOSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-                                     {{9, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
-                                     {{9, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
+static const std::map<std::pair<int32_t, ExtractField>,
+                      std::pair<hdk::ir::OpType, int64_t>>
+    orig_extract_precision_lookup = {
+        {{3, kMICROSECOND}, {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+        {{3, kNANOSECOND}, {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
+        {{6, kMILLISECOND}, {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
+        {{6, kNANOSECOND}, {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+        {{9, kMILLISECOND}, {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
+        {{9, kMICROSECOND}, {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
 
 static const std::map<std::pair<hdk::ir::TimeUnit, ExtractField>,
-                      std::pair<SQLOps, int64_t>>
-    extract_precision_lookup = {
-        {{hdk::ir::TimeUnit::kMilli, kMICROSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-        {{hdk::ir::TimeUnit::kMilli, kNANOSECOND}, {kMULTIPLY, kMicroSecsPerSec}},
-        {{hdk::ir::TimeUnit::kMicro, kMILLISECOND}, {kDIVIDE, kMilliSecsPerSec}},
-        {{hdk::ir::TimeUnit::kMicro, kNANOSECOND}, {kMULTIPLY, kMilliSecsPerSec}},
-        {{hdk::ir::TimeUnit::kNano, kMILLISECOND}, {kDIVIDE, kMicroSecsPerSec}},
-        {{hdk::ir::TimeUnit::kNano, kMICROSECOND}, {kDIVIDE, kMilliSecsPerSec}}};
+                      std::pair<hdk::ir::OpType, int64_t>>
+    extract_precision_lookup = {{{hdk::ir::TimeUnit::kMilli, kMICROSECOND},
+                                 {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+                                {{hdk::ir::TimeUnit::kMilli, kNANOSECOND},
+                                 {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
+                                {{hdk::ir::TimeUnit::kMicro, kMILLISECOND},
+                                 {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
+                                {{hdk::ir::TimeUnit::kMicro, kNANOSECOND},
+                                 {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+                                {{hdk::ir::TimeUnit::kNano, kMILLISECOND},
+                                 {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
+                                {{hdk::ir::TimeUnit::kNano, kMICROSECOND},
+                                 {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
 
 static const std::map<std::pair<hdk::ir::TimeUnit, DateTruncField>, int64_t>
     datetrunc_precision_lookup = {
@@ -117,38 +125,37 @@ constexpr inline bool is_subsecond_datetrunc_field(const DateTruncField field) {
   return field == dtMILLISECOND || field == dtMICROSECOND || field == dtNANOSECOND;
 }
 
-const inline std::pair<SQLOps, int64_t> get_dateadd_high_precision_adjusted_scale(
-    const DateAddField field,
-    int32_t dimen) {
+const inline std::pair<hdk::ir::OpType, int64_t>
+get_dateadd_high_precision_adjusted_scale(const DateAddField field, int32_t dimen) {
   switch (field) {
     case daNANOSECOND:
       switch (dimen) {
         case 9:
           return {};
         case 6:
-          return {kDIVIDE, kMilliSecsPerSec};
+          return {hdk::ir::OpType::kDiv, kMilliSecsPerSec};
         case 3:
-          return {kDIVIDE, kMicroSecsPerSec};
+          return {hdk::ir::OpType::kDiv, kMicroSecsPerSec};
         default:
           throw std::runtime_error("Unknown dimen = " + std::to_string(dimen));
       }
     case daMICROSECOND:
       switch (dimen) {
         case 9:
-          return {kMULTIPLY, kMilliSecsPerSec};
+          return {hdk::ir::OpType::kMul, kMilliSecsPerSec};
         case 6:
           return {};
         case 3:
-          return {kDIVIDE, kMilliSecsPerSec};
+          return {hdk::ir::OpType::kDiv, kMilliSecsPerSec};
         default:
           throw std::runtime_error("Unknown dimen = " + std::to_string(dimen));
       }
     case daMILLISECOND:
       switch (dimen) {
         case 9:
-          return {kMULTIPLY, kMicroSecsPerSec};
+          return {hdk::ir::OpType::kMul, kMicroSecsPerSec};
         case 6:
-          return {kMULTIPLY, kMilliSecsPerSec};
+          return {hdk::ir::OpType::kMul, kMilliSecsPerSec};
         case 3:
           return {};
         default:
@@ -160,9 +167,9 @@ const inline std::pair<SQLOps, int64_t> get_dateadd_high_precision_adjusted_scal
   return {};
 }
 
-const inline std::pair<SQLOps, int64_t> get_extract_high_precision_adjusted_scale(
-    const ExtractField& field,
-    const hdk::ir::TimeUnit unit) {
+const inline std::pair<hdk::ir::OpType, int64_t>
+get_extract_high_precision_adjusted_scale(const ExtractField& field,
+                                          const hdk::ir::TimeUnit unit) {
   const auto result = extract_precision_lookup.find(std::make_pair(unit, field));
   if (result != extract_precision_lookup.end()) {
     return result->second;

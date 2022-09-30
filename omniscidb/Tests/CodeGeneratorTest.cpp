@@ -110,7 +110,8 @@ TEST(CodeGeneratorTest, IntegerAdd) {
   d.intval = 42;
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -173,7 +174,8 @@ TEST(CodeGeneratorTest, IntegerExpr) {
   d.intval = 42;
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -268,7 +270,8 @@ TEST(CodeGeneratorTest, IntegerAddGPU) {
 
   auto lhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -384,7 +387,8 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
   d.intval = 42;
 
   auto rhs = hdk::ir::makeExpr<hdk::ir::Constant>(ctx.int32(), false, d);
-  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(ctx.int32(), kPLUS, kONE, lhs, rhs);
+  auto plus = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      ctx.int32(), hdk::ir::OpType::kPlus, kONE, lhs, rhs);
   const auto compiled_expr = code_generator.compile(plus.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);

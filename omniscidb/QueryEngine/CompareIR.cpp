@@ -21,76 +21,76 @@
 
 namespace {
 
-llvm::CmpInst::Predicate llvm_icmp_pred(const SQLOps op_type) {
+llvm::CmpInst::Predicate llvm_icmp_pred(hdk::ir::OpType op_type) {
   switch (op_type) {
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return llvm::ICmpInst::ICMP_EQ;
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return llvm::ICmpInst::ICMP_NE;
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return llvm::ICmpInst::ICMP_SLT;
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return llvm::ICmpInst::ICMP_SGT;
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return llvm::ICmpInst::ICMP_SLE;
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return llvm::ICmpInst::ICMP_SGE;
     default:
       abort();
   }
 }
 
-std::string icmp_name(const SQLOps op_type) {
+std::string icmp_name(hdk::ir::OpType op_type) {
   switch (op_type) {
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return "eq";
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return "ne";
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return "lt";
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return "gt";
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return "le";
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return "ge";
     default:
       abort();
   }
 }
 
-std::string icmp_arr_name(const SQLOps op_type) {
+std::string icmp_arr_name(hdk::ir::OpType op_type) {
   switch (op_type) {
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return "eq";
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return "ne";
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return "gt";
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return "lt";
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return "ge";
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return "le";
     default:
       abort();
   }
 }
 
-llvm::CmpInst::Predicate llvm_fcmp_pred(const SQLOps op_type) {
+llvm::CmpInst::Predicate llvm_fcmp_pred(hdk::ir::OpType op_type) {
   switch (op_type) {
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return llvm::CmpInst::FCMP_OEQ;
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return llvm::CmpInst::FCMP_ONE;
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return llvm::CmpInst::FCMP_OLT;
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return llvm::CmpInst::FCMP_OGT;
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return llvm::CmpInst::FCMP_OLE;
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return llvm::CmpInst::FCMP_OGE;
     default:
       abort();
@@ -101,19 +101,19 @@ llvm::CmpInst::Predicate llvm_fcmp_pred(const SQLOps op_type) {
 
 namespace {
 
-std::string string_cmp_func(const SQLOps optype) {
+std::string string_cmp_func(hdk::ir::OpType optype) {
   switch (optype) {
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return "string_lt";
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return "string_le";
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return "string_gt";
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return "string_ge";
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return "string_eq";
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return "string_ne";
     default:
       abort();
@@ -124,32 +124,32 @@ std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_e
   auto& ctx = bw_eq->ctx();
   const auto eq_oper = std::make_shared<hdk::ir::BinOper>(bw_eq->type(),
                                                           bw_eq->containsAgg(),
-                                                          kEQ,
+                                                          hdk::ir::OpType::kEq,
                                                           bw_eq->qualifier(),
                                                           bw_eq->leftOperandShared(),
                                                           bw_eq->rightOperandShared());
   const auto lhs_is_null = std::make_shared<hdk::ir::UOper>(
-      ctx.boolean(false), kISNULL, bw_eq->leftOperandShared());
+      ctx.boolean(false), hdk::ir::OpType::kIsNull, bw_eq->leftOperandShared());
   const auto rhs_is_null = std::make_shared<hdk::ir::UOper>(
-      ctx.boolean(false), kISNULL, bw_eq->rightOperandShared());
+      ctx.boolean(false), hdk::ir::OpType::kIsNull, bw_eq->rightOperandShared());
   const auto both_are_null =
-      Analyzer::normalizeOperExpr(kAND, kONE, lhs_is_null, rhs_is_null);
+      Analyzer::normalizeOperExpr(hdk::ir::OpType::kAnd, kONE, lhs_is_null, rhs_is_null);
   const auto bw_eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
-      Analyzer::normalizeOperExpr(kOR, kONE, eq_oper, both_are_null));
+      Analyzer::normalizeOperExpr(hdk::ir::OpType::kOr, kONE, eq_oper, both_are_null));
   CHECK(bw_eq_oper);
   return bw_eq_oper;
 }
 
 std::shared_ptr<const hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
                                                 const hdk::ir::ExprPtr& rhs,
-                                                const SQLOps optype) {
-  CHECK(IS_EQUIVALENCE(optype));
+                                                hdk::ir::OpType optype) {
+  CHECK(hdk::ir::isEquivalence(optype));
   // Sides of a tuple equality are stripped of cast operators to simplify the logic
   // in the hash table construction algorithm. Add them back here.
   auto eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
       Analyzer::normalizeOperExpr(optype, kONE, lhs, rhs));
   CHECK(eq_oper);
-  return optype == kBW_EQ ? lower_bw_eq(eq_oper.get()) : eq_oper;
+  return optype == hdk::ir::OpType::kBwEq ? lower_bw_eq(eq_oper.get()) : eq_oper;
 }
 
 // Convert a column tuple equality expression back to a conjunction of comparisons
@@ -169,8 +169,12 @@ std::shared_ptr<const hdk::ir::BinOper> lower_multicol_compare(
   for (size_t i = 1; i < left_tuple.size(); ++i) {
     auto crt = make_eq(left_tuple[i], right_tuple[i], multicol_compare->opType());
     const bool nullable = acc->type()->nullable() || crt->type()->nullable();
-    acc = hdk::ir::makeExpr<hdk::ir::BinOper>(
-        acc->type()->ctx().boolean(nullable), false, kAND, kONE, acc, crt);
+    acc = hdk::ir::makeExpr<hdk::ir::BinOper>(acc->type()->ctx().boolean(nullable),
+                                              false,
+                                              hdk::ir::OpType::kAnd,
+                                              kONE,
+                                              acc,
+                                              crt);
   }
   return acc;
 }
@@ -233,7 +237,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
     return lowered_lvs.front();
   }
   const auto optype = bin_oper->opType();
-  if (optype == kBW_EQ) {
+  if (optype == hdk::ir::OpType::kBwEq) {
     const auto bw_eq_oper = lower_bw_eq(bin_oper);
     return codegenLogical(bw_eq_oper.get(), co);
   }
@@ -246,7 +250,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
 
   if ((lhs_type->isString() || lhs_type->isExtDictionary()) &&
       (rhs_type->isString() || rhs_type->isExtDictionary()) &&
-      !(IS_EQUIVALENCE(optype) || optype == kNE)) {
+      !(hdk::ir::isEquivalence(optype) || optype == hdk::ir::OpType::kNe)) {
     auto cmp_str = codegenStrCmp(optype,
                                  qualifier,
                                  bin_oper->leftOperandShared(),
@@ -268,7 +272,7 @@ llvm::Value* CodeGenerator::codegenCmp(const hdk::ir::BinOper* bin_oper,
   return codegenCmp(optype, qualifier, lhs_lvs, lhs_type, rhs, co);
 }
 
-llvm::Value* CodeGenerator::codegenStrCmp(const SQLOps optype,
+llvm::Value* CodeGenerator::codegenStrCmp(hdk::ir::OpType optype,
                                           const SQLQualifier qualifier,
                                           const hdk::ir::ExprPtr lhs,
                                           const hdk::ir::ExprPtr rhs,
@@ -300,7 +304,7 @@ llvm::Value* CodeGenerator::codegenStrCmp(const SQLOps optype,
   return nullptr;
 }
 
-llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
+llvm::Value* CodeGenerator::codegenCmpDecimalConst(hdk::ir::OpType optype,
                                                    const SQLQualifier qualifier,
                                                    const hdk::ir::Expr* lhs,
                                                    const hdk::ir::Type* lhs_type,
@@ -355,14 +359,14 @@ llvm::Value* CodeGenerator::codegenCmpDecimalConst(const SQLOps optype,
   return codegenCmp(optype, qualifier, {lhs_lv}, new_type, new_rhs_lit.get(), co);
 }
 
-llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
+llvm::Value* CodeGenerator::codegenCmp(hdk::ir::OpType optype,
                                        const SQLQualifier qualifier,
                                        std::vector<llvm::Value*> lhs_lvs,
                                        const hdk::ir::Type* lhs_type,
                                        const hdk::ir::Expr* rhs,
                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  CHECK(IS_COMPARISON(optype));
+  CHECK(hdk::ir::isComparison(optype));
   const auto& rhs_type = rhs->type();
   if (rhs_type->isArray()) {
     return codegenQualifierCmp(optype, qualifier, lhs_lvs, rhs, co);
@@ -400,7 +404,7 @@ llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
             string_cmp_func(optype) + (null_check_suffix.empty() ? "" : "_nullable"),
             str_cmp_args);
       } else {
-        CHECK(optype == kEQ || optype == kNE);
+        CHECK(optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kNe);
       }
     }
 
@@ -448,7 +452,7 @@ llvm::Value* CodeGenerator::codegenCmp(const SQLOps optype,
   return nullptr;
 }
 
-llvm::Value* CodeGenerator::codegenQualifierCmp(const SQLOps optype,
+llvm::Value* CodeGenerator::codegenQualifierCmp(hdk::ir::OpType optype,
                                                 const SQLQualifier qualifier,
                                                 std::vector<llvm::Value*> lhs_lvs,
                                                 const hdk::ir::Expr* rhs,

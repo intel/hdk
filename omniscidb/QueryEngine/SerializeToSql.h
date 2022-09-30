@@ -62,7 +62,7 @@ class ScalarExprToSql : public ScalarExprVisitor<std::string> {
   }
 
  private:
-  static std::string binOpTypeToString(const SQLOps op_type);
+  static std::string binOpTypeToString(hdk::ir::OpType op_type);
 
   const RelAlgExecutionUnit* ra_exe_unit_;
   SchemaProviderPtr schema_provider_;

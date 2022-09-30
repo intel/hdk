@@ -135,7 +135,7 @@ int scaleOrZero(const hdk::ir::Type* type) {
 
 namespace Analyzer {
 
-const hdk::ir::Type* analyze_type_info(SQLOps op,
+const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
                                        const hdk::ir::Type* left_type,
                                        const hdk::ir::Type* right_type,
                                        const hdk::ir::Type** new_left_type,
@@ -145,13 +145,13 @@ const hdk::ir::Type* analyze_type_info(SQLOps op,
   const hdk::ir::Type* common_type;
   *new_left_type = left_type;
   *new_right_type = right_type;
-  if (IS_LOGIC(op)) {
+  if (hdk::ir::isLogic(op)) {
     if (!left_type->isBoolean() || !right_type->isBoolean()) {
       throw std::runtime_error(
           "non-boolean operands cannot be used in logic operations.");
     }
     result_type = ctx.boolean();
-  } else if (IS_COMPARISON(op)) {
+  } else if (hdk::ir::isComparison(op)) {
     if (!left_type->equal(right_type)) {
       if (left_type->isNumber() && right_type->isNumber()) {
         common_type = common_numeric_type(left_type, right_type);
@@ -249,22 +249,24 @@ const hdk::ir::Type* analyze_type_info(SQLOps op,
       }
     }
     result_type = ctx.boolean();
-  } else if (op == kMINUS && (left_type->isDate() || left_type->isTimestamp()) &&
+  } else if (op == hdk::ir::OpType::kMinus &&
+             (left_type->isDate() || left_type->isTimestamp()) &&
              right_type->isInterval()) {
     *new_left_type = left_type;
     *new_right_type = right_type;
     result_type = left_type;
-  } else if (IS_ARITHMETIC(op)) {
+  } else if (hdk::ir::isArithmetic(op)) {
     if (!(left_type->isNumber() || left_type->isInterval()) ||
         !(right_type->isNumber() || right_type->isInterval())) {
       throw std::runtime_error("non-numeric operands in arithmetic operations.");
     }
-    if (op == kMODULO && (!left_type->isInteger() || !right_type->isInteger())) {
+    if (op == hdk::ir::OpType::kMod &&
+        (!left_type->isInteger() || !right_type->isInteger())) {
       throw std::runtime_error("non-integer operands in modulo operation.");
     }
     common_type = common_numeric_type(left_type, right_type);
     if (common_type->isDecimal()) {
-      if (op == kMULTIPLY) {
+      if (op == hdk::ir::OpType::kMul) {
         // Decimal multiplication requires common_type adjustment:
         // dimension and scale of the result should be increased.
         auto left_precision = precisionOrZero(left_type);
@@ -278,7 +280,7 @@ const hdk::ir::Type* analyze_type_info(SQLOps op,
             std::max(common_type->as<hdk::ir::DecimalType>()->precision(), new_precision);
         common_type =
             ctx.decimal(common_type->size(), new_precision, left_scale + right_scale);
-      } else if (op == kPLUS || op == kMINUS) {
+      } else if (op == hdk::ir::OpType::kPlus || op == hdk::ir::OpType::kMinus) {
         // Scale should remain the same but dimension could actually go up
         common_type =
             ctx.decimal(common_type->size(),
@@ -288,7 +290,7 @@ const hdk::ir::Type* analyze_type_info(SQLOps op,
     }
     *new_left_type = common_type->withNullable(left_type->nullable());
     *new_right_type = common_type->withNullable(right_type->nullable());
-    if (common_type->isDecimal() && op == kMULTIPLY) {
+    if (common_type->isDecimal() && op == hdk::ir::OpType::kMul) {
       if ((*new_left_type)->isDecimal()) {
         *new_left_type = ctx.decimal((*new_left_type)->size(),
                                      precisionOrZero(*new_left_type),
@@ -537,7 +539,7 @@ const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
   return common_type;
 }
 
-hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
+hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
                                    const SQLQualifier qual,
                                    hdk::ir::ExprPtr left_expr,
                                    hdk::ir::ExprPtr right_expr,
@@ -593,7 +595,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
 
   // No executor means we are building DAG. Skip normalization at this
   // step and perform it later on execution unit build.
-  if (IS_COMPARISON(optype) && executor) {
+  if (hdk::ir::isComparison(optype) && executor) {
     if (new_left_type->isExtDictionary() && new_right_type->isExtDictionary()) {
       if (new_left_type->as<hdk::ir::ExtDictionaryType>()->dictId() !=
           new_right_type->as<hdk::ir::ExtDictionaryType>()->dictId()) {
@@ -604,7 +606,8 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
         // on translating
         const bool should_translate_strings =
             exprs_share_one_and_same_rte_idx(left_expr, right_expr);
-        if (should_translate_strings && (optype == kEQ || optype == kNE)) {
+        if (should_translate_strings &&
+            (optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kNe)) {
           CHECK(executor);
           // Make the type we're casting to the transient dictionary, if it exists,
           // otherwise the largest dictionary in terms of number of entries
@@ -619,7 +622,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
           right_expr = right_expr->decompress();
         }
       } else {  // Strings shared comp param
-        if (!(optype == kEQ || optype == kNE)) {
+        if (!(optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kNe)) {
           // We do not currently support ordered (i.e. >, <=) comparisons between
           // encoded columns, so try to decode (will only succeed with watchdog off)
           left_expr = left_expr->decompress();
@@ -644,7 +647,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const SQLOps optype,
       left_expr = left_expr->decompress();
       right_expr = right_expr->decompress();
     }
-  } else if (!IS_COMPARISON(optype)) {
+  } else if (!hdk::ir::isComparison(optype)) {
     left_expr = left_expr->decompress();
     right_expr = right_expr->decompress();
   }
@@ -818,7 +821,9 @@ hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
       arg_expr->decompress(), like_expr, escape_expr, is_ilike, is_simple);
   if (is_not) {
     result = hdk::ir::makeExpr<hdk::ir::UOper>(
-        arg_expr->ctx().boolean(result->type()->nullable()), kNOT, result);
+        arg_expr->ctx().boolean(result->type()->nullable()),
+        hdk::ir::OpType::kNot,
+        result);
   }
   return result;
 }
@@ -861,7 +866,9 @@ hdk::ir::ExprPtr getRegexpExpr(hdk::ir::ExprPtr arg_expr,
       arg_expr->decompress(), pattern_expr, escape_expr);
   if (is_not) {
     result = hdk::ir::makeExpr<hdk::ir::UOper>(
-        arg_expr->ctx().boolean(result->type()->nullable()), kNOT, result);
+        arg_expr->ctx().boolean(result->type()->nullable()),
+        hdk::ir::OpType::kNot,
+        result);
   }
   return result;
 }

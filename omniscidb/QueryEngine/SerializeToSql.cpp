@@ -52,16 +52,16 @@ std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
   const auto operand_str = visit(operand);
   const auto optype = uoper->opType();
   switch (optype) {
-    case kNOT: {
+    case hdk::ir::OpType::kNot: {
       return "NOT (" + operand_str + ")";
     }
-    case kUMINUS: {
+    case hdk::ir::OpType::kUMinus: {
       return "-" + operand_str;
     }
-    case kISNULL: {
+    case hdk::ir::OpType::kIsNull: {
       return operand_str + " IS NULL";
     }
-    case kCAST: {
+    case hdk::ir::OpType::kCast: {
       auto operand_type = operand->type();
       auto target_type = uoper->type();
       if (!is_supported_type_for_extern_execution(target_type)) {
@@ -77,7 +77,7 @@ std::string ScalarExprToSql::visitUOper(const hdk::ir::UOper* uoper) const {
       return "CAST(" + operand_str + " AS " + hdk::ir::sqlTypeName(target_type) + ")";
     }
     default: {
-      throw std::runtime_error("Unary operator type: " + std::to_string(optype) +
+      throw std::runtime_error("Unary operator type: " + ::toString(optype) +
                                " not supported");
     }
   }
@@ -184,38 +184,38 @@ std::string ScalarExprToSql::visitAggExpr(const hdk::ir::AggExpr* agg) const {
   return agg_to_string(agg, ra_exe_unit_, schema_provider_);
 }
 
-std::string ScalarExprToSql::binOpTypeToString(const SQLOps op_type) {
+std::string ScalarExprToSql::binOpTypeToString(hdk::ir::OpType op_type) {
   switch (op_type) {
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       return "=";
-    case kNE:
+    case hdk::ir::OpType::kNe:
       return "<>";
-    case kLT:
+    case hdk::ir::OpType::kLt:
       return "<";
-    case kLE:
+    case hdk::ir::OpType::kLe:
       return "<=";
-    case kGT:
+    case hdk::ir::OpType::kGt:
       return ">";
-    case kGE:
+    case hdk::ir::OpType::kGe:
       return ">=";
-    case kAND:
+    case hdk::ir::OpType::kAnd:
       return "AND";
-    case kOR:
+    case hdk::ir::OpType::kOr:
       return "OR";
-    case kMINUS:
+    case hdk::ir::OpType::kMinus:
       return "-";
-    case kPLUS:
+    case hdk::ir::OpType::kPlus:
       return "+";
-    case kMULTIPLY:
+    case hdk::ir::OpType::kMul:
       return "*";
-    case kDIVIDE:
+    case hdk::ir::OpType::kDiv:
       return "/";
-    case kMODULO:
+    case hdk::ir::OpType::kMod:
       return "%";
-    case kARRAY_AT:
+    case hdk::ir::OpType::kArrayAt:
       return "[]";
     default:
-      LOG(FATAL) << "Invalid operator type: " << op_type;
+      LOG(FATAL) << "Invalid operator type: " << ::toString(op_type);
       return "";
   }
 }

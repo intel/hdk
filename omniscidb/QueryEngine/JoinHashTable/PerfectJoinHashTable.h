@@ -218,7 +218,7 @@ class PerfectJoinHashTable : public HashJoin {
     const hdk::ir::ColumnVar* outer_col;
     const ChunkKey chunk_key;
     const size_t num_elements;
-    const SQLOps optype;
+    hdk::ir::OpType optype;
     const JoinType join_type;
   };
 

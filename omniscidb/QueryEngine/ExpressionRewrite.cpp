@@ -36,7 +36,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
   std::shared_ptr<const hdk::ir::InValues> visitBinOper(
       const hdk::ir::BinOper* bin_oper) const override {
     switch (bin_oper->opType()) {
-      case kEQ: {
+      case hdk::ir::OpType::kEq: {
         const auto rhs_owned = bin_oper->rightOperandShared();
         auto rhs_no_cast = extract_cast_arg(rhs_owned.get());
         if (!dynamic_cast<const hdk::ir::Constant*>(rhs_no_cast)) {
@@ -48,7 +48,7 @@ class OrToInVisitor : public ScalarExprVisitor<std::shared_ptr<const hdk::ir::In
         return hdk::ir::makeExpr<hdk::ir::InValues>(arg,
                                                     std::list<hdk::ir::ExprPtr>{rhs});
       }
-      case kOR: {
+      case hdk::ir::OpType::kOr: {
         return aggregateResult(visit(bin_oper->leftOperand()),
                                visit(bin_oper->rightOperand()));
       }
@@ -203,19 +203,19 @@ class ArrayElementStringLiteralEncodingVisitor : public hdk::ir::ExprRewriter {
 
 class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
   template <typename T>
-  bool foldComparison(SQLOps optype, T t1, T t2) const {
+  bool foldComparison(hdk::ir::OpType optype, T t1, T t2) const {
     switch (optype) {
-      case kEQ:
+      case hdk::ir::OpType::kEq:
         return t1 == t2;
-      case kNE:
+      case hdk::ir::OpType::kNe:
         return t1 != t2;
-      case kLT:
+      case hdk::ir::OpType::kLt:
         return t1 < t2;
-      case kLE:
+      case hdk::ir::OpType::kLe:
         return t1 <= t2;
-      case kGT:
+      case hdk::ir::OpType::kGt:
         return t1 > t2;
-      case kGE:
+      case hdk::ir::OpType::kGe:
         return t1 >= t2;
       default:
         break;
@@ -225,13 +225,13 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
   }
 
   template <typename T>
-  bool foldLogic(SQLOps optype, T t1, T t2) const {
+  bool foldLogic(hdk::ir::OpType optype, T t1, T t2) const {
     switch (optype) {
-      case kAND:
+      case hdk::ir::OpType::kAnd:
         return t1 && t2;
-      case kOR:
+      case hdk::ir::OpType::kOr:
         return t1 || t2;
-      case kNOT:
+      case hdk::ir::OpType::kNot:
         return !t1;
       default:
         break;
@@ -241,11 +241,11 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
   }
 
   template <typename T>
-  T foldArithmetic(SQLOps optype, T t1, T t2) const {
+  T foldArithmetic(hdk::ir::OpType optype, T t1, T t2) const {
     bool t2_is_zero = (t2 == (t2 - t2));
     bool t2_is_negative = (t2 < (t2 - t2));
     switch (optype) {
-      case kPLUS:
+      case hdk::ir::OpType::kPlus:
         // The MIN limit for float and double is the smallest representable value,
         // not the lowest negative value! Switching to C++11 lowest.
         if ((t2_is_negative && t1 < std::numeric_limits<T>::lowest() - t2) ||
@@ -254,14 +254,14 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
           throw std::runtime_error("Plus overflow");
         }
         return t1 + t2;
-      case kMINUS:
+      case hdk::ir::OpType::kMinus:
         if ((t2_is_negative && t1 > std::numeric_limits<T>::max() + t2) ||
             (!t2_is_negative && t1 < std::numeric_limits<T>::lowest() + t2)) {
           num_overflows_++;
           throw std::runtime_error("Minus overflow");
         }
         return t1 - t2;
-      case kMULTIPLY: {
+      case hdk::ir::OpType::kMul: {
         if (t2_is_zero) {
           return t2;
         }
@@ -289,7 +289,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
         }
         return t1 * t2;
       }
-      case kDIVIDE:
+      case hdk::ir::OpType::kDiv:
         if (t2_is_zero) {
           throw std::runtime_error("Will not fold division by zero");
         }
@@ -300,7 +300,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
     throw std::runtime_error("Unable to fold");
   }
 
-  bool foldOper(SQLOps optype,
+  bool foldOper(hdk::ir::OpType optype,
                 const hdk::ir::Type* type,
                 Datum lhs,
                 Datum rhs,
@@ -312,78 +312,78 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
     try {
       switch (type->id()) {
         case hdk::ir::Type::kBoolean:
-          if (IS_COMPARISON(optype)) {
+          if (hdk::ir::isComparison(optype)) {
             result.boolval = foldComparison<bool>(optype, lhs.boolval, rhs.boolval);
             result_type = ctx.boolean();
             return true;
           }
-          if (IS_LOGIC(optype)) {
+          if (hdk::ir::isLogic(optype)) {
             result.boolval = foldLogic<bool>(optype, lhs.boolval, rhs.boolval);
             result_type = ctx.boolean();
             return true;
           }
-          CHECK(!IS_ARITHMETIC(optype));
+          CHECK(!hdk::ir::isArithmetic(optype));
           break;
         case hdk::ir::Type::kInteger:
         case hdk::ir::Type::kDecimal:
           switch (type->size()) {
             case 1:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval =
                     foldComparison<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.tinyintval =
                     foldArithmetic<int8_t>(optype, lhs.tinyintval, rhs.tinyintval);
                 result_type = ctx.int8();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             case 2:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval =
                     foldComparison<int16_t>(optype, lhs.smallintval, rhs.smallintval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.smallintval =
                     foldArithmetic<int16_t>(optype, lhs.smallintval, rhs.smallintval);
                 result_type = ctx.int16();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             case 4:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval = foldComparison<int32_t>(optype, lhs.intval, rhs.intval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.intval = foldArithmetic<int32_t>(optype, lhs.intval, rhs.intval);
                 result_type = ctx.int32();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             case 8:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval =
                     foldComparison<int64_t>(optype, lhs.bigintval, rhs.bigintval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.bigintval =
                     foldArithmetic<int64_t>(optype, lhs.bigintval, rhs.bigintval);
                 result_type = ctx.int64();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             default:
               break;
@@ -392,34 +392,34 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
         case hdk::ir::Type::kFloatingPoint:
           switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
             case hdk::ir::FloatingPointType::kFloat:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval =
                     foldComparison<float>(optype, lhs.floatval, rhs.floatval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.floatval =
                     foldArithmetic<float>(optype, lhs.floatval, rhs.floatval);
                 result_type = ctx.fp32();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             case hdk::ir::FloatingPointType::kDouble:
-              if (IS_COMPARISON(optype)) {
+              if (hdk::ir::isComparison(optype)) {
                 result.boolval =
                     foldComparison<double>(optype, lhs.doubleval, rhs.doubleval);
                 result_type = ctx.boolean();
                 return true;
               }
-              if (IS_ARITHMETIC(optype)) {
+              if (hdk::ir::isArithmetic(optype)) {
                 result.doubleval =
                     foldArithmetic<double>(optype, lhs.doubleval, rhs.doubleval);
                 result_type = ctx.fp64();
                 return true;
               }
-              CHECK(!IS_LOGIC(optype));
+              CHECK(!hdk::ir::isLogic(optype));
               break;
             default:
               break;
@@ -438,7 +438,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
     const auto unvisited_operand = uoper->operand();
     const auto optype = uoper->opType();
     auto type = uoper->type();
-    if (optype == kCAST) {
+    if (optype == hdk::ir::OpType::kCast) {
       // Cache the cast type so it could be used in operand rewriting/folding
       casts_.insert({unvisited_operand, type});
     }
@@ -454,8 +454,8 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
       Datum result_datum = {};
       const hdk::ir::Type* result_type;
       switch (optype) {
-        case kNOT: {
-          if (foldOper(kEQ,
+        case hdk::ir::OpType::kNot: {
+          if (foldOper(hdk::ir::OpType::kEq,
                        operand_type,
                        zero_datum,
                        operand_datum,
@@ -466,8 +466,8 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
           }
           break;
         }
-        case kUMINUS: {
-          if (foldOper(kMINUS,
+        case hdk::ir::OpType::kUMinus: {
+          if (foldOper(hdk::ir::OpType::kMinus,
                        operand_type,
                        zero_datum,
                        operand_datum,
@@ -481,7 +481,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
           }
           break;
         }
-        case kCAST: {
+        case hdk::ir::OpType::kCast: {
           // Trying to fold number to number casts only
           if (!type->isNumber() || !operand_type->isNumber()) {
             break;
@@ -525,7 +525,8 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
       // Propagate cast down to the operands for folding
       if ((cast_type->isInteger() || cast_type->isFloatingPoint()) &&
           lhs_type->isInteger() && cast_type->size() > lhs_type->size() &&
-          (optype == kMINUS || optype == kPLUS || optype == kMULTIPLY)) {
+          (optype == hdk::ir::OpType::kMinus || optype == hdk::ir::OpType::kPlus ||
+           optype == hdk::ir::OpType::kMul)) {
         // Before folding, cast the operands to the bigger type to avoid overflows.
         // Currently upcasting smaller integer types to larger integers or double.
         left_operand = left_operand->cast(cast_type);
@@ -550,18 +551,20 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
       const hdk::ir::Type* result_type;
       if (foldOper(optype, lhs_type, lhs_datum, rhs_datum, result_datum, result_type)) {
         // Fold all ops that don't take in decimal operands, and also decimal comparisons
-        if (!lhs_type->isDecimal() || IS_COMPARISON(optype)) {
+        if (!lhs_type->isDecimal() || hdk::ir::isComparison(optype)) {
           return hdk::ir::makeExpr<hdk::ir::Constant>(result_type, false, result_datum);
         }
         // Decimal arithmetic has been done as kBIGINT. Selectively fold some decimal ops,
         // using result_datum and BinOper expr typeinfo which was adjusted for these ops.
-        if (optype == kMINUS || optype == kPLUS || optype == kMULTIPLY) {
+        if (optype == hdk::ir::OpType::kMinus || optype == hdk::ir::OpType::kPlus ||
+            optype == hdk::ir::OpType::kMul) {
           return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, result_datum);
         }
       }
     }
 
-    if (optype == kAND && lhs_type == rhs_type && lhs_type->isBoolean()) {
+    if (optype == hdk::ir::OpType::kAnd && lhs_type == rhs_type &&
+        lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->isNull()) {
         auto rhs_datum = const_rhs->value();
         if (rhs_datum.boolval == false) {
@@ -585,7 +588,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
         return rhs;
       }
     }
-    if (optype == kOR && lhs_type == rhs_type && lhs_type->isBoolean()) {
+    if (optype == hdk::ir::OpType::kOr && lhs_type == rhs_type && lhs_type->isBoolean()) {
       if (const_rhs && !const_rhs->isNull()) {
         auto rhs_datum = const_rhs->value();
         if (rhs_datum.boolval == true) {
@@ -611,25 +614,27 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
     }
     if (*lhs == *rhs) {
       // Tautologies: v=v; v<=v; v>=v
-      if (optype == kEQ || optype == kLE || optype == kGE) {
+      if (optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kLe ||
+          optype == hdk::ir::OpType::kGe) {
         Datum d;
         d.boolval = true;
         return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
       }
       // Contradictions: v!=v; v<v; v>v
-      if (optype == kNE || optype == kLT || optype == kGT) {
+      if (optype == hdk::ir::OpType::kNe || optype == hdk::ir::OpType::kLt ||
+          optype == hdk::ir::OpType::kGt) {
         Datum d;
         d.boolval = false;
         return hdk::ir::makeExpr<hdk::ir::Constant>(ctx.boolean(), false, d);
       }
       // v-v
-      if (optype == kMINUS) {
+      if (optype == hdk::ir::OpType::kMinus) {
         Datum d = {};
         return hdk::ir::makeExpr<hdk::ir::Constant>(lhs_type, false, d);
       }
     }
     // Convert fp division by a constant to multiplication by 1/constant
-    if (optype == kDIVIDE && const_rhs && rhs_type->isFloatingPoint()) {
+    if (optype == hdk::ir::OpType::kDiv && const_rhs && rhs_type->isFloatingPoint()) {
       auto rhs_datum = const_rhs->value();
       hdk::ir::ExprPtr recip_rhs = nullptr;
       if (rhs_type->isFp32()) {
@@ -654,7 +659,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
       if (recip_rhs) {
         return hdk::ir::makeExpr<hdk::ir::BinOper>(type,
                                                    bin_oper->containsAgg(),
-                                                   kMULTIPLY,
+                                                   hdk::ir::OpType::kMul,
                                                    bin_oper->qualifier(),
                                                    lhs,
                                                    recip_rhs);

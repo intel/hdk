@@ -8,6 +8,7 @@
 #pragma once
 
 #include "Context.h"
+#include "OpType.h"
 #include "Type.h"
 
 #include "SchemaMgr/ColumnInfo.h"
@@ -302,25 +303,25 @@ class UOper : public Expr {
  public:
   UOper(const Type* type,
         bool has_agg,
-        SQLOps o,
+        OpType o,
         ExprPtr p,
         bool is_dict_intersection = false)
       : Expr(type, has_agg)
       , op_type_(o)
       , operand_(p)
       , is_dict_intersection_(is_dict_intersection) {}
-  UOper(const Type* type, SQLOps o, ExprPtr p)
+  UOper(const Type* type, OpType o, ExprPtr p)
       : Expr(type), op_type_(o), operand_(p), is_dict_intersection_(false) {}
 
-  SQLOps opType() const { return op_type_; }
+  OpType opType() const { return op_type_; }
 
-  bool isNot() const { return op_type_ == SQLOps::kNOT; }
-  bool isUMinus() const { return op_type_ == SQLOps::kUMINUS; }
-  bool isIsNull() const { return op_type_ == SQLOps::kISNULL; }
-  bool isIsNotNull() const { return op_type_ == SQLOps::kISNOTNULL; }
-  bool isExists() const { return op_type_ == SQLOps::kEXISTS; }
-  bool isCast() const { return op_type_ == SQLOps::kCAST; }
-  bool isUnnest() const { return op_type_ == SQLOps::kUNNEST; }
+  bool isNot() const { return op_type_ == OpType::kNot; }
+  bool isUMinus() const { return op_type_ == OpType::kUMinus; }
+  bool isIsNull() const { return op_type_ == OpType::kIsNull; }
+  bool isIsNotNull() const { return op_type_ == OpType::kIsNotNull; }
+  bool isExists() const { return op_type_ == OpType::kExists; }
+  bool isCast() const { return op_type_ == OpType::kCast; }
+  bool isUnnest() const { return op_type_ == OpType::kUnnest; }
 
   const Expr* operand() const { return operand_.get(); }
   ExprPtr operandShared() const { return operand_; }
@@ -333,7 +334,7 @@ class UOper : public Expr {
   size_t hash() const override;
 
  protected:
-  SQLOps op_type_;   // operator type, e.g., kUMINUS, kISNULL, kEXISTS
+  OpType op_type_;   // operator type, e.g., kUMINUS, kISNULL, kEXISTS
   ExprPtr operand_;  // operand expression
   bool is_dict_intersection_;
 };
@@ -346,37 +347,37 @@ class UOper : public Expr {
  */
 class BinOper : public Expr {
  public:
-  BinOper(const Type* type, bool has_agg, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
+  BinOper(const Type* type, bool has_agg, OpType o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type, has_agg)
       , op_type_(o)
       , qualifier_(q)
       , left_operand_(l)
       , right_operand_(r) {}
-  BinOper(const Type* type, SQLOps o, SQLQualifier q, ExprPtr l, ExprPtr r)
+  BinOper(const Type* type, OpType o, SQLQualifier q, ExprPtr l, ExprPtr r)
       : Expr(type), op_type_(o), qualifier_(q), left_operand_(l), right_operand_(r) {}
 
-  SQLOps opType() const { return op_type_; }
+  OpType opType() const { return op_type_; }
 
-  bool isEq() const { return op_type_ == SQLOps::kEQ; }
-  bool isBwEq() const { return op_type_ == SQLOps::kBW_EQ; }
-  bool isNe() const { return op_type_ == SQLOps::kNE; }
-  bool isLt() const { return op_type_ == SQLOps::kLT; }
-  bool isGt() const { return op_type_ == SQLOps::kGT; }
-  bool isLe() const { return op_type_ == SQLOps::kLE; }
-  bool isGe() const { return op_type_ == SQLOps::kGE; }
-  bool isAnd() const { return op_type_ == SQLOps::kAND; }
-  bool isOr() const { return op_type_ == SQLOps::kOR; }
-  bool isMinus() const { return op_type_ == SQLOps::kMINUS; }
-  bool isPlus() const { return op_type_ == SQLOps::kPLUS; }
-  bool isMul() const { return op_type_ == SQLOps::kMULTIPLY; }
-  bool isDivide() const { return op_type_ == SQLOps::kDIVIDE; }
-  bool isModulo() const { return op_type_ == SQLOps::kMODULO; }
-  bool isArrayAt() const { return op_type_ == SQLOps::kARRAY_AT; }
+  bool isEq() const { return op_type_ == OpType::kEq; }
+  bool isBwEq() const { return op_type_ == OpType::kBwEq; }
+  bool isNe() const { return op_type_ == OpType::kNe; }
+  bool isLt() const { return op_type_ == OpType::kLt; }
+  bool isGt() const { return op_type_ == OpType::kGt; }
+  bool isLe() const { return op_type_ == OpType::kLe; }
+  bool isGe() const { return op_type_ == OpType::kGe; }
+  bool isAnd() const { return op_type_ == OpType::kAnd; }
+  bool isOr() const { return op_type_ == OpType::kOr; }
+  bool isMinus() const { return op_type_ == OpType::kMinus; }
+  bool isPlus() const { return op_type_ == OpType::kPlus; }
+  bool isMul() const { return op_type_ == OpType::kMul; }
+  bool isDivide() const { return op_type_ == OpType::kDiv; }
+  bool isModulo() const { return op_type_ == OpType::kMod; }
+  bool isArrayAt() const { return op_type_ == OpType::kArrayAt; }
 
-  bool isEquivalence() const { return isEq() || isBwEq(); }
-  bool isComparison() const { return IS_COMPARISON(op_type_); }
-  bool isLogic() const { return IS_LOGIC(op_type_); }
-  bool isArithmetic() const { return IS_ARITHMETIC(op_type_); }
+  bool isEquivalence() const { return hdk::ir::isEquivalence(op_type_); }
+  bool isComparison() const { return hdk::ir::isComparison(op_type_); }
+  bool isLogic() const { return hdk::ir::isLogic(op_type_); }
+  bool isArithmetic() const { return hdk::ir::isArithmetic(op_type_); }
 
   SQLQualifier qualifier() const { return qualifier_; }
   const Expr* leftOperand() const { return left_operand_.get(); }
@@ -391,7 +392,7 @@ class BinOper : public Expr {
   size_t hash() const override;
 
  private:
-  SQLOps op_type_;          // operator type, e.g., kLT, kAND, kPLUS, etc.
+  OpType op_type_;          // operator type, e.g., kLT, kAND, kPLUS, etc.
   SQLQualifier qualifier_;  // qualifier kANY, kALL or kONE.  Only relevant with
                             // right_operand is Subquery
   ExprPtr left_operand_;    // the left operand expression

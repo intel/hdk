@@ -34,13 +34,13 @@ llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
                                          const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto optype = bin_oper->opType();
-  CHECK(IS_ARITHMETIC(optype));
+  CHECK(hdk::ir::isArithmetic(optype));
   const auto lhs = bin_oper->leftOperand();
   const auto rhs = bin_oper->rightOperand();
   const auto& lhs_type = lhs->type();
   const auto& rhs_type = rhs->type();
 
-  if (lhs_type->isDecimal() && rhs_type->isDecimal() && optype == kDIVIDE) {
+  if (lhs_type->isDecimal() && rhs_type->isDecimal() && optype == hdk::ir::OpType::kDiv) {
     const auto ret = codegenDeciDiv(bin_oper, co);
     if (ret) {
       return ret;
@@ -82,7 +82,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
   const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
   const auto& oper_type = rhs_type->isInterval() ? rhs_type : lhs_type;
   switch (bin_oper->opType()) {
-    case kMINUS:
+    case hdk::ir::OpType::kMinus:
       return codegenSub(bin_oper,
                         lhs_lv,
                         rhs_lv,
@@ -90,7 +90,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         null_check_suffix,
                         oper_type,
                         co);
-    case kPLUS:
+    case hdk::ir::OpType::kPlus:
       return codegenAdd(bin_oper,
                         lhs_lv,
                         rhs_lv,
@@ -98,7 +98,7 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         null_check_suffix,
                         oper_type,
                         co);
-    case kMULTIPLY:
+    case hdk::ir::OpType::kMul:
       return codegenMul(bin_oper,
                         lhs_lv,
                         rhs_lv,
@@ -106,13 +106,13 @@ llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                         null_check_suffix,
                         oper_type,
                         co);
-    case kDIVIDE:
+    case hdk::ir::OpType::kDiv:
       return codegenDiv(lhs_lv,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
                         null_check_suffix,
                         oper_type);
-    case kMODULO:
+    case hdk::ir::OpType::kMod:
       return codegenMod(lhs_lv,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : int_typename,
@@ -139,22 +139,22 @@ llvm::Value* CodeGenerator::codegenFpArith(const hdk::ir::BinOper* bin_oper,
   llvm::ConstantFP* fp_null{lhs_type->isFp32() ? cgen_state_->llFp(NULL_FLOAT)
                                                : cgen_state_->llFp(NULL_DOUBLE)};
   switch (bin_oper->opType()) {
-    case kMINUS:
+    case hdk::ir::OpType::kMinus:
       return null_check_suffix.empty()
                  ? cgen_state_->ir_builder_.CreateFSub(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall("sub_" + fp_typename + null_check_suffix,
                                          {lhs_lv, rhs_lv, fp_null});
-    case kPLUS:
+    case hdk::ir::OpType::kPlus:
       return null_check_suffix.empty()
                  ? cgen_state_->ir_builder_.CreateFAdd(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall("add_" + fp_typename + null_check_suffix,
                                          {lhs_lv, rhs_lv, fp_null});
-    case kMULTIPLY:
+    case hdk::ir::OpType::kMul:
       return null_check_suffix.empty()
                  ? cgen_state_->ir_builder_.CreateFMul(lhs_lv, rhs_lv)
                  : cgen_state_->emitCall("mul_" + fp_typename + null_check_suffix,
                                          {lhs_lv, rhs_lv, fp_null});
-    case kDIVIDE:
+    case hdk::ir::OpType::kDiv:
       return codegenDiv(lhs_lv,
                         rhs_lv,
                         null_check_suffix.empty() ? "" : fp_typename,
@@ -709,13 +709,13 @@ llvm::Function* CodeGenerator::getArithWithOverflowIntrinsic(
     llvm::Type* type) {
   llvm::Intrinsic::ID fn_id{llvm::Intrinsic::not_intrinsic};
   switch (bin_oper->opType()) {
-    case kMINUS:
+    case hdk::ir::OpType::kMinus:
       fn_id = llvm::Intrinsic::ssub_with_overflow;
       break;
-    case kPLUS:
+    case hdk::ir::OpType::kPlus:
       fn_id = llvm::Intrinsic::sadd_with_overflow;
       break;
-    case kMULTIPLY:
+    case hdk::ir::OpType::kMul:
       fn_id = llvm::Intrinsic::smul_with_overflow;
       break;
     default:

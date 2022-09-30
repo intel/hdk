@@ -502,7 +502,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
           return nullptr;
         }
         return hdk::ir::makeExpr<hdk::ir::UOper>(
-            rhs->type(), false, kCAST, eq_left_op->shared());
+            rhs->type(), false, hdk::ir::OpType::kCast, eq_left_op->shared());
       }
     }
   }

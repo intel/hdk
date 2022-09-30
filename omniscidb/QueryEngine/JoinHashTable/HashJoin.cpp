@@ -492,8 +492,8 @@ std::shared_ptr<HashJoin> HashJoin::getSyntheticInstance(
   auto a1 = getSyntheticColumnVar(db_id, table1, column1, 0, executor);
   auto a2 = getSyntheticColumnVar(db_id, table2, column2, 1, executor);
 
-  auto qual_bin_oper =
-      std::make_shared<hdk::ir::BinOper>(a1->ctx().boolean(), kEQ, kONE, a1, a2);
+  auto qual_bin_oper = std::make_shared<hdk::ir::BinOper>(
+      a1->ctx().boolean(), hdk::ir::OpType::kEq, kONE, a1, a2);
 
   std::set<const hdk::ir::ColumnVar*> cvs =
       AllColumnVarsCollector::collect(qual_bin_oper.get());

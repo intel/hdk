@@ -202,12 +202,12 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
   } else if (contains_unsafe_division(lhs)) {
     // lhs contains a possible div-by-0: swap and short-circuit
     std::swap(rhs, lhs);
-  } else if (((optype == kOR && get_likelihood(lhs) > 0.90) ||
-              (optype == kAND && get_likelihood(lhs) < 0.10)) &&
+  } else if (((optype == hdk::ir::OpType::kOr && get_likelihood(lhs) > 0.90) ||
+              (optype == hdk::ir::OpType::kAnd && get_likelihood(lhs) < 0.10)) &&
              get_weight(rhs) > 10) {
     // short circuit if we're likely to see either (trueA || heavyB) or (falseA && heavyB)
-  } else if (((optype == kOR && get_likelihood(rhs) > 0.90) ||
-              (optype == kAND && get_likelihood(rhs) < 0.10)) &&
+  } else if (((optype == hdk::ir::OpType::kOr && get_likelihood(rhs) > 0.90) ||
+              (optype == hdk::ir::OpType::kAnd && get_likelihood(rhs) < 0.10)) &&
              get_weight(lhs) > 10) {
     // swap and short circuit if we're likely to see either (heavyA || trueB) or (heavyA
     // && falseB)
@@ -251,7 +251,8 @@ llvm::Value* CodeGenerator::codegenLogicalShortCircuit(const hdk::ir::BinOper* b
   }
 
   auto sc_check_bb = cgen_state_->ir_builder_.GetInsertBlock();
-  auto cnst_lv = llvm::ConstantInt::get(lhs_lv->getType(), (optype == kOR));
+  auto cnst_lv =
+      llvm::ConstantInt::get(lhs_lv->getType(), (optype == hdk::ir::OpType::kOr));
   // Branch to codegen rhs if NOT getting (true || rhs) or (false && rhs), likelihood of
   // the branch is < 0.10
   cgen_state_->ir_builder_.CreateCondBr(
@@ -309,9 +310,9 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
   auto type = bin_oper->type();
   if (!type->nullable()) {
     switch (optype) {
-      case kAND:
+      case hdk::ir::OpType::kAnd:
         return cgen_state_->ir_builder_.CreateAnd(toBool(lhs_lv), toBool(rhs_lv));
-      case kOR:
+      case hdk::ir::OpType::kOr:
         return cgen_state_->ir_builder_.CreateOr(toBool(lhs_lv), toBool(rhs_lv));
       default:
         CHECK(false);
@@ -326,10 +327,10 @@ llvm::Value* CodeGenerator::codegenLogical(const hdk::ir::BinOper* bin_oper,
     rhs_lv = cgen_state_->castToTypeIn(rhs_lv, 8);
   }
   switch (optype) {
-    case kAND:
+    case hdk::ir::OpType::kAnd:
       return cgen_state_->emitCall("logical_and",
                                    {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(type)});
-    case kOR:
+    case hdk::ir::OpType::kOr:
       return cgen_state_->emitCall("logical_or",
                                    {lhs_lv, rhs_lv, cgen_state_->inlineIntNull(type)});
     default:

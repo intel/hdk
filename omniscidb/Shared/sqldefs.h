@@ -24,47 +24,6 @@
 #ifndef SQLDEFS_H
 #define SQLDEFS_H
 
-// must not change the order without keeping the array in OperExpr::to_string
-// in sync.
-enum SQLOps {
-  kEQ = 0,
-  kBW_EQ,
-  kNE,
-  kLT,
-  kGT,
-  kLE,
-  kGE,
-  kAND,
-  kOR,
-  kNOT,
-  kMINUS,
-  kPLUS,
-  kMULTIPLY,
-  kDIVIDE,
-  kMODULO,
-  kUMINUS,
-  kISNULL,
-  kISNOTNULL,
-  kEXISTS,
-  kCAST,
-  kARRAY_AT,
-  kUNNEST,
-  kFUNCTION,
-  kIN
-};
-
-#define IS_COMPARISON(X)                                                    \
-  ((X) == kEQ || (X) == kBW_EQ || (X) == kNE || (X) == kLT || (X) == kGT || \
-   (X) == kLE || (X) == kGE)
-#define IS_LOGIC(X) ((X) == kAND || (X) == kOR)
-#define IS_ARITHMETIC(X) \
-  ((X) == kMINUS || (X) == kPLUS || (X) == kMULTIPLY || (X) == kDIVIDE || (X) == kMODULO)
-#define COMMUTE_COMPARISON(X) \
-  ((X) == kLT ? kGT : (X) == kLE ? kGE : (X) == kGT ? kLT : (X) == kGE ? kLE : (X))
-#define IS_UNARY(X) \
-  ((X) == kNOT || (X) == kUMINUS || (X) == kISNULL || (X) == kEXISTS || (X) == kCAST)
-#define IS_EQUIVALENCE(X) ((X) == kEQ || (X) == kBW_EQ)
-
 enum SQLQualifier { kONE, kANY, kALL };
 
 enum SQLAgg {
@@ -161,61 +120,6 @@ inline std::string toString(const SQLAgg& kind) {
       return "SINGLE_VALUE";
   }
   LOG(FATAL) << "Invalid aggregate kind: " << kind;
-  return "";
-}
-
-inline std::string toString(const SQLOps& op) {
-  switch (op) {
-    case kEQ:
-      return "EQ";
-    case kBW_EQ:
-      return "BW_EQ";
-    case kNE:
-      return "NE";
-    case kLT:
-      return "LT";
-    case kGT:
-      return "GT";
-    case kLE:
-      return "LE";
-    case kGE:
-      return "GE";
-    case kAND:
-      return "AND";
-    case kOR:
-      return "OR";
-    case kNOT:
-      return "NOT";
-    case kMINUS:
-      return "MINUS";
-    case kPLUS:
-      return "PLUS";
-    case kMULTIPLY:
-      return "MULTIPLY";
-    case kDIVIDE:
-      return "DIVIDE";
-    case kMODULO:
-      return "MODULO";
-    case kUMINUS:
-      return "UMINUS";
-    case kISNULL:
-      return "ISNULL";
-    case kISNOTNULL:
-      return "ISNOTNULL";
-    case kEXISTS:
-      return "EXISTS";
-    case kCAST:
-      return "CAST";
-    case kARRAY_AT:
-      return "ARRAY_AT";
-    case kUNNEST:
-      return "UNNEST";
-    case kFUNCTION:
-      return "FUNCTION";
-    case kIN:
-      return "IN";
-  }
-  LOG(FATAL) << "Invalid operation kind: " << op;
   return "";
 }
 

@@ -253,25 +253,25 @@ void Expr::print() const {
 ExprPtr Expr::decompress() const {
   if (type_->id() == Type::kExtDictionary) {
     auto new_type = static_cast<const ExtDictionaryType*>(type_)->elemType();
-    return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg_, OpType::kCast, shared_from_this());
   } else if (type_->id() == Type::kDate && type_->size() != 8) {
     auto date_type = static_cast<const DateType*>(type_);
     return makeExpr<UOper>(type_->ctx().date64(TimeUnit::kSecond, date_type->nullable()),
                            contains_agg_,
-                           kCAST,
+                           OpType::kCast,
                            shared_from_this());
   } else if (type_->id() == Type::kTime && type_->size() != 8) {
     auto time_type = static_cast<const TimeType*>(type_);
     return makeExpr<UOper>(type_->ctx().time64(time_type->unit(), time_type->nullable()),
                            contains_agg_,
-                           kCAST,
+                           OpType::kCast,
                            shared_from_this());
   } else if (type_->id() == Type::kInterval && type_->size() != 8) {
     auto interval_type = static_cast<const TimestampType*>(type_);
     return makeExpr<UOper>(
         type_->ctx().interval64(interval_type->unit(), interval_type->nullable()),
         contains_agg_,
-        kCAST,
+        OpType::kCast,
         shared_from_this());
   }
   return shared_from_this();
@@ -304,7 +304,7 @@ ExprPtr Expr::cast(const Type* new_type, bool is_dict_intersection) const {
         "expression "
         "yet.");
   }
-  return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
+  return makeExpr<UOper>(new_type, contains_agg_, OpType::kCast, shared_from_this());
 }
 
 std::string ColumnRef::toString() const {
@@ -915,13 +915,13 @@ ExprPtr Constant::cast(const Type* new_type, bool is_dict_intersection) const {
   }
   if ((type_->isTime() || type_->isDate()) && new_type->isNumber()) {
     // Let the codegen phase deal with casts from date/time to a number.
-    return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
+    return makeExpr<UOper>(new_type, contains_agg_, OpType::kCast, shared_from_this());
   }
   return doCast(new_type);
 }
 
 ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
-  if (op_type_ != kCAST) {
+  if (op_type_ != OpType::kCast) {
     return Expr::cast(new_type, is_dict_intersection);
   }
   if (type_->isString() && new_type->isExtDictionary()) {
@@ -1327,22 +1327,22 @@ std::string Constant::toString() const {
 std::string UOper::toString() const {
   std::string op;
   switch (op_type_) {
-    case kNOT:
+    case OpType::kNot:
       op = "NOT ";
       break;
-    case kUMINUS:
+    case OpType::kUMinus:
       op = "- ";
       break;
-    case kISNULL:
+    case OpType::kIsNull:
       op = "IS NULL ";
       break;
-    case kEXISTS:
+    case OpType::kExists:
       op = "EXISTS ";
       break;
-    case kCAST:
+    case OpType::kCast:
       op = "CAST " + type_->toString() + " ";
       break;
-    case kUNNEST:
+    case OpType::kUnnest:
       op = "UNNEST ";
       break;
     default:
@@ -1355,49 +1355,49 @@ std::string UOper::toString() const {
 std::string BinOper::toString() const {
   std::string op;
   switch (op_type_) {
-    case kEQ:
+    case OpType::kEq:
       op = "= ";
       break;
-    case kNE:
+    case OpType::kNe:
       op = "<> ";
       break;
-    case kLT:
+    case OpType::kLt:
       op = "< ";
       break;
-    case kLE:
+    case OpType::kLe:
       op = "<= ";
       break;
-    case kGT:
+    case OpType::kGt:
       op = "> ";
       break;
-    case kGE:
+    case OpType::kGe:
       op = ">= ";
       break;
-    case kAND:
+    case OpType::kAnd:
       op = "AND ";
       break;
-    case kOR:
+    case OpType::kOr:
       op = "OR ";
       break;
-    case kMINUS:
+    case OpType::kMinus:
       op = "- ";
       break;
-    case kPLUS:
+    case OpType::kPlus:
       op = "+ ";
       break;
-    case kMULTIPLY:
+    case OpType::kMul:
       op = "* ";
       break;
-    case kDIVIDE:
+    case OpType::kDiv:
       op = "/ ";
       break;
-    case kMODULO:
+    case OpType::kMod:
       op = "% ";
       break;
-    case kARRAY_AT:
+    case OpType::kArrayAt:
       op = "[] ";
       break;
-    case kBW_EQ:
+    case OpType::kBwEq:
       op = "BW_EQ ";
       break;
     default:

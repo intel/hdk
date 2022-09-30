@@ -1019,10 +1019,12 @@ hdk::ir::ExprPtrVector parseWindowOrderExprs(const rapidjson::Value& arr,
   return exprs;
 }
 
-hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type* type) {
+hdk::ir::ExprPtr makeUOper(hdk::ir::OpType op,
+                           hdk::ir::ExprPtr arg,
+                           const hdk::ir::Type* type) {
   auto& ctx = type->ctx();
   switch (op) {
-    case kCAST: {
+    case hdk::ir::OpType::kCast: {
       CHECK(!type->isNull());
       const auto& arg_type = arg->type();
       if ((arg_type->isString() || arg_type->isExtDictionary()) &&
@@ -1044,23 +1046,29 @@ hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type*
       }
       return std::make_shared<hdk::ir::UOper>(type, false, op, arg);
     }
-    case kNOT:
+    case hdk::ir::OpType::kNot:
       return std::make_shared<hdk::ir::UOper>(
           ctx.boolean(arg->type()->nullable()), op, arg);
-    case kISNULL:
+    case hdk::ir::OpType::kIsNull:
       return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), op, arg);
-    case kISNOTNULL: {
-      auto is_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kISNULL, arg);
-      return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kNOT, is_null);
+    case hdk::ir::OpType::kIsNotNull: {
+      auto is_null = std::make_shared<hdk::ir::UOper>(
+          ctx.boolean(false), hdk::ir::OpType::kIsNull, arg);
+      return std::make_shared<hdk::ir::UOper>(
+          ctx.boolean(false), hdk::ir::OpType::kNot, is_null);
     }
-    case kMINUS: {
-      return std::make_shared<hdk::ir::UOper>(arg->type(), false, kUMINUS, arg);
+    case hdk::ir::OpType::kMinus: {
+      return std::make_shared<hdk::ir::UOper>(
+          arg->type(), false, hdk::ir::OpType::kUMinus, arg);
     }
-    case kUNNEST: {
+    case hdk::ir::OpType::kUnnest: {
       const auto& arg_type = arg->type();
       CHECK(arg_type->isArray());
       return hdk::ir::makeExpr<hdk::ir::UOper>(
-          arg_type->as<hdk::ir::ArrayBaseType>()->elemType(), false, kUNNEST, arg);
+          arg_type->as<hdk::ir::ArrayBaseType>()->elemType(),
+          false,
+          hdk::ir::OpType::kUnnest,
+          arg);
     }
     default:
       CHECK(false);
@@ -1068,10 +1076,10 @@ hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type*
   return nullptr;
 }
 
-hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
+hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
                                    const hdk::ir::ExprPtrVector& operands,
                                    const hdk::ir::Type* type) {
-  if (op != kPLUS && op != kMINUS) {
+  if (op != hdk::ir::OpType::kPlus && op != hdk::ir::OpType::kMinus) {
     return nullptr;
   }
   if (operands.size() != 2) {
@@ -1098,7 +1106,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
     }
     auto bigint_type = type->ctx().int64(false);
 
-    CHECK(op == kMINUS);
+    CHECK(op == hdk::ir::OpType::kMinus);
     CHECK(type->isInterval());
     auto res_unit = type->as<hdk::ir::IntervalType>()->unit();
     if (res_unit == hdk::ir::TimeUnit::kMilli) {
@@ -1107,7 +1115,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
       // multiply 1000 to result since expected result should be in millisecond precision.
       return hdk::ir::makeExpr<hdk::ir::BinOper>(
           bigint_type,
-          kMULTIPLY,
+          hdk::ir::OpType::kMul,
           kONE,
           result,
           hdk::ir::Constant::make(bigint_type, 1000));
@@ -1119,7 +1127,7 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
       throw std::runtime_error("Unexpected DATEDIFF result type" + type->toString());
     }
   }
-  if (op == kPLUS) {
+  if (op == hdk::ir::OpType::kPlus) {
     auto dt_plus =
         hdk::ir::makeExpr<hdk::ir::FunctionOper>(lhs_type, "DATETIME_PLUS", operands);
     const auto date_trunc = rewrite_to_date_trunc(dt_plus.get());
@@ -1135,29 +1143,31 @@ hdk::ir::ExprPtr maybeMakeDateExpr(SQLOps op,
   if (interval_type->unit() == hdk::ir::TimeUnit::kMilli) {
     hdk::ir::ExprPtr interval_sec;
     if (interval_lit) {
-      interval_sec =
-          hdk::ir::Constant::make(bigint_type,
-                                  (op == kMINUS ? -interval_lit->value().bigintval
-                                                : interval_lit->value().bigintval) /
-                                      1000);
+      interval_sec = hdk::ir::Constant::make(
+          bigint_type,
+          (op == hdk::ir::OpType::kMinus ? -interval_lit->value().bigintval
+                                         : interval_lit->value().bigintval) /
+              1000);
     } else {
       interval_sec =
           hdk::ir::makeExpr<hdk::ir::BinOper>(bigint_type,
-                                              kDIVIDE,
+                                              hdk::ir::OpType::kDiv,
                                               kONE,
                                               interval,
                                               hdk::ir::Constant::make(bigint_type, 1000));
-      if (op == kMINUS) {
-        interval_sec =
-            std::make_shared<hdk::ir::UOper>(bigint_type, false, kUMINUS, interval_sec);
+      if (op == hdk::ir::OpType::kMinus) {
+        interval_sec = std::make_shared<hdk::ir::UOper>(
+            bigint_type, false, hdk::ir::OpType::kUMinus, interval_sec);
       }
     }
     return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daSECOND, interval_sec, lhs);
   }
   CHECK(interval_type->unit() == hdk::ir::TimeUnit::kMonth);
-  const auto interval_months = op == kMINUS ? std::make_shared<hdk::ir::UOper>(
-                                                  bigint_type, false, kUMINUS, interval)
-                                            : interval;
+  const auto interval_months =
+      op == hdk::ir::OpType::kMinus
+          ? std::make_shared<hdk::ir::UOper>(
+                bigint_type, false, hdk::ir::OpType::kUMinus, interval)
+          : interval;
   return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daMONTH, interval_months, lhs);
 }
 
@@ -1484,7 +1494,7 @@ hdk::ir::ExprPtr parseItem(const hdk::ir::ExprPtrVector& operands) {
   return hdk::ir::makeExpr<hdk::ir::BinOper>(
       base->type()->as<hdk::ir::ArrayBaseType>()->elemType(),
       false,
-      kARRAY_AT,
+      hdk::ir::OpType::kArrayAt,
       kONE,
       base,
       index);
@@ -1566,8 +1576,9 @@ hdk::ir::ExprPtr parseAbs(const hdk::ir::ExprPtrVector& operands) {
   auto arg_type = arg->type();
   CHECK(arg_type->isNumber());
   auto zero = hdk::ir::Constant::make(arg_type, 0);
-  auto lt_zero = Analyzer::normalizeOperExpr(kLT, kONE, arg, zero);
-  auto uminus_operand = hdk::ir::makeExpr<hdk::ir::UOper>(arg_type, false, kUMINUS, arg);
+  auto lt_zero = Analyzer::normalizeOperExpr(hdk::ir::OpType::kLt, kONE, arg, zero);
+  auto uminus_operand =
+      hdk::ir::makeExpr<hdk::ir::UOper>(arg_type, false, hdk::ir::OpType::kUMinus, arg);
   expr_list.emplace_back(lt_zero, uminus_operand);
   return Analyzer::normalizeCaseExpr(expr_list, arg, nullptr);
 }
@@ -1584,14 +1595,14 @@ hdk::ir::ExprPtr parseSign(const hdk::ir::ExprPtrVector& operands) {
   // TODO: revise this part in checker and probably remove this flag here.
   const auto zero = hdk::ir::Constant::make(arg_type, 0, false);
   auto bool_type = arg_type->ctx().boolean(arg_type->nullable());
-  const auto lt_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kLT, kONE, arg, zero);
+  const auto lt_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      bool_type, hdk::ir::OpType::kLt, kONE, arg, zero);
   expr_list.emplace_back(lt_zero, hdk::ir::Constant::make(arg_type, -1));
-  const auto eq_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kEQ, kONE, arg, zero);
+  const auto eq_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      bool_type, hdk::ir::OpType::kEq, kONE, arg, zero);
   expr_list.emplace_back(eq_zero, hdk::ir::Constant::make(arg_type, 0));
-  const auto gt_zero =
-      hdk::ir::makeExpr<hdk::ir::BinOper>(bool_type, kGT, kONE, arg, zero);
+  const auto gt_zero = hdk::ir::makeExpr<hdk::ir::BinOper>(
+      bool_type, hdk::ir::OpType::kGt, kONE, arg, zero);
   expr_list.emplace_back(gt_zero, hdk::ir::Constant::make(arg_type, 1));
   return Analyzer::normalizeCaseExpr(expr_list, nullptr, nullptr);
 }
@@ -1769,7 +1780,8 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   }
   if (fn_name == "/INT"sv) {
     CHECK_EQ(operands.size(), size_t(2));
-    return Analyzer::normalizeOperExpr(kDIVIDE, kONE, operands[0], operands[1]);
+    return Analyzer::normalizeOperExpr(
+        hdk::ir::OpType::kDiv, kONE, operands[0], operands[1]);
   }
   if (fn_name == "Reinterpret"sv) {
     CHECK_EQ(operands.size(), size_t(1));
@@ -1903,7 +1915,7 @@ hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
   const auto op_name = json_str(field(json_expr, "op"));
   const bool is_quantifier =
       op_name == std::string("PG_ANY") || op_name == std::string("PG_ALL");
-  const auto op = is_quantifier ? kFUNCTION : to_sql_op(op_name);
+  const auto op = is_quantifier ? hdk::ir::OpType::kFunction : to_sql_op(op_name);
   const auto& operators_json_arr = field(json_expr, "operands");
   CHECK(operators_json_arr.IsArray());
   auto operands = parseExprArray(
@@ -1912,7 +1924,7 @@ hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
   CHECK(type_it != json_expr.MemberEnd());
   auto type = parseType(type_it->value);
 
-  if (op == kIN && json_expr.HasMember("subquery")) {
+  if (op == hdk::ir::OpType::kIn && json_expr.HasMember("subquery")) {
     CHECK_EQ(operands.size(), (size_t)1);
     auto subquery =
         parse_subquery_expr(json_expr, db_id, schema_provider, root_dag_builder);
@@ -1930,7 +1942,7 @@ hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,
                                root_dag_builder,
                                ra_output);
 
-  } else if (op == kFUNCTION) {
+  } else if (op == hdk::ir::OpType::kFunction) {
     return parseFunctionOperator(op_name, operands, type, root_dag_builder);
   } else {
     CHECK_GE(operands.size(), (size_t)1);

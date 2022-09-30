@@ -174,19 +174,19 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::UOper* u_oper,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto optype = u_oper->opType();
   switch (optype) {
-    case kNOT: {
+    case hdk::ir::OpType::kNot: {
       return codegenLogical(u_oper, co);
     }
-    case kCAST: {
+    case hdk::ir::OpType::kCast: {
       return codegenCast(u_oper, co);
     }
-    case kUMINUS: {
+    case hdk::ir::OpType::kUMinus: {
       return codegenUMinus(u_oper, co);
     }
-    case kISNULL: {
+    case hdk::ir::OpType::kIsNull: {
       return codegenIsNull(u_oper, co);
     }
-    case kUNNEST:
+    case hdk::ir::OpType::kUnnest:
       return codegenUnnest(u_oper, co);
     default:
       UNREACHABLE();
@@ -434,7 +434,7 @@ llvm::Value* CodeGenerator::codegenWidthBucketExpr(const hdk::ir::WidthBucketExp
       bound_check, width_bucket_argument_check_fail_bb, width_bucket_bound_check_ok_bb);
   cgen_state_->ir_builder_.SetInsertPoint(width_bucket_bound_check_ok_bb);
   cgen_state_->needs_error_check_ = true;
-  auto reversed_expr = toBool(codegenCmp(SQLOps::kGT,
+  auto reversed_expr = toBool(codegenCmp(hdk::ir::OpType::kGt,
                                          kONE,
                                          lower_bound_expr_lvs,
                                          lower_bound_expr->type(),

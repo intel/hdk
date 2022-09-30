@@ -22,73 +22,74 @@
 
 #include "../Shared/sqldefs.h"
 #include "../Shared/sqltypes.h"
+#include "IR/OpType.h"
 #include "Logger/Logger.h"
 
-inline SQLOps to_sql_op(const std::string& op_str) {
+inline hdk::ir::OpType to_sql_op(const std::string& op_str) {
   if (op_str == std::string(">")) {
-    return kGT;
+    return hdk::ir::OpType::kGt;
   }
   if (op_str == std::string("IS NOT DISTINCT FROM")) {
-    return kBW_EQ;
+    return hdk::ir::OpType::kBwEq;
   }
   if (op_str == std::string(">=")) {
-    return kGE;
+    return hdk::ir::OpType::kGe;
   }
   if (op_str == std::string("<")) {
-    return kLT;
+    return hdk::ir::OpType::kLt;
   }
   if (op_str == std::string("<=")) {
-    return kLE;
+    return hdk::ir::OpType::kLe;
   }
   if (op_str == std::string("=")) {
-    return kEQ;
+    return hdk::ir::OpType::kEq;
   }
   if (op_str == std::string("<>")) {
-    return kNE;
+    return hdk::ir::OpType::kNe;
   }
   if (op_str == std::string("+")) {
-    return kPLUS;
+    return hdk::ir::OpType::kPlus;
   }
   if (op_str == std::string("-")) {
-    return kMINUS;
+    return hdk::ir::OpType::kMinus;
   }
   if (op_str == std::string("*")) {
-    return kMULTIPLY;
+    return hdk::ir::OpType::kMul;
   }
   if (op_str == std::string("/")) {
-    return kDIVIDE;
+    return hdk::ir::OpType::kDiv;
   }
   if (op_str == "MOD") {
-    return kMODULO;
+    return hdk::ir::OpType::kMod;
   }
   if (op_str == std::string("AND")) {
-    return kAND;
+    return hdk::ir::OpType::kAnd;
   }
   if (op_str == std::string("OR")) {
-    return kOR;
+    return hdk::ir::OpType::kOr;
   }
   if (op_str == std::string("CAST")) {
-    return kCAST;
+    return hdk::ir::OpType::kCast;
   }
   if (op_str == std::string("NOT")) {
-    return kNOT;
+    return hdk::ir::OpType::kNot;
   }
   if (op_str == std::string("IS NULL")) {
-    return kISNULL;
+    return hdk::ir::OpType::kIsNull;
   }
   if (op_str == std::string("IS NOT NULL")) {
-    return kISNOTNULL;
+    return hdk::ir::OpType::kIsNotNull;
   }
   if (op_str == std::string("PG_UNNEST")) {
-    return kUNNEST;
+    return hdk::ir::OpType::kUnnest;
   }
   if (op_str == std::string("PG_ANY") || op_str == std::string("PG_ALL")) {
     throw std::runtime_error("Invalid use of " + op_str + " operator");
   }
   if (op_str == std::string("IN")) {
-    return kIN;
+    return hdk::ir::OpType::kIn;
   }
-  return kFUNCTION;
+  return hdk::ir::OpType::kFunction;
 }
 
 inline SQLAgg to_agg_kind(const std::string& agg_name) {

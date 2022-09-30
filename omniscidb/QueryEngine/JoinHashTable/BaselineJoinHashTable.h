@@ -202,7 +202,7 @@ class BaselineJoinHashTable : public HashJoin {
   struct AlternativeCacheKeyForBaselineHashJoin {
     std::vector<InnerOuter> inner_outer_pairs;
     const size_t num_elements;
-    const SQLOps optype;
+    hdk::ir::OpType optype;
     const JoinType join_type;
   };
 

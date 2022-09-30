@@ -3725,27 +3725,27 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
   // Todo: dedup the following comparison code with the integer/timestamp path, it is
   // slightly tricky due to do cleanly as we do not have rowid on this path
   switch (comp_expr->opType()) {
-    case kGE:
+    case hdk::ir::OpType::kGe:
       if (chunk_max < rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
       }
       break;
-    case kGT:
+    case hdk::ir::OpType::kGt:
       if (chunk_max <= rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
       }
       break;
-    case kLE:
+    case hdk::ir::OpType::kLe:
       if (chunk_min > rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
       }
       break;
-    case kLT:
+    case hdk::ir::OpType::kLt:
       if (chunk_min >= rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
       }
       break;
-    case kEQ:
+    case hdk::ir::OpType::kEq:
       if (chunk_min > rhs_val || chunk_max < rhs_val) {
         return FragmentSkipStatus::SKIPPABLE;
       }
@@ -3886,27 +3886,27 @@ std::pair<bool, int64_t> Executor::skipFragment(
         CodeGenerator::codegenIntConst(rhs_const, &local_cgen_state)->getSExtValue();
 
     switch (comp_expr->opType()) {
-      case kGE:
+      case hdk::ir::OpType::kGe:
         if (chunk_max < rhs_val) {
           return {true, -1};
         }
         break;
-      case kGT:
+      case hdk::ir::OpType::kGt:
         if (chunk_max <= rhs_val) {
           return {true, -1};
         }
         break;
-      case kLE:
+      case hdk::ir::OpType::kLe:
         if (chunk_min > rhs_val) {
           return {true, -1};
         }
         break;
-      case kLT:
+      case hdk::ir::OpType::kLt:
         if (chunk_min >= rhs_val) {
           return {true, -1};
         }
         break;
-      case kEQ:
+      case hdk::ir::OpType::kEq:
         if (chunk_min > rhs_val || chunk_max < rhs_val) {
           return {true, -1};
         } else if (is_rowid) {

@@ -63,14 +63,14 @@ class HashtableRecycler
 
   static std::pair<QueryPlanHash, HashtableCacheMetaInfo> getHashtableCacheKey(
       const std::vector<InnerOuter>& inner_outer_pairs,
-      const SQLOps op_type,
+      hdk::ir::OpType op_type,
       const JoinType join_type,
       const HashTableBuildDagMap& hashtable_build_dag_map,
       Executor* executor);
 
   static std::pair<QueryPlan, HashtableCacheMetaInfo> getHashtableKeyString(
       const std::vector<InnerOuter>& inner_outer_pairs,
-      const SQLOps op_type,
+      hdk::ir::OpType op_type,
       const JoinType join_type,
       const HashTableBuildDagMap& hashtable_build_dag_map,
       Executor* executor);

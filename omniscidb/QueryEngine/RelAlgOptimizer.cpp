@@ -1484,8 +1484,13 @@ void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
       hdk::ir::ExprPtr lhs = folded_filter->getConditionExprShared();
       hdk::ir::ExprPtr rhs = visitor.visit(filter->getConditionExpr());
       bool nullable = lhs->type()->nullable() || rhs->type()->nullable();
-      auto new_condition = hdk::ir::makeExpr<hdk::ir::BinOper>(
-          lhs->type()->ctx().boolean(nullable), false, kAND, kONE, lhs, rhs);
+      auto new_condition =
+          hdk::ir::makeExpr<hdk::ir::BinOper>(lhs->type()->ctx().boolean(nullable),
+                                              false,
+                                              hdk::ir::OpType::kAnd,
+                                              kONE,
+                                              lhs,
+                                              rhs);
       folded_filter->setCondition(std::move(new_condition));
       replace_all_usages(filter, folded_filter, deconst_mapping, web);
       deconst_mapping.erase(filter.get());
@@ -1517,7 +1522,7 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
     const size_t last_col_idx) {
   if (auto bin_op = dynamic_cast<const hdk::ir::BinOper*>(condition)) {
     switch (bin_op->opType()) {
-      case kAND: {
+      case hdk::ir::OpType::kAnd: {
         auto lhs_conditions = find_hoistable_conditions(
             bin_op->leftOperand(), source, first_col_idx, last_col_idx);
         auto rhs_conditions = find_hoistable_conditions(
@@ -1531,7 +1536,7 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
             lhs_conditions.end(), rhs_conditions.begin(), rhs_conditions.end());
         return lhs_conditions;
       }
-      case kEQ: {
+      case hdk::ir::OpType::kEq: {
         auto lhs_conditions = find_hoistable_conditions(
             bin_op->leftOperand(), source, first_col_idx, last_col_idx);
         auto rhs_conditions = find_hoistable_conditions(
@@ -1695,7 +1700,7 @@ void hoist_filter_cond_to_cross_join(
             auto res_type = rhs->type()->ctx().boolean(
                 rhs->type()->nullable() || new_join_condition->type()->nullable());
             new_join_condition = hdk::ir::makeExpr<hdk::ir::BinOper>(
-                res_type, kAND, kONE, new_join_condition, rhs);
+                res_type, hdk::ir::OpType::kAnd, kONE, new_join_condition, rhs);
           }
           join->setCondition(new_join_condition);
         }

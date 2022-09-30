@@ -261,7 +261,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
         return op;
       }
       return hdk::ir::makeExpr<hdk::ir::UOper>(
-          uoper->type(), op->containsAgg(), kCAST, op);
+          uoper->type(), op->containsAgg(), hdk::ir::OpType::kCast, op);
     }
     return ExprRewriter::visitUOper(uoper);
   }
@@ -362,7 +362,7 @@ hdk::ir::ExprPtr get_in_values_expr(hdk::ir::ExprPtr arg,
               auto none_encoded_string = hdk::ir::makeExpr<hdk::ir::Constant>(
                   type->ctx().text(is_null_const), is_null_const, d);
               auto dict_encoded_string = std::make_shared<hdk::ir::UOper>(
-                  type, false, kCAST, none_encoded_string);
+                  type, false, hdk::ir::OpType::kCast, none_encoded_string);
               in_vals.push_back(dict_encoded_string);
             } else {
               in_vals.push_back(
@@ -436,8 +436,8 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
     if (type->isExtDictionary()) {
       auto none_encoded_string = hdk::ir::makeExpr<hdk::ir::Constant>(
           type->ctx().text(is_null_const), is_null_const, d);
-      auto dict_encoded_string =
-          std::make_shared<hdk::ir::UOper>(type, false, kCAST, none_encoded_string);
+      auto dict_encoded_string = std::make_shared<hdk::ir::UOper>(
+          type, false, hdk::ir::OpType::kCast, none_encoded_string);
       value_exprs.push_back(dict_encoded_string);
     } else {
       value_exprs.push_back(hdk::ir::makeExpr<hdk::ir::Constant>(type, is_null_const, d));
@@ -644,12 +644,13 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
       auto uo = right_operand->as<hdk::ir::UOper>();
       auto cv = uo->operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->rteIdx();
-      return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
-                                                 bin_oper->containsAgg(),
-                                                 COMMUTE_COMPARISON(bin_oper->opType()),
-                                                 bin_oper->qualifier(),
-                                                 right_operand,
-                                                 left_operand);
+      return hdk::ir::makeExpr<hdk::ir::BinOper>(
+          bin_oper->type(),
+          bin_oper->containsAgg(),
+          hdk::ir::commuteComparison(bin_oper->opType()),
+          bin_oper->qualifier(),
+          right_operand,
+          left_operand);
     }
   } else if (left_operand->is<hdk::ir::ColumnVar>() &&
              !left_operand->is<hdk::ir::Var>() &&
@@ -662,12 +663,13 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
              !right_operand->is<hdk::ir::Var>()) {
     auto cv = right_operand->as<hdk::ir::ColumnVar>();
     rte_idx = cv->rteIdx();
-    return hdk::ir::makeExpr<hdk::ir::BinOper>(bin_oper->type(),
-                                               bin_oper->containsAgg(),
-                                               COMMUTE_COMPARISON(bin_oper->opType()),
-                                               bin_oper->qualifier(),
-                                               right_operand,
-                                               left_operand);
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(
+        bin_oper->type(),
+        bin_oper->containsAgg(),
+        hdk::ir::commuteComparison(bin_oper->opType()),
+        bin_oper->qualifier(),
+        right_operand,
+        left_operand);
   }
   return nullptr;
 }
