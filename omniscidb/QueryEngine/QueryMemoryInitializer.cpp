@@ -814,7 +814,8 @@ std::vector<int64_t> QueryMemoryInitializer::allocateCountDistinctBuffers(
         get_target_info(target_expr, executor->getConfig().exec.group_by.bigint_count);
     if (is_distinct_target(agg_info)) {
       CHECK(agg_info.is_agg &&
-            (agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT));
+            (agg_info.agg_kind == hdk::ir::AggType::kCount ||
+             agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct));
       CHECK(!agg_info.type->isString() && !agg_info.type->isArray());
 
       const size_t agg_col_idx = query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
@@ -877,7 +878,7 @@ QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_
   for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
     auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
     if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
-      if (agg_expr->aggType() == kAPPROX_QUANTILE) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kApproxQuantile) {
         size_t const agg_col_idx =
             query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
         CHECK_LT(agg_col_idx, slot_count);

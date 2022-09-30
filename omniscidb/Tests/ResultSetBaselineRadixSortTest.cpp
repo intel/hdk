@@ -46,9 +46,12 @@ namespace {
 std::vector<TargetInfo> get_sort_int_target_infos() {
   std::vector<TargetInfo> target_infos;
   auto int_type = hdk::ir::Context::defaultCtx().int32();
-  target_infos.push_back(TargetInfo{false, kMIN, int_type, nullptr, false, false});
-  target_infos.push_back(TargetInfo{false, kMIN, int_type, nullptr, false, false});
-  target_infos.push_back(TargetInfo{true, kCOUNT, int_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, int_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, int_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kCount, int_type, nullptr, false, false});
   return target_infos;
 }
 
@@ -88,7 +91,8 @@ void fill_storage_buffer_baseline_sort_int(int8_t* buff,
 
       const auto cols_ptr = reinterpret_cast<int64_t*>(
           row_ptr + get_slot_off_quad(query_mem_desc) * sizeof(int64_t));
-      cols_ptr[target_slot] = (target_info.agg_kind == kCOUNT ? 0 : 0xdeadbeef);
+      cols_ptr[target_slot] =
+          (target_info.agg_kind == hdk::ir::AggType::kCount ? 0 : 0xdeadbeef);
     }
   }
   std::vector<int64_t> values(upper_bound);
@@ -134,7 +138,7 @@ void fill_storage_buffer_baseline_sort_fp(int8_t* buff,
       const auto& target_info = target_infos[target_it->second];
       i64_buff[slot_offset_rowwise(
           i, target_slot, key_component_count, target_slot_count)] =
-          (target_info.agg_kind == kCOUNT ? 0 : 0xdeadbeef);
+          (target_info.agg_kind == hdk::ir::AggType::kCount ? 0 : 0xdeadbeef);
     }
   }
   std::vector<int64_t> values(upper_bound);
@@ -185,18 +189,24 @@ void check_sorted(const ResultSet& result_set,
 std::vector<TargetInfo> get_sort_fp_target_infos() {
   std::vector<TargetInfo> target_infos;
   auto fp_type = hdk::ir::Context::defaultCtx().fp32();
-  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
-  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
-  target_infos.push_back(TargetInfo{true, kSUM, fp_type, fp_type, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, fp_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, fp_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kSum, fp_type, fp_type, true, false});
   return target_infos;
 }
 
 std::vector<TargetInfo> get_sort_notnull_fp_target_infos() {
   std::vector<TargetInfo> target_infos;
   auto fp_type = hdk::ir::Context::defaultCtx().fp32(false);
-  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, false, false});
-  target_infos.push_back(TargetInfo{false, kMIN, fp_type, nullptr, true, false});
-  target_infos.push_back(TargetInfo{true, kMAX, fp_type, fp_type, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, fp_type, nullptr, false, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, fp_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kMax, fp_type, fp_type, true, false});
   return target_infos;
 }
 

@@ -1845,8 +1845,9 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   return hdk::ir::makeExpr<hdk::ir::FunctionOper>(ret_type, fn_name, std::move(args));
 }
 
-bool isAggSupportedForType(const SQLAgg& agg_kind, const hdk::ir::Type* arg_type) {
-  if ((agg_kind == kMIN || agg_kind == kMAX || agg_kind == kSUM || agg_kind == kAVG) &&
+bool isAggSupportedForType(hdk::ir::AggType agg_kind, const hdk::ir::Type* arg_type) {
+  if ((agg_kind == hdk::ir::AggType::kMin || agg_kind == hdk::ir::AggType::kMax ||
+       agg_kind == hdk::ir::AggType::kSum || agg_kind == hdk::ir::AggType::kAvg) &&
       !(arg_type->isNumber() || arg_type->isBoolean() || arg_type->isDateTime())) {
     return false;
   }
@@ -1866,8 +1867,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
   auto is_distinct = json_bool(field(json_expr, "distinct"));
   auto operands = indices_from_json_array(field(json_expr, "operands"));
   if (operands.size() > 1 &&
-      (operands.size() != 2 ||
-       (agg_kind != kAPPROX_COUNT_DISTINCT && agg_kind != kAPPROX_QUANTILE))) {
+      (operands.size() != 2 || (agg_kind != hdk::ir::AggType::kApproxCountDistinct &&
+                                agg_kind != hdk::ir::AggType::kApproxQuantile))) {
     throw QueryNotSupported("Multiple arguments for aggregates aren't supported");
   }
 
@@ -1879,7 +1880,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
     CHECK_LE(operands.size(), 2u);
     arg_expr = sources[operand];
 
-    if (agg_kind == kAPPROX_COUNT_DISTINCT && operands.size() == 2) {
+    if (agg_kind == hdk::ir::AggType::kApproxCountDistinct && operands.size() == 2) {
       arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(sources[operands[1]]);
       if (!arg1 || !arg1->type()->isInt32() || arg1->value().intval < 1 ||
           arg1->value().intval > 100) {
@@ -1887,7 +1888,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
             "APPROX_COUNT_DISTINCT's second parameter should be SMALLINT literal between "
             "1 and 100");
       }
-    } else if (agg_kind == kAPPROX_QUANTILE) {
+    } else if (agg_kind == hdk::ir::AggType::kApproxQuantile) {
       // If second parameter is not given then APPROX_MEDIAN is assumed.
       if (operands.size() == 2) {
         arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(

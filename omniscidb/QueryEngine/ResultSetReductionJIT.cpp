@@ -727,8 +727,8 @@ void ResultSetReductionJIT::reduceOneEntryTargetsNoCollisions(
 
     bool two_slot_target{false};
     if (target_info.is_agg &&
-        (target_info.agg_kind == kAVG ||
-         (target_info.agg_kind == kSAMPLE &&
+        (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+         (target_info.agg_kind == hdk::ir::AggType::kSample &&
           (target_info.type->isString() || target_info.type->isArray())))) {
       // Note that this assumes if one of the slot pairs in a given target is an array,
       // all slot pairs are arrays.
@@ -808,8 +808,8 @@ void ResultSetReductionJIT::reduceOneEntryBaseline(
     Value* this_ptr2{nullptr};
     Value* that_ptr2{nullptr};
     if (target_info.is_agg &&
-        (target_info.agg_kind == kAVG ||
-         (target_info.agg_kind == kSAMPLE &&
+        (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+         (target_info.agg_kind == hdk::ir::AggType::kSample &&
           (target_info.type->isString() || target_info.type->isArray())))) {
       const auto desc = "target_" + std::to_string(target_logical_idx) + "_second_slot";
       const auto second_slot_rel_off =
@@ -1073,8 +1073,8 @@ void ResultSetReductionJIT::reduceOneSlot(Value* this_ptr1,
       target_slot_idx, float_argument_input, query_mem_desc_);
   CHECK_LT(init_agg_val_idx, target_init_vals_.size());
   auto init_val = target_init_vals_[init_agg_val_idx];
-  if (target_info.is_agg &&
-      (target_info.agg_kind != kSINGLE_VALUE && target_info.agg_kind != kSAMPLE)) {
+  if (target_info.is_agg && (target_info.agg_kind != hdk::ir::AggType::kSingleValue &&
+                             target_info.agg_kind != hdk::ir::AggType::kSample)) {
     reduceOneAggregateSlot(this_ptr1,
                            this_ptr2,
                            that_ptr1,
@@ -1085,7 +1085,7 @@ void ResultSetReductionJIT::reduceOneSlot(Value* this_ptr1,
                            init_val,
                            chosen_bytes,
                            ir_reduce_one_entry);
-  } else if (target_info.agg_kind == kSINGLE_VALUE) {
+  } else if (target_info.agg_kind == hdk::ir::AggType::kSingleValue) {
     const auto checked_rc = emit_checked_write_projection(
         this_ptr1, that_ptr1, init_val, chosen_bytes, ir_reduce_one_entry);
 
@@ -1100,7 +1100,7 @@ void ResultSetReductionJIT::reduceOneSlot(Value* this_ptr1,
   } else {
     emit_write_projection(
         this_ptr1, that_ptr1, init_val, chosen_bytes, ir_reduce_one_entry);
-    if (target_info.agg_kind == kSAMPLE &&
+    if (target_info.agg_kind == hdk::ir::AggType::kSample &&
         (target_info.type->isString() || target_info.type->isArray())) {
       CHECK(this_ptr2 && that_ptr2);
       size_t length_to_elems{0};
@@ -1137,8 +1137,8 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
                                                    const int8_t chosen_bytes,
                                                    Function* ir_reduce_one_entry) const {
   switch (target_info.agg_kind) {
-    case kCOUNT:
-    case kAPPROX_COUNT_DISTINCT: {
+    case hdk::ir::AggType::kCount:
+    case hdk::ir::AggType::kApproxCountDistinct: {
       if (is_distinct_target(target_info)) {
         CHECK_EQ(static_cast<size_t>(chosen_bytes), sizeof(int64_t));
         reduceOneCountDistinctSlot(
@@ -1149,12 +1149,12 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
       emit_aggregate_one_count(this_ptr1, that_ptr1, chosen_bytes, ir_reduce_one_entry);
       break;
     }
-    case kAPPROX_QUANTILE:
+    case hdk::ir::AggType::kApproxQuantile:
       CHECK_EQ(chosen_bytes, static_cast<int8_t>(sizeof(int64_t)));
       reduceOneApproxQuantileSlot(
           this_ptr1, that_ptr1, target_logical_idx, ir_reduce_one_entry);
       break;
-    case kAVG: {
+    case hdk::ir::AggType::kAvg: {
       // Ignore float argument compaction for count component for fear of its overflow
       emit_aggregate_one_count(this_ptr2,
                                that_ptr2,
@@ -1162,7 +1162,7 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
                                ir_reduce_one_entry);
     }
     // fall thru
-    case kSUM: {
+    case hdk::ir::AggType::kSum: {
       emit_aggregate_one_nullable_value("sum",
                                         this_ptr1,
                                         that_ptr1,
@@ -1172,7 +1172,7 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
                                         ir_reduce_one_entry);
       break;
     }
-    case kMIN: {
+    case hdk::ir::AggType::kMin: {
       emit_aggregate_one_nullable_value("min",
                                         this_ptr1,
                                         that_ptr1,
@@ -1182,7 +1182,7 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
                                         ir_reduce_one_entry);
       break;
     }
-    case kMAX: {
+    case hdk::ir::AggType::kMax: {
       emit_aggregate_one_nullable_value("max",
                                         this_ptr1,
                                         that_ptr1,
@@ -1272,9 +1272,8 @@ void ResultSetReductionJIT::finalizeReductionCode(
 namespace {
 
 std::string target_info_key(const TargetInfo& target_info) {
-  return std::to_string(target_info.is_agg) + "\n" +
-         std::to_string(target_info.agg_kind) + "\n" + target_info.type->toString() +
-         "\n" +
+  return std::to_string(target_info.is_agg) + "\n" + ::toString(target_info.agg_kind) +
+         "\n" + target_info.type->toString() + "\n" +
          (target_info.agg_arg_type ? target_info.agg_arg_type->toString()
                                    : std::string("null")) +
          "\n" + std::to_string(target_info.skip_null_val) + "\n" +

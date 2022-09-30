@@ -173,7 +173,7 @@ std::unordered_map<size_t, size_t> get_slot_to_target_mapping(
 
 std::vector<TargetInfo> generate_custom_agg_target_infos(
     std::vector<int8_t> key_columns,
-    std::vector<SQLAgg> sql_aggs,
+    std::vector<hdk::ir::AggType> sql_aggs,
     std::vector<const hdk::ir::Type*> agg_types,
     std::vector<const hdk::ir::Type*> arg_types);
 

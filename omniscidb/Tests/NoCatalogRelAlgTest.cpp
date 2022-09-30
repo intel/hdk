@@ -259,10 +259,10 @@ TEST_F(NoCatalogRelAlgTest, GroupBySingleColumn) {
       dag->addProject(dag->addScan(TEST_DB_ID, "test_agg"), std::vector<int>({0, 1}));
   auto agg = dag->addAgg(proj,
                          1,
-                         {{kCOUNT},
-                          {kCOUNT, ctx.int32(), 1},
-                          {kSUM, ctx.int64(), 1},
-                          {kAVG, ctx.int32(), 1}});
+                         {{hdk::ir::AggType::kCount},
+                          {hdk::ir::AggType::kCount, ctx.int32(), 1},
+                          {hdk::ir::AggType::kSum, ctx.int64(), 1},
+                          {hdk::ir::AggType::kAvg, ctx.int32(), 1}});
   dag->addSort(agg, {{0, SortDirection::Ascending, NullSortedPosition::Last}});
   dag->finalize();
   auto res = runRelAlgQuery(std::move(dag));

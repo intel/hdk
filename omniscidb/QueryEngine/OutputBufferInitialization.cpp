@@ -31,8 +31,8 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
     CHECK_LT(agg_col_idx, query_mem_desc.getSlotCount());
     const auto agg_info = targets[target_idx];
     auto agg_type = agg_info.type;
-    if (!agg_info.is_agg || agg_info.agg_kind == kSAMPLE) {
-      if (agg_info.agg_kind == kSAMPLE && agg_type->isExtDictionary()) {
+    if (!agg_info.is_agg || agg_info.agg_kind == hdk::ir::AggType::kSample) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kSample && agg_type->isExtDictionary()) {
         agg_init_vals.push_back(
             get_agg_initial_val(agg_info.agg_kind,
                                 agg_type,
@@ -62,7 +62,7 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
                             init_type,
                             is_group_by || float_argument_input,
                             (float_argument_input ? sizeof(float) : chosen_bytes)));
-    if (kAVG == agg_info.agg_kind) {
+    if (hdk::ir::AggType::kAvg == agg_info.agg_kind) {
       ++agg_col_idx;
       agg_init_vals.push_back(0);
     }
@@ -109,12 +109,12 @@ std::pair<uint64_t, uint64_t> inline_uint_max_min(const size_t byte_width) {
 }
 
 // TODO(alex): proper types for aggregate
-int64_t get_agg_initial_val(const SQLAgg agg,
+int64_t get_agg_initial_val(hdk::ir::AggType agg,
                             const hdk::ir::Type* type,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact) {
   CHECK(!(type->isString() || type->isExtDictionary()) ||
-        (agg == kSINGLE_VALUE || agg == kSAMPLE));
+        (agg == hdk::ir::AggType::kSingleValue || agg == hdk::ir::AggType::kSample));
   const auto byte_width =
       enable_compaction
           ? compact_byte_width(static_cast<unsigned>(get_bit_width(type) >> 3),
@@ -123,7 +123,7 @@ int64_t get_agg_initial_val(const SQLAgg agg,
   CHECK(type->canonicalSize() < 0 ||
         byte_width >= static_cast<unsigned>(type->canonicalSize()));
   switch (agg) {
-    case kSUM: {
+    case hdk::ir::AggType::kSum: {
       if (type->nullable()) {
         if (type->isFloatingPoint()) {
           switch (byte_width) {
@@ -159,13 +159,13 @@ int64_t get_agg_initial_val(const SQLAgg agg,
           CHECK(false);
       }
     }
-    case kAVG:
-    case kCOUNT:
-    case kAPPROX_COUNT_DISTINCT:
+    case hdk::ir::AggType::kAvg:
+    case hdk::ir::AggType::kCount:
+    case hdk::ir::AggType::kApproxCountDistinct:
       return 0;
-    case kAPPROX_QUANTILE:
+    case hdk::ir::AggType::kApproxQuantile:
       return {};  // Init value is a quantile::TDigest* set elsewhere.
-    case kMIN: {
+    case hdk::ir::AggType::kMin: {
       switch (byte_width) {
         case 1: {
           CHECK(!type->isFloatingPoint());
@@ -206,9 +206,9 @@ int64_t get_agg_initial_val(const SQLAgg agg,
           CHECK(false);
       }
     }
-    case kSINGLE_VALUE:
-    case kSAMPLE:
-    case kMAX: {
+    case hdk::ir::AggType::kSingleValue:
+    case hdk::ir::AggType::kSample:
+    case hdk::ir::AggType::kMax: {
       switch (byte_width) {
         case 1: {
           CHECK(!type->isFloatingPoint());
@@ -271,9 +271,11 @@ std::vector<int64_t> init_agg_val_vec(const std::vector<const hdk::ir::Expr*>& t
       if (query_mem_desc.getQueryDescriptionType() ==
               QueryDescriptionType::NonGroupedAggregate &&
           target.is_agg &&
-          (target.agg_kind == kMIN || target.agg_kind == kMAX ||
-           target.agg_kind == kSUM || target.agg_kind == kAVG ||
-           target.agg_kind == kAPPROX_QUANTILE)) {
+          (target.agg_kind == hdk::ir::AggType::kMin ||
+           target.agg_kind == hdk::ir::AggType::kMax ||
+           target.agg_kind == hdk::ir::AggType::kSum ||
+           target.agg_kind == hdk::ir::AggType::kAvg ||
+           target.agg_kind == hdk::ir::AggType::kApproxQuantile)) {
         set_notnull(target, false);
       } else if (constrained_not_null(arg_expr, quals)) {
         set_notnull(target, true);

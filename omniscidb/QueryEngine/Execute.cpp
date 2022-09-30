@@ -878,7 +878,7 @@ int Executor::deviceCountForMemoryLevel(
 }
 
 // TODO(alex): remove or split
-std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
+std::pair<int64_t, int32_t> Executor::reduceResults(hdk::ir::AggType agg,
                                                     const hdk::ir::Type* type,
                                                     const int64_t agg_init_val,
                                                     const int8_t out_byte_width,
@@ -887,8 +887,8 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
                                                     const bool is_group_by,
                                                     const bool float_argument_input) {
   switch (agg) {
-    case kAVG:
-    case kSUM:
+    case hdk::ir::AggType::kAvg:
+    case hdk::ir::AggType::kSum:
       if (0 != agg_init_val) {
         if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
             type->isBoolean()) {
@@ -962,7 +962,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
         }
       }
       break;
-    case kCOUNT: {
+    case hdk::ir::AggType::kCount: {
       uint64_t agg_result = 0;
       for (size_t i = 0; i < out_vec_sz; ++i) {
         const uint64_t out = static_cast<uint64_t>(out_vec[i]);
@@ -970,7 +970,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
       }
       return {static_cast<int64_t>(agg_result), 0};
     }
-    case kMIN: {
+    case hdk::ir::AggType::kMin: {
       if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
           type->isBoolean()) {
         int64_t agg_result = agg_init_val;
@@ -1009,7 +1009,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
         }
       }
     }
-    case kMAX:
+    case hdk::ir::AggType::kMax:
       if (type->isInteger() || type->isDecimal() || type->isDateTime() ||
           type->isBoolean()) {
         int64_t agg_result = agg_init_val;
@@ -1046,7 +1046,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
             CHECK(false);
         }
       }
-    case kSINGLE_VALUE: {
+    case hdk::ir::AggType::kSingleValue: {
       int64_t agg_result = agg_init_val;
       for (size_t i = 0; i < out_vec_sz; ++i) {
         if (out_vec[i] != agg_init_val) {
@@ -1059,7 +1059,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(const SQLAgg agg,
       }
       return {agg_result, 0};
     }
-    case kSAMPLE: {
+    case hdk::ir::AggType::kSample: {
       int64_t agg_result = agg_init_val;
       for (size_t i = 0; i < out_vec_sz; ++i) {
         if (out_vec[i] != agg_init_val) {
@@ -2176,7 +2176,8 @@ void Executor::addTransientStringLiterals(
     }
     const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr);
     if (agg_expr) {
-      if (agg_expr->aggType() == kSINGLE_VALUE || agg_expr->aggType() == kSAMPLE) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kSingleValue ||
+          agg_expr->aggType() == hdk::ir::AggType::kSample) {
         visit_expr(agg_expr->arg());
       }
     } else {
@@ -2193,7 +2194,8 @@ ExecutorDeviceType Executor::getDeviceTypeForTargets(
         get_target_info(target_expr, getConfig().exec.group_by.bigint_count);
     if (!ra_exe_unit.groupby_exprs.empty() &&
         !isArchPascalOrLater(requested_device_type)) {
-      if ((agg_info.agg_kind == kAVG || agg_info.agg_kind == kSUM) &&
+      if ((agg_info.agg_kind == hdk::ir::AggType::kAvg ||
+           agg_info.agg_kind == hdk::ir::AggType::kSum) &&
           agg_info.agg_arg_type->isFp64()) {
         return ExecutorDeviceType::CPU;
       }
@@ -2234,12 +2236,14 @@ void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
     CHECK(agg_info.is_agg);
     target_infos.push_back(agg_info);
     const bool float_argument_input = takes_float_argument(agg_info);
-    if (agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
+    if (agg_info.agg_kind == hdk::ir::AggType::kCount ||
+        agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct) {
       entry.push_back(0);
-    } else if (agg_info.agg_kind == kAVG) {
+    } else if (agg_info.agg_kind == hdk::ir::AggType::kAvg) {
       entry.push_back(0);
       entry.push_back(0);
-    } else if (agg_info.agg_kind == kSINGLE_VALUE || agg_info.agg_kind == kSAMPLE) {
+    } else if (agg_info.agg_kind == hdk::ir::AggType::kSingleValue ||
+               agg_info.agg_kind == hdk::ir::AggType::kSample) {
       if (agg_info.type->isString() || agg_info.type->isArray()) {
         entry.push_back(0);
         entry.push_back(0);
@@ -3297,10 +3301,11 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
 
         int64_t val1;
         const bool float_argument_input = takes_float_argument(agg_info);
-        if (is_distinct_target(agg_info) || agg_info.agg_kind == kAPPROX_QUANTILE) {
-          CHECK(agg_info.agg_kind == kCOUNT ||
-                agg_info.agg_kind == kAPPROX_COUNT_DISTINCT ||
-                agg_info.agg_kind == kAPPROX_QUANTILE);
+        if (is_distinct_target(agg_info) ||
+            agg_info.agg_kind == hdk::ir::AggType::kApproxQuantile) {
+          CHECK(agg_info.agg_kind == hdk::ir::AggType::kCount ||
+                agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct ||
+                agg_info.agg_kind == hdk::ir::AggType::kApproxQuantile);
           val1 = out_vec[out_vec_idx][0];
           error_code = 0;
         } else {
@@ -3320,15 +3325,16 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
           break;
         }
         reduced_outs.push_back(val1);
-        if (agg_info.agg_kind == kAVG ||
-            (agg_info.agg_kind == kSAMPLE &&
+        if (agg_info.agg_kind == hdk::ir::AggType::kAvg ||
+            (agg_info.agg_kind == hdk::ir::AggType::kSample &&
              (agg_info.type->isString() || agg_info.type->isArray()))) {
           const auto chosen_bytes = static_cast<size_t>(
               query_exe_context->query_mem_desc_.getPaddedSlotWidthBytes(out_vec_idx +
                                                                          1));
           int64_t val2;
           std::tie(val2, error_code) = Executor::reduceResults(
-              agg_info.agg_kind == kAVG ? kCOUNT : agg_info.agg_kind,
+              agg_info.agg_kind == hdk::ir::AggType::kAvg ? hdk::ir::AggType::kCount
+                                                          : agg_info.agg_kind,
               agg_info.type,
               query_exe_context->getAggInitValForIndex(out_vec_idx + 1),
               float_argument_input ? sizeof(int32_t) : chosen_bytes,

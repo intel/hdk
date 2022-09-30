@@ -172,7 +172,8 @@ ResultSet* ResultSetLogicalValuesBuilder::create(
   std::vector<TargetInfo> target_infos;
   for (size_t col = 0; col < numCols; col++) {
     auto colType = label_infos[col].type();
-    target_infos.push_back(TargetInfo{false, kSAMPLE, colType, colType, true, false});
+    target_infos.push_back(
+        TargetInfo{false, hdk::ir::AggType::kSample, colType, colType, true, false});
     query_mem_desc.addColSlotInfo({std::make_tuple(colType->size(), 8)});
   }
 

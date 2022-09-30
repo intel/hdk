@@ -82,8 +82,8 @@ TEST_F(HighCardinalityStringEnv, PerfectHashNoFallback) {
 
   std::vector<InputTableInfo> table_infos = get_table_infos(input_descs, executor.get());
 
-  auto count_expr =
-      hdk::ir::makeExpr<hdk::ir::AggExpr>(ctx().int64(), kCOUNT, nullptr, false, nullptr);
+  auto count_expr = hdk::ir::makeExpr<hdk::ir::AggExpr>(
+      ctx().int64(), hdk::ir::AggType::kCount, nullptr, false, nullptr);
   auto group_expr = hdk::ir::makeExpr<hdk::ir::ColumnVar>(colStrInfo, 0);
   auto filter_col_expr = hdk::ir::makeExpr<hdk::ir::ColumnVar>(colXInfo, 0);
   Datum d{int64_t(1)};
@@ -178,8 +178,8 @@ TEST_F(HighCardinalityStringEnv, BaselineFallbackTest) {
 
   std::vector<InputTableInfo> table_infos = get_table_infos(input_descs, executor.get());
 
-  auto count_expr =
-      hdk::ir::makeExpr<hdk::ir::AggExpr>(ctx().int64(), kCOUNT, nullptr, false, nullptr);
+  auto count_expr = hdk::ir::makeExpr<hdk::ir::AggExpr>(
+      ctx().int64(), hdk::ir::AggType::kCount, nullptr, false, nullptr);
   auto group_expr = hdk::ir::makeExpr<hdk::ir::ColumnVar>(colStrInfo, 0);
   auto filter_col_expr = hdk::ir::makeExpr<hdk::ir::ColumnVar>(colXInfo, 0);
   Datum d{int64_t(1)};
@@ -263,8 +263,8 @@ TEST_F(HighCardinalityStringEnv, BaselineNoFilters) {
 
   std::vector<InputTableInfo> table_infos = get_table_infos(input_descs, executor.get());
 
-  auto count_expr =
-      hdk::ir::makeExpr<hdk::ir::AggExpr>(ctx().int64(), kCOUNT, nullptr, false, nullptr);
+  auto count_expr = hdk::ir::makeExpr<hdk::ir::AggExpr>(
+      ctx().int64(), hdk::ir::AggType::kCount, nullptr, false, nullptr);
   auto group_expr = hdk::ir::makeExpr<hdk::ir::ColumnVar>(colStrInfo, 0);
 
   RelAlgExecutionUnit ra_exe_unit{input_descs,

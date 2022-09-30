@@ -35,14 +35,15 @@
 #include <algorithm>
 
 inline bool is_real_str_or_array(const TargetInfo& target_info) {
-  return (!target_info.is_agg || target_info.agg_kind == kSAMPLE) &&
+  return (!target_info.is_agg || target_info.agg_kind == hdk::ir::AggType::kSample) &&
          (target_info.type->isArray() || target_info.type->isString());
 }
 
 inline size_t get_slots_for_target(const TargetInfo& target_info,
                                    const bool separate_varlen_storage) {
   if (target_info.is_agg) {
-    if (target_info.agg_kind == kAVG || is_real_str_or_array(target_info)) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+        is_real_str_or_array(target_info)) {
       return 2;
     } else {
       return 1;
@@ -135,7 +136,7 @@ inline T advance_target_ptr_row_wise(T target_ptr,
                                      const QueryMemoryDescriptor& query_mem_desc,
                                      const bool separate_varlen_storage) {
   auto result = target_ptr + query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
-  if ((target_info.is_agg && target_info.agg_kind == kAVG) ||
+  if ((target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) ||
       ((!separate_varlen_storage || target_info.is_agg) &&
        is_real_str_or_array(target_info))) {
     return result + query_mem_desc.getPaddedSlotWidthBytes(slot_idx + 1);
@@ -151,7 +152,7 @@ inline T advance_target_ptr_col_wise(T target_ptr,
                                      const bool separate_varlen_storage) {
   auto result =
       advance_to_next_columnar_target_buff(target_ptr, query_mem_desc, slot_idx);
-  if ((target_info.is_agg && target_info.agg_kind == kAVG) ||
+  if ((target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) ||
       (is_real_str_or_array(target_info) && !separate_varlen_storage)) {
     return advance_to_next_columnar_target_buff(result, query_mem_desc, slot_idx + 1);
   } else {

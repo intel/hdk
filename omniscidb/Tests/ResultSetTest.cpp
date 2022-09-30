@@ -278,23 +278,23 @@ void ResultSetEmulator::mergeResultSets() {
       rseReducedGroups[j] = true;
       for (size_t i = 0; i < rs_target_infos.size(); i++) {  // iterates through columns
         switch (rs_target_infos[i].agg_kind) {
-          case kMIN: {
+          case hdk::ir::AggType::kMin: {
             rse_reduced_row[i] = rseAggregateKMIN(j);
             break;
           }
-          case kMAX: {
+          case hdk::ir::AggType::kMax: {
             rse_reduced_row[i] = rseAggregateKMAX(j);
             break;
           }
-          case kAVG: {
+          case hdk::ir::AggType::kAvg: {
             rse_reduced_row[i] = rseAggregateKAVG(j);
             break;
           }
-          case kSUM: {
+          case hdk::ir::AggType::kSum: {
             rse_reduced_row[i] = rseAggregateKSUM(j);
             break;
           }
-          case kCOUNT: {
+          case hdk::ir::AggType::kCount: {
             rse_reduced_row[i] = rseAggregateKCOUNT(j);
             break;
           }
@@ -340,7 +340,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_perfect_hash_colwise(
     const auto col_bytes = rs_query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
     for (size_t i = 0; i < rs_entry_count; i++) {
       int8_t* ptr2{nullptr};
-      if (target_info.agg_kind == kAVG) {
+      if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
         ptr2 = col_entry_ptr + rs_query_mem_desc.getEntryCount() * col_bytes;
       }
       const auto v = generator.getNextValue();
@@ -397,7 +397,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_perfect_hash_colwise(
       col_entry_ptr += col_bytes;
     }
     col_ptr = advance_to_next_columnar_target_buff(col_ptr, rs_query_mem_desc, slot_idx);
-    if (target_info.is_agg && target_info.agg_kind == kAVG) {
+    if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) {
       col_ptr =
           advance_to_next_columnar_target_buff(col_ptr, rs_query_mem_desc, slot_idx + 1);
     }
@@ -475,7 +475,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_colwise(
     size_t target_slot = 0;
     int64_t init_val = 0;
     for (const auto& target_info : rs_target_infos) {
-      if (target_info.agg_kind == kCOUNT) {
+      if (target_info.agg_kind == hdk::ir::AggType::kCount) {
         init_val = 0;
       } else if (target_info.type->nullable() && target_info.skip_null_val &&
                  (rs_flow == 2)) {  // null_val support
@@ -483,7 +483,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_colwise(
       } else {
         init_val = 0xdeadbeef;
       }
-      if (target_info.agg_kind != kAVG) {
+      if (target_info.agg_kind != hdk::ir::AggType::kAvg) {
         i64_buff[slot_offset_colwise(
             i, target_slot, key_component_count, rs_entry_count)] = init_val;
       } else {
@@ -512,7 +512,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_colwise(
         fill_one_entry_one_col(
             value_slots, v, target_info, rs_entry_count, false, null_val);
         value_slots += rs_entry_count;
-        if (target_info.agg_kind == kAVG) {
+        if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
           value_slots += rs_entry_count;
         }
       }
@@ -539,7 +539,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_rowwise(
     size_t target_slot = 0;
     int64_t init_val = 0;
     for (const auto& target_info : rs_target_infos) {
-      if (target_info.agg_kind == kCOUNT) {
+      if (target_info.agg_kind == hdk::ir::AggType::kCount) {
         init_val = 0;
       } else if (target_info.type->nullable() && target_info.skip_null_val &&
                  (rs_flow == 2)) {  // null_val support
@@ -550,7 +550,7 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_rowwise(
       i64_buff[slot_offset_rowwise(
           i, target_slot, key_component_count, target_slot_count)] = init_val;
       target_slot++;
-      if (target_info.agg_kind == kAVG) {
+      if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
         i64_buff[slot_offset_rowwise(
             i, target_slot, key_component_count, target_slot_count)] = 0;
         target_slot++;
@@ -669,11 +669,11 @@ void ResultSetEmulator::print_merged_result_sets(const std::vector<OneRow>& resu
   printf("\n ****** KMIN_DATA_FROM_RS_MERGE_CODE ****** %i", (int)result.size());
   size_t j = 0;
   for (const auto& row : result) {
-    const auto ival_0 = v<int64_t>(row[0]);  // kMIN
-    const auto ival_1 = v<int64_t>(row[1]);  // kMAX
-    const auto ival_2 = v<int64_t>(row[2]);  // kSUM
-    const auto ival_3 = v<int64_t>(row[3]);  // kCOUNT
-    const auto ival_4 = v<double>(row[4]);   // kAVG
+    const auto ival_0 = v<int64_t>(row[0]);  // hdk::ir::AggType::kMin
+    const auto ival_1 = v<int64_t>(row[1]);  // hdk::ir::AggType::kMax
+    const auto ival_2 = v<int64_t>(row[2]);  // hdk::ir::AggType::kSum
+    const auto ival_3 = v<int64_t>(row[3]);  // hdk::ir::AggType::kCount
+    const auto ival_4 = v<double>(row[4]);   // hdk::ir::AggType::kAvg
     printf("\n Group #%i KMIN/KMAX/KSUM/KCOUNT from RS_MergeCode: %lld %lld %lld %lld %f",
            (int)j,
            static_cast<long long>(ival_0),
@@ -696,11 +696,11 @@ void ResultSetEmulator::print_merged_result_sets(const std::vector<OneRow>& resu
   size_t num_groups = getReferenceTable().size();
   for (size_t i = 0; i < num_groups; i++) {
     std::vector<int64_t> ref_row = getReferenceRow(true);
-    int64_t ref_val_0 = ref_row[0];  // kMIN
-    int64_t ref_val_1 = ref_row[1];  // kMAX
-    int64_t ref_val_2 = ref_row[2];  // kSUM
-    int64_t ref_val_3 = ref_row[3];  // kCOUNT
-    int64_t ref_val_4 = ref_row[4];  // kAVG
+    int64_t ref_val_0 = ref_row[0];  // hdk::ir::AggType::kMin
+    int64_t ref_val_1 = ref_row[1];  // hdk::ir::AggType::kMax
+    int64_t ref_val_2 = ref_row[2];  // hdk::ir::AggType::kSum
+    int64_t ref_val_3 = ref_row[3];  // hdk::ir::AggType::kCount
+    int64_t ref_val_4 = ref_row[4];  // hdk::ir::AggType::kAvg
     printf(
         "\n Group #%i KMIN/KMAX/KSUM/KCOUNT from ReducedBuffer: %lld %lld %lld %lld %f",
         static_cast<int>(i),
@@ -909,8 +909,9 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
     CHECK_EQ(target_infos.size(), row.size());
     for (size_t i = 0; i < target_infos.size(); ++i) {
       const auto& target_info = target_infos[i];
-      auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
-                                               : target_info.type;
+      auto type = target_info.agg_kind == hdk::ir::AggType::kAvg
+                      ? target_info.type->ctx().fp64()
+                      : target_info.type;
       switch (type->id()) {
         case hdk::ir::Type::kInteger: {
           const auto ival = v<int64_t>(row[i]);
@@ -942,13 +943,18 @@ std::vector<TargetInfo> generate_test_target_infos() {
   auto& ctx = hdk::ir::Context::defaultCtx();
   auto int_type = ctx.int32();
   auto double_type = ctx.fp64();
-  target_infos.push_back(TargetInfo{false, kMIN, int_type, nullptr, true, false});
-  target_infos.push_back(TargetInfo{true, kAVG, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kSUM, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{false, kMIN, double_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, int_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kAvg, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kSum, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, double_type, nullptr, true, false});
   {
     auto dict_type = ctx.extDict(ctx.text(), 1);
-    target_infos.push_back(TargetInfo{false, kMIN, dict_type, nullptr, true, false});
+    target_infos.push_back(
+        TargetInfo{false, hdk::ir::AggType::kMin, dict_type, nullptr, true, false});
   }
   return target_infos;
 }
@@ -958,11 +964,16 @@ std::vector<TargetInfo> generate_random_groups_target_infos() {
   auto& ctx = hdk::ir::Context::defaultCtx();
   auto int_type = ctx.int32(false);
   auto double_type = ctx.fp64(false);
-  target_infos.push_back(TargetInfo{true, kMIN, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kMAX, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kSUM, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kCOUNT, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kAVG, int_type, double_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kMin, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kMax, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kSum, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kCount, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kAvg, int_type, double_type, true, false});
   return target_infos;
 }
 
@@ -971,11 +982,16 @@ std::vector<TargetInfo> generate_random_groups_nullable_target_infos() {
   auto& ctx = hdk::ir::Context::defaultCtx();
   auto int_type = ctx.int32();
   auto double_type = ctx.fp64();
-  target_infos.push_back(TargetInfo{true, kMIN, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kMAX, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kSUM, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kCOUNT, int_type, int_type, true, false});
-  target_infos.push_back(TargetInfo{true, kAVG, int_type, double_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kMin, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kMax, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kSum, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kCount, int_type, int_type, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kAvg, int_type, double_type, true, false});
   return target_infos;
 }
 
@@ -1096,25 +1112,27 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
 
             for (size_t i = 0; i < target_infos.size(); ++i) {
               const auto& target_info = target_infos[i];
-              auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
-                                                       : target_info.type;
+              auto type = target_info.agg_kind == hdk::ir::AggType::kAvg
+                              ? target_info.type->ctx().fp64()
+                              : target_info.type;
               switch (type->id()) {
                 case hdk::ir::Type::kInteger: {
                   const auto ival = v<int64_t>(row[i]);
-                  const int64_t ref =
-                      (target_info.agg_kind == kSUM || target_info.agg_kind == kCOUNT)
-                          ? step * row_idx
-                          : row_idx;
+                  const int64_t ref = (target_info.agg_kind == hdk::ir::AggType::kSum ||
+                                       target_info.agg_kind == hdk::ir::AggType::kCount)
+                                          ? step * row_idx
+                                          : row_idx;
                   ASSERT_EQ(ref, ival);
                   break;
                 }
                 case hdk::ir::Type::kFloatingPoint: {
                   CHECK(type->isFp64());
                   const auto dval = v<double>(row[i]);
-                  ASSERT_DOUBLE_EQ(static_cast<double>((target_info.agg_kind == kSUM ||
-                                                        target_info.agg_kind == kCOUNT)
-                                                           ? step * row_idx
-                                                           : row_idx),
+                  ASSERT_DOUBLE_EQ(static_cast<double>(
+                                       (target_info.agg_kind == hdk::ir::AggType::kSum ||
+                                        target_info.agg_kind == hdk::ir::AggType::kCount)
+                                           ? step * row_idx
+                                           : row_idx),
                                    dval);
                   break;
                 }
@@ -1241,8 +1259,9 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
     for (size_t i = 0; i < target_infos.size(); ++i) {
       ref_val = ref_row[i];
       const auto& target_info = target_infos[i];
-      auto type = target_info.agg_kind == kAVG ? target_info.type->ctx().fp64()
-                                               : target_info.type;
+      auto type = target_info.agg_kind == hdk::ir::AggType::kAvg
+                      ? target_info.type->ctx().fp64()
+                      : target_info.type;
       std::string p_tag("");
       if (flow == 2) {  // null_val test-cases
         p_tag += "kNULLT_";
@@ -1252,7 +1271,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
           CHECK(type->size() > 1);
           const auto ival = v<int64_t>(row[i]);
           switch (target_info.agg_kind) {
-            case kMIN: {
+            case hdk::ir::AggType::kMin: {
               if (!silent) {
                 p_tag += "KMIN";
                 printf("\n%s row_idx = %i, ref_val = %lld, ival = %lld",
@@ -1270,7 +1289,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kMAX: {
+            case hdk::ir::AggType::kMax: {
               if (!silent) {
                 p_tag += "KMAX";
                 printf("\n%s row_idx = %i, ref_val = %lld, ival = %lld",
@@ -1288,7 +1307,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kAVG: {
+            case hdk::ir::AggType::kAvg: {
               if (!silent) {
                 p_tag += "KAVG";
                 printf("\n%s row_idx = %i, ref_val = %lld, ival = %lld",
@@ -1306,8 +1325,8 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kSUM:
-            case kCOUNT: {
+            case hdk::ir::AggType::kSum:
+            case hdk::ir::AggType::kCount: {
               if (!silent) {
                 p_tag += "KSUM";
                 printf("\n%s row_idx = %i, ref_val = %lld, ival = %lld",
@@ -1334,7 +1353,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
           CHECK(type->isFp64());
           const auto dval = v<double>(row[i]);
           switch (target_info.agg_kind) {
-            case kMIN: {
+            case hdk::ir::AggType::kMin: {
               if (!silent) {
                 p_tag += "KMIN_D";
                 printf("\nKMIN_D row_idx = %i, ref_val = %e, dval = %e",
@@ -1351,7 +1370,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kMAX: {
+            case hdk::ir::AggType::kMax: {
               if (!silent) {
                 p_tag += "KMAX_D";
                 printf("\n%s row_idx = %i, ref_val = %e, dval = %e",
@@ -1369,7 +1388,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kAVG: {
+            case hdk::ir::AggType::kAvg: {
               if (!silent) {
                 p_tag += "KAVG_D";
                 printf("\n%s row_idx = %i, ref_val = %e, dval = %e",
@@ -1392,8 +1411,8 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
               }
               break;
             }
-            case kSUM:
-            case kCOUNT: {
+            case hdk::ir::AggType::kSum:
+            case hdk::ir::AggType::kCount: {
               if (!silent) {
                 p_tag += "KSUM_D";
                 printf("\n%s row_idx = %i, ref_val = %e, dval = %e",
@@ -1458,7 +1477,11 @@ TEST(Iterate, PerfectHashOneColColumnar16) {
   const int8_t suggested_agg_width = 2;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kMAX, kMIN, kCOUNT, kSUM, kAVG},
+      {hdk::ir::AggType::kMax,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kAvg},
       {ctx().int16(), ctx().int16(), ctx().int32(), ctx().int32(), ctx().fp64()},
       {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc = perfect_hash_one_col_desc(
@@ -1472,7 +1495,11 @@ TEST(Iterate, PerfectHashOneColColumnar8) {
   const int8_t suggested_agg_width = 1;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kMAX, kMIN, kCOUNT, kSUM, kAVG},
+      {hdk::ir::AggType::kMax,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kAvg},
       {ctx().int8(), ctx().int8(), ctx().int32(), ctx().int32(), ctx().fp64()},
       {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc = perfect_hash_one_col_desc(
@@ -1520,7 +1547,11 @@ TEST(Iterate, PerfectHashOneColColumnarKeyless16) {
   const int8_t suggested_agg_width = 2;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kAVG, kSUM, kMIN, kCOUNT, kMAX},
+      {hdk::ir::AggType::kAvg,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kMax},
       {ctx().fp64(), ctx().int32(), ctx().int16(), ctx().int32(), ctx().int16()},
       {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc =
@@ -1536,7 +1567,11 @@ TEST(Iterate, PerfectHashOneColColumnarKeyless8) {
   const int8_t suggested_agg_width = 1;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kAVG, kSUM, kMIN, kCOUNT, kMAX},
+      {hdk::ir::AggType::kAvg,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kMax},
       {ctx().fp64(), ctx().int32(), ctx().int8(), ctx().int32(), ctx().int8()},
       {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc =
@@ -1659,7 +1694,11 @@ TEST(Reduce, PerfectHashOneColColumnar16) {
   const int8_t suggested_agg_width = 2;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kMAX, kMIN, kCOUNT, kSUM, kAVG},
+      {hdk::ir::AggType::kMax,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kAvg},
       {ctx().int16(), ctx().int16(), ctx().int32(), ctx().int64(), ctx().fp64()},
       {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc = perfect_hash_one_col_desc(
@@ -1675,7 +1714,11 @@ TEST(Reduce, PerfectHashOneColColumnar8) {
   const int8_t suggested_agg_width = 1;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kMAX, kMIN, kCOUNT, kSUM, kAVG},
+      {hdk::ir::AggType::kMax,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kAvg},
       {ctx().int8(), ctx().int8(), ctx().int32(), ctx().int64(), ctx().fp64()},
       {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc = perfect_hash_one_col_desc(
@@ -1733,7 +1776,11 @@ TEST(Reduce, PerfectHashOneColColumnarKeyless16) {
   const int8_t suggested_agg_width = 2;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kAVG, kSUM, kMIN, kCOUNT, kMAX},
+      {hdk::ir::AggType::kAvg,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kMax},
       {ctx().fp64(), ctx().int32(), ctx().int16(), ctx().int32(), ctx().int16()},
       {ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16(), ctx().int16()});
   auto query_mem_desc =
@@ -1751,7 +1798,11 @@ TEST(Reduce, PerfectHashOneColColumnarKeyless8) {
   const int8_t suggested_agg_width = 1;
   const auto target_infos = generate_custom_agg_target_infos(
       group_column_widths,
-      {kAVG, kSUM, kMIN, kCOUNT, kMAX},
+      {hdk::ir::AggType::kAvg,
+       hdk::ir::AggType::kSum,
+       hdk::ir::AggType::kMin,
+       hdk::ir::AggType::kCount,
+       hdk::ir::AggType::kMax},
       {ctx().fp64(), ctx().int32(), ctx().int8(), ctx().int32(), ctx().int8()},
       {ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8(), ctx().int8()});
   auto query_mem_desc =
@@ -1919,8 +1970,10 @@ TEST(ReduceLargeBuffers, BaselineHashColumnar_Overflow32) {
 TEST(MoreReduce, MissingValues) {
   std::vector<TargetInfo> target_infos;
   auto bigint_type = hdk::ir::Context::defaultCtx().int64();
-  target_infos.push_back(TargetInfo{false, kMIN, bigint_type, nullptr, true, false});
-  target_infos.push_back(TargetInfo{true, kCOUNT, bigint_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, bigint_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kCount, bigint_type, nullptr, true, false});
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(false);
   // for codegen only
@@ -1997,8 +2050,10 @@ TEST(MoreReduce, MissingValues) {
 TEST(MoreReduce, MissingValuesKeyless) {
   std::vector<TargetInfo> target_infos;
   auto bigint_type = hdk::ir::Context::defaultCtx().int64();
-  target_infos.push_back(TargetInfo{false, kMIN, bigint_type, nullptr, true, false});
-  target_infos.push_back(TargetInfo{true, kCOUNT, bigint_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, bigint_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kCount, bigint_type, nullptr, true, false});
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(true);
   // for codegen only
@@ -2071,8 +2126,10 @@ TEST(MoreReduce, OffsetRewrite) {
   auto bigint_type = hdk::ir::Context::defaultCtx().int64();
   auto text_type = hdk::ir::Context::defaultCtx().text(false);
 
-  target_infos.push_back(TargetInfo{false, kMIN, bigint_type, nullptr, true, false});
-  target_infos.push_back(TargetInfo{true, kSAMPLE, text_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{false, hdk::ir::AggType::kMin, bigint_type, nullptr, true, false});
+  target_infos.push_back(
+      TargetInfo{true, hdk::ir::AggType::kSample, text_type, nullptr, true, false});
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(false);
   // for codegen only

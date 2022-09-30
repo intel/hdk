@@ -69,7 +69,7 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
   }
   const auto count_expr = hdk::ir::makeExpr<hdk::ir::AggExpr>(
       hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
-      kCOUNT,
+      hdk::ir::AggType::kCount,
       nullptr,
       false,
       nullptr);

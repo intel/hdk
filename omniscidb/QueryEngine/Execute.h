@@ -650,7 +650,7 @@ class Executor {
                       const int64_t rows_to_process = -1);
 
  public:  // Temporary, ask saman about this
-  static std::pair<int64_t, int32_t> reduceResults(const SQLAgg agg,
+  static std::pair<int64_t, int32_t> reduceResults(hdk::ir::AggType agg,
                                                    const hdk::ir::Type* type,
                                                    const int64_t agg_init_val,
                                                    const int8_t out_byte_width,

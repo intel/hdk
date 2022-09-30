@@ -196,7 +196,7 @@ bool use_speculative_top_n(const RelAlgExecutionUnit& ra_exe_unit,
   }
   for (const auto target_expr : ra_exe_unit.target_exprs) {
     const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr);
-    if (agg_expr && agg_expr->aggType() != kCOUNT) {
+    if (agg_expr && agg_expr->aggType() != hdk::ir::AggType::kCount) {
       return false;
     }
   }

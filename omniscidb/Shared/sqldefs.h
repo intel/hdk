@@ -24,18 +24,6 @@
 #ifndef SQLDEFS_H
 #define SQLDEFS_H
 
-enum SQLAgg {
-  kAVG,
-  kMIN,
-  kMAX,
-  kSUM,
-  kCOUNT,
-  kAPPROX_COUNT_DISTINCT,
-  kAPPROX_QUANTILE,
-  kSAMPLE,
-  kSINGLE_VALUE
-};
-
 enum class SqlWindowFunctionKind {
   ROW_NUMBER,
   RANK,
@@ -81,31 +69,6 @@ inline std::string toString(const JoinType& join_type) {
     default:
       return "INVALID";
   }
-}
-
-inline std::string toString(const SQLAgg& kind) {
-  switch (kind) {
-    case kAVG:
-      return "AVG";
-    case kMIN:
-      return "MIN";
-    case kMAX:
-      return "MAX";
-    case kSUM:
-      return "SUM";
-    case kCOUNT:
-      return "COUNT";
-    case kAPPROX_COUNT_DISTINCT:
-      return "APPROX_COUNT_DISTINCT";
-    case kAPPROX_QUANTILE:
-      return "APPROX_PERCENTILE";
-    case kSAMPLE:
-      return "SAMPLE";
-    case kSINGLE_VALUE:
-      return "SINGLE_VALUE";
-  }
-  LOG(FATAL) << "Invalid aggregate kind: " << kind;
-  return "";
 }
 
 inline std::string toString(const SqlWindowFunctionKind& kind) {

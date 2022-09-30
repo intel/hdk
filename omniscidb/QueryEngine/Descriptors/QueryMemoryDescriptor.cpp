@@ -190,7 +190,7 @@ inline std::vector<int8_t> get_col_byte_widths(const T& col_expr_list,
       CHECK_EQ(size_t(0), col_expr_bitwidth % 8);
       col_widths.push_back(static_cast<int8_t>(col_expr_bitwidth >> 3));
       // for average, we'll need to keep the count as well
-      if (agg_info.agg_kind == kAVG) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kAvg) {
         CHECK(agg_info.is_agg);
         col_widths.push_back(sizeof(int64_t));
       }
@@ -309,7 +309,7 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
           if (target_expr->containsAgg()) {
             const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
             CHECK(agg_expr);
-            if (agg_expr->aggType() == kSAMPLE &&
+            if (agg_expr->aggType() == hdk::ir::AggType::kSample &&
                 (agg_expr->type()->isString() || agg_expr->type()->isArray())) {
               has_varlen_sample_agg = true;
               break;
@@ -397,7 +397,8 @@ std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
 }
 
 namespace {
-bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs, SQLAgg const agg_kind) {
+bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs,
+           hdk::ir::AggType agg_kind) {
   return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
     auto const* const agg = dynamic_cast<hdk::ir::AggExpr const*>(expr);
     return agg && agg->aggType() == agg_kind;
@@ -461,10 +462,11 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
       case QueryDescriptionType::GroupByPerfectHash:
       case QueryDescriptionType::GroupByBaselineHash:
       case QueryDescriptionType::NonGroupedAggregate:
-        output_columnar_ = output_columnar_hint &&
-                           QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
-                               count_distinct_descriptors_) &&
-                           !anyOf(ra_exe_unit.target_exprs, kAPPROX_QUANTILE);
+        output_columnar_ =
+            output_columnar_hint &&
+            QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
+                count_distinct_descriptors_) &&
+            !anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kApproxQuantile);
         break;
       default:
         output_columnar_ = false;
@@ -705,7 +707,7 @@ int8_t QueryMemoryDescriptor::pick_target_compact_width(
       }
 
       if (agg) {
-        CHECK_EQ(kCOUNT, agg->aggType());
+        CHECK_EQ(hdk::ir::AggType::kCount, agg->aggType());
         CHECK(!agg->isDistinct());
         if (col_it != end) {
           ++col_it;

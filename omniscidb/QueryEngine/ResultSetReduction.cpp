@@ -401,8 +401,8 @@ void ResultSetStorage::reduceEntriesNoCollisionsColWise(
     const auto& slots_for_col = col_slot_context.getSlotsForCol(target_idx);
 
     bool two_slot_target{false};
-    if (agg_info.is_agg && (agg_info.agg_kind == kAVG ||
-                            (agg_info.agg_kind == kSAMPLE &&
+    if (agg_info.is_agg && (agg_info.agg_kind == hdk::ir::AggType::kAvg ||
+                            (agg_info.agg_kind == hdk::ir::AggType::kSample &&
                              (agg_info.type->isString() || agg_info.type->isArray())))) {
       // Note that this assumes if one of the slot pairs in a given target is an array,
       // all slot pairs are arrays.
@@ -541,7 +541,7 @@ void ResultSetStorage::rewriteAggregateBufferOffsets(
       const auto& target_info = targets_[target_logical_idx];
       if ((target_info.type->isString() || target_info.type->isArray()) &&
           target_info.is_agg) {
-        CHECK(target_info.agg_kind == kSAMPLE);
+        CHECK(target_info.agg_kind == hdk::ir::AggType::kSample);
         auto ptr1 = rowwise_targets_ptr;
         auto slot_idx = target_slot_idx;
         auto ptr2 = ptr1 + query_mem_desc_.getPaddedSlotWidthBytes(slot_idx);
@@ -870,8 +870,8 @@ void ResultSetStorage::reduceOneSlotBaseline(int64_t* this_buff,
   int8_t* this_ptr2{nullptr};
   const int8_t* that_ptr2{nullptr};
   if (target_info.is_agg &&
-      (target_info.agg_kind == kAVG ||
-       (target_info.agg_kind == kSAMPLE &&
+      (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+       (target_info.agg_kind == hdk::ir::AggType::kSample &&
         (target_info.type->isString() || target_info.type->isArray())))) {
     const auto this_count_off = query_mem_desc_.getEntryCount();
     const auto that_count_off = that_entry_count;
@@ -1318,7 +1318,7 @@ void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const 
     }                                                                        \
   }
 
-// to be used for 8/16-bit kMIN and kMAX only
+// to be used for 8/16-bit kMin and kMax only
 #define AGGREGATE_ONE_VALUE_SMALL(                                    \
     agg_kind__, val_ptr__, other_ptr__, chosen_bytes__, agg_info__)   \
   do {                                                                \
@@ -1335,7 +1335,7 @@ void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const 
     }                                                                 \
   } while (0)
 
-// to be used for 8/16-bit kMIN and kMAX only
+// to be used for 8/16-bit kMin and kMax only
 #define AGGREGATE_ONE_NULLABLE_VALUE_SMALL(                                       \
     agg_kind__, val_ptr__, other_ptr__, init_val__, chosen_bytes__, agg_info__)   \
   do {                                                                            \
@@ -1437,13 +1437,13 @@ void ResultSetStorage::reduceOneSlot(
       target_slot_idx, float_argument_input, query_mem_desc_);
   int64_t init_val = target_init_vals_[init_agg_val_idx];  // skip_val for nullable types
 
-  if (target_info.is_agg && target_info.agg_kind == kSINGLE_VALUE) {
+  if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kSingleValue) {
     reduceOneSlotSingleValue(
         this_ptr1, target_info, target_logical_idx, init_agg_val_idx, that_ptr1);
-  } else if (target_info.is_agg && target_info.agg_kind != kSAMPLE) {
+  } else if (target_info.is_agg && target_info.agg_kind != hdk::ir::AggType::kSample) {
     switch (target_info.agg_kind) {
-      case kCOUNT:
-      case kAPPROX_COUNT_DISTINCT: {
+      case hdk::ir::AggType::kCount:
+      case hdk::ir::AggType::kApproxCountDistinct: {
         if (is_distinct_target(target_info)) {
           CHECK_EQ(static_cast<size_t>(chosen_bytes), sizeof(int64_t));
           reduceOneCountDistinctSlot(this_ptr1, that_ptr1, target_logical_idx, that);
@@ -1453,19 +1453,19 @@ void ResultSetStorage::reduceOneSlot(
         AGGREGATE_ONE_COUNT(this_ptr1, that_ptr1, chosen_bytes);
         break;
       }
-      case kAVG: {
+      case hdk::ir::AggType::kAvg: {
         // Ignore float argument compaction for count component for fear of its overflow
         AGGREGATE_ONE_COUNT(this_ptr2,
                             that_ptr2,
                             query_mem_desc_.getPaddedSlotWidthBytes(target_slot_idx));
       }
       // fall thru
-      case kSUM: {
+      case hdk::ir::AggType::kSum: {
         AGGREGATE_ONE_NULLABLE_VALUE(
             sum, this_ptr1, that_ptr1, init_val, chosen_bytes, target_info);
         break;
       }
-      case kMIN: {
+      case hdk::ir::AggType::kMin: {
         if (static_cast<size_t>(chosen_bytes) <= sizeof(int16_t)) {
           AGGREGATE_ONE_NULLABLE_VALUE_SMALL(
               min, this_ptr1, that_ptr1, init_val, chosen_bytes, target_info);
@@ -1475,7 +1475,7 @@ void ResultSetStorage::reduceOneSlot(
         }
         break;
       }
-      case kMAX: {
+      case hdk::ir::AggType::kMax: {
         if (static_cast<size_t>(chosen_bytes) <= sizeof(int16_t)) {
           AGGREGATE_ONE_NULLABLE_VALUE_SMALL(
               max, this_ptr1, that_ptr1, init_val, chosen_bytes, target_info);
@@ -1485,7 +1485,7 @@ void ResultSetStorage::reduceOneSlot(
         }
         break;
       }
-      case kAPPROX_QUANTILE:
+      case hdk::ir::AggType::kApproxQuantile:
         CHECK_EQ(static_cast<int8_t>(sizeof(int64_t)), chosen_bytes);
         reduceOneApproxQuantileSlot(this_ptr1, that_ptr1, target_logical_idx, that);
         break;
@@ -1511,7 +1511,7 @@ void ResultSetStorage::reduceOneSlot(
         break;
       }
       case 4: {
-        CHECK(target_info.agg_kind != kSAMPLE ||
+        CHECK(target_info.agg_kind != hdk::ir::AggType::kSample ||
               query_mem_desc_.isLogicalSizedColumnsAllowed());
         const auto rhs_proj_col = *reinterpret_cast<const int32_t*>(that_ptr1);
         if (rhs_proj_col != init_val) {
@@ -1521,7 +1521,7 @@ void ResultSetStorage::reduceOneSlot(
       }
       case 8: {
         auto rhs_proj_col = *reinterpret_cast<const int64_t*>(that_ptr1);
-        if ((target_info.agg_kind == kSAMPLE &&
+        if ((target_info.agg_kind == hdk::ir::AggType::kSample &&
              (target_info.type->isString() || target_info.type->isArray())) &&
             !serialized_varlen_buffer.empty()) {
           size_t length_to_elems{0};
@@ -1540,7 +1540,7 @@ void ResultSetStorage::reduceOneSlot(
         } else {
           if (rhs_proj_col != init_val) {
             *reinterpret_cast<int64_t*>(this_ptr1) = rhs_proj_col;
-            if ((target_info.agg_kind == kSAMPLE &&
+            if ((target_info.agg_kind == hdk::ir::AggType::kSample &&
                  (target_info.type->isString() || target_info.type->isArray()))) {
               CHECK(this_ptr2 && that_ptr2);
               *reinterpret_cast<int64_t*>(this_ptr2) =
@@ -1626,15 +1626,16 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
       partial_agg_vals[agg_col_idx] = partial_bin_val;
       if (is_distinct_target(agg_info)) {
         CHECK_EQ(int8_t(1), warp_count);
-        CHECK(agg_info.is_agg && (agg_info.agg_kind == kCOUNT ||
-                                  agg_info.agg_kind == kAPPROX_COUNT_DISTINCT));
+        CHECK(agg_info.is_agg &&
+              (agg_info.agg_kind == hdk::ir::AggType::kCount ||
+               agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct));
         partial_bin_val = count_distinct_set_size(
             partial_bin_val, query_mem_desc.getCountDistinctDescriptor(target_idx));
         if (replace_bitmap_ptr_with_bitmap_sz) {
           partial_agg_vals[agg_col_idx] = partial_bin_val;
         }
       }
-      if (kAVG == agg_info.agg_kind) {
+      if (hdk::ir::AggType::kAvg == agg_info.agg_kind) {
         CHECK(agg_info.is_agg && !agg_info.is_distinct);
         ++agg_col_idx;
         partial_bin_val = partial_agg_vals[agg_col_idx] =
@@ -1662,11 +1663,11 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
                                     ? sizeof(float)
                                     : query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx);
       auto chosen_type = get_compact_type(agg_info);
-      if (agg_info.is_agg && agg_info.agg_kind != kSAMPLE) {
+      if (agg_info.is_agg && agg_info.agg_kind != hdk::ir::AggType::kSample) {
         try {
           switch (agg_info.agg_kind) {
-            case kCOUNT:
-            case kAPPROX_COUNT_DISTINCT:
+            case hdk::ir::AggType::kCount:
+            case hdk::ir::AggType::kApproxCountDistinct:
               AGGREGATE_ONE_NULLABLE_COUNT(
                   reinterpret_cast<int8_t*>(&agg_vals[agg_col_idx]),
                   reinterpret_cast<int8_t*>(&partial_agg_vals[agg_col_idx]),
@@ -1674,7 +1675,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
                   chosen_bytes,
                   agg_info);
               break;
-            case kAVG:
+            case hdk::ir::AggType::kAvg:
               // Ignore float argument compaction for count component for fear of its
               // overflow
               AGGREGATE_ONE_COUNT(
@@ -1682,7 +1683,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
                   reinterpret_cast<int8_t*>(&partial_agg_vals[agg_col_idx + 1]),
                   query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx));
             // fall thru
-            case kSUM:
+            case hdk::ir::AggType::kSum:
               AGGREGATE_ONE_NULLABLE_VALUE(
                   sum,
                   reinterpret_cast<int8_t*>(&agg_vals[agg_col_idx]),
@@ -1691,7 +1692,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
                   chosen_bytes,
                   agg_info);
               break;
-            case kMIN:
+            case hdk::ir::AggType::kMin:
               if (static_cast<size_t>(chosen_bytes) <= sizeof(int16_t)) {
                 AGGREGATE_ONE_NULLABLE_VALUE_SMALL(
                     min,
@@ -1710,7 +1711,7 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
                     agg_info);
               }
               break;
-            case kMAX:
+            case hdk::ir::AggType::kMax:
               if (static_cast<size_t>(chosen_bytes) <= sizeof(int16_t)) {
                 AGGREGATE_ONE_NULLABLE_VALUE_SMALL(
                     max,
@@ -1743,7 +1744,8 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
               break;
             case 4: {
               int32_t ret = *reinterpret_cast<const int32_t*>(&agg_vals[agg_col_idx]);
-              if (!(agg_info.agg_kind == kCOUNT && ret != agg_init_vals[agg_col_idx])) {
+              if (!(agg_info.agg_kind == hdk::ir::AggType::kCount &&
+                    ret != agg_init_vals[agg_col_idx])) {
                 agg_vals[agg_col_idx] = static_cast<int64_t>(ret);
               }
               break;
@@ -1752,18 +1754,18 @@ bool ResultSetStorage::reduceSingleRow(const int8_t* row_ptr,
               CHECK(false);
           }
         }
-        if (kAVG == agg_info.agg_kind) {
+        if (hdk::ir::AggType::kAvg == agg_info.agg_kind) {
           ++agg_col_idx;
         }
       } else {
-        if (agg_info.agg_kind == kSAMPLE) {
+        if (agg_info.agg_kind == hdk::ir::AggType::kSample) {
           CHECK(!agg_info.type->isString() && !agg_info.type->isArray())
               << "Interleaved bins reduction not supported for variable length "
                  "arguments "
                  "to SAMPLE";
         }
         if (agg_vals[agg_col_idx]) {
-          if (agg_info.agg_kind == kSAMPLE) {
+          if (agg_info.agg_kind == hdk::ir::AggType::kSample) {
             continue;
           }
           CHECK_EQ(agg_vals[agg_col_idx], partial_bin_val);

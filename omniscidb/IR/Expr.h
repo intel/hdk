@@ -808,12 +808,12 @@ class LikelihoodExpr : public Expr {
 class AggExpr : public Expr {
  public:
   AggExpr(const Type* type,
-          SQLAgg a,
+          AggType a,
           ExprPtr g,
           bool d,
           std::shared_ptr<const Constant> e)
       : Expr(type, true), agg_type_(a), arg_(g), is_distinct_(d), arg1_(e) {}
-  SQLAgg aggType() const { return agg_type_; }
+  AggType aggType() const { return agg_type_; }
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   bool isDistinct() const { return is_distinct_; }
@@ -825,7 +825,7 @@ class AggExpr : public Expr {
   size_t hash() const override;
 
  private:
-  SQLAgg agg_type_;   // aggregate type: kAVG, kMIN, kMAX, kSUM, kCOUNT
+  AggType agg_type_;  // aggregate type: kAvg, kMin, kMax, kSum, kCount
   ExprPtr arg_;       // argument to aggregate
   bool is_distinct_;  // true only if it is for COUNT(DISTINCT x)
   // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile

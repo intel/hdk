@@ -18,27 +18,32 @@
 class TestRelAlgDagBuilder : public RelAlgDag {
  public:
   struct AggDesc {
-    AggDesc(SQLAgg agg_,
+    AggDesc(hdk::ir::AggType agg_,
             bool distinct_,
             const hdk::ir::Type* type_,
             const std::vector<size_t>& operands_)
         : agg(agg_), distinct(distinct_), type(type_), operands(operands_) {}
 
-    AggDesc(SQLAgg agg_, bool distinct_, const hdk::ir::Type* type_, size_t operand)
+    AggDesc(hdk::ir::AggType agg_,
+            bool distinct_,
+            const hdk::ir::Type* type_,
+            size_t operand)
         : agg(agg_), distinct(distinct_), type(type_), operands({operand}) {}
 
-    AggDesc(SQLAgg agg_, const hdk::ir::Type* type_, const std::vector<size_t>& operands_)
+    AggDesc(hdk::ir::AggType agg_,
+            const hdk::ir::Type* type_,
+            const std::vector<size_t>& operands_)
         : agg(agg_), distinct(false), type(type_), operands(operands_) {}
 
-    AggDesc(SQLAgg agg_, const hdk::ir::Type* type_, size_t operand)
+    AggDesc(hdk::ir::AggType agg_, const hdk::ir::Type* type_, size_t operand)
         : agg(agg_), distinct(false), type(type_), operands({operand}) {}
 
-    AggDesc(SQLAgg agg_)
+    AggDesc(hdk::ir::AggType agg_)
         : agg(agg_), distinct(false), type(hdk::ir::Context::defaultCtx().int32()) {
-      CHECK(agg == kCOUNT);
+      CHECK(agg == hdk::ir::AggType::kCount);
     }
 
-    SQLAgg agg;
+    hdk::ir::AggType agg;
     bool distinct;
     const hdk::ir::Type* type;
     std::vector<size_t> operands;

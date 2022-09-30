@@ -23,30 +23,30 @@
 
 #include <boost/algorithm/string.hpp>
 
-const hdk::ir::Type* get_agg_type(const SQLAgg agg_kind,
+const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
                                   const hdk::ir::Expr* arg_expr,
                                   bool bigint_count) {
   auto& ctx = arg_expr ? arg_expr->type()->ctx() : hdk::ir::Context::defaultCtx();
   switch (agg_kind) {
-    case kCOUNT:
+    case hdk::ir::AggType::kCount:
       return ctx.integer(bigint_count ? 8 : 4);
-    case kMIN:
-    case kMAX:
+    case hdk::ir::AggType::kMin:
+    case hdk::ir::AggType::kMax:
       return arg_expr->type();
-    case kSUM:
+    case hdk::ir::AggType::kSum:
       return arg_expr->type()->isInteger() ? ctx.int64() : arg_expr->type();
-    case kAVG:
+    case hdk::ir::AggType::kAvg:
       return ctx.fp64();
-    case kAPPROX_COUNT_DISTINCT:
+    case hdk::ir::AggType::kApproxCountDistinct:
       return ctx.int64();
-    case kAPPROX_QUANTILE:
+    case hdk::ir::AggType::kApproxQuantile:
       return ctx.fp64();
-    case kSINGLE_VALUE:
+    case hdk::ir::AggType::kSingleValue:
       if (arg_expr->type()->isVarLen()) {
         throw std::runtime_error("SINGLE_VALUE not supported on '" +
                                  arg_expr->type()->toString() + "' input.");
       }
-    case kSAMPLE:
+    case hdk::ir::AggType::kSample:
       return arg_expr->type();
     default:
       CHECK(false);

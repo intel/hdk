@@ -68,7 +68,7 @@ ColSlotContext::ColSlotContext(const std::vector<const hdk::ir::Expr*>& col_expr
       CHECK_EQ(size_t(0), col_expr_bitwidth % 8);
       addSlotForColumn(static_cast<int8_t>(col_expr_bitwidth >> 3), col_expr_idx);
       // for average, we'll need to keep the count as well
-      if (agg_info.agg_kind == kAVG) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kAvg) {
         CHECK(agg_info.is_agg);
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
       }

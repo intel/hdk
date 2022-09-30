@@ -47,7 +47,7 @@ TargetValue make_avg_target_value(const int8_t* ptr1,
                                   const int8_t compact_sz2,
                                   const TargetInfo& target_info) {
   int64_t sum{0};
-  CHECK(target_info.agg_kind == kAVG);
+  CHECK(target_info.agg_kind == hdk::ir::AggType::kAvg);
   const bool float_argument_input = takes_float_argument(target_info);
   const auto actual_compact_sz1 = float_argument_input ? sizeof(float) : compact_sz1;
   const auto& agg_type = target_info.agg_arg_type;
@@ -93,7 +93,7 @@ const int8_t* advance_col_buff_to_slot(const int8_t* buff,
     const auto& agg_info = targets[target_idx];
     crt_col_ptr =
         advance_to_next_columnar_target_buff(crt_col_ptr, query_mem_desc, agg_col_idx);
-    if (agg_info.is_agg && agg_info.agg_kind == kAVG) {
+    if (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg) {
       if (agg_col_idx + 1 == slot_idx) {
         return crt_col_ptr;
       }
@@ -387,7 +387,7 @@ void ResultSet::RowWiseTargetAccessor::initializeOffsetsForStorage() {
 
       const int8_t* ptr2{nullptr};
       int8_t compact_sz2{0};
-      if ((agg_info.is_agg && agg_info.agg_kind == kAVG)) {
+      if ((agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg)) {
         ptr2 = ptr1 + compact_sz1;
         compact_sz2 =
             result_set_->query_mem_desc_.getPaddedSlotWidthBytes(agg_col_idx + 1);
@@ -452,7 +452,7 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
       result_set_->lazyReadInt(read_int_from_buff(ptr1, offsets_for_target.compact_sz1),
                                target_logical_idx,
                                storage_lookup_result);
-  if (agg_info.is_agg && agg_info.agg_kind == kAVG) {
+  if (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg) {
     CHECK(offsets_for_target.ptr2);
     const auto ptr2 =
         rowwise_target_ptr + reinterpret_cast<size_t>(offsets_for_target.ptr2);
@@ -522,11 +522,13 @@ void ResultSet::ColumnWiseTargetAccessor::initializeOffsetsForStorage() {
 
       const auto next_col_ptr = advance_to_next_columnar_target_buff(
           crt_col_ptr, crt_query_mem_desc, agg_col_idx);
-      const bool uses_two_slots = (agg_info.is_agg && agg_info.agg_kind == kAVG) ||
-                                  is_real_str_or_array(agg_info);
+      const bool uses_two_slots =
+          (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg) ||
+          is_real_str_or_array(agg_info);
       const auto col2_ptr = uses_two_slots ? next_col_ptr : nullptr;
       const auto compact_sz2 =
-          (agg_info.is_agg && agg_info.agg_kind == kAVG) || is_real_str_or_array(agg_info)
+          (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg) ||
+                  is_real_str_or_array(agg_info)
               ? crt_query_mem_desc.getPaddedSlotWidthBytes(agg_col_idx + 1)
               : 0;
 
@@ -578,7 +580,7 @@ InternalTargetValue ResultSet::ColumnWiseTargetAccessor::getColumnInternal(
           offsets_for_target.compact_sz1),
       target_logical_idx,
       storage_lookup_result);
-  if (agg_info.is_agg && agg_info.agg_kind == kAVG) {
+  if (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kAvg) {
     CHECK(offsets_for_target.ptr2);
     const auto i2 = read_int_from_buff(
         columnar_elem_ptr(
@@ -1248,10 +1250,11 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
     } else {
       actual_compact_sz = sizeof(double);
     }
-    if (target_info.is_agg &&
-        (target_info.agg_kind == kAVG || target_info.agg_kind == kSUM ||
-         target_info.agg_kind == kMIN || target_info.agg_kind == kMAX ||
-         target_info.agg_kind == kSINGLE_VALUE)) {
+    if (target_info.is_agg && (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+                               target_info.agg_kind == hdk::ir::AggType::kSum ||
+                               target_info.agg_kind == hdk::ir::AggType::kMin ||
+                               target_info.agg_kind == hdk::ir::AggType::kMax ||
+                               target_info.agg_kind == hdk::ir::AggType::kSingleValue)) {
       // The above listed aggregates use two floats in a single 8-byte slot. Set the
       // padded size to 4 bytes to properly read each value.
       actual_compact_sz = sizeof(float);
@@ -1292,7 +1295,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
     }
   }
   if (chosen_type->isFloatingPoint()) {
-    if (target_info.agg_kind == kAPPROX_QUANTILE) {
+    if (target_info.agg_kind == hdk::ir::AggType::kApproxQuantile) {
       return *reinterpret_cast<double const*>(ptr) == NULL_DOUBLE
                  ? NULL_DOUBLE  // sql_validate / just_validate
                  : calculateQuantile(*reinterpret_cast<quantile::TDigest* const*>(ptr));
@@ -1350,8 +1353,10 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
   if (chosen_type->isDecimal()) {
     if (decimal_to_double) {
       if (target_info.is_agg &&
-          (target_info.agg_kind == kAVG || target_info.agg_kind == kSUM ||
-           target_info.agg_kind == kMIN || target_info.agg_kind == kMAX) &&
+          (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+           target_info.agg_kind == hdk::ir::AggType::kSum ||
+           target_info.agg_kind == hdk::ir::AggType::kMin ||
+           target_info.agg_kind == hdk::ir::AggType::kMax) &&
           ival == inline_int_null_value(chosen_type->ctx().int64())) {
         return NULL_DOUBLE;
       }
@@ -1387,21 +1392,24 @@ TargetValue ResultSet::getTargetValueFromBufferColwise(
   const auto compact_sz1 = query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
   const auto next_col_ptr =
       advance_to_next_columnar_target_buff(col1_ptr, query_mem_desc, slot_idx);
-  const auto col2_ptr = ((target_info.is_agg && target_info.agg_kind == kAVG) ||
-                         is_real_str_or_array(target_info))
-                            ? next_col_ptr
-                            : nullptr;
-  const auto compact_sz2 = ((target_info.is_agg && target_info.agg_kind == kAVG) ||
-                            is_real_str_or_array(target_info))
-                               ? query_mem_desc.getPaddedSlotWidthBytes(slot_idx + 1)
-                               : 0;
+  const auto col2_ptr =
+      ((target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) ||
+       is_real_str_or_array(target_info))
+          ? next_col_ptr
+          : nullptr;
+  const auto compact_sz2 =
+      ((target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) ||
+       is_real_str_or_array(target_info))
+          ? query_mem_desc.getPaddedSlotWidthBytes(slot_idx + 1)
+          : 0;
 
   const auto ptr1 = columnar_elem_ptr(local_entry_idx, col1_ptr, compact_sz1);
-  if (target_info.agg_kind == kAVG || is_real_str_or_array(target_info)) {
+  if (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+      is_real_str_or_array(target_info)) {
     CHECK(col2_ptr);
     CHECK(compact_sz2);
     const auto ptr2 = columnar_elem_ptr(local_entry_idx, col2_ptr, compact_sz2);
-    return target_info.agg_kind == kAVG
+    return target_info.agg_kind == hdk::ir::AggType::kAvg
                ? make_avg_target_value(ptr1, compact_sz1, ptr2, compact_sz2, target_info)
                : makeVarlenTargetValue(ptr1,
                                        compact_sz1,
@@ -1483,7 +1491,8 @@ TargetValue ResultSet::getTargetValueFromBufferRowwise(
   }
 
   // logic for deciding width of column
-  if (target_info.agg_kind == kAVG || is_real_str_or_array(target_info)) {
+  if (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+      is_real_str_or_array(target_info)) {
     const auto ptr2 =
         rowwise_target_ptr + query_mem_desc_.getPaddedSlotWidthBytes(slot_idx);
     int8_t compact_sz2 = 0;
@@ -1497,7 +1506,7 @@ TargetValue ResultSet::getTargetValueFromBufferRowwise(
       compact_sz2 = 8;  // TODO(adb): is there a better way to do this?
     }
     CHECK(ptr2);
-    return target_info.agg_kind == kAVG
+    return target_info.agg_kind == hdk::ir::AggType::kAvg
                ? make_avg_target_value(ptr1, compact_sz1, ptr2, compact_sz2, target_info)
                : makeVarlenTargetValue(ptr1,
                                        compact_sz1,

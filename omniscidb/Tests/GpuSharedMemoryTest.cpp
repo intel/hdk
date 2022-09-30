@@ -505,8 +505,8 @@ TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
     TestInputData input;
     input.setDeviceId(0)
         .setNumInputBuffers(4)
-        .setTargetInfos(
-            generate_custom_agg_target_infos({4}, {kCOUNT}, {int32_type}, {int32_type}))
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {4}, {hdk::ir::AggType::kCount}, {int32_type}, {int32_type}))
         .setAggWidth(4)
         .setMinEntry(0)
         .setMaxEntry(num_entries)
@@ -522,8 +522,8 @@ TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
     TestInputData input;
     input.setDeviceId(0)
         .setNumInputBuffers(4)
-        .setTargetInfos(
-            generate_custom_agg_target_infos({8}, {kCOUNT}, {int64_type}, {int64_type}))
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {8}, {hdk::ir::AggType::kCount}, {int64_type}, {int64_type}))
         .setAggWidth(8)
         .setMinEntry(0)
         .setMaxEntry(num_entries)
@@ -545,7 +545,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_1) {
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
-          {kCOUNT, kMAX, kMIN, kSUM, kAVG},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kMin,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kAvg},
           {int64_type, int64_type, int64_type, int64_type, double_type},
           {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
@@ -566,7 +570,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_2) {
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
-          {kCOUNT, kAVG, kMAX, kSUM, kMIN},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMin},
           {int64_type, double_type, int64_type, int64_type, int64_type},
           {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
@@ -587,7 +595,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_3) {
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
-          {kCOUNT, kMAX, kAVG, kSUM, kMIN},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMin},
           {int64_type, double_type, double_type, double_type, double_type},
           {int32_type, double_type, double_type, double_type, double_type}));
 
@@ -608,7 +620,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_4) {
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
-          {kCOUNT, kSUM, kMAX, kAVG, kMIN},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMin},
           {int64_type, float_type, float_type, float_type, float_type},
           {int16_type, float_type, float_type, float_type, float_type}));
 
@@ -628,7 +644,11 @@ TEST(SingleColumn, VariableNumBuffers) {
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
           {8},
-          {kCOUNT, kSUM, kAVG, kMAX, kMIN},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kMin},
           {int32_type, int64_type, double_type, float_type, double_type},
           {int8_type, int8_type, int16_type, float_type, double_type}));
 

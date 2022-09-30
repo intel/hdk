@@ -114,7 +114,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
     const auto slot_bytes = query_mem_desc.getLogicalSlotWidthBytes(target_idx);
     CHECK_LE(target_info.type->size(), slot_bytes);
     bool isNullable = target_info.type->nullable();
-    if (target_info.agg_kind == kCOUNT) {
+    if (target_info.agg_kind == hdk::ir::AggType::kCount) {
       if (empty || null_val) {
         vv = 0;
       } else {
@@ -140,7 +140,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
       }
     }
     slot_ptr += slot_bytes;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       const auto count_slot_bytes =
           query_mem_desc.getLogicalSlotWidthBytes(target_idx + 1);
       if (empty) {
@@ -170,7 +170,7 @@ void fill_one_entry_one_col(int8_t* ptr1,
                             const bool empty_entry,
                             const bool null_val /* = false */) {
   int64_t vv = 0;
-  if (target_info.agg_kind == kCOUNT) {
+  if (target_info.agg_kind == hdk::ir::AggType::kCount) {
     if (empty_entry || null_val) {
       vv = 0;
     } else {
@@ -181,7 +181,7 @@ void fill_one_entry_one_col(int8_t* ptr1,
     if (isNullable && target_info.skip_null_val && null_val) {
       vv = inline_int_null_value(target_info.type);
     } else {
-      if (empty_entry && (target_info.agg_kind == kAVG)) {
+      if (empty_entry && (target_info.agg_kind == hdk::ir::AggType::kAvg)) {
         vv = 0;
       } else {
         vv = v;
@@ -219,7 +219,7 @@ void fill_one_entry_one_col(int8_t* ptr1,
     default:
       CHECK(false);
   }
-  if (target_info.is_agg && target_info.agg_kind == kAVG) {
+  if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) {
     CHECK(ptr2);
     switch (compact_sz2) {
       case 8:
@@ -242,7 +242,7 @@ void fill_one_entry_one_col(int64_t* value_slot,
                             const bool null_val /* = false */) {
   auto ptr1 = reinterpret_cast<int8_t*>(value_slot);
   int8_t* ptr2{nullptr};
-  if (target_info.agg_kind == kAVG) {
+  if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
     ptr2 = reinterpret_cast<int8_t*>(&value_slot[entry_count]);
   }
   fill_one_entry_one_col(ptr1, 8, ptr2, 8, v, target_info, empty_entry, null_val);
@@ -281,7 +281,7 @@ void fill_storage_buffer_perfect_hash_colwise(int8_t* buff,
     for (size_t i = 0; i < query_mem_desc.getEntryCount(); ++i) {
       int8_t* ptr2{nullptr};
       const bool read_secondary_buffer{target_info.is_agg &&
-                                       target_info.agg_kind == kAVG};
+                                       target_info.agg_kind == hdk::ir::AggType::kAvg};
       if (read_secondary_buffer) {
         ptr2 = col_entry_ptr + query_mem_desc.getEntryCount() * col_bytes;
       }
@@ -314,7 +314,7 @@ void fill_storage_buffer_perfect_hash_colwise(int8_t* buff,
       col_entry_ptr += col_bytes;
     }
     col_ptr = advance_to_next_columnar_target_buff(col_ptr, query_mem_desc, slot_idx);
-    if (target_info.is_agg && target_info.agg_kind == kAVG) {
+    if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kAvg) {
       col_ptr =
           advance_to_next_columnar_target_buff(col_ptr, query_mem_desc, slot_idx + 1);
     }
@@ -374,7 +374,7 @@ void fill_storage_buffer_baseline_colwise(int8_t* buff,
       const auto& target_info = target_infos[target_it->second];
       i64_buff[slot_offset_colwise(
           i, target_slot, key_component_count, query_mem_desc.getEntryCount())] =
-          (target_info.agg_kind == kCOUNT ? 0 : 0xdeadbeef);
+          (target_info.agg_kind == hdk::ir::AggType::kCount ? 0 : 0xdeadbeef);
     }
   }
   for (size_t i = 0; i < query_mem_desc.getEntryCount(); i += step) {
@@ -391,7 +391,7 @@ void fill_storage_buffer_baseline_colwise(int8_t* buff,
       fill_one_entry_one_col(
           value_slots, val, target_info, query_mem_desc.getEntryCount());
       value_slots += query_mem_desc.getEntryCount();
-      if (target_info.agg_kind == kAVG) {
+      if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
         value_slots += query_mem_desc.getEntryCount();
       }
     }
@@ -419,7 +419,7 @@ void fill_storage_buffer_baseline_rowwise(int8_t* buff,
       const auto& target_info = target_infos[target_it->second];
       i64_buff[slot_offset_rowwise(
           i, target_slot, key_component_count, target_slot_count)] =
-          (target_info.agg_kind == kCOUNT ? 0 : 0xdeadbeef);
+          (target_info.agg_kind == hdk::ir::AggType::kCount ? 0 : 0xdeadbeef);
     }
   }
   for (size_t i = 0; i < query_mem_desc.getEntryCount(); i += step) {
@@ -480,7 +480,7 @@ QueryMemoryDescriptor perfect_hash_one_col_desc_small(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -507,7 +507,7 @@ QueryMemoryDescriptor perfect_hash_one_col_desc(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -531,7 +531,7 @@ QueryMemoryDescriptor perfect_hash_two_col_desc(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -551,7 +551,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc_large(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -572,7 +572,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc_overflow32(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -593,7 +593,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc(
     const auto slot_bytes =
         std::max(num_bytes, static_cast<int8_t>(target_info.type->size()));
     std::vector<std::tuple<int8_t, int8_t>> slots_for_target;
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       CHECK(target_info.is_agg);
       slots_for_target.emplace_back(std::make_tuple(slot_bytes, slot_bytes));
     }
@@ -614,7 +614,7 @@ void fill_one_entry_baseline(int64_t* value_slots,
   int64_t vv = 0;
   for (const auto& target_info : target_infos) {
     const bool float_argument_input = takes_float_argument(target_info);
-    if (target_info.agg_kind == kCOUNT) {
+    if (target_info.agg_kind == hdk::ir::AggType::kCount) {
       if (empty || null_val) {
         vv = 0;
       } else {
@@ -652,7 +652,7 @@ void fill_one_entry_baseline(int64_t* value_slots,
       default:
         CHECK(false);
     }
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       value_slots[target_slot + 1] = !(empty || null_val);
     }
     target_slot = advance_slot(target_slot, target_info, false);
@@ -669,7 +669,7 @@ size_t get_slot_count(const std::vector<TargetInfo>& target_infos) {
 
 std::vector<TargetInfo> generate_custom_agg_target_infos(
     std::vector<int8_t> group_columns,
-    std::vector<SQLAgg> sql_aggs,
+    std::vector<hdk::ir::AggType> sql_aggs,
     std::vector<const hdk::ir::Type*> agg_types,
     std::vector<const hdk::ir::Type*> arg_types) {
   const auto num_targets = sql_aggs.size();
@@ -680,7 +680,7 @@ std::vector<TargetInfo> generate_custom_agg_target_infos(
   // creating proper TargetInfo to represent group columns:
   for (auto group_size : group_columns) {
     target_infos.push_back(TargetInfo{false,
-                                      kMIN,
+                                      hdk::ir::AggType::kMin,
                                       hdk::ir::Context::defaultCtx().integer(group_size),
                                       nullptr,
                                       true,

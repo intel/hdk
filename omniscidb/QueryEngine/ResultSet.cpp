@@ -316,8 +316,9 @@ const hdk::ir::Type* ResultSet::colType(const size_t col_idx) const {
     return hdk::ir::Context::defaultCtx().text();
   }
   CHECK_LT(col_idx, targets_.size());
-  return targets_[col_idx].agg_kind == kAVG ? hdk::ir::Context::defaultCtx().fp64()
-                                            : targets_[col_idx].type;
+  return targets_[col_idx].agg_kind == hdk::ir::AggType::kAvg
+             ? hdk::ir::Context::defaultCtx().fp64()
+             : targets_[col_idx].type;
 }
 
 StringDictionaryProxy* ResultSet::getStringDictionaryProxy(int const dict_id) const {
@@ -969,7 +970,8 @@ ResultSet::ApproxQuantileBuffers ResultSet::ResultSetComparator<
     BUFFER_ITERATOR_TYPE>::materializeApproxQuantileColumns() const {
   ResultSet::ApproxQuantileBuffers approx_quantile_materialized_buffers;
   for (const auto& order_entry : order_entries_) {
-    if (result_set_->targets_[order_entry.tle_no - 1].agg_kind == kAPPROX_QUANTILE) {
+    if (result_set_->targets_[order_entry.tle_no - 1].agg_kind ==
+        hdk::ir::AggType::kApproxQuantile) {
       approx_quantile_materialized_buffers.emplace_back(
           materializeApproxQuantileColumn(order_entry));
     }
@@ -1106,7 +1108,7 @@ bool ResultSet::ResultSetComparator<BUFFER_ITERATOR_TYPE>::operator()(
         continue;
       }
       return (lhs_sz < rhs_sz) != order_entry.is_desc;
-    } else if (UNLIKELY(agg_info.agg_kind == kAPPROX_QUANTILE)) {
+    } else if (UNLIKELY(agg_info.agg_kind == hdk::ir::AggType::kApproxQuantile)) {
       CHECK_LT(materialized_approx_quantile_buffer_idx,
                approx_quantile_materialized_buffers_.size());
       const auto& approx_quantile_materialized_buffer =
@@ -1426,7 +1428,8 @@ std::tuple<std::vector<bool>, size_t> ResultSet::getSingleSlotTargetBitmap() con
   size_t num_single_slot_targets = 0;
   for (size_t target_idx = 0; target_idx < targets_.size(); target_idx++) {
     auto sql_type = targets_[target_idx].type;
-    if (targets_[target_idx].is_agg && targets_[target_idx].agg_kind == kAVG) {
+    if (targets_[target_idx].is_agg &&
+        targets_[target_idx].agg_kind == hdk::ir::AggType::kAvg) {
       target_bitmap[target_idx] = false;
     } else if (sql_type->isString() || sql_type->isArray()) {
       target_bitmap[target_idx] = false;
@@ -1453,8 +1456,10 @@ std::tuple<std::vector<bool>, size_t> ResultSet::getSupportedSingleSlotTargetBit
   for (size_t target_idx = 0; target_idx < single_slot_targets.size(); target_idx++) {
     const auto& target = targets_[target_idx];
     if (single_slot_targets[target_idx] &&
-        (is_distinct_target(target) || target.agg_kind == kAPPROX_QUANTILE ||
-         (target.is_agg && target.agg_kind == kSAMPLE && target.type->isFp32()))) {
+        (is_distinct_target(target) ||
+         target.agg_kind == hdk::ir::AggType::kApproxQuantile ||
+         (target.is_agg && target.agg_kind == hdk::ir::AggType::kSample &&
+          target.type->isFp32()))) {
       single_slot_targets[target_idx] = false;
       num_single_slot_targets--;
     }

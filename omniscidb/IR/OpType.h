@@ -68,6 +68,18 @@ inline bool isEquivalence(OpType op) {
 
 enum class Qualifier { kOne, kAny, kAll };
 
+enum class AggType {
+  kAvg,
+  kMin,
+  kMax,
+  kSum,
+  kCount,
+  kApproxCountDistinct,
+  kApproxQuantile,
+  kSample,
+  kSingleValue
+};
+
 }  // namespace hdk::ir
 
 inline std::string toString(hdk::ir::OpType op) {
@@ -144,4 +156,33 @@ inline std::string toString(hdk::ir::Qualifier qualifier) {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::Qualifier qualifier) {
   return os << toString(qualifier);
+}
+
+inline std::string toString(hdk::ir::AggType agg) {
+  switch (agg) {
+    case hdk::ir::AggType::kAvg:
+      return "AVG";
+    case hdk::ir::AggType::kMin:
+      return "MIN";
+    case hdk::ir::AggType::kMax:
+      return "MAX";
+    case hdk::ir::AggType::kSum:
+      return "SUM";
+    case hdk::ir::AggType::kCount:
+      return "COUNT";
+    case hdk::ir::AggType::kApproxCountDistinct:
+      return "APPROX_COUNT_DISTINCT";
+    case hdk::ir::AggType::kApproxQuantile:
+      return "APPROX_PERCENTILE";
+    case hdk::ir::AggType::kSample:
+      return "SAMPLE";
+    case hdk::ir::AggType::kSingleValue:
+      return "SINGLE_VALUE";
+  }
+  LOG(FATAL) << "Invalid aggregate kind: " << (int)agg;
+  return "";
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
+  return os << toString(agg);
 }

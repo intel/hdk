@@ -707,7 +707,7 @@ std::vector<std::string> get_agg_fnames(
     const bool is_varlen =
         target_type->isString() ||
         target_type->isArray();  // TODO: should it use is_varlen_array() ?
-    if (!agg_expr || agg_expr->aggType() == kSAMPLE) {
+    if (!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample) {
       result.emplace_back(target_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
       if (is_varlen) {
         result.emplace_back("agg_id");
@@ -715,9 +715,10 @@ std::vector<std::string> get_agg_fnames(
       continue;
     }
     const auto agg = agg_expr->aggType();
-    auto agg_type = agg != kCOUNT ? agg_expr->arg()->type() : target_type;
+    auto agg_type =
+        agg != hdk::ir::AggType::kCount ? agg_expr->arg()->type() : target_type;
     switch (agg) {
-      case kAVG: {
+      case hdk::ir::AggType::kAvg: {
         if (!agg_type->isInteger() && !agg_type->isDecimal() &&
             !agg_type->isFloatingPoint()) {
           throw std::runtime_error("AVG is only valid on integer and floating point");
@@ -730,7 +731,7 @@ std::vector<std::string> get_agg_fnames(
                                 : "agg_count_double");
         break;
       }
-      case kMIN: {
+      case hdk::ir::AggType::kMin: {
         if (agg_type->isString() || agg_type->isExtDictionary() || agg_type->isArray()) {
           throw std::runtime_error("MIN on strings or arrays types not supported yet");
         }
@@ -739,7 +740,7 @@ std::vector<std::string> get_agg_fnames(
                                 : "agg_min_double");
         break;
       }
-      case kMAX: {
+      case hdk::ir::AggType::kMax: {
         if (agg_type->isString() || agg_type->isExtDictionary() || agg_type->isArray()) {
           throw std::runtime_error("MAX on strings or arrays types not supported yet");
         }
@@ -748,7 +749,7 @@ std::vector<std::string> get_agg_fnames(
                                 : "agg_max_double");
         break;
       }
-      case kSUM: {
+      case hdk::ir::AggType::kSum: {
         if (!agg_type->isInteger() && !agg_type->isDecimal() &&
             !agg_type->isFloatingPoint()) {
           throw std::runtime_error("SUM is only valid on integer and floating point");
@@ -758,22 +759,22 @@ std::vector<std::string> get_agg_fnames(
                                 : "agg_sum_double");
         break;
       }
-      case kCOUNT:
+      case hdk::ir::AggType::kCount:
         result.emplace_back(agg_expr->isDistinct() ? "agg_count_distinct" : "agg_count");
         break;
-      case kSINGLE_VALUE: {
+      case hdk::ir::AggType::kSingleValue: {
         result.emplace_back(agg_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
         break;
       }
-      case kSAMPLE: {
+      case hdk::ir::AggType::kSample: {
         // Note that varlen SAMPLE arguments are handled separately above
         result.emplace_back(agg_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
         break;
       }
-      case kAPPROX_COUNT_DISTINCT:
+      case hdk::ir::AggType::kApproxCountDistinct:
         result.emplace_back("agg_approximate_count_distinct");
         break;
-      case kAPPROX_QUANTILE:
+      case hdk::ir::AggType::kApproxQuantile:
         result.emplace_back("agg_approx_quantile");
         break;
       default:

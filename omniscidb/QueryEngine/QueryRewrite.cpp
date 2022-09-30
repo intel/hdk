@@ -220,9 +220,10 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
         // in subquery, i.e., SELECT MIN(v1) FROM (SELECT v1, AGG(v1) FROM T GROUP BY v1);
         if (target_expr && !target_expr->type()->isFp32()) {
           switch (agg_expr->aggType()) {
-            case SQLAgg::kCOUNT:
-            case SQLAgg::kAPPROX_COUNT_DISTINCT: {
-              if (agg_expr->aggType() == SQLAgg::kCOUNT && !agg_expr->isDistinct()) {
+            case hdk::ir::AggType::kCount:
+            case hdk::ir::AggType::kApproxCountDistinct: {
+              if (agg_expr->aggType() == hdk::ir::AggType::kCount &&
+                  !agg_expr->isDistinct()) {
                 break;
               }
               auto case_expr = generateCaseExprForCountDistinctOnGroupByCol(
@@ -232,11 +233,11 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
               rewritten = true;
               break;
             }
-            case SQLAgg::kAPPROX_QUANTILE:
-            case SQLAgg::kAVG:
-            case SQLAgg::kSAMPLE:
-            case SQLAgg::kMAX:
-            case SQLAgg::kMIN: {
+            case hdk::ir::AggType::kApproxQuantile:
+            case hdk::ir::AggType::kAvg:
+            case hdk::ir::AggType::kSample:
+            case hdk::ir::AggType::kMax:
+            case hdk::ir::AggType::kMin: {
               // we just replace the agg_expr into a plain expr
               // i.e, avg(x1) --> x1
               auto agg_expr_type = agg_expr->type();

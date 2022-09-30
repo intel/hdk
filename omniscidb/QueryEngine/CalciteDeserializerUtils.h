@@ -92,35 +92,35 @@ inline hdk::ir::OpType to_sql_op(const std::string& op_str) {
   return hdk::ir::OpType::kFunction;
 }
 
-inline SQLAgg to_agg_kind(const std::string& agg_name) {
+inline hdk::ir::AggType to_agg_kind(const std::string& agg_name) {
   if (agg_name == std::string("COUNT")) {
-    return kCOUNT;
+    return hdk::ir::AggType::kCount;
   }
   if (agg_name == std::string("MIN")) {
-    return kMIN;
+    return hdk::ir::AggType::kMin;
   }
   if (agg_name == std::string("MAX")) {
-    return kMAX;
+    return hdk::ir::AggType::kMax;
   }
   if (agg_name == std::string("SUM")) {
-    return kSUM;
+    return hdk::ir::AggType::kSum;
   }
   if (agg_name == std::string("AVG")) {
-    return kAVG;
+    return hdk::ir::AggType::kAvg;
   }
   if (agg_name == std::string("APPROX_COUNT_DISTINCT")) {
-    return kAPPROX_COUNT_DISTINCT;
+    return hdk::ir::AggType::kApproxCountDistinct;
   }
   if (agg_name == "APPROX_MEDIAN" || agg_name == "APPROX_PERCENTILE" ||
       agg_name == "APPROX_QUANTILE") {
-    return kAPPROX_QUANTILE;
+    return hdk::ir::AggType::kApproxQuantile;
   }
   if (agg_name == std::string("ANY_VALUE") || agg_name == std::string("SAMPLE") ||
       agg_name == std::string("LAST_SAMPLE")) {
-    return kSAMPLE;
+    return hdk::ir::AggType::kSample;
   }
   if (agg_name == std::string("SINGLE_VALUE")) {
-    return kSINGLE_VALUE;
+    return hdk::ir::AggType::kSingleValue;
   }
   throw std::runtime_error("Aggregate function " + agg_name + " not supported");
 }
@@ -133,7 +133,7 @@ class Type;
 
 }  // namespace hdk::ir
 
-const hdk::ir::Type* get_agg_type(const SQLAgg agg_kind,
+const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
                                   const hdk::ir::Expr* arg_expr,
                                   bool bigint_count);
 

@@ -1277,11 +1277,14 @@ TEST(Reduction, Baseline) {
   const SQLTypeInfo bigint_ti(kBIGINT, true);
   switch (val_count) {
     case 3:
-      target_infos.push_back(TargetInfo{true, kMIN, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kMin, bigint_ti, bigint_ti, true, false});
     case 2:
-      target_infos.push_back(TargetInfo{true, kMAX, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kMax, bigint_ti, bigint_ti, true, false});
     case 1:
-      target_infos.push_back(TargetInfo{true, kSUM, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kSum, bigint_ti, bigint_ti, true, false});
       break;
     default:
       CHECK(false);
@@ -1543,11 +1546,14 @@ TEST(Reduction, PerfectHash) {
   const SQLTypeInfo bigint_ti(kBIGINT, true);
   switch (val_count) {
     case 3:
-      target_infos.push_back(TargetInfo{true, kMIN, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kMin, bigint_ti, bigint_ti, true, false});
     case 2:
-      target_infos.push_back(TargetInfo{true, kMAX, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kMax, bigint_ti, bigint_ti, true, false});
     case 1:
-      target_infos.push_back(TargetInfo{true, kSUM, bigint_ti, bigint_ti, true, false});
+      target_infos.push_back(
+          TargetInfo{true, hdk::ir::AggType::kSum, bigint_ti, bigint_ti, true, false});
       break;
     default:
       CHECK(false);

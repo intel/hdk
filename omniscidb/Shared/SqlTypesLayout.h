@@ -40,7 +40,7 @@ inline const hdk::ir::Type* get_compact_type(const TargetInfo& target) {
   const auto agg_type = target.agg_kind;
   auto agg_arg = target.agg_arg_type;
   if (!agg_arg) {
-    CHECK_EQ(kCOUNT, agg_type);
+    CHECK_EQ(hdk::ir::AggType::kCount, agg_type);
     CHECK(!target.is_distinct);
     return target.type;
   }
@@ -57,7 +57,7 @@ inline const hdk::ir::Type* get_compact_type(const TargetInfo& target) {
 inline void set_compact_type(TargetInfo& target, const hdk::ir::Type* new_type) {
   if (target.is_agg) {
     const auto agg_type = target.agg_kind;
-    if (agg_type != kCOUNT || !target.agg_arg_type) {
+    if (agg_type != hdk::ir::AggType::kCount || !target.agg_arg_type) {
       target.agg_arg_type = new_type;
       return;
     }

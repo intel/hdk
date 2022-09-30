@@ -39,7 +39,7 @@ std::pair<int64_t, int64_t> inline_int_max_min(const size_t byte_width);
 
 std::pair<uint64_t, uint64_t> inline_uint_max_min(const size_t byte_width);
 
-int64_t get_agg_initial_val(const SQLAgg agg,
+int64_t get_agg_initial_val(hdk::ir::AggType agg,
                             const hdk::ir::Type* type,
                             const bool enable_compaction,
                             const unsigned min_byte_width_to_compact);

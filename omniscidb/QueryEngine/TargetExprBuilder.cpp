@@ -39,7 +39,7 @@ namespace {
 
 std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info) {
   auto chosen_type = get_compact_type(target_info);
-  if (!target_info.is_agg || target_info.agg_kind == kSAMPLE) {
+  if (!target_info.is_agg || target_info.agg_kind == hdk::ir::AggType::kSample) {
     if (chosen_type->isString() || chosen_type->isArray()) {
       // not a varlen projection (not creating new varlen outputs). Just store the pointer
       // and offset into the input buffer in the output slots.
@@ -48,26 +48,26 @@ std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info) {
     return {"agg_id"};
   }
   switch (target_info.agg_kind) {
-    case kAVG:
+    case hdk::ir::AggType::kAvg:
       return {"agg_sum", "agg_count"};
-    case kCOUNT:
+    case hdk::ir::AggType::kCount:
       return {target_info.is_distinct ? "agg_count_distinct" : "agg_count"};
-    case kMAX:
+    case hdk::ir::AggType::kMax:
       return {"agg_max"};
-    case kMIN:
+    case hdk::ir::AggType::kMin:
       return {"agg_min"};
-    case kSUM:
+    case hdk::ir::AggType::kSum:
       return {"agg_sum"};
-    case kAPPROX_COUNT_DISTINCT:
+    case hdk::ir::AggType::kApproxCountDistinct:
       return {"agg_approximate_count_distinct"};
-    case kAPPROX_QUANTILE:
+    case hdk::ir::AggType::kApproxQuantile:
       return {"agg_approx_quantile"};
-    case kSINGLE_VALUE:
+    case hdk::ir::AggType::kSingleValue:
       return {"checked_single_agg_id"};
-    case kSAMPLE:
+    case hdk::ir::AggType::kSample:
       return {"agg_id"};
     default:
-      UNREACHABLE() << "Unrecognized agg kind: " << std::to_string(target_info.agg_kind);
+      UNREACHABLE() << "Unrecognized agg kind: " << toString(target_info.agg_kind);
   }
   return {};
 }
@@ -78,7 +78,8 @@ inline bool is_columnar_projection(const QueryMemoryDescriptor& query_mem_desc) 
 }
 
 bool is_simple_count(const TargetInfo& target_info) {
-  return target_info.is_agg && target_info.agg_kind == kCOUNT && !target_info.is_distinct;
+  return target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kCount &&
+         !target_info.is_distinct;
 }
 
 }  // namespace
@@ -338,7 +339,8 @@ void TargetExprCodegen::codegenAggregate(
     }
 
     const bool float_argument_input = takes_float_argument(target_info);
-    const bool is_count_in_avg = target_info.agg_kind == kAVG && target_lv_idx == 1;
+    const bool is_count_in_avg =
+        target_info.agg_kind == hdk::ir::AggType::kAvg && target_lv_idx == 1;
     // The count component of an average should never be compacted.
     const auto agg_chosen_bytes =
         float_argument_input && !is_count_in_avg ? sizeof(float) : chosen_bytes;
@@ -407,7 +409,7 @@ void TargetExprCodegen::codegenAggregate(
       CHECK(!chosen_type->isFloatingPoint());
       row_func_builder->codegenCountDistinct(
           target_idx, target_expr, agg_args, query_mem_desc, co.device_type);
-    } else if (target_info.agg_kind == kAPPROX_QUANTILE) {
+    } else if (target_info.agg_kind == hdk::ir::AggType::kApproxQuantile) {
       CHECK_EQ(agg_chosen_bytes, sizeof(int64_t));
       row_func_builder->codegenApproxQuantile(
           target_idx, target_expr, agg_args, query_mem_desc, co.device_type);
@@ -417,7 +419,7 @@ void TargetExprCodegen::codegenAggregate(
         agg_fname += "_skip_val";
       }
 
-      if (target_info.agg_kind == kSINGLE_VALUE || need_skip_null) {
+      if (target_info.agg_kind == hdk::ir::AggType::kSingleValue || need_skip_null) {
         llvm::Value* null_in_lv{nullptr};
         if (arg_type->isFloatingPoint()) {
           null_in_lv =
@@ -526,8 +528,9 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
       get_target_info(target_expr, executor->getConfig().exec.group_by.bigint_count);
   auto arg_expr = agg_arg(target_expr);
   if (arg_expr) {
-    if (target_info.agg_kind == kSINGLE_VALUE || target_info.agg_kind == kSAMPLE ||
-        target_info.agg_kind == kAPPROX_QUANTILE) {
+    if (target_info.agg_kind == hdk::ir::AggType::kSingleValue ||
+        target_info.agg_kind == hdk::ir::AggType::kSample ||
+        target_info.agg_kind == hdk::ir::AggType::kApproxQuantile) {
       target_info.skip_null_val = false;
     } else if (query_mem_desc.getQueryDescriptionType() ==
                    QueryDescriptionType::NonGroupedAggregate &&
@@ -543,7 +546,7 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
   if (!(query_mem_desc.getQueryDescriptionType() ==
         QueryDescriptionType::NonGroupedAggregate) &&
       (co.device_type == ExecutorDeviceType::GPU) && target_info.is_agg &&
-      (target_info.agg_kind == kSAMPLE)) {
+      (target_info.agg_kind == hdk::ir::AggType::kSample)) {
     sample_exprs_to_codegen.emplace_back(target_expr,
                                          target_info,
                                          slot_index_counter,
@@ -566,7 +569,8 @@ namespace {
 inline int64_t get_initial_agg_val(const TargetInfo& target_info,
                                    const QueryMemoryDescriptor& query_mem_desc) {
   const bool is_group_by{query_mem_desc.isGroupBy()};
-  if (target_info.agg_kind == kSAMPLE && target_info.type->isExtDictionary()) {
+  if (target_info.agg_kind == hdk::ir::AggType::kSample &&
+      target_info.type->isExtDictionary()) {
     return get_agg_initial_val(target_info.agg_kind,
                                target_info.type,
                                is_group_by,

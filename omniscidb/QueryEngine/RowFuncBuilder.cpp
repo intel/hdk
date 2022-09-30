@@ -72,7 +72,7 @@ int32_t get_agg_count(const std::vector<const hdk::ir::Expr*>& target_exprs) {
   for (auto target_expr : target_exprs) {
     CHECK(target_expr);
     const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-    if (!agg_expr || agg_expr->aggType() == kSAMPLE) {
+    if (!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample) {
       auto type = target_expr->type();
       if (type->isBuffer()) {
         agg_count += 2;
@@ -81,7 +81,7 @@ int32_t get_agg_count(const std::vector<const hdk::ir::Expr*>& target_exprs) {
       }
       continue;
     }
-    if (agg_expr && agg_expr->aggType() == kAVG) {
+    if (agg_expr && agg_expr->aggType() == hdk::ir::AggType::kAvg) {
       agg_count += 2;
     } else {
       ++agg_count;
@@ -687,7 +687,8 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
         need_conversion = true;
       }
     } else {
-      CHECK(agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT);
+      CHECK(agg_info.agg_kind == hdk::ir::AggType::kCount ||
+            agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct);
       return target;
     }
   } else {
@@ -981,7 +982,7 @@ void RowFuncBuilder::codegenCountDistinct(const size_t target_idx,
   const auto& count_distinct_descriptor =
       query_mem_desc.getCountDistinctDescriptor(target_idx);
   CHECK(count_distinct_descriptor.impl_type_ != CountDistinctImplType::Invalid);
-  if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
+  if (agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct) {
     CHECK(count_distinct_descriptor.impl_type_ == CountDistinctImplType::Bitmap);
     agg_args.push_back(LL_INT(int32_t(count_distinct_descriptor.bitmap_sz_bits)));
     if (device_type == ExecutorDeviceType::GPU) {
@@ -1112,7 +1113,7 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         }
         CHECK(target_type->isArray());
         CHECK_EQ(size_t(1), target_lvs.size());
-        CHECK(!agg_expr || agg_expr->aggType() == kSAMPLE);
+        CHECK(!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample);
         const auto i32_ty = get_int_type(32, executor_->cgen_state_->context_);
         const auto i8p_ty =
             llvm::PointerType::get(get_int_type(8, executor_->cgen_state_->context_), 0);

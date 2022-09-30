@@ -136,12 +136,12 @@ std::vector<uint32_t> baseline_sort_fp(const ExecutorDeviceType device_type,
   pos_oe_col_buffer.reserve(slice_entry_count);
   size_t oe_col_buffer_idx = 0;
   const auto& oe_info = layout.oe_target_info;
-  const auto col_type =
-      oe_info.agg_kind == kAVG ? oe_info.type->ctx().fp64() : oe_info.type;
+  const auto col_type = 
+      oe_info.agg_kind == hdk::ir::AggType::kAvg ? oe_info.type->ctx().fp64() : oe_info.type;
   // Execlude AVG b/c collect_order_entry_column already makes its pair collapse into a
   // double
   const bool float_argument_input =
-      takes_float_argument(oe_info) && oe_info.agg_kind != kAVG;
+      takes_float_argument(oe_info) && oe_info.agg_kind != hdk::ir::AggType::kAvg;
 
   auto is_negative =
       float_argument_input ? [](const int64_t v) -> bool { return (v & (1 << 31)) != 0; }
@@ -308,7 +308,7 @@ thrust::host_vector<int64_t> collect_order_entry_column(
                             ? row_ptr + layout.target_groupby_index * sizeof(K)
                             : row_ptr + layout.col_off;
   const int8_t* crt_group_ptr2{nullptr};
-  if (layout.oe_target_info.agg_kind == kAVG) {
+  if (layout.oe_target_info.agg_kind == hdk::ir::AggType::kAvg) {
     crt_group_ptr2 = crt_group_ptr1 + layout.col_bytes;
   }
   auto entry_type = get_compact_type(layout.oe_target_info);
@@ -346,7 +346,7 @@ std::vector<uint32_t> baseline_sort(const ExecutorDeviceType device_type,
   auto oe_col_buffer = collect_order_entry_column<K>(groupby_buffer, layout, start, step);
   auto entry_type = get_compact_type(layout.oe_target_info);
   CHECK(entry_type->isNumber());
-  if (entry_type->isFloatingPoint() || layout.oe_target_info.agg_kind == kAVG) {
+  if (entry_type->isFloatingPoint() || layout.oe_target_info.agg_kind == hdk::ir::AggType::kAvg) {
     return baseline_sort_fp<K>(device_type,
                                device_id,
                                buffer_provider,

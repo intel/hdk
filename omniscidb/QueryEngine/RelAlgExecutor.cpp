@@ -1229,8 +1229,8 @@ bool is_agg(const hdk::ir::Expr* expr) {
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(expr);
   if (agg_expr && agg_expr->containsAgg()) {
     auto agg_type = agg_expr->aggType();
-    if (agg_type == SQLAgg::kMIN || agg_type == SQLAgg::kMAX ||
-        agg_type == SQLAgg::kSUM || agg_type == SQLAgg::kAVG) {
+    if (agg_type == hdk::ir::AggType::kMin || agg_type == hdk::ir::AggType::kMax ||
+        agg_type == hdk::ir::AggType::kSum || agg_type == hdk::ir::AggType::kAvg) {
       return true;
     }
   }
@@ -1613,8 +1613,12 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
 
   std::vector<TargetInfo> target_infos;
   for (const auto& tuple_type_component : tuple_type) {
-    target_infos.emplace_back(
-        TargetInfo{false, kCOUNT, tuple_type_component.type(), nullptr, false, false});
+    target_infos.emplace_back(TargetInfo{false,
+                                         hdk::ir::AggType::kCount,
+                                         tuple_type_component.type(),
+                                         nullptr,
+                                         false,
+                                         false});
   }
 
   std::shared_ptr<ResultSet> rs{
@@ -1851,7 +1855,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     const auto target_expr = ra_exe_unit.target_exprs[i];
     const auto agg_info =
         get_target_info(target_expr, executor->getConfig().exec.group_by.bigint_count);
-    if (agg_info.agg_kind != kAPPROX_COUNT_DISTINCT) {
+    if (agg_info.agg_kind != hdk::ir::AggType::kApproxCountDistinct) {
       continue;
     }
     CHECK(target_expr->is<hdk::ir::AggExpr>());
@@ -1902,9 +1906,10 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     if (approx_count_distinct_desc.bitmapPaddedSizeBytes() >=
         precise_count_distinct_desc.bitmapPaddedSizeBytes()) {
       auto precise_count_distinct = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-          get_agg_type(
-              kCOUNT, arg.get(), executor->getConfig().exec.group_by.bigint_count),
-          kCOUNT,
+          get_agg_type(hdk::ir::AggType::kCount,
+                       arg.get(),
+                       executor->getConfig().exec.group_by.bigint_count),
+          hdk::ir::AggType::kCount,
           arg,
           true,
           nullptr);
@@ -2094,7 +2099,7 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
                                                           const ExecutionOptions& eo) {
   const auto count = hdk::ir::makeExpr<hdk::ir::AggExpr>(
       hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
-      kCOUNT,
+      hdk::ir::AggType::kCount,
       nullptr,
       false,
       nullptr);

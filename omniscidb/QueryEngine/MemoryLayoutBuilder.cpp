@@ -240,7 +240,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
       const auto arg_expr = agg_arg(target_expr);
       const bool float_argument_input = takes_float_argument(agg_info);
       switch (agg_info.agg_kind) {
-        case kAVG:
+        case hdk::ir::AggType::kAvg:
           ++index;
           if (arg_expr && arg_expr->type()->nullable()) {
             auto expr_range_info = getExpressionRange(arg_expr, query_infos, executor);
@@ -251,7 +251,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           }
           found = true;
           break;
-        case kCOUNT:
+        case hdk::ir::AggType::kCount:
           if (arg_expr && arg_expr->type()->nullable()) {
             auto expr_range_info = getExpressionRange(arg_expr, query_infos, executor);
             if (expr_range_info.getType() == ExpressionRangeType::Invalid ||
@@ -261,7 +261,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           }
           found = true;
           break;
-        case kSUM: {
+        case hdk::ir::AggType::kSum: {
           auto arg_type = arg_expr->type();
           if (constrained_not_null(arg_expr, ra_exe_unit.quals)) {
             arg_type = arg_type->withNullable(false);
@@ -292,7 +292,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           }
           break;
         }
-        case kMIN: {
+        case hdk::ir::AggType::kMin: {
           CHECK(agg_expr && agg_expr->arg());
           auto arg_type = agg_expr->arg()->type();
           if (arg_type->isString() || arg_type->isExtDictionary() ||
@@ -325,7 +325,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           }
           break;
         }
-        case kMAX: {
+        case hdk::ir::AggType::kMax: {
           CHECK(agg_expr && agg_expr->arg());
           auto arg_type = agg_expr->arg()->type();
           if (arg_type->isString() || arg_type->isExtDictionary() ||
@@ -334,7 +334,7 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
           }
           auto expr_range_info =
               getExpressionRange(agg_expr->arg(), query_infos, executor);
-          // NULL sentinel and init value for kMAX are identical, which results in
+          // NULL sentinel and init value for kMax are identical, which results in
           // ambiguity in detecting empty keys in presence of nulls.
           if (expr_range_info.getType() == ExpressionRangeType::Invalid ||
               expr_range_info.hasNulls()) {
@@ -397,14 +397,16 @@ CountDistinctDescriptors init_count_distinct_descriptors(
         get_target_info(target_expr, executor->getConfig().exec.group_by.bigint_count);
     if (is_distinct_target(agg_info)) {
       CHECK(agg_info.is_agg);
-      CHECK(agg_info.agg_kind == kCOUNT || agg_info.agg_kind == kAPPROX_COUNT_DISTINCT);
+      CHECK(agg_info.agg_kind == hdk::ir::AggType::kCount ||
+            agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct);
       const auto agg_expr = static_cast<const hdk::ir::AggExpr*>(target_expr);
       auto arg_type = agg_expr->arg()->type();
       if (arg_type->isText()) {
         throw std::runtime_error(
             "Strings must be dictionary-encoded for COUNT(DISTINCT).");
       }
-      if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT && arg_type->isBuffer()) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct &&
+          arg_type->isBuffer()) {
         throw std::runtime_error("APPROX_COUNT_DISTINCT on arrays not supported yet");
       }
       ColRangeInfo no_range_info{QueryDescriptionType::Projection, 0, 0, 0, false};
@@ -414,7 +416,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
               : get_expr_range_info(ra_exe_unit, query_infos, agg_expr->arg(), executor);
       CountDistinctImplType count_distinct_impl_type{CountDistinctImplType::HashSet};
       int64_t bitmap_sz_bits{0};
-      if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct) {
         const auto error_rate = agg_expr->arg1();
         if (error_rate) {
           CHECK(error_rate->type()->isInt32());
@@ -425,20 +427,20 @@ CountDistinctDescriptors init_count_distinct_descriptors(
         }
       }
       if (arg_range_info.isEmpty()) {
-        count_distinct_descriptors.emplace_back(
-            CountDistinctDescriptor{CountDistinctImplType::Bitmap,
-                                    0,
-                                    64,
-                                    agg_info.agg_kind == kAPPROX_COUNT_DISTINCT,
-                                    device_type,
-                                    1});
+        count_distinct_descriptors.emplace_back(CountDistinctDescriptor{
+            CountDistinctImplType::Bitmap,
+            0,
+            64,
+            agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct,
+            device_type,
+            1});
         continue;
       }
       if (arg_range_info.hash_type_ == QueryDescriptionType::GroupByPerfectHash &&
           !arg_type->isBuffer()) {  // TODO(alex): allow bitmap
                                     // implementation for arrays
         count_distinct_impl_type = CountDistinctImplType::Bitmap;
-        if (agg_info.agg_kind == kCOUNT) {
+        if (agg_info.agg_kind == hdk::ir::AggType::kCount) {
           bitmap_sz_bits = arg_range_info.max - arg_range_info.min + 1;
 
           if (group_by_hash_type == QueryDescriptionType::GroupByBaselineHash) {
@@ -456,7 +458,7 @@ CountDistinctDescriptors init_count_distinct_descriptors(
           }
         }
       }
-      if (agg_info.agg_kind == kAPPROX_COUNT_DISTINCT &&
+      if (agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct &&
           count_distinct_impl_type == CountDistinctImplType::HashSet &&
           !arg_type->isArray()) {
         count_distinct_impl_type = CountDistinctImplType::Bitmap;
@@ -468,13 +470,13 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       }
       const auto sub_bitmap_count =
           get_count_distinct_sub_bitmap_count(bitmap_sz_bits, ra_exe_unit, device_type);
-      count_distinct_descriptors.emplace_back(
-          CountDistinctDescriptor{count_distinct_impl_type,
-                                  arg_range_info.min,
-                                  bitmap_sz_bits,
-                                  agg_info.agg_kind == kAPPROX_COUNT_DISTINCT,
-                                  device_type,
-                                  sub_bitmap_count});
+      count_distinct_descriptors.emplace_back(CountDistinctDescriptor{
+          count_distinct_impl_type,
+          arg_range_info.min,
+          bitmap_sz_bits,
+          agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct,
+          device_type,
+          sub_bitmap_count});
     } else {
       count_distinct_descriptors.emplace_back(CountDistinctDescriptor{
           CountDistinctImplType::Invalid, 0, 0, false, device_type, 0});
@@ -577,9 +579,10 @@ bool gpu_can_handle_order_entries(const RelAlgExecutionUnit& ra_exe_unit,
     }
     // TODO(alex): relax the restrictions
     auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-    if (agg_expr->isDistinct() || agg_expr->aggType() == kAVG ||
-        agg_expr->aggType() == kMIN || agg_expr->aggType() == kMAX ||
-        agg_expr->aggType() == kAPPROX_COUNT_DISTINCT) {
+    if (agg_expr->isDistinct() || agg_expr->aggType() == hdk::ir::AggType::kAvg ||
+        agg_expr->aggType() == hdk::ir::AggType::kMin ||
+        agg_expr->aggType() == hdk::ir::AggType::kMax ||
+        agg_expr->aggType() == hdk::ir::AggType::kApproxCountDistinct) {
       return false;
     }
     if (agg_expr->arg()) {
@@ -717,7 +720,7 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
     // not a COUNT aggregate
     const auto target_infos = target_exprs_to_infos(
         ra_exe_unit_.target_exprs, *query_mem_desc, config.exec.group_by.bigint_count);
-    std::unordered_set<SQLAgg> supported_aggs{kCOUNT};
+    std::unordered_set<hdk::ir::AggType> supported_aggs{hdk::ir::AggType::kCount};
     if (std::find_if(target_infos.begin(),
                      target_infos.end(),
                      [&supported_aggs](const TargetInfo& ti) {
@@ -771,9 +774,13 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
       // TODO: relax this if necessary
       const auto target_infos = target_exprs_to_infos(
           ra_exe_unit_.target_exprs, *query_mem_desc, config.exec.group_by.bigint_count);
-      std::unordered_set<SQLAgg> supported_aggs{kCOUNT};
+      std::unordered_set<hdk::ir::AggType> supported_aggs{hdk::ir::AggType::kCount};
       if (config.exec.group_by.enable_gpu_smem_grouped_non_count_agg) {
-        supported_aggs = {kCOUNT, kMIN, kMAX, kSUM, kAVG};
+        supported_aggs = {hdk::ir::AggType::kCount,
+                          hdk::ir::AggType::kMin,
+                          hdk::ir::AggType::kMax,
+                          hdk::ir::AggType::kSum,
+                          hdk::ir::AggType::kAvg};
       }
       if (std::find_if(target_infos.begin(),
                        target_infos.end(),

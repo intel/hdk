@@ -86,8 +86,8 @@ std::vector<int64_t> result_set::initialize_target_values_for_storage(
     const std::vector<TargetInfo>& targets) {
   std::vector<int64_t> target_init_vals;
   for (const auto& target_info : targets) {
-    if (target_info.agg_kind == kCOUNT ||
-        target_info.agg_kind == kAPPROX_COUNT_DISTINCT) {
+    if (target_info.agg_kind == hdk::ir::AggType::kCount ||
+        target_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct) {
       target_init_vals.push_back(0);
       continue;
     }
@@ -98,9 +98,9 @@ std::vector<int64_t> result_set::initialize_target_values_for_storage(
     } else {
       target_init_vals.push_back(target_info.is_agg ? 0xdeadbeef : 0);
     }
-    if (target_info.agg_kind == kAVG) {
+    if (target_info.agg_kind == hdk::ir::AggType::kAvg) {
       target_init_vals.push_back(0);
-    } else if (target_info.agg_kind == kSAMPLE &&
+    } else if (target_info.agg_kind == hdk::ir::AggType::kSample &&
                (target_info.type->isString() || target_info.type->isArray())) {
       target_init_vals.push_back(0);
     }

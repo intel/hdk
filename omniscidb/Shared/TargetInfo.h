@@ -38,7 +38,7 @@ inline const hdk::ir::AggExpr* cast_to_agg_expr(const hdk::ir::ExprPtr target_ex
 
 struct TargetInfo {
   bool is_agg;
-  SQLAgg agg_kind;
+  hdk::ir::AggType agg_kind;
   const hdk::ir::Type* type;
   const hdk::ir::Type* agg_arg_type;
   bool skip_null_val;
@@ -63,12 +63,12 @@ struct TargetInfo {
  * Returns true if the aggregate function always returns a value in the domain of the
  * argument. Returns false otherwise.
  */
-inline bool is_agg_domain_range_equivalent(const SQLAgg& agg_kind) {
+inline bool is_agg_domain_range_equivalent(hdk::ir::AggType agg_kind) {
   switch (agg_kind) {
-    case kMIN:
-    case kMAX:
-    case kSINGLE_VALUE:
-    case kSAMPLE:
+    case hdk::ir::AggType::kMin:
+    case hdk::ir::AggType::kMax:
+    case hdk::ir::AggType::kSingleValue:
+    case hdk::ir::AggType::kSample:
       return true;
     default:
       break;
@@ -84,24 +84,28 @@ inline TargetInfo get_target_info(const PointerType target_expr,
   bool nullable = target_expr->type()->nullable();
   if (!agg_expr) {
     auto target_type = target_expr->type()->canonicalize();
-    return {false, kMIN, target_type, nullptr, false, false};
+    return {false, hdk::ir::AggType::kMin, target_type, nullptr, false, false};
   }
   const auto agg_type = agg_expr->aggType();
   const auto agg_arg = agg_expr->arg();
   if (!agg_arg) {
-    CHECK_EQ(kCOUNT, agg_type);
+    CHECK_EQ(hdk::ir::AggType::kCount, agg_type);
     CHECK(!agg_expr->isDistinct());
-    return {
-        true, kCOUNT, ctx.integer(bigint_count ? 8 : 4, nullable), nullptr, false, false};
+    return {true,
+            hdk::ir::AggType::kCount,
+            ctx.integer(bigint_count ? 8 : 4, nullable),
+            nullptr,
+            false,
+            false};
   }
 
   auto agg_arg_type = agg_arg->type();
   bool is_distinct{false};
-  if (agg_expr->aggType() == kCOUNT) {
+  if (agg_expr->aggType() == hdk::ir::AggType::kCount) {
     is_distinct = agg_expr->isDistinct();
   }
 
-  if (agg_type == kAVG) {
+  if (agg_type == hdk::ir::AggType::kAvg) {
     // Upcast the target type for AVG, so that the integer argument does not overflow the
     // sum
     return {
@@ -115,25 +119,29 @@ inline TargetInfo get_target_info(const PointerType target_expr,
 
   return {true,
           agg_expr->aggType(),
-          agg_type == kCOUNT
+          agg_type == hdk::ir::AggType::kCount
               ? ctx.integer((is_distinct || bigint_count) ? 8 : 4, nullable)
               : agg_expr->type(),
           agg_arg_type,
-          agg_type == kCOUNT && (agg_arg_type->isString() || agg_arg_type->isArray())
+          agg_type == hdk::ir::AggType::kCount &&
+                  (agg_arg_type->isString() || agg_arg_type->isArray())
               ? false
               : agg_arg_type->nullable(),
           is_distinct};
 }
 
 inline bool is_distinct_target(const TargetInfo& target_info) {
-  return target_info.is_distinct || target_info.agg_kind == kAPPROX_COUNT_DISTINCT;
+  return target_info.is_distinct ||
+         target_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct;
 }
 
 inline bool takes_float_argument(const TargetInfo& target_info) {
   return target_info.is_agg &&
-         (target_info.agg_kind == kAVG || target_info.agg_kind == kSUM ||
-          target_info.agg_kind == kMIN || target_info.agg_kind == kMAX ||
-          target_info.agg_kind == kSINGLE_VALUE) &&
+         (target_info.agg_kind == hdk::ir::AggType::kAvg ||
+          target_info.agg_kind == hdk::ir::AggType::kSum ||
+          target_info.agg_kind == hdk::ir::AggType::kMin ||
+          target_info.agg_kind == hdk::ir::AggType::kMax ||
+          target_info.agg_kind == hdk::ir::AggType::kSingleValue) &&
          target_info.agg_arg_type->isFp32();
 }
 
