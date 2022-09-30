@@ -198,21 +198,6 @@ std::string TextType::toString() const {
   return ss.str();
 }
 
-int64_t unitsPerSecond(TimeUnit unit) {
-  switch (unit) {
-    case hdk::ir::TimeUnit::kSecond:
-      return 1;
-    case hdk::ir::TimeUnit::kMilli:
-      return 1'000;
-    case hdk::ir::TimeUnit::kMicro:
-      return 1'000'000;
-    case hdk::ir::TimeUnit::kNano:
-      return 1'000'000'000;
-    default:
-      throw std::runtime_error("Enexpected unit in unitsInSecond: " + toString(unit));
-  }
-}
-
 DateTimeBaseType::DateTimeBaseType(Context& ctx,
                                    Id id,
                                    int size,
@@ -592,30 +577,6 @@ std::string toString(hdk::ir::FloatingPointType::Precision precision) {
 std::ostream& operator<<(std::ostream& os,
                          hdk::ir::FloatingPointType::Precision precision) {
   os << toString(precision);
-  return os;
-}
-
-std::string toString(hdk::ir::TimeUnit unit) {
-  switch (unit) {
-    case hdk::ir::TimeUnit::kMonth:
-      return "Month";
-    case hdk::ir::TimeUnit::kDay:
-      return "Day";
-    case hdk::ir::TimeUnit::kSecond:
-      return "Second";
-    case hdk::ir::TimeUnit::kMilli:
-      return "Milli";
-    case hdk::ir::TimeUnit::kMicro:
-      return "Micro";
-    case hdk::ir::TimeUnit::kNano:
-      return "Nano";
-    default:
-      return "InvalidTimeUnit";
-  }
-}
-
-std::ostream& operator<<(std::ostream& os, hdk::ir::TimeUnit unit) {
-  os << toString(unit);
   return os;
 }
 

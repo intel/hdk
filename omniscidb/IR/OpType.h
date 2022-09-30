@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "Logger/Logger.h"
+
 namespace hdk::ir {
 
 // must not change the order without keeping the array in OperExpr::to_string

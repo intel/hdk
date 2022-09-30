@@ -15,6 +15,7 @@
 #include "ArrowStorageUtils.h"
 
 #include "IR/Context.h"
+#include "Shared/InlineNullValues.h"
 
 // TODO: use <Shared/threading.h>
 #include <tbb/parallel_for.h>

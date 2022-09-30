@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "DateTime.h"
+
 #include "Shared/funcannotations.h"
 #include "Shared/sqltypes.h"
 
@@ -258,17 +260,6 @@ class TextType : public Type {
   TextType(Context& ctx, bool nullable);
 };
 
-enum class TimeUnit {
-  kMonth,
-  kDay,
-  kSecond,
-  kMilli,
-  kMicro,
-  kNano,
-};
-
-int64_t unitsPerSecond(TimeUnit unit);
-
 class DateTimeBaseType : public Type {
  public:
   TimeUnit unit() const { return unit_; }
@@ -506,8 +497,5 @@ std::ostream& operator<<(std::ostream& os, hdk::ir::Type::Id precision);
 std::string toString(hdk::ir::FloatingPointType::Precision precision);
 std::ostream& operator<<(std::ostream& os,
                          hdk::ir::FloatingPointType::Precision precision);
-
-std::string toString(hdk::ir::TimeUnit precision);
-std::ostream& operator<<(std::ostream& os, hdk::ir::TimeUnit precision);
 
 std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* precision);
