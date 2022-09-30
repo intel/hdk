@@ -18,50 +18,23 @@
 
 #include <set>
 
-#include "ScalarExprVisitor.h"
+#include "IR/ExprCollector.h"
 
-class MaxRangeTableIndexVisitor : public ScalarExprVisitor<int> {
+class MaxRangeTableIndexCollector
+    : public hdk::ir::ExprCollector<int, MaxRangeTableIndexCollector> {
+ public:
+  MaxRangeTableIndexCollector() { result_ = 0; }
+
  protected:
-  int visitColumnVar(const hdk::ir::ColumnVar* column) const override {
-    return column->rteIdx();
-  }
-
-  int visitColumnVarTuple(const hdk::ir::ExpressionTuple* expr_tuple) const override {
-    MaxRangeTableIndexVisitor visitor;
-    int max_range_table_idx = 0;
-    for (const auto& expr_component : expr_tuple->tuple()) {
-      max_range_table_idx =
-          std::max(max_range_table_idx, visitor.visit(expr_component.get()));
-    }
-    return max_range_table_idx;
-  }
-
-  int aggregateResult(const int& aggregate, const int& next_result) const override {
-    return std::max(aggregate, next_result);
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
+    result_ = std::max(result_, column->rteIdx());
   }
 };
 
-class AllRangeTableIndexVisitor : public ScalarExprVisitor<std::set<int>> {
+class AllRangeTableIndexCollector
+    : public hdk::ir::ExprCollector<std::set<int>, AllRangeTableIndexCollector> {
  protected:
-  std::set<int> visitColumnVar(const hdk::ir::ColumnVar* column) const override {
-    return {column->rteIdx()};
-  }
-
-  std::set<int> visitColumnVarTuple(
-      const hdk::ir::ExpressionTuple* expr_tuple) const override {
-    AllRangeTableIndexVisitor visitor;
-    std::set<int> result;
-    for (const auto& expr_component : expr_tuple->tuple()) {
-      const auto component_rte_set = visitor.visit(expr_component.get());
-      result.insert(component_rte_set.begin(), component_rte_set.end());
-    }
-    return result;
-  }
-
-  std::set<int> aggregateResult(const std::set<int>& aggregate,
-                                const std::set<int>& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
+    result_.insert(column->rteIdx());
   }
 };

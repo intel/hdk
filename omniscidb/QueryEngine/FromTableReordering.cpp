@@ -57,12 +57,11 @@ std::vector<std::map<node_t, cost_t>> build_join_cost_graph(
     const Executor* executor) {
   CHECK_EQ(left_deep_join_quals.size() + 1, table_infos.size());
   std::vector<std::map<node_t, cost_t>> join_cost_graph(table_infos.size());
-  AllRangeTableIndexVisitor visitor;
   // Build the constraints graph: nodes are nest levels, edges are the existence of
   // qualifiers between levels.
   for (const auto& current_level_join_conditions : left_deep_join_quals) {
     for (const auto& qual : current_level_join_conditions.quals) {
-      std::set<int> qual_nest_levels = visitor.visit(qual.get());
+      std::set<int> qual_nest_levels = AllRangeTableIndexCollector::collect(qual.get());
       if (qual_nest_levels.size() != 2) {
         continue;
       }

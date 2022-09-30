@@ -2770,7 +2770,6 @@ JoinQualsPerNestingLevel RelAlgExecutor::translateLeftDeepJoinFilter(
   const auto join_types = left_deep_join_types(join);
   const auto join_condition_quals = makeJoinQuals(
       join->getInnerCondition(), join_types, input_to_nest_level, just_explain);
-  MaxRangeTableIndexVisitor rte_idx_visitor;
   JoinQualsPerNestingLevel result(input_descs.size() - 1);
   std::unordered_set<hdk::ir::ExprPtr> visited_quals;
   for (size_t rte_idx = 1; rte_idx < input_descs.size(); ++rte_idx) {
@@ -2787,7 +2786,7 @@ JoinQualsPerNestingLevel RelAlgExecutor::translateLeftDeepJoinFilter(
       if (visited_quals.count(qual)) {
         continue;
       }
-      const auto qual_rte_idx = rte_idx_visitor.visit(qual.get());
+      const auto qual_rte_idx = MaxRangeTableIndexCollector::collect(qual.get());
       if (static_cast<size_t>(qual_rte_idx) <= rte_idx) {
         const auto it_ok = visited_quals.emplace(qual);
         CHECK(it_ok.second);

@@ -660,8 +660,7 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
           "Cannot use hash join for given expression: try to join with a constant "
           "value");
     }
-    MaxRangeTableIndexVisitor rte_idx_visitor;
-    int outer_rte_idx = rte_idx_visitor.visit(outer_expr);
+    int outer_rte_idx = MaxRangeTableIndexCollector::collect(outer_expr);
     // The inner column candidate is not actually inner; the outer
     // expression contains columns which are at least as deep.
     if (inner_col->rteIdx() <= outer_rte_idx) {
