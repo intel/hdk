@@ -192,8 +192,8 @@ class ColumnVar : public Expr {
  */
 class ExpressionTuple : public Expr {
  public:
-  ExpressionTuple(const ExprPtrVector& tuple)
-      : Expr(hdk::ir::Context::defaultCtx().null()), tuple_(tuple){};
+  ExpressionTuple(ExprPtrVector tuple)
+      : Expr(hdk::ir::Context::defaultCtx().null()), tuple_(std::move(tuple)){};
 
   const ExprPtrVector& tuple() const { return tuple_; }
 

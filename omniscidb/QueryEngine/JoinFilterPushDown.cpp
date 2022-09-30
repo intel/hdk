@@ -17,12 +17,13 @@
 #include "JoinFilterPushDown.h"
 #include "DeepCopyVisitor.h"
 #include "IR/ExprCollector.h"
+#include "IR/ExprRewriter.h"
 #include "RelAlgExecutor.h"
 
 namespace {
 
-class BindFilterToOutermostVisitor : public DeepCopyVisitor {
-  hdk::ir::ExprPtr visitColumnVar(const hdk::ir::ColumnVar* col_var) const override {
+class BindFilterToOutermostVisitor : public hdk::ir::ExprRewriter {
+  hdk::ir::ExprPtr visitColumnVar(const hdk::ir::ColumnVar* col_var) override {
     return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col_var->columnInfo(), 0);
   }
 };
