@@ -49,16 +49,16 @@ class Expr : public std::enable_shared_from_this<Expr> {
   Expr(const Type* type, bool has_agg = false);
   virtual ~Expr() {}
 
+  ExprPtr shared() const { return shared_from_this(); }
+
   const Type* type() const { return type_; }
   Context& ctx() const { return type_->ctx(); }
   bool containsAgg() const { return contains_agg_; }
 
   virtual ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const;
 
-  // Make a deep copy of self
-  virtual ExprPtr deep_copy() const = 0;
-  // Make a deep copy of self replacing its type with the specified one.
-  virtual ExprPtr withType(const Type* type) const;
+  // Make a copy of self replacing its type with the specified one.
+  virtual ExprPtr withType(const Type* new_type) const = 0;
 
   virtual bool operator==(const Expr& rhs) const = 0;
   virtual std::string toString() const = 0;
@@ -95,7 +95,9 @@ class ColumnRef : public Expr {
   ColumnRef(const Type* type, const RelAlgNode* node, unsigned idx)
       : Expr(type), node_(node), idx_(idx) {}
 
-  ExprPtr deep_copy() const override { return makeExpr<ColumnRef>(type_, node_, idx_); }
+  ExprPtr withType(const Type* new_type) const override {
+    return makeExpr<ColumnRef>(new_type, node_, idx_);
+  }
 
   bool operator==(const Expr& rhs) const override {
     const ColumnRef* rhsp = dynamic_cast<const ColumnRef*>(&rhs);
@@ -123,7 +125,9 @@ class GroupColumnRef : public Expr {
  public:
   GroupColumnRef(const Type* type, unsigned idx) : Expr(type), idx_(idx) {}
 
-  ExprPtr deep_copy() const override { return makeExpr<GroupColumnRef>(type_, idx_); }
+  ExprPtr withType(const Type* new_type) const override {
+    return makeExpr<GroupColumnRef>(new_type, idx_);
+  }
 
   bool operator==(const Expr& rhs) const override {
     const GroupColumnRef* rhsp = dynamic_cast<const GroupColumnRef*>(&rhs);
@@ -172,8 +176,7 @@ class ColumnVar : public Expr {
   ColumnInfoPtr columnInfo() const { return col_info_; }
   bool isVirtual() const { return col_info_->is_rowid; }
 
-  ExprPtr deep_copy() const override;
-  ExprPtr withType(const Type* type) const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -197,7 +200,7 @@ class ExpressionTuple : public Expr {
 
   const ExprPtrVector& tuple() const { return tuple_; }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -226,8 +229,7 @@ class Var : public ColumnVar {
       : ColumnVar(type), which_row_(o), var_no_(v) {}
   WhichRow whichRow() const { return which_row_; }
   int varNo() const { return var_no_; }
-  ExprPtr deep_copy() const override;
-  ExprPtr withType(const Type* type) const override;
+  ExprPtr withType(const Type* new_type) const override;
   std::string toString() const override;
 
   size_t hash() const override;
@@ -266,7 +268,7 @@ class Constant : public Expr {
   int64_t intVal() const { return extract_int_type_from_datum(value_, type_); }
   double fpVal() const { return extract_fp_type_from_datum(value_, type_); }
   const ExprPtrList& valueList() const { return value_list_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -323,7 +325,7 @@ class UOper : public Expr {
   const Expr* operand() const { return operand_.get(); }
   ExprPtr operandShared() const { return operand_; }
   bool isDictIntersection() const { return is_dict_intersection_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection = false) const override;
@@ -382,7 +384,7 @@ class BinOper : public Expr {
   ExprPtr leftOperandShared() const { return left_operand_; }
   ExprPtr rightOperandShared() const { return right_operand_; }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -415,7 +417,7 @@ class RangeOper : public Expr {
   const Expr* leftOperand() const { return left_operand_.get(); }
   const Expr* rightOperand() const { return right_operand_.get(); }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -433,7 +435,9 @@ class ScalarSubquery : public Expr {
  public:
   ScalarSubquery(const hdk::ir::Type* type, std::shared_ptr<const RelAlgNode> node)
       : Expr(type), node_(node) {}
-  ExprPtr deep_copy() const override { return makeExpr<ScalarSubquery>(type_, node_); }
+  ExprPtr withType(const Type* new_type) const override {
+    return makeExpr<ScalarSubquery>(new_type, node_);
+  }
 
   bool operator==(const Expr& rhs) const override {
     const ScalarSubquery* rhsp = dynamic_cast<const ScalarSubquery*>(&rhs);
@@ -462,7 +466,7 @@ class InValues : public Expr {
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   const ExprPtrList& valueList() const { return value_list_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -492,7 +496,7 @@ class InIntegerSet : public Expr {
 
   const std::vector<int64_t>& valueList() const { return value_list_; }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -511,8 +515,8 @@ class InSubquery : public Expr {
              std::shared_ptr<const RelAlgNode> node)
       : Expr(type), arg_(std::move(arg)), node_(std::move(node)) {}
 
-  ExprPtr deep_copy() const override {
-    return makeExpr<InSubquery>(type_, arg_->deep_copy(), node_);
+  ExprPtr withType(const Type* new_type) const override {
+    return makeExpr<InSubquery>(new_type, arg_, node_);
   }
 
   bool operator==(const Expr& rhs) const override {
@@ -547,7 +551,7 @@ class CharLengthExpr : public Expr {
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   bool calcEncodedLength() const { return calc_encoded_length_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -568,7 +572,7 @@ class KeyForStringExpr : public Expr {
   KeyForStringExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -588,7 +592,7 @@ class SampleRatioExpr : public Expr {
   SampleRatioExpr(ExprPtr a) : Expr(a->ctx().boolean(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -611,7 +615,7 @@ class LowerExpr : public Expr {
 
   ExprPtr argShared() const { return arg_; }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
 
@@ -633,7 +637,7 @@ class CardinalityExpr : public Expr {
   CardinalityExpr(ExprPtr a) : Expr(a->ctx().int32(a->type()->nullable())), arg_(a) {}
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -663,7 +667,7 @@ class LikeExpr : public Expr {
   const Expr* escapeExpr() const { return escape_expr_.get(); }
   bool isIlike() const { return is_ilike_; }
   bool isSimple() const { return is_simple_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -694,7 +698,7 @@ class RegexpExpr : public Expr {
   const ExprPtr argShared() const { return arg_; }
   const Expr* patternExpr() const { return pattern_expr_.get(); }
   const Expr* escapeExpr() const { return escape_expr_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -725,7 +729,7 @@ class WidthBucketExpr : public Expr {
   const Expr* lowerBound() const { return lower_bound_.get(); }
   const Expr* upperBound() const { return upper_bound_.get(); }
   const Expr* partitionCount() const { return partition_count_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   double boundVal(const Expr* bound_expr) const;
   int32_t partitionCountVal() const;
   template <typename T>
@@ -785,7 +789,7 @@ class LikelihoodExpr : public Expr {
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   float likelihood() const { return likelihood_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -813,7 +817,7 @@ class AggExpr : public Expr {
   ExprPtr argShared() const { return arg_; }
   bool isDistinct() const { return is_distinct_; }
   std::shared_ptr<const Constant> arg1() const { return arg1_; }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -840,7 +844,7 @@ class CaseExpr : public Expr {
       : Expr(type, has_agg), expr_pairs_(std::move(expr_pairs)), else_expr_(e) {}
   const std::list<std::pair<ExprPtr, ExprPtr>>& exprPairs() const { return expr_pairs_; }
   const Expr* elseExpr() const { return else_expr_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
   ExprPtr cast(const Type* new_type, bool is_dict_intersection) const override;
@@ -865,7 +869,7 @@ class ExtractExpr : public Expr {
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
   ExtractField field() const { return field_; }
   const Expr* from() const { return from_expr_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -890,7 +894,7 @@ class DateAddExpr : public Expr {
   DateAddField field() const { return field_; }
   const Expr* number() const { return number_.get(); }
   const Expr* datetime() const { return datetime_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -916,7 +920,7 @@ class DateDiffExpr : public Expr {
   DateTruncField field() const { return field_; }
   const Expr* start() const { return start_.get(); }
   const Expr* end() const { return end_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -938,7 +942,7 @@ class DateTruncExpr : public Expr {
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
   DateTruncField field() const { return field_; }
   const Expr* from() const { return from_expr_.get(); }
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
@@ -970,14 +974,14 @@ class FunctionOper : public Expr {
     return args_[i];
   }
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
 
   size_t hash() const override;
 
- private:
+ protected:
   const std::string name_;
   const ExprPtrVector args_;
 };
@@ -989,7 +993,7 @@ class FunctionOperWithCustomTypeHandling : public FunctionOper {
                                      const ExprPtrVector& args)
       : FunctionOper(type, name, args) {}
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
 };
@@ -1002,7 +1006,7 @@ class OffsetInFragment : public Expr {
  public:
   OffsetInFragment() : Expr(hdk::ir::Context::defaultCtx().int64(false)){};
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1051,7 +1055,7 @@ class WindowFunction : public Expr {
       , order_keys_(order_keys)
       , collation_(collation){};
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
 
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -1092,7 +1096,7 @@ class ArrayExpr : public Expr {
       , local_alloc_(local_alloc)
       , is_null_(is_null) {}
 
-  ExprPtr deep_copy() const override;
+  ExprPtr withType(const Type* new_type) const override;
   std::string toString() const override;
   bool operator==(Expr const& rhs) const override;
   size_t elementCount() const { return contained_expressions_.size(); }

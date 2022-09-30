@@ -67,7 +67,7 @@ class Estimator : public hdk::ir::Expr {
   //   uint32_t the size of the argument tuple, in bytes
   virtual std::string getRuntimeFunctionName() const = 0;
 
-  hdk::ir::ExprPtr deep_copy() const override {
+  hdk::ir::ExprPtr withType(const hdk::ir::Type* new_type) const override {
     CHECK(false);
     return nullptr;
   }

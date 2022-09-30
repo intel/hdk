@@ -165,8 +165,7 @@ class PerfectJoinHashTable : public HashJoin {
       : HashJoin(data_provider)
       , qual_bin_oper_(qual_bin_oper)
       , join_type_(join_type)
-      , col_var_(
-            std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(col_var->deep_copy()))
+      , col_var_(std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(col_var->shared()))
       , query_infos_(query_infos)
       , memory_level_(memory_level)
       , hash_type_(preferred_hash_type)

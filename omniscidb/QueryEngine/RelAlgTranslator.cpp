@@ -637,7 +637,7 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
       auto uo = left_operand->as<hdk::ir::UOper>();
       auto cv = uo->operand()->as<hdk::ir::ColumnVar>();
       rte_idx = cv->rteIdx();
-      return bin_oper->deep_copy();
+      return bin_oper->shared();
     }
   } else if (right_operand->is<hdk::ir::UOper>()) {
     if (simple_predicate_has_simple_cast(right_operand, left_operand)) {
@@ -648,15 +648,15 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
                                                  bin_oper->containsAgg(),
                                                  COMMUTE_COMPARISON(bin_oper->opType()),
                                                  bin_oper->qualifier(),
-                                                 right_operand->deep_copy(),
-                                                 left_operand->deep_copy());
+                                                 right_operand,
+                                                 left_operand);
     }
   } else if (left_operand->is<hdk::ir::ColumnVar>() &&
              !left_operand->is<hdk::ir::Var>() &&
              right_operand->is<hdk::ir::Constant>()) {
     auto cv = left_operand->as<hdk::ir::ColumnVar>();
     rte_idx = cv->rteIdx();
-    return bin_oper->deep_copy();
+    return bin_oper->shared();
   } else if (left_operand->is<hdk::ir::Constant>() &&
              right_operand->is<hdk::ir::ColumnVar>() &&
              !right_operand->is<hdk::ir::Var>()) {
@@ -666,8 +666,8 @@ hdk::ir::ExprPtr normalize_simple_predicate(const hdk::ir::BinOper* bin_oper,
                                                bin_oper->containsAgg(),
                                                COMMUTE_COMPARISON(bin_oper->opType()),
                                                bin_oper->qualifier(),
-                                               right_operand->deep_copy(),
-                                               left_operand->deep_copy());
+                                               right_operand,
+                                               left_operand);
   }
   return nullptr;
 }

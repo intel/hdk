@@ -2549,7 +2549,7 @@ class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
         if (auto cur_project_node = dynamic_cast<const RelProject*>(cur_source_node)) {
           field_name = cur_project_node->getFieldName(cur_index);
         }
-        node_->appendInput(field_name, col_ref->deep_copy());
+        node_->appendInput(field_name, col_ref->shared());
         auto expr = hdk::ir::makeExpr<hdk::ir::ColumnRef>(
             getColumnType(node_, node_->size() - 1), node_, node_->size() - 1);
         replacements_[std::make_pair(cur_source_node, cur_index)] = expr;

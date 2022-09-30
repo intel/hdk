@@ -132,11 +132,11 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
 std::shared_ptr<const hdk::ir::CaseExpr> QueryRewriter::generateCaseForDomainValues(
     const hdk::ir::InValues* in_vals) {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> case_expr_list;
-  auto in_val_arg = in_vals->arg()->deep_copy();
+  auto in_val_arg = in_vals->argShared();
   for (const auto& in_val : in_vals->valueList()) {
     auto case_cond = hdk::ir::makeExpr<hdk::ir::BinOper>(
         in_vals->ctx().boolean(false), false, kEQ, kONE, in_val_arg, in_val);
-    auto in_val_copy = in_val->deep_copy();
+    auto in_val_copy = in_val;
     auto type = in_val_copy->type();
     if (type->isExtDictionary()) {
       type = type->ctx().extDict(

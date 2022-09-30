@@ -2455,12 +2455,11 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
   }
   if ((*eq_lhs == *is_null_lhs && *eq_rhs == *is_null_rhs) ||
       (*eq_lhs == *is_null_rhs && *eq_rhs == *is_null_lhs)) {
-    return hdk::ir::makeExpr<hdk::ir::BinOper>(
-        expr->ctx().boolean(),
-        kBW_EQ,
-        kONE,
-        equi_join_condition->leftOperand()->deep_copy(),
-        equi_join_condition->rightOperand()->deep_copy());
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(expr->ctx().boolean(),
+                                               kBW_EQ,
+                                               kONE,
+                                               equi_join_condition->leftOperandShared(),
+                                               equi_join_condition->rightOperandShared());
   }
   return nullptr;
 }

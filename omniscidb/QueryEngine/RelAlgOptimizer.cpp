@@ -47,7 +47,7 @@ class ProjectInputRedirector : public hdk::ir::ExprRewriter {
         } else {
           CHECK_EQ(new_col_ref->node(), new_source);
         }
-        return new_col_ref->deep_copy();
+        return new_col_ref->shared();
       }
     }
     return ExprRewriter::visitColumnRef(col_ref);
@@ -1389,9 +1389,8 @@ void sink_projected_boolean_expr_to_join(
         new_proj_exprs.emplace_back(hdk::ir::makeExpr<hdk::ir::ColumnRef>(
             getColumnType(project->getInput(0), 0), project->getInput(0), 0));
       } else {
-        auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(project->getExpr(i).get());
-        CHECK(col_ref != nullptr);
-        new_proj_exprs.push_back(col_ref->deep_copy());
+        CHECK(project->getExpr(i)->is<hdk::ir::ColumnRef>());
+        new_proj_exprs.push_back(project->getExpr(i));
       }
     }
     for (auto i : unloaded_input_indices) {

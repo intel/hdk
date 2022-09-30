@@ -307,15 +307,6 @@ ExprPtr Expr::cast(const Type* new_type, bool is_dict_intersection) const {
   return makeExpr<UOper>(new_type, contains_agg_, kCAST, shared_from_this());
 }
 
-ExprPtr Expr::withType(const Type* type) const {
-  if (!type_->equal(type)) {
-    auto res = deep_copy();
-    const_cast<Expr*>(res.get())->type_ = type;
-    return res;
-  }
-  return shared_from_this();
-}
-
 std::string ColumnRef::toString() const {
   std::stringstream ss;
   ss << "(ColumnRef " << node_->getIdString() << ":" << idx_ << ")";
@@ -374,195 +365,223 @@ ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
   return makeExpr<Constant>(type, false, datum, cacheable);
 }
 
-ExprPtr ColumnVar::deep_copy() const {
-  return makeExpr<ColumnVar>(col_info_, rte_idx_);
+ExprPtr ColumnVar::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
+                                               col_info_->table_id,
+                                               col_info_->column_id,
+                                               col_info_->name,
+                                               new_type,
+                                               col_info_->is_rowid);
+  return makeExpr<ColumnVar>(col_info, rte_idx_);
 }
 
-ExprPtr ColumnVar::withType(const Type* type) const {
-  if (!type_->equal(type)) {
-    auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
-                                                 col_info_->table_id,
-                                                 col_info_->column_id,
-                                                 col_info_->name,
-                                                 type,
-                                                 col_info_->is_rowid);
-    return makeExpr<ColumnVar>(col_info, rte_idx_);
-  }
+ExprPtr ExpressionTuple::withType(const Type* new_type) const {
+  CHECK(new_type->isNull());
   return shared_from_this();
 }
 
-ExprPtr ExpressionTuple::deep_copy() const {
-  std::vector<ExprPtr> tuple_deep_copy;
-  for (const auto& column : tuple_) {
-    const auto column_deep_copy = column->deep_copy();
-    CHECK(column_deep_copy->is<ColumnVar>());
-    tuple_deep_copy.push_back(column_deep_copy);
+ExprPtr Var::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<ExpressionTuple>(tuple_deep_copy);
+  auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
+                                               col_info_->table_id,
+                                               col_info_->column_id,
+                                               col_info_->name,
+                                               new_type,
+                                               col_info_->is_rowid);
+  return makeExpr<Var>(col_info, rte_idx_, which_row_, var_no_);
 }
 
-ExprPtr Var::deep_copy() const {
-  return makeExpr<Var>(col_info_, rte_idx_, which_row_, var_no_);
+ExprPtr Constant::withType(const Type* new_type) const {
+  return cast(new_type);
 }
 
-ExprPtr Var::withType(const Type* type) const {
-  if (!type_->equal(type)) {
-    auto col_info = std::make_shared<ColumnInfo>(col_info_->db_id,
-                                                 col_info_->table_id,
-                                                 col_info_->column_id,
-                                                 col_info_->name,
-                                                 type,
-                                                 col_info_->is_rowid);
-    return makeExpr<Var>(col_info, rte_idx_, which_row_, var_no_);
+ExprPtr UOper::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return shared_from_this();
-}
-
-ExprPtr Constant::deep_copy() const {
-  Datum d = value_;
-  if (type_->isString() && !is_null_) {
-    d.stringval = new std::string(*value_.stringval);
-  }
-  if (type_->isArray()) {
-    return makeExpr<Constant>(type_, is_null_, value_list_, cacheable_);
-  }
-  return makeExpr<Constant>(type_, is_null_, d, cacheable_);
-}
-
-ExprPtr UOper::deep_copy() const {
   return makeExpr<UOper>(
-      type_, contains_agg_, op_type_, operand_->deep_copy(), is_dict_intersection_);
+      new_type, contains_agg_, op_type_, operand_, is_dict_intersection_);
 }
 
-ExprPtr BinOper::deep_copy() const {
-  return makeExpr<BinOper>(type_,
-                           contains_agg_,
-                           op_type_,
-                           qualifier_,
-                           left_operand_->deep_copy(),
-                           right_operand_->deep_copy());
-}
-
-ExprPtr RangeOper::deep_copy() const {
-  return makeExpr<RangeOper>(left_inclusive_,
-                             right_inclusive_,
-                             left_operand_->deep_copy(),
-                             right_operand_->deep_copy());
-}
-
-ExprPtr InValues::deep_copy() const {
-  std::list<ExprPtr> new_value_list;
-  for (auto p : value_list_) {
-    new_value_list.push_back(p->deep_copy());
+ExprPtr BinOper::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<InValues>(arg_->deep_copy(), new_value_list);
+  return makeExpr<BinOper>(
+      new_type, contains_agg_, op_type_, qualifier_, left_operand_, right_operand_);
 }
 
-ExprPtr CharLengthExpr::deep_copy() const {
-  return makeExpr<CharLengthExpr>(arg_->deep_copy(), calc_encoded_length_);
+ExprPtr RangeOper::withType(const Type* new_type) const {
+  CHECK(type_->equal(new_type));
+  return shared_from_this();
 }
 
-ExprPtr KeyForStringExpr::deep_copy() const {
-  return makeExpr<KeyForStringExpr>(arg_->deep_copy());
-}
-
-ExprPtr SampleRatioExpr::deep_copy() const {
-  return makeExpr<SampleRatioExpr>(arg_->deep_copy());
-}
-
-ExprPtr LowerExpr::deep_copy() const {
-  return makeExpr<LowerExpr>(arg_->deep_copy());
-}
-
-ExprPtr CardinalityExpr::deep_copy() const {
-  return makeExpr<CardinalityExpr>(arg_->deep_copy());
-}
-
-ExprPtr LikeExpr::deep_copy() const {
-  return makeExpr<LikeExpr>(arg_->deep_copy(),
-                            like_expr_->deep_copy(),
-                            escape_expr_ ? escape_expr_->deep_copy() : nullptr,
-                            is_ilike_,
-                            is_simple_);
-}
-
-ExprPtr RegexpExpr::deep_copy() const {
-  return makeExpr<RegexpExpr>(arg_->deep_copy(),
-                              pattern_expr_->deep_copy(),
-                              escape_expr_ ? escape_expr_->deep_copy() : nullptr);
-}
-
-ExprPtr WidthBucketExpr::deep_copy() const {
-  return makeExpr<WidthBucketExpr>(target_value_->deep_copy(),
-                                   lower_bound_->deep_copy(),
-                                   upper_bound_->deep_copy(),
-                                   partition_count_->deep_copy());
-}
-
-ExprPtr LikelihoodExpr::deep_copy() const {
-  return makeExpr<LikelihoodExpr>(arg_->deep_copy(), likelihood_);
-}
-
-ExprPtr AggExpr::deep_copy() const {
-  return makeExpr<AggExpr>(
-      type_, agg_type_, arg_ ? arg_->deep_copy() : nullptr, is_distinct_, arg1_);
-}
-
-ExprPtr CaseExpr::deep_copy() const {
-  std::list<std::pair<ExprPtr, ExprPtr>> new_list;
-  for (auto p : expr_pairs_) {
-    new_list.emplace_back(p.first->deep_copy(), p.second->deep_copy());
+ExprPtr InValues::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<CaseExpr>(type_,
-                            contains_agg_,
-                            new_list,
-                            else_expr_ == nullptr ? nullptr : else_expr_->deep_copy());
+  auto res = makeExpr<InValues>(arg_, value_list_);
+  res->type_ = new_type;
+  return res;
 }
 
-ExprPtr ExtractExpr::deep_copy() const {
-  return makeExpr<ExtractExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
-}
-
-ExprPtr DateAddExpr::deep_copy() const {
-  return makeExpr<DateAddExpr>(
-      type_, field_, number_->deep_copy(), datetime_->deep_copy());
-}
-
-ExprPtr DateDiffExpr::deep_copy() const {
-  return makeExpr<DateDiffExpr>(type_, field_, start_->deep_copy(), end_->deep_copy());
-}
-
-ExprPtr DateTruncExpr::deep_copy() const {
-  return makeExpr<DateTruncExpr>(type_, contains_agg_, field_, from_expr_->deep_copy());
-}
-
-ExprPtr OffsetInFragment::deep_copy() const {
-  return makeExpr<OffsetInFragment>();
-}
-
-ExprPtr WindowFunction::deep_copy() const {
-  ExprPtrVector new_args;
-  for (auto& expr : args_) {
-    new_args.emplace_back(expr->deep_copy());
+ExprPtr CharLengthExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isInt32());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  ExprPtrVector new_partition_keys;
-  for (auto& expr : partition_keys_) {
-    new_partition_keys.emplace_back(expr->deep_copy());
+  auto res = makeExpr<CharLengthExpr>(arg_, calc_encoded_length_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr KeyForStringExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isInt32());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  ExprPtrVector new_order_keys;
-  for (auto& expr : order_keys_) {
-    new_order_keys.emplace_back(expr->deep_copy());
+  auto res = makeExpr<KeyForStringExpr>(arg_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr SampleRatioExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<SampleRatioExpr>(arg_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr LowerExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isString());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<LowerExpr>(arg_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr CardinalityExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isInt32());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<CardinalityExpr>(arg_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr LikeExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<LikeExpr>(arg_, like_expr_, escape_expr_, is_ilike_, is_simple_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr RegexpExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<RegexpExpr>(arg_, pattern_expr_, escape_expr_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr WidthBucketExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isInt32());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<WidthBucketExpr>(
+      target_value_, lower_bound_, upper_bound_, partition_count_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr LikelihoodExpr::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<LikelihoodExpr>(arg_, likelihood_);
+  res->type_ = new_type;
+  return res;
+}
+
+ExprPtr AggExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<AggExpr>(new_type, agg_type_, arg_, is_distinct_, arg1_);
+}
+
+ExprPtr CaseExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<CaseExpr>(new_type, contains_agg_, expr_pairs_, else_expr_);
+}
+
+ExprPtr ExtractExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<ExtractExpr>(new_type, contains_agg_, field_, from_expr_);
+}
+
+ExprPtr DateAddExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<DateAddExpr>(new_type, field_, number_, datetime_);
+}
+
+ExprPtr DateDiffExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<DateDiffExpr>(new_type, field_, start_, end_);
+}
+
+ExprPtr DateTruncExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<DateTruncExpr>(new_type, contains_agg_, field_, from_expr_);
+}
+
+ExprPtr OffsetInFragment::withType(const Type* new_type) const {
+  CHECK(type_->equal(new_type));
+  return shared_from_this();
+}
+
+ExprPtr WindowFunction::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
   return makeExpr<WindowFunction>(
-      type_, kind_, new_args, new_partition_keys, new_order_keys, collation_);
+      new_type, kind_, args_, partition_keys_, order_keys_, collation_);
 }
 
-ExprPtr ArrayExpr::deep_copy() const {
-  ExprPtrVector new_contained_expressions;
-  for (auto& expr : contained_expressions_) {
-    new_contained_expressions.emplace_back(expr->deep_copy());
+ExprPtr ArrayExpr::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<ArrayExpr>(type_, new_contained_expressions, is_null_, local_alloc_);
+  return makeExpr<ArrayExpr>(new_type, contained_expressions_, is_null_, local_alloc_);
 }
 
 ExprPtr Constant::castNumber(const Type* new_type) const {
@@ -824,7 +843,7 @@ ExprPtr Constant::doCast(const Type* new_type) const {
     throw std::runtime_error("Cast from " + type_->toString() + " to " +
                              new_type->toString() + " not supported");
   }
-  return withType(new_type);
+  return makeExpr<Constant>(new_type, is_null_, value_, cacheable_);
 }
 
 void Constant::setNullValue() {
@@ -1431,9 +1450,14 @@ std::string InValues::toString() const {
   return str;
 }
 
-ExprPtr InIntegerSet::deep_copy() const {
-  return std::make_shared<InIntegerSet>(
-      arg_->deep_copy(), value_list_, !type()->nullable());
+ExprPtr InIntegerSet::withType(const Type* new_type) const {
+  CHECK(new_type->isBoolean());
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  auto res = makeExpr<InIntegerSet>(arg_, value_list_, !new_type->nullable());
+  res->type_ = new_type;
+  return res;
 }
 
 bool InIntegerSet::operator==(const Expr& rhs) const {
@@ -1664,12 +1688,11 @@ std::string OrderEntry::toString() const {
   return str;
 }
 
-ExprPtr FunctionOper::deep_copy() const {
-  std::vector<ExprPtr> args_copy;
-  for (size_t i = 0; i < arity(); ++i) {
-    args_copy.push_back(arg(i)->deep_copy());
+ExprPtr FunctionOper::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<FunctionOper>(type_, name(), args_copy);
+  return makeExpr<FunctionOper>(new_type, name_, args_);
 }
 
 bool FunctionOper::operator==(const Expr& rhs) const {
@@ -1703,12 +1726,11 @@ std::string FunctionOper::toString() const {
   return str;
 }
 
-ExprPtr FunctionOperWithCustomTypeHandling::deep_copy() const {
-  std::vector<ExprPtr> args_copy;
-  for (size_t i = 0; i < arity(); ++i) {
-    args_copy.push_back(arg(i)->deep_copy());
+ExprPtr FunctionOperWithCustomTypeHandling::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
   }
-  return makeExpr<FunctionOperWithCustomTypeHandling>(type_, name(), args_copy);
+  return makeExpr<FunctionOperWithCustomTypeHandling>(new_type, name_, args_);
 }
 
 bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
@@ -1736,8 +1758,7 @@ bool FunctionOperWithCustomTypeHandling::operator==(const Expr& rhs) const {
 
 double WidthBucketExpr::boundVal(const Expr* bound_expr) const {
   CHECK(bound_expr);
-  auto copied_expr = bound_expr->deep_copy();
-  auto casted_expr = copied_expr->cast(ctx().fp64());
+  auto casted_expr = bound_expr->cast(ctx().fp64());
   CHECK(casted_expr);
   auto casted_constant = std::dynamic_pointer_cast<const Constant>(casted_expr);
   CHECK(casted_constant);

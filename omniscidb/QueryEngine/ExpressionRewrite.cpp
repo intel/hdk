@@ -494,8 +494,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
           if (type->isDecimal() && operand_type->isFloatingPoint()) {
             break;
           }
-          auto operand_copy = const_operand->deep_copy();
-          auto cast_operand = operand_copy->cast(type);
+          auto cast_operand = const_operand->cast(type);
           auto const_cast_operand =
               std::dynamic_pointer_cast<const hdk::ir::Constant>(cast_operand);
           if (const_cast_operand) {

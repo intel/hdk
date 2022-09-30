@@ -492,7 +492,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
           return nullptr;
         }
         if (rhs->type()->isString() || rhs->type()->isExtDictionary()) {
-          return eq_left_op->deep_copy();
+          return eq_left_op->shared();
         }
         if (rhs->type()->isArray()) {
           // Note(jclay): Can this be restored from copy as above?
@@ -502,7 +502,7 @@ hdk::ir::ExprPtr CodeGenerator::hashJoinLhs(const hdk::ir::ColumnVar* rhs) const
           return nullptr;
         }
         return hdk::ir::makeExpr<hdk::ir::UOper>(
-            rhs->type(), false, kCAST, eq_left_op->deep_copy());
+            rhs->type(), false, kCAST, eq_left_op->shared());
       }
     }
   }
