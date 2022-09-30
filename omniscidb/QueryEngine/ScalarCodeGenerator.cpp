@@ -15,28 +15,20 @@
  */
 
 #include "CodeGenerator.h"
+#include "IR/ExprCollector.h"
 #include "QueryEngine/Compiler/Backend.h"
-#include "ScalarExprVisitor.h"
 
 namespace {
 
-class UsedColumnExpressions : public ScalarExprVisitor<ScalarCodeGenerator::ColumnMap> {
+class UsedColumnExpressions
+    : public hdk::ir::ExprCollector<ScalarCodeGenerator::ColumnMap,
+                                    UsedColumnExpressions> {
  protected:
-  ScalarCodeGenerator::ColumnMap visitColumnVar(
-      const hdk::ir::ColumnVar* column) const override {
-    ScalarCodeGenerator::ColumnMap m;
+  void visitColumnVar(const hdk::ir::ColumnVar* column) override {
     InputColDescriptor input_desc(column->columnInfo(), column->rteIdx());
-    m.emplace(input_desc,
-              std::static_pointer_cast<const hdk::ir::ColumnVar>(column->deep_copy()));
-    return m;
-  }
-
-  ScalarCodeGenerator::ColumnMap aggregateResult(
-      const ScalarCodeGenerator::ColumnMap& aggregate,
-      const ScalarCodeGenerator::ColumnMap& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+    result_.emplace(
+        input_desc,
+        std::static_pointer_cast<const hdk::ir::ColumnVar>(column->shared_from_this()));
   }
 };
 
@@ -53,8 +45,7 @@ llvm::Type* llvm_type_from_type(const hdk::ir::Type* type, llvm::LLVMContext& ct
 }  // namespace
 
 ScalarCodeGenerator::ColumnMap ScalarCodeGenerator::prepare(const hdk::ir::Expr* expr) {
-  UsedColumnExpressions visitor;
-  const auto used_columns = visitor.visit(expr);
+  const auto used_columns = UsedColumnExpressions::collect(expr);
   std::list<std::shared_ptr<const InputColDescriptor>> global_col_ids;
   for (const auto& used_column : used_columns) {
     global_col_ids.push_back(std::make_shared<InputColDescriptor>(used_column.first));
