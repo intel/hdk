@@ -16,6 +16,7 @@
 
 #include "RelAlgOptimizer.h"
 #include "DeepCopyVisitor.h"
+#include "IR/ExprCollector.h"
 #include "Logger/Logger.h"
 #include "Visitors/SubQueryCollector.h"
 
@@ -594,53 +595,41 @@ namespace {
 using InputSet = std::unordered_set<std::pair<const RelAlgNode*, unsigned>,
                                     boost::hash<std::pair<const RelAlgNode*, unsigned>>>;
 
-class InputCollector : public ScalarExprVisitor<InputSet> {
+class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  private:
   const RelAlgNode* node_;
-
- protected:
-  using RetType = InputSet;
-  RetType aggregateResult(const RetType& aggregate,
-                          const RetType& next_result) const override {
-    RetType result(aggregate.begin(), aggregate.end());
-    result.insert(next_result.begin(), next_result.end());
-    return result;
-  }
 
  public:
   InputCollector(const RelAlgNode* node) : node_(node) {}
 
-  RetType visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
-    RetType result;
+  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (node_->inputCount() == 1) {
       auto src = node_->getInput(0);
       if (auto join = dynamic_cast<const RelJoin*>(src)) {
         CHECK_EQ(join->inputCount(), size_t(2));
         const auto src2_in_offset = join->getInput(0)->size();
         if (col_ref->node() == join->getInput(1)) {
-          result.emplace(src, col_ref->index() + src2_in_offset);
+          result_.emplace(src, col_ref->index() + src2_in_offset);
         } else {
-          result.emplace(src, col_ref->index());
+          result_.emplace(src, col_ref->index());
         }
-        return result;
+        return;
       }
     }
-    result.emplace(col_ref->node(), col_ref->index());
-    return result;
+    result_.emplace(col_ref->node(), col_ref->index());
   }
 };
 
 size_t pick_always_live_col_idx(const RelAlgNode* node) {
   CHECK(node->size());
-  InputCollector collector(node);
   if (auto filter = dynamic_cast<const RelFilter*>(node)) {
-    auto rex_ins = collector.visit(filter->getConditionExpr());
+    auto rex_ins = InputCollector::collect(filter->getConditionExpr(), node);
     if (!rex_ins.empty()) {
       return static_cast<size_t>(rex_ins.begin()->second);
     }
     return pick_always_live_col_idx(filter->getInput(0));
   } else if (auto join = dynamic_cast<const RelJoin*>(node)) {
-    auto inputs = collector.visit(join->getCondition());
+    auto inputs = InputCollector::collect(join->getCondition(), node);
     if (!inputs.empty()) {
       return static_cast<size_t>(inputs.begin()->second);
     }
@@ -665,7 +654,6 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
   if (!node || dynamic_cast<const RelScan*>(node)) {
     return {};
   }
-  InputCollector collector(node);
   auto it = live_outs.find(node);
   CHECK(it != live_outs.end());
   auto live_out = it->second;
@@ -674,7 +662,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     std::unordered_set<size_t> live_in;
     for (const auto& idx : live_out) {
       CHECK_LT(idx, project->size());
-      auto partial_in = collector.visit(project->getExpr(idx).get());
+      auto partial_in = InputCollector::collect(project->getExpr(idx).get(), node);
       for (auto rex_in : partial_in) {
         live_in.insert(rex_in.second);
       }
@@ -708,7 +696,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
       if (!agg_expr->arg()) {
         has_count_star_only = true;
       } else {
-        auto inputs = collector.visit(agg_expr);
+        auto inputs = InputCollector::collect(agg_expr, node);
         for (auto& pr : inputs) {
           CHECK_EQ(aggregate->getInput(0), pr.first);
           live_in.insert(pr.second);
@@ -734,7 +722,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
         rhs_live_ins.insert(idx - rhs_idx_base);
       }
     }
-    auto inputs = collector.visit(join->getCondition());
+    auto inputs = InputCollector::collect(join->getCondition(), node);
     for (const auto& input : inputs) {
       const auto in_idx = static_cast<size_t>(input.second);
       if (input.first == lhs) {
@@ -760,7 +748,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
   if (auto filter = dynamic_cast<const RelFilter*>(node)) {
     CHECK_EQ(size_t(1), filter->inputCount());
     std::unordered_set<size_t> live_in(live_out.begin(), live_out.end());
-    auto rex_ins = collector.visit(filter->getConditionExpr());
+    auto rex_ins = InputCollector::collect(filter->getConditionExpr(), node);
     for (const auto& rex_in : rex_ins) {
       live_in.insert(static_cast<size_t>(rex_in.second));
     }
@@ -1375,12 +1363,11 @@ void sink_projected_boolean_expr_to_join(
     if (discarded) {
       continue;
     }
-    InputCollector collector(project.get());
     std::vector<size_t> unloaded_input_indices;
     std::unordered_map<size_t, hdk::ir::ExprPtr> in_idx_to_new_subcond;
     // Given all are dead right after join, safe to sink
     for (auto i : boolean_expr_indicies) {
-      auto inputs = collector.visit(project->getExpr(i).get());
+      auto inputs = InputCollector::collect(project->getExpr(i).get(), project.get());
       for (auto& in : inputs) {
         CHECK_EQ(in.first, project->getInput(0));
         if (!in_to_out_index.count(in.second)) {
