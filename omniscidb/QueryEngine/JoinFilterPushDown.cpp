@@ -16,6 +16,7 @@
 
 #include "JoinFilterPushDown.h"
 #include "DeepCopyVisitor.h"
+#include "IR/ExprCollector.h"
 #include "RelAlgExecutor.h"
 
 namespace {
@@ -26,20 +27,12 @@ class BindFilterToOutermostVisitor : public DeepCopyVisitor {
   }
 };
 
-class CollectInputColumnsVisitor
-    : public ScalarExprVisitor<std::unordered_set<InputColDescriptor>> {
-  std::unordered_set<InputColDescriptor> visitColumnVar(
-      const hdk::ir::ColumnVar* col_var) const override {
-    return {InputColDescriptor(col_var->columnInfo(), 0)};
-  }
-
- public:
-  std::unordered_set<InputColDescriptor> aggregateResult(
-      const std::unordered_set<InputColDescriptor>& aggregate,
-      const std::unordered_set<InputColDescriptor>& next_result) const override {
-    auto result = aggregate;
-    result.insert(next_result.begin(), next_result.end());
-    return result;
+class InputColumnsCollector
+    : public hdk::ir::ExprCollector<std::unordered_set<InputColDescriptor>,
+                                    InputColumnsCollector> {
+ protected:
+  void visitColumnVar(const hdk::ir::ColumnVar* col_var) override {
+    result_.insert(InputColDescriptor(col_var->columnInfo(), 0));
   }
 };
 
@@ -56,15 +49,14 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
     const std::vector<hdk::ir::ExprPtr>& filter_expressions,
     const CompilationOptions& co,
     const ExecutionOptions& eo) {
-  CollectInputColumnsVisitor input_columns_visitor;
+  InputColumnsCollector input_columns_collector;
   std::list<hdk::ir::ExprPtr> quals;
-  std::unordered_set<InputColDescriptor> input_column_descriptors;
   BindFilterToOutermostVisitor bind_filter_to_outermost;
   for (const auto& filter_expr : filter_expressions) {
-    input_column_descriptors = input_columns_visitor.aggregateResult(
-        input_column_descriptors, input_columns_visitor.visit(filter_expr.get()));
+    input_columns_collector.visit(filter_expr.get());
     quals.push_back(bind_filter_to_outermost.visit(filter_expr.get()));
   }
+  auto& input_column_descriptors = input_columns_collector.result();
   std::vector<InputDescriptor> input_descs;
   std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
   for (const auto& input_col_desc : input_column_descriptors) {
