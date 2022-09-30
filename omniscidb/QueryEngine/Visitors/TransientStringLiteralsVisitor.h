@@ -16,22 +16,22 @@
 
 #pragma once
 
+#include "IR/ExprCollector.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/ScalarExprVisitor.h"
 
-class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
+class TransientStringLiteralsVisitor : public hdk::ir::ExprVisitor<void> {
  public:
   TransientStringLiteralsVisitor(StringDictionaryProxy* sdp, Executor* executor)
       : sdp_(sdp), executor_(executor) {
     CHECK(sdp);
   }
 
-  void* visitConstant(const hdk::ir::Constant* constant) const override {
+  void visitConstant(const hdk::ir::Constant* constant) override {
     if (constant->type()->isString() && !constant->isNull()) {
       CHECK(constant->value().stringval);
       sdp_->getOrAddTransient(*constant->value().stringval);
     }
-    return defaultResult();
   }
 
   // visitUOper is for handling casts between dictionary encoded text
@@ -45,7 +45,7 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
   // translations/literals on the remote dictionary server instead
   // so the translation happens once and only once
 
-  void* visitUOper(const hdk::ir::UOper* uoper) const override {
+  void visitUOper(const hdk::ir::UOper* uoper) override {
     visit(uoper->operand());
     auto uoper_type = uoper->type();
     auto operand_type = uoper->operand()->type();
@@ -53,22 +53,22 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
           operand_type->isExtDictionary())) {
       // If we are not casting from a dictionary-encoded string
       // to a dictionary-encoded string
-      return defaultResult();
+      return;
     }
     auto uoper_dict_id = uoper_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     auto operand_dict_id = operand_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     if (uoper_dict_id != sdp_->getDictId()) {
       // If we are not casting to our dictionary (sdp_
-      return defaultResult();
+      return;
     }
     if (uoper_dict_id == operand_dict_id) {
       // If cast is inert, i.e. source and destination dict ids are same
-      return defaultResult();
+      return;
     }
     if (uoper->isDictIntersection()) {
       // Intersection translations don't add transients to the dest proxy,
       // and hence can be ignored for the purposes of populating transients
-      return defaultResult();
+      return;
     }
     executor_->getStringProxyTranslationMap(
         operand_dict_id,
@@ -76,35 +76,37 @@ class TransientStringLiteralsVisitor : public ScalarExprVisitor<void*> {
         RowSetMemoryOwner::StringTranslationType::SOURCE_UNION,
         executor_->getRowSetMemoryOwner(),
         true);  // with_generation
-    return defaultResult();
   }
 
  protected:
-  void* defaultResult() const override { return nullptr; }
-
- private:
-  mutable StringDictionaryProxy* sdp_;
-  mutable Executor* executor_;
+  StringDictionaryProxy* sdp_;
+  Executor* executor_;
 };
 
-class TransientDictIdVisitor : public ScalarExprVisitor<int> {
+class TransientDictIdCollector
+    : public hdk::ir::ExprCollector<int, TransientDictIdCollector> {
  public:
-  int visitUOper(const hdk::ir::UOper* uoper) const override {
-    auto expr_type = uoper->type();
-    if (uoper->isCast() && expr_type->isExtDictionary()) {
-      return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-    }
-    return ScalarExprVisitor::visitUOper(uoper);
-  }
-
-  int visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
-    auto expr_type = case_expr->type();
-    if (expr_type->isExtDictionary()) {
-      return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-    }
-    return ScalarExprVisitor::visitCaseExpr(case_expr);
+  void visit(const hdk::ir::Expr* expr) override {
+    result_ = -1;
+    ExprVisitor::visit(expr);
   }
 
  protected:
-  int defaultResult() const override { return -1; }
+  void visitUOper(const hdk::ir::UOper* uoper) override {
+    auto expr_type = uoper->type();
+    if (uoper->isCast() && expr_type->isExtDictionary()) {
+      result_ = expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    } else {
+      ExprCollector::visitUOper(uoper);
+    }
+  }
+
+  void visitCaseExpr(const hdk::ir::CaseExpr* case_expr) override {
+    auto expr_type = case_expr->type();
+    if (expr_type->isExtDictionary()) {
+      result_ = expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    } else {
+      ExprCollector::visitCaseExpr(case_expr);
+    }
+  }
 };

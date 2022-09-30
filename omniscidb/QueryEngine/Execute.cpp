@@ -2144,21 +2144,18 @@ ResultSetPtr Executor::executeExplain(const QueryCompilationDescriptor& query_co
 void Executor::addTransientStringLiterals(
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::shared_ptr<RowSetMemoryOwner>& row_set_mem_owner) {
-  TransientDictIdVisitor dict_id_visitor;
-
-  auto visit_expr =
-      [this, &dict_id_visitor, &row_set_mem_owner](const hdk::ir::Expr* expr) {
-        if (!expr) {
-          return;
-        }
-        const auto dict_id = dict_id_visitor.visit(expr);
-        if (dict_id >= 0) {
-          auto sdp = getStringDictionaryProxy(dict_id, row_set_mem_owner, true);
-          CHECK(sdp);
-          TransientStringLiteralsVisitor visitor(sdp, this);
-          visitor.visit(expr);
-        }
-      };
+  auto visit_expr = [this, &row_set_mem_owner](const hdk::ir::Expr* expr) {
+    if (!expr) {
+      return;
+    }
+    const auto dict_id = TransientDictIdCollector::collect(expr);
+    if (dict_id >= 0) {
+      auto sdp = getStringDictionaryProxy(dict_id, row_set_mem_owner, true);
+      CHECK(sdp);
+      TransientStringLiteralsVisitor visitor(sdp, this);
+      visitor.visit(expr);
+    }
+  };
 
   for (const auto& group_expr : ra_exe_unit.groupby_exprs) {
     visit_expr(group_expr.get());
