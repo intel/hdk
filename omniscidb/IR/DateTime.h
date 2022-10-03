@@ -29,7 +29,7 @@ enum class DateAddField {
   kHour,
   kMinute,
   kSecond,
-  kMillenium,
+  kMillennium,
   kCentury,
   kDecade,
   kMilli,
@@ -39,6 +39,27 @@ enum class DateAddField {
   kQuarterDay,
   kWeekDay,
   kDayOfYear,
+  kInvalid
+};
+
+enum class DateTruncField {
+  kYear,
+  kQuarter,
+  kMonth,
+  kDay,
+  kHour,
+  kMinute,
+  kSecond,
+  kMilli,
+  kMicro,
+  kNano,
+  kMillennium,
+  kCentury,
+  kDecade,
+  kWeek,
+  kWeekSunday,
+  kWeekSaturday,
+  kQuarterDay,
   kInvalid
 };
 
@@ -84,8 +105,8 @@ inline std::string toString(hdk::ir::DateAddField field) {
       return "Minute";
     case hdk::ir::DateAddField::kSecond:
       return "Second";
-    case hdk::ir::DateAddField::kMillenium:
-      return "Millenium";
+    case hdk::ir::DateAddField::kMillennium:
+      return "Millennium";
     case hdk::ir::DateAddField::kCentury:
       return "Century";
     case hdk::ir::DateAddField::kDecade:
@@ -109,6 +130,59 @@ inline std::string toString(hdk::ir::DateAddField field) {
     default:
       return "InvalidDateAddField";
   }
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::DateAddField field) {
+  os << toString(field);
+  return os;
+}
+
+inline std::string toString(hdk::ir::DateTruncField field) {
+  switch (field) {
+    case hdk::ir::DateTruncField::kYear:
+      return "Year";
+    case hdk::ir::DateTruncField::kQuarter:
+      return "Quarter";
+    case hdk::ir::DateTruncField::kMonth:
+      return "Month";
+    case hdk::ir::DateTruncField::kDay:
+      return "Day";
+    case hdk::ir::DateTruncField::kHour:
+      return "Hour";
+    case hdk::ir::DateTruncField::kMinute:
+      return "Minute";
+    case hdk::ir::DateTruncField::kSecond:
+      return "Second";
+    case hdk::ir::DateTruncField::kMilli:
+      return "Milli";
+    case hdk::ir::DateTruncField::kMicro:
+      return "Micro";
+    case hdk::ir::DateTruncField::kNano:
+      return "Nano";
+    case hdk::ir::DateTruncField::kMillennium:
+      return "Millennium";
+    case hdk::ir::DateTruncField::kCentury:
+      return "Century";
+    case hdk::ir::DateTruncField::kDecade:
+      return "Decade";
+    case hdk::ir::DateTruncField::kWeek:
+      return "Week";
+    case hdk::ir::DateTruncField::kWeekSunday:
+      return "WeekSunday";
+    case hdk::ir::DateTruncField::kWeekSaturday:
+      return "WeekSaturday";
+    case hdk::ir::DateTruncField::kQuarterDay:
+      return "QuarterDay";
+    case hdk::ir::DateTruncField::kInvalid:
+      return "Invalid";
+    default:
+      return "InvalidDateTruncField";
+  }
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::DateTruncField field) {
+  os << toString(field);
+  return os;
 }
 
 namespace hdk::ir {

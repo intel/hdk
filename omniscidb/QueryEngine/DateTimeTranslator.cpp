@@ -66,43 +66,43 @@ std::string from_extract_field(const ExtractField& fieldno) {
   return "";
 }
 
-std::string from_datetrunc_field(const DateTruncField& fieldno) {
+std::string from_datetrunc_field(const hdk::ir::DateTruncField& fieldno) {
   switch (fieldno) {
-    case dtYEAR:
+    case hdk::ir::DateTruncField::kYear:
       return "year";
-    case dtQUARTER:
+    case hdk::ir::DateTruncField::kQuarter:
       return "quarter";
-    case dtMONTH:
+    case hdk::ir::DateTruncField::kMonth:
       return "month";
-    case dtQUARTERDAY:
+    case hdk::ir::DateTruncField::kQuarterDay:
       return "quarterday";
-    case dtDAY:
+    case hdk::ir::DateTruncField::kDay:
       return "day";
-    case dtHOUR:
+    case hdk::ir::DateTruncField::kHour:
       return "hour";
-    case dtMINUTE:
+    case hdk::ir::DateTruncField::kMinute:
       return "minute";
-    case dtSECOND:
+    case hdk::ir::DateTruncField::kSecond:
       return "second";
-    case dtMILLENNIUM:
+    case hdk::ir::DateTruncField::kMillennium:
       return "millennium";
-    case dtCENTURY:
+    case hdk::ir::DateTruncField::kCentury:
       return "century";
-    case dtDECADE:
+    case hdk::ir::DateTruncField::kDecade:
       return "decade";
-    case dtMILLISECOND:
+    case hdk::ir::DateTruncField::kMilli:
       return "millisecond";
-    case dtMICROSECOND:
+    case hdk::ir::DateTruncField::kMicro:
       return "microsecond";
-    case dtNANOSECOND:
+    case hdk::ir::DateTruncField::kNano:
       return "nanosecond";
-    case dtWEEK:
+    case hdk::ir::DateTruncField::kWeek:
       return "week";
-    case dtWEEK_SUNDAY:
+    case hdk::ir::DateTruncField::kWeekSunday:
       return "week_sunday";
-    case dtWEEK_SATURDAY:
+    case hdk::ir::DateTruncField::kWeekSaturday:
       return "week_saturday";
-    case dtINVALID:
+    case hdk::ir::DateTruncField::kInvalid:
     default:
       UNREACHABLE();
   }
@@ -191,42 +191,42 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
       type, from_expr->containsAgg(), field, from_expr->decompress());
 }
 
-DateTruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
-  DateTruncField fieldno;
+hdk::ir::DateTruncField DateTruncExpr::to_datetrunc_field(const std::string& field) {
+  hdk::ir::DateTruncField fieldno;
   if (boost::iequals(field, "year")) {
-    fieldno = dtYEAR;
+    fieldno = hdk::ir::DateTruncField::kYear;
   } else if (boost::iequals(field, "quarter")) {
-    fieldno = dtQUARTER;
+    fieldno = hdk::ir::DateTruncField::kQuarter;
   } else if (boost::iequals(field, "month")) {
-    fieldno = dtMONTH;
+    fieldno = hdk::ir::DateTruncField::kMonth;
   } else if (boost::iequals(field, "quarterday")) {
-    fieldno = dtQUARTERDAY;
+    fieldno = hdk::ir::DateTruncField::kQuarterDay;
   } else if (boost::iequals(field, "day")) {
-    fieldno = dtDAY;
+    fieldno = hdk::ir::DateTruncField::kDay;
   } else if (boost::iequals(field, "hour")) {
-    fieldno = dtHOUR;
+    fieldno = hdk::ir::DateTruncField::kHour;
   } else if (boost::iequals(field, "minute")) {
-    fieldno = dtMINUTE;
+    fieldno = hdk::ir::DateTruncField::kMinute;
   } else if (boost::iequals(field, "second")) {
-    fieldno = dtSECOND;
+    fieldno = hdk::ir::DateTruncField::kSecond;
   } else if (boost::iequals(field, "millennium")) {
-    fieldno = dtMILLENNIUM;
+    fieldno = hdk::ir::DateTruncField::kMillennium;
   } else if (boost::iequals(field, "century")) {
-    fieldno = dtCENTURY;
+    fieldno = hdk::ir::DateTruncField::kCentury;
   } else if (boost::iequals(field, "decade")) {
-    fieldno = dtDECADE;
+    fieldno = hdk::ir::DateTruncField::kDecade;
   } else if (boost::iequals(field, "millisecond")) {
-    fieldno = dtMILLISECOND;
+    fieldno = hdk::ir::DateTruncField::kMilli;
   } else if (boost::iequals(field, "microsecond")) {
-    fieldno = dtMICROSECOND;
+    fieldno = hdk::ir::DateTruncField::kMicro;
   } else if (boost::iequals(field, "nanosecond")) {
-    fieldno = dtNANOSECOND;
+    fieldno = hdk::ir::DateTruncField::kNano;
   } else if (boost::iequals(field, "week")) {
-    fieldno = dtWEEK;
+    fieldno = hdk::ir::DateTruncField::kWeek;
   } else if (boost::iequals(field, "week_sunday")) {
-    fieldno = dtWEEK_SUNDAY;
+    fieldno = hdk::ir::DateTruncField::kWeekSunday;
   } else if (boost::iequals(field, "week_saturday")) {
-    fieldno = dtWEEK_SATURDAY;
+    fieldno = hdk::ir::DateTruncField::kWeekSaturday;
   } else {
     throw std::runtime_error("Invalid field in DATE_TRUNC function " + field);
   }
@@ -240,13 +240,15 @@ hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
 }
 
 hdk::ir::ExprPtr DateTruncExpr::generate(const hdk::ir::ExprPtr from_expr,
-                                         const DateTruncField& field) {
+                                         const hdk::ir::DateTruncField& field) {
   auto expr_type = from_expr->type();
   if (!expr_type->isDateTime()) {
     throw std::runtime_error(
         "Only TIME, TIMESTAMP and DATE types can be in DATE_TRUNC function.");
   }
-  if (expr_type->isTime() && field != dtHOUR && field != dtMINUTE && field != dtSECOND) {
+  if (expr_type->isTime() && field != hdk::ir::DateTruncField::kHour &&
+      field != hdk::ir::DateTruncField::kMinute &&
+      field != hdk::ir::DateTruncField::kSecond) {
     throw std::runtime_error("Cannot DATE_TRUNC " + from_datetrunc_field(field) +
                              " from TIME.");
   }

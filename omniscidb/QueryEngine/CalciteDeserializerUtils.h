@@ -141,7 +141,7 @@ ExtractField to_datepart_field(const std::string&);
 
 hdk::ir::DateAddField to_dateadd_field(const std::string&);
 
-DateTruncField to_datediff_field(const std::string&);
+hdk::ir::DateTruncField to_datediff_field(const std::string&);
 
 std::shared_ptr<const hdk::ir::Constant> make_fp_constant(const int64_t val,
                                                           const hdk::ir::Type* type);

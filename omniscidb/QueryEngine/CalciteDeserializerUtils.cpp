@@ -150,60 +150,60 @@ hdk::ir::DateAddField to_dateadd_field(const std::string& field) {
   } else if (boost::iequals(field, "century")) {
     fieldno = hdk::ir::DateAddField::kCentury;
   } else if (boost::iequals(field, "millennium")) {
-    fieldno = hdk::ir::DateAddField::kMillenium;
+    fieldno = hdk::ir::DateAddField::kMillennium;
   } else {
     throw std::runtime_error("Unsupported field in DATEADD function: " + field);
   }
   return fieldno;
 }
 
-DateTruncField to_datediff_field(const std::string& field) {
-  DateTruncField fieldno;
+hdk::ir::DateTruncField to_datediff_field(const std::string& field) {
+  hdk::ir::DateTruncField fieldno;
   if (boost::iequals(field, "year") || boost::iequals(field, "yy") ||
       boost::iequals(field, "yyyy") || boost::iequals(field, "sql_tsi_year")) {
-    fieldno = dtYEAR;
+    fieldno = hdk::ir::DateTruncField::kYear;
   } else if (boost::iequals(field, "quarter") || boost::iequals(field, "qq") ||
              boost::iequals(field, "q") || boost::iequals(field, "sql_tsi_quarter")) {
-    fieldno = dtQUARTER;
+    fieldno = hdk::ir::DateTruncField::kQuarter;
   } else if (boost::iequals(field, "month") || boost::iequals(field, "mm") ||
              boost::iequals(field, "m") || boost::iequals(field, "sql_tsi_month")) {
-    fieldno = dtMONTH;
+    fieldno = hdk::ir::DateTruncField::kMonth;
   } else if (boost::iequals(field, "week") || boost::iequals(field, "ww") ||
              boost::iequals(field, "w") || boost::iequals(field, "sql_tsi_week")) {
-    fieldno = dtWEEK;
+    fieldno = hdk::ir::DateTruncField::kWeek;
   } else if (boost::iequals(field, "week_sunday")) {
-    fieldno = dtWEEK_SUNDAY;
+    fieldno = hdk::ir::DateTruncField::kWeekSunday;
   } else if (boost::iequals(field, "week_saturday")) {
-    fieldno = dtWEEK_SATURDAY;
+    fieldno = hdk::ir::DateTruncField::kWeekSaturday;
   } else if (boost::iequals(field, "day") || boost::iequals(field, "dd") ||
              boost::iequals(field, "d") || boost::iequals(field, "sql_tsi_day")) {
-    fieldno = dtDAY;
+    fieldno = hdk::ir::DateTruncField::kDay;
   } else if (boost::iequals(field, "quarterday")) {
-    fieldno = dtQUARTERDAY;
+    fieldno = hdk::ir::DateTruncField::kQuarterDay;
   } else if (boost::iequals(field, "hour") || boost::iequals(field, "hh") ||
              boost::iequals(field, "sql_tsi_hour")) {
-    fieldno = dtHOUR;
+    fieldno = hdk::ir::DateTruncField::kHour;
   } else if (boost::iequals(field, "minute") || boost::iequals(field, "mi") ||
              boost::iequals(field, "n") || boost::iequals(field, "sql_tsi_minute")) {
-    fieldno = dtMINUTE;
+    fieldno = hdk::ir::DateTruncField::kMinute;
   } else if (boost::iequals(field, "second") || boost::iequals(field, "ss") ||
              boost::iequals(field, "s") || boost::iequals(field, "sql_tsi_second")) {
-    fieldno = dtSECOND;
+    fieldno = hdk::ir::DateTruncField::kSecond;
   } else if (boost::iequals(field, "millisecond") || boost::iequals(field, "ms")) {
-    fieldno = dtMILLISECOND;
+    fieldno = hdk::ir::DateTruncField::kMilli;
   } else if (boost::iequals(field, "microsecond") || boost::iequals(field, "us") ||
              boost::iequals(field, "sql_tsi_microsecond") ||
              boost::iequals(field, "frac_second")) {
-    fieldno = dtMICROSECOND;
+    fieldno = hdk::ir::DateTruncField::kMicro;
   } else if (boost::iequals(field, "nanosecond") || boost::iequals(field, "ns") ||
              boost::iequals(field, "sql_tsi_frac_second")) {
-    fieldno = dtNANOSECOND;
+    fieldno = hdk::ir::DateTruncField::kNano;
   } else if (boost::iequals(field, "decade") || boost::iequals(field, "dc")) {
-    fieldno = dtDECADE;
+    fieldno = hdk::ir::DateTruncField::kDecade;
   } else if (boost::iequals(field, "century")) {
-    fieldno = dtCENTURY;
+    fieldno = hdk::ir::DateTruncField::kCentury;
   } else if (boost::iequals(field, "millennium")) {
-    fieldno = dtMILLENNIUM;
+    fieldno = hdk::ir::DateTruncField::kMillennium;
   } else {
     throw std::runtime_error("Unsupported field in DATEDIFF function: " + field);
   }

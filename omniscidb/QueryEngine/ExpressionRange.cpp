@@ -479,33 +479,33 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
 
 namespace {
 
-int64_t get_conservative_datetrunc_bucket(const DateTruncField datetrunc_field) {
+int64_t get_conservative_datetrunc_bucket(const hdk::ir::DateTruncField datetrunc_field) {
   const int64_t day_seconds{24 * 3600};
   const int64_t year_days{365};
   switch (datetrunc_field) {
-    case dtYEAR:
+    case hdk::ir::DateTruncField::kYear:
       return year_days * day_seconds;
-    case dtQUARTER:
+    case hdk::ir::DateTruncField::kQuarter:
       return 90 * day_seconds;  // 90 is least number of days in any quater
-    case dtMONTH:
+    case hdk::ir::DateTruncField::kMonth:
       return 28 * day_seconds;
-    case dtDAY:
+    case hdk::ir::DateTruncField::kDay:
       return day_seconds;
-    case dtHOUR:
+    case hdk::ir::DateTruncField::kHour:
       return 3600;
-    case dtMINUTE:
+    case hdk::ir::DateTruncField::kMinute:
       return 60;
-    case dtMILLENNIUM:
+    case hdk::ir::DateTruncField::kMillennium:
       return 1000 * year_days * day_seconds;
-    case dtCENTURY:
+    case hdk::ir::DateTruncField::kCentury:
       return 100 * year_days * day_seconds;
-    case dtDECADE:
+    case hdk::ir::DateTruncField::kDecade:
       return 10 * year_days * day_seconds;
-    case dtWEEK:
-    case dtWEEK_SUNDAY:
-    case dtWEEK_SATURDAY:
+    case hdk::ir::DateTruncField::kWeek:
+    case hdk::ir::DateTruncField::kWeekSunday:
+    case hdk::ir::DateTruncField::kWeekSaturday:
       return 7 * day_seconds;
-    case dtQUARTERDAY:
+    case hdk::ir::DateTruncField::kQuarterDay:
       return 4 * 60 * 50;
     default:
       return 0;
@@ -603,7 +603,9 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
         return ExpressionRange::makeIntRange(0, -1, 0, has_nulls);
       }
       const int64_t bucket =
-          col_type->isDate() ? get_conservative_datetrunc_bucket(dtDAY) : 0;
+          col_type->isDate()
+              ? get_conservative_datetrunc_bucket(hdk::ir::DateTruncField::kDay)
+              : 0;
       return ExpressionRange::makeIntRange(min_val, max_val, bucket, has_nulls);
     }
     default:
@@ -698,7 +700,7 @@ ExpressionRange getDateTimePrecisionCastRange(const ExpressionRange& arg_range,
                                               const hdk::ir::Type* oper_type,
                                               const hdk::ir::Type* target_type) {
   if (oper_type->isTimestamp() && target_type->isDate()) {
-    const auto field = dtDAY;
+    const auto field = hdk::ir::DateTruncField::kDay;
     auto oper_unit = oper_type->as<hdk::ir::TimestampType>()->unit();
     bool is_hpt = oper_unit > hdk::ir::TimeUnit::kSecond;
     const int64_t scale =

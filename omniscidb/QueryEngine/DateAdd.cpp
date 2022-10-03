@@ -104,7 +104,7 @@ DateAdd(hdk::ir::DateAddField field, const int64_t number, const int64_t timeval
       return MonthDaySecond(timeval).addMonths(number * 120).unixtime();
     case hdk::ir::DateAddField::kCentury:
       return MonthDaySecond(timeval).addMonths(number * 1200).unixtime();
-    case hdk::ir::DateAddField::kMillenium:
+    case hdk::ir::DateAddField::kMillennium:
       return MonthDaySecond(timeval).addMonths(number * 12000).unixtime();
     default:
 #ifdef __CUDACC__

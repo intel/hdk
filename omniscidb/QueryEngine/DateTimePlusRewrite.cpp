@@ -63,67 +63,68 @@ bool match_const_integer(const hdk::ir::Expr* expr, const int64_t v) {
   return false;
 }
 
-DateTruncField get_dt_field(const hdk::ir::Expr* ts,
-                            const hdk::ir::Expr* interval_multiplier,
-                            const bool dt_hour) {
+hdk::ir::DateTruncField get_dt_field(const hdk::ir::Expr* ts,
+                                     const hdk::ir::Expr* interval_multiplier,
+                                     const bool dt_hour) {
   if (dt_hour) {
     const auto extract_fn =
         dynamic_cast<const hdk::ir::ExtractExpr*>(interval_multiplier);
     return (extract_fn && extract_fn->field() == kHOUR && *extract_fn->from() == *ts)
-               ? dtHOUR
-               : dtINVALID;
+               ? hdk::ir::DateTruncField::kHour
+               : hdk::ir::DateTruncField::kInvalid;
   }
   const auto interval_multiplier_fn =
       remove_truncate_int(remove_cast_to_int(interval_multiplier));
   if (!interval_multiplier_fn) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   const auto interval_multiplier_mul =
       dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_fn);
   if (!interval_multiplier_mul || !interval_multiplier_mul->isMul() ||
       !match_const_integer(interval_multiplier_mul->leftOperand(), -1)) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   const auto extract_minus_one =
       dynamic_cast<const hdk::ir::BinOper*>(interval_multiplier_mul->rightOperand());
   if (!extract_minus_one || !extract_minus_one->isMinus() ||
       !match_const_integer(extract_minus_one->rightOperand(), 1)) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   const auto extract_fn =
       dynamic_cast<const hdk::ir::ExtractExpr*>(extract_minus_one->leftOperand());
   if (!extract_fn || !(*extract_fn->from() == *ts)) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   switch (extract_fn->field()) {
     case kDAY:
-      return dtMONTH;
+      return hdk::ir::DateTruncField::kMonth;
     case kDOY:
-      return dtYEAR;
+      return hdk::ir::DateTruncField::kYear;
     default:
       break;
   }
-  return dtINVALID;
+  return hdk::ir::DateTruncField::kInvalid;
 }
 
-DateTruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_arg) {
+hdk::ir::DateTruncField get_dt_field(const hdk::ir::Expr* ts,
+                                     const hdk::ir::Expr* off_arg) {
   const auto mul_by_interval = dynamic_cast<const hdk::ir::BinOper*>(off_arg);
   if (!mul_by_interval) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   auto interval = dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->rightOperand());
   auto interval_multiplier = mul_by_interval->leftOperand();
   if (!interval) {
     interval = dynamic_cast<const hdk::ir::Constant*>(mul_by_interval->leftOperand());
     if (!interval) {
-      return dtINVALID;
+      return hdk::ir::DateTruncField::kInvalid;
     }
     interval_multiplier = mul_by_interval->rightOperand();
   }
   auto interval_type = interval->type();
   if (!interval_type->isInterval() ||
       interval_type->as<hdk::ir::IntervalType>()->unit() != hdk::ir::TimeUnit::kMilli) {
-    return dtINVALID;
+    return hdk::ir::DateTruncField::kInvalid;
   }
   const auto& datum = interval->value();
   switch (datum.bigintval) {
@@ -134,7 +135,7 @@ DateTruncField get_dt_field(const hdk::ir::Expr* ts, const hdk::ir::Expr* off_ar
     default:
       break;
   }
-  return dtINVALID;
+  return hdk::ir::DateTruncField::kInvalid;
 }
 
 hdk::ir::ExprPtr remove_cast_to_date(const hdk::ir::Expr* expr) {
@@ -164,7 +165,7 @@ hdk::ir::ExprPtr rewrite_to_date_trunc(const hdk::ir::FunctionOper* dt_plus) {
   }
   const auto off_arg = dt_plus->arg(1);
   const auto dt_field = get_dt_field(ts.get(), off_arg);
-  if (dt_field == dtINVALID) {
+  if (dt_field == hdk::ir::DateTruncField::kInvalid) {
     return nullptr;
   }
   return DateTruncExpr::generate(ts, dt_field);

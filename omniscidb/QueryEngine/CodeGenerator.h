@@ -335,7 +335,7 @@ class CodeGenerator {
 
   llvm::Value* codegenDateTruncHighPrecisionTimestamps(llvm::Value*,
                                                        const hdk::ir::Type*,
-                                                       const DateTruncField&);
+                                                       const hdk::ir::DateTruncField&);
 
   llvm::Value* codegenCmpDecimalConst(hdk::ir::OpType,
                                       hdk::ir::Qualifier,

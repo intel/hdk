@@ -20,6 +20,7 @@
 
 #include "DateTruncate.h"
 #include "ExtractFromTime.h"
+#include "IR/DateTime.h"
 
 #include "Shared/funcannotations.h"
 
@@ -260,38 +261,38 @@ DATE_TRUNC_FUNC_JIT(datetrunc_millennium)
 /*
  * @brief support the SQL DATE_TRUNC function in internal (non-JITed) code
  */
-int64_t DateTruncate(DateTruncField field, const int64_t timeval) {
+int64_t DateTruncate(hdk::ir::DateTruncField field, const int64_t timeval) {
   switch (field) {
-    case dtNANOSECOND:
-    case dtMICROSECOND:
-    case dtMILLISECOND:
-    case dtSECOND:
+    case hdk::ir::DateTruncField::kNano:
+    case hdk::ir::DateTruncField::kMicro:
+    case hdk::ir::DateTruncField::kMilli:
+    case hdk::ir::DateTruncField::kSecond:
       return timeval;
-    case dtMINUTE:
+    case hdk::ir::DateTruncField::kMinute:
       return datetrunc_minute_impl(timeval);
-    case dtHOUR:
+    case hdk::ir::DateTruncField::kHour:
       return datetrunc_hour_impl(timeval);
-    case dtQUARTERDAY:
+    case hdk::ir::DateTruncField::kQuarterDay:
       return datetrunc_quarterday_impl(timeval);
-    case dtDAY:
+    case hdk::ir::DateTruncField::kDay:
       return datetrunc_day_impl(timeval);
-    case dtWEEK:
+    case hdk::ir::DateTruncField::kWeek:
       return datetrunc_week<dtMONDAY>(timeval);
-    case dtWEEK_SUNDAY:
+    case hdk::ir::DateTruncField::kWeekSunday:
       return datetrunc_week<dtSUNDAY>(timeval);
-    case dtWEEK_SATURDAY:
+    case hdk::ir::DateTruncField::kWeekSaturday:
       return datetrunc_week<dtSATURDAY>(timeval);
-    case dtMONTH:
+    case hdk::ir::DateTruncField::kMonth:
       return datetrunc_month_impl(timeval);
-    case dtQUARTER:
+    case hdk::ir::DateTruncField::kQuarter:
       return datetrunc_quarter_impl(timeval);
-    case dtYEAR:
+    case hdk::ir::DateTruncField::kYear:
       return datetrunc_year_impl(timeval);
-    case dtDECADE:
+    case hdk::ir::DateTruncField::kDecade:
       return datetrunc_decade_impl(timeval);
-    case dtCENTURY:
+    case hdk::ir::DateTruncField::kCentury:
       return datetrunc_century_impl(timeval);
-    case dtMILLENNIUM:
+    case hdk::ir::DateTruncField::kMillennium:
       return datetrunc_millennium_impl(timeval);
     default:
 #ifdef __CUDACC__
@@ -385,31 +386,31 @@ struct EraTime {
     }
   }
 
-  DEVICE int64_t count(DateTruncField const field) const {
+  DEVICE int64_t count(hdk::ir::DateTruncField const field) const {
     int const sgn = sign(ERA);
     EraTime const ut = sgn == -1 ? -*this : *this;  // Unsigned time
     switch (field) {
-      case dtMONTH:
+      case hdk::ir::DateTruncField::kMonth:
         return sgn * (12 * (400 * ut.era + ut.yoe) + ut.moy - (ut.sign(DOM) == -1));
-      case dtQUARTER: {
+      case hdk::ir::DateTruncField::kQuarter: {
         int const quarters = ut.moy / 3;
         int const rem = ut.moy % 3;
         return sgn * (4 * (400 * ut.era + ut.yoe) + quarters -
                       (rem < 0 || (rem == 0 && ut.sign(DOM) == -1)));
       }
-      case dtYEAR:
+      case hdk::ir::DateTruncField::kYear:
         return sgn * (400 * ut.era + ut.yoe - (ut.sign(MOY) == -1));
-      case dtDECADE: {
+      case hdk::ir::DateTruncField::kDecade: {
         uint64_t const decades = (400 * ut.era + ut.yoe) / 10;
         unsigned const rem = (400 * ut.era + ut.yoe) % 10;
         return sgn * (decades - (rem == 0 && ut.sign(MOY) == -1));
       }
-      case dtCENTURY: {
+      case hdk::ir::DateTruncField::kCentury: {
         uint64_t const centuries = (400 * ut.era + ut.yoe) / 100;
         unsigned const rem = (400 * ut.era + ut.yoe) % 100;
         return sgn * (centuries - (rem == 0 && ut.sign(MOY) == -1));
       }
-      case dtMILLENNIUM: {
+      case hdk::ir::DateTruncField::kMillennium: {
         uint64_t const millennia = (400 * ut.era + ut.yoe) / 1000;
         unsigned const rem = (400 * ut.era + ut.yoe) % 1000;
         return sgn * (millennia - (rem == 0 && ut.sign(MOY) == -1));
@@ -426,29 +427,29 @@ struct EraTime {
 
 }  // namespace
 
-extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const DateTruncField datepart,
+extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const hdk::ir::DateTruncField datepart,
                                                   const int64_t startdate,
                                                   const int64_t enddate) {
   switch (datepart) {
-    case dtNANOSECOND:
+    case hdk::ir::DateTruncField::kNano:
       return (enddate - startdate) * kNanoSecsPerSec;
-    case dtMICROSECOND:
+    case hdk::ir::DateTruncField::kMicro:
       return (enddate - startdate) * kMicroSecsPerSec;
-    case dtMILLISECOND:
+    case hdk::ir::DateTruncField::kMilli:
       return (enddate - startdate) * kMilliSecsPerSec;
-    case dtSECOND:
+    case hdk::ir::DateTruncField::kSecond:
       return enddate - startdate;
-    case dtMINUTE:
+    case hdk::ir::DateTruncField::kMinute:
       return (enddate - startdate) / kSecsPerMin;
-    case dtHOUR:
+    case hdk::ir::DateTruncField::kHour:
       return (enddate - startdate) / kSecsPerHour;
-    case dtQUARTERDAY:
+    case hdk::ir::DateTruncField::kQuarterDay:
       return (enddate - startdate) / (kSecsPerDay / 4);
-    case dtDAY:
+    case hdk::ir::DateTruncField::kDay:
       return (enddate - startdate) / kSecsPerDay;
-    case dtWEEK:
-    case dtWEEK_SUNDAY:
-    case dtWEEK_SATURDAY:
+    case hdk::ir::DateTruncField::kWeek:
+    case hdk::ir::DateTruncField::kWeekSunday:
+    case hdk::ir::DateTruncField::kWeekSaturday:
       return (enddate - startdate) / (7 * kSecsPerDay);
     default:
       return (EraTime::make(enddate) - EraTime::make(startdate)).count(datepart);
@@ -456,7 +457,7 @@ extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiff(const DateTruncField datepart,
 }
 
 extern "C" RUNTIME_EXPORT DEVICE int64_t
-DateDiffHighPrecision(const DateTruncField datepart,
+DateDiffHighPrecision(const hdk::ir::DateTruncField datepart,
                       const int64_t startdate,
                       const int64_t enddate,
                       const int32_t start_dim,
@@ -464,12 +465,12 @@ DateDiffHighPrecision(const DateTruncField datepart,
   // Return pow(10,i). Only valid for i = 0, 3, 6, 9.
   constexpr int pow10[10]{1, 0, 0, 1000, 0, 0, 1000 * 1000, 0, 0, 1000 * 1000 * 1000};
   switch (datepart) {
-    case dtNANOSECOND:
-    case dtMICROSECOND:
-    case dtMILLISECOND: {
-      static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
-      static_assert(dtMICROSECOND + 1 == dtNANOSECOND, "Please keep these consecutive.");
-      int const target_dim = (datepart - (dtMILLISECOND - 1)) * 3;  // 3, 6, or 9.
+    case hdk::ir::DateTruncField::kNano:
+    case hdk::ir::DateTruncField::kMicro:
+    case hdk::ir::DateTruncField::kMilli: {
+      int const target_dim = datepart == hdk::ir::DateTruncField::kMilli   ? 3
+                             : datepart == hdk::ir::DateTruncField::kMicro ? 6
+                                                                           : 9;
       int const delta_dim = end_dim - start_dim;  // in [-9,9] multiple of 3
       int const adj_dim = target_dim - (delta_dim < 0 ? start_dim : end_dim);
       int64_t const numerator = delta_dim < 0 ? enddate * pow10[-delta_dim] - startdate
@@ -492,10 +493,11 @@ DateDiffHighPrecision(const DateTruncField datepart,
   }
 }
 
-extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiffNullable(const DateTruncField datepart,
-                                                          const int64_t startdate,
-                                                          const int64_t enddate,
-                                                          const int64_t null_val) {
+extern "C" RUNTIME_EXPORT DEVICE int64_t
+DateDiffNullable(const hdk::ir::DateTruncField datepart,
+                 const int64_t startdate,
+                 const int64_t enddate,
+                 const int64_t null_val) {
   if (startdate == null_val || enddate == null_val) {
     return null_val;
   }
@@ -503,7 +505,7 @@ extern "C" RUNTIME_EXPORT DEVICE int64_t DateDiffNullable(const DateTruncField d
 }
 
 extern "C" RUNTIME_EXPORT DEVICE int64_t
-DateDiffHighPrecisionNullable(const DateTruncField datepart,
+DateDiffHighPrecisionNullable(const hdk::ir::DateTruncField datepart,
                               const int64_t startdate,
                               const int64_t enddate,
                               const int32_t start_dim,

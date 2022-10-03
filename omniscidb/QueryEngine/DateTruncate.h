@@ -17,31 +17,11 @@
 #ifndef QUERYENGINE_DATETRUNCATE_H
 #define QUERYENGINE_DATETRUNCATE_H
 
+#include "IR/DateTime.h"
+
 #include <cstdint>
 
-// DateTruncField must be synced with datetrunc_fname
-enum DateTruncField {
-  dtYEAR = 0,
-  dtQUARTER,
-  dtMONTH,
-  dtDAY,
-  dtHOUR,
-  dtMINUTE,
-  dtSECOND,
-  dtMILLISECOND,
-  dtMICROSECOND,
-  dtNANOSECOND,
-  dtMILLENNIUM,
-  dtCENTURY,
-  dtDECADE,
-  dtWEEK,
-  dtWEEK_SUNDAY,
-  dtWEEK_SATURDAY,
-  dtQUARTERDAY,
-  dtINVALID
-};
-
-int64_t DateTruncate(DateTruncField field, const int64_t timeval);
+int64_t DateTruncate(hdk::ir::DateTruncField field, const int64_t timeval);
 
 // for usage in compiled and linked modules in the binary
 int64_t truncate_high_precision_timestamp_to_date(const int64_t timeval,

@@ -253,16 +253,23 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr
   auto from_expr = codegen(datetrunc_expr->from(), true, co).front();
   auto datetrunc_expr_type = datetrunc_expr->from()->type();
   CHECK(from_expr->getType()->isIntegerTy(64));
-  DateTruncField const field = datetrunc_expr->field();
+  auto field = datetrunc_expr->field();
   if (datetrunc_expr_type->isTimestamp() &&
       datetrunc_expr_type->as<hdk::ir::TimestampType>()->unit() >
           hdk::ir::TimeUnit::kSecond) {
     return codegenDateTruncHighPrecisionTimestamps(from_expr, datetrunc_expr_type, field);
   }
-  static_assert(dtSECOND + 1 == dtMILLISECOND, "Please keep these consecutive.");
-  static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
-  static_assert(dtMICROSECOND + 1 == dtNANOSECOND, "Please keep these consecutive.");
-  if (dtSECOND <= field && field <= dtNANOSECOND) {
+  static_assert(
+      (int)hdk::ir::DateTruncField::kSecond + 1 == (int)hdk::ir::DateTruncField::kMilli,
+      "Please keep these consecutive.");
+  static_assert(
+      (int)hdk::ir::DateTruncField::kMilli + 1 == (int)hdk::ir::DateTruncField::kMicro,
+      "Please keep these consecutive.");
+  static_assert(
+      (int)hdk::ir::DateTruncField::kMicro + 1 == (int)hdk::ir::DateTruncField::kNano,
+      "Please keep these consecutive.");
+  if (hdk::ir::DateTruncField::kSecond <= field &&
+      field <= hdk::ir::DateTruncField::kNano) {
     return cgen_state_->ir_builder_.CreateCast(llvm::Instruction::CastOps::SExt,
                                                from_expr,
                                                get_int_type(64, cgen_state_->context_));
@@ -273,7 +280,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
         cgen_state_, executor(), from_expr, datetrunc_expr_type, "date_trunc_nullcheck");
   }
-  char const* const fname = datetrunc_fname_lookup.at(field);
+  char const* const fname = datetrunc_fname_lookup.at((size_t)field);
   auto ret = cgen_state_->emitExternalCall(
       fname, get_int_type(64, cgen_state_->context_), {from_expr});
   if (is_nullable) {
@@ -327,7 +334,7 @@ llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
 llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
     llvm::Value* ts_lv,
     const hdk::ir::Type* type,
-    const DateTruncField& field) {
+    const hdk::ir::DateTruncField& field) {
   // Only needed for i in { 0, 3, 6, 9 }.
   constexpr int64_t pow10[10]{1, 0, 0, 1000, 0, 0, 1000000, 0, 0, 1000000000};
   AUTOMATIC_IR_METADATA(cgen_state_);
@@ -336,12 +343,20 @@ llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
   CHECK(unit > hdk::ir::TimeUnit::kSecond);
   CHECK(ts_lv->getType()->isIntegerTy(64));
   bool const is_nullable = type->nullable();
-  static_assert(dtSECOND + 1 == dtMILLISECOND, "Please keep these consecutive.");
-  static_assert(dtMILLISECOND + 1 == dtMICROSECOND, "Please keep these consecutive.");
-  static_assert(dtMICROSECOND + 1 == dtNANOSECOND, "Please keep these consecutive.");
-  if (dtSECOND <= field && field <= dtNANOSECOND) {
-    unsigned const start_dim = unitToDimension(unit);   // 0, 3, 6, 9
-    unsigned const trunc_dim = (field - dtSECOND) * 3;  // 0, 3, 6, 9
+  static_assert(
+      (int)hdk::ir::DateTruncField::kSecond + 1 == (int)hdk::ir::DateTruncField::kMilli,
+      "Please keep these consecutive.");
+  static_assert(
+      (int)hdk::ir::DateTruncField::kMilli + 1 == (int)hdk::ir::DateTruncField::kMicro,
+      "Please keep these consecutive.");
+  static_assert(
+      (int)hdk::ir::DateTruncField::kMicro + 1 == (int)hdk::ir::DateTruncField::kNano,
+      "Please keep these consecutive.");
+  if (hdk::ir::DateTruncField::kSecond <= field &&
+      field <= hdk::ir::DateTruncField::kNano) {
+    unsigned const start_dim = unitToDimension(unit);  // 0, 3, 6, 9
+    unsigned const trunc_dim =
+        ((int)field - (int)hdk::ir::DateTruncField::kSecond) * 3;  // 0, 3, 6, 9
     if (start_dim <= trunc_dim) {
       return ts_lv;  // Truncating to an equal or higher precision has no effect.
     }
@@ -370,7 +385,7 @@ llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
         cgen_state_, executor(), ts_lv, type, "date_trunc_hp_nullcheck");
   }
-  char const* const fname = datetrunc_fname_lookup.at(field);
+  char const* const fname = datetrunc_fname_lookup.at((size_t)field);
   ts_lv = cgen_state_->emitExternalCall(
       fname, get_int_type(64, cgen_state_->context_), {ts_lv});
   if (is_nullable) {

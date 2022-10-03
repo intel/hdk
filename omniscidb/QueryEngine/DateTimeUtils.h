@@ -55,11 +55,11 @@ static const std::map<std::pair<hdk::ir::TimeUnit, ExtractField>,
                                 {{hdk::ir::TimeUnit::kNano, kMICROSECOND},
                                  {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
 
-static const std::map<std::pair<hdk::ir::TimeUnit, DateTruncField>, int64_t>
+static const std::map<std::pair<hdk::ir::TimeUnit, hdk::ir::DateTruncField>, int64_t>
     datetrunc_precision_lookup = {
-        {{hdk::ir::TimeUnit::kMicro, dtMILLISECOND}, kMilliSecsPerSec},
-        {{hdk::ir::TimeUnit::kNano, dtMICROSECOND}, kMilliSecsPerSec},
-        {{hdk::ir::TimeUnit::kNano, dtMILLISECOND}, kMicroSecsPerSec}};
+        {{hdk::ir::TimeUnit::kMicro, hdk::ir::DateTruncField::kMilli}, kMilliSecsPerSec},
+        {{hdk::ir::TimeUnit::kNano, hdk::ir::DateTruncField::kMicro}, kMilliSecsPerSec},
+        {{hdk::ir::TimeUnit::kNano, hdk::ir::DateTruncField::kMilli}, kMicroSecsPerSec}};
 
 }  // namespace
 
@@ -122,8 +122,10 @@ constexpr inline bool is_subsecond_dateadd_field(const hdk::ir::DateAddField fie
          field == hdk::ir::DateAddField::kMicro || field == hdk::ir::DateAddField::kNano;
 }
 
-constexpr inline bool is_subsecond_datetrunc_field(const DateTruncField field) {
-  return field == dtMILLISECOND || field == dtMICROSECOND || field == dtNANOSECOND;
+constexpr inline bool is_subsecond_datetrunc_field(const hdk::ir::DateTruncField field) {
+  return field == hdk::ir::DateTruncField::kMilli ||
+         field == hdk::ir::DateTruncField::kMicro ||
+         field == hdk::ir::DateTruncField::kNano;
 }
 
 const inline std::pair<hdk::ir::OpType, int64_t>
@@ -179,8 +181,9 @@ get_extract_high_precision_adjusted_scale(const ExtractField& field,
   return {};
 }
 
-const inline int64_t get_datetrunc_high_precision_scale(const DateTruncField& field,
-                                                        const hdk::ir::TimeUnit unit) {
+const inline int64_t get_datetrunc_high_precision_scale(
+    const hdk::ir::DateTruncField& field,
+    const hdk::ir::TimeUnit unit) {
   const auto result = datetrunc_precision_lookup.find(std::make_pair(unit, field));
   if (result != datetrunc_precision_lookup.end()) {
     return result->second;

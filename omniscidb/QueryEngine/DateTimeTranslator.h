@@ -52,7 +52,7 @@ class DateTimeTranslator {
   }
 
   static inline int64_t getDateTruncConstantValue(const int64_t& timeval,
-                                                  const DateTruncField& field,
+                                                  const hdk::ir::DateTruncField& field,
                                                   const hdk::ir::Type* type) {
     CHECK(type->isDateTime());
     auto unit = type->as<hdk::ir::DateTimeBaseType>()->unit();
@@ -94,19 +94,20 @@ class ExtractExpr : protected DateTimeTranslator {
 
 class DateTruncExpr : protected DateTimeTranslator {
  public:
-  DateTruncExpr(const hdk::ir::ExprPtr expr, const DateTruncField& field)
+  DateTruncExpr(const hdk::ir::ExprPtr expr, const hdk::ir::DateTruncField& field)
       : from_expr_(expr), field_(field) {}
   DateTruncExpr(const hdk::ir::ExprPtr expr, const std::string& field)
       : from_expr_(expr), field_(to_datetrunc_field(field)) {}
 
   static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr, const std::string&);
-  static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr, const DateTruncField&);
+  static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr,
+                                   const hdk::ir::DateTruncField&);
 
   const hdk::ir::ExprPtr generate() const { return generate(from_expr_, field_); }
 
  private:
-  static DateTruncField to_datetrunc_field(const std::string& field);
+  static hdk::ir::DateTruncField to_datetrunc_field(const std::string& field);
 
   hdk::ir::ExprPtr from_expr_;
-  DateTruncField field_;
+  hdk::ir::DateTruncField field_;
 };

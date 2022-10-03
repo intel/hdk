@@ -811,7 +811,7 @@ ExprPtr Constant::doCast(const Type* new_type) const {
             ? truncate_high_precision_timestamp_to_date(
                   value_.bigintval,
                   hdk::ir::unitsPerSecond(type_->as<TimestampType>()->unit()))
-            : DateTruncate(dtDAY, value_.bigintval);
+            : DateTruncate(hdk::ir::DateTruncField::kDay, value_.bigintval);
     return makeExpr<Constant>(new_type, is_null_, new_value, cacheable_);
   } else if ((type_->isTimestamp() || type_->isDate()) && new_type->isTimestamp()) {
     auto old_unit = type_->as<DateTimeBaseType>()->unit();
@@ -1641,12 +1641,12 @@ std::string DateAddExpr::toString() const {
 }
 
 std::string DateDiffExpr::toString() const {
-  return "DATEDIFF(" + std::to_string(field_) + " START " + start_->toString() + " END " +
+  return "DATEDIFF(" + ::toString(field_) + " START " + start_->toString() + " END " +
          end_->toString() + ") ";
 }
 
 std::string DateTruncExpr::toString() const {
-  return "DATE_TRUNC(" + std::to_string(field_) + " , " + from_expr_->toString() + ") ";
+  return "DATE_TRUNC(" + ::toString(field_) + " , " + from_expr_->toString() + ") ";
 }
 
 std::string OffsetInFragment::toString() const {
