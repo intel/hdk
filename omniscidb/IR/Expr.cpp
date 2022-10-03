@@ -1636,7 +1636,7 @@ std::string ExtractExpr::toString() const {
 }
 
 std::string DateAddExpr::toString() const {
-  return "DATEADD(" + std::to_string(field_) + " NUMBER " + number_->toString() +
+  return "DATEADD(" + ::toString(field_) + " NUMBER " + number_->toString() +
          " DATETIME " + datetime_->toString() + ") ";
 }
 

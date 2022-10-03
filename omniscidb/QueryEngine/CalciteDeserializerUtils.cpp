@@ -18,6 +18,7 @@
 
 #include "../Analyzer/Analyzer.h"
 #include "IR/Context.h"
+#include "IR/DateTime.h"
 #include "IR/Type.h"
 #include "Logger/Logger.h"
 
@@ -107,49 +108,49 @@ ExtractField to_datepart_field(const std::string& field) {
   return fieldno;
 }
 
-DateAddField to_dateadd_field(const std::string& field) {
-  DateAddField fieldno;
+hdk::ir::DateAddField to_dateadd_field(const std::string& field) {
+  hdk::ir::DateAddField fieldno;
   if (boost::iequals(field, "year") || boost::iequals(field, "yy") ||
       boost::iequals(field, "yyyy") || boost::iequals(field, "sql_tsi_year")) {
-    fieldno = daYEAR;
+    fieldno = hdk::ir::DateAddField::kYear;
   } else if (boost::iequals(field, "quarter") || boost::iequals(field, "qq") ||
              boost::iequals(field, "q") || boost::iequals(field, "sql_tsi_quarter")) {
-    fieldno = daQUARTER;
+    fieldno = hdk::ir::DateAddField::kQuarter;
   } else if (boost::iequals(field, "month") || boost::iequals(field, "mm") ||
              boost::iequals(field, "m") || boost::iequals(field, "sql_tsi_month")) {
-    fieldno = daMONTH;
+    fieldno = hdk::ir::DateAddField::kMonth;
   } else if (boost::iequals(field, "day") || boost::iequals(field, "dd") ||
              boost::iequals(field, "d") || boost::iequals(field, "sql_tsi_day")) {
-    fieldno = daDAY;
+    fieldno = hdk::ir::DateAddField::kDay;
   } else if (boost::iequals(field, "week") || boost::iequals(field, "ww") ||
              boost::iequals(field, "w") || boost::iequals(field, "sql_tsi_week")) {
-    fieldno = daWEEK;
+    fieldno = hdk::ir::DateAddField::kWeek;
   } else if (boost::iequals(field, "hour") || boost::iequals(field, "hh") ||
              boost::iequals(field, "sql_tsi_hour")) {
-    fieldno = daHOUR;
+    fieldno = hdk::ir::DateAddField::kHour;
   } else if (boost::iequals(field, "minute") || boost::iequals(field, "mi") ||
              boost::iequals(field, "n") || boost::iequals(field, "sql_tsi_minute")) {
-    fieldno = daMINUTE;
+    fieldno = hdk::ir::DateAddField::kMinute;
   } else if (boost::iequals(field, "second") || boost::iequals(field, "ss") ||
              boost::iequals(field, "s") || boost::iequals(field, "sql_tsi_second")) {
-    fieldno = daSECOND;
+    fieldno = hdk::ir::DateAddField::kSecond;
   } else if (boost::iequals(field, "millisecond") || boost::iequals(field, "ms")) {
-    fieldno = daMILLISECOND;
+    fieldno = hdk::ir::DateAddField::kMilli;
   } else if (boost::iequals(field, "microsecond") || boost::iequals(field, "us") ||
              boost::iequals(field, "sql_tsi_microsecond") ||
              boost::iequals(field, "frac_second")) {
-    fieldno = daMICROSECOND;
+    fieldno = hdk::ir::DateAddField::kMicro;
   } else if (boost::iequals(field, "nanosecond") || boost::iequals(field, "ns") ||
              boost::iequals(field, "sql_tsi_frac_second")) {
-    fieldno = daNANOSECOND;
+    fieldno = hdk::ir::DateAddField::kNano;
   } else if (boost::iequals(field, "weekday") || boost::iequals(field, "dw")) {
-    fieldno = daWEEKDAY;
+    fieldno = hdk::ir::DateAddField::kWeekDay;
   } else if (boost::iequals(field, "decade") || boost::iequals(field, "dc")) {
-    fieldno = daDECADE;
+    fieldno = hdk::ir::DateAddField::kDecade;
   } else if (boost::iequals(field, "century")) {
-    fieldno = daCENTURY;
+    fieldno = hdk::ir::DateAddField::kCentury;
   } else if (boost::iequals(field, "millennium")) {
-    fieldno = daMILLENNIUM;
+    fieldno = hdk::ir::DateAddField::kMillenium;
   } else {
     throw std::runtime_error("Unsupported field in DATEADD function: " + field);
   }

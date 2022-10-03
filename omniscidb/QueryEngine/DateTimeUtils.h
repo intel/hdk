@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "DateAdd.h"
 #include "DateTruncate.h"
 
 #include "IR/OpType.h"
@@ -85,16 +84,17 @@ constexpr inline int64_t get_timestamp_precision_scale(const int32_t dimen) {
   return -1;
 }
 
-constexpr inline int64_t get_dateadd_timestamp_precision_scale(const DateAddField field) {
+constexpr inline int64_t get_dateadd_timestamp_precision_scale(
+    const hdk::ir::DateAddField field) {
   switch (field) {
-    case daMILLISECOND:
+    case hdk::ir::DateAddField::kMilli:
       return kMilliSecsPerSec;
-    case daMICROSECOND:
+    case hdk::ir::DateAddField::kMicro:
       return kMicroSecsPerSec;
-    case daNANOSECOND:
+    case hdk::ir::DateAddField::kNano:
       return kNanoSecsPerSec;
     default:
-      throw std::runtime_error("Unknown field = " + std::to_string(field));
+      throw std::runtime_error("Unknown field = " + toString(field));
   }
   return -1;
 }
@@ -117,8 +117,9 @@ constexpr inline bool is_subsecond_extract_field(const ExtractField& field) {
   return field == kMILLISECOND || field == kMICROSECOND || field == kNANOSECOND;
 }
 
-constexpr inline bool is_subsecond_dateadd_field(const DateAddField field) {
-  return field == daMILLISECOND || field == daMICROSECOND || field == daNANOSECOND;
+constexpr inline bool is_subsecond_dateadd_field(const hdk::ir::DateAddField field) {
+  return field == hdk::ir::DateAddField::kMilli ||
+         field == hdk::ir::DateAddField::kMicro || field == hdk::ir::DateAddField::kNano;
 }
 
 constexpr inline bool is_subsecond_datetrunc_field(const DateTruncField field) {
@@ -126,9 +127,10 @@ constexpr inline bool is_subsecond_datetrunc_field(const DateTruncField field) {
 }
 
 const inline std::pair<hdk::ir::OpType, int64_t>
-get_dateadd_high_precision_adjusted_scale(const DateAddField field, int32_t dimen) {
+get_dateadd_high_precision_adjusted_scale(const hdk::ir::DateAddField field,
+                                          int32_t dimen) {
   switch (field) {
-    case daNANOSECOND:
+    case hdk::ir::DateAddField::kNano:
       switch (dimen) {
         case 9:
           return {};
@@ -139,7 +141,7 @@ get_dateadd_high_precision_adjusted_scale(const DateAddField field, int32_t dime
         default:
           throw std::runtime_error("Unknown dimen = " + std::to_string(dimen));
       }
-    case daMICROSECOND:
+    case hdk::ir::DateAddField::kMicro:
       switch (dimen) {
         case 9:
           return {hdk::ir::OpType::kMul, kMilliSecsPerSec};
@@ -150,7 +152,7 @@ get_dateadd_high_precision_adjusted_scale(const DateAddField field, int32_t dime
         default:
           throw std::runtime_error("Unknown dimen = " + std::to_string(dimen));
       }
-    case daMILLISECOND:
+    case hdk::ir::DateAddField::kMilli:
       switch (dimen) {
         case 9:
           return {hdk::ir::OpType::kMul, kMicroSecsPerSec};
@@ -162,7 +164,7 @@ get_dateadd_high_precision_adjusted_scale(const DateAddField field, int32_t dime
           throw std::runtime_error("Unknown dimen = " + std::to_string(dimen));
       }
     default:
-      throw std::runtime_error("Unknown field = " + std::to_string(field));
+      throw std::runtime_error("Unknown field = " + toString(field));
   }
   return {};
 }

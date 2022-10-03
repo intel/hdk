@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#include "DateAdd.h"
+#include "IR/DateTime.h"
 #include "Shared/funcannotations.h"
+
+#include <cstdint>
+#include <ctime>
 
 #ifdef EXECUTE_INCLUDE
 
@@ -76,33 +79,32 @@ class MonthDaySecond {
 
 }  // namespace
 
-extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t DateAdd(DateAddField field,
-                                                               const int64_t number,
-                                                               const int64_t timeval) {
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
+DateAdd(hdk::ir::DateAddField field, const int64_t number, const int64_t timeval) {
   switch (field) {
-    case daSECOND:
+    case hdk::ir::DateAddField::kSecond:
       return timeval + number;
-    case daMINUTE:
+    case hdk::ir::DateAddField::kMinute:
       return timeval + number * kSecsPerMin;
-    case daHOUR:
+    case hdk::ir::DateAddField::kHour:
       return timeval + number * kSecsPerHour;
-    case daWEEKDAY:
-    case daDAYOFYEAR:
-    case daDAY:
+    case hdk::ir::DateAddField::kWeekDay:
+    case hdk::ir::DateAddField::kDayOfYear:
+    case hdk::ir::DateAddField::kDay:
       return timeval + number * kSecsPerDay;
-    case daWEEK:
+    case hdk::ir::DateAddField::kWeek:
       return timeval + number * (7 * kSecsPerDay);
-    case daMONTH:
+    case hdk::ir::DateAddField::kMonth:
       return MonthDaySecond(timeval).addMonths(number).unixtime();
-    case daQUARTER:
+    case hdk::ir::DateAddField::kQuarter:
       return MonthDaySecond(timeval).addMonths(number * 3).unixtime();
-    case daYEAR:
+    case hdk::ir::DateAddField::kYear:
       return MonthDaySecond(timeval).addMonths(number * 12).unixtime();
-    case daDECADE:
+    case hdk::ir::DateAddField::kDecade:
       return MonthDaySecond(timeval).addMonths(number * 120).unixtime();
-    case daCENTURY:
+    case hdk::ir::DateAddField::kCentury:
       return MonthDaySecond(timeval).addMonths(number * 1200).unixtime();
-    case daMILLENNIUM:
+    case hdk::ir::DateAddField::kMillenium:
       return MonthDaySecond(timeval).addMonths(number * 12000).unixtime();
     default:
 #ifdef __CUDACC__
@@ -115,7 +117,7 @@ extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t DateAdd(DateAddField fiel
 
 // The dimension of the return value is always equal to the timeval dimension.
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddHighPrecision(DateAddField field,
+DateAddHighPrecision(hdk::ir::DateAddField field,
                      const int64_t number,
                      const int64_t timeval,
                      const int32_t dim) {
@@ -123,12 +125,12 @@ DateAddHighPrecision(DateAddField field,
   constexpr unsigned pow10[10]{
       1, 0, 0, 1000, 0, 0, 1000 * 1000, 0, 0, 1000 * 1000 * 1000};
   switch (field) {
-    case daNANOSECOND:
-    case daMICROSECOND:
-    case daMILLISECOND: {
-      static_assert(daMILLISECOND + 1 == daMICROSECOND, "Please keep these consecutive.");
-      static_assert(daMICROSECOND + 1 == daNANOSECOND, "Please keep these consecutive.");
-      unsigned const field_dim = (field - (daMILLISECOND - 1)) * 3;
+    case hdk::ir::DateAddField::kNano:
+    case hdk::ir::DateAddField::kMicro:
+    case hdk::ir::DateAddField::kMilli: {
+      unsigned const field_dim = field == hdk::ir::DateAddField::kMilli   ? 3
+                                 : field == hdk::ir::DateAddField::kMicro ? 6
+                                                                          : 9;
       int const adj_dim = dim - field_dim;
       if (adj_dim < 0) {
         return timeval + floor_div(number, pow10[-adj_dim]);
@@ -144,7 +146,7 @@ DateAddHighPrecision(DateAddField field,
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddNullable(const DateAddField field,
+DateAddNullable(const hdk::ir::DateAddField field,
                 const int64_t number,
                 const int64_t timeval,
                 const int64_t null_val) {
@@ -155,7 +157,7 @@ DateAddNullable(const DateAddField field,
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
-DateAddHighPrecisionNullable(const DateAddField field,
+DateAddHighPrecisionNullable(const hdk::ir::DateAddField field,
                              const int64_t number,
                              const int64_t timeval,
                              const int32_t dim,

@@ -17,11 +17,11 @@
 #ifndef QUERYENGINE_CALCITEDESERIALIZERUTILS_H
 #define QUERYENGINE_CALCITEDESERIALIZERUTILS_H
 
-#include "DateAdd.h"
 #include "DateTruncate.h"
 
 #include "../Shared/sqldefs.h"
 #include "../Shared/sqltypes.h"
+#include "IR/DateTime.h"
 #include "IR/OpType.h"
 #include "Logger/Logger.h"
 
@@ -139,7 +139,7 @@ const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
 
 ExtractField to_datepart_field(const std::string&);
 
-DateAddField to_dateadd_field(const std::string&);
+hdk::ir::DateAddField to_dateadd_field(const std::string&);
 
 DateTruncField to_datediff_field(const std::string&);
 

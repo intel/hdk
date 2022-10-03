@@ -1160,7 +1160,8 @@ hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
             bigint_type, false, hdk::ir::OpType::kUMinus, interval_sec);
       }
     }
-    return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daSECOND, interval_sec, lhs);
+    return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(
+        lhs_type, hdk::ir::DateAddField::kSecond, interval_sec, lhs);
   }
   CHECK(interval_type->unit() == hdk::ir::TimeUnit::kMonth);
   const auto interval_months =
@@ -1168,7 +1169,8 @@ hdk::ir::ExprPtr maybeMakeDateExpr(hdk::ir::OpType op,
           ? std::make_shared<hdk::ir::UOper>(
                 bigint_type, false, hdk::ir::OpType::kUMinus, interval)
           : interval;
-  return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(lhs_type, daMONTH, interval_months, lhs);
+  return hdk::ir::makeExpr<hdk::ir::DateAddExpr>(
+      lhs_type, hdk::ir::DateAddField::kMonth, interval_months, lhs);
 }
 
 std::pair<hdk::ir::ExprPtr, hdk::ir::Qualifier> getQuantifiedBinOperRhs(
