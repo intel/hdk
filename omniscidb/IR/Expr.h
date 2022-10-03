@@ -866,9 +866,9 @@ class CaseExpr : public Expr {
  */
 class ExtractExpr : public Expr {
  public:
-  ExtractExpr(const hdk::ir::Type* type, bool has_agg, ExtractField f, ExprPtr e)
+  ExtractExpr(const hdk::ir::Type* type, bool has_agg, DateExtractField f, ExprPtr e)
       : Expr(type, has_agg), field_(f), from_expr_(e) {}
-  ExtractField field() const { return field_; }
+  DateExtractField field() const { return field_; }
   const Expr* from() const { return from_expr_.get(); }
   ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
@@ -877,7 +877,7 @@ class ExtractExpr : public Expr {
   size_t hash() const override;
 
  private:
-  ExtractField field_;
+  DateExtractField field_;
   ExprPtr from_expr_;
 };
 

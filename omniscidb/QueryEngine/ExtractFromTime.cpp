@@ -264,45 +264,45 @@ extract_year(const int64_t timeval) {
 /*
  * @brief support the SQL EXTRACT function
  */
-DEVICE int64_t ExtractFromTime(ExtractField field, const int64_t timeval) {
+DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t timeval) {
   switch (field) {
-    case kEPOCH:
+    case hdk::ir::DateExtractField::kEpoch:
       return extract_epoch(timeval);
-    case kDATEEPOCH:
+    case hdk::ir::DateExtractField::kDateEpoch:
       return extract_dateepoch(timeval);
-    case kQUARTERDAY:
+    case hdk::ir::DateExtractField::kQuarterDay:
       return extract_quarterday(timeval);
-    case kHOUR:
+    case hdk::ir::DateExtractField::kHour:
       return extract_hour(timeval);
-    case kMINUTE:
+    case hdk::ir::DateExtractField::kMinute:
       return extract_minute(timeval);
-    case kSECOND:
+    case hdk::ir::DateExtractField::kSecond:
       return extract_second(timeval);
-    case kMILLISECOND:
+    case hdk::ir::DateExtractField::kMilli:
       return extract_millisecond(timeval);
-    case kMICROSECOND:
+    case hdk::ir::DateExtractField::kMicro:
       return extract_microsecond(timeval);
-    case kNANOSECOND:
+    case hdk::ir::DateExtractField::kNano:
       return extract_nanosecond(timeval);
-    case kDOW:
+    case hdk::ir::DateExtractField::kDayOfWeek:
       return extract_dow(timeval);
-    case kISODOW:
+    case hdk::ir::DateExtractField::kIsoDayOfWeek:
       return extract_isodow(timeval);
-    case kDAY:
+    case hdk::ir::DateExtractField::kDay:
       return extract_day(timeval);
-    case kWEEK:
+    case hdk::ir::DateExtractField::kWeek:
       return extract_week_monday(timeval);
-    case kWEEK_SUNDAY:
+    case hdk::ir::DateExtractField::kWeekSunday:
       return extract_week_sunday(timeval);
-    case kWEEK_SATURDAY:
+    case hdk::ir::DateExtractField::kWeekSaturday:
       return extract_week_saturday(timeval);
-    case kDOY:
+    case hdk::ir::DateExtractField::kDayOfYear:
       return extract_day_of_year(timeval);
-    case kMONTH:
+    case hdk::ir::DateExtractField::kMonth:
       return extract_month(timeval);
-    case kQUARTER:
+    case hdk::ir::DateExtractField::kQuarter:
       return extract_quarter(timeval);
-    case kYEAR:
+    case hdk::ir::DateExtractField::kYear:
       return extract_year(timeval);
   }
 

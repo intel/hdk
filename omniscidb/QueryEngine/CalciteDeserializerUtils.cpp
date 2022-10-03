@@ -56,52 +56,52 @@ const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
   return nullptr;
 }
 
-ExtractField to_datepart_field(const std::string& field) {
-  ExtractField fieldno;
+hdk::ir::DateExtractField to_datepart_field(const std::string& field) {
+  hdk::ir::DateExtractField fieldno;
   if (boost::iequals(field, "year") || boost::iequals(field, "yy") ||
       boost::iequals(field, "yyyy") || boost::iequals(field, "sql_tsi_year")) {
-    fieldno = kYEAR;
+    fieldno = hdk::ir::DateExtractField::kYear;
   } else if (boost::iequals(field, "quarter") || boost::iequals(field, "qq") ||
              boost::iequals(field, "q") || boost::iequals(field, "sql_tsi_quarter")) {
-    fieldno = kQUARTER;
+    fieldno = hdk::ir::DateExtractField::kQuarter;
   } else if (boost::iequals(field, "month") || boost::iequals(field, "mm") ||
              boost::iequals(field, "m") || boost::iequals(field, "sql_tsi_month")) {
-    fieldno = kMONTH;
+    fieldno = hdk::ir::DateExtractField::kMonth;
   } else if (boost::iequals(field, "dayofyear") || boost::iequals(field, "dy") ||
              boost::iequals(field, "y")) {
-    fieldno = kDOY;
+    fieldno = hdk::ir::DateExtractField::kDayOfYear;
   } else if (boost::iequals(field, "day") || boost::iequals(field, "dd") ||
              boost::iequals(field, "d") || boost::iequals(field, "sql_tsi_day")) {
-    fieldno = kDAY;
+    fieldno = hdk::ir::DateExtractField::kDay;
   } else if (boost::iequals(field, "week") || boost::iequals(field, "ww") ||
              boost::iequals(field, "w") || boost::iequals(field, "sql_tsi_week")) {
-    fieldno = kWEEK;
+    fieldno = hdk::ir::DateExtractField::kWeek;
   } else if (boost::iequals(field, "week_sunday")) {
-    fieldno = kWEEK_SUNDAY;
+    fieldno = hdk::ir::DateExtractField::kWeekSunday;
   } else if (boost::iequals(field, "week_saturday")) {
-    fieldno = kWEEK_SATURDAY;
+    fieldno = hdk::ir::DateExtractField::kWeekSaturday;
   } else if (boost::iequals(field, "hour") || boost::iequals(field, "hh") ||
              boost::iequals(field, "sql_tsi_hour")) {
-    fieldno = kHOUR;
+    fieldno = hdk::ir::DateExtractField::kHour;
   } else if (boost::iequals(field, "minute") || boost::iequals(field, "mi") ||
              boost::iequals(field, "n") || boost::iequals(field, "sql_tsi_minute")) {
-    fieldno = kMINUTE;
+    fieldno = hdk::ir::DateExtractField::kMinute;
   } else if (boost::iequals(field, "second") || boost::iequals(field, "ss") ||
              boost::iequals(field, "s") || boost::iequals(field, "sql_tsi_second")) {
-    fieldno = kSECOND;
+    fieldno = hdk::ir::DateExtractField::kSecond;
   } else if (boost::iequals(field, "millisecond") || boost::iequals(field, "ms")) {
-    fieldno = kMILLISECOND;
+    fieldno = hdk::ir::DateExtractField::kMilli;
   } else if (boost::iequals(field, "microsecond") || boost::iequals(field, "us") ||
              boost::iequals(field, "sql_tsi_microsecond") ||
              boost::iequals(field, "frac_second")) {
-    fieldno = kMICROSECOND;
+    fieldno = hdk::ir::DateExtractField::kMicro;
   } else if (boost::iequals(field, "nanosecond") || boost::iequals(field, "ns") ||
              boost::iequals(field, "sql_tsi_frac_second")) {
-    fieldno = kNANOSECOND;
+    fieldno = hdk::ir::DateExtractField::kNano;
   } else if (boost::iequals(field, "weekday") || boost::iequals(field, "dw")) {
-    fieldno = kISODOW;
+    fieldno = hdk::ir::DateExtractField::kIsoDayOfWeek;
   } else if (boost::iequals(field, "quarterday") || boost::iequals(field, "dq")) {
-    fieldno = kQUARTERDAY;
+    fieldno = hdk::ir::DateExtractField::kQuarterDay;
   } else {
     throw std::runtime_error("Unsupported field in DATEPART function: " + field);
   }

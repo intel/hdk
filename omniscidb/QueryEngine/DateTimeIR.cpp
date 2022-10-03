@@ -25,45 +25,45 @@ using namespace DateTimeUtils;
 
 namespace {
 
-const char* get_extract_function_name(ExtractField field) {
+const char* get_extract_function_name(hdk::ir::DateExtractField field) {
   switch (field) {
-    case kEPOCH:
+    case hdk::ir::DateExtractField::kEpoch:
       return "extract_epoch";
-    case kDATEEPOCH:
+    case hdk::ir::DateExtractField::kDateEpoch:
       return "extract_dateepoch";
-    case kQUARTERDAY:
+    case hdk::ir::DateExtractField::kQuarterDay:
       return "extract_quarterday";
-    case kHOUR:
+    case hdk::ir::DateExtractField::kHour:
       return "extract_hour";
-    case kMINUTE:
+    case hdk::ir::DateExtractField::kMinute:
       return "extract_minute";
-    case kSECOND:
+    case hdk::ir::DateExtractField::kSecond:
       return "extract_second";
-    case kMILLISECOND:
+    case hdk::ir::DateExtractField::kMilli:
       return "extract_millisecond";
-    case kMICROSECOND:
+    case hdk::ir::DateExtractField::kMicro:
       return "extract_microsecond";
-    case kNANOSECOND:
+    case hdk::ir::DateExtractField::kNano:
       return "extract_nanosecond";
-    case kDOW:
+    case hdk::ir::DateExtractField::kDayOfWeek:
       return "extract_dow";
-    case kISODOW:
+    case hdk::ir::DateExtractField::kIsoDayOfWeek:
       return "extract_isodow";
-    case kDAY:
+    case hdk::ir::DateExtractField::kDay:
       return "extract_day";
-    case kWEEK:
+    case hdk::ir::DateExtractField::kWeek:
       return "extract_week_monday";
-    case kWEEK_SUNDAY:
+    case hdk::ir::DateExtractField::kWeekSunday:
       return "extract_week_sunday";
-    case kWEEK_SATURDAY:
+    case hdk::ir::DateExtractField::kWeekSaturday:
       return "extract_week_saturday";
-    case kDOY:
+    case hdk::ir::DateExtractField::kDayOfYear:
       return "extract_day_of_year";
-    case kMONTH:
+    case hdk::ir::DateExtractField::kMonth:
       return "extract_month";
-    case kQUARTER:
+    case hdk::ir::DateExtractField::kQuarter:
       return "extract_quarter";
-    case kYEAR:
+    case hdk::ir::DateExtractField::kYear:
       return "extract_year";
   }
   UNREACHABLE();
@@ -76,9 +76,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   auto from_expr = codegen(extract_expr->from(), true, co).front();
-  const int32_t extract_field{extract_expr->field()};
+  const auto extract_field{extract_expr->field()};
   auto extract_expr_type = extract_expr->from()->type();
-  if (extract_field == kEPOCH) {
+  if (extract_field == hdk::ir::DateExtractField::kEpoch) {
     CHECK(extract_expr_type->isTimestamp() || extract_expr_type->isDate());
     if (from_expr->getType()->isIntegerTy(32)) {
       from_expr =
@@ -292,7 +292,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr
 llvm::Value* CodeGenerator::codegenExtractHighPrecisionTimestamps(
     llvm::Value* ts_lv,
     const hdk::ir::Type* type,
-    const ExtractField& field) {
+    const hdk::ir::DateExtractField& field) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   CHECK(type->isTimestamp());
   auto unit = type->as<hdk::ir::TimestampType>()->unit();

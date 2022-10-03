@@ -19,6 +19,8 @@
 
 #include <cstdint>
 #include <ctime>
+
+#include "IR/DateTime.h"
 #include "Shared/funcannotations.h"
 
 static constexpr int64_t kNanoSecsPerSec = 1000000000;
@@ -70,29 +72,7 @@ static constexpr uint32_t kSecsJanToMar1900 = 5097600;
 constexpr unsigned MARJAN = 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31;
 constexpr unsigned JANMAR = 31 + 28;  // leap day handled separately
 
-enum ExtractField {
-  kYEAR,
-  kQUARTER,
-  kMONTH,
-  kDAY,
-  kHOUR,
-  kMINUTE,
-  kSECOND,
-  kMILLISECOND,
-  kMICROSECOND,
-  kNANOSECOND,
-  kDOW,
-  kISODOW,
-  kDOY,
-  kEPOCH,
-  kQUARTERDAY,
-  kWEEK,
-  kWEEK_SUNDAY,
-  kWEEK_SATURDAY,
-  kDATEEPOCH
-};
-
-DEVICE int64_t ExtractFromTime(ExtractField field, const int64_t timeval);
+DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t timeval);
 
 // Return floor(dividend / divisor).
 // Assumes 0 < divisor.

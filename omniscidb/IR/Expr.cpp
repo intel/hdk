@@ -1632,7 +1632,7 @@ std::string CaseExpr::toString() const {
 }
 
 std::string ExtractExpr::toString() const {
-  return "EXTRACT(" + std::to_string(field_) + " FROM " + from_expr_->toString() + ") ";
+  return "EXTRACT(" + ::toString(field_) + " FROM " + from_expr_->toString() + ") ";
 }
 
 std::string DateAddExpr::toString() const {

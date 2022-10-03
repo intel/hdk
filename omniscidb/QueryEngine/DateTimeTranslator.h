@@ -28,9 +28,10 @@ using namespace DateTimeUtils;
 
 class DateTimeTranslator {
  public:
-  static inline int64_t getExtractFromTimeConstantValue(const int64_t& timeval,
-                                                        const ExtractField& field,
-                                                        const hdk::ir::Type* type) {
+  static inline int64_t getExtractFromTimeConstantValue(
+      const int64_t& timeval,
+      const hdk::ir::DateExtractField& field,
+      const hdk::ir::Type* type) {
     auto unit = type->isTimestamp() ? type->as<hdk::ir::TimestampType>()->unit()
                                     : hdk::ir::TimeUnit::kSecond;
     if (type->isTimestamp() && unit > hdk::ir::TimeUnit::kSecond) {
@@ -75,21 +76,22 @@ class DateTimeTranslator {
 
 class ExtractExpr : protected DateTimeTranslator {
  public:
-  ExtractExpr(const hdk::ir::ExprPtr expr, const ExtractField& field)
+  ExtractExpr(const hdk::ir::ExprPtr expr, const hdk::ir::DateExtractField& field)
       : from_expr_(expr), field_(field) {}
   ExtractExpr(const hdk::ir::ExprPtr expr, const std::string& field)
       : from_expr_(expr), field_(to_extract_field(field)) {}
 
   static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr, const std::string&);
-  static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr, const ExtractField&);
+  static hdk::ir::ExprPtr generate(const hdk::ir::ExprPtr,
+                                   const hdk::ir::DateExtractField&);
 
   const hdk::ir::ExprPtr generate() const { return generate(from_expr_, field_); }
 
  private:
-  static ExtractField to_extract_field(const std::string& field);
+  static hdk::ir::DateExtractField to_extract_field(const std::string& field);
 
   hdk::ir::ExprPtr from_expr_;
-  ExtractField field_;
+  hdk::ir::DateExtractField field_;
 };
 
 class DateTruncExpr : protected DateTimeTranslator {

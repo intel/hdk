@@ -850,7 +850,7 @@ ExpressionRange getExpressionRange(
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor,
     boost::optional<std::list<hdk::ir::ExprPtr>> simple_quals) {
-  const int32_t extract_field{extract_expr->field()};
+  const auto extract_field{extract_expr->field()};
   const auto arg_range =
       getExpressionRange(extract_expr->from(), query_infos, executor, simple_quals);
   const bool has_nulls =
@@ -861,53 +861,55 @@ ExpressionRange getExpressionRange(
                   : hdk::ir::TimeUnit::kSecond;
   bool is_hpt = extract_expr_type->isTimestamp() && (unit > hdk::ir::TimeUnit::kSecond);
   switch (extract_field) {
-    case kYEAR: {
+    case hdk::ir::DateExtractField::kYear: {
       if (arg_range.getType() == ExpressionRangeType::Invalid) {
         return ExpressionRange::makeInvalidRange();
       }
       CHECK(arg_range.getType() == ExpressionRangeType::Integer);
       const int64_t year_range_min =
-          is_hpt ? ExtractFromTime(kYEAR,
-                                   arg_range.getIntMin() / hdk::ir::unitsPerSecond(unit))
-                 : ExtractFromTime(kYEAR, arg_range.getIntMin());
+          is_hpt
+              ? ExtractFromTime(hdk::ir::DateExtractField::kYear,
+                                arg_range.getIntMin() / hdk::ir::unitsPerSecond(unit))
+              : ExtractFromTime(hdk::ir::DateExtractField::kYear, arg_range.getIntMin());
       const int64_t year_range_max =
-          is_hpt ? ExtractFromTime(kYEAR,
-                                   arg_range.getIntMax() / hdk::ir::unitsPerSecond(unit))
-                 : ExtractFromTime(kYEAR, arg_range.getIntMax());
+          is_hpt
+              ? ExtractFromTime(hdk::ir::DateExtractField::kYear,
+                                arg_range.getIntMax() / hdk::ir::unitsPerSecond(unit))
+              : ExtractFromTime(hdk::ir::DateExtractField::kYear, arg_range.getIntMax());
       return ExpressionRange::makeIntRange(
           year_range_min, year_range_max, 0, arg_range.hasNulls());
     }
-    case kEPOCH:
-    case kDATEEPOCH:
+    case hdk::ir::DateExtractField::kEpoch:
+    case hdk::ir::DateExtractField::kDateEpoch:
       return arg_range;
-    case kQUARTERDAY:
-    case kQUARTER:
+    case hdk::ir::DateExtractField::kQuarterDay:
+    case hdk::ir::DateExtractField::kQuarter:
       return ExpressionRange::makeIntRange(1, 4, 0, has_nulls);
-    case kMONTH:
+    case hdk::ir::DateExtractField::kMonth:
       return ExpressionRange::makeIntRange(1, 12, 0, has_nulls);
-    case kDAY:
+    case hdk::ir::DateExtractField::kDay:
       return ExpressionRange::makeIntRange(1, 31, 0, has_nulls);
-    case kHOUR:
+    case hdk::ir::DateExtractField::kHour:
       return ExpressionRange::makeIntRange(0, 23, 0, has_nulls);
-    case kMINUTE:
+    case hdk::ir::DateExtractField::kMinute:
       return ExpressionRange::makeIntRange(0, 59, 0, has_nulls);
-    case kSECOND:
+    case hdk::ir::DateExtractField::kSecond:
       return ExpressionRange::makeIntRange(0, 60, 0, has_nulls);
-    case kMILLISECOND:
+    case hdk::ir::DateExtractField::kMilli:
       return ExpressionRange::makeIntRange(0, 999, 0, has_nulls);
-    case kMICROSECOND:
+    case hdk::ir::DateExtractField::kMicro:
       return ExpressionRange::makeIntRange(0, 999999, 0, has_nulls);
-    case kNANOSECOND:
+    case hdk::ir::DateExtractField::kNano:
       return ExpressionRange::makeIntRange(0, 999999999, 0, has_nulls);
-    case kDOW:
+    case hdk::ir::DateExtractField::kDayOfWeek:
       return ExpressionRange::makeIntRange(0, 6, 0, has_nulls);
-    case kISODOW:
+    case hdk::ir::DateExtractField::kIsoDayOfWeek:
       return ExpressionRange::makeIntRange(1, 7, 0, has_nulls);
-    case kDOY:
+    case hdk::ir::DateExtractField::kDayOfYear:
       return ExpressionRange::makeIntRange(1, 366, 0, has_nulls);
-    case kWEEK:
-    case kWEEK_SUNDAY:
-    case kWEEK_SATURDAY:
+    case hdk::ir::DateExtractField::kWeek:
+    case hdk::ir::DateExtractField::kWeekSunday:
+    case hdk::ir::DateExtractField::kWeekSaturday:
       return ExpressionRange::makeIntRange(1, 53, 0, has_nulls);
     default:
       CHECK(false);

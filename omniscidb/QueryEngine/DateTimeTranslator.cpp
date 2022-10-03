@@ -20,45 +20,45 @@
 
 namespace {
 
-std::string from_extract_field(const ExtractField& fieldno) {
+std::string from_extract_field(const hdk::ir::DateExtractField& fieldno) {
   switch (fieldno) {
-    case kYEAR:
+    case hdk::ir::DateExtractField::kYear:
       return "year";
-    case kQUARTER:
+    case hdk::ir::DateExtractField::kQuarter:
       return "quarter";
-    case kMONTH:
+    case hdk::ir::DateExtractField::kMonth:
       return "month";
-    case kDAY:
+    case hdk::ir::DateExtractField::kDay:
       return "day";
-    case kHOUR:
+    case hdk::ir::DateExtractField::kHour:
       return "hour";
-    case kMINUTE:
+    case hdk::ir::DateExtractField::kMinute:
       return "minute";
-    case kSECOND:
+    case hdk::ir::DateExtractField::kSecond:
       return "second";
-    case kMILLISECOND:
+    case hdk::ir::DateExtractField::kMilli:
       return "millisecond";
-    case kMICROSECOND:
+    case hdk::ir::DateExtractField::kMicro:
       return "microsecond";
-    case kNANOSECOND:
+    case hdk::ir::DateExtractField::kNano:
       return "nanosecond";
-    case kDOW:
+    case hdk::ir::DateExtractField::kDayOfWeek:
       return "dow";
-    case kISODOW:
+    case hdk::ir::DateExtractField::kIsoDayOfWeek:
       return "isodow";
-    case kDOY:
+    case hdk::ir::DateExtractField::kDayOfYear:
       return "doy";
-    case kEPOCH:
+    case hdk::ir::DateExtractField::kEpoch:
       return "epoch";
-    case kQUARTERDAY:
+    case hdk::ir::DateExtractField::kQuarterDay:
       return "quarterday";
-    case kWEEK:
+    case hdk::ir::DateExtractField::kWeek:
       return "week";
-    case kWEEK_SUNDAY:
+    case hdk::ir::DateExtractField::kWeekSunday:
       return "week_sunday";
-    case kWEEK_SATURDAY:
+    case hdk::ir::DateExtractField::kWeekSaturday:
       return "week_saturday";
-    case kDATEEPOCH:
+    case hdk::ir::DateExtractField::kDateEpoch:
       return "dateepoch";
     default:
       UNREACHABLE();
@@ -111,46 +111,46 @@ std::string from_datetrunc_field(const hdk::ir::DateTruncField& fieldno) {
 
 }  // namespace
 
-ExtractField ExtractExpr::to_extract_field(const std::string& field) {
-  ExtractField fieldno;
+hdk::ir::DateExtractField ExtractExpr::to_extract_field(const std::string& field) {
+  hdk::ir::DateExtractField fieldno;
   if (boost::iequals(field, "year")) {
-    fieldno = kYEAR;
+    fieldno = hdk::ir::DateExtractField::kYear;
   } else if (boost::iequals(field, "quarter")) {
-    fieldno = kQUARTER;
+    fieldno = hdk::ir::DateExtractField::kQuarter;
   } else if (boost::iequals(field, "month")) {
-    fieldno = kMONTH;
+    fieldno = hdk::ir::DateExtractField::kMonth;
   } else if (boost::iequals(field, "day")) {
-    fieldno = kDAY;
+    fieldno = hdk::ir::DateExtractField::kDay;
   } else if (boost::iequals(field, "quarterday")) {
-    fieldno = kQUARTERDAY;
+    fieldno = hdk::ir::DateExtractField::kQuarterDay;
   } else if (boost::iequals(field, "hour")) {
-    fieldno = kHOUR;
+    fieldno = hdk::ir::DateExtractField::kHour;
   } else if (boost::iequals(field, "minute")) {
-    fieldno = kMINUTE;
+    fieldno = hdk::ir::DateExtractField::kMinute;
   } else if (boost::iequals(field, "second")) {
-    fieldno = kSECOND;
+    fieldno = hdk::ir::DateExtractField::kSecond;
   } else if (boost::iequals(field, "millisecond")) {
-    fieldno = kMILLISECOND;
+    fieldno = hdk::ir::DateExtractField::kMilli;
   } else if (boost::iequals(field, "microsecond")) {
-    fieldno = kMICROSECOND;
+    fieldno = hdk::ir::DateExtractField::kMicro;
   } else if (boost::iequals(field, "nanosecond")) {
-    fieldno = kNANOSECOND;
+    fieldno = hdk::ir::DateExtractField::kNano;
   } else if (boost::iequals(field, "dow")) {
-    fieldno = kDOW;
+    fieldno = hdk::ir::DateExtractField::kDayOfWeek;
   } else if (boost::iequals(field, "isodow")) {
-    fieldno = kISODOW;
+    fieldno = hdk::ir::DateExtractField::kIsoDayOfWeek;
   } else if (boost::iequals(field, "doy")) {
-    fieldno = kDOY;
+    fieldno = hdk::ir::DateExtractField::kDayOfYear;
   } else if (boost::iequals(field, "epoch")) {
-    fieldno = kEPOCH;
+    fieldno = hdk::ir::DateExtractField::kEpoch;
   } else if (boost::iequals(field, "week")) {
-    fieldno = kWEEK;
+    fieldno = hdk::ir::DateExtractField::kWeek;
   } else if (boost::iequals(field, "week_sunday")) {
-    fieldno = kWEEK_SUNDAY;
+    fieldno = hdk::ir::DateExtractField::kWeekSunday;
   } else if (boost::iequals(field, "week_saturday")) {
-    fieldno = kWEEK_SATURDAY;
+    fieldno = hdk::ir::DateExtractField::kWeekSaturday;
   } else if (boost::iequals(field, "dateepoch")) {
-    fieldno = kDATEEPOCH;
+    fieldno = hdk::ir::DateExtractField::kDateEpoch;
   } else {
     throw std::runtime_error("Unsupported field in EXTRACT function " + field);
   }
@@ -164,13 +164,15 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
 }
 
 hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
-                                       const ExtractField& field) {
+                                       const hdk::ir::DateExtractField& field) {
   const auto expr_type = from_expr->type();
   if (!expr_type->isDateTime()) {
     throw std::runtime_error(
         "Only TIME, TIMESTAMP and DATE types can be in EXTRACT function.");
   }
-  if (expr_type->isTime() && field != kHOUR && field != kMINUTE && field != kSECOND) {
+  if (expr_type->isTime() && field != hdk::ir::DateExtractField::kHour &&
+      field != hdk::ir::DateExtractField::kMinute &&
+      field != hdk::ir::DateExtractField::kSecond) {
     throw std::runtime_error("Cannot EXTRACT " + from_extract_field(field) +
                              " from TIME.");
   }
@@ -178,7 +180,7 @@ hdk::ir::ExprPtr ExtractExpr::generate(const hdk::ir::ExprPtr from_expr,
   auto constant = from_expr->as<hdk::ir::Constant>();
   if (constant != nullptr) {
     Datum d;
-    d.bigintval = field == kEPOCH
+    d.bigintval = field == hdk::ir::DateExtractField::kEpoch
                       ? floor_div(constant->value().bigintval,
                                   hdk::ir::unitsPerSecond(
                                       expr_type->as<hdk::ir::DateTimeBaseType>()->unit()))

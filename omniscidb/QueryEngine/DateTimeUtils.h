@@ -30,30 +30,36 @@
 
 namespace {
 
-static const std::map<std::pair<int32_t, ExtractField>,
+static const std::map<std::pair<int32_t, hdk::ir::DateExtractField>,
                       std::pair<hdk::ir::OpType, int64_t>>
-    orig_extract_precision_lookup = {
-        {{3, kMICROSECOND}, {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
-        {{3, kNANOSECOND}, {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
-        {{6, kMILLISECOND}, {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
-        {{6, kNANOSECOND}, {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
-        {{9, kMILLISECOND}, {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
-        {{9, kMICROSECOND}, {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
+    orig_extract_precision_lookup = {{{3, hdk::ir::DateExtractField::kMicro},
+                                      {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+                                     {{3, hdk::ir::DateExtractField::kNano},
+                                      {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
+                                     {{6, hdk::ir::DateExtractField::kMilli},
+                                      {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
+                                     {{6, hdk::ir::DateExtractField::kNano},
+                                      {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+                                     {{9, hdk::ir::DateExtractField::kMilli},
+                                      {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
+                                     {{9, hdk::ir::DateExtractField::kMicro},
+                                      {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
 
-static const std::map<std::pair<hdk::ir::TimeUnit, ExtractField>,
+static const std::map<std::pair<hdk::ir::TimeUnit, hdk::ir::DateExtractField>,
                       std::pair<hdk::ir::OpType, int64_t>>
-    extract_precision_lookup = {{{hdk::ir::TimeUnit::kMilli, kMICROSECOND},
-                                 {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
-                                {{hdk::ir::TimeUnit::kMilli, kNANOSECOND},
-                                 {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
-                                {{hdk::ir::TimeUnit::kMicro, kMILLISECOND},
-                                 {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
-                                {{hdk::ir::TimeUnit::kMicro, kNANOSECOND},
-                                 {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
-                                {{hdk::ir::TimeUnit::kNano, kMILLISECOND},
-                                 {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
-                                {{hdk::ir::TimeUnit::kNano, kMICROSECOND},
-                                 {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
+    extract_precision_lookup = {
+        {{hdk::ir::TimeUnit::kMilli, hdk::ir::DateExtractField::kMicro},
+         {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMilli, hdk::ir::DateExtractField::kNano},
+         {hdk::ir::OpType::kMul, kMicroSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMicro, hdk::ir::DateExtractField::kMilli},
+         {hdk::ir::OpType::kDiv, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kMicro, hdk::ir::DateExtractField::kNano},
+         {hdk::ir::OpType::kMul, kMilliSecsPerSec}},
+        {{hdk::ir::TimeUnit::kNano, hdk::ir::DateExtractField::kMilli},
+         {hdk::ir::OpType::kDiv, kMicroSecsPerSec}},
+        {{hdk::ir::TimeUnit::kNano, hdk::ir::DateExtractField::kMicro},
+         {hdk::ir::OpType::kDiv, kMilliSecsPerSec}}};
 
 static const std::map<std::pair<hdk::ir::TimeUnit, hdk::ir::DateTruncField>, int64_t>
     datetrunc_precision_lookup = {
@@ -99,22 +105,25 @@ constexpr inline int64_t get_dateadd_timestamp_precision_scale(
   return -1;
 }
 
-constexpr inline int64_t get_extract_timestamp_precision_scale(const ExtractField field) {
+constexpr inline int64_t get_extract_timestamp_precision_scale(
+    const hdk::ir::DateExtractField field) {
   switch (field) {
-    case kMILLISECOND:
+    case hdk::ir::DateExtractField::kMilli:
       return kMilliSecsPerSec;
-    case kMICROSECOND:
+    case hdk::ir::DateExtractField::kMicro:
       return kMicroSecsPerSec;
-    case kNANOSECOND:
+    case hdk::ir::DateExtractField::kNano:
       return kNanoSecsPerSec;
     default:
-      throw std::runtime_error("Unknown field = " + std::to_string(field));
+      throw std::runtime_error("Unknown field = " + toString(field));
   }
   return -1;
 }
 
-constexpr inline bool is_subsecond_extract_field(const ExtractField& field) {
-  return field == kMILLISECOND || field == kMICROSECOND || field == kNANOSECOND;
+constexpr inline bool is_subsecond_extract_field(const hdk::ir::DateExtractField& field) {
+  return field == hdk::ir::DateExtractField::kMilli ||
+         field == hdk::ir::DateExtractField::kMicro ||
+         field == hdk::ir::DateExtractField::kNano;
 }
 
 constexpr inline bool is_subsecond_dateadd_field(const hdk::ir::DateAddField field) {
@@ -172,7 +181,7 @@ get_dateadd_high_precision_adjusted_scale(const hdk::ir::DateAddField field,
 }
 
 const inline std::pair<hdk::ir::OpType, int64_t>
-get_extract_high_precision_adjusted_scale(const ExtractField& field,
+get_extract_high_precision_adjusted_scale(const hdk::ir::DateExtractField& field,
                                           const hdk::ir::TimeUnit unit) {
   const auto result = extract_precision_lookup.find(std::make_pair(unit, field));
   if (result != extract_precision_lookup.end()) {

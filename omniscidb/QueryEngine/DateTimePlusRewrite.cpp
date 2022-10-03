@@ -69,7 +69,8 @@ hdk::ir::DateTruncField get_dt_field(const hdk::ir::Expr* ts,
   if (dt_hour) {
     const auto extract_fn =
         dynamic_cast<const hdk::ir::ExtractExpr*>(interval_multiplier);
-    return (extract_fn && extract_fn->field() == kHOUR && *extract_fn->from() == *ts)
+    return (extract_fn && extract_fn->field() == hdk::ir::DateExtractField::kHour &&
+            *extract_fn->from() == *ts)
                ? hdk::ir::DateTruncField::kHour
                : hdk::ir::DateTruncField::kInvalid;
   }
@@ -96,9 +97,9 @@ hdk::ir::DateTruncField get_dt_field(const hdk::ir::Expr* ts,
     return hdk::ir::DateTruncField::kInvalid;
   }
   switch (extract_fn->field()) {
-    case kDAY:
+    case hdk::ir::DateExtractField::kDay:
       return hdk::ir::DateTruncField::kMonth;
-    case kDOY:
+    case hdk::ir::DateExtractField::kDayOfYear:
       return hdk::ir::DateTruncField::kYear;
     default:
       break;

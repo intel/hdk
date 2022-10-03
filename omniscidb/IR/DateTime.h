@@ -63,6 +63,28 @@ enum class DateTruncField {
   kInvalid
 };
 
+enum class DateExtractField {
+  kYear,
+  kQuarter,
+  kMonth,
+  kDay,
+  kHour,
+  kMinute,
+  kSecond,
+  kMilli,
+  kMicro,
+  kNano,
+  kDayOfWeek,
+  kIsoDayOfWeek,
+  kDayOfYear,
+  kEpoch,
+  kQuarterDay,
+  kWeek,
+  kWeekSunday,
+  kWeekSaturday,
+  kDateEpoch
+};
+
 }  // namespace hdk::ir
 
 inline std::string toString(hdk::ir::TimeUnit unit) {
@@ -183,6 +205,51 @@ inline std::string toString(hdk::ir::DateTruncField field) {
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::DateTruncField field) {
   os << toString(field);
   return os;
+}
+
+inline std::string toString(hdk::ir::DateExtractField field) {
+  switch (field) {
+    case hdk::ir::DateExtractField::kYear:
+      return "Year";
+    case hdk::ir::DateExtractField::kQuarter:
+      return "Quarter";
+    case hdk::ir::DateExtractField::kMonth:
+      return "Month";
+    case hdk::ir::DateExtractField::kDay:
+      return "Day";
+    case hdk::ir::DateExtractField::kHour:
+      return "Hour";
+    case hdk::ir::DateExtractField::kMinute:
+      return "Minute";
+    case hdk::ir::DateExtractField::kSecond:
+      return "Second";
+    case hdk::ir::DateExtractField::kMilli:
+      return "Milli";
+    case hdk::ir::DateExtractField::kMicro:
+      return "Micro";
+    case hdk::ir::DateExtractField::kNano:
+      return "Nano";
+    case hdk::ir::DateExtractField::kDayOfWeek:
+      return "DayOfWeek";
+    case hdk::ir::DateExtractField::kIsoDayOfWeek:
+      return "IsoDayOfWeek";
+    case hdk::ir::DateExtractField::kDayOfYear:
+      return "DayOfYear";
+    case hdk::ir::DateExtractField::kEpoch:
+      return "Epoch";
+    case hdk::ir::DateExtractField::kQuarterDay:
+      return "QuarterDay";
+    case hdk::ir::DateExtractField::kWeek:
+      return "Week";
+    case hdk::ir::DateExtractField::kWeekSunday:
+      return "WeekSunday";
+    case hdk::ir::DateExtractField::kWeekSaturday:
+      return "WeekSaturday";
+    case hdk::ir::DateExtractField::kDateEpoch:
+      return "DateEpoch";
+    default:
+      return "InvalidDateExtractField";
+  }
 }
 
 namespace hdk::ir {

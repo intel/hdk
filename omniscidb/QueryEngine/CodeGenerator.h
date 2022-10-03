@@ -331,7 +331,7 @@ class CodeGenerator {
 
   llvm::Value* codegenExtractHighPrecisionTimestamps(llvm::Value*,
                                                      const hdk::ir::Type*,
-                                                     const ExtractField&);
+                                                     const hdk::ir::DateExtractField&);
 
   llvm::Value* codegenDateTruncHighPrecisionTimestamps(llvm::Value*,
                                                        const hdk::ir::Type*,

@@ -137,7 +137,7 @@ const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
                                   const hdk::ir::Expr* arg_expr,
                                   bool bigint_count);
 
-ExtractField to_datepart_field(const std::string&);
+hdk::ir::DateExtractField to_datepart_field(const std::string&);
 
 hdk::ir::DateAddField to_dateadd_field(const std::string&);
 
