@@ -25,6 +25,8 @@
 #include <ostream>
 #endif
 
+#include "Shared/Config.h"
+
 enum class ExecutorDeviceType { CPU = 0, GPU };
 #ifndef __CUDACC__
 inline std::ostream& operator<<(std::ostream& os, ExecutorDeviceType const dt) {
@@ -103,22 +105,29 @@ struct ExecutionOptions {
   bool multifrag_result = false;
   bool preserve_order = false;
 
-  static ExecutionOptions defaults() {
-    return ExecutionOptions{false,
-                            true,
-                            false,
-                            false,
-                            true,
-                            false,
-                            false,
-                            false,
-                            0,
-                            false,
-                            false,
-                            1.0,
-                            false,
-                            0.5,
-                            1000};
+  static ExecutionOptions fromConfig(const Config& config) {
+    auto eo = ExecutionOptions();
+    eo.output_columnar_hint = config.rs.enable_columnar_output;
+    eo.allow_multifrag = true;
+    eo.just_explain = false;
+    eo.allow_loop_joins = config.exec.join.allow_loop_joins;
+    eo.with_watchdog = config.exec.watchdog.enable;
+    eo.jit_debug = false;
+    eo.just_validate = false;
+    eo.with_dynamic_watchdog = config.exec.watchdog.enable_dynamic;
+    eo.dynamic_watchdog_time_limit = config.exec.watchdog.time_limit;
+    eo.find_push_down_candidates = config.opts.filter_pushdown.enable;
+    eo.just_calcite_explain = false;
+    eo.gpu_input_mem_limit_percent = config.mem.gpu.input_mem_limit_percent;
+    eo.allow_runtime_query_interrupt =
+        config.exec.interrupt.enable_runtime_query_interrupt;
+    eo.running_query_interrupt_freq = config.exec.interrupt.running_query_interrupt_freq;
+    eo.pending_query_interrupt_freq = 0;
+
+    eo.multifrag_result = config.exec.enable_multifrag_rs;
+    eo.preserve_order = false;
+
+    return eo;
   }
 
   ExecutionOptions with_multifrag_result(bool enable = true) const {
@@ -132,6 +141,9 @@ struct ExecutionOptions {
     eo.preserve_order = enable;
     return eo;
   }
+
+ private:
+  ExecutionOptions() {}
 };
 
 #endif  // QUERYENGINE_COMPILATIONOPTIONS_H

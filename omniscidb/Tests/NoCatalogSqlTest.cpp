@@ -187,7 +187,8 @@ class NoCatalogSqlTest : public ::testing::Test {
 
     auto co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
     co.use_groupby_buffer_desc = use_groupby_buffer_desc;
-    return ra_executor.executeRelAlgQuery(co, ExecutionOptions(), false);
+    return ra_executor.executeRelAlgQuery(
+        co, ExecutionOptions::fromConfig(config()), false);
   }
 
   ExecutionResult runSqlQuery(const std::string& sql, Executor* executor) {
@@ -208,6 +209,8 @@ class NoCatalogSqlTest : public ::testing::Test {
     auto data_provider_ptr = ps_mgr->getDataProvider(TEST_SCHEMA_ID);
     return dynamic_cast<TestDataProvider&>(*data_provider_ptr);
   }
+
+  const Config& config() const { return *config_; }
 
  protected:
   static ConfigPtr config_;
@@ -263,7 +266,8 @@ TEST_F(NoCatalogSqlTest, GroupBySingleColumn) {
 
 TEST_F(NoCatalogSqlTest, StreamingAggregate) {
   auto ra_executor = getExecutor("SELECT SUM(val) FROM test_streaming;");
-  ra_executor.prepareStreamingExecution(CompilationOptions(), ExecutionOptions());
+  ra_executor.prepareStreamingExecution(CompilationOptions(),
+                                        ExecutionOptions::fromConfig(config()));
   TestDataProvider& data_provider = getDataProvider();
 
   data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {1, 2, 3});
@@ -291,7 +295,8 @@ TEST_F(NoCatalogSqlTest, StreamingAggregate) {
 TEST_F(NoCatalogSqlTest, StreamingFilter) {
   GTEST_SKIP();
   auto ra_executor = getExecutor("SELECT val FROM test_streaming WHERE val > 20;");
-  ra_executor.prepareStreamingExecution(CompilationOptions(), ExecutionOptions());
+  ra_executor.prepareStreamingExecution(CompilationOptions(),
+                                        ExecutionOptions::fromConfig(config()));
 
   std::vector<std::string> col_names;
   col_names.push_back("val");

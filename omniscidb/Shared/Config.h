@@ -31,7 +31,7 @@ struct CpuSubTasksConfig {
 };
 
 struct JoinConfig {
-  bool allow_loop_joins = false;
+  bool allow_loop_joins = true;
   unsigned trivial_loop_join_threshold = 1'000;
   bool inner_join_fragment_skipping = true;
   size_t huge_join_hash_threshold = 1'000'000;
@@ -70,9 +70,9 @@ struct HeterogenousConfig {
 };
 
 struct InterruptConfig {
-  bool enable_runtime_query_interrupt = true;
+  bool enable_runtime_query_interrupt = false;
   bool enable_non_kernel_time_query_interrupt = true;
-  double running_query_interrupt_freq = 0.1;
+  double running_query_interrupt_freq = 1000;
 };
 
 struct CodegenConfig {

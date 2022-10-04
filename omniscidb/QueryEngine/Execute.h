@@ -238,7 +238,10 @@ struct StreamExecutionContext {
   std::unique_ptr<SharedKernelContext> shared_context;
   bool is_agg;
 
-  StreamExecutionContext(RelAlgExecutionUnit ra_exe_unit) : ra_exe_unit(ra_exe_unit) {}
+  StreamExecutionContext(RelAlgExecutionUnit ra_exe_unit,
+                         const CompilationOptions& co,
+                         const ExecutionOptions& eo)
+      : ra_exe_unit(ra_exe_unit), co(co), eo(eo) {}
 };
 
 class Executor {

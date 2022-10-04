@@ -9792,7 +9792,7 @@ TEST_F(Select, Joins_LeftJoinFiltered) {
     CompilationOptions co;
     co.device_type = dt;
     co.hoist_literals = true;
-    ExecutionOptions eo;
+    ExecutionOptions eo = ExecutionOptions::fromConfig(config());
     eo.allow_loop_joins = false;
     eo.just_explain = true;
     const auto query_explain_result = runSqlQuery(query, co, eo);

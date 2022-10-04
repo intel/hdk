@@ -133,20 +133,10 @@ class ArrowSQLRunnerImpl {
   }
 
   ExecutionOptions getExecutionOptions(bool allow_loop_joins, bool just_explain = false) {
-    return {config_->rs.enable_columnar_output,
-            true,
-            just_explain,
-            allow_loop_joins,
-            false,
-            false,
-            false,
-            false,
-            10000,
-            false,
-            false,
-            config_->mem.gpu.input_mem_limit_percent,
-            false,
-            1000};
+    ExecutionOptions eo = ExecutionOptions::fromConfig(*config_);
+    eo.allow_loop_joins = allow_loop_joins;
+    eo.just_explain = just_explain;
+    return eo;
   }
 
   CompilationOptions getCompilationOptions(ExecutorDeviceType device_type) {
@@ -360,7 +350,7 @@ class ArrowSQLRunnerImpl {
     SystemParameters system_parameters;
     system_parameters.gpu_buffer_mem_bytes = max_gpu_mem;
     data_mgr_ = std::make_unique<DataMgr>(
-        *config_, system_parameters, std::move(gpu_mgrs), uses_gpu);
+        *config_, system_parameters, std::move(gpu_mgrs), max_gpu_mem);
     auto* ps_mgr = data_mgr_->getPersistentStorageMgr();
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID, storage_);
 

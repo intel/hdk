@@ -1738,11 +1738,9 @@ std::shared_ptr<StreamExecutionContext> Executor::prepareStreamingExecution(
 
   CHECK(query_mem_desc_owned);
 
-  auto ctx = std::make_shared<StreamExecutionContext>(std::move(ra_exe_unit));
+  auto ctx = std::make_shared<StreamExecutionContext>(std::move(ra_exe_unit), co, eo);
   ctx->query_comp_desc = std::move(query_comp_desc_owned);
   ctx->query_mem_desc = std::move(query_mem_desc_owned);
-  ctx->co = co;
-  ctx->eo = eo;
   ctx->column_fetcher = std::move(column_fetcher);
   ctx->shared_context = std::make_unique<SharedKernelContext>(query_infos);
 

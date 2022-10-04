@@ -115,7 +115,7 @@ TEST_F(HighCardinalityStringEnv, PerfectHashNoFallback) {
                                 table_infos,
                                 ra_exe_unit,
                                 CompilationOptions::defaults(ExecutorDeviceType::CPU),
-                                ExecutionOptions::defaults(),
+                                ExecutionOptions::fromConfig(executor->getConfig()),
                                 /*has_cardinality_estimation=*/false,
                                 getDataMgr()->getDataProvider(),
                                 column_cache)[0];
@@ -211,7 +211,7 @@ TEST_F(HighCardinalityStringEnv, BaselineFallbackTest) {
                                 table_infos,
                                 ra_exe_unit,
                                 CompilationOptions::defaults(ExecutorDeviceType::CPU),
-                                ExecutionOptions::defaults(),
+                                ExecutionOptions::fromConfig(executor->getConfig()),
                                 /*has_cardinality_estimation=*/false,
                                 getDataMgr()->getDataProvider(),
                                 column_cache),
@@ -223,7 +223,7 @@ TEST_F(HighCardinalityStringEnv, BaselineFallbackTest) {
                                 table_infos,
                                 ra_exe_unit,
                                 CompilationOptions::defaults(ExecutorDeviceType::CPU),
-                                ExecutionOptions::defaults(),
+                                ExecutionOptions::fromConfig(executor->getConfig()),
                                 /*has_cardinality_estimation=*/true,
                                 getDataMgr()->getDataProvider(),
                                 column_cache)[0];
@@ -288,7 +288,7 @@ TEST_F(HighCardinalityStringEnv, BaselineNoFilters) {
                                 table_infos,
                                 ra_exe_unit,
                                 CompilationOptions::defaults(ExecutorDeviceType::CPU),
-                                ExecutionOptions::defaults(),
+                                ExecutionOptions::fromConfig(executor->getConfig()),
                                 /*has_cardinality_estimation=*/false,
                                 getDataMgr()->getDataProvider(),
                                 column_cache)[0];

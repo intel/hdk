@@ -491,7 +491,7 @@ RelAlgExecutor::getJoinInfo(const RelAlgNode* root_node) {
     // we assume that test query that needs join info does not contain any sort node
     return {};
   }
-  auto work_unit = createWorkUnit(root_node, {}, ExecutionOptions::defaults());
+  auto work_unit = createWorkUnit(root_node, {}, ExecutionOptions::fromConfig(Config()));
   RelLeftDeepTreeIdsCollector visitor;
   auto left_deep_tree_ids = visitor.visit(root_node);
   return {left_deep_tree_ids, getLeftDeepJoinTreesInfo()};
@@ -533,24 +533,12 @@ QueryStepExecutionResult RelAlgExecutor::executeRelAlgQuerySingleStep(
     if (sort->collationCount() || node_is_aggregate(source)) {
       auto temp_seq = RaExecutionSequence(std::make_unique<RaExecutionDesc>(source));
       CHECK_EQ(temp_seq.size(), size_t(1));
-      ExecutionOptions eo_copy = {
-          eo.output_columnar_hint,
-          eo.allow_multifrag,
-          eo.just_explain,
-          eo.allow_loop_joins,
-          eo.with_watchdog,
-          eo.jit_debug,
-          eo.just_validate || sort->isEmptyResult(),
-          eo.with_dynamic_watchdog,
-          eo.dynamic_watchdog_time_limit,
-          eo.find_push_down_candidates,
-          eo.just_calcite_explain,
-          eo.gpu_input_mem_limit_percent,
-          eo.allow_runtime_query_interrupt,
-          eo.running_query_interrupt_freq,
-          eo.pending_query_interrupt_freq,
-          eo.executor_type,
-      };
+      const ExecutionOptions eo_copy = [&]() {
+        ExecutionOptions copy = eo;
+        copy.just_validate = eo.just_validate || sort->isEmptyResult();
+        return copy;
+      }();
+
       // Use subseq to avoid clearing existing temporary tables
       return {executeRelAlgSubSeq(temp_seq, std::make_pair(0, 1), co, eo_copy, 0),
               merge_type(source),
@@ -706,24 +694,14 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     return;
   }
 
-  const ExecutionOptions eo_work_unit{
-      eo.output_columnar_hint,
-      eo.allow_multifrag,
-      eo.just_explain,
-      eo.allow_loop_joins,
-      eo.with_watchdog && (step_idx == 0 || dynamic_cast<const RelProject*>(body)),
-      eo.jit_debug,
-      eo.just_validate,
-      eo.with_dynamic_watchdog,
-      eo.dynamic_watchdog_time_limit,
-      eo.find_push_down_candidates,
-      eo.just_calcite_explain,
-      eo.gpu_input_mem_limit_percent,
-      eo.allow_runtime_query_interrupt,
-      eo.running_query_interrupt_freq,
-      eo.pending_query_interrupt_freq,
-      eo.executor_type,
-      step_idx == 0 ? eo.outer_fragment_indices : std::vector<size_t>()};
+  const auto eo_work_unit = [&]() {
+    ExecutionOptions new_eo = eo;
+    new_eo.with_watchdog =
+        eo.with_watchdog && (step_idx == 0 || dynamic_cast<const RelProject*>(body));
+    new_eo.outer_fragment_indices =
+        step_idx == 0 ? eo.outer_fragment_indices : std::vector<size_t>();
+    return new_eo;
+  }();
 
   auto hint_applied = handle_hint(co, eo_work_unit, body);
   const auto compound = dynamic_cast<const RelCompound*>(body);
@@ -1723,24 +1701,12 @@ ExecutionResult RelAlgExecutor::executeSort(const RelSort* sort,
                              &is_desc]() -> ExecutionResult {
     const auto source_work_unit = createSortInputWorkUnit(sort, eo);
     is_desc = first_oe_is_desc(source_work_unit.exe_unit.sort_info.order_entries);
-    ExecutionOptions eo_copy = {
-        eo.output_columnar_hint,
-        eo.allow_multifrag,
-        eo.just_explain,
-        eo.allow_loop_joins,
-        eo.with_watchdog,
-        eo.jit_debug,
-        eo.just_validate || sort->isEmptyResult(),
-        eo.with_dynamic_watchdog,
-        eo.dynamic_watchdog_time_limit,
-        eo.find_push_down_candidates,
-        eo.just_calcite_explain,
-        eo.gpu_input_mem_limit_percent,
-        eo.allow_runtime_query_interrupt,
-        eo.running_query_interrupt_freq,
-        eo.pending_query_interrupt_freq,
-        eo.executor_type,
-    };
+    const ExecutionOptions eo_copy = [&]() {
+      ExecutionOptions copy = eo;
+      copy.just_validate = eo.just_validate || sort->isEmptyResult();
+      copy.outer_fragment_indices = {};
+      return copy;
+    }();
 
     groupby_exprs = source_work_unit.exe_unit.groupby_exprs;
     auto source_result = executeWorkUnit(source_work_unit,
@@ -2245,23 +2211,14 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
 
   const auto table_infos = get_table_infos(ra_exe_unit_in, executor_);
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;
-  ExecutionOptions eo_no_multifrag{eo.output_columnar_hint,
-                                   false,
-                                   false,
-                                   eo.allow_loop_joins,
-                                   eo.with_watchdog,
-                                   eo.jit_debug,
-                                   false,
-                                   eo.with_dynamic_watchdog,
-                                   eo.dynamic_watchdog_time_limit,
-                                   false,
-                                   false,
-                                   eo.gpu_input_mem_limit_percent,
-                                   eo.allow_runtime_query_interrupt,
-                                   eo.running_query_interrupt_freq,
-                                   eo.pending_query_interrupt_freq,
-                                   eo.executor_type,
-                                   eo.outer_fragment_indices};
+  const ExecutionOptions eo_no_multifrag = [&]() {
+    ExecutionOptions copy = eo;
+    copy.allow_multifrag = false;
+    copy.just_explain = false;
+    copy.find_push_down_candidates = false;
+    copy.just_calcite_explain = false;
+    return copy;
+  }();
 
   if (was_multifrag_kernel_launch) {
     try {

@@ -39,7 +39,7 @@ std::string getFilePath(const std::string& file_name) {
 
 ExecutionResult runSqlQuery(const std::string& sql) {
   return TestHelpers::ArrowSQLRunner::runSqlQuery(
-      sql, CompilationOptions(), ExecutionOptions());
+      sql, CompilationOptions(), ExecutionOptions::fromConfig(config()));
 }
 
 }  // anonymous namespace
