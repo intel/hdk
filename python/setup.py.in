@@ -86,7 +86,7 @@ storage = Extension(
 
 setup(
     name="pyhdk",
-    version="0.1",
+    version="@HDK_VERSION_RAW@",
     packages=["pyhdk"],
     package_dir={"pyhdk": "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
     ext_modules=cythonize(
