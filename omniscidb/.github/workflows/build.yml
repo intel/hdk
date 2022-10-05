@@ -63,7 +63,7 @@ jobs:
 
       - name: Build
         env:
-          CPU_COUNT: 4
+          CPU_COUNT: 2
           RUN_TESTS: 1
         run: |
           mkdir -p ${{ env.PREFIX }}
