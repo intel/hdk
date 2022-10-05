@@ -68,7 +68,7 @@ class QueryPlanDagCache {
   QueryPlanDagCache(const QueryPlanDagCache&) = delete;
   QueryPlanDagCache& operator=(const QueryPlanDagCache&) = delete;
 
-  std::optional<RelNodeId> addNodeIfAbsent(const RelAlgNode*);
+  std::optional<RelNodeId> addNodeIfAbsent(const hdk::ir::Node*);
 
   void connectNodes(const RelNodeId parent_id, const RelNodeId child_id);
 

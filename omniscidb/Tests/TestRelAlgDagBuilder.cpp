@@ -16,28 +16,28 @@
 
 #include "QueryEngine/RelAlgTranslator.h"
 
-RelAlgNodePtr TestRelAlgDagBuilder::addScan(const TableRef& table) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addScan(const TableRef& table) {
   return addScan(schema_provider_->getTableInfo(table));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addScan(int db_id, int table_id) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addScan(int db_id, int table_id) {
   return addScan(schema_provider_->getTableInfo(db_id, table_id));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addScan(int db_id, const std::string& table_name) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addScan(int db_id, const std::string& table_name) {
   return addScan(schema_provider_->getTableInfo(db_id, table_name));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addScan(TableInfoPtr table_info) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addScan(TableInfoPtr table_info) {
   auto col_infos = schema_provider_->listColumns(*table_info);
-  auto scan_node = std::make_shared<RelScan>(table_info, std::move(col_infos));
+  auto scan_node = std::make_shared<hdk::ir::Scan>(table_info, std::move(col_infos));
   nodes_.push_back(scan_node);
   return scan_node;
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addProject(RelAlgNodePtr input,
-                                               const std::vector<std::string>& fields,
-                                               const std::vector<int>& cols) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addProject(hdk::ir::NodePtr input,
+                                                  const std::vector<std::string>& fields,
+                                                  const std::vector<int>& cols) {
   hdk::ir::ExprPtrVector exprs;
   auto input_cols = getNodeColumnRefs(input.get());
   for (auto col_idx : cols) {
@@ -47,39 +47,40 @@ RelAlgNodePtr TestRelAlgDagBuilder::addProject(RelAlgNodePtr input,
   return addProject(input, fields, std::move(exprs));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addProject(RelAlgNodePtr input,
-                                               const std::vector<std::string>& fields,
-                                               hdk::ir::ExprPtrVector exprs) {
-  auto res = std::make_shared<RelProject>(std::move(exprs), fields, input);
+hdk::ir::NodePtr TestRelAlgDagBuilder::addProject(hdk::ir::NodePtr input,
+                                                  const std::vector<std::string>& fields,
+                                                  hdk::ir::ExprPtrVector exprs) {
+  auto res = std::make_shared<hdk::ir::Project>(std::move(exprs), fields, input);
   nodes_.push_back(res);
   return res;
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addProject(RelAlgNodePtr input,
-                                               const std::vector<int>& cols) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addProject(hdk::ir::NodePtr input,
+                                                  const std::vector<int>& cols) {
   auto fields = buildFieldNames(cols.size());
   return addProject(input, fields, std::move(cols));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addProject(RelAlgNodePtr input,
-                                               hdk::ir::ExprPtrVector exprs) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addProject(hdk::ir::NodePtr input,
+                                                  hdk::ir::ExprPtrVector exprs) {
   auto fields = buildFieldNames(exprs.size());
   return addProject(input, fields, std::move(exprs));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addAgg(RelAlgNodePtr input,
-                                           const std::vector<std::string>& fields,
-                                           size_t group_size,
-                                           hdk::ir::ExprPtrVector aggs) {
-  auto res = std::make_shared<RelAggregate>(group_size, std::move(aggs), fields, input);
+hdk::ir::NodePtr TestRelAlgDagBuilder::addAgg(hdk::ir::NodePtr input,
+                                              const std::vector<std::string>& fields,
+                                              size_t group_size,
+                                              hdk::ir::ExprPtrVector aggs) {
+  auto res =
+      std::make_shared<hdk::ir::Aggregate>(group_size, std::move(aggs), fields, input);
   nodes_.push_back(res);
   return res;
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addAgg(RelAlgNodePtr input,
-                                           const std::vector<std::string>& fields,
-                                           size_t group_size,
-                                           std::vector<AggDesc> aggs) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addAgg(hdk::ir::NodePtr input,
+                                              const std::vector<std::string>& fields,
+                                              size_t group_size,
+                                              std::vector<AggDesc> aggs) {
   hdk::ir::ExprPtrVector agg_exprs;
   for (auto& agg : aggs) {
     hdk::ir::ExprPtr arg_expr;
@@ -94,43 +95,44 @@ RelAlgNodePtr TestRelAlgDagBuilder::addAgg(RelAlgNodePtr input,
   return addAgg(input, fields, group_size, std::move(agg_exprs));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addAgg(RelAlgNodePtr input,
-                                           size_t group_size,
-                                           hdk::ir::ExprPtrVector aggs) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addAgg(hdk::ir::NodePtr input,
+                                              size_t group_size,
+                                              hdk::ir::ExprPtrVector aggs) {
   auto fields = buildFieldNames(group_size + aggs.size());
   return addAgg(input, fields, group_size, std::move(aggs));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addAgg(RelAlgNodePtr input,
-                                           size_t group_size,
-                                           std::vector<AggDesc> aggs) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addAgg(hdk::ir::NodePtr input,
+                                              size_t group_size,
+                                              std::vector<AggDesc> aggs) {
   auto fields = buildFieldNames(group_size + aggs.size());
   return addAgg(input, fields, group_size, std::move(aggs));
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addSort(RelAlgNodePtr input,
-                                            const std::vector<SortField>& collation,
-                                            const size_t limit,
-                                            const size_t offset) {
-  auto res = std::make_shared<RelSort>(collation, limit, offset, input);
+hdk::ir::NodePtr TestRelAlgDagBuilder::addSort(
+    hdk::ir::NodePtr input,
+    const std::vector<hdk::ir::SortField>& collation,
+    const size_t limit,
+    const size_t offset) {
+  auto res = std::make_shared<hdk::ir::Sort>(collation, limit, offset, input);
   nodes_.push_back(res);
   return res;
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addJoin(RelAlgNodePtr lhs,
-                                            RelAlgNodePtr rhs,
-                                            const JoinType join_type,
-                                            hdk::ir::ExprPtr condition) {
-  auto res = std::make_shared<RelJoin>(lhs, rhs, std::move(condition), join_type);
+hdk::ir::NodePtr TestRelAlgDagBuilder::addJoin(hdk::ir::NodePtr lhs,
+                                               hdk::ir::NodePtr rhs,
+                                               const JoinType join_type,
+                                               hdk::ir::ExprPtr condition) {
+  auto res = std::make_shared<hdk::ir::Join>(lhs, rhs, std::move(condition), join_type);
   nodes_.push_back(res);
   return res;
 }
 
-RelAlgNodePtr TestRelAlgDagBuilder::addEquiJoin(RelAlgNodePtr lhs,
-                                                RelAlgNodePtr rhs,
-                                                const JoinType join_type,
-                                                size_t lhs_col_idx,
-                                                size_t rhs_col_idx) {
+hdk::ir::NodePtr TestRelAlgDagBuilder::addEquiJoin(hdk::ir::NodePtr lhs,
+                                                   hdk::ir::NodePtr rhs,
+                                                   const JoinType join_type,
+                                                   size_t lhs_col_idx,
+                                                   size_t rhs_col_idx) {
   auto lhs_expr = hdk::ir::makeExpr<hdk::ir::ColumnRef>(
       getColumnType(lhs.get(), lhs_col_idx), lhs.get(), lhs_col_idx);
   auto rhs_expr = hdk::ir::makeExpr<hdk::ir::ColumnRef>(
@@ -151,6 +153,6 @@ std::vector<std::string> TestRelAlgDagBuilder::buildFieldNames(size_t count) con
   return res;
 }
 
-void TestRelAlgDagBuilder::setRoot(RelAlgNodePtr root) {
+void TestRelAlgDagBuilder::setRoot(hdk::ir::NodePtr root) {
   root_ = root;
 }

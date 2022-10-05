@@ -20,12 +20,11 @@
 #include <set>
 #include <vector>
 
-class RelAlgNode;
-
 namespace hdk::ir {
 
 class Type;
 class Expr;
+class Node;
 
 using ExprPtr = std::shared_ptr<const Expr>;
 using ExprPtrList = std::list<ExprPtr>;
@@ -93,7 +92,7 @@ class Expr : public std::enable_shared_from_this<Expr> {
  */
 class ColumnRef : public Expr {
  public:
-  ColumnRef(const Type* type, const RelAlgNode* node, unsigned idx)
+  ColumnRef(const Type* type, const Node* node, unsigned idx)
       : Expr(type), node_(node), idx_(idx) {}
 
   ExprPtr withType(const Type* new_type) const override {
@@ -107,14 +106,14 @@ class ColumnRef : public Expr {
 
   std::string toString() const override;
 
-  const RelAlgNode* node() const { return node_; }
+  const Node* node() const { return node_; }
 
   unsigned index() const { return idx_; }
 
   size_t hash() const override;
 
  protected:
-  const RelAlgNode* node_;
+  const Node* node_;
   unsigned idx_;
 };
 
@@ -434,7 +433,7 @@ class RangeOper : public Expr {
 
 class ScalarSubquery : public Expr {
  public:
-  ScalarSubquery(const hdk::ir::Type* type, std::shared_ptr<const RelAlgNode> node)
+  ScalarSubquery(const hdk::ir::Type* type, std::shared_ptr<const Node> node)
       : Expr(type), node_(node) {}
   ExprPtr withType(const Type* new_type) const override {
     return makeExpr<ScalarSubquery>(new_type, node_);
@@ -447,13 +446,13 @@ class ScalarSubquery : public Expr {
 
   std::string toString() const override;
 
-  const RelAlgNode* node() const { return node_.get(); }
-  std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
+  const Node* node() const { return node_.get(); }
+  std::shared_ptr<const Node> nodeShared() const { return node_; }
 
   size_t hash() const override;
 
  private:
-  std::shared_ptr<const RelAlgNode> node_;
+  std::shared_ptr<const Node> node_;
 };
 
 /*
@@ -513,7 +512,7 @@ class InSubquery : public Expr {
  public:
   InSubquery(const hdk::ir::Type* type,
              hdk::ir::ExprPtr arg,
-             std::shared_ptr<const RelAlgNode> node)
+             std::shared_ptr<const Node> node)
       : Expr(type), arg_(std::move(arg)), node_(std::move(node)) {}
 
   ExprPtr withType(const Type* new_type) const override {
@@ -530,14 +529,14 @@ class InSubquery : public Expr {
   const hdk::ir::Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
 
-  const RelAlgNode* node() const { return node_.get(); }
-  std::shared_ptr<const RelAlgNode> nodeShared() const { return node_; }
+  const Node* node() const { return node_.get(); }
+  std::shared_ptr<const Node> nodeShared() const { return node_; }
 
   size_t hash() const override;
 
  private:
   hdk::ir::ExprPtr arg_;
-  std::shared_ptr<const RelAlgNode> node_;
+  std::shared_ptr<const Node> node_;
 };
 
 /*

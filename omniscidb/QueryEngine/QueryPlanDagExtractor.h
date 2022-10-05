@@ -25,11 +25,11 @@
 #include <vector>
 
 // a vector of explained join info
-using TranslatedJoinInfo = std::vector<std::shared_ptr<RelTranslatedJoin>>;
+using TranslatedJoinInfo = std::vector<std::shared_ptr<hdk::ir::TranslatedJoin>>;
 
 struct ExtractedPlanDag {
   // a root node of the query plan
-  const RelAlgNode* root_node;
+  const hdk::ir::Node* root_node;
   // extracted DAG starting from the root_node
   const QueryPlan extracted_dag;
   // join qual's info collected while converting calcite AST to logical query plan tree
@@ -71,7 +71,7 @@ class QueryPlanDagExtractor {
 
   // a function that try to extract query plan DAG
   static ExtractedPlanDag extractQueryPlanDag(
-      const RelAlgNode* node,
+      const hdk::ir::Node* node,
       SchemaProviderPtr schema_provider,
       std::optional<unsigned> left_deep_tree_id,
       std::unordered_map<unsigned, JoinQualsPerNestingLevel>& left_deep_tree_infos,
@@ -109,7 +109,7 @@ class QueryPlanDagExtractor {
 
   TableIdToNodeMap& getTableIdToNodeMap() { return table_id_to_node_map_; }
 
-  void addTableIdToNodeLink(const int table_id, const RelAlgNode* node) {
+  void addTableIdToNodeLink(const int table_id, const hdk::ir::Node* node) {
     auto it = table_id_to_node_map_.find(table_id);
     if (it == table_id_to_node_map_.end()) {
       table_id_to_node_map_.emplace(table_id, node);
@@ -123,16 +123,17 @@ class QueryPlanDagExtractor {
   }
 
  private:
-  void visit(const RelAlgNode*, const RelAlgNode*);
+  void visit(const hdk::ir::Node*, const hdk::ir::Node*);
   hdk::ir::ColumnVar const* getColVar(const hdk::ir::Expr* col_info);
-  void handleLeftDeepJoinTree(const RelAlgNode*, const RelLeftDeepInnerJoin*);
-  void handleTranslatedJoin(const RelAlgNode*, const RelTranslatedJoin*);
-  bool validateNodeId(const RelAlgNode* node, std::optional<RelNodeId> retrieved_node_id);
-  bool registerNodeToDagCache(const RelAlgNode* parent_node,
-                              const RelAlgNode* child_node,
+  void handleLeftDeepJoinTree(const hdk::ir::Node*, const hdk::ir::LeftDeepInnerJoin*);
+  void handleTranslatedJoin(const hdk::ir::Node*, const hdk::ir::TranslatedJoin*);
+  bool validateNodeId(const hdk::ir::Node* node,
+                      std::optional<RelNodeId> retrieved_node_id);
+  bool registerNodeToDagCache(const hdk::ir::Node* parent_node,
+                              const hdk::ir::Node* child_node,
                               std::optional<RelNodeId> retrieved_node_id);
   static ExtractedPlanDag extractQueryPlanDagImpl(
-      const RelAlgNode* node,
+      const hdk::ir::Node* node,
       SchemaProviderPtr schema_provider,
       std::optional<unsigned> left_deep_tree_id,
       std::unordered_map<unsigned, JoinQualsPerNestingLevel>& left_deep_tree_infos,

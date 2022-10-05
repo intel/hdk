@@ -13,30 +13,31 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
  public:
   using ScalarExprVisitor::visit;
 
-  void visit(const RelAlgNode* node) {
-    if (auto agg = dynamic_cast<const RelAggregate*>(node)) {
+  void visit(const hdk::ir::Node* node) {
+    if (auto agg = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
       visitAggregate(agg);
-    } else if (auto compound = dynamic_cast<const RelCompound*>(node)) {
+    } else if (auto compound = dynamic_cast<const hdk::ir::Compound*>(node)) {
       visitCompound(compound);
-    } else if (auto filter = dynamic_cast<const RelFilter*>(node)) {
+    } else if (auto filter = dynamic_cast<const hdk::ir::Filter*>(node)) {
       visitFilter(filter);
-    } else if (auto join = dynamic_cast<const RelJoin*>(node)) {
+    } else if (auto join = dynamic_cast<const hdk::ir::Join*>(node)) {
       visitJoin(join);
-    } else if (auto deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(node)) {
+    } else if (auto deep_join = dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node)) {
       visitLeftDeepInnerJoin(deep_join);
-    } else if (auto logical_union = dynamic_cast<const RelLogicalUnion*>(node)) {
+    } else if (auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(node)) {
       visitLogicalUnion(logical_union);
-    } else if (auto values = dynamic_cast<const RelLogicalValues*>(node)) {
+    } else if (auto values = dynamic_cast<const hdk::ir::LogicalValues*>(node)) {
       visitLogicalValues(values);
-    } else if (auto project = dynamic_cast<const RelProject*>(node)) {
+    } else if (auto project = dynamic_cast<const hdk::ir::Project*>(node)) {
       visitProject(project);
-    } else if (auto scan = dynamic_cast<const RelScan*>(node)) {
+    } else if (auto scan = dynamic_cast<const hdk::ir::Scan*>(node)) {
       visitScan(scan);
-    } else if (auto sort = dynamic_cast<const RelSort*>(node)) {
+    } else if (auto sort = dynamic_cast<const hdk::ir::Sort*>(node)) {
       visitSort(sort);
-    } else if (auto table_fn = dynamic_cast<const RelTableFunction*>(node)) {
+    } else if (auto table_fn = dynamic_cast<const hdk::ir::TableFunction*>(node)) {
       visitTableFunction(table_fn);
-    } else if (auto translated_join = dynamic_cast<const RelTranslatedJoin*>(node)) {
+    } else if (auto translated_join =
+                   dynamic_cast<const hdk::ir::TranslatedJoin*>(node)) {
       visitTranslatedJoin(translated_join);
     } else {
       LOG(FATAL) << "Unsupported node type: " << node->toString();
@@ -47,13 +48,13 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
   }
 
  protected:
-  virtual void visitAggregate(const RelAggregate* agg) {
+  virtual void visitAggregate(const hdk::ir::Aggregate* agg) {
     for (auto& expr : agg->getAggs()) {
       visit(expr.get());
     }
   }
 
-  virtual void visitCompound(const RelCompound* compound) {
+  virtual void visitCompound(const hdk::ir::Compound* compound) {
     if (compound->getFilter()) {
       visit(compound->getFilter().get());
     }
@@ -65,11 +66,13 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     }
   }
 
-  virtual void visitFilter(const RelFilter* filter) { visit(filter->getConditionExpr()); }
+  virtual void visitFilter(const hdk::ir::Filter* filter) {
+    visit(filter->getConditionExpr());
+  }
 
-  virtual void visitJoin(const RelJoin* join) { visit(join->getCondition()); }
+  virtual void visitJoin(const hdk::ir::Join* join) { visit(join->getCondition()); }
 
-  virtual void visitLeftDeepInnerJoin(const RelLeftDeepInnerJoin* join) {
+  virtual void visitLeftDeepInnerJoin(const hdk::ir::LeftDeepInnerJoin* join) {
     visit(join->getInnerCondition());
     for (size_t level = 1; level < join->inputCount(); ++level) {
       if (auto* outer_condition = join->getOuterCondition(level)) {
@@ -78,9 +81,9 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     }
   }
 
-  virtual void visitLogicalUnion(const RelLogicalUnion*) {}
+  virtual void visitLogicalUnion(const hdk::ir::LogicalUnion*) {}
 
-  virtual void visitLogicalValues(const RelLogicalValues* logical_values) {
+  virtual void visitLogicalValues(const hdk::ir::LogicalValues* logical_values) {
     for (size_t row_idx = 0; row_idx < logical_values->getNumRows(); ++row_idx) {
       for (size_t col_idx = 0; col_idx < logical_values->getRowsSize(); ++col_idx) {
         visit(logical_values->getValue(row_idx, col_idx));
@@ -88,22 +91,22 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     }
   }
 
-  virtual void visitProject(const RelProject* proj) {
+  virtual void visitProject(const hdk::ir::Project* proj) {
     for (auto& expr : proj->getExprs()) {
       visit(expr.get());
     }
   }
 
-  virtual void visitScan(const RelScan*) {}
-  virtual void visitSort(const RelSort*) {}
+  virtual void visitScan(const hdk::ir::Scan*) {}
+  virtual void visitSort(const hdk::ir::Sort*) {}
 
-  virtual void visitTableFunction(const RelTableFunction* table_function) {
+  virtual void visitTableFunction(const hdk::ir::TableFunction* table_function) {
     for (size_t i = 0; i < table_function->getTableFuncInputsSize(); ++i) {
       visit(table_function->getTableFuncInputExprAt(i));
     }
   }
 
-  virtual void visitTranslatedJoin(const RelTranslatedJoin* translated_join) {
+  virtual void visitTranslatedJoin(const hdk::ir::TranslatedJoin* translated_join) {
     visit(translated_join->getLHS());
     visit(translated_join->getRHS());
     for (auto& expr : translated_join->getFilterCond()) {

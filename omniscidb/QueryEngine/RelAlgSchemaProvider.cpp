@@ -14,7 +14,7 @@
 
 #include "RelAlgSchemaProvider.h"
 
-RelAlgSchemaProvider::RelAlgSchemaProvider(const RelAlgNode& root) {
+RelAlgSchemaProvider::RelAlgSchemaProvider(const hdk::ir::Node& root) {
   table_infos_ = get_physical_table_infos(&root);
   for (auto& pr : table_infos_) {
     CHECK_EQ(table_index_by_name_[pr.first.db_id].count(pr.second->name), 0);

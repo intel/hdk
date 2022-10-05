@@ -22,21 +22,23 @@
 #include <unordered_set>
 #include <vector>
 
-class RelAlgNode;
-class RexSubQuery;
+namespace hdk::ir {
+class Node;
+}
 
-std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>> build_du_web(
-    const std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
-void eliminate_identical_copy(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
-void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
+std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>>
+build_du_web(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
+void eliminate_identical_copy(
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
+void eliminate_dead_columns(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
 void eliminate_dead_subqueries(
     std::vector<std::shared_ptr<const hdk::ir::ScalarSubquery>>& subqueries,
-    RelAlgNode const* root);
-void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
+    hdk::ir::Node const* root);
+void fold_filters(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
 void hoist_filter_cond_to_cross_join(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
-void simplify_sort(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
+void simplify_sort(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
 void sink_projected_boolean_expr_to_join(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept;
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept;
 
 #endif  // QUERYENGINE_RELALGOPTIMIZER_H

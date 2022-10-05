@@ -178,10 +178,11 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
 
 class NormalizerVisitor : public hdk::ir::ExprRewriter {
  public:
-  NormalizerVisitor(const RelAlgTranslator& translator,
-                    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
-                    const std::vector<JoinType>& join_types,
-                    const Executor* executor)
+  NormalizerVisitor(
+      const RelAlgTranslator& translator,
+      const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
+      const std::vector<JoinType>& join_types,
+      const Executor* executor)
       : translator_(translator)
       , input_to_nest_level_(input_to_nest_level)
       , join_types_(join_types)
@@ -192,7 +193,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
     auto col_idx = col_ref->index();
     const auto it_rte_idx = input_to_nest_level_.find(source);
     const int rte_idx = it_rte_idx == input_to_nest_level_.end() ? 0 : it_rte_idx->second;
-    const auto scan_source = dynamic_cast<const RelScan*>(source);
+    const auto scan_source = dynamic_cast<const hdk::ir::Scan*>(source);
     const auto& in_metainfo = source->getOutputMetainfo();
     if (scan_source) {
       // We're at leaf (scan) level and not supposed to have input metadata,
@@ -286,7 +287,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
 
  private:
   const RelAlgTranslator& translator_;
-  const std::unordered_map<const RelAlgNode*, int> input_to_nest_level_;
+  const std::unordered_map<const hdk::ir::Node*, int> input_to_nest_level_;
   const std::vector<JoinType> join_types_;
   const Executor* executor_;
 };
@@ -295,7 +296,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
 
 RelAlgTranslator::RelAlgTranslator(
     const Executor* executor,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
     const std::vector<JoinType>& join_types,
     const time_t now,
     const bool just_explain)

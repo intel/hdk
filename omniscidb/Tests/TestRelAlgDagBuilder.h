@@ -15,7 +15,7 @@
 #include "QueryEngine/RelAlgDagBuilder.h"
 #include "QueryEngine/RelLeftDeepInnerJoin.h"
 
-class TestRelAlgDagBuilder : public RelAlgDag {
+class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
  public:
   struct AggDesc {
     AggDesc(hdk::ir::AggType agg_,
@@ -50,54 +50,56 @@ class TestRelAlgDagBuilder : public RelAlgDag {
   };
 
   TestRelAlgDagBuilder(SchemaProviderPtr schema_provider, ConfigPtr config)
-      : RelAlgDag(config), schema_provider_(schema_provider) {}
+      : hdk::ir::QueryDag(config), schema_provider_(schema_provider) {}
   ~TestRelAlgDagBuilder() override = default;
 
-  RelAlgNodePtr addScan(const TableRef& table);
-  RelAlgNodePtr addScan(int db_id, int table_id);
-  RelAlgNodePtr addScan(int db_id, const std::string& table_name);
+  hdk::ir::NodePtr addScan(const TableRef& table);
+  hdk::ir::NodePtr addScan(int db_id, int table_id);
+  hdk::ir::NodePtr addScan(int db_id, const std::string& table_name);
 
-  RelAlgNodePtr addProject(RelAlgNodePtr input,
-                           const std::vector<std::string>& fields,
-                           const std::vector<int>& cols);
-  RelAlgNodePtr addProject(RelAlgNodePtr input,
-                           const std::vector<std::string>& fields,
-                           hdk::ir::ExprPtrVector exprs);
+  hdk::ir::NodePtr addProject(hdk::ir::NodePtr input,
+                              const std::vector<std::string>& fields,
+                              const std::vector<int>& cols);
+  hdk::ir::NodePtr addProject(hdk::ir::NodePtr input,
+                              const std::vector<std::string>& fields,
+                              hdk::ir::ExprPtrVector exprs);
 
-  RelAlgNodePtr addProject(RelAlgNodePtr input, const std::vector<int>& cols);
-  RelAlgNodePtr addProject(RelAlgNodePtr input, hdk::ir::ExprPtrVector exprs);
+  hdk::ir::NodePtr addProject(hdk::ir::NodePtr input, const std::vector<int>& cols);
+  hdk::ir::NodePtr addProject(hdk::ir::NodePtr input, hdk::ir::ExprPtrVector exprs);
 
-  RelAlgNodePtr addAgg(RelAlgNodePtr input,
-                       const std::vector<std::string>& fields,
-                       size_t group_size,
-                       hdk::ir::ExprPtrVector aggs);
-  RelAlgNodePtr addAgg(RelAlgNodePtr input,
-                       const std::vector<std::string>& fields,
-                       size_t group_size,
-                       std::vector<AggDesc> aggs);
+  hdk::ir::NodePtr addAgg(hdk::ir::NodePtr input,
+                          const std::vector<std::string>& fields,
+                          size_t group_size,
+                          hdk::ir::ExprPtrVector aggs);
+  hdk::ir::NodePtr addAgg(hdk::ir::NodePtr input,
+                          const std::vector<std::string>& fields,
+                          size_t group_size,
+                          std::vector<AggDesc> aggs);
 
-  RelAlgNodePtr addAgg(RelAlgNodePtr input,
-                       size_t group_size,
-                       hdk::ir::ExprPtrVector aggs);
-  RelAlgNodePtr addAgg(RelAlgNodePtr input, size_t group_size, std::vector<AggDesc> aggs);
+  hdk::ir::NodePtr addAgg(hdk::ir::NodePtr input,
+                          size_t group_size,
+                          hdk::ir::ExprPtrVector aggs);
+  hdk::ir::NodePtr addAgg(hdk::ir::NodePtr input,
+                          size_t group_size,
+                          std::vector<AggDesc> aggs);
 
-  RelAlgNodePtr addSort(RelAlgNodePtr input,
-                        const std::vector<SortField>& collation,
-                        const size_t limit = 0,
-                        const size_t offset = 0);
+  hdk::ir::NodePtr addSort(hdk::ir::NodePtr input,
+                           const std::vector<hdk::ir::SortField>& collation,
+                           const size_t limit = 0,
+                           const size_t offset = 0);
 
-  RelAlgNodePtr addJoin(RelAlgNodePtr lhs,
-                        RelAlgNodePtr rhs,
-                        const JoinType join_type,
-                        hdk::ir::ExprPtr condition);
+  hdk::ir::NodePtr addJoin(hdk::ir::NodePtr lhs,
+                           hdk::ir::NodePtr rhs,
+                           const JoinType join_type,
+                           hdk::ir::ExprPtr condition);
 
-  RelAlgNodePtr addEquiJoin(RelAlgNodePtr lhs,
-                            RelAlgNodePtr rhs,
-                            const JoinType join_type,
-                            size_t lhs_col_idx,
-                            size_t rhs_col_idx);
+  hdk::ir::NodePtr addEquiJoin(hdk::ir::NodePtr lhs,
+                               hdk::ir::NodePtr rhs,
+                               const JoinType join_type,
+                               size_t lhs_col_idx,
+                               size_t rhs_col_idx);
 
-  void setRoot(RelAlgNodePtr root);
+  void setRoot(hdk::ir::NodePtr root);
 
   void finalize() {
     create_left_deep_join(nodes_);
@@ -105,7 +107,7 @@ class TestRelAlgDagBuilder : public RelAlgDag {
   }
 
  private:
-  RelAlgNodePtr addScan(TableInfoPtr table_info);
+  hdk::ir::NodePtr addScan(TableInfoPtr table_info);
 
   std::vector<std::string> buildFieldNames(size_t count) const;
 

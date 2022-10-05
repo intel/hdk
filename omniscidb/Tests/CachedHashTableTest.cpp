@@ -104,7 +104,7 @@ getCachedHashtableWithoutCacheKey(std::set<size_t>& visited,
 }
 
 struct QueryPlanDagInfo {
-  std::shared_ptr<const RelAlgNode> root_node;
+  std::shared_ptr<const hdk::ir::Node> root_node;
   std::vector<unsigned> left_deep_trees_id;
   std::unordered_map<unsigned, JoinQualsPerNestingLevel> left_deep_trees_info;
   std::shared_ptr<RelAlgTranslator> rel_alg_translator;
@@ -121,7 +121,7 @@ QueryPlanDagInfo getQueryInfoForDataRecyclerTest(const std::string& query_str) {
   // note that we assume the test for data recycler that needs to have join_info
   // does not contain any ORDER BY clause; this is necessary to create work_unit
   // without actually performing the query
-  auto root_node_shared_ptr = ra_executor.getRootRelAlgNodeShPtr();
+  auto root_node_shared_ptr = ra_executor.getRootNodeShPtr();
   auto join_info = ra_executor.getJoinInfo(root_node_shared_ptr.get());
   auto relAlgTranslator = ra_executor.getRelAlgTranslator(root_node_shared_ptr.get());
   return {root_node_shared_ptr, join_info.first, join_info.second, relAlgTranslator};

@@ -33,11 +33,12 @@ class Expr;
 
 class RelAlgTranslator {
  public:
-  RelAlgTranslator(const Executor* executor,
-                   const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
-                   const std::vector<JoinType>& join_types,
-                   const time_t now,
-                   const bool just_explain);
+  RelAlgTranslator(
+      const Executor* executor,
+      const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
+      const std::vector<JoinType>& join_types,
+      const time_t now,
+      const bool just_explain);
   RelAlgTranslator(const Config& config, const time_t now, const bool just_explain);
 
   hdk::ir::ExprPtr normalize(const hdk::ir::Expr* expr) const;
@@ -51,7 +52,7 @@ class RelAlgTranslator {
                                        const ResultSet& val_set) const;
   const Executor* executor_;
   const Config& config_;
-  const std::unordered_map<const RelAlgNode*, int> input_to_nest_level_;
+  const std::unordered_map<const hdk::ir::Node*, int> input_to_nest_level_;
   const std::vector<JoinType> join_types_;
   time_t now_;
   const bool just_explain_;

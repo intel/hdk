@@ -88,11 +88,11 @@ using HashTableBuildDagMap = std::unordered_map<JoinColumnsInfo, HashTableBuildD
 // A map btw. join column's input table id to its corresponding rel node
 // for each hash join operation, we can determine whether its input source
 // has inconsistency in its source data, e.g., row ordering
-// by seeing a type of input node, e.g., RelSort
+// by seeing a type of input node, e.g., Sort
 // note that disabling DAG extraction when we find sort node from join's input
 // is too restrict when a query becomes complex (and so have multiple joins)
 // since it eliminates a change of data recycling
-using TableIdToNodeMap = std::unordered_map<int, const RelAlgNode*>;
+using TableIdToNodeMap = std::unordered_map<int, const hdk::ir::Node*>;
 
 enum JoinColumnSide {
   kInner,

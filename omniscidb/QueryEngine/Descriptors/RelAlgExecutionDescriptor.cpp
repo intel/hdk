@@ -142,7 +142,7 @@ void RaExecutionDesc::setResult(const ExecutionResult& result) {
   body_->setContextData(this);
 }
 
-const RelAlgNode* RaExecutionDesc::getBody() const {
+const hdk::ir::Node* RaExecutionDesc::getBody() const {
   return body_;
 }
 
@@ -153,12 +153,12 @@ std::vector<Vertex> merge_sort_with_input(const std::vector<Vertex>& vertices,
   DAG::in_edge_iterator ie_iter, ie_end;
   std::unordered_set<Vertex> inputs;
   for (const auto vert : vertices) {
-    if (const auto sort = dynamic_cast<const RelSort*>(graph[vert])) {
+    if (const auto sort = dynamic_cast<const hdk::ir::Sort*>(graph[vert])) {
       boost::tie(ie_iter, ie_end) = boost::in_edges(vert, graph);
       CHECK(size_t(1) == sort->inputCount() && boost::next(ie_iter) == ie_end);
       const auto in_vert = boost::source(*ie_iter, graph);
       const auto input = graph[in_vert];
-      if (dynamic_cast<const RelScan*>(input)) {
+      if (dynamic_cast<const hdk::ir::Scan*>(input)) {
         throw std::runtime_error("Standalone sort not supported yet");
       }
       if (boost::out_degree(in_vert, graph) > 1) {
@@ -178,36 +178,36 @@ std::vector<Vertex> merge_sort_with_input(const std::vector<Vertex>& vertices,
   return new_vertices;
 }
 
-DAG build_dag(const RelAlgNode* sink) {
+DAG build_dag(const hdk::ir::Node* sink) {
   DAG graph(1);
   graph[0] = sink;
-  std::unordered_map<const RelAlgNode*, int> node_ptr_to_vert_idx{
+  std::unordered_map<const hdk::ir::Node*, int> node_ptr_to_vert_idx{
       std::make_pair(sink, 0)};
-  std::vector<const RelAlgNode*> stack(1, sink);
+  std::vector<const hdk::ir::Node*> stack(1, sink);
   while (!stack.empty()) {
     const auto node = stack.back();
     stack.pop_back();
-    if (dynamic_cast<const RelScan*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node)) {
       continue;
     }
 
     const auto input_num = node->inputCount();
     switch (input_num) {
       case 0:
-        CHECK(dynamic_cast<const RelLogicalValues*>(node) ||
-              dynamic_cast<const RelTableFunction*>(node));
+        CHECK(dynamic_cast<const hdk::ir::LogicalValues*>(node) ||
+              dynamic_cast<const hdk::ir::TableFunction*>(node));
       case 1:
         break;
       case 2:
-        CHECK(dynamic_cast<const RelJoin*>(node) ||
-              dynamic_cast<const RelLeftDeepInnerJoin*>(node) ||
-              dynamic_cast<const RelLogicalUnion*>(node) ||
-              dynamic_cast<const RelTableFunction*>(node));
+        CHECK(dynamic_cast<const hdk::ir::Join*>(node) ||
+              dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node) ||
+              dynamic_cast<const hdk::ir::LogicalUnion*>(node) ||
+              dynamic_cast<const hdk::ir::TableFunction*>(node));
         break;
       default:
-        CHECK(dynamic_cast<const RelLeftDeepInnerJoin*>(node) ||
-              dynamic_cast<const RelLogicalUnion*>(node) ||
-              dynamic_cast<const RelTableFunction*>(node));
+        CHECK(dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node) ||
+              dynamic_cast<const hdk::ir::LogicalUnion*>(node) ||
+              dynamic_cast<const hdk::ir::TableFunction*>(node));
     }
     for (size_t i = 0; i < input_num; ++i) {
       const auto input = node->getInput(i);
@@ -230,11 +230,11 @@ std::unordered_set<Vertex> get_join_vertices(const std::vector<Vertex>& vertices
                                              const DAG& graph) {
   std::unordered_set<Vertex> joins;
   for (const auto vert : vertices) {
-    if (dynamic_cast<const RelLeftDeepInnerJoin*>(graph[vert])) {
+    if (dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(graph[vert])) {
       joins.insert(vert);
       continue;
     }
-    if (!dynamic_cast<const RelJoin*>(graph[vert])) {
+    if (!dynamic_cast<const hdk::ir::Join*>(graph[vert])) {
       continue;
     }
     if (boost::out_degree(vert, graph) > 1) {
@@ -243,7 +243,7 @@ std::unordered_set<Vertex> get_join_vertices(const std::vector<Vertex>& vertices
     auto [oe_iter, oe_end] = boost::out_edges(vert, graph);
     CHECK(std::next(oe_iter) == oe_end);
     const auto out_vert = boost::target(*oe_iter, graph);
-    if (!dynamic_cast<const RelJoin*>(graph[out_vert])) {
+    if (!dynamic_cast<const hdk::ir::Join*>(graph[out_vert])) {
       joins.insert(vert);
     }
   }
@@ -252,10 +252,10 @@ std::unordered_set<Vertex> get_join_vertices(const std::vector<Vertex>& vertices
 
 }  // namespace
 
-RaExecutionSequence::RaExecutionSequence(const RelAlgNode* sink,
+RaExecutionSequence::RaExecutionSequence(const hdk::ir::Node* sink,
                                          const bool build_sequence) {
   CHECK(sink);
-  if (dynamic_cast<const RelScan*>(sink) || dynamic_cast<const RelJoin*>(sink)) {
+  if (dynamic_cast<const hdk::ir::Scan*>(sink) || dynamic_cast<const hdk::ir::Join*>(sink)) {
     throw std::runtime_error("Query not supported yet");
   }
 
@@ -286,7 +286,7 @@ RaExecutionDesc* RaExecutionSequence::next() {
     }
     auto& node = graph_[vert];
     CHECK(node);
-    if (dynamic_cast<const RelScan*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node)) {
       scan_count_++;
       continue;
     }
@@ -366,7 +366,7 @@ size_t RaExecutionSequence::totalDescriptorsCount() const {
     }
     auto& node = graph_[vert];
     CHECK(node);
-    if (dynamic_cast<const RelScan*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node)) {
       continue;
     }
     ++num_descriptors;
@@ -382,16 +382,16 @@ size_t RaExecutionSequence::stepsToNextBroadcast() const {
     auto node = graph_[vert];
     CHECK(node);
     if (joins_.count(vert)) {
-      auto join_node = dynamic_cast<const RelLeftDeepInnerJoin*>(node);
+      auto join_node = dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node);
       CHECK(join_node);
       for (size_t i = 0; i < join_node->inputCount(); i++) {
         const auto input = join_node->getInput(i);
-        if (dynamic_cast<const RelScan*>(input)) {
+        if (dynamic_cast<const hdk::ir::Scan*>(input)) {
           return steps_to_next_broadcast;
         }
       }
       if (crt_vertex < ordering_.size() - 1) {
-        // Force the parent node of the RelLeftDeepInnerJoin to run on the aggregator.
+        // Force the parent node of the LeftDeepInnerJoin to run on the aggregator.
         // Note that crt_vertex has already been incremented once above for the join node
         // -- increment it again to account for the parent node of the join
         ++steps_to_next_broadcast;
@@ -404,21 +404,21 @@ size_t RaExecutionSequence::stepsToNextBroadcast() const {
         return ++steps_to_next_broadcast;
       }
     }
-    if (auto sort = dynamic_cast<const RelSort*>(node)) {
+    if (auto sort = dynamic_cast<const hdk::ir::Sort*>(node)) {
       CHECK_EQ(sort->inputCount(), size_t(1));
       node = sort->getInput(0);
     }
-    if (dynamic_cast<const RelScan*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node)) {
       return steps_to_next_broadcast;
     }
-    if (auto project = dynamic_cast<const RelProject*>(node)) {
-      if (project->hasWindowFunctionExpr()) {
+    if (auto project = dynamic_cast<const hdk::ir::Project*>(node)) {
+      if (hasWindowFunctionExpr(project)) {
         ++steps_to_next_broadcast;
         continue;
       }
     }
     for (size_t input_idx = 0; input_idx < node->inputCount(); input_idx++) {
-      if (dynamic_cast<const RelScan*>(node->getInput(input_idx))) {
+      if (dynamic_cast<const hdk::ir::Scan*>(node->getInput(input_idx))) {
         return steps_to_next_broadcast;
       }
     }

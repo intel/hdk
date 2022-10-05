@@ -26,28 +26,28 @@ void QueryPlanDagChecker::detectNonSupportedNode(const std::string& node_tag) co
 }
 
 std::pair<bool, std::string> QueryPlanDagChecker::hasNonSupportedNodeInDag(
-    const RelAlgNode* rel_alg_node,
+    const hdk::ir::Node* rel_alg_node,
     const RelAlgTranslator& rel_alg_translator) {
   QueryPlanDagChecker checker(rel_alg_translator);
   checker.check(rel_alg_node);
   return std::make_pair(checker.getCheckResult(), checker.getNonSupportedNodeTag());
 }
 
-void QueryPlanDagChecker::check(const RelAlgNode* rel_alg_node) {
+void QueryPlanDagChecker::check(const hdk::ir::Node* rel_alg_node) {
   ExprDagVisitor::visit(rel_alg_node);
 }
 
-void QueryPlanDagChecker::visitLogicalValues(const RelLogicalValues* rel_alg_node) {
-  detectNonSupportedNode("Detect RelLogicalValues node");
+void QueryPlanDagChecker::visitLogicalValues(const hdk::ir::LogicalValues* rel_alg_node) {
+  detectNonSupportedNode("Detect LogicalValues node");
   return;
 }
 
-void QueryPlanDagChecker::visitTableFunction(const RelTableFunction* rel_alg_node) {
-  detectNonSupportedNode("Detect RelTableFunction node");
+void QueryPlanDagChecker::visitTableFunction(const hdk::ir::TableFunction* rel_alg_node) {
+  detectNonSupportedNode("Detect TableFunction node");
   return;
 }
 
-void QueryPlanDagChecker::visitCompound(const RelCompound* rel_alg_node) {
+void QueryPlanDagChecker::visitCompound(const hdk::ir::Compound* rel_alg_node) {
   // SINGLE_VALUE / SAMPLE query
   if (rel_alg_node->isAggregate() && rel_alg_node->size() > 0) {
     for (size_t i = 0; i < rel_alg_node->size(); ++i) {
@@ -66,8 +66,8 @@ void QueryPlanDagChecker::visitCompound(const RelCompound* rel_alg_node) {
   ExprDagVisitor::visitCompound(rel_alg_node);
 }
 
-void QueryPlanDagChecker::visitLogicalUnion(const RelLogicalUnion* rel_alg_node) {
-  detectNonSupportedNode("Detect RelLogicalUnion node");
+void QueryPlanDagChecker::visitLogicalUnion(const hdk::ir::LogicalUnion* rel_alg_node) {
+  detectNonSupportedNode("Detect LogicalUnion node");
 }
 
 void* QueryPlanDagChecker::visitCardinality(const hdk::ir::CardinalityExpr*) const {

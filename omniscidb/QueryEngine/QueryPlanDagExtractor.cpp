@@ -75,7 +75,7 @@ std::vector<InnerOuterOrLoopQual> QueryPlanDagExtractor::normalizeColumnsPair(
 // We decide each rel node's node id by searching the cached plan DAG first,
 // and assign a new id iff there exists no duplicated rel node that can reuse
 ExtractedPlanDag QueryPlanDagExtractor::extractQueryPlanDag(
-    const RelAlgNode*
+    const hdk::ir::Node*
         node, /* the root node of the query plan tree we want to extract its DAG */
     SchemaProviderPtr schema_provider,
     std::optional<unsigned> left_deep_tree_id,
@@ -100,7 +100,7 @@ ExtractedPlanDag QueryPlanDagExtractor::extractQueryPlanDag(
 }
 
 ExtractedPlanDag QueryPlanDagExtractor::extractQueryPlanDagImpl(
-    const RelAlgNode*
+    const hdk::ir::Node*
         node, /* the root node of the query plan tree we want to extract its DAG */
     SchemaProviderPtr schema_provider,
     std::optional<unsigned> left_deep_tree_id,
@@ -130,7 +130,7 @@ ExtractedPlanDag QueryPlanDagExtractor::extractQueryPlanDagImpl(
       dag_extractor.visit(node, node->getInput(0));
       break;
     case 2:  // binary op
-      if (auto trans_join_node = dynamic_cast<const RelTranslatedJoin*>(node)) {
+      if (auto trans_join_node = dynamic_cast<const hdk::ir::TranslatedJoin*>(node)) {
         dag_extractor.visit(trans_join_node, trans_join_node->getLHS());
         dag_extractor.visit(trans_join_node, trans_join_node->getRHS());
         break;
@@ -141,7 +141,7 @@ ExtractedPlanDag QueryPlanDagExtractor::extractQueryPlanDagImpl(
     case 0:  // leaf node
       break;
     default:
-      // since we replace RelLeftDeepJoin as a set of RelTranslatedJoin
+      // since we replace RelLeftDeepJoin as a set of hdk::ir::TranslatedJoin
       // which is a binary op, # child nodes for every rel node should be <= 2
       UNREACHABLE();
   }
@@ -172,7 +172,7 @@ std::string QueryPlanDagExtractor::getExtractedQueryPlanDagStr() {
   return oss.str();
 }
 
-bool QueryPlanDagExtractor::validateNodeId(const RelAlgNode* node,
+bool QueryPlanDagExtractor::validateNodeId(const hdk::ir::Node* node,
                                            std::optional<RelNodeId> retrieved_node_id) {
   if (!retrieved_node_id) {
     VLOG(1) << "Stop DAG extraction (Detect an invalid dag id)";
@@ -185,8 +185,8 @@ bool QueryPlanDagExtractor::validateNodeId(const RelAlgNode* node,
 }
 
 bool QueryPlanDagExtractor::registerNodeToDagCache(
-    const RelAlgNode* parent_node,
-    const RelAlgNode* child_node,
+    const hdk::ir::Node* parent_node,
+    const hdk::ir::Node* child_node,
     std::optional<RelNodeId> retrieved_node_id) {
   CHECK(parent_node);
   CHECK(child_node);
@@ -201,15 +201,15 @@ bool QueryPlanDagExtractor::registerNodeToDagCache(
 // and collect assigned rel node ids and return them as query plan DAG
 // for join operations we additionally generate additional information
 // to recycle each hashtable that needs to process a given query
-void QueryPlanDagExtractor::visit(const RelAlgNode* parent_node,
-                                  const RelAlgNode* child_node) {
+void QueryPlanDagExtractor::visit(const hdk::ir::Node* parent_node,
+                                  const hdk::ir::Node* child_node) {
   if (!child_node || contain_not_supported_rel_node_) {
     return;
   }
-  auto register_and_visit = [this](const RelAlgNode* parent_node,
-                                   const RelAlgNode* child_node) {
+  auto register_and_visit = [this](const hdk::ir::Node* parent_node,
+                                   const hdk::ir::Node* child_node) {
     // This function takes a responsibility for all rel nodes
-    // except 1) RelLeftDeepJoinTree and 2) RelTranslatedJoin
+    // except 1) RelLeftDeepJoinTree and 2) hdk::ir::TranslatedJoin
     auto res = global_dag_.addNodeIfAbsent(child_node);
     if (validateNodeId(child_node, res) &&
         registerNodeToDagCache(parent_node, child_node, res)) {
@@ -218,7 +218,8 @@ void QueryPlanDagExtractor::visit(const RelAlgNode* parent_node,
       }
     }
   };
-  if (auto left_deep_joins = dynamic_cast<const RelLeftDeepInnerJoin*>(child_node)) {
+  if (auto left_deep_joins =
+          dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(child_node)) {
     if (left_deep_tree_infos_.empty()) {
       // we should have left_deep_tree_info for input left deep tree node
       VLOG(1) << "Stop DAG extraction (Detect non-supported join pattern)";
@@ -227,22 +228,22 @@ void QueryPlanDagExtractor::visit(const RelAlgNode* parent_node,
     }
     const auto inner_cond = left_deep_joins->getInnerConditionShared();
     // we analyze left-deep join tree as per-join qual level, so
-    // when visiting RelLeftDeepInnerJoin we decompose it into individual join node
-    // (RelTranslatedJoin).
-    // Thus, this RelLeftDeepInnerJoin object itself is useless when recycling data
+    // when visiting LeftDeepInnerJoin we decompose it into individual join node
+    // (TranslatedJoin).
+    // Thus, this LeftDeepInnerJoin object itself is useless when recycling data
     // but sometimes it has inner condition that has to consider so we add an extra
-    // RelFilter node containing the condition to keep query semantic correctly
+    // Filter node containing the condition to keep query semantic correctly
     if (inner_cond->is<hdk::ir::UOper>() || inner_cond->is<hdk::ir::BinOper>() ||
         inner_cond->is<hdk::ir::InValues>() || inner_cond->is<hdk::ir::InIntegerSet>() ||
         inner_cond->is<hdk::ir::InSubquery>()) {
-      auto dummy_filter = std::make_shared<RelFilter>(inner_cond);
+      auto dummy_filter = std::make_shared<hdk::ir::Filter>(inner_cond);
       register_and_visit(parent_node, dummy_filter.get());
       handleLeftDeepJoinTree(dummy_filter.get(), left_deep_joins);
     } else {
       handleLeftDeepJoinTree(parent_node, left_deep_joins);
     }
   } else if (auto translated_join_node =
-                 dynamic_cast<const RelTranslatedJoin*>(child_node)) {
+                 dynamic_cast<const hdk::ir::TranslatedJoin*>(child_node)) {
     handleTranslatedJoin(parent_node, translated_join_node);
   } else {
     register_and_visit(parent_node, child_node);
@@ -250,8 +251,8 @@ void QueryPlanDagExtractor::visit(const RelAlgNode* parent_node,
 }
 
 void QueryPlanDagExtractor::handleTranslatedJoin(
-    const RelAlgNode* parent_node,
-    const RelTranslatedJoin* rel_trans_join) {
+    const hdk::ir::Node* parent_node,
+    const hdk::ir::TranslatedJoin* rel_trans_join) {
   // when left-deep tree has multiple joins this rel_trans_join can be revisited
   // but we need to mark the child query plan to accurately catch the query plan dag
   // here we do not create new dag id since all rel nodes are visited already
@@ -335,10 +336,11 @@ struct OpInfo {
 
 // Return the input index whose tableId matches the given tbl_id.
 // If none then return -1.
-int get_input_idx(const RelLeftDeepInnerJoin* rel_left_deep_join, int const tbl_id) {
+int get_input_idx(const hdk::ir::LeftDeepInnerJoin* rel_left_deep_join,
+                  int const tbl_id) {
   for (size_t input_idx = 0; input_idx < rel_left_deep_join->inputCount(); ++input_idx) {
     auto const input_node = rel_left_deep_join->getInput(input_idx);
-    auto const scan_node = dynamic_cast<const RelScan*>(input_node);
+    auto const scan_node = dynamic_cast<const hdk::ir::Scan*>(input_node);
     int const target_table_id = scan_node ? scan_node->getTableId()
                                           : -1 * input_node->getId();  // temporary table
     if (target_table_id == tbl_id) {
@@ -361,21 +363,21 @@ hdk::ir::ColumnVar const* QueryPlanDagExtractor::getColVar(
   return col_var;
 }
 
-// we coalesce join quals and related filter conditions into a single RelLeftDeepInnerJoin
-// node when converting calcite AST to logical query plan, but to recycle hashtable(s) we
-// need to know access path of each hashtable, so we disassemble it into a set of join
-// qual and collect hashtable info from there
+// we coalesce join quals and related filter conditions into a single
+// hdk::ir::LeftDeepInnerJoin node when converting calcite AST to logical query plan, but
+// to recycle hashtable(s) we need to know access path of each hashtable, so we
+// disassemble it into a set of join qual and collect hashtable info from there
 void QueryPlanDagExtractor::handleLeftDeepJoinTree(
-    const RelAlgNode* parent_node,
-    const RelLeftDeepInnerJoin* rel_left_deep_join) {
+    const hdk::ir::Node* parent_node,
+    const hdk::ir::LeftDeepInnerJoin* rel_left_deep_join) {
   CHECK(parent_node);
   CHECK(rel_left_deep_join);
 
-  // RelLeftDeepInnerJoin node does not need to be added to DAG since
-  // RelLeftDeepInnerJoin is a logical node and
-  // we add all join nodes of this `RelLeftDeepInnerJoin`
+  // hdk::ir::LeftDeepInnerJoin node does not need to be added to DAG since
+  // hdk::ir::LeftDeepInnerJoin is a logical node and
+  // we add all join nodes of this `hdk::ir::LeftDeepInnerJoin`
   // thus, the below `left_deep_tree_id` is not the same as its DAG id
-  // (we do not have a DAG node id for this `RelLeftDeepInnerJoin`)
+  // (we do not have a DAG node id for this `hdk::ir::LeftDeepInnerJoin`)
   auto left_deep_tree_id = rel_left_deep_join->getId();
   auto left_deep_join_info = getPerNestingJoinQualInfo(left_deep_tree_id);
   if (!left_deep_join_info) {
@@ -478,7 +480,7 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
       return;
     }
 
-    // create RelTranslatedJoin based on the collected info from the join qual
+    // create hdk::ir::TranslatedJoin based on the collected info from the join qual
     // there are total seven types of join query pattern
     //  1. INNER HASH ONLY
     //  2. INNER LOOP ONLY (!)
@@ -489,10 +491,10 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
     //  7. LEFT LOOP + INNER HASH + INNER LOOP (!)
     // here, if a query contains INNER LOOP join, its qual has nothing
     // so, some patterns do not have bin_oper at the specific join nest level
-    // if we find INNER LOOP, corresponding RelTranslatedJoin has nulled LHS and RHS
+    // if we find INNER LOOP, corresponding hdk::ir::TranslatedJoin has nulled LHS and RHS
     // to mark it as loop join
-    const RelAlgNode* lhs;
-    const RelAlgNode* rhs;
+    const hdk::ir::Node* lhs;
+    const hdk::ir::Node* rhs;
     if (inner_input_idx != -1 && outer_input_idx != -1) {
       lhs = rel_left_deep_join->getInput(inner_input_idx);
       rhs = rel_left_deep_join->getInput(outer_input_idx);
@@ -508,17 +510,17 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
     CHECK(lhs);
     CHECK(rhs);
     auto cur_translated_join_node =
-        std::make_shared<RelTranslatedJoin>(lhs,
-                                            rhs,
-                                            std::move(inner_join_cols),
-                                            std::move(outer_join_cols),
-                                            std::move(filter_ops),
-                                            std::move(outer_join_cond),
-                                            nested_loop,
-                                            current_level_join_conditions.type,
-                                            op_info.type_,
-                                            op_info.qualifier_,
-                                            op_info.typeinfo_);
+        std::make_shared<hdk::ir::TranslatedJoin>(lhs,
+                                                  rhs,
+                                                  std::move(inner_join_cols),
+                                                  std::move(outer_join_cols),
+                                                  std::move(filter_ops),
+                                                  std::move(outer_join_cond),
+                                                  nested_loop,
+                                                  current_level_join_conditions.type,
+                                                  op_info.type_,
+                                                  op_info.qualifier_,
+                                                  op_info.typeinfo_);
     CHECK(cur_translated_join_node);
     handleTranslatedJoin(parent_node, cur_translated_join_node.get());
     translated_join_info_->push_back(std::move(cur_translated_join_node));

@@ -107,11 +107,13 @@ class ExecutionResult {
   RType type_;
 };
 
-class RelAlgNode;
+namespace hdk::ir {
+class Node;
+}
 
 class RaExecutionDesc {
  public:
-  RaExecutionDesc(const RelAlgNode* body)
+  RaExecutionDesc(const hdk::ir::Node* body)
       : body_(body)
       , result_(std::make_shared<ResultSet>(std::vector<TargetInfo>{},
                                             ExecutorDeviceType::CPU,
@@ -127,15 +129,15 @@ class RaExecutionDesc {
 
   void setResult(const ExecutionResult& result);
 
-  const RelAlgNode* getBody() const;
+  const hdk::ir::Node* getBody() const;
 
  private:
-  const RelAlgNode* body_;
+  const hdk::ir::Node* body_;
   ExecutionResult result_;
 };
 
 using DAG = boost::
-    adjacency_list<boost::setS, boost::vecS, boost::bidirectionalS, const RelAlgNode*>;
+    adjacency_list<boost::setS, boost::vecS, boost::bidirectionalS, const hdk::ir::Node*>;
 using Vertex = DAG::vertex_descriptor;
 
 /**
@@ -148,7 +150,7 @@ using Vertex = DAG::vertex_descriptor;
  */
 class RaExecutionSequence {
  public:
-  RaExecutionSequence(const RelAlgNode*, const bool build_sequence = true);
+  RaExecutionSequence(const hdk::ir::Node*, const bool build_sequence = true);
   RaExecutionSequence(std::unique_ptr<RaExecutionDesc> exec_desc);
 
   /**

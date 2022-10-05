@@ -21,18 +21,17 @@
 
 #include "IR/Expr.h"
 
-class RelAlgNode;
-class RelLeftDeepInnerJoin;
-class RexScalar;
+namespace hdk::ir {
+class Node;
+class LeftDeepInnerJoin;
+}  // namespace hdk::ir
 
 // Gets the start node of a left-deep pattern starting at the node itself or its child.
-std::shared_ptr<const RelAlgNode> get_left_deep_join_root(
-    const std::shared_ptr<RelAlgNode>& node);
+std::shared_ptr<const hdk::ir::Node> get_left_deep_join_root(
+    const std::shared_ptr<hdk::ir::Node>& node);
 
-void create_left_deep_join(std::vector<std::shared_ptr<RelAlgNode>>& nodes);
+void create_left_deep_join(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes);
 
-void rebind_inputs_from_left_deep_join(const RexScalar* rex,
-                                       const RelLeftDeepInnerJoin* left_deep_join);
 hdk::ir::ExprPtr rebind_inputs_from_left_deep_join(
     const hdk::ir::Expr* expr,
-    const RelLeftDeepInnerJoin* left_deep_join);
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join);

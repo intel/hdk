@@ -108,8 +108,7 @@ class ArrowSQLRunnerImpl {
 
   RegisteredQueryHint getParsedQueryHint(const std::string& query_str) {
     auto ra_executor = makeRelAlgExecutor(query_str);
-    auto query_hints =
-        ra_executor->getParsedQueryHint(ra_executor->getRootRelAlgNodeShPtr().get());
+    auto query_hints = ra_executor->getParsedQueryHint(ra_executor->getRootNode());
     return query_hints ? *query_hints : RegisteredQueryHint::fromConfig(*config_);
   }
 

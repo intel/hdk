@@ -22,52 +22,53 @@
 template <class T>
 class RelAlgVisitor {
  public:
-  T visit(const RelAlgNode* rel_alg) const {
+  T visit(const hdk::ir::Node* rel_alg) const {
     auto result = defaultResult();
     for (size_t i = 0; i < rel_alg->inputCount(); ++i) {
       result = aggregateResult(result, visit(rel_alg->getInput(i)));
     }
-    const auto aggregate = dynamic_cast<const RelAggregate*>(rel_alg);
+    const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(rel_alg);
     if (aggregate) {
       return aggregateResult(result, visitAggregate(aggregate));
     }
-    const auto compound = dynamic_cast<const RelCompound*>(rel_alg);
+    const auto compound = dynamic_cast<const hdk::ir::Compound*>(rel_alg);
     if (compound) {
       return aggregateResult(result, visitCompound(compound));
     }
-    const auto filter = dynamic_cast<const RelFilter*>(rel_alg);
+    const auto filter = dynamic_cast<const hdk::ir::Filter*>(rel_alg);
     if (filter) {
       return aggregateResult(result, visitFilter(filter));
     }
-    const auto join = dynamic_cast<const RelJoin*>(rel_alg);
+    const auto join = dynamic_cast<const hdk::ir::Join*>(rel_alg);
     if (join) {
       return aggregateResult(result, visitJoin(join));
     }
-    const auto left_deep_inner_join = dynamic_cast<const RelLeftDeepInnerJoin*>(rel_alg);
+    const auto left_deep_inner_join =
+        dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(rel_alg);
     if (left_deep_inner_join) {
       return aggregateResult(result, visitLeftDeepInnerJoin(left_deep_inner_join));
     }
-    const auto project = dynamic_cast<const RelProject*>(rel_alg);
+    const auto project = dynamic_cast<const hdk::ir::Project*>(rel_alg);
     if (project) {
       return aggregateResult(result, visitProject(project));
     }
-    const auto scan = dynamic_cast<const RelScan*>(rel_alg);
+    const auto scan = dynamic_cast<const hdk::ir::Scan*>(rel_alg);
     if (scan) {
       return aggregateResult(result, visitScan(scan));
     }
-    const auto sort = dynamic_cast<const RelSort*>(rel_alg);
+    const auto sort = dynamic_cast<const hdk::ir::Sort*>(rel_alg);
     if (sort) {
       return aggregateResult(result, visitSort(sort));
     }
-    const auto logical_values = dynamic_cast<const RelLogicalValues*>(rel_alg);
+    const auto logical_values = dynamic_cast<const hdk::ir::LogicalValues*>(rel_alg);
     if (logical_values) {
       return aggregateResult(result, visitLogicalValues(logical_values));
     }
-    const auto table_func = dynamic_cast<const RelTableFunction*>(rel_alg);
+    const auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(rel_alg);
     if (table_func) {
       return aggregateResult(result, visitTableFunction(table_func));
     }
-    const auto logical_union = dynamic_cast<const RelLogicalUnion*>(rel_alg);
+    const auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(rel_alg);
     if (logical_union) {
       return aggregateResult(result, visitLogicalUnion(logical_union));
     }
@@ -75,29 +76,35 @@ class RelAlgVisitor {
     return {};
   }
 
-  virtual T visitAggregate(const RelAggregate*) const { return defaultResult(); }
+  virtual T visitAggregate(const hdk::ir::Aggregate*) const { return defaultResult(); }
 
-  virtual T visitCompound(const RelCompound*) const { return defaultResult(); }
+  virtual T visitCompound(const hdk::ir::Compound*) const { return defaultResult(); }
 
-  virtual T visitFilter(const RelFilter*) const { return defaultResult(); }
+  virtual T visitFilter(const hdk::ir::Filter*) const { return defaultResult(); }
 
-  virtual T visitJoin(const RelJoin*) const { return defaultResult(); }
+  virtual T visitJoin(const hdk::ir::Join*) const { return defaultResult(); }
 
-  virtual T visitLeftDeepInnerJoin(const RelLeftDeepInnerJoin*) const {
+  virtual T visitLeftDeepInnerJoin(const hdk::ir::LeftDeepInnerJoin*) const {
     return defaultResult();
   }
 
-  virtual T visitProject(const RelProject*) const { return defaultResult(); }
+  virtual T visitProject(const hdk::ir::Project*) const { return defaultResult(); }
 
-  virtual T visitScan(const RelScan*) const { return defaultResult(); }
+  virtual T visitScan(const hdk::ir::Scan*) const { return defaultResult(); }
 
-  virtual T visitSort(const RelSort*) const { return defaultResult(); }
+  virtual T visitSort(const hdk::ir::Sort*) const { return defaultResult(); }
 
-  virtual T visitLogicalValues(const RelLogicalValues*) const { return defaultResult(); }
+  virtual T visitLogicalValues(const hdk::ir::LogicalValues*) const {
+    return defaultResult();
+  }
 
-  virtual T visitTableFunction(const RelTableFunction*) const { return defaultResult(); }
+  virtual T visitTableFunction(const hdk::ir::TableFunction*) const {
+    return defaultResult();
+  }
 
-  virtual T visitLogicalUnion(const RelLogicalUnion*) const { return defaultResult(); }
+  virtual T visitLogicalUnion(const hdk::ir::LogicalUnion*) const {
+    return defaultResult();
+  }
 
  protected:
   virtual T aggregateResult(const T& aggregate, const T& next_result) const {

@@ -79,7 +79,7 @@ ResultSetLogicalValuesBuilder::ResultSetLogicalValuesBuilder(
     , executor(nullptr) {}
 
 ResultSetLogicalValuesBuilder::ResultSetLogicalValuesBuilder(
-    const RelLogicalValues* _logical_values,
+    const hdk::ir::LogicalValues* _logical_values,
     const std::vector<TargetInfo>& _targets,
     const ExecutorDeviceType _device_type,
     const QueryMemoryDescriptor& _query_mem_desc,
@@ -177,8 +177,8 @@ ResultSet* ResultSetLogicalValuesBuilder::create(
     query_mem_desc.addColSlotInfo({std::make_tuple(colType->size(), 8)});
   }
 
-  std::shared_ptr<RelLogicalValues> rel_logical_values =
-      std::make_shared<RelLogicalValues>(label_infos, std::move(logical_values));
+  std::shared_ptr<hdk::ir::LogicalValues> rel_logical_values =
+      std::make_shared<hdk::ir::LogicalValues>(label_infos, std::move(logical_values));
 
   const auto row_set_mem_owner =
       std::make_shared<RowSetMemoryOwner>(nullptr, Executor::getArenaBlockSize());

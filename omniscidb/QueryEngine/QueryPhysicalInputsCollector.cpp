@@ -33,7 +33,7 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
 
   using RelAlgVisitor<ResultType>::visit;
 
-  ResultType visitCompound(const RelCompound* compound) const override {
+  ResultType visitCompound(const hdk::ir::Compound* compound) const override {
     ResultType result;
     ExprVisitor visitor;
     for (auto& expr : compound->getGroupByExprs()) {
@@ -52,12 +52,12 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     return result;
   }
 
-  ResultType visitFilter(const RelFilter* filter) const override {
+  ResultType visitFilter(const hdk::ir::Filter* filter) const override {
     ExprVisitor visitor;
     return visitor.visit(filter->getConditionExpr());
   }
 
-  ResultType visitJoin(const RelJoin* join) const override {
+  ResultType visitJoin(const hdk::ir::Join* join) const override {
     auto condition = join->getCondition();
     if (!condition) {
       return ResultType{};
@@ -67,7 +67,7 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
   }
 
   ResultType visitLeftDeepInnerJoin(
-      const RelLeftDeepInnerJoin* left_deep_inner_join) const override {
+      const hdk::ir::LeftDeepInnerJoin* left_deep_inner_join) const override {
     ResultType result;
     auto condition = left_deep_inner_join->getInnerCondition();
     ExprVisitor visitor;
@@ -85,7 +85,7 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     return result;
   }
 
-  ResultType visitProject(const RelProject* project) const override {
+  ResultType visitProject(const hdk::ir::Project* project) const override {
     ResultType result;
     ExprVisitor visitor;
     for (auto& expr : project->getExprs()) {
@@ -95,7 +95,7 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     return result;
   }
 
-  ResultType visitSort(const RelSort* sort) const override {
+  ResultType visitSort(const hdk::ir::Sort* sort) const override {
     return this->visit(sort->getInput(0));
   }
 
@@ -129,7 +129,7 @@ class InputVisitorBase : public ScalarExprVisitor<ResultType> {
     ResultType result;
     for (auto& part_key : window_func->partitionKeys()) {
       if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(part_key.get())) {
-        if (auto filter = dynamic_cast<const RelFilter*>(col_ref->node())) {
+        if (auto filter = dynamic_cast<const hdk::ir::Filter*>(col_ref->node())) {
           // Partitions utilize string dictionary translation in the hash join framework
           // if the partition key is a dictionary encoded string. Ensure we reach the
           // source for all partition keys, so we can access string dictionaries for the
@@ -165,9 +165,9 @@ class PhysicalInputsVisitor
 
   InputColDescriptorSet visitColumnRef(const hdk::ir::ColumnRef* col_ref) const override {
     const auto source = col_ref->node();
-    const auto scan = dynamic_cast<const RelScan*>(source);
+    const auto scan = dynamic_cast<const hdk::ir::Scan*>(source);
     if (!scan) {
-      const auto join = dynamic_cast<const RelJoin*>(source);
+      const auto join = dynamic_cast<const hdk::ir::Join*>(source);
       if (join) {
         auto input = getNodeColumnRef(join, col_ref->index());
         return visit(input.get());
@@ -212,7 +212,7 @@ class PhysicalColumnInfosNodeVisitor
  public:
   PhysicalColumnInfosNodeVisitor() {}
 
-  ColumnInfoMap visitScan(const RelScan* scan) const override {
+  ColumnInfoMap visitScan(const hdk::ir::Scan* scan) const override {
     ColumnInfoMap res;
 
     for (size_t col_idx = 0; col_idx < scan->size(); ++col_idx) {
@@ -231,7 +231,7 @@ class PhysicalTableInputsNodeVisitor : public ExprDagVisitor {
   using ExprDagVisitor::visit;
   using TableIds = std::unordered_set<std::pair<int, int>>;
 
-  static TableIds getTableIds(RelAlgNode const* node) {
+  static TableIds getTableIds(hdk::ir::Node const* node) {
     PhysicalTableInputsNodeVisitor visitor;
     visitor.visit(node);
     return std::move(visitor.table_ids_);
@@ -240,7 +240,7 @@ class PhysicalTableInputsNodeVisitor : public ExprDagVisitor {
  private:
   TableIds table_ids_;
 
-  void visitScan(const RelScan* scan) override {
+  void visitScan(const hdk::ir::Scan* scan) override {
     table_ids_.insert({scan->getDatabaseId(), scan->getTableId()});
   }
 };
@@ -252,7 +252,7 @@ class PhysicalTableInfosNodeVisitor
  public:
   PhysicalTableInfosNodeVisitor() {}
 
-  TableInfoMap visitScan(const RelScan* scan) const override {
+  TableInfoMap visitScan(const hdk::ir::Scan* scan) const override {
     TableInfoMap res;
     auto info = scan->getTableInfo();
     res.insert(std::make_pair(TableRef(info->db_id, info->table_id), info));
@@ -262,22 +262,23 @@ class PhysicalTableInfosNodeVisitor
 
 }  // namespace
 
-std::unordered_set<InputColDescriptor> get_physical_inputs(const RelAlgNode* ra) {
+std::unordered_set<InputColDescriptor> get_physical_inputs(const hdk::ir::Node* ra) {
   PhysicalInputsNodeVisitor<PhysicalInputsVisitor, InputColDescriptorSet>
       phys_inputs_visitor;
   return phys_inputs_visitor.visit(ra);
 }
 
-std::unordered_set<std::pair<int, int>> get_physical_table_inputs(const RelAlgNode* ra) {
+std::unordered_set<std::pair<int, int>> get_physical_table_inputs(
+    const hdk::ir::Node* ra) {
   return PhysicalTableInputsNodeVisitor::getTableIds(ra);
 }
 
-ColumnInfoMap get_physical_column_infos(const RelAlgNode* ra) {
+ColumnInfoMap get_physical_column_infos(const hdk::ir::Node* ra) {
   PhysicalColumnInfosNodeVisitor visitor;
   return visitor.visit(ra);
 }
 
-TableInfoMap get_physical_table_infos(const RelAlgNode* ra) {
+TableInfoMap get_physical_table_infos(const hdk::ir::Node* ra) {
   PhysicalTableInfosNodeVisitor visitor;
   return visitor.visit(ra);
 }

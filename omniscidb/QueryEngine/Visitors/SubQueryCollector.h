@@ -27,11 +27,11 @@
 
 class SubQueryCollector final : public ExprDagVisitor {
  public:
-  static std::unordered_set<const RelAlgNode*> getLiveSubQueries(RelAlgNode const*);
+  static std::unordered_set<const hdk::ir::Node*> getLiveSubQueries(hdk::ir::Node const*);
 
  private:
   void* visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) const override;
   void* visitInSubquery(const hdk::ir::InSubquery* in_subquery) const override;
 
-  mutable std::unordered_set<const RelAlgNode*> subqueries_;
+  mutable std::unordered_set<const hdk::ir::Node*> subqueries_;
 };

@@ -20,7 +20,7 @@
 
 class RelAlgSchemaProvider : public SchemaProvider {
  public:
-  RelAlgSchemaProvider(const RelAlgNode& root);
+  RelAlgSchemaProvider(const hdk::ir::Node& root);
 
   int getId() const override { return -1; }
   std::string_view getName() const override { return "__RelAlgSchema__"; }

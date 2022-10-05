@@ -79,9 +79,9 @@ bool should_output_columnar(const RelAlgExecutionUnit& ra_exe_unit) {
   return ra_exe_unit.scan_limit >= g_columnar_large_projections_threshold;
 }
 
-bool node_is_aggregate(const RelAlgNode* ra) {
-  const auto compound = dynamic_cast<const RelCompound*>(ra);
-  const auto aggregate = dynamic_cast<const RelAggregate*>(ra);
+bool node_is_aggregate(const hdk::ir::Node* ra) {
+  const auto compound = dynamic_cast<const hdk::ir::Compound*>(ra);
+  const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(ra);
   return ((compound && compound->isAggregate()) || aggregate);
 }
 
@@ -93,7 +93,7 @@ bool is_extracted_dag_valid(ExtractedPlanDag& dag) {
 class RelLeftDeepTreeIdsCollector : public RelAlgVisitor<std::vector<unsigned>> {
  public:
   std::vector<unsigned> visitLeftDeepInnerJoin(
-      const RelLeftDeepInnerJoin* left_deep_join_tree) const override {
+      const hdk::ir::LeftDeepInnerJoin* left_deep_join_tree) const override {
     return {left_deep_join_tree->getId()};
   }
 
@@ -122,10 +122,10 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
 RelAlgExecutor::RelAlgExecutor(Executor* executor,
                                SchemaProviderPtr schema_provider,
                                DataProvider* data_provider,
-                               std::unique_ptr<RelAlgDag> query_dag)
+                               std::unique_ptr<hdk::ir::QueryDag> query_dag)
     : executor_(executor)
     , query_dag_(std::move(query_dag))
-    , schema_provider_(std::make_shared<RelAlgSchemaProvider>(query_dag_->getRootNode()))
+    , schema_provider_(std::make_shared<RelAlgSchemaProvider>(*query_dag_->getRootNode()))
     , data_provider_(data_provider)
     , config_(executor_->getConfig())
     , now_(0)
@@ -144,16 +144,16 @@ size_t RelAlgExecutor::getOuterFragmentCount(const CompilationOptions& co,
   CHECK(query_dag_);
 
   query_dag_->resetQueryExecutionState();
-  const auto& ra = query_dag_->getRootNode();
+  const auto ra = query_dag_->getRootNode();
 
   ScopeGuard row_set_holder = [this] { cleanupPostExecution(); };
-  const auto col_descs = get_physical_inputs(&ra);
-  const auto phys_table_ids = get_physical_table_inputs(&ra);
+  const auto col_descs = get_physical_inputs(ra);
+  const auto phys_table_ids = get_physical_table_inputs(ra);
   executor_->setSchemaProvider(schema_provider_);
   executor_->setupCaching(data_provider_, col_descs, phys_table_ids);
 
   ScopeGuard restore_metainfo_cache = [this] { executor_->clearMetaInfoCache(); };
-  auto ed_seq = RaExecutionSequence(&ra);
+  auto ed_seq = RaExecutionSequence(ra);
 
   if (!getSubqueries().empty()) {
     return 0;
@@ -178,7 +178,7 @@ size_t RelAlgExecutor::getOuterFragmentCount(const CompilationOptions& co,
     return 0;
   }
 
-  const auto project = dynamic_cast<const RelProject*>(body);
+  const auto project = dynamic_cast<const hdk::ir::Project*>(body);
   if (project) {
     auto work_unit =
         createProjectWorkUnit(project, {{}, SortAlgorithm::Default, 0, 0}, eo);
@@ -188,7 +188,7 @@ size_t RelAlgExecutor::getOuterFragmentCount(const CompilationOptions& co,
                                    executor_);
   }
 
-  const auto compound = dynamic_cast<const RelCompound*>(body);
+  const auto compound = dynamic_cast<const hdk::ir::Compound*>(body);
   if (compound) {
     if (compound->isAggregate()) {
       return 0;
@@ -243,11 +243,11 @@ ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
 std::pair<CompilationOptions, ExecutionOptions> RelAlgExecutor::handle_hint(
     const CompilationOptions& co,
     const ExecutionOptions& eo,
-    const RelAlgNode* body) {
+    const hdk::ir::Node* body) {
   ExecutionOptions eo_hint_applied = eo;
   CompilationOptions co_hint_applied = co;
   auto target_node = body;
-  if (auto sort_body = dynamic_cast<const RelSort*>(body)) {
+  if (auto sort_body = dynamic_cast<const hdk::ir::Sort*>(body)) {
     target_node = sort_body->getInput(0);
   }
   auto query_hints = getParsedQueryHint(target_node);
@@ -279,14 +279,14 @@ std::pair<CompilationOptions, ExecutionOptions> RelAlgExecutor::handle_hint(
 void RelAlgExecutor::prepareStreamingExecution(const CompilationOptions& co,
                                                const ExecutionOptions& eo) {
   query_dag_->resetQueryExecutionState();
-  const auto& ra = query_dag_->getRootNode();
+  const auto ra = query_dag_->getRootNode();
   if (config_.exec.watchdog.enable_dynamic) {
     executor_->resetInterrupt();
   }
 
   //  ScopeGuard row_set_holder = [this] { cleanupPostExecution(); };
-  const auto col_descs = get_physical_inputs(&ra);
-  const auto phys_table_ids = get_physical_table_inputs(&ra);
+  const auto col_descs = get_physical_inputs(ra);
+  const auto phys_table_ids = get_physical_table_inputs(ra);
 
   decltype(temporary_tables_)().swap(temporary_tables_);
   decltype(target_exprs_owned_)().swap(target_exprs_owned_);
@@ -297,7 +297,7 @@ void RelAlgExecutor::prepareStreamingExecution(const CompilationOptions& co,
   executor_->temporary_tables_ = &temporary_tables_;
 
   //   ScopeGuard restore_metainfo_cache = [this] { executor_->clearMetaInfoCache(); };
-  auto ed_seq = RaExecutionSequence(&ra);
+  auto ed_seq = RaExecutionSequence(ra);
 
   if (getSubqueries().size() != 0) {
     throw std::runtime_error("Streaming queries with subqueries are not supported yet");
@@ -340,23 +340,23 @@ void RelAlgExecutor::prepareStreamingExecution(const CompilationOptions& co,
 }
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnitForStreaming(
-    const RelAlgNode* body,
+    const hdk::ir::Node* body,
     const CompilationOptions& co,
     const ExecutionOptions& eo) {
-  if (const auto compound = dynamic_cast<const RelCompound*>(body)) {
+  if (const auto compound = dynamic_cast<const hdk::ir::Compound*>(body)) {
     return createCompoundWorkUnit(compound, {{}, SortAlgorithm::Default, 0, 0}, eo);
   }
-  if (const auto project = dynamic_cast<const RelProject*>(body)) {
+  if (const auto project = dynamic_cast<const hdk::ir::Project*>(body)) {
     auto work_unit =
         createProjectWorkUnit(project, {{}, SortAlgorithm::Default, 0, 0}, eo);
     CHECK(!project->isSimple());  // check if input table is not temporary
     return work_unit;
   }
-  if (const auto aggregate = dynamic_cast<const RelAggregate*>(body)) {
+  if (const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(body)) {
     return createAggregateWorkUnit(
         aggregate, {{}, SortAlgorithm::Default, 0, 0}, eo.just_explain);
   }
-  if (const auto filter = dynamic_cast<const RelFilter*>(body)) {
+  if (const auto filter = dynamic_cast<const hdk::ir::Filter*>(body)) {
     return createFilterWorkUnit(
         filter, {{}, SortAlgorithm::Default, 0, 0}, eo.just_explain);
   }
@@ -381,7 +381,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
   auto timer_setup = DEBUG_TIMER("Query pre-execution steps");
 
   query_dag_->resetQueryExecutionState();
-  const auto& ra = query_dag_->getRootNode();
+  const auto ra = query_dag_->getRootNode();
 
   // capture the lock acquistion time
   auto clock_begin = timer_start();
@@ -391,17 +391,17 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
 
   int64_t queue_time_ms = timer_stop(clock_begin);
   ScopeGuard row_set_holder = [this] { cleanupPostExecution(); };
-  const auto col_descs = get_physical_inputs(&ra);
-  const auto phys_table_ids = get_physical_table_inputs(&ra);
+  const auto col_descs = get_physical_inputs(ra);
+  const auto phys_table_ids = get_physical_table_inputs(ra);
   executor_->setSchemaProvider(schema_provider_);
   executor_->setupCaching(data_provider_, col_descs, phys_table_ids);
 
   ScopeGuard restore_metainfo_cache = [this] { executor_->clearMetaInfoCache(); };
-  auto ed_seq = RaExecutionSequence(&ra);
+  auto ed_seq = RaExecutionSequence(ra);
 
   if (just_explain_plan) {
     std::stringstream ss;
-    std::vector<const RelAlgNode*> nodes;
+    std::vector<const hdk::ir::Node*> nodes;
     for (size_t i = 0; i < ed_seq.size(); i++) {
       nodes.emplace_back(ed_seq.getDescriptor(i)->getBody());
     }
@@ -412,12 +412,13 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
       const auto tabs = std::string(tab_ctr++, '\t');
       CHECK(body);
       ss << tabs << std::to_string(index) << " : " << body->toString() << "\n";
-      if (auto sort = dynamic_cast<const RelSort*>(body)) {
+      if (auto sort = dynamic_cast<const hdk::ir::Sort*>(body)) {
         ss << tabs << "  : " << sort->getInput(0)->toString() << "\n";
       }
-      if (dynamic_cast<const RelProject*>(body) ||
-          dynamic_cast<const RelCompound*>(body)) {
-        if (auto join = dynamic_cast<const RelLeftDeepInnerJoin*>(body->getInput(0))) {
+      if (dynamic_cast<const hdk::ir::Project*>(body) ||
+          dynamic_cast<const hdk::ir::Compound*>(body)) {
+        if (auto join =
+                dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(body->getInput(0))) {
           ss << tabs << "  : " << join->toString() << "\n";
         }
       }
@@ -461,17 +462,17 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
 
 AggregatedColRange RelAlgExecutor::computeColRangesCache() {
   AggregatedColRange agg_col_range_cache;
-  const auto col_descs = get_physical_inputs(&getRootRelAlgNode());
+  const auto col_descs = get_physical_inputs(getRootNode());
   return executor_->computeColRangesCache(col_descs);
 }
 
 StringDictionaryGenerations RelAlgExecutor::computeStringDictionaryGenerations() {
-  const auto col_descs = get_physical_inputs(&getRootRelAlgNode());
+  const auto col_descs = get_physical_inputs(getRootNode());
   return executor_->computeStringDictionaryGenerations(col_descs);
 }
 
 TableGenerations RelAlgExecutor::computeTableGenerations() {
-  const auto phys_table_ids = get_physical_table_inputs(&getRootRelAlgNode());
+  const auto phys_table_ids = get_physical_table_inputs(getRootNode());
   return executor_->computeTableGenerations(phys_table_ids);
 }
 
@@ -485,8 +486,8 @@ void RelAlgExecutor::cleanupPostExecution() {
 }
 
 std::pair<std::vector<unsigned>, std::unordered_map<unsigned, JoinQualsPerNestingLevel>>
-RelAlgExecutor::getJoinInfo(const RelAlgNode* root_node) {
-  auto sort_node = dynamic_cast<const RelSort*>(root_node);
+RelAlgExecutor::getJoinInfo(const hdk::ir::Node* root_node) {
+  auto sort_node = dynamic_cast<const hdk::ir::Sort*>(root_node);
   if (sort_node) {
     // we assume that test query that needs join info does not contain any sort node
     return {};
@@ -499,10 +500,10 @@ RelAlgExecutor::getJoinInfo(const RelAlgNode* root_node) {
 
 namespace {
 
-inline void check_sort_node_source_constraint(const RelSort* sort) {
+inline void check_sort_node_source_constraint(const hdk::ir::Sort* sort) {
   CHECK_EQ(size_t(1), sort->inputCount());
   const auto source = sort->getInput(0);
-  if (dynamic_cast<const RelSort*>(source)) {
+  if (dynamic_cast<const hdk::ir::Sort*>(source)) {
     throw std::runtime_error("Sort node not supported as input to another sort");
   }
 }
@@ -518,9 +519,9 @@ QueryStepExecutionResult RelAlgExecutor::executeRelAlgQuerySingleStep(
 
   auto exe_desc_ptr = seq.getDescriptor(step_idx);
   CHECK(exe_desc_ptr);
-  const auto sort = dynamic_cast<const RelSort*>(exe_desc_ptr->getBody());
+  const auto sort = dynamic_cast<const hdk::ir::Sort*>(exe_desc_ptr->getBody());
 
-  auto merge_type = [](const RelAlgNode* body) -> MergeType {
+  auto merge_type = [](const hdk::ir::Node* body) -> MergeType {
     return node_is_aggregate(body) ? MergeType::Reduce : MergeType::Union;
   };
 
@@ -596,7 +597,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgSeq(const RaExecutionSequence& seq,
 
   auto get_descriptor_count = [&seq, &eo]() -> size_t {
     if (eo.just_explain) {
-      if (dynamic_cast<const RelLogicalValues*>(seq.getDescriptor(0)->getBody())) {
+      if (dynamic_cast<const hdk::ir::LogicalValues*>(seq.getDescriptor(0)->getBody())) {
         // run the logical values descriptor to generate the result set, then the next
         // descriptor to generate the explain
         CHECK_GE(seq.size(), size_t(2));
@@ -634,7 +635,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgSeq(const RaExecutionSequence& seq,
       eo_extern.executor_type = ::ExecutorType::Extern;
       auto exec_desc_ptr = seq.getDescriptor(i);
       const auto body = exec_desc_ptr->getBody();
-      const auto compound = dynamic_cast<const RelCompound*>(body);
+      const auto compound = dynamic_cast<const hdk::ir::Compound*>(body);
       if (compound && (compound->getGroupByCount() || compound->isAggregate())) {
         LOG(INFO) << "Also failed to run the query using interoperability";
         throw;
@@ -696,15 +697,15 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
 
   const auto eo_work_unit = [&]() {
     ExecutionOptions new_eo = eo;
-    new_eo.with_watchdog =
-        eo.with_watchdog && (step_idx == 0 || dynamic_cast<const RelProject*>(body));
+    new_eo.with_watchdog = eo.with_watchdog &&
+                           (step_idx == 0 || dynamic_cast<const hdk::ir::Project*>(body));
     new_eo.outer_fragment_indices =
         step_idx == 0 ? eo.outer_fragment_indices : std::vector<size_t>();
     return new_eo;
   }();
 
   auto hint_applied = handle_hint(co, eo_work_unit, body);
-  const auto compound = dynamic_cast<const RelCompound*>(body);
+  const auto compound = dynamic_cast<const hdk::ir::Compound*>(body);
   if (compound) {
     exec_desc.setResult(executeCompound(
         compound, hint_applied.first, hint_applied.second, queue_time_ms));
@@ -718,15 +719,16 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     addTemporaryTable(-compound->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto project = dynamic_cast<const RelProject*>(body);
+  const auto project = dynamic_cast<const hdk::ir::Project*>(body);
   if (project) {
     std::optional<size_t> prev_count;
     // Disabling the intermediate count optimization in distributed, as the previous
     // execution descriptor will likely not hold the aggregated result.
     if (config_.opts.skip_intermediate_count && step_idx > 0) {
       // If the previous node produced a reliable count, skip the pre-flight count.
-      RelAlgNode const* const prev_body = project->getInput(0);
-      if (shared::dynamic_castable_to_any<RelCompound, RelLogicalValues>(prev_body)) {
+      hdk::ir::Node const* const prev_body = project->getInput(0);
+      if (shared::dynamic_castable_to_any<hdk::ir::Compound, hdk::ir::LogicalValues>(
+              prev_body)) {
         if (RaExecutionDesc const* const prev_exec_desc =
                 prev_body->hasContextData()
                     ? prev_body->getContextData()
@@ -757,21 +759,21 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     addTemporaryTable(-project->getId(), exec_desc.getResult().getTable());
     return;
   }
-  const auto aggregate = dynamic_cast<const RelAggregate*>(body);
+  const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(body);
   if (aggregate) {
     exec_desc.setResult(executeAggregate(
         aggregate, hint_applied.first, hint_applied.second, queue_time_ms));
     addTemporaryTable(-aggregate->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto filter = dynamic_cast<const RelFilter*>(body);
+  const auto filter = dynamic_cast<const hdk::ir::Filter*>(body);
   if (filter) {
     exec_desc.setResult(
         executeFilter(filter, hint_applied.first, hint_applied.second, queue_time_ms));
     addTemporaryTable(-filter->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto sort = dynamic_cast<const RelSort*>(body);
+  const auto sort = dynamic_cast<const hdk::ir::Sort*>(body);
   if (sort) {
     exec_desc.setResult(
         executeSort(sort, hint_applied.first, hint_applied.second, queue_time_ms));
@@ -781,20 +783,20 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     addTemporaryTable(-sort->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto logical_values = dynamic_cast<const RelLogicalValues*>(body);
+  const auto logical_values = dynamic_cast<const hdk::ir::LogicalValues*>(body);
   if (logical_values) {
     exec_desc.setResult(executeLogicalValues(logical_values, hint_applied.second));
     addTemporaryTable(-logical_values->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto logical_union = dynamic_cast<const RelLogicalUnion*>(body);
+  const auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(body);
   if (logical_union) {
     exec_desc.setResult(executeUnion(
         logical_union, seq, co, eo_work_unit.with_preserve_order(true), queue_time_ms));
     addTemporaryTable(-logical_union->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto table_func = dynamic_cast<const RelTableFunction*>(body);
+  const auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(body);
   if (table_func) {
     exec_desc.setResult(executeTableFunction(
         table_func, hint_applied.first, hint_applied.second, queue_time_ms));
@@ -807,7 +809,7 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
 void RelAlgExecutor::handleNop(RaExecutionDesc& ed) {
   // just set the result of the previous node as the result of no op
   auto body = ed.getBody();
-  CHECK(dynamic_cast<const RelAggregate*>(body));
+  CHECK(dynamic_cast<const hdk::ir::Aggregate*>(body));
   CHECK_EQ(size_t(1), body->inputCount());
   const auto input = body->getInput(0);
   body->setOutputMetainfo(input->getOutputMetainfo());
@@ -837,24 +839,24 @@ class UsedInputsCollector
   }
 };
 
-const RelAlgNode* get_data_sink(const RelAlgNode* ra_node) {
-  if (auto table_func = dynamic_cast<const RelTableFunction*>(ra_node)) {
+const hdk::ir::Node* get_data_sink(const hdk::ir::Node* ra_node) {
+  if (auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(ra_node)) {
     return table_func;
   }
-  if (auto join = dynamic_cast<const RelJoin*>(ra_node)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(ra_node)) {
     CHECK_EQ(size_t(2), join->inputCount());
     return join;
   }
-  if (!dynamic_cast<const RelLogicalUnion*>(ra_node)) {
+  if (!dynamic_cast<const hdk::ir::LogicalUnion*>(ra_node)) {
     CHECK_EQ(size_t(1), ra_node->inputCount());
   }
   auto only_src = ra_node->getInput(0);
-  const bool is_join = dynamic_cast<const RelJoin*>(only_src) ||
-                       dynamic_cast<const RelLeftDeepInnerJoin*>(only_src);
+  const bool is_join = dynamic_cast<const hdk::ir::Join*>(only_src) ||
+                       dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(only_src);
   return is_join ? only_src : ra_node;
 }
 
-ColumnRefSet get_used_inputs(const RelCompound* compound) {
+ColumnRefSet get_used_inputs(const hdk::ir::Compound* compound) {
   UsedInputsCollector collector;
   const auto filter_expr = compound->getFilter();
   if (filter_expr) {
@@ -869,7 +871,7 @@ ColumnRefSet get_used_inputs(const RelCompound* compound) {
   return std::move(collector.result());
 }
 
-ColumnRefSet get_used_inputs(const RelAggregate* aggregate) {
+ColumnRefSet get_used_inputs(const hdk::ir::Aggregate* aggregate) {
   UsedInputsCollector collector;
   ColumnRefSet res;
   const auto source = aggregate->getInput(0);
@@ -890,7 +892,7 @@ ColumnRefSet get_used_inputs(const RelAggregate* aggregate) {
   return res;
 }
 
-ColumnRefSet get_used_inputs(const RelProject* project) {
+ColumnRefSet get_used_inputs(const hdk::ir::Project* project) {
   UsedInputsCollector collector;
   for (auto& expr : project->getExprs()) {
     collector.visit(expr.get());
@@ -898,7 +900,7 @@ ColumnRefSet get_used_inputs(const RelProject* project) {
   return std::move(collector.result());
 }
 
-ColumnRefSet get_used_inputs(const RelTableFunction* table_func) {
+ColumnRefSet get_used_inputs(const hdk::ir::TableFunction* table_func) {
   UsedInputsCollector collector;
   for (auto& expr : table_func->getTableFuncInputExprs()) {
     collector.visit(expr.get());
@@ -906,12 +908,12 @@ ColumnRefSet get_used_inputs(const RelTableFunction* table_func) {
   return std::move(collector.result());
 }
 
-ColumnRefSet get_used_inputs(const RelFilter* filter) {
+ColumnRefSet get_used_inputs(const hdk::ir::Filter* filter) {
   ColumnRefSet res;
   const auto data_sink_node = get_data_sink(filter);
   for (size_t nest_level = 0; nest_level < data_sink_node->inputCount(); ++nest_level) {
     const auto source = data_sink_node->getInput(nest_level);
-    const auto scan_source = dynamic_cast<const RelScan*>(source);
+    const auto scan_source = dynamic_cast<const hdk::ir::Scan*>(source);
     auto input_count =
         scan_source ? scan_source->size() : source->getOutputMetainfo().size();
     for (unsigned i = 0; i < static_cast<unsigned>(input_count); ++i) {
@@ -921,7 +923,7 @@ ColumnRefSet get_used_inputs(const RelFilter* filter) {
   return res;
 }
 
-ColumnRefSet get_used_inputs(const RelLogicalUnion* logical_union) {
+ColumnRefSet get_used_inputs(const hdk::ir::LogicalUnion* logical_union) {
   ColumnRefSet res;
   auto const n_inputs = logical_union->inputCount();
   for (size_t nest_level = 0; nest_level < n_inputs; ++nest_level) {
@@ -933,27 +935,27 @@ ColumnRefSet get_used_inputs(const RelLogicalUnion* logical_union) {
   return res;
 }
 
-int db_id_from_ra(const RelAlgNode* ra_node) {
-  const auto scan_ra = dynamic_cast<const RelScan*>(ra_node);
+int db_id_from_ra(const hdk::ir::Node* ra_node) {
+  const auto scan_ra = dynamic_cast<const hdk::ir::Scan*>(ra_node);
   if (scan_ra) {
     return scan_ra->getDatabaseId();
   }
   return 0;
 }
 
-int table_id_from_ra(const RelAlgNode* ra_node) {
-  const auto scan_ra = dynamic_cast<const RelScan*>(ra_node);
+int table_id_from_ra(const hdk::ir::Node* ra_node) {
+  const auto scan_ra = dynamic_cast<const hdk::ir::Scan*>(ra_node);
   if (scan_ra) {
     return scan_ra->getTableId();
   }
   return -ra_node->getId();
 }
 
-std::unordered_map<const RelAlgNode*, int> get_input_nest_levels(
-    const RelAlgNode* ra_node,
+std::unordered_map<const hdk::ir::Node*, int> get_input_nest_levels(
+    const hdk::ir::Node* ra_node,
     const std::vector<size_t>& input_permutation) {
   const auto data_sink_node = get_data_sink(ra_node);
-  std::unordered_map<const RelAlgNode*, int> input_to_nest_level;
+  std::unordered_map<const hdk::ir::Node*, int> input_to_nest_level;
   for (size_t input_idx = 0; input_idx < data_sink_node->inputCount(); ++input_idx) {
     const auto input_node_idx =
         input_permutation.empty() ? input_idx : input_permutation[input_idx];
@@ -962,7 +964,8 @@ std::unordered_map<const RelAlgNode*, int> get_input_nest_levels(
     // interpretted as a JOIN within CodeGenerator::codegenColVar() due to rte_idx
     // being set to the mapped value (input_idx) which originates here. This would be
     // incorrect for UNION.
-    size_t const idx = dynamic_cast<const RelLogicalUnion*>(ra_node) ? 0 : input_idx;
+    size_t const idx =
+        dynamic_cast<const hdk::ir::LogicalUnion*>(ra_node) ? 0 : input_idx;
     const auto it_ok = input_to_nest_level.emplace(input_ra, idx);
     CHECK(it_ok.second);
     LOG_IF(INFO, !input_permutation.empty())
@@ -971,15 +974,16 @@ std::unordered_map<const RelAlgNode*, int> get_input_nest_levels(
   return input_to_nest_level;
 }
 
-ColumnRefSet get_join_source_used_inputs(const RelAlgNode* ra_node) {
+ColumnRefSet get_join_source_used_inputs(const hdk::ir::Node* ra_node) {
   const auto data_sink_node = get_data_sink(ra_node);
-  if (auto join = dynamic_cast<const RelJoin*>(data_sink_node)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(data_sink_node)) {
     CHECK_EQ(join->inputCount(), 2u);
     const auto condition = join->getCondition();
     return UsedInputsCollector::collect(condition);
   }
 
-  if (auto left_deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(data_sink_node)) {
+  if (auto left_deep_join =
+          dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(data_sink_node)) {
     CHECK_GE(left_deep_join->inputCount(), 2u);
     UsedInputsCollector collector;
     collector.visit(left_deep_join->getInnerCondition());
@@ -993,9 +997,9 @@ ColumnRefSet get_join_source_used_inputs(const RelAlgNode* ra_node) {
     return std::move(collector.result());
   }
 
-  if (dynamic_cast<const RelLogicalUnion*>(ra_node)) {
+  if (dynamic_cast<const hdk::ir::LogicalUnion*>(ra_node)) {
     CHECK_GT(ra_node->inputCount(), 1u) << ra_node->toString();
-  } else if (dynamic_cast<const RelTableFunction*>(ra_node)) {
+  } else if (dynamic_cast<const hdk::ir::TableFunction*>(ra_node)) {
     // no-op
     CHECK_GE(ra_node->inputCount(), 0u) << ra_node->toString();
   } else {
@@ -1007,9 +1011,9 @@ ColumnRefSet get_join_source_used_inputs(const RelAlgNode* ra_node) {
 void collect_used_input_desc(
     std::vector<InputDescriptor>& input_descs,
     std::unordered_set<std::shared_ptr<const InputColDescriptor>>& input_col_descs_unique,
-    const RelAlgNode* ra_node,
+    const hdk::ir::Node* ra_node,
     const ColumnRefSet& source_used_inputs,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level) {
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level) {
   for (const auto col_ref : source_used_inputs) {
     const auto source = col_ref.node();
     const int table_id = table_id_from_ra(source);
@@ -1017,14 +1021,14 @@ void collect_used_input_desc(
     auto it = input_to_nest_level.find(source);
     if (it != input_to_nest_level.end()) {
       const int nest_level = it->second;
-      auto scan = dynamic_cast<const RelScan*>(source);
+      auto scan = dynamic_cast<const hdk::ir::Scan*>(source);
       ColumnInfoPtr col_info = scan
                                    ? scan->getColumnInfo(col_id)
                                    : std::make_shared<ColumnInfo>(
                                          -1, table_id, col_id, "", col_ref.type(), false);
       input_col_descs_unique.insert(
           std::make_shared<const InputColDescriptor>(col_info, nest_level));
-    } else if (!dynamic_cast<const RelLogicalUnion*>(ra_node)) {
+    } else if (!dynamic_cast<const hdk::ir::LogicalUnion*>(ra_node)) {
       throw std::runtime_error("Bushy joins not supported");
     }
   }
@@ -1034,7 +1038,7 @@ template <class RA>
 std::pair<std::vector<InputDescriptor>,
           std::list<std::shared_ptr<const InputColDescriptor>>>
 get_input_desc(const RA* ra_node,
-               const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
+               const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
                const std::vector<size_t>& input_permutation) {
   auto used_inputs = get_used_inputs(ra_node);
   std::vector<InputDescriptor> input_descs;
@@ -1133,7 +1137,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
   return res;
 }
 
-std::list<hdk::ir::ExprPtr> translate_groupby_exprs(const RelCompound* compound,
+std::list<hdk::ir::ExprPtr> translate_groupby_exprs(const hdk::ir::Compound* compound,
                                                     const RelAlgTranslator& translator,
                                                     ::ExecutorType executor_type) {
   if (!compound->isAggregate()) {
@@ -1149,7 +1153,7 @@ std::list<hdk::ir::ExprPtr> translate_groupby_exprs(const RelCompound* compound,
 }
 
 std::list<hdk::ir::ExprPtr> translate_groupby_exprs(
-    const RelAggregate* aggregate,
+    const hdk::ir::Aggregate* aggregate,
     const std::vector<hdk::ir::ExprPtr>& scalar_sources) {
   std::list<hdk::ir::ExprPtr> groupby_exprs;
   for (size_t group_idx = 0; group_idx < aggregate->getGroupByCount(); ++group_idx) {
@@ -1158,7 +1162,7 @@ std::list<hdk::ir::ExprPtr> translate_groupby_exprs(
   return groupby_exprs;
 }
 
-QualsConjunctiveForm translate_quals(const RelCompound* compound,
+QualsConjunctiveForm translate_quals(const hdk::ir::Compound* compound,
                                      const RelAlgTranslator& translator) {
   if (auto filter = compound->getFilter()) {
     auto filter_expr = translator.normalize(filter.get());
@@ -1171,7 +1175,7 @@ QualsConjunctiveForm translate_quals(const RelCompound* compound,
 std::vector<const hdk::ir::Expr*> translate_targets(
     std::vector<hdk::ir::ExprPtr>& target_exprs_owned,
     const std::list<hdk::ir::ExprPtr>& groupby_exprs,
-    const RelCompound* compound,
+    const hdk::ir::Compound* compound,
     const RelAlgTranslator& translator,
     const ExecutorType executor_type,
     bool bigint_count) {
@@ -1199,7 +1203,7 @@ std::vector<const hdk::ir::Expr*> translate_targets(
     std::vector<hdk::ir::ExprPtr>& target_exprs_owned,
     const std::vector<hdk::ir::ExprPtr>& scalar_sources,
     const std::list<hdk::ir::ExprPtr>& groupby_exprs,
-    const RelAggregate* aggregate,
+    const hdk::ir::Aggregate* aggregate,
     const RelAlgTranslator& translator,
     bool bigint_count) {
   std::vector<const hdk::ir::Expr*> target_exprs;
@@ -1265,18 +1269,18 @@ std::vector<TargetMetaInfo> get_targets_meta(
 
 template <>
 std::vector<TargetMetaInfo> get_targets_meta(
-    const RelFilter* filter,
+    const hdk::ir::Filter* filter,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  RelAlgNode const* input0 = filter->getInput(0);
-  if (auto const* input = dynamic_cast<RelCompound const*>(input0)) {
+  hdk::ir::Node const* input0 = filter->getInput(0);
+  if (auto const* input = dynamic_cast<hdk::ir::Compound const*>(input0)) {
     return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<RelProject const*>(input0)) {
+  } else if (auto const* input = dynamic_cast<hdk::ir::Project const*>(input0)) {
     return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<RelLogicalUnion const*>(input0)) {
+  } else if (auto const* input = dynamic_cast<hdk::ir::LogicalUnion const*>(input0)) {
     return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<RelAggregate const*>(input0)) {
+  } else if (auto const* input = dynamic_cast<hdk::ir::Aggregate const*>(input0)) {
     return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<RelScan const*>(input0)) {
+  } else if (auto const* input = dynamic_cast<hdk::ir::Scan const*>(input0)) {
     return get_targets_meta(input, target_exprs);
   }
   UNREACHABLE() << "Unhandled node type: " << input0->toString();
@@ -1285,7 +1289,7 @@ std::vector<TargetMetaInfo> get_targets_meta(
 
 }  // namespace
 
-ExecutionResult RelAlgExecutor::executeCompound(const RelCompound* compound,
+ExecutionResult RelAlgExecutor::executeCompound(const hdk::ir::Compound* compound,
                                                 const CompilationOptions& co,
                                                 const ExecutionOptions& eo,
                                                 const int64_t queue_time_ms) {
@@ -1301,7 +1305,7 @@ ExecutionResult RelAlgExecutor::executeCompound(const RelCompound* compound,
                          queue_time_ms);
 }
 
-ExecutionResult RelAlgExecutor::executeAggregate(const RelAggregate* aggregate,
+ExecutionResult RelAlgExecutor::executeAggregate(const hdk::ir::Aggregate* aggregate,
                                                  const CompilationOptions& co,
                                                  const ExecutionOptions& eo,
                                                  const int64_t queue_time_ms) {
@@ -1326,7 +1330,7 @@ bool is_window_execution_unit(const RelAlgExecutionUnit& ra_exe_unit) {
 }  // namespace
 
 ExecutionResult RelAlgExecutor::executeProject(
-    const RelProject* project,
+    const hdk::ir::Project* project,
     const CompilationOptions& co,
     const ExecutionOptions& eo,
     const int64_t queue_time_ms,
@@ -1337,7 +1341,7 @@ ExecutionResult RelAlgExecutor::executeProject(
   if (project->isSimple()) {
     CHECK_EQ(size_t(1), project->inputCount());
     const auto input_ra = project->getInput(0);
-    if (dynamic_cast<const RelSort*>(input_ra)) {
+    if (dynamic_cast<const hdk::ir::Sort*>(input_ra)) {
       co_project.device_type = ExecutorDeviceType::CPU;
       const auto& input_table =
           get_temporary_table(&temporary_tables_, -input_ra->getId());
@@ -1354,10 +1358,11 @@ ExecutionResult RelAlgExecutor::executeProject(
                          previous_count);
 }
 
-ExecutionResult RelAlgExecutor::executeTableFunction(const RelTableFunction* table_func,
-                                                     const CompilationOptions& co_in,
-                                                     const ExecutionOptions& eo,
-                                                     const int64_t queue_time_ms) {
+ExecutionResult RelAlgExecutor::executeTableFunction(
+    const hdk::ir::TableFunction* table_func,
+    const CompilationOptions& co_in,
+    const ExecutionOptions& eo,
+    const int64_t queue_time_ms) {
   INJECT_TIMER(executeTableFunction);
   auto timer = DEBUG_TIMER(__func__);
 
@@ -1545,7 +1550,7 @@ std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionConte
   return context;
 }
 
-ExecutionResult RelAlgExecutor::executeFilter(const RelFilter* filter,
+ExecutionResult RelAlgExecutor::executeFilter(const hdk::ir::Filter* filter,
                                               const CompilationOptions& co,
                                               const ExecutionOptions& eo,
                                               const int64_t queue_time_ms) {
@@ -1556,7 +1561,7 @@ ExecutionResult RelAlgExecutor::executeFilter(const RelFilter* filter,
       work_unit, filter->getOutputMetainfo(), false, co, eo, queue_time_ms);
 }
 
-ExecutionResult RelAlgExecutor::executeUnion(const RelLogicalUnion* logical_union,
+ExecutionResult RelAlgExecutor::executeUnion(const hdk::ir::LogicalUnion* logical_union,
                                              const RaExecutionSequence& seq,
                                              const CompilationOptions& co,
                                              const ExecutionOptions& eo,
@@ -1569,10 +1574,11 @@ ExecutionResult RelAlgExecutor::executeUnion(const RelLogicalUnion* logical_unio
   logical_union->checkForMatchingMetaInfoTypes();
   logical_union->setOutputMetainfo(logical_union->getInput(0)->getOutputMetainfo());
   // Only Projections and Aggregates from a UNION are supported for now.
-  query_dag_->eachNode([logical_union](RelAlgNode const* node) {
+  query_dag_->eachNode([logical_union](hdk::ir::Node const* node) {
     if (node->hasInput(logical_union) &&
-        !shared::dynamic_castable_to_any<RelProject, RelLogicalUnion, RelAggregate>(
-            node)) {
+        !shared::dynamic_castable_to_any<hdk::ir::Project,
+                                         hdk::ir::LogicalUnion,
+                                         hdk::ir::Aggregate>(node)) {
       throw std::runtime_error("UNION ALL not yet supported in this context.");
     }
   });
@@ -1588,7 +1594,7 @@ ExecutionResult RelAlgExecutor::executeUnion(const RelLogicalUnion* logical_unio
 }
 
 ExecutionResult RelAlgExecutor::executeLogicalValues(
-    const RelLogicalValues* logical_values,
+    const hdk::ir::LogicalValues* logical_values,
     const ExecutionOptions& eo) {
   auto timer = DEBUG_TIMER(__func__);
   QueryMemoryDescriptor query_mem_desc(executor_,
@@ -1637,23 +1643,24 @@ namespace {
 
 // TODO(alex): Once we're fully migrated to the relational algebra model, change
 // the executor interface to use the collation directly and remove this conversion.
-std::list<hdk::ir::OrderEntry> get_order_entries(const RelSort* sort) {
+std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort) {
   std::list<hdk::ir::OrderEntry> result;
   for (size_t i = 0; i < sort->collationCount(); ++i) {
     const auto sort_field = sort->getCollation(i);
-    result.emplace_back(sort_field.getField() + 1,
-                        sort_field.getSortDir() == SortDirection::Descending,
-                        sort_field.getNullsPosition() == NullSortedPosition::First);
+    result.emplace_back(
+        sort_field.getField() + 1,
+        sort_field.getSortDir() == hdk::ir::SortDirection::Descending,
+        sort_field.getNullsPosition() == hdk::ir::NullSortedPosition::First);
   }
   return result;
 }
 
-size_t get_scan_limit(const RelAlgNode* ra, const size_t limit) {
-  const auto aggregate = dynamic_cast<const RelAggregate*>(ra);
+size_t get_scan_limit(const hdk::ir::Node* ra, const size_t limit) {
+  const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(ra);
   if (aggregate) {
     return 0;
   }
-  const auto compound = dynamic_cast<const RelCompound*>(ra);
+  const auto compound = dynamic_cast<const hdk::ir::Compound*>(ra);
   return (compound && compound->isAggregate()) ? 0 : limit;
 }
 
@@ -1663,7 +1670,7 @@ bool first_oe_is_desc(const std::list<hdk::ir::OrderEntry>& order_entries) {
 
 }  // namespace
 
-ExecutionResult RelAlgExecutor::executeSort(const RelSort* sort,
+ExecutionResult RelAlgExecutor::executeSort(const hdk::ir::Sort* sort,
                                             const CompilationOptions& co,
                                             const ExecutionOptions& eo,
                                             const int64_t queue_time_ms) {
@@ -1735,7 +1742,7 @@ ExecutionResult RelAlgExecutor::executeSort(const RelSort* sort,
 }
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createSortInputWorkUnit(
-    const RelSort* sort,
+    const hdk::ir::Sort* sort,
     const ExecutionOptions& eo) {
   const auto source = sort->getInput(0);
   const size_t limit = sort->getLimit();
@@ -2366,22 +2373,22 @@ void RelAlgExecutor::executePostExecutionCallback() {
   }
 }
 
-RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const RelAlgNode* node,
+RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* node,
                                                         const SortInfo& sort_info,
                                                         const ExecutionOptions& eo) {
-  const auto compound = dynamic_cast<const RelCompound*>(node);
+  const auto compound = dynamic_cast<const hdk::ir::Compound*>(node);
   if (compound) {
     return createCompoundWorkUnit(compound, sort_info, eo);
   }
-  const auto project = dynamic_cast<const RelProject*>(node);
+  const auto project = dynamic_cast<const hdk::ir::Project*>(node);
   if (project) {
     return createProjectWorkUnit(project, sort_info, eo);
   }
-  const auto aggregate = dynamic_cast<const RelAggregate*>(node);
+  const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node);
   if (aggregate) {
     return createAggregateWorkUnit(aggregate, sort_info, eo.just_explain);
   }
-  const auto filter = dynamic_cast<const RelFilter*>(node);
+  const auto filter = dynamic_cast<const hdk::ir::Filter*>(node);
   if (filter) {
     return createFilterWorkUnit(filter, sort_info, eo.just_explain);
   }
@@ -2391,12 +2398,12 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const RelAlgNode* node,
 
 namespace {
 
-JoinType get_join_type(const RelAlgNode* ra) {
+JoinType get_join_type(const hdk::ir::Node* ra) {
   auto sink = get_data_sink(ra);
-  if (auto join = dynamic_cast<const RelJoin*>(sink)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(sink)) {
     return join->getJoinType();
   }
-  if (dynamic_cast<const RelLeftDeepInnerJoin*>(sink)) {
+  if (dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(sink)) {
     return JoinType::INNER;
   }
 
@@ -2486,7 +2493,8 @@ hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
   return get_bitwise_equals(expr);
 }
 
-std::vector<JoinType> left_deep_join_types(const RelLeftDeepInnerJoin* left_deep_join) {
+std::vector<JoinType> left_deep_join_types(
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
   CHECK_GE(left_deep_join->inputCount(), size_t(2));
   std::vector<JoinType> join_types(left_deep_join->inputCount() - 1, JoinType::INNER);
   for (size_t nesting_level = 1; nesting_level <= left_deep_join->inputCount() - 1;
@@ -2507,7 +2515,7 @@ std::vector<size_t> do_table_reordering(
     std::vector<InputDescriptor>& input_descs,
     std::list<std::shared_ptr<const InputColDescriptor>>& input_col_descs,
     const JoinQualsPerNestingLevel& left_deep_join_quals,
-    std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
+    std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
     const RA* node,
     const std::vector<InputTableInfo>& query_infos,
     const Executor* executor) {
@@ -2525,7 +2533,7 @@ std::vector<size_t> do_table_reordering(
 }
 
 std::vector<size_t> get_left_deep_join_input_sizes(
-    const RelLeftDeepInnerJoin* left_deep_join) {
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
   std::vector<size_t> input_sizes;
   for (size_t i = 0; i < left_deep_join->inputCount(); ++i) {
     auto input_size = getNodeColumnCount(left_deep_join->getInput(i));
@@ -2546,7 +2554,7 @@ std::list<hdk::ir::ExprPtr> rewrite_quals(const std::list<hdk::ir::ExprPtr>& qua
 }  // namespace
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
-    const RelCompound* compound,
+    const hdk::ir::Compound* compound,
     const SortInfo& sort_info,
     const ExecutionOptions& eo) {
   std::vector<InputDescriptor> input_descs;
@@ -2558,7 +2566,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
   const auto query_infos = get_table_infos(input_descs, executor_);
   CHECK_EQ(size_t(1), compound->inputCount());
   const auto left_deep_join =
-      dynamic_cast<const RelLeftDeepInnerJoin*>(compound->getInput(0));
+      dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(compound->getInput(0));
   JoinQualsPerNestingLevel left_deep_join_quals;
   const auto join_types = left_deep_join ? left_deep_join_types(left_deep_join)
                                          : std::vector<JoinType>{get_join_type(compound)};
@@ -2652,10 +2660,10 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
 }
 
 std::shared_ptr<RelAlgTranslator> RelAlgExecutor::getRelAlgTranslator(
-    const RelAlgNode* node) {
+    const hdk::ir::Node* node) {
   auto input_to_nest_level = get_input_nest_levels(node, {});
   const auto left_deep_join =
-      dynamic_cast<const RelLeftDeepInnerJoin*>(node->getInput(0));
+      dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node->getInput(0));
   const auto join_types = left_deep_join ? left_deep_join_types(left_deep_join)
                                          : std::vector<JoinType>{get_join_type(node)};
   return std::make_shared<RelAlgTranslator>(
@@ -2746,7 +2754,7 @@ hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr) {
 std::list<hdk::ir::ExprPtr> RelAlgExecutor::makeJoinQuals(
     const hdk::ir::Expr* join_condition,
     const std::vector<JoinType>& join_types,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
     const bool just_explain) const {
   RelAlgTranslator translator(
       executor_, input_to_nest_level, join_types, now_, just_explain);
@@ -2771,9 +2779,9 @@ std::list<hdk::ir::ExprPtr> RelAlgExecutor::makeJoinQuals(
 // per nesting level. The code generated for hash table lookups on each level
 // must dominate its uses in deeper nesting levels.
 JoinQualsPerNestingLevel RelAlgExecutor::translateLeftDeepJoinFilter(
-    const RelLeftDeepInnerJoin* join,
+    const hdk::ir::LeftDeepInnerJoin* join,
     const std::vector<InputDescriptor>& input_descs,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level,
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
     const bool just_explain) {
   const auto join_types = left_deep_join_types(join);
   const auto join_condition_quals = makeJoinQuals(
@@ -2813,10 +2821,10 @@ JoinQualsPerNestingLevel RelAlgExecutor::translateLeftDeepJoinFilter(
 namespace {
 
 std::vector<hdk::ir::ExprPtr> synthesize_inputs(
-    const RelAlgNode* ra_node,
+    const hdk::ir::Node* ra_node,
     const size_t nest_level,
     const std::vector<TargetMetaInfo>& in_metainfo,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level) {
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level) {
   CHECK_LE(size_t(1), ra_node->inputCount());
   CHECK_GE(size_t(2), ra_node->inputCount());
   const auto input = ra_node->getInput(nest_level);
@@ -2825,7 +2833,7 @@ std::vector<hdk::ir::ExprPtr> synthesize_inputs(
   const int rte_idx = it_rte_idx->second;
   const int table_id = table_id_from_ra(input);
   std::vector<hdk::ir::ExprPtr> inputs;
-  const auto scan_ra = dynamic_cast<const RelScan*>(input);
+  const auto scan_ra = dynamic_cast<const hdk::ir::Scan*>(input);
   int input_idx = 0;
   for (const auto& input_meta : in_metainfo) {
     inputs.push_back(std::make_shared<hdk::ir::ColumnVar>(
@@ -2842,7 +2850,7 @@ std::vector<hdk::ir::ExprPtr> synthesize_inputs(
 }  // namespace
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createAggregateWorkUnit(
-    const RelAggregate* aggregate,
+    const hdk::ir::Aggregate* aggregate,
     const SortInfo& sort_info,
     const bool just_explain) {
   std::vector<InputDescriptor> input_descs;
@@ -2904,7 +2912,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createAggregateWorkUnit(
 }
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
-    const RelProject* project,
+    const hdk::ir::Project* project,
     const SortInfo& sort_info,
     const ExecutionOptions& eo) {
   std::vector<InputDescriptor> input_descs;
@@ -2915,7 +2923,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
   const auto query_infos = get_table_infos(input_descs, executor_);
 
   const auto left_deep_join =
-      dynamic_cast<const RelLeftDeepInnerJoin*>(project->getInput(0));
+      dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(project->getInput(0));
   JoinQualsPerNestingLevel left_deep_join_quals;
   const auto join_types = left_deep_join ? left_deep_join_types(left_deep_join)
                                          : std::vector<JoinType>{get_join_type(project)};
@@ -3006,7 +3014,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
 
 namespace {
 
-std::vector<hdk::ir::ExprPtr> target_exprs_for_union(RelAlgNode const* input_node) {
+std::vector<hdk::ir::ExprPtr> target_exprs_for_union(hdk::ir::Node const* input_node) {
   std::vector<TargetMetaInfo> const& tmis = input_node->getOutputMetainfo();
   VLOG(3) << "input_node->getOutputMetainfo()=" << shared::printContainer(tmis);
   const int negative_node_id = -input_node->getId();
@@ -3022,7 +3030,7 @@ std::vector<hdk::ir::ExprPtr> target_exprs_for_union(RelAlgNode const* input_nod
 }  // namespace
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
-    const RelLogicalUnion* logical_union,
+    const hdk::ir::LogicalUnion* logical_union,
     const SortInfo& sort_info,
     const ExecutionOptions& eo) {
   std::vector<InputDescriptor> input_descs;
@@ -3082,29 +3090,30 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
   auto query_rewriter = std::make_unique<QueryRewriter>(query_infos, executor_);
   const auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);
 
-  RelAlgNode const* input0 = logical_union->getInput(0);
-  if (auto const* node = dynamic_cast<const RelCompound*>(input0)) {
+  hdk::ir::Node const* input0 = logical_union->getInput(0);
+  if (auto const* node = dynamic_cast<const hdk::ir::Compound*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (auto const* node = dynamic_cast<const RelProject*>(input0)) {
+  } else if (auto const* node = dynamic_cast<const hdk::ir::Project*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (auto const* node = dynamic_cast<const RelLogicalUnion*>(input0)) {
+  } else if (auto const* node = dynamic_cast<const hdk::ir::LogicalUnion*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (auto const* node = dynamic_cast<const RelAggregate*>(input0)) {
+  } else if (auto const* node = dynamic_cast<const hdk::ir::Aggregate*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (auto const* node = dynamic_cast<const RelScan*>(input0)) {
+  } else if (auto const* node = dynamic_cast<const hdk::ir::Scan*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (auto const* node = dynamic_cast<const RelFilter*>(input0)) {
+  } else if (auto const* node = dynamic_cast<const hdk::ir::Filter*>(input0)) {
     logical_union->setOutputMetainfo(
         get_targets_meta(node, rewritten_exe_unit.target_exprs));
-  } else if (dynamic_cast<const RelSort*>(input0)) {
-    throw QueryNotSupported("LIMIT and OFFSET are not currently supported with UNION.");
+  } else if (dynamic_cast<const hdk::ir::Sort*>(input0)) {
+    throw hdk::ir::QueryNotSupported(
+        "LIMIT and OFFSET are not currently supported with UNION.");
   } else {
-    throw QueryNotSupported("Unsupported input type: " + input0->toString());
+    throw hdk::ir::QueryNotSupported("Unsupported input type: " + input0->toString());
   }
   VLOG(3) << "logical_union->getOutputMetainfo()="
           << shared::printContainer(logical_union->getOutputMetainfo())
@@ -3118,7 +3127,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
 }
 
 RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUnit(
-    const RelTableFunction* rel_table_func,
+    const hdk::ir::TableFunction* rel_table_func,
     const bool just_explain,
     const bool is_gpu) {
   std::vector<InputDescriptor> input_descs;
@@ -3293,15 +3302,15 @@ RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUni
 namespace {
 
 std::pair<std::vector<TargetMetaInfo>, std::vector<hdk::ir::ExprPtr>> get_inputs_meta(
-    const RelFilter* filter,
+    const hdk::ir::Filter* filter,
     const RelAlgTranslator& translator,
-    const std::unordered_map<const RelAlgNode*, int>& input_to_nest_level) {
+    const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level) {
   std::vector<TargetMetaInfo> in_metainfo;
   std::vector<hdk::ir::ExprPtr> exprs_owned;
   const auto data_sink_node = get_data_sink(filter);
   for (size_t nest_level = 0; nest_level < data_sink_node->inputCount(); ++nest_level) {
     const auto source = data_sink_node->getInput(nest_level);
-    const auto scan_source = dynamic_cast<const RelScan*>(source);
+    const auto scan_source = dynamic_cast<const hdk::ir::Scan*>(source);
     if (scan_source) {
       CHECK(source->getOutputMetainfo().empty());
       std::vector<hdk::ir::ExprPtr> scalar_sources_owned;
@@ -3331,9 +3340,10 @@ std::pair<std::vector<TargetMetaInfo>, std::vector<hdk::ir::ExprPtr>> get_inputs
 
 }  // namespace
 
-RelAlgExecutor::WorkUnit RelAlgExecutor::createFilterWorkUnit(const RelFilter* filter,
-                                                              const SortInfo& sort_info,
-                                                              const bool just_explain) {
+RelAlgExecutor::WorkUnit RelAlgExecutor::createFilterWorkUnit(
+    const hdk::ir::Filter* filter,
+    const SortInfo& sort_info,
+    const bool just_explain) {
   CHECK_EQ(size_t(1), filter->inputCount());
   std::vector<InputDescriptor> input_descs;
   std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;

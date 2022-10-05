@@ -16,8 +16,8 @@
 
 #include "SubQueryCollector.h"
 
-std::unordered_set<const RelAlgNode*> SubQueryCollector::getLiveSubQueries(
-    RelAlgNode const* rel_alg_node) {
+std::unordered_set<const hdk::ir::Node*> SubQueryCollector::getLiveSubQueries(
+    hdk::ir::Node const* rel_alg_node) {
   SubQueryCollector collector;
   collector.visit(rel_alg_node);
   return std::move(collector.subqueries_);

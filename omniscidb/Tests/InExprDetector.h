@@ -23,7 +23,7 @@ class InExprDetector : public ExprDagVisitor {
     return nullptr;
   }
 
-  static bool detect(const RelAlgNode* node) {
+  static bool detect(const hdk::ir::Node* node) {
     InExprDetector detector;
     detector.visit(node);
     return detector.has_in_;

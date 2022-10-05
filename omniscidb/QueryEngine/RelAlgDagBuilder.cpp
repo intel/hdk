@@ -42,565 +42,17 @@
 
 using namespace std::literals;
 
-namespace {
-
-const unsigned FIRST_RA_NODE_ID = 1;
-
-}  // namespace
-
-thread_local unsigned RelAlgNode::crt_id_ = FIRST_RA_NODE_ID;
-
-void RelAlgNode::resetRelAlgFirstId() noexcept {
-  crt_id_ = FIRST_RA_NODE_ID;
-}
-
-namespace {
-
-class RebindInputsVisitor : public hdk::ir::ExprRewriter {
- public:
-  RebindInputsVisitor(const RelAlgNode* old_input, const RelAlgNode* new_input)
-      : old_input_(old_input), new_input_(new_input) {}
-
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    if (col_ref->node() == old_input_) {
-      auto left_deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(new_input_);
-      if (left_deep_join) {
-        return rebind_inputs_from_left_deep_join(col_ref, left_deep_join);
-      }
-      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->type(), new_input_, col_ref->index());
-    }
-    return ExprRewriter::visitColumnRef(col_ref);
-  }
-
- protected:
-  const RelAlgNode* old_input_;
-  const RelAlgNode* new_input_;
-};
-
-class RebindReindexInputsVisitor : public RebindInputsVisitor {
- public:
-  RebindReindexInputsVisitor(
-      const RelAlgNode* old_input,
-      const RelAlgNode* new_input,
-      const std::optional<std::unordered_map<unsigned, unsigned>>& old_to_new_index_map)
-      : RebindInputsVisitor(old_input, new_input), mapping_(old_to_new_index_map) {}
-
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    auto res = RebindInputsVisitor::visitColumnRef(col_ref);
-    if (mapping_) {
-      auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(res.get());
-      CHECK(new_col_ref);
-      auto it = mapping_->find(new_col_ref->index());
-      CHECK(it != mapping_->end());
-      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          new_col_ref->type(), new_col_ref->node(), it->second);
-    }
-    return res;
-  }
-
- protected:
-  const std::optional<std::unordered_map<unsigned, unsigned>>& mapping_;
-};
-
-}  // namespace
-
-void RelAlgNode::print() const {
-  std::cout << toString() << std::endl;
-}
-
-void RelProject::replaceInput(
-    std::shared_ptr<const RelAlgNode> old_input,
-    std::shared_ptr<const RelAlgNode> input,
-    std::optional<std::unordered_map<unsigned, unsigned>> old_to_new_index_map) {
-  RelAlgNode::replaceInput(old_input, input);
-  RebindReindexInputsVisitor visitor(old_input.get(), input.get(), old_to_new_index_map);
-  for (size_t i = 0; i < exprs_.size(); ++i) {
-    exprs_[i] = visitor.visit(exprs_[i].get());
-  }
-}
-
-void RelProject::appendInput(std::string new_field_name, hdk::ir::ExprPtr expr) {
-  fields_.emplace_back(std::move(new_field_name));
-  exprs_.emplace_back(std::move(expr));
-}
-
-template <typename T>
-bool is_one_of(const RelAlgNode* node) {
-  return dynamic_cast<const T*>(node);
-}
-
-template <typename T1, typename T2, typename... Ts>
-bool is_one_of(const RelAlgNode* node) {
-  return dynamic_cast<const T1*>(node) || is_one_of<T2, Ts...>(node);
-}
-
-// TODO: always simply use node->size()
-size_t getNodeColumnCount(const RelAlgNode* node) {
-  // Nodes that don't depend on input.
-  if (is_one_of<RelScan,
-                RelProject,
-                RelAggregate,
-                RelCompound,
-                RelTableFunction,
-                RelLogicalUnion,
-                RelLogicalValues>(node)) {
-    return node->size();
-  }
-
-  // Nodes that preserve size.
-  if (is_one_of<RelFilter, RelSort>(node)) {
-    CHECK_EQ(size_t(1), node->inputCount());
-    return getNodeColumnCount(node->getInput(0));
-  }
-
-  // Join concatenates the outputs from the inputs.
-  if (is_one_of<RelJoin>(node)) {
-    CHECK_EQ(size_t(2), node->inputCount());
-    return getNodeColumnCount(node->getInput(0)) + getNodeColumnCount(node->getInput(1));
-  }
-
-  LOG(FATAL) << "Unhandled ra_node type: " << ::toString(node);
-  return 0;
-}
-
-hdk::ir::ExprPtrVector genColumnRefs(const RelAlgNode* node, size_t count) {
-  hdk::ir::ExprPtrVector res;
-  res.reserve(count);
-  for (size_t i = 0; i < count; ++i) {
-    res.emplace_back(
-        hdk::ir::makeExpr<hdk::ir::ColumnRef>(getColumnType(node, i), node, i));
-  }
-  return res;
-}
-
-hdk::ir::ExprPtrVector getNodeColumnRefs(const RelAlgNode* node) {
-  // Nodes that don't depend on input.
-  if (is_one_of<RelScan,
-                RelProject,
-                RelAggregate,
-                RelCompound,
-                RelTableFunction,
-                RelLogicalUnion,
-                RelLogicalValues,
-                RelFilter,
-                RelSort>(node)) {
-    return genColumnRefs(node, getNodeColumnCount(node));
-  }
-
-  if (is_one_of<RelJoin>(node)) {
-    CHECK_EQ(size_t(2), node->inputCount());
-    auto lhs_out =
-        genColumnRefs(node->getInput(0), getNodeColumnCount(node->getInput(0)));
-    const auto rhs_out =
-        genColumnRefs(node->getInput(1), getNodeColumnCount(node->getInput(1)));
-    lhs_out.insert(lhs_out.end(), rhs_out.begin(), rhs_out.end());
-    return lhs_out;
-  }
-
-  LOG(FATAL) << "Unhandled ra_node type: " << ::toString(node);
-  return {};
-}
-
-hdk::ir::ExprPtr getNodeColumnRef(const RelAlgNode* node, unsigned index) {
-  if (is_one_of<RelScan,
-                RelProject,
-                RelAggregate,
-                RelCompound,
-                RelTableFunction,
-                RelLogicalUnion,
-                RelLogicalValues,
-                RelFilter,
-                RelSort>(node)) {
-    CHECK_LT(index, node->size());
-    return hdk::ir::makeExpr<hdk::ir::ColumnRef>(getColumnType(node, index), node, index);
-  }
-
-  if (is_one_of<RelJoin>(node)) {
-    CHECK_EQ(size_t(2), node->inputCount());
-    auto lhs_size = node->getInput(0)->size();
-    if (index < lhs_size) {
-      return getNodeColumnRef(node->getInput(0), index);
-    }
-    return getNodeColumnRef(node->getInput(1), index - lhs_size);
-  }
-
-  LOG(FATAL) << "Unhandled node type: " << ::toString(node);
-  return nullptr;
-}
-
-bool RelProject::isIdentity() const {
-  if (!isSimple()) {
-    return false;
-  }
-  CHECK_EQ(size_t(1), inputCount());
-  const auto source = getInput(0);
-  if (dynamic_cast<const RelJoin*>(source)) {
-    return false;
-  }
-  const auto source_shape = getNodeColumnRefs(source);
-  if (source_shape.size() != exprs_.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < exprs_.size(); ++i) {
-    const auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(exprs_[i].get());
-    CHECK(col_ref);
-    CHECK_EQ(source, col_ref->node());
-    // We should add the additional check that input->index() !=
-    // source_shape[i].index(), but Calcite doesn't generate the right
-    // Sort-Project-Sort sequence when joins are involved.
-    if (col_ref->node() !=
-        dynamic_cast<const hdk::ir::ColumnRef*>(source_shape[i].get())->node()) {
-      return false;
-    }
-  }
-  return true;
-}
-
-namespace {
-
-bool isRenamedInput(const RelAlgNode* node,
-                    const size_t index,
-                    const std::string& new_name) {
-  CHECK_LT(index, node->size());
-  if (auto join = dynamic_cast<const RelJoin*>(node)) {
-    CHECK_EQ(size_t(2), join->inputCount());
-    const auto lhs_size = join->getInput(0)->size();
-    if (index < lhs_size) {
-      return isRenamedInput(join->getInput(0), index, new_name);
-    }
-    CHECK_GE(index, lhs_size);
-    return isRenamedInput(join->getInput(1), index - lhs_size, new_name);
-  }
-
-  if (auto scan = dynamic_cast<const RelScan*>(node)) {
-    return new_name != scan->getFieldName(index);
-  }
-
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
-    return new_name != aggregate->getFieldName(index);
-  }
-
-  if (auto project = dynamic_cast<const RelProject*>(node)) {
-    return new_name != project->getFieldName(index);
-  }
-
-  if (auto table_func = dynamic_cast<const RelTableFunction*>(node)) {
-    return new_name != table_func->getFieldName(index);
-  }
-
-  if (auto logical_values = dynamic_cast<const RelLogicalValues*>(node)) {
-    const auto& tuple_type = logical_values->getTupleType();
-    CHECK_LT(index, tuple_type.size());
-    return new_name != tuple_type[index].get_resname();
-  }
-
-  CHECK(dynamic_cast<const RelSort*>(node) || dynamic_cast<const RelFilter*>(node) ||
-        dynamic_cast<const RelLogicalUnion*>(node));
-  return isRenamedInput(node->getInput(0), index, new_name);
-}
-
-}  // namespace
-
-bool RelProject::isRenaming() const {
-  if (!isSimple()) {
-    return false;
-  }
-  CHECK_EQ(exprs_.size(), fields_.size());
-  for (size_t i = 0; i < fields_.size(); ++i) {
-    auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(exprs_[i].get());
-    CHECK(col_ref);
-    if (isRenamedInput(col_ref->node(), col_ref->index(), fields_[i])) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void RelAggregate::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
-                                std::shared_ptr<const RelAlgNode> input) {
-  RelAlgNode::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  for (size_t i = 0; i < aggs_.size(); ++i) {
-    aggs_[i] = visitor.visit(aggs_[i].get());
-  }
-}
-
-void RelJoin::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
-                           std::shared_ptr<const RelAlgNode> input) {
-  RelAlgNode::replaceInput(old_input, input);
-  if (condition_) {
-    RebindInputsVisitor visitor(old_input.get(), input.get());
-    condition_ = visitor.visit(condition_.get());
-  }
-}
-
-void RelFilter::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
-                             std::shared_ptr<const RelAlgNode> input) {
-  RelAlgNode::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  condition_ = visitor.visit(condition_.get());
-}
-
-void RelCompound::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
-                               std::shared_ptr<const RelAlgNode> input) {
-  RelAlgNode::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  if (filter_) {
-    filter_ = visitor.visit(filter_.get());
-  }
-  for (size_t i = 0; i < groupby_exprs_.size(); ++i) {
-    groupby_exprs_[i] = visitor.visit(groupby_exprs_[i].get());
-  }
-  for (size_t i = 0; i < exprs_.size(); ++i) {
-    exprs_[i] = visitor.visit(exprs_[i].get());
-  }
-}
-
-RelProject::RelProject(RelProject const& rhs)
-    : RelAlgNode(rhs)
-    , exprs_(rhs.exprs_)
-    , fields_(rhs.fields_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
-
-RelLogicalValues::RelLogicalValues(RelLogicalValues const& rhs)
-    : RelAlgNode(rhs), tuple_type_(rhs.tuple_type_), values_(rhs.values_) {}
-
-RelFilter::RelFilter(RelFilter const& rhs)
-    : RelAlgNode(rhs), condition_(rhs.condition_) {}
-
-RelAggregate::RelAggregate(RelAggregate const& rhs)
-    : RelAlgNode(rhs)
-    , groupby_count_(rhs.groupby_count_)
-    , aggs_(rhs.aggs_)
-    , fields_(rhs.fields_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
-
-RelJoin::RelJoin(RelJoin const& rhs)
-    : RelAlgNode(rhs)
-    , condition_(rhs.condition_)
-    , join_type_(rhs.join_type_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
-
-RelCompound::RelCompound(RelCompound const& rhs)
-    : RelAlgNode(rhs)
-    , filter_(rhs.filter_)
-    , groupby_count_(rhs.groupby_count_)
-    , fields_(rhs.fields_)
-    , is_agg_(rhs.is_agg_)
-    , groupby_exprs_(rhs.groupby_exprs_)
-    , exprs_(rhs.exprs_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
-
-void RelTableFunction::replaceInput(std::shared_ptr<const RelAlgNode> old_input,
-                                    std::shared_ptr<const RelAlgNode> input) {
-  RelAlgNode::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  for (size_t i = 0; i < table_func_input_exprs_.size(); ++i) {
-    table_func_input_exprs_[i] = visitor.visit(table_func_input_exprs_[i].get());
-  }
-}
-
-int32_t RelTableFunction::countConstantArgs() const {
-  int32_t literal_args = 0;
-  for (const auto& arg : table_func_input_exprs_) {
-    if (arg->is<hdk::ir::Constant>()) {
-      literal_args += 1;
-    }
-  }
-  return literal_args;
-}
-
-RelTableFunction::RelTableFunction(RelTableFunction const& rhs)
-    : RelAlgNode(rhs)
-    , function_name_(rhs.function_name_)
-    , fields_(rhs.fields_)
-    , col_input_exprs_(rhs.col_input_exprs_)
-    , table_func_input_exprs_(rhs.table_func_input_exprs_) {}
-
 namespace std {
 template <>
-struct hash<std::pair<const RelAlgNode*, int>> {
-  size_t operator()(const std::pair<const RelAlgNode*, int>& input_col) const {
+struct hash<std::pair<const hdk::ir::Node*, int>> {
+  size_t operator()(const std::pair<const hdk::ir::Node*, int>& input_col) const {
     auto ptr_val = reinterpret_cast<const int64_t*>(&input_col.first);
     return static_cast<int64_t>(*ptr_val) ^ input_col.second;
   }
 };
 }  // namespace std
 
-namespace {
-
-std::set<std::pair<const RelAlgNode*, int>> get_equiv_cols(const RelAlgNode* node,
-                                                           const size_t which_col) {
-  std::set<std::pair<const RelAlgNode*, int>> work_set;
-  auto walker = node;
-  auto curr_col = which_col;
-  while (true) {
-    work_set.insert(std::make_pair(walker, curr_col));
-    if (dynamic_cast<const RelScan*>(walker) || dynamic_cast<const RelJoin*>(walker)) {
-      break;
-    }
-    CHECK_EQ(size_t(1), walker->inputCount());
-    auto only_source = walker->getInput(0);
-    if (auto project = dynamic_cast<const RelProject*>(walker)) {
-      if (auto col_ref =
-              dynamic_cast<const hdk::ir::ColumnRef*>(project->getExpr(curr_col).get())) {
-        const auto join_source = dynamic_cast<const RelJoin*>(only_source);
-        if (join_source) {
-          CHECK_EQ(size_t(2), join_source->inputCount());
-          auto lhs = join_source->getInput(0);
-          CHECK((col_ref->index() < lhs->size() && lhs == col_ref->node()) ||
-                join_source->getInput(1) == col_ref->node());
-        } else {
-          CHECK_EQ(col_ref->node(), only_source);
-        }
-        curr_col = col_ref->index();
-      } else {
-        break;
-      }
-    } else if (auto aggregate = dynamic_cast<const RelAggregate*>(walker)) {
-      if (curr_col >= aggregate->getGroupByCount()) {
-        break;
-      }
-    }
-    walker = only_source;
-  }
-  return work_set;
-}
-
-}  // namespace
-
-bool RelSort::hasEquivCollationOf(const RelSort& that) const {
-  if (collation_.size() != that.collation_.size()) {
-    return false;
-  }
-
-  for (size_t i = 0, e = collation_.size(); i < e; ++i) {
-    auto this_sort_key = collation_[i];
-    auto that_sort_key = that.collation_[i];
-    if (this_sort_key.getSortDir() != that_sort_key.getSortDir()) {
-      return false;
-    }
-    if (this_sort_key.getNullsPosition() != that_sort_key.getNullsPosition()) {
-      return false;
-    }
-    auto this_equiv_keys = get_equiv_cols(this, this_sort_key.getField());
-    auto that_equiv_keys = get_equiv_cols(&that, that_sort_key.getField());
-    std::vector<std::pair<const RelAlgNode*, int>> intersect;
-    std::set_intersection(this_equiv_keys.begin(),
-                          this_equiv_keys.end(),
-                          that_equiv_keys.begin(),
-                          that_equiv_keys.end(),
-                          std::back_inserter(intersect));
-    if (intersect.empty()) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// class RelLogicalUnion methods
-
-RelLogicalUnion::RelLogicalUnion(RelAlgInputs inputs, bool is_all)
-    : RelAlgNode(std::move(inputs)), is_all_(is_all) {
-  CHECK_EQ(2u, inputs_.size());
-  if (!is_all_) {
-    throw QueryNotSupported("UNION without ALL is not supported yet.");
-  }
-}
-
-size_t RelLogicalUnion::size() const {
-  return inputs_.front()->size();
-}
-
-std::string RelLogicalUnion::toString() const {
-  return cat(::typeName(this), "(is_all(", is_all_, "))");
-}
-
-size_t RelLogicalUnion::toHash() const {
-  if (!hash_) {
-    hash_ = typeid(RelLogicalUnion).hash_code();
-    boost::hash_combine(*hash_, is_all_);
-  }
-  return *hash_;
-}
-
-std::string RelLogicalUnion::getFieldName(const size_t i) const {
-  if (auto const* input = dynamic_cast<RelCompound const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<RelProject const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<RelLogicalUnion const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<RelAggregate const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<RelScan const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input =
-                 dynamic_cast<RelTableFunction const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  }
-  UNREACHABLE() << "Unhandled input type: " << ::toString(inputs_.front());
-  return {};
-}
-
-void RelLogicalUnion::checkForMatchingMetaInfoTypes() const {
-  std::vector<TargetMetaInfo> const& tmis0 = inputs_[0]->getOutputMetainfo();
-  std::vector<TargetMetaInfo> const& tmis1 = inputs_[1]->getOutputMetainfo();
-  if (tmis0.size() != tmis1.size()) {
-    VLOG(2) << "tmis0.size() = " << tmis0.size() << " != " << tmis1.size()
-            << " = tmis1.size()";
-    throw std::runtime_error("Subqueries of a UNION must have matching data types.");
-  }
-  for (size_t i = 0; i < tmis0.size(); ++i) {
-    if (!tmis0[i].type()->equal(tmis1[i].type())) {
-      auto ti0 = tmis0[i].type();
-      auto ti1 = tmis1[i].type();
-      VLOG(2) << "Types do not match for UNION:\n  tmis0[" << i
-              << "].type()->toString() = " << ti0->toString() << "\n  tmis1[" << i
-              << "].type()->toString() = " << ti1->toString();
-      if (ti0->isExtDictionary() && ti1->isExtDictionary() &&
-          (ti0->as<hdk::ir::ExtDictionaryType>()->dictId() !=
-           ti1->as<hdk::ir::ExtDictionaryType>()->dictId())) {
-        throw std::runtime_error(
-            "Taking the UNION of different text-encoded dictionaries is not yet "
-            "supported. This may be resolved by using shared dictionaries. For example, "
-            "by making one a shared dictionary reference to the other.");
-      } else {
-        throw std::runtime_error(
-            "Subqueries of a UNION must have the exact same data types.");
-      }
-    }
-  }
-}
+namespace {}  // namespace
 
 namespace {
 
@@ -707,7 +159,7 @@ const hdk::ir::Type* buildType(hdk::ir::Context& ctx,
 
 const hdk::ir::Type* parseType(const rapidjson::Value& type_obj) {
   if (type_obj.IsArray()) {
-    throw QueryNotSupported("Composite types are not currently supported.");
+    throw hdk::ir::QueryNotSupported("Composite types are not currently supported.");
   }
   CHECK(type_obj.IsObject() && type_obj.MemberCount() >= 2)
       << json_node_to_string(type_obj);
@@ -774,16 +226,16 @@ hdk::ir::WindowFunctionKind parse_window_function_kind(const std::string& name) 
   throw std::runtime_error("Unsupported window function: " + name);
 }
 
-SortDirection parse_sort_direction(const rapidjson::Value& collation) {
+hdk::ir::SortDirection parse_sort_direction(const rapidjson::Value& collation) {
   return json_str(field(collation, "direction")) == std::string("DESCENDING")
-             ? SortDirection::Descending
-             : SortDirection::Ascending;
+             ? hdk::ir::SortDirection::Descending
+             : hdk::ir::SortDirection::Ascending;
 }
 
-NullSortedPosition parse_nulls_position(const rapidjson::Value& collation) {
+hdk::ir::NullSortedPosition parse_nulls_position(const rapidjson::Value& collation) {
   return json_str(field(collation, "nulls")) == std::string("FIRST")
-             ? NullSortedPosition::First
-             : NullSortedPosition::Last;
+             ? hdk::ir::NullSortedPosition::First
+             : hdk::ir::NullSortedPosition::Last;
 }
 
 std::vector<hdk::ir::OrderEntry> parseWindowOrderCollation(const rapidjson::Value& arr) {
@@ -793,8 +245,8 @@ std::vector<hdk::ir::OrderEntry> parseWindowOrderCollation(const rapidjson::Valu
     const auto sort_dir = parse_sort_direction(*it);
     const auto null_pos = parse_nulls_position(*it);
     collation.emplace_back(field_idx,
-                           sort_dir == SortDirection::Descending,
-                           null_pos == NullSortedPosition::First);
+                           sort_dir == hdk::ir::SortDirection::Descending,
+                           null_pos == hdk::ir::NullSortedPosition::First);
   }
   return collation;
 }
@@ -1872,7 +1324,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
   if (operands.size() > 1 &&
       (operands.size() != 2 || (agg_kind != hdk::ir::AggType::kApproxCountDistinct &&
                                 agg_kind != hdk::ir::AggType::kApproxQuantile))) {
-    throw QueryNotSupported("Multiple arguments for aggregates aren't supported");
+    throw hdk::ir::QueryNotSupported(
+        "Multiple arguments for aggregates aren't supported");
   }
 
   hdk::ir::ExprPtr arg_expr;
@@ -1998,8 +1451,8 @@ hdk::ir::ExprPtr parse_expr(const rapidjson::Value& expr,
 
     return res;
   }
-  throw QueryNotSupported("Expression node " + json_node_to_string(expr) +
-                          " not supported");
+  throw hdk::ir::QueryNotSupported("Expression node " + json_node_to_string(expr) +
+                                   " not supported");
 }
 
 JoinType to_join_type(const std::string& join_type_name) {
@@ -2015,29 +1468,29 @@ JoinType to_join_type(const std::string& join_type_name) {
   if (join_type_name == "anti") {
     return JoinType::ANTI;
   }
-  throw QueryNotSupported("Join type (" + join_type_name + ") not supported");
+  throw hdk::ir::QueryNotSupported("Join type (" + join_type_name + ") not supported");
 }
 
-void handleQueryHint(const std::vector<std::shared_ptr<RelAlgNode>>& nodes,
+void handleQueryHint(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
                      RelAlgDagBuilder* dag_builder) noexcept {
   // query hint is delivered by the above three nodes
   // when a query block has top-sort node, a hint is registered to
   // one of the node which locates at the nearest from the sort node
   for (auto node : nodes) {
     Hints* hint_delivered = nullptr;
-    const auto agg_node = std::dynamic_pointer_cast<RelAggregate>(node);
+    const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
     if (agg_node) {
       if (agg_node->hasDeliveredHint()) {
         hint_delivered = agg_node->getDeliveredHints();
       }
     }
-    const auto project_node = std::dynamic_pointer_cast<RelProject>(node);
+    const auto project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
     if (project_node) {
       if (project_node->hasDeliveredHint()) {
         hint_delivered = project_node->getDeliveredHints();
       }
     }
-    const auto compound_node = std::dynamic_pointer_cast<RelCompound>(node);
+    const auto compound_node = std::dynamic_pointer_cast<hdk::ir::Compound>(node);
     if (compound_node) {
       if (compound_node->hasDeliveredHint()) {
         hint_delivered = compound_node->getDeliveredHints();
@@ -2049,14 +1502,15 @@ void handleQueryHint(const std::vector<std::shared_ptr<RelAlgNode>>& nodes,
   }
 }
 
-void mark_nops(const std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
+void mark_nops(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
   for (auto node : nodes) {
-    const auto agg_node = std::dynamic_pointer_cast<RelAggregate>(node);
+    const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
     if (!agg_node || agg_node->getAggsCount()) {
       continue;
     }
     CHECK_EQ(size_t(1), node->inputCount());
-    const auto agg_input_node = dynamic_cast<const RelAggregate*>(node->getInput(0));
+    const auto agg_input_node =
+        dynamic_cast<const hdk::ir::Aggregate*>(node->getInput(0));
     if (agg_input_node && !agg_input_node->getAggsCount() &&
         agg_node->getGroupByCount() == agg_input_node->getGroupByCount()) {
       agg_node->markAsNop();
@@ -2064,7 +1518,7 @@ void mark_nops(const std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
   }
 }
 
-hdk::ir::ExprPtrVector reprojectExprs(const RelProject* simple_project,
+hdk::ir::ExprPtrVector reprojectExprs(const hdk::ir::Project* simple_project,
                                       const hdk::ir::ExprPtrVector& exprs) noexcept {
   hdk::ir::ExprPtrVector result;
   for (size_t i = 0; i < simple_project->size(); ++i) {
@@ -2084,7 +1538,7 @@ hdk::ir::ExprPtrVector reprojectExprs(const RelProject* simple_project,
  */
 class InputReplacementVisitor : public hdk::ir::ExprRewriter {
  public:
-  InputReplacementVisitor(const RelAlgNode* node_to_keep,
+  InputReplacementVisitor(const hdk::ir::Node* node_to_keep,
                           const hdk::ir::ExprPtrVector& exprs,
                           const hdk::ir::ExprPtrVector* groupby_exprs = nullptr)
       : node_to_keep_(node_to_keep), exprs_(exprs), groupby_exprs_(groupby_exprs) {}
@@ -2105,13 +1559,13 @@ class InputReplacementVisitor : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const RelAlgNode* node_to_keep_;
+  const hdk::ir::Node* node_to_keep_;
   const hdk::ir::ExprPtrVector& exprs_;
   const hdk::ir::ExprPtrVector* groupby_exprs_;
 };
 
 void create_compound(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes,
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
     const std::vector<size_t>& pattern,
     std::unordered_map<size_t, RegisteredQueryHint>& query_hints) noexcept {
   CHECK_GE(pattern.size(), size_t(2));
@@ -2124,7 +1578,7 @@ void create_compound(
   hdk::ir::ExprPtrVector groupby_exprs;
   bool first_project{true};
   bool is_agg{false};
-  RelAlgNode* last_node{nullptr};
+  hdk::ir::Node* last_node{nullptr};
 
   size_t node_hash{0};
   std::optional<RegisteredQueryHint> registered_query_hint;
@@ -2135,7 +1589,7 @@ void create_compound(
       node_hash = registered_query_hint_it->first;
       registered_query_hint = registered_query_hint_it->second;
     }
-    const auto ra_filter = std::dynamic_pointer_cast<RelFilter>(ra_node);
+    const auto ra_filter = std::dynamic_pointer_cast<hdk::ir::Filter>(ra_node);
     if (ra_filter) {
       CHECK(!filter_expr);
       filter_expr = ra_filter->getConditionExprShared();
@@ -2143,7 +1597,7 @@ void create_compound(
       last_node = ra_node.get();
       continue;
     }
-    const auto ra_project = std::dynamic_pointer_cast<RelProject>(ra_node);
+    const auto ra_project = std::dynamic_pointer_cast<hdk::ir::Project>(ra_node);
     if (ra_project) {
       fields = ra_project->getFields();
 
@@ -2153,7 +1607,8 @@ void create_compound(
         // since we know that we'll evaluate the filter on the fly, with no
         // intermediate buffer. There are cases when filter is not a part of
         // the pattern, detect it by simply cehcking current filter rex.
-        const auto filter_input = dynamic_cast<const RelFilter*>(ra_project->getInput(0));
+        const auto filter_input =
+            dynamic_cast<const hdk::ir::Filter*>(ra_project->getInput(0));
         if (filter_input && filter_expr) {
           CHECK_EQ(size_t(1), filter_input->inputCount());
           ra_project->replaceInput(ra_project->getAndOwnInput(0),
@@ -2187,7 +1642,7 @@ void create_compound(
       last_node = ra_node.get();
       continue;
     }
-    const auto ra_aggregate = std::dynamic_pointer_cast<RelAggregate>(ra_node);
+    const auto ra_aggregate = std::dynamic_pointer_cast<hdk::ir::Aggregate>(ra_node);
     if (ra_aggregate) {
       is_agg = true;
       fields = ra_aggregate->getFields();
@@ -2207,12 +1662,12 @@ void create_compound(
     }
   }
 
-  auto compound_node = std::make_shared<RelCompound>(filter_expr,
-                                                     std::move(exprs),
-                                                     groupby_count,
-                                                     std::move(groupby_exprs),
-                                                     fields,
-                                                     is_agg);
+  auto compound_node = std::make_shared<hdk::ir::Compound>(filter_expr,
+                                                           std::move(exprs),
+                                                           groupby_count,
+                                                           std::move(groupby_exprs),
+                                                           fields,
+                                                           is_agg);
   auto old_node = nodes[pattern.back()];
   nodes[pattern.back()] = compound_node;
   auto first_node = nodes[pattern.front()];
@@ -2235,8 +1690,9 @@ void create_compound(
   }
 }
 
-class RANodeIterator : public std::vector<std::shared_ptr<RelAlgNode>>::const_iterator {
-  using ElementType = std::shared_ptr<RelAlgNode>;
+class RANodeIterator
+    : public std::vector<std::shared_ptr<hdk::ir::Node>>::const_iterator {
+  using ElementType = std::shared_ptr<hdk::ir::Node>;
   using Super = std::vector<ElementType>::const_iterator;
   using Container = std::vector<ElementType>;
 
@@ -2316,10 +1772,10 @@ class RANodeIterator : public std::vector<std::shared_ptr<RelAlgNode>>::const_it
   std::unordered_set<size_t> visited_;
 };
 
-bool input_can_be_coalesced(const RelAlgNode* parent_node,
+bool input_can_be_coalesced(const hdk::ir::Node* parent_node,
                             const size_t index,
                             const bool first_rex_is_input) {
-  if (auto agg_node = dynamic_cast<const RelAggregate*>(parent_node)) {
+  if (auto agg_node = dynamic_cast<const hdk::ir::Aggregate*>(parent_node)) {
     if (index == 0 && agg_node->getGroupByCount() > 0) {
       return true;
     } else {
@@ -2335,7 +1791,7 @@ bool input_can_be_coalesced(const RelAlgNode* parent_node,
 /**
  * CoalesceSecondaryProjectVisitor visits each relational algebra expression node in a
  * given input and determines whether or not the input is a candidate for coalescing
- * into the parent RA node. Intended for use only on the inputs of a RelProject node.
+ * into the parent RA node. Intended for use only on the inputs of a Project node.
  */
 class CoalesceSecondaryProjectVisitor : public ScalarExprVisitor<bool> {
  public:
@@ -2414,8 +1870,8 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
   return false;
 }
 
-void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
-                    const std::vector<const RelAlgNode*>& left_deep_joins,
+void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
+                    const std::vector<const hdk::ir::Node*>& left_deep_joins,
                     std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
   enum class CoalesceState { Initial, Filter, FirstProject, Aggregate };
   std::vector<size_t> crt_pattern;
@@ -2430,15 +1886,15 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
     const auto ra_node = nodeIt != nodes.end() ? *nodeIt : nullptr;
     switch (crt_state) {
       case CoalesceState::Initial: {
-        if (std::dynamic_pointer_cast<const RelFilter>(ra_node) &&
+        if (std::dynamic_pointer_cast<const hdk::ir::Filter>(ra_node) &&
             std::find(left_deep_joins.begin(), left_deep_joins.end(), ra_node.get()) ==
                 left_deep_joins.end()) {
           crt_pattern.push_back(size_t(nodeIt));
           crt_state = CoalesceState::Filter;
           nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
         } else if (auto project_node =
-                       std::dynamic_pointer_cast<const RelProject>(ra_node)) {
-          if (project_node->hasWindowFunctionExpr()) {
+                       std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
+          if (hasWindowFunctionExpr(project_node.get())) {
             nodeIt.advance(RANodeIterator::AdvancingMode::InOrder);
           } else {
             crt_pattern.push_back(size_t(nodeIt));
@@ -2451,10 +1907,11 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
         break;
       }
       case CoalesceState::Filter: {
-        if (auto project_node = std::dynamic_pointer_cast<const RelProject>(ra_node)) {
+        if (auto project_node =
+                std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
           // Given we now add preceding projects for all window functions following
-          // RelFilter nodes, the following should never occur
-          CHECK(!project_node->hasWindowFunctionExpr());
+          // Filter nodes, the following should never occur
+          CHECK(!hasWindowFunctionExpr(project_node.get()));
           crt_pattern.push_back(size_t(nodeIt));
           crt_state = CoalesceState::FirstProject;
           nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
@@ -2464,7 +1921,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
         break;
       }
       case CoalesceState::FirstProject: {
-        if (std::dynamic_pointer_cast<const RelAggregate>(ra_node)) {
+        if (std::dynamic_pointer_cast<const hdk::ir::Aggregate>(ra_node)) {
           crt_pattern.push_back(size_t(nodeIt));
           crt_state = CoalesceState::Aggregate;
           nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
@@ -2477,8 +1934,9 @@ void coalesce_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes,
         break;
       }
       case CoalesceState::Aggregate: {
-        if (auto project_node = std::dynamic_pointer_cast<const RelProject>(ra_node)) {
-          if (!project_node->hasWindowFunctionExpr()) {
+        if (auto project_node =
+                std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
+          if (!hasWindowFunctionExpr(project_node.get())) {
             // TODO(adb): overloading the simple project terminology again here
             bool is_simple_project{true};
             for (auto& expr : project_node->getExprs()) {
@@ -2554,7 +2012,7 @@ class ReplacementExprVisitor : public hdk::ir::ExprRewriter {
  */
 class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
  public:
-  InputBackpropagationVisitor(RelProject* node) : node_(node) {}
+  InputBackpropagationVisitor(hdk::ir::Project* node) : node_(node) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (col_ref->node() != node_) {
@@ -2565,7 +2023,8 @@ class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
         return it->second;
       } else {
         std::string field_name = "";
-        if (auto cur_project_node = dynamic_cast<const RelProject*>(cur_source_node)) {
+        if (auto cur_project_node =
+                dynamic_cast<const hdk::ir::Project*>(cur_source_node)) {
           field_name = cur_project_node->getFieldName(cur_index);
         }
         node_->appendInput(field_name, col_ref->shared());
@@ -2581,17 +2040,17 @@ class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
 
  protected:
   using InputReplacements =
-      std::unordered_map<std::pair<const RelAlgNode*, unsigned>,
+      std::unordered_map<std::pair<const hdk::ir::Node*, unsigned>,
                          hdk::ir::ExprPtr,
-                         boost::hash<std::pair<const RelAlgNode*, unsigned>>>;
+                         boost::hash<std::pair<const hdk::ir::Node*, unsigned>>>;
 
-  mutable RelProject* node_;
+  mutable hdk::ir::Project* node_;
   mutable InputReplacements replacements_;
 };
 
 void propagate_hints_to_new_project(
-    std::shared_ptr<RelProject> prev_node,
-    std::shared_ptr<RelProject> new_node,
+    std::shared_ptr<hdk::ir::Project> prev_node,
+    std::shared_ptr<hdk::ir::Project> new_node,
     std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
   auto delivered_hints = prev_node->getDeliveredHints();
   bool needs_propagate_hints = !delivered_hints->empty();
@@ -2622,13 +2081,13 @@ void propagate_hints_to_new_project(
  expression copy
  */
 void separate_window_function_expressions(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes,
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
     std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
-  std::list<std::shared_ptr<RelAlgNode>> node_list(nodes.begin(), nodes.end());
+  std::list<std::shared_ptr<hdk::ir::Node>> node_list(nodes.begin(), nodes.end());
 
   for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
     const auto node = *node_itr;
-    auto window_func_project_node = std::dynamic_pointer_cast<RelProject>(node);
+    auto window_func_project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
     if (!window_func_project_node) {
       continue;
     }
@@ -2713,9 +2172,9 @@ void separate_window_function_expressions(
       // Build the new project node and insert it into the list after the project node
       // containing the window function
       auto new_project =
-          std::make_shared<RelProject>(std::move(new_exprs),
-                                       window_func_project_node->getFields(),
-                                       window_func_project_node);
+          std::make_shared<hdk::ir::Project>(std::move(new_exprs),
+                                             window_func_project_node->getFields(),
+                                             window_func_project_node);
       propagate_hints_to_new_project(window_func_project_node, new_project, query_hints);
       node_list.insert(std::next(node_itr), new_project);
 
@@ -2729,8 +2188,9 @@ void separate_window_function_expressions(
   nodes.assign(node_list.begin(), node_list.end());
 }
 
-using InputSet = std::unordered_set<std::pair<const RelAlgNode*, unsigned>,
-                                    boost::hash<std::pair<const RelAlgNode*, unsigned>>>;
+using InputSet =
+    std::unordered_set<std::pair<const hdk::ir::Node*, unsigned>,
+                       boost::hash<std::pair<const hdk::ir::Node*, unsigned>>>;
 
 class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  protected:
@@ -2752,20 +2212,20 @@ class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  * off the projected exprs in the new project.
  */
 void add_window_function_pre_project(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes,
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
     const bool always_add_project_if_first_project_is_window_expr,
     std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
-  std::list<std::shared_ptr<RelAlgNode>> node_list(nodes.begin(), nodes.end());
+  std::list<std::shared_ptr<hdk::ir::Node>> node_list(nodes.begin(), nodes.end());
   size_t project_node_counter{0};
   for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
     const auto node = *node_itr;
 
-    auto window_func_project_node = std::dynamic_pointer_cast<RelProject>(node);
+    auto window_func_project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
     if (!window_func_project_node) {
       continue;
     }
     project_node_counter++;
-    if (!window_func_project_node->hasWindowFunctionExpr()) {
+    if (!hasWindowFunctionExpr(window_func_project_node.get())) {
       // this projection node does not have a window function
       // expression -- skip to the next node in the DAG.
       continue;
@@ -2775,9 +2235,9 @@ void add_window_function_pre_project(
     const auto prev_node = *prev_node_itr;
     CHECK(prev_node);
 
-    auto filter_node = std::dynamic_pointer_cast<RelFilter>(prev_node);
+    auto filter_node = std::dynamic_pointer_cast<hdk::ir::Filter>(prev_node);
 
-    auto scan_node = std::dynamic_pointer_cast<RelScan>(prev_node);
+    auto scan_node = std::dynamic_pointer_cast<hdk::ir::Scan>(prev_node);
     const bool has_multi_fragment_scan_input =
         (scan_node && scan_node->getNumFragments() > 1) ? true : false;
 
@@ -2814,8 +2274,8 @@ void add_window_function_pre_project(
 
     // Note: Technically not required since we are mapping old inputs to new input
     // indices, but makes the re-mapping of inputs easier to follow.
-    std::vector<std::pair<const RelAlgNode*, unsigned>> sorted_inputs(inputs.begin(),
-                                                                      inputs.end());
+    std::vector<std::pair<const hdk::ir::Node*, unsigned>> sorted_inputs(inputs.begin(),
+                                                                         inputs.end());
     std::sort(sorted_inputs.begin(),
               sorted_inputs.end(),
               [](const auto& a, const auto& b) { return a.second < b.second; });
@@ -2833,7 +2293,8 @@ void add_window_function_pre_project(
       fields.emplace_back("");
     }
 
-    auto new_project = std::make_shared<RelProject>(std::move(exprs), fields, prev_node);
+    auto new_project =
+        std::make_shared<hdk::ir::Project>(std::move(exprs), fields, prev_node);
     propagate_hints_to_new_project(window_func_project_node, new_project, query_hints);
     node_list.insert(node_itr, new_project);
     window_func_project_node->replaceInput(
@@ -2876,16 +2337,27 @@ std::vector<std::string> getFieldNamesFromScanNode(const rapidjson::Value& scan_
   return strings_from_json_array(fields_json);
 }
 
+hdk::ir::ExprPtrVector genColumnRefs(const hdk::ir::Node* node, size_t count) {
+  hdk::ir::ExprPtrVector res;
+  res.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    res.emplace_back(
+        hdk::ir::makeExpr<hdk::ir::ColumnRef>(getColumnType(node, i), node, i));
+  }
+  return res;
+}
+
 }  // namespace
 
-bool RelProject::hasWindowFunctionExpr() const {
-  for (const auto& expr : exprs_) {
+bool hasWindowFunctionExpr(const hdk::ir::Project* node) {
+  for (const auto& expr : node->getExprs()) {
     if (is_window_function_expr(expr.get())) {
       return true;
     }
   }
   return false;
 }
+
 namespace details {
 
 class RelAlgDispatcher {
@@ -2893,14 +2365,14 @@ class RelAlgDispatcher {
   RelAlgDispatcher(int db_id, SchemaProviderPtr schema_provider)
       : db_id_(db_id), schema_provider_(schema_provider) {}
 
-  std::vector<std::shared_ptr<RelAlgNode>> run(const rapidjson::Value& rels,
-                                               RelAlgDagBuilder& root_dag_builder) {
+  std::vector<std::shared_ptr<hdk::ir::Node>> run(const rapidjson::Value& rels,
+                                                  RelAlgDagBuilder& root_dag_builder) {
     for (auto rels_it = rels.Begin(); rels_it != rels.End(); ++rels_it) {
       const auto& crt_node = *rels_it;
       const auto id = node_id(crt_node);
       CHECK_EQ(static_cast<size_t>(id), nodes_.size());
       CHECK(crt_node.IsObject());
-      std::shared_ptr<RelAlgNode> ra_node = nullptr;
+      std::shared_ptr<hdk::ir::Node> ra_node = nullptr;
       const auto rel_op = json_str(field(crt_node, "relOp"));
       if (rel_op == std::string("EnumerableTableScan") ||
           rel_op == std::string("LogicalTableScan")) {
@@ -2922,7 +2394,8 @@ class RelAlgDispatcher {
       } else if (rel_op == std::string("LogicalUnion")) {
         ra_node = dispatchUnion(crt_node);
       } else {
-        throw QueryNotSupported(std::string("Node ") + rel_op + " not supported yet");
+        throw hdk::ir::QueryNotSupported(std::string("Node ") + rel_op +
+                                         " not supported yet");
       }
       nodes_.push_back(ra_node);
     }
@@ -2931,7 +2404,7 @@ class RelAlgDispatcher {
   }
 
  private:
-  std::shared_ptr<RelScan> dispatchTableScan(const rapidjson::Value& scan_ra) {
+  std::shared_ptr<hdk::ir::Scan> dispatchTableScan(const rapidjson::Value& scan_ra) {
     check_empty_inputs_field(scan_ra);
     CHECK(scan_ra.IsObject());
     const auto tinfo = getTableFromScanNode(db_id_, schema_provider_, scan_ra);
@@ -2942,15 +2415,15 @@ class RelAlgDispatcher {
       infos.emplace_back(schema_provider_->getColumnInfo(*tinfo, col_name));
       CHECK(infos.back());
     }
-    auto scan_node = std::make_shared<RelScan>(tinfo, std::move(infos));
+    auto scan_node = std::make_shared<hdk::ir::Scan>(tinfo, std::move(infos));
     if (scan_ra.HasMember("hints")) {
       getRelAlgHints(scan_ra, scan_node);
     }
     return scan_node;
   }
 
-  std::shared_ptr<RelProject> dispatchProject(const rapidjson::Value& proj_ra,
-                                              RelAlgDagBuilder& root_dag_builder) {
+  std::shared_ptr<hdk::ir::Project> dispatchProject(const rapidjson::Value& proj_ra,
+                                                    RelAlgDagBuilder& root_dag_builder) {
     const auto inputs = getRelAlgInputs(proj_ra);
     CHECK_EQ(size_t(1), inputs.size());
     const auto& exprs_json = field(proj_ra, "exprs");
@@ -2966,17 +2439,17 @@ class RelAlgDispatcher {
     }
     const auto& fields = field(proj_ra, "fields");
     if (proj_ra.HasMember("hints")) {
-      auto project_node = std::make_shared<RelProject>(
+      auto project_node = std::make_shared<hdk::ir::Project>(
           std::move(exprs), strings_from_json_array(fields), inputs.front());
       getRelAlgHints(proj_ra, project_node);
       return project_node;
     }
-    return std::make_shared<RelProject>(
+    return std::make_shared<hdk::ir::Project>(
         std::move(exprs), strings_from_json_array(fields), inputs.front());
   }
 
-  std::shared_ptr<RelFilter> dispatchFilter(const rapidjson::Value& filter_ra,
-                                            RelAlgDagBuilder& root_dag_builder) {
+  std::shared_ptr<hdk::ir::Filter> dispatchFilter(const rapidjson::Value& filter_ra,
+                                                  RelAlgDagBuilder& root_dag_builder) {
     const auto inputs = getRelAlgInputs(filter_ra);
     CHECK_EQ(size_t(1), inputs.size());
     const auto id = node_id(filter_ra);
@@ -2986,11 +2459,12 @@ class RelAlgDispatcher {
                                      schema_provider_,
                                      root_dag_builder,
                                      getNodeColumnRefs(inputs[0].get()));
-    return std::make_shared<RelFilter>(std::move(condition_expr), inputs.front());
+    return std::make_shared<hdk::ir::Filter>(std::move(condition_expr), inputs.front());
   }
 
-  std::shared_ptr<RelAggregate> dispatchAggregate(const rapidjson::Value& agg_ra,
-                                                  RelAlgDagBuilder& root_dag_builder) {
+  std::shared_ptr<hdk::ir::Aggregate> dispatchAggregate(
+      const rapidjson::Value& agg_ra,
+      RelAlgDagBuilder& root_dag_builder) {
     const auto inputs = getRelAlgInputs(agg_ra);
     CHECK_EQ(size_t(1), inputs.size());
     const auto fields = strings_from_json_array(field(agg_ra, "fields"));
@@ -2999,7 +2473,7 @@ class RelAlgDispatcher {
       CHECK_EQ(i, group[i]);
     }
     if (agg_ra.HasMember("groups") || agg_ra.HasMember("indicator")) {
-      throw QueryNotSupported("GROUP BY extensions not supported");
+      throw hdk::ir::QueryNotSupported("GROUP BY extensions not supported");
     }
     const auto& aggs_json_arr = field(agg_ra, "aggs");
     CHECK(aggs_json_arr.IsArray());
@@ -3011,7 +2485,7 @@ class RelAlgDispatcher {
       auto agg = parseAggregateExpr(*aggs_json_arr_it, root_dag_builder, input_exprs);
       aggs.push_back(agg);
     }
-    auto agg_node = std::make_shared<RelAggregate>(
+    auto agg_node = std::make_shared<hdk::ir::Aggregate>(
         group.size(), std::move(aggs), fields, inputs.front());
     if (agg_ra.HasMember("hints")) {
       getRelAlgHints(agg_ra, agg_node);
@@ -3019,8 +2493,8 @@ class RelAlgDispatcher {
     return agg_node;
   }
 
-  std::shared_ptr<RelJoin> dispatchJoin(const rapidjson::Value& join_ra,
-                                        RelAlgDagBuilder& root_dag_builder) {
+  std::shared_ptr<hdk::ir::Join> dispatchJoin(const rapidjson::Value& join_ra,
+                                              RelAlgDagBuilder& root_dag_builder) {
     const auto inputs = getRelAlgInputs(join_ra);
     CHECK_EQ(size_t(2), inputs.size());
     const auto join_type = to_join_type(json_str(field(join_ra, "joinType")));
@@ -3032,18 +2506,18 @@ class RelAlgDispatcher {
                                 schema_provider_,
                                 root_dag_builder,
                                 ra_outputs);
-    auto join_node =
-        std::make_shared<RelJoin>(inputs[0], inputs[1], std::move(condition), join_type);
+    auto join_node = std::make_shared<hdk::ir::Join>(
+        inputs[0], inputs[1], std::move(condition), join_type);
     if (join_ra.HasMember("hints")) {
       getRelAlgHints(join_ra, join_node);
     }
     return join_node;
   }
 
-  std::shared_ptr<RelSort> dispatchSort(const rapidjson::Value& sort_ra) {
+  std::shared_ptr<hdk::ir::Sort> dispatchSort(const rapidjson::Value& sort_ra) {
     const auto inputs = getRelAlgInputs(sort_ra);
     CHECK_EQ(size_t(1), inputs.size());
-    std::vector<SortField> collation;
+    std::vector<hdk::ir::SortField> collation;
     const auto& collation_arr = field(sort_ra, "collation");
     CHECK(collation_arr.IsArray());
     for (auto collation_arr_it = collation_arr.Begin();
@@ -3056,7 +2530,7 @@ class RelAlgDispatcher {
     }
     auto limit = get_int_literal_field(sort_ra, "fetch", -1);
     const auto offset = get_int_literal_field(sort_ra, "offset", 0);
-    auto ret = std::make_shared<RelSort>(
+    auto ret = std::make_shared<hdk::ir::Sort>(
         collation, limit > 0 ? limit : 0, offset, inputs.front());
     ret->setEmptyResult(limit == 0);
     return ret;
@@ -3075,7 +2549,7 @@ class RelAlgDispatcher {
     return tuple_type;
   }
 
-  std::shared_ptr<RelTableFunction> dispatchTableFunction(
+  std::shared_ptr<hdk::ir::TableFunction> dispatchTableFunction(
       const rapidjson::Value& table_func_ra,
       RelAlgDagBuilder& root_dag_builder) {
     const auto inputs = getRelAlgInputs(table_func_ra);
@@ -3168,15 +2642,15 @@ class RelAlgDispatcher {
     for (size_t i = 0; i < tuple_type.size(); i++) {
       fields.emplace_back("");
     }
-    return std::make_shared<RelTableFunction>(op_name.GetString(),
-                                              inputs,
-                                              fields,
-                                              std::move(col_input_exprs),
-                                              std::move(table_func_input_exprs),
-                                              std::move(tuple_type));
+    return std::make_shared<hdk::ir::TableFunction>(op_name.GetString(),
+                                                    inputs,
+                                                    fields,
+                                                    std::move(col_input_exprs),
+                                                    std::move(table_func_input_exprs),
+                                                    std::move(tuple_type));
   }
 
-  std::shared_ptr<RelLogicalValues> dispatchLogicalValues(
+  std::shared_ptr<hdk::ir::LogicalValues> dispatchLogicalValues(
       const rapidjson::Value& logical_values_ra) {
     const auto& tuple_type_arr = field(logical_values_ra, "type");
     std::vector<TargetMetaInfo> tuple_type = parseTupleType(tuple_type_arr);
@@ -3186,7 +2660,7 @@ class RelAlgDispatcher {
     CHECK(tuples_arr.IsArray());
 
     if (inputs_arr.Size()) {
-      throw QueryNotSupported("Inputs not supported in logical values yet.");
+      throw hdk::ir::QueryNotSupported("Inputs not supported in logical values yet.");
     }
 
     std::vector<hdk::ir::ExprPtrVector> values;
@@ -3206,21 +2680,22 @@ class RelAlgDispatcher {
       }
     }
 
-    return std::make_shared<RelLogicalValues>(tuple_type, std::move(values));
+    return std::make_shared<hdk::ir::LogicalValues>(tuple_type, std::move(values));
   }
 
-  std::shared_ptr<RelLogicalUnion> dispatchUnion(
+  std::shared_ptr<hdk::ir::LogicalUnion> dispatchUnion(
       const rapidjson::Value& logical_union_ra) {
     auto inputs = getRelAlgInputs(logical_union_ra);
     auto const& all_type_bool = field(logical_union_ra, "all");
     CHECK(all_type_bool.IsBool());
-    return std::make_shared<RelLogicalUnion>(std::move(inputs), all_type_bool.GetBool());
+    return std::make_shared<hdk::ir::LogicalUnion>(std::move(inputs),
+                                                   all_type_bool.GetBool());
   }
 
-  RelAlgInputs getRelAlgInputs(const rapidjson::Value& node) {
+  hdk::ir::NodeInputs getRelAlgInputs(const rapidjson::Value& node) {
     if (node.HasMember("inputs")) {
       const auto str_input_ids = strings_from_json_array(field(node, "inputs"));
-      RelAlgInputs ra_inputs;
+      hdk::ir::NodeInputs ra_inputs;
       for (const auto& str_id : str_input_ids) {
         ra_inputs.push_back(nodes_[std::stoi(str_id)]);
       }
@@ -3289,7 +2764,7 @@ class RelAlgDispatcher {
   }
 
   void getRelAlgHints(const rapidjson::Value& json_node,
-                      std::shared_ptr<RelAlgNode> node) {
+                      std::shared_ptr<hdk::ir::Node> node) {
     std::string hint_explained = json_str(field(json_node, "hints"));
     size_t pos = 0;
     std::string delim = "|";
@@ -3301,28 +2776,28 @@ class RelAlgDispatcher {
     // handling the last one
     hint_list.emplace_back(hint_explained.substr(0, pos));
 
-    const auto agg_node = std::dynamic_pointer_cast<RelAggregate>(node);
+    const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
     if (agg_node) {
       for (std::string& hint : hint_list) {
         auto parsed_hint = parseHintString(hint);
         agg_node->addHint(parsed_hint);
       }
     }
-    const auto project_node = std::dynamic_pointer_cast<RelProject>(node);
+    const auto project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
     if (project_node) {
       for (std::string& hint : hint_list) {
         auto parsed_hint = parseHintString(hint);
         project_node->addHint(parsed_hint);
       }
     }
-    const auto scan_node = std::dynamic_pointer_cast<RelScan>(node);
+    const auto scan_node = std::dynamic_pointer_cast<hdk::ir::Scan>(node);
     if (scan_node) {
       for (std::string& hint : hint_list) {
         auto parsed_hint = parseHintString(hint);
         scan_node->addHint(parsed_hint);
       }
     }
-    const auto join_node = std::dynamic_pointer_cast<RelJoin>(node);
+    const auto join_node = std::dynamic_pointer_cast<hdk::ir::Join>(node);
     if (join_node) {
       for (std::string& hint : hint_list) {
         auto parsed_hint = parseHintString(hint);
@@ -3330,7 +2805,7 @@ class RelAlgDispatcher {
       }
     }
 
-    const auto compound_node = std::dynamic_pointer_cast<RelCompound>(node);
+    const auto compound_node = std::dynamic_pointer_cast<hdk::ir::Compound>(node);
     if (compound_node) {
       for (std::string& hint : hint_list) {
         auto parsed_hint = parseHintString(hint);
@@ -3339,7 +2814,7 @@ class RelAlgDispatcher {
     }
   }
 
-  std::shared_ptr<const RelAlgNode> prev(const rapidjson::Value& crt_node) {
+  std::shared_ptr<const hdk::ir::Node> prev(const rapidjson::Value& crt_node) {
     const auto id = node_id(crt_node);
     CHECK(id);
     CHECK_EQ(static_cast<size_t>(id), nodes_.size());
@@ -3348,94 +2823,16 @@ class RelAlgDispatcher {
 
   int db_id_;
   SchemaProviderPtr schema_provider_;
-  std::vector<std::shared_ptr<RelAlgNode>> nodes_;
+  std::vector<std::shared_ptr<hdk::ir::Node>> nodes_;
 };
 
 }  // namespace details
-
-void RelAlgDag::eachNode(std::function<void(RelAlgNode const*)> const& callback) const {
-  for (auto const& node : nodes_) {
-    if (node) {
-      callback(node.get());
-    }
-  }
-}
-
-void RelAlgDag::registerQueryHints(std::shared_ptr<RelAlgNode> node,
-                                   Hints* hints_delivered) {
-  bool detect_columnar_output_hint = false;
-  bool detect_rowwise_output_hint = false;
-  RegisteredQueryHint query_hint = RegisteredQueryHint::fromConfig(*config_);
-  for (auto it = hints_delivered->begin(); it != hints_delivered->end(); it++) {
-    auto target = it->second;
-    auto hint_type = it->first;
-    switch (hint_type) {
-      case QueryHint::kCpuMode: {
-        query_hint.registerHint(QueryHint::kCpuMode);
-        query_hint.cpu_mode = true;
-        break;
-      }
-      case QueryHint::kColumnarOutput: {
-        detect_columnar_output_hint = true;
-        break;
-      }
-      case QueryHint::kRowwiseOutput: {
-        detect_rowwise_output_hint = true;
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  // we have four cases depending on 1) enable_columnar_output flag
-  // and 2) query hint status: columnar_output and rowwise_output
-  // case 1. enable_columnar_output = true
-  // case 1.a) columnar_output = true (so rowwise_output = false);
-  // case 1.b) rowwise_output = true (so columnar_output = false);
-  // case 2. enable_columnar_output = false
-  // case 2.a) columnar_output = true (so rowwise_output = false);
-  // case 2.b) rowwise_output = true (so columnar_output = false);
-  // case 1.a --> use columnar output
-  // case 1.b --> use rowwise output
-  // case 2.a --> use columnar output
-  // case 2.b --> use rowwise output
-  if (detect_columnar_output_hint && detect_rowwise_output_hint) {
-    VLOG(1) << "Two hints 1) columnar output and 2) rowwise output are enabled together, "
-            << "so skip them and use the runtime configuration "
-               "\"enable_columnar_output\"";
-  } else if (detect_columnar_output_hint && !detect_rowwise_output_hint) {
-    if (config_->rs.enable_columnar_output) {
-      VLOG(1) << "We already enable columnar output by default "
-                 "(g_enable_columnar_output = true), so skip this columnar output hint";
-    } else {
-      query_hint.registerHint(QueryHint::kColumnarOutput);
-      query_hint.columnar_output = true;
-    }
-  } else if (!detect_columnar_output_hint && detect_rowwise_output_hint) {
-    if (!config_->rs.enable_columnar_output) {
-      VLOG(1) << "We already use the default rowwise output (g_enable_columnar_output "
-                 "= false), so skip this rowwise output hint";
-    } else {
-      query_hint.registerHint(QueryHint::kRowwiseOutput);
-      query_hint.rowwise_output = true;
-    }
-  }
-  query_hint_.emplace(node->toHash(), query_hint);
-}
-
-void RelAlgDag::resetQueryExecutionState() {
-  for (auto& node : nodes_) {
-    if (node) {
-      node->resetQueryExecutionState();
-    }
-  }
-}
 
 RelAlgDagBuilder::RelAlgDagBuilder(RelAlgDagBuilder& root_dag_builder,
                                    const rapidjson::Value& query_ast,
                                    int db_id,
                                    SchemaProviderPtr schema_provider)
-    : RelAlgDag(root_dag_builder.config_, root_dag_builder.now())
+    : hdk::ir::QueryDag(root_dag_builder.config_, root_dag_builder.now())
     , db_id_(db_id)
     , schema_provider_(schema_provider) {
   build(query_ast, root_dag_builder);
@@ -3445,7 +2842,7 @@ RelAlgDagBuilder::RelAlgDagBuilder(const std::string& query_ra,
                                    int db_id,
                                    SchemaProviderPtr schema_provider,
                                    ConfigPtr config)
-    : RelAlgDag(config), db_id_(db_id), schema_provider_(schema_provider) {
+    : hdk::ir::QueryDag(config), db_id_(db_id), schema_provider_(schema_provider) {
   rapidjson::Document query_ast;
   query_ast.Parse(query_ra.c_str());
   VLOG(2) << "Parsing query RA JSON: " << query_ra;
@@ -3459,7 +2856,7 @@ RelAlgDagBuilder::RelAlgDagBuilder(const std::string& query_ra,
         "Failed to parse relational algebra tree. Possible query syntax error.");
   }
   CHECK(query_ast.IsObject());
-  RelAlgNode::resetRelAlgFirstId();
+  hdk::ir::Node::resetRelAlgFirstId();
   build(query_ast, *this);
 }
 
@@ -3470,7 +2867,7 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   try {
     nodes_ =
         details::RelAlgDispatcher(db_id_, schema_provider_).run(rels, lead_dag_builder);
-  } catch (const QueryNotSupported&) {
+  } catch (const hdk::ir::QueryNotSupported&) {
     throw;
   }
   CHECK(!nodes_.empty());
@@ -3481,15 +2878,15 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   sink_projected_boolean_expr_to_join(nodes_);
   eliminate_identical_copy(nodes_);
   fold_filters(nodes_);
-  std::vector<const RelAlgNode*> filtered_left_deep_joins;
-  std::vector<const RelAlgNode*> left_deep_joins;
+  std::vector<const hdk::ir::Node*> filtered_left_deep_joins;
+  std::vector<const hdk::ir::Node*> left_deep_joins;
   for (const auto& node : nodes_) {
     const auto left_deep_join_root = get_left_deep_join_root(node);
     // The filter which starts a left-deep join pattern must not be coalesced
     // since it contains (part of) the join condition.
     if (left_deep_join_root) {
       left_deep_joins.push_back(left_deep_join_root.get());
-      if (std::dynamic_pointer_cast<const RelFilter>(left_deep_join_root)) {
+      if (std::dynamic_pointer_cast<const hdk::ir::Filter>(left_deep_join_root)) {
         filtered_left_deep_joins.push_back(left_deep_join_root.get());
       }
     }
@@ -3512,7 +2909,7 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
 }
 
 // Return tree with depth represented by indentations.
-std::string tree_string(const RelAlgNode* ra, const size_t depth) {
+std::string tree_string(const hdk::ir::Node* ra, const size_t depth) {
   std::string result = std::string(2 * depth, ' ') + ::toString(ra) + '\n';
   for (size_t i = 0; i < ra->inputCount(); ++i) {
     result += tree_string(ra->getInput(i), depth + 1);
@@ -3520,140 +2917,11 @@ std::string tree_string(const RelAlgNode* ra, const size_t depth) {
   return result;
 }
 
-std::string RelCompound::toString() const {
-  return cat(::typeName(this),
-             getIdString(),
-             "(filter=",
-             (filter_ ? filter_->toString() : "null"),
-             ", ",
-             std::to_string(groupby_count_),
-             ", fields=",
-             ::toString(fields_),
-             ", groupby_exprs=",
-             ::toString(groupby_exprs_),
-             ", exprs=",
-             ::toString(exprs_),
-             ", is_agg=",
-             std::to_string(is_agg_),
-             ", inputs=",
-             inputsToString(inputs_),
-             ")");
-}
-
-size_t RelCompound::toHash() const {
-  if (!hash_) {
-    hash_ = typeid(RelCompound).hash_code();
-    boost::hash_combine(*hash_, filter_ ? filter_->hash() : boost::hash_value("n"));
-    boost::hash_combine(*hash_, is_agg_);
-    for (auto& expr : exprs_) {
-      boost::hash_combine(*hash_, expr->hash());
-    }
-    for (auto& expr : groupby_exprs_) {
-      boost::hash_combine(*hash_, expr->hash());
-    }
-    boost::hash_combine(*hash_, groupby_count_);
-    boost::hash_combine(*hash_, ::toString(fields_));
-  }
-  return *hash_;
-}
-
-const hdk::ir::Type* getColumnType(const RelAlgNode* node, size_t col_idx) {
-  // By default use metainfo.
-  const auto& metainfo = node->getOutputMetainfo();
-  if (metainfo.size() > col_idx) {
-    return metainfo[col_idx].type();
-  }
-
-  // For scans we can use embedded column info.
-  const auto scan = dynamic_cast<const RelScan*>(node);
-  if (scan) {
-    return scan->getColumnType(col_idx);
-  }
-
-  // For filter, sort and union we can propagate column type of
-  // their sources.
-  if (is_one_of<RelFilter, RelSort, RelLogicalUnion>(node)) {
-    return getColumnType(node->getInput(0), col_idx);
-  }
-
-  // For aggregates we can we can propagate type from group key
-  // or extract type from AggExpr
-  const auto agg = dynamic_cast<const RelAggregate*>(node);
-  if (agg) {
-    if (col_idx < agg->getGroupByCount()) {
-      return getColumnType(agg->getInput(0), col_idx);
-    } else {
-      return agg->getAggs()[col_idx - agg->getGroupByCount()]->type();
-    }
-  }
-
-  // For logical values we can use its tuple type.
-  const auto values = dynamic_cast<const RelLogicalValues*>(node);
-  if (values) {
-    CHECK_GT(values->size(), col_idx);
-    auto type = values->getTupleType()[col_idx].type();
-    if (type->isNull()) {
-      // replace w/ bigint
-      return type->ctx().int64();
-    }
-    return values->getTupleType()[col_idx].type();
-  }
-
-  // For table functions we can use its tuple type.
-  const auto table_fn = dynamic_cast<const RelTableFunction*>(node);
-  if (table_fn) {
-    CHECK_GT(table_fn->size(), col_idx);
-    return table_fn->getTupleType()[col_idx].type();
-  }
-
-  // For projections type can be extracted from Exprs.
-  const auto proj = dynamic_cast<const RelProject*>(node);
-  if (proj) {
-    CHECK_GT(proj->getExprs().size(), col_idx);
-    return proj->getExprs()[col_idx]->type();
-  }
-
-  // For joins we can propagate type from one of its sources.
-  const auto join = dynamic_cast<const RelJoin*>(node);
-  if (join) {
-    CHECK_GT(join->size(), col_idx);
-    if (col_idx < join->getInput(0)->size()) {
-      return getColumnType(join->getInput(0), col_idx);
-    } else {
-      return getColumnType(join->getInput(1), col_idx - join->getInput(0)->size());
-    }
-  }
-
-  const auto deep_join = dynamic_cast<const RelLeftDeepInnerJoin*>(node);
-  if (deep_join) {
-    CHECK_GT(deep_join->size(), col_idx);
-    unsigned offs = 0;
-    for (size_t i = 0; i < join->inputCount(); ++i) {
-      auto input = join->getInput(i);
-      if (col_idx - offs < input->size()) {
-        return getColumnType(input, col_idx - offs);
-      }
-      offs += input->size();
-    }
-  }
-
-  // For coumpounds type can be extracted from Exprs.
-  const auto compound = dynamic_cast<const RelCompound*>(node);
-  if (compound) {
-    CHECK_GT(compound->size(), col_idx);
-    return compound->getExprs()[col_idx]->type();
-  }
-
-  CHECK(false) << "Missing output metainfo for node " + node->toString() +
-                      " col_idx=" + std::to_string(col_idx);
-  return {};
-}
-
-hdk::ir::ExprPtrVector getInputExprsForAgg(const RelAlgNode* node) {
+hdk::ir::ExprPtrVector getInputExprsForAgg(const hdk::ir::Node* node) {
   hdk::ir::ExprPtrVector res;
   res.reserve(node->size());
-  auto project = dynamic_cast<const RelProject*>(node);
-  auto compound = dynamic_cast<const RelCompound*>(node);
+  auto project = dynamic_cast<const hdk::ir::Project*>(node);
+  auto compound = dynamic_cast<const hdk::ir::Compound*>(node);
   if (project || compound) {
     const auto& exprs = project ? project->getExprs() : compound->getExprs();
     for (unsigned col_idx = 0; col_idx < static_cast<unsigned>(exprs.size()); ++col_idx) {
@@ -3665,8 +2933,8 @@ hdk::ir::ExprPtrVector getInputExprsForAgg(const RelAlgNode* node) {
             hdk::ir::makeExpr<hdk::ir::ColumnRef>(expr->type(), node, col_idx));
       }
     }
-  } else if (is_one_of<RelLogicalValues, RelAggregate, RelLogicalUnion, RelTableFunction>(
-                 node)) {
+  } else if (node->is<hdk::ir::LogicalValues>() || node->is<hdk::ir::Aggregate>() ||
+             node->is<hdk::ir::LogicalUnion>() || node->is<hdk::ir::TableFunction>()) {
     res = getNodeColumnRefs(node);
   } else {
     CHECK(false) << "Unexpected node: " << node->toString();

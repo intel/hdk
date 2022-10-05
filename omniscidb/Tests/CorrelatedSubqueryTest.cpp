@@ -834,8 +834,8 @@ TEST(Select, InExpr_As_Child_Operand_Of_OR_Operator) {
 
   auto check_query = [](const std::string& query, bool expected) {
     auto ra_executor = makeRelAlgExecutor(query);
-    auto root_node = ra_executor->getRootRelAlgNodeShPtr();
-    auto has_in_expr = InExprDetector::detect(root_node.get());
+    auto root_node = ra_executor->getRootNode();
+    auto has_in_expr = InExprDetector::detect(root_node);
     EXPECT_EQ(has_in_expr, expected);
   };
 
@@ -868,8 +868,8 @@ TEST(Select, Disable_INExpr_Decorrelation_Under_Watchdog) {
 
   auto check_query = [](const std::string& query, bool expected) {
     auto ra_executor = makeRelAlgExecutor(query);
-    auto root_node = ra_executor->getRootRelAlgNodeShPtr();
-    auto has_in_expr = InExprDetector::detect(root_node.get());
+    auto root_node = ra_executor->getRootNode();
+    auto has_in_expr = InExprDetector::detect(root_node);
     EXPECT_EQ(has_in_expr, expected);
   };
 

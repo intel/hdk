@@ -31,17 +31,17 @@ namespace {
 
 class ProjectInputRedirector : public hdk::ir::ExprRewriter {
  public:
-  ProjectInputRedirector(const std::unordered_set<const RelProject*>& crt_inputs)
+  ProjectInputRedirector(const std::unordered_set<const hdk::ir::Project*>& crt_inputs)
       : crt_projects_(crt_inputs) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    auto source = dynamic_cast<const RelProject*>(col_ref->node());
+    auto source = dynamic_cast<const hdk::ir::Project*>(col_ref->node());
     if (source && crt_projects_.count(source)) {
       auto new_source = source->getInput(0);
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(
           source->getExpr(col_ref->index()).get());
       if (new_col_ref) {
-        if (auto join = dynamic_cast<const RelJoin*>(new_source)) {
+        if (auto join = dynamic_cast<const hdk::ir::Join*>(new_source)) {
           CHECK(new_col_ref->node() == join->getInput(0) ||
                 new_col_ref->node() == join->getInput(1));
         } else {
@@ -54,7 +54,7 @@ class ProjectInputRedirector : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const std::unordered_set<const RelProject*>& crt_projects_;
+  const std::unordered_set<const hdk::ir::Project*>& crt_projects_;
 };
 
 // TODO: use more generic InputRenumberVisitor instead.
@@ -86,7 +86,7 @@ class InputSimpleRenumberVisitor : public hdk::ir::ExprRewriter {
 
 class RebindInputsVisitor : public hdk::ir::ExprRewriter {
  public:
-  RebindInputsVisitor(const RelAlgNode* old_input, const RelAlgNode* new_input)
+  RebindInputsVisitor(const hdk::ir::Node* old_input, const hdk::ir::Node* new_input)
       : old_input_(old_input), new_input_(new_input) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
@@ -97,18 +97,21 @@ class RebindInputsVisitor : public hdk::ir::ExprRewriter {
     return ExprRewriter::visitColumnRef(col_ref);
   }
 
-  void visitNode(const RelAlgNode* node) {
-    if (dynamic_cast<const RelAggregate*>(node) || dynamic_cast<const RelSort*>(node)) {
+  void visitNode(const hdk::ir::Node* node) {
+    if (dynamic_cast<const hdk::ir::Aggregate*>(node) ||
+        dynamic_cast<const hdk::ir::Sort*>(node)) {
       return;
     }
-    if (auto join = const_cast<RelJoin*>(dynamic_cast<const RelJoin*>(node))) {
+    if (auto join =
+            const_cast<hdk::ir::Join*>(dynamic_cast<const hdk::ir::Join*>(node))) {
       if (join->getCondition()) {
         auto cond = ExprRewriter::visit(join->getCondition());
         join->setCondition(std::move(cond));
       }
       return;
     }
-    if (auto project = const_cast<RelProject*>(dynamic_cast<const RelProject*>(node))) {
+    if (auto project =
+            const_cast<hdk::ir::Project*>(dynamic_cast<const hdk::ir::Project*>(node))) {
       hdk::ir::ExprPtrVector new_exprs;
       for (auto& expr : project->getExprs()) {
         new_exprs.push_back(ExprRewriter::visit(expr.get()));
@@ -116,7 +119,8 @@ class RebindInputsVisitor : public hdk::ir::ExprRewriter {
       project->setExpressions(std::move(new_exprs));
       return;
     }
-    if (auto filter = const_cast<RelFilter*>(dynamic_cast<const RelFilter*>(node))) {
+    if (auto filter =
+            const_cast<hdk::ir::Filter*>(dynamic_cast<const hdk::ir::Filter*>(node))) {
       auto cond = ExprRewriter::visit(filter->getConditionExpr());
       filter->setCondition(std::move(cond));
       return;
@@ -125,18 +129,18 @@ class RebindInputsVisitor : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const RelAlgNode* old_input_;
-  const RelAlgNode* new_input_;
+  const hdk::ir::Node* old_input_;
+  const hdk::ir::Node* new_input_;
 };
 
 size_t get_actual_source_size(
-    const RelProject* curr_project,
-    const std::unordered_set<const RelProject*>& projects_to_remove) {
+    const hdk::ir::Project* curr_project,
+    const std::unordered_set<const hdk::ir::Project*>& projects_to_remove) {
   auto source = curr_project->getInput(0);
-  while (auto filter = dynamic_cast<const RelFilter*>(source)) {
+  while (auto filter = dynamic_cast<const hdk::ir::Filter*>(source)) {
     source = filter->getInput(0);
   }
-  if (auto src_project = dynamic_cast<const RelProject*>(source)) {
+  if (auto src_project = dynamic_cast<const hdk::ir::Project*>(source)) {
     if (projects_to_remove.count(src_project)) {
       return get_actual_source_size(src_project, projects_to_remove);
     }
@@ -145,16 +149,17 @@ size_t get_actual_source_size(
 }
 
 bool safe_to_redirect(
-    const RelProject* project,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web) {
+    const hdk::ir::Project* project,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web) {
   if (!project->isSimple()) {
     return false;
   }
   auto usrs_it = du_web.find(project);
   CHECK(usrs_it != du_web.end());
   for (auto usr : usrs_it->second) {
-    if (!dynamic_cast<const RelProject*>(usr) && !dynamic_cast<const RelFilter*>(usr)) {
+    if (!dynamic_cast<const hdk::ir::Project*>(usr) &&
+        !dynamic_cast<const hdk::ir::Filter*>(usr)) {
       return false;
     }
   }
@@ -162,11 +167,11 @@ bool safe_to_redirect(
 }
 
 bool is_identical_copy(
-    const RelProject* project,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web,
-    const std::unordered_set<const RelProject*>& projects_to_remove,
-    std::unordered_set<const RelProject*>& permutating_projects) {
+    const hdk::ir::Project* project,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web,
+    const std::unordered_set<const hdk::ir::Project*>& projects_to_remove,
+    std::unordered_set<const hdk::ir::Project*>& permutating_projects) {
   auto source_size = get_actual_source_size(project, projects_to_remove);
   if (project->size() > source_size) {
     return false;
@@ -178,18 +183,18 @@ bool is_identical_copy(
     bool guard_found = false;
     while (usrs_it->second.size() == size_t(1)) {
       auto only_usr = *usrs_it->second.begin();
-      if (dynamic_cast<const RelProject*>(only_usr)) {
+      if (dynamic_cast<const hdk::ir::Project*>(only_usr)) {
         guard_found = true;
         break;
       }
-      if (dynamic_cast<const RelAggregate*>(only_usr) ||
-          dynamic_cast<const RelSort*>(only_usr) ||
-          dynamic_cast<const RelJoin*>(only_usr) ||
-          dynamic_cast<const RelTableFunction*>(only_usr) ||
-          dynamic_cast<const RelLogicalUnion*>(only_usr)) {
+      if (dynamic_cast<const hdk::ir::Aggregate*>(only_usr) ||
+          dynamic_cast<const hdk::ir::Sort*>(only_usr) ||
+          dynamic_cast<const hdk::ir::Join*>(only_usr) ||
+          dynamic_cast<const hdk::ir::TableFunction*>(only_usr) ||
+          dynamic_cast<const hdk::ir::LogicalUnion*>(only_usr)) {
         return false;
       }
-      CHECK(dynamic_cast<const RelFilter*>(only_usr))
+      CHECK(dynamic_cast<const hdk::ir::Filter*>(only_usr))
           << "only_usr: " << only_usr->toString();
       usrs_it = du_web.find(only_usr);
       CHECK(usrs_it != du_web.end());
@@ -223,13 +228,14 @@ bool is_identical_copy(
 }
 
 void propagate_rex_input_renumber(
-    const RelFilter* excluded_root,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web) {
+    const hdk::ir::Filter* excluded_root,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web) {
   CHECK(excluded_root);
-  auto src_project = dynamic_cast<const RelProject*>(excluded_root->getInput(0));
+  auto src_project = dynamic_cast<const hdk::ir::Project*>(excluded_root->getInput(0));
   CHECK(src_project && src_project->isSimple());
-  const auto indirect_join_src = dynamic_cast<const RelJoin*>(src_project->getInput(0));
+  const auto indirect_join_src =
+      dynamic_cast<const hdk::ir::Join*>(src_project->getInput(0));
   std::unordered_map<size_t, size_t> old_to_new_idx;
   for (size_t i = 0; i < src_project->size(); ++i) {
     auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(src_project->getExpr(i).get());
@@ -246,12 +252,13 @@ void propagate_rex_input_renumber(
   InputSimpleRenumberVisitor<false> visitor(old_to_new_idx);
   auto usrs_it = du_web.find(excluded_root);
   CHECK(usrs_it != du_web.end());
-  std::vector<const RelAlgNode*> work_set(usrs_it->second.begin(), usrs_it->second.end());
+  std::vector<const hdk::ir::Node*> work_set(usrs_it->second.begin(),
+                                             usrs_it->second.end());
   while (!work_set.empty()) {
     auto node = work_set.back();
     work_set.pop_back();
-    auto modified_node = const_cast<RelAlgNode*>(node);
-    if (auto filter = dynamic_cast<RelFilter*>(modified_node)) {
+    auto modified_node = const_cast<hdk::ir::Node*>(node);
+    if (auto filter = dynamic_cast<hdk::ir::Filter*>(modified_node)) {
       auto new_condition_expr = visitor.visit(filter->getConditionExpr());
       filter->setCondition(std::move(new_condition_expr));
       auto usrs_it = du_web.find(filter);
@@ -259,7 +266,7 @@ void propagate_rex_input_renumber(
       work_set.push_back(*usrs_it->second.begin());
       continue;
     }
-    if (auto project = dynamic_cast<RelProject*>(modified_node)) {
+    if (auto project = dynamic_cast<hdk::ir::Project*>(modified_node)) {
       hdk::ir::ExprPtrVector new_exprs;
       for (size_t i = 0; i < project->size(); ++i) {
         new_exprs.push_back(visitor.visit(project->getExpr(i).get()));
@@ -273,18 +280,18 @@ void propagate_rex_input_renumber(
 
 // This function appears to redirect/remove redundant Projection input nodes(?)
 void redirect_inputs_of(
-    std::shared_ptr<RelAlgNode> node,
-    const std::unordered_set<const RelProject*>& projects,
-    const std::unordered_set<const RelProject*>& permutating_projects,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web) {
-  if (dynamic_cast<RelLogicalUnion*>(node.get())) {
+    std::shared_ptr<hdk::ir::Node> node,
+    const std::unordered_set<const hdk::ir::Project*>& projects,
+    const std::unordered_set<const hdk::ir::Project*>& permutating_projects,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web) {
+  if (dynamic_cast<hdk::ir::LogicalUnion*>(node.get())) {
     return;  // UNION keeps all Projection inputs.
   }
-  std::shared_ptr<const RelProject> src_project = nullptr;
+  std::shared_ptr<const hdk::ir::Project> src_project = nullptr;
   for (size_t i = 0; i < node->inputCount(); ++i) {
     if (auto project =
-            std::dynamic_pointer_cast<const RelProject>(node->getAndOwnInput(i))) {
+            std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(i))) {
       if (projects.count(project.get())) {
         src_project = project;
         break;
@@ -294,11 +301,11 @@ void redirect_inputs_of(
   if (!src_project) {
     return;
   }
-  if (auto join = std::dynamic_pointer_cast<RelJoin>(node)) {
+  if (auto join = std::dynamic_pointer_cast<hdk::ir::Join>(node)) {
     auto other_project =
         src_project == node->getAndOwnInput(0)
-            ? std::dynamic_pointer_cast<const RelProject>(node->getAndOwnInput(1))
-            : std::dynamic_pointer_cast<const RelProject>(node->getAndOwnInput(0));
+            ? std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(1))
+            : std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(0));
     join->replaceInput(src_project, src_project->getAndOwnInput(0));
     RebindInputsVisitor rebinder(src_project.get(), src_project->getInput(0));
     auto usrs_it = du_web.find(join.get());
@@ -316,8 +323,8 @@ void redirect_inputs_of(
     }
     return;
   }
-  if (auto project = std::dynamic_pointer_cast<RelProject>(node)) {
-    project->RelAlgNode::replaceInput(src_project, src_project->getAndOwnInput(0));
+  if (auto project = std::dynamic_pointer_cast<hdk::ir::Project>(node)) {
+    project->hdk::ir::Node::replaceInput(src_project, src_project->getAndOwnInput(0));
     ProjectInputRedirector visitor(projects);
     hdk::ir::ExprPtrVector new_exprs;
     for (auto& expr : project->getExprs()) {
@@ -326,13 +333,14 @@ void redirect_inputs_of(
     project->setExpressions(std::move(new_exprs));
     return;
   }
-  if (auto filter = std::dynamic_pointer_cast<RelFilter>(node)) {
+  if (auto filter = std::dynamic_pointer_cast<hdk::ir::Filter>(node)) {
     const bool is_permutating_proj = permutating_projects.count(src_project.get());
-    if (is_permutating_proj || dynamic_cast<const RelJoin*>(src_project->getInput(0))) {
+    if (is_permutating_proj ||
+        dynamic_cast<const hdk::ir::Join*>(src_project->getInput(0))) {
       if (is_permutating_proj) {
         propagate_rex_input_renumber(filter.get(), du_web);
       }
-      filter->RelAlgNode::replaceInput(src_project, src_project->getAndOwnInput(0));
+      filter->hdk::ir::Node::replaceInput(src_project, src_project->getAndOwnInput(0));
       ProjectInputRedirector visitor(projects);
       auto new_condition_expr = visitor.visit(filter->getConditionExpr());
       filter->setCondition(new_condition_expr);
@@ -341,23 +349,23 @@ void redirect_inputs_of(
     }
     return;
   }
-  if (std::dynamic_pointer_cast<RelSort>(node)) {
+  if (std::dynamic_pointer_cast<hdk::ir::Sort>(node)) {
     auto const src_project_input = src_project->getInput(0);
-    if (dynamic_cast<const RelScan*>(src_project_input) ||
-        dynamic_cast<const RelLogicalValues*>(src_project_input) ||
-        dynamic_cast<const RelLogicalUnion*>(src_project_input)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(src_project_input) ||
+        dynamic_cast<const hdk::ir::LogicalValues*>(src_project_input) ||
+        dynamic_cast<const hdk::ir::LogicalUnion*>(src_project_input)) {
       return;
     }
   }
-  if (std::dynamic_pointer_cast<RelTableFunction>(node)) {
+  if (std::dynamic_pointer_cast<hdk::ir::TableFunction>(node)) {
     return;
   }
-  CHECK(std::dynamic_pointer_cast<RelAggregate>(node) ||
-        std::dynamic_pointer_cast<RelSort>(node));
+  CHECK(std::dynamic_pointer_cast<hdk::ir::Aggregate>(node) ||
+        std::dynamic_pointer_cast<hdk::ir::Sort>(node));
   node->replaceInput(src_project, src_project->getAndOwnInput(0));
 }
 
-void cleanup_dead_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes) {
+void cleanup_dead_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
   for (auto nodeIt = nodes.rbegin(); nodeIt != nodes.rend(); ++nodeIt) {
     if (nodeIt->use_count() == 1) {
       VLOG(1) << "Node (ID: " << (*nodeIt)->getId() << ") deleted.";
@@ -371,7 +379,7 @@ void cleanup_dead_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes) {
     }
   }
 
-  std::vector<std::shared_ptr<RelAlgNode>> new_nodes;
+  std::vector<std::shared_ptr<hdk::ir::Node>> new_nodes;
   for (auto node : nodes) {
     if (!node) {
       continue;
@@ -381,24 +389,26 @@ void cleanup_dead_nodes(std::vector<std::shared_ptr<RelAlgNode>>& nodes) {
   nodes.swap(new_nodes);
 }
 
-std::unordered_set<const RelProject*> get_visible_projects(const RelAlgNode* root) {
-  if (auto project = dynamic_cast<const RelProject*>(root)) {
+std::unordered_set<const hdk::ir::Project*> get_visible_projects(
+    const hdk::ir::Node* root) {
+  if (auto project = dynamic_cast<const hdk::ir::Project*>(root)) {
     return {project};
   }
 
-  if (dynamic_cast<const RelAggregate*>(root) || dynamic_cast<const RelScan*>(root) ||
-      dynamic_cast<const RelLogicalValues*>(root)) {
-    return std::unordered_set<const RelProject*>{};
+  if (dynamic_cast<const hdk::ir::Aggregate*>(root) ||
+      dynamic_cast<const hdk::ir::Scan*>(root) ||
+      dynamic_cast<const hdk::ir::LogicalValues*>(root)) {
+    return std::unordered_set<const hdk::ir::Project*>{};
   }
 
-  if (auto join = dynamic_cast<const RelJoin*>(root)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(root)) {
     auto lhs_projs = get_visible_projects(join->getInput(0));
     auto rhs_projs = get_visible_projects(join->getInput(1));
     lhs_projs.insert(rhs_projs.begin(), rhs_projs.end());
     return lhs_projs;
   }
 
-  if (auto logical_union = dynamic_cast<const RelLogicalUnion*>(root)) {
+  if (auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(root)) {
     auto projections = get_visible_projects(logical_union->getInput(0));
     for (size_t i = 1; i < logical_union->inputCount(); ++i) {
       auto next = get_visible_projects(logical_union->getInput(i));
@@ -407,18 +417,20 @@ std::unordered_set<const RelProject*> get_visible_projects(const RelAlgNode* roo
     return projections;
   }
 
-  CHECK(dynamic_cast<const RelFilter*>(root) || dynamic_cast<const RelSort*>(root))
+  CHECK(dynamic_cast<const hdk::ir::Filter*>(root) ||
+        dynamic_cast<const hdk::ir::Sort*>(root))
       << "root = " << root->toString();
   return get_visible_projects(root->getInput(0));
 }
 
 // TODO(miyu): checking this at runtime is more accurate
-bool is_distinct(const size_t input_idx, const RelAlgNode* node) {
-  if (dynamic_cast<const RelFilter*>(node) || dynamic_cast<const RelSort*>(node)) {
+bool is_distinct(const size_t input_idx, const hdk::ir::Node* node) {
+  if (dynamic_cast<const hdk::ir::Filter*>(node) ||
+      dynamic_cast<const hdk::ir::Sort*>(node)) {
     CHECK_EQ(size_t(1), node->inputCount());
     return is_distinct(input_idx, node->getInput(0));
   }
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
+  if (auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
     CHECK_EQ(size_t(1), node->inputCount());
     if (aggregate->getGroupByCount() == 1 && !input_idx) {
       return true;
@@ -428,7 +440,7 @@ bool is_distinct(const size_t input_idx, const RelAlgNode* node) {
     }
     return false;
   }
-  if (auto project = dynamic_cast<const RelProject*>(node)) {
+  if (auto project = dynamic_cast<const hdk::ir::Project*>(node)) {
     CHECK_LT(input_idx, project->size());
     if (auto input =
             dynamic_cast<const hdk::ir::ColumnRef*>(project->getExpr(input_idx).get())) {
@@ -437,19 +449,20 @@ bool is_distinct(const size_t input_idx, const RelAlgNode* node) {
     }
     return false;
   }
-  CHECK(dynamic_cast<const RelJoin*>(node) || dynamic_cast<const RelScan*>(node));
+  CHECK(dynamic_cast<const hdk::ir::Join*>(node) ||
+        dynamic_cast<const hdk::ir::Scan*>(node));
   return false;
 }
 
 }  // namespace
 
-std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>> build_du_web(
-    const std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
-  std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>> web;
-  std::unordered_set<const RelAlgNode*> visited;
-  std::vector<const RelAlgNode*> work_set;
+std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>>
+build_du_web(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
+  std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>> web;
+  std::unordered_set<const hdk::ir::Node*> visited;
+  std::vector<const hdk::ir::Node*> work_set;
   for (auto node : nodes) {
-    if (std::dynamic_pointer_cast<RelScan>(node) || visited.count(node.get())) {
+    if (std::dynamic_pointer_cast<hdk::ir::Scan>(node) || visited.count(node.get())) {
       continue;
     }
     work_set.push_back(node.get());
@@ -461,25 +474,25 @@ std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>> bui
       }
       CHECK(!web.count(walker));
       auto it_ok =
-          web.insert(std::make_pair(walker, std::unordered_set<const RelAlgNode*>{}));
+          web.insert(std::make_pair(walker, std::unordered_set<const hdk::ir::Node*>{}));
       CHECK(it_ok.second);
       visited.insert(walker);
-      CHECK(dynamic_cast<const RelJoin*>(walker) ||
-            dynamic_cast<const RelProject*>(walker) ||
-            dynamic_cast<const RelAggregate*>(walker) ||
-            dynamic_cast<const RelFilter*>(walker) ||
-            dynamic_cast<const RelSort*>(walker) ||
-            dynamic_cast<const RelLeftDeepInnerJoin*>(walker) ||
-            dynamic_cast<const RelLogicalValues*>(walker) ||
-            dynamic_cast<const RelTableFunction*>(walker) ||
-            dynamic_cast<const RelLogicalUnion*>(walker));
+      CHECK(dynamic_cast<const hdk::ir::Join*>(walker) ||
+            dynamic_cast<const hdk::ir::Project*>(walker) ||
+            dynamic_cast<const hdk::ir::Aggregate*>(walker) ||
+            dynamic_cast<const hdk::ir::Filter*>(walker) ||
+            dynamic_cast<const hdk::ir::Sort*>(walker) ||
+            dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(walker) ||
+            dynamic_cast<const hdk::ir::LogicalValues*>(walker) ||
+            dynamic_cast<const hdk::ir::TableFunction*>(walker) ||
+            dynamic_cast<const hdk::ir::LogicalUnion*>(walker));
       for (size_t i = 0; i < walker->inputCount(); ++i) {
         auto src = walker->getInput(i);
-        if (dynamic_cast<const RelScan*>(src)) {
+        if (dynamic_cast<const hdk::ir::Scan*>(src)) {
           continue;
         }
         if (web.empty() || !web.count(src)) {
-          web.insert(std::make_pair(src, std::unordered_set<const RelAlgNode*>{}));
+          web.insert(std::make_pair(src, std::unordered_set<const hdk::ir::Node*>{}));
         }
         web[src].insert(walker);
         work_set.push_back(src);
@@ -497,13 +510,14 @@ std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>> bui
  * required to ensure the first sort runs to completion prior to the second sort. Back to
  * back sort nodes are not executable and will throw an error.
  */
-bool project_separates_sort(const RelProject* project, const RelAlgNode* next_node) {
+bool project_separates_sort(const hdk::ir::Project* project,
+                            const hdk::ir::Node* next_node) {
   CHECK(project);
   if (!next_node) {
     return false;
   }
 
-  auto sort = dynamic_cast<const RelSort*>(next_node);
+  auto sort = dynamic_cast<const hdk::ir::Sort*>(next_node);
   if (!sort) {
     return false;
   }
@@ -511,7 +525,7 @@ bool project_separates_sort(const RelProject* project, const RelAlgNode* next_no
     return false;
   }
 
-  if (dynamic_cast<const RelSort*>(project->getInput(0))) {
+  if (dynamic_cast<const hdk::ir::Sort*>(project->getInput(0))) {
     return true;
   }
   return false;
@@ -520,17 +534,18 @@ bool project_separates_sort(const RelProject* project, const RelAlgNode* next_no
 // For now, the only target to eliminate is restricted to project-aggregate pair between
 // scan/sort and join
 // TODO(miyu): allow more chance if proved safe
-void eliminate_identical_copy(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
-  std::unordered_set<std::shared_ptr<const RelAlgNode>> copies;
+void eliminate_identical_copy(
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
+  std::unordered_set<std::shared_ptr<const hdk::ir::Node>> copies;
   auto sink = nodes.back();
   for (auto node : nodes) {
-    auto aggregate = std::dynamic_pointer_cast<const RelAggregate>(node);
+    auto aggregate = std::dynamic_pointer_cast<const hdk::ir::Aggregate>(node);
     if (!aggregate || aggregate == sink ||
         !(aggregate->getGroupByCount() == 1 && aggregate->getAggsCount() == 0)) {
       continue;
     }
     auto project =
-        std::dynamic_pointer_cast<const RelProject>(aggregate->getAndOwnInput(0));
+        std::dynamic_pointer_cast<const hdk::ir::Project>(aggregate->getAndOwnInput(0));
     if (project && project->size() == aggregate->size() &&
         project->getFields() == aggregate->getFields()) {
       CHECK_EQ(size_t(0), copies.count(aggregate));
@@ -545,21 +560,21 @@ void eliminate_identical_copy(std::vector<std::shared_ptr<RelAlgNode>>& nodes) n
     if (!copies.count(last_source)) {
       continue;
     }
-    auto aggregate = std::dynamic_pointer_cast<const RelAggregate>(last_source);
+    auto aggregate = std::dynamic_pointer_cast<const hdk::ir::Aggregate>(last_source);
     CHECK(aggregate);
-    if (!std::dynamic_pointer_cast<const RelJoin>(node) || aggregate->size() != 1) {
+    if (!std::dynamic_pointer_cast<const hdk::ir::Join>(node) || aggregate->size() != 1) {
       continue;
     }
     auto project =
-        std::dynamic_pointer_cast<const RelProject>(aggregate->getAndOwnInput(0));
+        std::dynamic_pointer_cast<const hdk::ir::Project>(aggregate->getAndOwnInput(0));
     CHECK(project);
     CHECK_EQ(size_t(1), project->size());
     if (!is_distinct(size_t(0), project.get())) {
       continue;
     }
     auto new_source = project->getAndOwnInput(0);
-    if (std::dynamic_pointer_cast<const RelSort>(new_source) ||
-        std::dynamic_pointer_cast<const RelScan>(new_source)) {
+    if (std::dynamic_pointer_cast<const hdk::ir::Sort>(new_source) ||
+        std::dynamic_pointer_cast<const hdk::ir::Scan>(new_source)) {
       node->replaceInput(last_source, new_source);
     }
   }
@@ -567,12 +582,12 @@ void eliminate_identical_copy(std::vector<std::shared_ptr<RelAlgNode>>& nodes) n
 
   auto web = build_du_web(nodes);
 
-  std::unordered_set<const RelProject*> projects;
-  std::unordered_set<const RelProject*> permutating_projects;
+  std::unordered_set<const hdk::ir::Project*> projects;
+  std::unordered_set<const hdk::ir::Project*> permutating_projects;
   auto const visible_projs = get_visible_projects(nodes.back().get());
   for (auto node_it = nodes.begin(); node_it != nodes.end(); node_it++) {
     auto node = *node_it;
-    auto project = std::dynamic_pointer_cast<RelProject>(node);
+    auto project = std::dynamic_pointer_cast<hdk::ir::Project>(node);
     auto next_node_it = std::next(node_it);
     if (project && project->isSimple() &&
         (!visible_projs.count(project.get()) || !project->isRenaming()) &&
@@ -592,20 +607,21 @@ void eliminate_identical_copy(std::vector<std::shared_ptr<RelAlgNode>>& nodes) n
 
 namespace {
 
-using InputSet = std::unordered_set<std::pair<const RelAlgNode*, unsigned>,
-                                    boost::hash<std::pair<const RelAlgNode*, unsigned>>>;
+using InputSet =
+    std::unordered_set<std::pair<const hdk::ir::Node*, unsigned>,
+                       boost::hash<std::pair<const hdk::ir::Node*, unsigned>>>;
 
 class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  private:
-  const RelAlgNode* node_;
+  const hdk::ir::Node* node_;
 
  public:
-  InputCollector(const RelAlgNode* node) : node_(node) {}
+  InputCollector(const hdk::ir::Node* node) : node_(node) {}
 
   void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     if (node_->inputCount() == 1) {
       auto src = node_->getInput(0);
-      if (auto join = dynamic_cast<const RelJoin*>(src)) {
+      if (auto join = dynamic_cast<const hdk::ir::Join*>(src)) {
         CHECK_EQ(join->inputCount(), size_t(2));
         const auto src2_in_offset = join->getInput(0)->size();
         if (col_ref->node() == join->getInput(1)) {
@@ -620,15 +636,15 @@ class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
   }
 };
 
-size_t pick_always_live_col_idx(const RelAlgNode* node) {
+size_t pick_always_live_col_idx(const hdk::ir::Node* node) {
   CHECK(node->size());
-  if (auto filter = dynamic_cast<const RelFilter*>(node)) {
+  if (auto filter = dynamic_cast<const hdk::ir::Filter*>(node)) {
     auto rex_ins = InputCollector::collect(filter->getConditionExpr(), node);
     if (!rex_ins.empty()) {
       return static_cast<size_t>(rex_ins.begin()->second);
     }
     return pick_always_live_col_idx(filter->getInput(0));
-  } else if (auto join = dynamic_cast<const RelJoin*>(node)) {
+  } else if (auto join = dynamic_cast<const hdk::ir::Join*>(node)) {
     auto inputs = InputCollector::collect(join->getCondition(), node);
     if (!inputs.empty()) {
       return static_cast<size_t>(inputs.begin()->second);
@@ -639,7 +655,7 @@ size_t pick_always_live_col_idx(const RelAlgNode* node) {
     if (auto rhs_idx = pick_always_live_col_idx(join->getInput(0))) {
       return rhs_idx + join->getInput(0)->size();
     }
-  } else if (auto sort = dynamic_cast<const RelSort*>(node)) {
+  } else if (auto sort = dynamic_cast<const hdk::ir::Sort*>(node)) {
     if (sort->collationCount()) {
       return sort->getCollation(0).getField();
     }
@@ -649,15 +665,16 @@ size_t pick_always_live_col_idx(const RelAlgNode* node) {
 }
 
 std::vector<std::unordered_set<size_t>> get_live_ins(
-    const RelAlgNode* node,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>>& live_outs) {
-  if (!node || dynamic_cast<const RelScan*>(node)) {
+    const hdk::ir::Node* node,
+    const std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>>&
+        live_outs) {
+  if (!node || dynamic_cast<const hdk::ir::Scan*>(node)) {
     return {};
   }
   auto it = live_outs.find(node);
   CHECK(it != live_outs.end());
   auto live_out = it->second;
-  if (auto project = dynamic_cast<const RelProject*>(node)) {
+  if (auto project = dynamic_cast<const hdk::ir::Project*>(node)) {
     CHECK_EQ(size_t(1), project->inputCount());
     std::unordered_set<size_t> live_in;
     for (const auto& idx : live_out) {
@@ -674,7 +691,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {live_in};
   }
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
+  if (auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
     CHECK_EQ(size_t(1), aggregate->inputCount());
     const auto group_key_count = static_cast<size_t>(aggregate->getGroupByCount());
     const auto agg_expr_count = static_cast<size_t>(aggregate->getAggsCount());
@@ -708,7 +725,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {live_in};
   }
-  if (auto join = dynamic_cast<const RelJoin*>(node)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(node)) {
     std::unordered_set<size_t> lhs_live_ins;
     std::unordered_set<size_t> rhs_live_ins;
     CHECK_EQ(size_t(2), join->inputCount());
@@ -737,7 +754,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {lhs_live_ins, rhs_live_ins};
   }
-  if (auto sort = dynamic_cast<const RelSort*>(node)) {
+  if (auto sort = dynamic_cast<const hdk::ir::Sort*>(node)) {
     CHECK_EQ(size_t(1), sort->inputCount());
     std::unordered_set<size_t> live_in(live_out.begin(), live_out.end());
     for (size_t i = 0; i < sort->collationCount(); ++i) {
@@ -745,7 +762,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {live_in};
   }
-  if (auto filter = dynamic_cast<const RelFilter*>(node)) {
+  if (auto filter = dynamic_cast<const hdk::ir::Filter*>(node)) {
     CHECK_EQ(size_t(1), filter->inputCount());
     std::unordered_set<size_t> live_in(live_out.begin(), live_out.end());
     auto rex_ins = InputCollector::collect(filter->getConditionExpr(), node);
@@ -754,7 +771,7 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {live_in};
   }
-  if (auto table_func = dynamic_cast<const RelTableFunction*>(node)) {
+  if (auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(node)) {
     const auto input_count = table_func->size();
     std::unordered_set<size_t> live_in;
     for (size_t i = 0; i < input_count; i++) {
@@ -769,16 +786,16 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
 
     return result;
   }
-  if (auto logical_union = dynamic_cast<const RelLogicalUnion*>(node)) {
+  if (auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(node)) {
     return std::vector<std::unordered_set<size_t>>(logical_union->inputCount(), live_out);
   }
   return {};
 }
 
-bool any_dead_col_in(const RelAlgNode* node,
+bool any_dead_col_in(const hdk::ir::Node* node,
                      const std::unordered_set<size_t>& live_outs) {
-  CHECK(!dynamic_cast<const RelScan*>(node));
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
+  CHECK(!dynamic_cast<const hdk::ir::Scan*>(node));
+  if (auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
     for (size_t i = aggregate->getGroupByCount(); i < aggregate->size(); ++i) {
       if (!live_outs.count(i)) {
         return true;
@@ -790,23 +807,24 @@ bool any_dead_col_in(const RelAlgNode* node,
   return node->size() > live_outs.size();
 }
 
-bool does_redef_cols(const RelAlgNode* node) {
-  return dynamic_cast<const RelAggregate*>(node) || dynamic_cast<const RelProject*>(node);
+bool does_redef_cols(const hdk::ir::Node* node) {
+  return dynamic_cast<const hdk::ir::Aggregate*>(node) ||
+         dynamic_cast<const hdk::ir::Project*>(node);
 }
 
 class AvailabilityChecker {
  public:
   AvailabilityChecker(
-      const std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+      const std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
           liveouts,
-      const std::unordered_set<const RelAlgNode*>& intact_nodes)
+      const std::unordered_set<const hdk::ir::Node*>& intact_nodes)
       : liveouts_(liveouts), intact_nodes_(intact_nodes) {}
 
-  bool hasAllSrcReady(const RelAlgNode* node) const {
+  bool hasAllSrcReady(const hdk::ir::Node* node) const {
     for (size_t i = 0; i < node->inputCount(); ++i) {
       auto src = node->getInput(i);
-      if (!dynamic_cast<const RelScan*>(src) && liveouts_.find(src) == liveouts_.end() &&
-          !intact_nodes_.count(src)) {
+      if (!dynamic_cast<const hdk::ir::Scan*>(src) &&
+          liveouts_.find(src) == liveouts_.end() && !intact_nodes_.count(src)) {
         return false;
       }
     }
@@ -814,20 +832,20 @@ class AvailabilityChecker {
   }
 
  private:
-  const std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+  const std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
       liveouts_;
-  const std::unordered_set<const RelAlgNode*>& intact_nodes_;
+  const std::unordered_set<const hdk::ir::Node*>& intact_nodes_;
 };
 
 void add_new_indices_for(
-    const RelAlgNode* node,
-    std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+    const hdk::ir::Node* node,
+    std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
         new_liveouts,
     const std::unordered_set<size_t>& old_liveouts,
-    const std::unordered_set<const RelAlgNode*>& intact_nodes,
-    const std::unordered_map<const RelAlgNode*, size_t>& orig_node_sizes) {
+    const std::unordered_set<const hdk::ir::Node*>& intact_nodes,
+    const std::unordered_map<const hdk::ir::Node*, size_t>& orig_node_sizes) {
   auto live_fields = old_liveouts;
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
+  if (auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
     for (size_t i = 0; i < aggregate->getGroupByCount(); ++i) {
       live_fields.insert(i);
     }
@@ -867,7 +885,7 @@ void add_new_indices_for(
         new_indices.insert(std::make_pair(old_base + m.first, new_base + m.second));
       }
       new_base += src_renum_it->second.size();
-    } else if (dynamic_cast<const RelScan*>(src) || intact_nodes.count(src)) {
+    } else if (dynamic_cast<const hdk::ir::Scan*>(src) || intact_nodes.count(src)) {
       for (size_t i = 0; i < src->size(); ++i) {
         new_indices.insert(std::make_pair(old_base + i, new_base + i));
       }
@@ -884,7 +902,7 @@ void add_new_indices_for(
 class InputRenumberVisitor : public hdk::ir::ExprRewriter {
  public:
   InputRenumberVisitor(
-      const std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+      const std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
           new_numbering)
       : node_to_input_renum_(new_numbering) {}
 
@@ -901,28 +919,30 @@ class InputRenumberVisitor : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+  const std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
       node_to_input_renum_;
 };
 
-SortField renumber_sort_field(const SortField& old_field,
-                              const std::unordered_map<size_t, size_t>& new_numbering) {
+hdk::ir::SortField renumber_sort_field(
+    const hdk::ir::SortField& old_field,
+    const std::unordered_map<size_t, size_t>& new_numbering) {
   auto field_idx = old_field.getField();
   auto idx_it = new_numbering.find(field_idx);
   if (idx_it != new_numbering.end()) {
     field_idx = idx_it->second;
   }
-  return SortField(field_idx, old_field.getSortDir(), old_field.getNullsPosition());
+  return hdk::ir::SortField(
+      field_idx, old_field.getSortDir(), old_field.getNullsPosition());
 }
 
-std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>> mark_live_columns(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes) {
-  std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>> live_outs;
-  std::vector<const RelAlgNode*> work_set;
+std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>> mark_live_columns(
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
+  std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>> live_outs;
+  std::vector<const hdk::ir::Node*> work_set;
   for (auto node_it = nodes.rbegin(); node_it != nodes.rend(); ++node_it) {
     auto node = node_it->get();
-    if (dynamic_cast<const RelScan*>(node) || live_outs.count(node) ||
-        dynamic_cast<const RelTableFunction*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node) || live_outs.count(node) ||
+        dynamic_cast<const hdk::ir::TableFunction*>(node)) {
       continue;
     }
     std::vector<size_t> all_live(node->size());
@@ -934,14 +954,14 @@ std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>> mark_live_colu
     while (!work_set.empty()) {
       auto walker = work_set.back();
       work_set.pop_back();
-      CHECK(!dynamic_cast<const RelScan*>(walker));
+      CHECK(!dynamic_cast<const hdk::ir::Scan*>(walker));
       CHECK(live_outs.count(walker));
       auto live_ins = get_live_ins(walker, live_outs);
       CHECK_EQ(live_ins.size(), walker->inputCount());
       for (size_t i = 0; i < walker->inputCount(); ++i) {
         auto src = walker->getInput(i);
-        if (dynamic_cast<const RelScan*>(src) ||
-            dynamic_cast<const RelTableFunction*>(src) || live_ins[i].empty()) {
+        if (dynamic_cast<const hdk::ir::Scan*>(src) ||
+            dynamic_cast<const hdk::ir::TableFunction*>(src) || live_ins[i].empty()) {
           continue;
         }
         if (!live_outs.count(src)) {
@@ -968,38 +988,39 @@ std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>> mark_live_colu
   return live_outs;
 }
 
-std::string get_field_name(const RelAlgNode* node, size_t index) {
+std::string get_field_name(const hdk::ir::Node* node, size_t index) {
   CHECK_LT(index, node->size());
-  if (auto scan = dynamic_cast<const RelScan*>(node)) {
+  if (auto scan = dynamic_cast<const hdk::ir::Scan*>(node)) {
     return scan->getFieldName(index);
   }
-  if (auto aggregate = dynamic_cast<const RelAggregate*>(node)) {
+  if (auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
     CHECK_EQ(aggregate->size(), aggregate->getFields().size());
     return aggregate->getFieldName(index);
   }
-  if (auto join = dynamic_cast<const RelJoin*>(node)) {
+  if (auto join = dynamic_cast<const hdk::ir::Join*>(node)) {
     const auto lhs_size = join->getInput(0)->size();
     if (index < lhs_size) {
       return get_field_name(join->getInput(0), index);
     }
     return get_field_name(join->getInput(1), index - lhs_size);
   }
-  if (auto project = dynamic_cast<const RelProject*>(node)) {
+  if (auto project = dynamic_cast<const hdk::ir::Project*>(node)) {
     return project->getFieldName(index);
   }
-  CHECK(dynamic_cast<const RelSort*>(node) || dynamic_cast<const RelFilter*>(node));
+  CHECK(dynamic_cast<const hdk::ir::Sort*>(node) ||
+        dynamic_cast<const hdk::ir::Filter*>(node));
   return get_field_name(node->getInput(0), index);
 }
 
 void try_insert_coalesceable_proj(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes,
-    std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>>& liveouts,
-    std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
+    std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>>& liveouts,
+    std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>>&
         du_web) {
-  std::vector<std::shared_ptr<RelAlgNode>> new_nodes;
+  std::vector<std::shared_ptr<hdk::ir::Node>> new_nodes;
   for (auto node : nodes) {
     new_nodes.push_back(node);
-    if (!std::dynamic_pointer_cast<RelFilter>(node)) {
+    if (!std::dynamic_pointer_cast<hdk::ir::Filter>(node)) {
       continue;
     }
     const auto filter = node.get();
@@ -1015,7 +1036,7 @@ void try_insert_coalesceable_proj(
     if (usrs.size() != 1 || does_redef_cols(*usrs.begin())) {
       continue;
     }
-    auto only_usr = const_cast<RelAlgNode*>(*usrs.begin());
+    auto only_usr = const_cast<hdk::ir::Node*>(*usrs.begin());
 
     hdk::ir::ExprPtrVector exprs;
     std::vector<std::string> fields;
@@ -1024,11 +1045,12 @@ void try_insert_coalesceable_proj(
           getColumnType(filter, i), filter, static_cast<unsigned>(i)));
       fields.push_back(get_field_name(filter, i));
     }
-    auto project_owner = std::make_shared<RelProject>(std::move(exprs), fields, node);
+    auto project_owner =
+        std::make_shared<hdk::ir::Project>(std::move(exprs), fields, node);
     auto project = project_owner.get();
 
     only_usr->replaceInput(node, project_owner);
-    if (dynamic_cast<const RelJoin*>(only_usr)) {
+    if (dynamic_cast<const hdk::ir::Join*>(only_usr)) {
       RebindInputsVisitor visitor(filter, project);
       for (auto usr : du_web[only_usr]) {
         visitor.visitNode(usr);
@@ -1040,7 +1062,7 @@ void try_insert_coalesceable_proj(
     usrs.clear();
     usrs.insert(project);
     du_web.insert(
-        std::make_pair(project, std::unordered_set<const RelAlgNode*>{only_usr}));
+        std::make_pair(project, std::unordered_set<const hdk::ir::Node*>{only_usr}));
 
     new_nodes.push_back(project_owner);
   }
@@ -1049,18 +1071,18 @@ void try_insert_coalesceable_proj(
   }
 }
 
-std::pair<std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>,
-          std::vector<const RelAlgNode*>>
+std::pair<std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>,
+          std::vector<const hdk::ir::Node*>>
 sweep_dead_columns(
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>>& live_outs,
-    const std::vector<std::shared_ptr<RelAlgNode>>& nodes,
-    const std::unordered_set<const RelAlgNode*>& intact_nodes,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web,
-    const std::unordered_map<const RelAlgNode*, size_t>& orig_node_sizes) {
-  std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>
+    const std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>>& live_outs,
+    const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
+    const std::unordered_set<const hdk::ir::Node*>& intact_nodes,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web,
+    const std::unordered_map<const hdk::ir::Node*, size_t>& orig_node_sizes) {
+  std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>
       liveouts_renumbering;
-  std::vector<const RelAlgNode*> ready_nodes;
+  std::vector<const hdk::ir::Node*> ready_nodes;
   AvailabilityChecker checker(liveouts_renumbering, intact_nodes);
   for (auto node : nodes) {
     // Ignore empty live_out due to some invalid node
@@ -1072,7 +1094,7 @@ sweep_dead_columns(
     auto old_live_outs = live_pair->second;
     add_new_indices_for(
         node.get(), liveouts_renumbering, old_live_outs, intact_nodes, orig_node_sizes);
-    if (auto aggregate = std::dynamic_pointer_cast<RelAggregate>(node)) {
+    if (auto aggregate = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node)) {
       hdk::ir::ExprPtrVector new_exprs;
       auto key_name_it = aggregate->getFields().begin();
       std::vector<std::string> new_fields(key_name_it,
@@ -1087,7 +1109,7 @@ sweep_dead_columns(
       }
       aggregate->setAggExprs(std::move(new_exprs));
       aggregate->setFields(std::move(new_fields));
-    } else if (auto project = std::dynamic_pointer_cast<RelProject>(node)) {
+    } else if (auto project = std::dynamic_pointer_cast<hdk::ir::Project>(node)) {
       hdk::ir::ExprPtrVector new_exprs;
       std::vector<std::string> new_fields;
       for (size_t i = 0; i < project->size(); ++i) {
@@ -1113,30 +1135,31 @@ sweep_dead_columns(
 }
 
 void propagate_input_renumbering(
-    std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>&
+    std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>&
         liveout_renumbering,
-    const std::vector<const RelAlgNode*>& ready_nodes,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<size_t>>& old_liveouts,
-    const std::unordered_set<const RelAlgNode*>& intact_nodes,
-    const std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
-        du_web,
-    const std::unordered_map<const RelAlgNode*, size_t>& orig_node_sizes) {
+    const std::vector<const hdk::ir::Node*>& ready_nodes,
+    const std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>>&
+        old_liveouts,
+    const std::unordered_set<const hdk::ir::Node*>& intact_nodes,
+    const std::unordered_map<const hdk::ir::Node*,
+                             std::unordered_set<const hdk::ir::Node*>>& du_web,
+    const std::unordered_map<const hdk::ir::Node*, size_t>& orig_node_sizes) {
   InputRenumberVisitor visitor(liveout_renumbering);
   AvailabilityChecker checker(liveout_renumbering, intact_nodes);
-  std::deque<const RelAlgNode*> work_set(ready_nodes.begin(), ready_nodes.end());
+  std::deque<const hdk::ir::Node*> work_set(ready_nodes.begin(), ready_nodes.end());
   while (!work_set.empty()) {
     auto walker = work_set.front();
     work_set.pop_front();
-    CHECK(!dynamic_cast<const RelScan*>(walker));
-    auto node = const_cast<RelAlgNode*>(walker);
-    if (auto project = dynamic_cast<RelProject*>(node)) {
+    CHECK(!dynamic_cast<const hdk::ir::Scan*>(walker));
+    auto node = const_cast<hdk::ir::Node*>(walker);
+    if (auto project = dynamic_cast<hdk::ir::Project*>(node)) {
       hdk::ir::ExprPtrVector new_exprs;
       new_exprs.reserve(project->size());
       for (auto& expr : project->getExprs()) {
         new_exprs.emplace_back(visitor.visit(expr.get()));
       }
       project->setExpressions(std::move(new_exprs));
-    } else if (auto aggregate = dynamic_cast<RelAggregate*>(node)) {
+    } else if (auto aggregate = dynamic_cast<hdk::ir::Aggregate*>(node)) {
       auto src_it = liveout_renumbering.find(node->getInput(0));
       CHECK(src_it != liveout_renumbering.end());
       InputSimpleRenumberVisitor<true> visitor(src_it->second);
@@ -1146,22 +1169,22 @@ void propagate_input_renumbering(
         new_exprs.emplace_back(visitor.visit(expr.get()));
       }
       aggregate->setAggExprs(std::move(new_exprs));
-    } else if (auto join = dynamic_cast<RelJoin*>(node)) {
+    } else if (auto join = dynamic_cast<hdk::ir::Join*>(node)) {
       auto new_condition = visitor.visit(join->getCondition());
       join->setCondition(std::move(new_condition));
-    } else if (auto filter = dynamic_cast<RelFilter*>(node)) {
+    } else if (auto filter = dynamic_cast<hdk::ir::Filter*>(node)) {
       auto new_condition_expr = visitor.visit(filter->getConditionExpr());
       filter->setCondition(new_condition_expr);
-    } else if (auto sort = dynamic_cast<RelSort*>(node)) {
+    } else if (auto sort = dynamic_cast<hdk::ir::Sort*>(node)) {
       auto src_it = liveout_renumbering.find(node->getInput(0));
       CHECK(src_it != liveout_renumbering.end());
-      std::vector<SortField> new_collations;
+      std::vector<hdk::ir::SortField> new_collations;
       for (size_t i = 0; i < sort->collationCount(); ++i) {
         new_collations.push_back(
             renumber_sort_field(sort->getCollation(i), src_it->second));
       }
       sort->setCollation(std::move(new_collations));
-    } else if (!dynamic_cast<RelLogicalUnion*>(node)) {
+    } else if (!dynamic_cast<hdk::ir::LogicalUnion*>(node)) {
       LOG(FATAL) << "Unhandled node type: " << node->toString();
     }
 
@@ -1186,7 +1209,7 @@ void propagate_input_renumbering(
 
 }  // namespace
 
-void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
+void eliminate_dead_columns(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
   if (nodes.empty()) {
     return;
   }
@@ -1194,10 +1217,11 @@ void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noe
   if (!root) {
     return;
   }
-  CHECK(!dynamic_cast<const RelScan*>(root) && !dynamic_cast<const RelJoin*>(root));
+  CHECK(!dynamic_cast<const hdk::ir::Scan*>(root) &&
+        !dynamic_cast<const hdk::ir::Join*>(root));
   // Mark
   auto old_liveouts = mark_live_columns(nodes);
-  std::unordered_set<const RelAlgNode*> intact_nodes;
+  std::unordered_set<const hdk::ir::Node*> intact_nodes;
   bool has_dead_cols = false;
   for (auto live_pair : old_liveouts) {
     auto node = live_pair.first;
@@ -1226,7 +1250,7 @@ void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noe
     bool intact = true;
     for (size_t i = 0; i < node->inputCount(); ++i) {
       auto source = node->getInput(i);
-      if (!dynamic_cast<const RelScan*>(source) && !intact_nodes.count(source)) {
+      if (!dynamic_cast<const hdk::ir::Scan*>(source) && !intact_nodes.count(source)) {
         intact = false;
         break;
       }
@@ -1236,14 +1260,14 @@ void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noe
     }
   }
 
-  std::unordered_map<const RelAlgNode*, size_t> orig_node_sizes;
+  std::unordered_map<const hdk::ir::Node*, size_t> orig_node_sizes;
   for (auto node : nodes) {
     orig_node_sizes.insert(std::make_pair(node.get(), node->size()));
   }
   // Sweep
-  std::unordered_map<const RelAlgNode*, std::unordered_map<size_t, size_t>>
+  std::unordered_map<const hdk::ir::Node*, std::unordered_map<size_t, size_t>>
       liveout_renumbering;
-  std::vector<const RelAlgNode*> ready_nodes;
+  std::vector<const hdk::ir::Node*> ready_nodes;
   std::tie(liveout_renumbering, ready_nodes) =
       sweep_dead_columns(old_liveouts, nodes, intact_nodes, web, orig_node_sizes);
   // Propagate
@@ -1253,7 +1277,7 @@ void eliminate_dead_columns(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noe
 
 void eliminate_dead_subqueries(
     std::vector<std::shared_ptr<const hdk::ir::ScalarSubquery>>& subqueries,
-    RelAlgNode const* root) {
+    hdk::ir::Node const* root) {
   if (!subqueries.empty()) {
     auto live_subqueries = SubQueryCollector::getLiveSubQueries(root);
     int live_count = 0;
@@ -1271,7 +1295,7 @@ namespace {
 class InputSinker : public hdk::ir::ExprRewriter {
  public:
   InputSinker(const std::unordered_map<size_t, size_t>& old_to_new_idx,
-              const RelAlgNode* new_src)
+              const hdk::ir::Node* new_src)
       : old_to_new_in_idx_(old_to_new_idx), target_(new_src) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
@@ -1285,7 +1309,7 @@ class InputSinker : public hdk::ir::ExprRewriter {
 
  private:
   const std::unordered_map<size_t, size_t>& old_to_new_in_idx_;
-  const RelAlgNode* target_;
+  const hdk::ir::Node* target_;
 };
 
 class ConditionReplacer : public hdk::ir::ExprRewriter {
@@ -1309,14 +1333,14 @@ class ConditionReplacer : public hdk::ir::ExprRewriter {
 }  // namespace
 
 void sink_projected_boolean_expr_to_join(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
   auto web = build_du_web(nodes);
   auto liveouts = mark_live_columns(nodes);
   for (auto node : nodes) {
-    auto project = std::dynamic_pointer_cast<RelProject>(node);
-    // TODO(miyu): relax RelScan limitation
+    auto project = std::dynamic_pointer_cast<hdk::ir::Project>(node);
+    // TODO(miyu): relax hdk::ir::Scan limitation
     if (!project || project->isSimple() ||
-        !dynamic_cast<const RelScan*>(project->getInput(0))) {
+        !dynamic_cast<const hdk::ir::Scan*>(project->getInput(0))) {
       continue;
     }
     auto usrs_it = web.find(project.get());
@@ -1325,7 +1349,7 @@ void sink_projected_boolean_expr_to_join(
     if (usrs.size() != 1) {
       continue;
     }
-    auto join = dynamic_cast<RelJoin*>(const_cast<RelAlgNode*>(*usrs.begin()));
+    auto join = dynamic_cast<hdk::ir::Join*>(const_cast<hdk::ir::Node*>(*usrs.begin()));
     if (!join) {
       continue;
     }
@@ -1409,7 +1433,7 @@ namespace {
 
 class InputRedirector : public hdk::ir::ExprRewriter {
  public:
-  InputRedirector(const RelAlgNode* old_src, const RelAlgNode* new_src)
+  InputRedirector(const hdk::ir::Node* old_src, const hdk::ir::Node* new_src)
       : old_src_(old_src), new_src_(new_src) {
     CHECK_NE(old_src_, new_src_);
   }
@@ -1418,7 +1442,7 @@ class InputRedirector : public hdk::ir::ExprRewriter {
     CHECK_EQ(old_src_, col_ref->node());
     auto idx = col_ref->index();
     auto ti = getColumnType(new_src_, idx);
-    if (auto join = dynamic_cast<const RelJoin*>(new_src_)) {
+    if (auto join = dynamic_cast<const hdk::ir::Join*>(new_src_)) {
       auto lhs_size = join->getInput(0)->size();
       if (idx >= lhs_size) {
         return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
@@ -1432,15 +1456,16 @@ class InputRedirector : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const RelAlgNode* old_src_;
-  const RelAlgNode* new_src_;
+  const hdk::ir::Node* old_src_;
+  const hdk::ir::Node* new_src_;
 };
 
 void replace_all_usages(
-    std::shared_ptr<const RelAlgNode> old_def_node,
-    std::shared_ptr<const RelAlgNode> new_def_node,
-    std::unordered_map<const RelAlgNode*, std::shared_ptr<RelAlgNode>>& deconst_mapping,
-    std::unordered_map<const RelAlgNode*, std::unordered_set<const RelAlgNode*>>&
+    std::shared_ptr<const hdk::ir::Node> old_def_node,
+    std::shared_ptr<const hdk::ir::Node> new_def_node,
+    std::unordered_map<const hdk::ir::Node*, std::shared_ptr<hdk::ir::Node>>&
+        deconst_mapping,
+    std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>>&
         du_web) {
   auto usrs_it = du_web.find(old_def_node.get());
   CHECK(usrs_it != du_web.end());
@@ -1457,8 +1482,9 @@ void replace_all_usages(
 
 }  // namespace
 
-void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
-  std::unordered_map<const RelAlgNode*, std::shared_ptr<RelAlgNode>> deconst_mapping;
+void fold_filters(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
+  std::unordered_map<const hdk::ir::Node*, std::shared_ptr<hdk::ir::Node>>
+      deconst_mapping;
   for (auto node : nodes) {
     deconst_mapping.insert(std::make_pair(node.get(), node));
   }
@@ -1466,9 +1492,9 @@ void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
   auto web = build_du_web(nodes);
   for (auto node_it = nodes.rbegin(); node_it != nodes.rend(); ++node_it) {
     auto& node = *node_it;
-    if (auto filter = std::dynamic_pointer_cast<RelFilter>(node)) {
+    if (auto filter = std::dynamic_pointer_cast<hdk::ir::Filter>(node)) {
       CHECK_EQ(filter->inputCount(), size_t(1));
-      auto src_filter = dynamic_cast<const RelFilter*>(filter->getInput(0));
+      auto src_filter = dynamic_cast<const hdk::ir::Filter*>(filter->getInput(0));
       if (!src_filter) {
         continue;
       }
@@ -1478,7 +1504,7 @@ void fold_filters(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
       }
       auto src_it = deconst_mapping.find(src_filter);
       CHECK(src_it != deconst_mapping.end());
-      auto folded_filter = std::dynamic_pointer_cast<RelFilter>(src_it->second);
+      auto folded_filter = std::dynamic_pointer_cast<hdk::ir::Filter>(src_it->second);
       CHECK(folded_filter);
       InputRedirector visitor(folded_filter.get(), folded_filter->getInput(0));
       hdk::ir::ExprPtr lhs = folded_filter->getConditionExprShared();
@@ -1517,7 +1543,7 @@ namespace {
 
 std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
     const hdk::ir::Expr* condition,
-    const RelAlgNode* source,
+    const hdk::ir::Node* source,
     const size_t first_col_idx,
     const size_t last_col_idx) {
   if (auto bin_op = dynamic_cast<const hdk::ir::BinOper*>(condition)) {
@@ -1569,7 +1595,7 @@ std::vector<const hdk::ir::Expr*> find_hoistable_conditions(
 
 class JoinTargetRebaseVisitor : public hdk::ir::ExprRewriter {
  public:
-  JoinTargetRebaseVisitor(const RelJoin* join, const unsigned old_base)
+  JoinTargetRebaseVisitor(const hdk::ir::Join* join, const unsigned old_base)
       : join_(join), old_base_(old_base), inp0_size_(join->getInput(0)->size()) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
@@ -1585,7 +1611,7 @@ class JoinTargetRebaseVisitor : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const RelJoin* join_;
+  const hdk::ir::Join* join_;
   const unsigned old_base_;
   const size_t inp0_size_;
 };
@@ -1623,15 +1649,15 @@ class SubConditionRemoveVisitor : public hdk::ir::ExprRewriter {
 }  // namespace
 
 void hoist_filter_cond_to_cross_join(
-    std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
-  std::unordered_set<const RelAlgNode*> visited;
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
+  std::unordered_set<const hdk::ir::Node*> visited;
   auto web = build_du_web(nodes);
   for (auto node : nodes) {
     if (visited.count(node.get())) {
       continue;
     }
     visited.insert(node.get());
-    auto join = dynamic_cast<RelJoin*>(node.get());
+    auto join = dynamic_cast<hdk::ir::Join*>(node.get());
     if (join && join->getJoinType() == JoinType::INNER) {
       // Only allow cross join for now.
       if (auto literal = dynamic_cast<const hdk::ir::Constant*>(join->getCondition())) {
@@ -1639,16 +1665,16 @@ void hoist_filter_cond_to_cross_join(
         // cross join.
         CHECK(literal->type()->isBoolean() && literal->intVal());
         size_t first_col_idx = 0;
-        const RelFilter* filter = nullptr;
-        std::vector<const RelJoin*> join_seq{join};
-        for (const RelJoin* curr_join = join; !filter;) {
+        const hdk::ir::Filter* filter = nullptr;
+        std::vector<const hdk::ir::Join*> join_seq{join};
+        for (const hdk::ir::Join* curr_join = join; !filter;) {
           auto usrs_it = web.find(curr_join);
           CHECK(usrs_it != web.end());
           if (usrs_it->second.size() != size_t(1)) {
             break;
           }
           auto only_usr = *usrs_it->second.begin();
-          if (auto usr_join = dynamic_cast<const RelJoin*>(only_usr)) {
+          if (auto usr_join = dynamic_cast<const hdk::ir::Join*>(only_usr)) {
             if (join == usr_join->getInput(1)) {
               const auto src1_offset = usr_join->getInput(0)->size();
               first_col_idx += src1_offset;
@@ -1658,16 +1684,16 @@ void hoist_filter_cond_to_cross_join(
             continue;
           }
 
-          filter = dynamic_cast<const RelFilter*>(only_usr);
+          filter = dynamic_cast<const hdk::ir::Filter*>(only_usr);
           break;
         }
         if (!filter) {
           visited.insert(join_seq.begin(), join_seq.end());
           continue;
         }
-        const auto src_join = dynamic_cast<const RelJoin*>(filter->getInput(0));
+        const auto src_join = dynamic_cast<const hdk::ir::Join*>(filter->getInput(0));
         CHECK(src_join);
-        auto modified_filter = const_cast<RelFilter*>(filter);
+        auto modified_filter = const_cast<hdk::ir::Filter*>(filter);
 
         if (src_join == join) {
           auto filter_condition = modified_filter->getConditionExprShared();
@@ -1717,20 +1743,20 @@ void hoist_filter_cond_to_cross_join(
   }
 }
 
-void sync_field_names_if_necessary(std::shared_ptr<const RelProject> from_node,
-                                   RelAlgNode* to_node) noexcept {
+void sync_field_names_if_necessary(std::shared_ptr<const hdk::ir::Project> from_node,
+                                   hdk::ir::Node* to_node) noexcept {
   auto from_fields = from_node->getFields();
   if (!from_fields.empty()) {
-    if (auto proj_to = dynamic_cast<RelProject*>(to_node);
+    if (auto proj_to = dynamic_cast<hdk::ir::Project*>(to_node);
         proj_to && proj_to->getFields().size() == from_fields.size()) {
       proj_to->setFields(std::move(from_fields));
-    } else if (auto agg_to = dynamic_cast<RelAggregate*>(to_node);
+    } else if (auto agg_to = dynamic_cast<hdk::ir::Aggregate*>(to_node);
                agg_to && agg_to->getFields().size() == from_fields.size()) {
       agg_to->setFields(std::move(from_fields));
-    } else if (auto compound_to = dynamic_cast<RelCompound*>(to_node);
+    } else if (auto compound_to = dynamic_cast<hdk::ir::Compound*>(to_node);
                compound_to && compound_to->getFields().size() == from_fields.size()) {
       compound_to->setFields(std::move(from_fields));
-    } else if (auto tf_to = dynamic_cast<RelTableFunction*>(to_node);
+    } else if (auto tf_to = dynamic_cast<hdk::ir::TableFunction*>(to_node);
                tf_to && tf_to->getFields().size() == from_fields.size()) {
       tf_to->setFields(std::move(from_fields));
     }
@@ -1740,18 +1766,18 @@ void sync_field_names_if_necessary(std::shared_ptr<const RelProject> from_node,
 // For some reason, Calcite generates Sort, Project, Sort sequences where the
 // two Sort nodes are identical and the Project is identity. Simplify this
 // pattern by re-binding the input of the second sort to the input of the first.
-void simplify_sort(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
+void simplify_sort(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
   if (nodes.size() < 3) {
     return;
   }
   for (size_t i = 0; i <= nodes.size() - 3;) {
-    auto first_sort = std::dynamic_pointer_cast<RelSort>(nodes[i]);
-    const auto project = std::dynamic_pointer_cast<const RelProject>(nodes[i + 1]);
-    auto second_sort = std::dynamic_pointer_cast<RelSort>(nodes[i + 2]);
+    auto first_sort = std::dynamic_pointer_cast<hdk::ir::Sort>(nodes[i]);
+    const auto project = std::dynamic_pointer_cast<const hdk::ir::Project>(nodes[i + 1]);
+    auto second_sort = std::dynamic_pointer_cast<hdk::ir::Sort>(nodes[i + 2]);
     if (first_sort && second_sort && project && project->isIdentity() &&
         *first_sort == *second_sort) {
       sync_field_names_if_necessary(project, /* an input of the second sort */
-                                    const_cast<RelAlgNode*>(first_sort->getInput(0)));
+                                    const_cast<hdk::ir::Node*>(first_sort->getInput(0)));
       second_sort->replaceInput(second_sort->getAndOwnInput(0),
                                 first_sort->getAndOwnInput(0));
       nodes[i].reset();
@@ -1762,7 +1788,7 @@ void simplify_sort(std::vector<std::shared_ptr<RelAlgNode>>& nodes) noexcept {
     }
   }
 
-  std::vector<std::shared_ptr<RelAlgNode>> new_nodes;
+  std::vector<std::shared_ptr<hdk::ir::Node>> new_nodes;
   for (auto node : nodes) {
     if (!node) {
       continue;

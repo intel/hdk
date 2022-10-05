@@ -22,7 +22,7 @@
 // and for DAG graph
 constexpr size_t elem_size_ = 2 * sizeof(size_t);
 
-std::optional<RelNodeId> QueryPlanDagCache::addNodeIfAbsent(const RelAlgNode* node) {
+std::optional<RelNodeId> QueryPlanDagCache::addNodeIfAbsent(const hdk::ir::Node* node) {
   std::lock_guard<std::mutex> cache_lock(cache_lock_);
   auto key = node->toHash();
   auto const result = node_map_.emplace(key, getCurrentNodeMapCardinality());

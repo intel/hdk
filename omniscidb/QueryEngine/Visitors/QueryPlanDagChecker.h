@@ -28,19 +28,19 @@ class QueryPlanDagChecker final : public ExprDagVisitor {
       , rel_alg_translator_(rel_alg_translator) {}
 
   static std::pair<bool, std::string> hasNonSupportedNodeInDag(
-      const RelAlgNode* rel_alg_node,
+      const hdk::ir::Node* rel_alg_node,
       const RelAlgTranslator& rel_alg_translator);
-  void check(const RelAlgNode*);
+  void check(const hdk::ir::Node*);
   void detectNonSupportedNode(const std::string& node_tag) const;
   void reset();
   bool getCheckResult() const;
   std::string const& getNonSupportedNodeTag() const;
 
  private:
-  void visitLogicalValues(const RelLogicalValues*) override;
-  void visitTableFunction(const RelTableFunction*) override;
-  void visitCompound(const RelCompound*) override;
-  void visitLogicalUnion(const RelLogicalUnion*) override;
+  void visitLogicalValues(const hdk::ir::LogicalValues*) override;
+  void visitTableFunction(const hdk::ir::TableFunction*) override;
+  void visitCompound(const hdk::ir::Compound*) override;
+  void visitLogicalUnion(const hdk::ir::LogicalUnion*) override;
 
   void* visitCardinality(const hdk::ir::CardinalityExpr* cardinality) const override;
   void* visitConstant(const hdk::ir::Constant* constant) const override;

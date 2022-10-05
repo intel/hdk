@@ -65,7 +65,7 @@ class ResultSetDefaultBuilder : public ResultSetBuilder {
 
 class ResultSetLogicalValuesBuilder : public ResultSetBuilder {
  private:
-  const RelLogicalValues* logical_values;
+  const hdk::ir::LogicalValues* logical_values;
   const std::vector<TargetInfo>& targets;
   const ExecutorDeviceType device_type;
   const QueryMemoryDescriptor& query_mem_desc;
@@ -79,7 +79,7 @@ class ResultSetLogicalValuesBuilder : public ResultSetBuilder {
       const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner);
 
   ResultSetLogicalValuesBuilder(
-      const RelLogicalValues* logical_values,
+      const hdk::ir::LogicalValues* logical_values,
       const std::vector<TargetInfo>& targets,
       const ExecutorDeviceType device_type,
       const QueryMemoryDescriptor& query_mem_desc,

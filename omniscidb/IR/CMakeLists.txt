@@ -5,6 +5,8 @@ set(ir_source_files
     Exception.h
     Expr.cpp
     Expr.h
+    Node.cpp
+    Node.h
     Type.cpp
     Type.h
     TypeUtils.cpp

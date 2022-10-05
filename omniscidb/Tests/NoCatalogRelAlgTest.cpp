@@ -191,7 +191,7 @@ class NoCatalogRelAlgTest : public ::testing::Test {
         std::make_unique<RelAlgDagBuilder>(ra, TEST_DB_ID, schema_provider_, config_));
   }
 
-  ExecutionResult runRelAlgQuery(std::unique_ptr<RelAlgDag> dag) {
+  ExecutionResult runRelAlgQuery(std::unique_ptr<hdk::ir::QueryDag> dag) {
     auto ra_executor = RelAlgExecutor(
         executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
     return ra_executor.executeRelAlgQuery(
@@ -263,7 +263,8 @@ TEST_F(NoCatalogRelAlgTest, GroupBySingleColumn) {
                           {hdk::ir::AggType::kCount, ctx.int32(), 1},
                           {hdk::ir::AggType::kSum, ctx.int64(), 1},
                           {hdk::ir::AggType::kAvg, ctx.int32(), 1}});
-  dag->addSort(agg, {{0, SortDirection::Ascending, NullSortedPosition::Last}});
+  dag->addSort(
+      agg, {{0, hdk::ir::SortDirection::Ascending, hdk::ir::NullSortedPosition::Last}});
   dag->finalize();
   auto res = runRelAlgQuery(std::move(dag));
   compare_res_data(res,

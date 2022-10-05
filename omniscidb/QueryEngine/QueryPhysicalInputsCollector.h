@@ -32,7 +32,9 @@
 #include <ostream>
 #include <unordered_set>
 
-class RelAlgNode;
+namespace hdk::ir {
+class Node;
+}
 
 struct PhysicalInput {
   int col_id;
@@ -56,10 +58,10 @@ struct hash<PhysicalInput> {
 
 }  // namespace std
 
-std::unordered_set<InputColDescriptor> get_physical_inputs(const RelAlgNode*);
-std::unordered_set<std::pair<int, int>> get_physical_table_inputs(const RelAlgNode*);
+std::unordered_set<InputColDescriptor> get_physical_inputs(const hdk::ir::Node*);
+std::unordered_set<std::pair<int, int>> get_physical_table_inputs(const hdk::ir::Node*);
 
-TableInfoMap get_physical_table_infos(const RelAlgNode*);
-ColumnInfoMap get_physical_column_infos(const RelAlgNode*);
+TableInfoMap get_physical_table_infos(const hdk::ir::Node*);
+ColumnInfoMap get_physical_column_infos(const hdk::ir::Node*);
 
 #endif  // QUERYENGINE_QUERYPHYSICALINPUTSCOLLECTOR_H

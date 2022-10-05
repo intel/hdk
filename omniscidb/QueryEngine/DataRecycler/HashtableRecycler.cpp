@@ -232,7 +232,7 @@ bool HashtableRecycler::isSafeToCacheHashtable(
   // permutated per execution and 2) whether it needs dictionary translation for hashtable
   // building to recycle the hashtable safely
   auto getNodeByTableId =
-      [&table_id_to_node_map](const int table_id) -> const RelAlgNode* {
+      [&table_id_to_node_map](const int table_id) -> const hdk::ir::Node* {
     auto it = table_id_to_node_map.find(table_id);
     if (it != table_id_to_node_map.end()) {
       return it->second;
@@ -252,11 +252,11 @@ bool HashtableRecycler::isSafeToCacheHashtable(
     // it is not safe to recycle the hashtable when
     // this resultset may have resultset ordering inconsistency and/or
     // need dictionary translation for hashtable building
-    auto sort_node = dynamic_cast<const RelSort*>(inner_node);
+    auto sort_node = dynamic_cast<const hdk::ir::Sort*>(inner_node);
     if (sort_node) {
       found_sort_node = true;
     } else {
-      auto project_node = dynamic_cast<const RelProject*>(inner_node);
+      auto project_node = dynamic_cast<const hdk::ir::Project*>(inner_node);
       if (project_node) {
         found_project_node = true;
       }
