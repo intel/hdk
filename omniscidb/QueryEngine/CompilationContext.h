@@ -27,20 +27,20 @@ class CompilationContext {
 
 class CpuCompilationContext : public CompilationContext {
  public:
-  CpuCompilationContext(ExecutionEngineWrapper&& execution_engine)
+  CpuCompilationContext(std::unique_ptr<ExecutionEngineWrapper>&& execution_engine)
       : execution_engine_(std::move(execution_engine)) {}
 
   void setFunctionPointer(llvm::Function* function) {
-    func_ = execution_engine_.getPointerToFunction(function);
+    func_ = execution_engine_->getPointerToFunction(function);
     CHECK(func_);
     // With ORC JIT, Module is deleted on function materialization.
 #ifndef ENABLE_ORCJIT
-    execution_engine_.removeModule(function->getParent());
+    execution_engine_->removeModule(function->getParent());
 #endif
   }
 
   void* getPointerToFunction(llvm::Function* function) {
-    return execution_engine_.getPointerToFunction(function);
+    return execution_engine_->getPointerToFunction(function);
   }
 
   void* func() const { return func_; }
@@ -56,5 +56,5 @@ class CpuCompilationContext : public CompilationContext {
 
  private:
   void* func_{nullptr};
-  ExecutionEngineWrapper execution_engine_;
+  std::unique_ptr<ExecutionEngineWrapper> execution_engine_;
 };

@@ -22,7 +22,6 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
@@ -36,10 +35,14 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #endif
 
-#ifdef ENABLE_ORCJIT
-ORCJITExecutionEngineWrapper::ORCJITExecutionEngineWrapper() {}
+#if LLVM_VERSION_MAJOR > 13
+#include <llvm/MC/TargetRegistry.h>
+#else
+#include <llvm/Support/TargetRegistry.h>
+#endif
 
-#else  // MCJIT
+#ifndef ENABLE_ORCJIT  // MCJIT
+
 MCJITExecutionEngineWrapper::MCJITExecutionEngineWrapper() {}
 
 MCJITExecutionEngineWrapper::MCJITExecutionEngineWrapper(
@@ -207,10 +210,11 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
   std::unique_ptr<llvm::DataLayout> data_layout =
       std::make_unique<llvm::DataLayout>(std::move(*data_layout_or_err));
 
-  ExecutionEngineWrapper execution_engine(std::move(execution_session),
-                                          std::move(target_machine_builder),
-                                          std::move(data_layout));
-  execution_engine.addModule(std::move(owner));
+  auto execution_engine =
+      std::make_unique<ExecutionEngineWrapper>(std::move(execution_session),
+                                               std::move(target_machine_builder),
+                                               std::move(data_layout));
+  execution_engine->addModule(std::move(owner));
   return std::make_shared<CpuCompilationContext>(std::move(execution_engine));
 #else
 
