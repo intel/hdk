@@ -41,7 +41,6 @@ enum class ExecutorExplainType { Default, Optimized };
 
 enum class ExecutorDispatchMode { KernelPerFragment, MultifragmentKernel };
 
-std::ostream& operator<<(std::ostream& os, const ExecutorDeviceType& dt);
 std::string deviceToString(const ExecutorDeviceType& dt);
 
 struct CompilationOptions {
@@ -145,5 +144,9 @@ struct ExecutionOptions {
  private:
   ExecutionOptions() {}
 };
+
+#ifndef __CUDACC__
+std::ostream& operator<<(std::ostream& os, const ExecutionOptions& eo);
+#endif
 
 #endif  // QUERYENGINE_COMPILATIONOPTIONS_H
