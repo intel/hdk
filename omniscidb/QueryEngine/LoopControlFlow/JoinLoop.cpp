@@ -228,8 +228,9 @@ llvm::BasicBlock* JoinLoop::codegen(
           builder.CreateBr(after_evaluate_outer_cond_bb);
           builder.SetInsertPoint(after_evaluate_outer_cond_bb);
         }
-        auto match_found =
-            builder.CreateAnd(join_cond_match, builder.CreateLoad(remaining_cond_match));
+        auto match_found = builder.CreateAnd(
+            join_cond_match,
+            builder.CreateLoad(get_int_type(1, context), remaining_cond_match));
         CHECK(match_found);
         auto match_found_bb = builder.GetInsertBlock();
         switch (join_loop.type_) {

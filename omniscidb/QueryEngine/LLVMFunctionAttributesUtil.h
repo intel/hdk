@@ -19,6 +19,6 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/Function.h>
 
-void mark_function_always_inline(llvm::Function* func);
-void mark_function_never_inline(llvm::Function* func);
+void mark_function_always_inline(llvm::Function* func, llvm::LLVMContext& context);
+void mark_function_never_inline(llvm::Function* func, llvm::LLVMContext& context);
 void clear_function_attributes(llvm::Function* func);

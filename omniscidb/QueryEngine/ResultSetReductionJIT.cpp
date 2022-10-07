@@ -367,7 +367,7 @@ llvm::Function* create_llvm_function(const Function* function, CgenState* cgen_s
     arg->setName(arg_types[i].name);
   }
   if (function->always_inline()) {
-    mark_function_always_inline(func);
+    mark_function_always_inline(func, ctx);
   }
   return func;
 }

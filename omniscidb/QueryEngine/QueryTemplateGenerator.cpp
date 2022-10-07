@@ -24,6 +24,12 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Verifier.h>
 
+#if LLVM_VERSION_MAJOR > 13
+#define ATTR_BUILDER(ctx) llvm::AttrBuilder B(ctx);
+#else
+#define ATTR_BUILDER(ctx) llvm::AttrBuilder B;
+#endif
+
 namespace {
 
 inline llvm::Type* get_pointer_element_type(llvm::Value* value) {
@@ -60,7 +66,7 @@ llvm::Function* default_func_builder(llvm::Module* mod, const std::string& name)
     SmallVector<Attributes, 4> Attrs;
     Attributes PAS;
     {
-      AttrBuilder B;
+      ATTR_BUILDER(mod->getContext());
       PAS = Attributes::get(mod->getContext(), ~0U, B);
     }
 
@@ -107,7 +113,7 @@ llvm::Function* pos_step(llvm::Module* mod) {
     SmallVector<Attributes, 4> Attrs;
     Attributes PAS;
     {
-      AttrBuilder B;
+      ATTR_BUILDER(mod->getContext());
       PAS = Attributes::get(mod->getContext(), ~0U, B);
     }
 
@@ -175,7 +181,7 @@ llvm::Function* row_process(llvm::Module* mod,
       SmallVector<Attributes, 4> Attrs;
       Attributes PAS;
       {
-        AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         PAS = Attributes::get(mod->getContext(), ~0U, B);
       }
 
@@ -313,7 +319,7 @@ class QueryTemplateGenerator {
       llvm::SmallVector<llvm::AttributeList, 4> Attrs;
       llvm::AttributeList PAS;
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::ReadNone);
         B.addAttribute(llvm::Attribute::NoCapture);
         PAS = llvm::AttributeList::get(mod->getContext(), 1U, B);
@@ -321,7 +327,7 @@ class QueryTemplateGenerator {
 
       Attrs.push_back(PAS);
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::ReadOnly);
         B.addAttribute(llvm::Attribute::NoCapture);
         PAS = llvm::AttributeList::get(mod->getContext(), 2U, B);
@@ -329,7 +335,7 @@ class QueryTemplateGenerator {
 
       Attrs.push_back(PAS);
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::ReadNone);
         B.addAttribute(llvm::Attribute::NoCapture);
         PAS = llvm::AttributeList::get(mod->getContext(), 3U, B);
@@ -337,7 +343,7 @@ class QueryTemplateGenerator {
 
       Attrs.push_back(PAS);
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::ReadOnly);
         B.addAttribute(llvm::Attribute::NoCapture);
         PAS = llvm::AttributeList::get(mod->getContext(), 4U, B);
@@ -346,7 +352,7 @@ class QueryTemplateGenerator {
       Attrs.push_back(PAS);
       // applied to i32* total_matched
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::NoAlias);
         PAS = llvm::AttributeList::get(mod->getContext(), 10U, B);
       }
@@ -354,7 +360,7 @@ class QueryTemplateGenerator {
       // NOTE(adb): This attribute is missing in the query template. Why?
       Attrs.push_back(PAS);
       {
-        llvm::AttrBuilder B;
+        ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::UWTable);
         PAS = llvm::AttributeList::get(mod->getContext(), ~0U, B);
       }

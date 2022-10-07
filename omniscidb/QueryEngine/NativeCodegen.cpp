@@ -16,8 +16,8 @@
 
 #include "QueryEngine/Execute.h"
 
-#if LLVM_VERSION_MAJOR < 9
-static_assert(false, "LLVM Version >= 9 is required.");
+#if LLVM_VERSION_MAJOR < 12
+static_assert(false, "LLVM Version >= 12 is required.");
 #endif
 
 #include <llvm/Analysis/ScopedNoAliasAA.h>
@@ -45,7 +45,6 @@ static_assert(false, "LLVM Version >= 9 is required.");
 #include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
@@ -78,6 +77,16 @@ static_assert(false, "LLVM Version >= 9 is required.");
 #include "StreamingTopN.h"
 
 #include <boost/filesystem.hpp>
+
+#if LLVM_VERSION_MAJOR > 13
+
+#define LLVM_NUM_OPERANDS(x) x->arg_size()
+
+#else
+
+#define LLVM_NUM_OPERANDS(x) x->getNumArgOperands()
+
+#endif
 
 namespace {
 
@@ -690,7 +699,7 @@ void bind_query(llvm::Function* query_func,
   }
   for (auto& S : query_stubs) {
     std::vector<llvm::Value*> args;
-    for (size_t i = 0; i < S->getNumArgOperands(); ++i) {
+    for (size_t i = 0; i < LLVM_NUM_OPERANDS(S); ++i) {
       args.push_back(S->getArgOperand(i));
     }
     llvm::ReplaceInstWithInst(S, llvm::CallInst::Create(query_func, args, ""));
@@ -1605,7 +1614,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   // replace the row func placeholder call with the call to the actual row func
   std::vector<llvm::Value*> row_func_args;
-  for (size_t i = 0; i < cgen_state_->row_func_call_->getNumArgOperands(); ++i) {
+  for (size_t i = 0; i < LLVM_NUM_OPERANDS(cgen_state_->row_func_call_); ++i) {
     row_func_args.push_back(cgen_state_->row_func_call_->getArgOperand(i));
   }
   row_func_args.insert(row_func_args.end(), col_heads.begin(), col_heads.end());
@@ -1692,9 +1701,9 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   // We don't want register spills in the inner loops.
   // LLVM seems to correctly free up alloca instructions
   // in these functions even when they are inlined.
-  mark_function_always_inline(cgen_state_->row_func_);
+  mark_function_always_inline(cgen_state_->row_func_, cgen_state_->context_);
   if (cgen_state_->filter_func_) {
-    mark_function_always_inline(cgen_state_->filter_func_);
+    mark_function_always_inline(cgen_state_->filter_func_, cgen_state_->context_);
   }
 
 #ifndef NDEBUG
@@ -1760,7 +1769,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
         auto& get_gv_call = llvm::cast<llvm::CallInst>(*it);
         if (get_gv_call.getCalledFunction()->getName() == "array_size" ||
             get_gv_call.getCalledFunction()->getName() == "linear_probabilistic_count") {
-          mark_function_never_inline(cgen_state_->row_func_);
+          mark_function_never_inline(cgen_state_->row_func_, cgen_state_->context_);
           row_func_not_inlined = true;
           break;
         }

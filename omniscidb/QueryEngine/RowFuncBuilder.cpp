@@ -313,7 +313,8 @@ llvm::Value* RowFuncBuilder::codegenOutputSlot(
          order_entry_lv});
   } else {
     const auto group_expr_lv =
-        LL_BUILDER.CreateLoad(get_arg_by_name(ROW_FUNC, "old_total_matched"));
+        LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT),
+                              get_arg_by_name(ROW_FUNC, "old_total_matched"));
     std::vector<llvm::Value*> args{groups_buffer,
                                    get_arg_by_name(ROW_FUNC, "max_matched"),
                                    group_expr_lv,
@@ -624,7 +625,7 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction() {
                                               "perfect_key_hash",
                                               executor_->cgen_state_->module_);
   executor_->cgen_state_->helper_functions_.push_back(key_hash_func);
-  mark_function_always_inline(key_hash_func);
+  mark_function_always_inline(key_hash_func, executor_->cgen_state_->context_);
   auto& key_buff_arg = *key_hash_func->args().begin();
   llvm::Value* key_buff_lv = &key_buff_arg;
   auto bb = llvm::BasicBlock::Create(LL_CONTEXT, "entry", key_hash_func);
@@ -1199,21 +1200,24 @@ void RowFuncBuilder::checkErrorCode(llvm::Value* retCode) {
 
 std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::genLoadHashDesc(
     llvm::Value* groups_buffer) {
-  auto* desc_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(LL_CONTEXT),
-                                          LL_BUILDER.getInt32Ty());
+  const auto int8_ptr_ty = llvm::Type::getInt8PtrTy(LL_CONTEXT);
+  const auto int32_ptr_ty = LL_BUILDER.getInt32Ty();
+  auto* desc_type = llvm::StructType::get(int8_ptr_ty, int32_ptr_ty);
   auto* desc_ptr_type = llvm::PointerType::getUnqual(desc_type);
 
   llvm::Value* hash_table_desc_ptr =
       LL_BUILDER.CreatePointerCast(groups_buffer, desc_ptr_type);
   CHECK(hash_table_desc_ptr);
 
-  auto hash_ptr_ptr = LL_BUILDER.CreateStructGEP(hash_table_desc_ptr, 0);
-  llvm::Value* hash_ptr = LL_BUILDER.CreateLoad(hash_ptr_ptr);
+  auto hash_ptr_ptr = LL_BUILDER.CreateStructGEP(int8_ptr_ty, hash_table_desc_ptr, 0);
+  llvm::Value* hash_ptr =
+      LL_BUILDER.CreateLoad(llvm::Type::getInt8Ty(LL_CONTEXT), hash_ptr_ptr);
   CHECK(hash_ptr->getType() == llvm::Type::getInt8PtrTy(LL_CONTEXT));
   hash_ptr =
       LL_BUILDER.CreatePointerCast(hash_ptr, llvm::Type::getInt64PtrTy(LL_CONTEXT));
-  auto hash_size_ptr = LL_BUILDER.CreateStructGEP(hash_table_desc_ptr, 1);
-  llvm::Value* hash_size = LL_BUILDER.CreateLoad(hash_size_ptr);
+  auto hash_size_ptr = LL_BUILDER.CreateStructGEP(int32_ptr_ty, hash_table_desc_ptr, 1);
+  llvm::Value* hash_size =
+      LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT), hash_size_ptr);
 
   return {hash_ptr, hash_size};
 }

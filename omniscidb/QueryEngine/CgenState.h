@@ -256,7 +256,11 @@ struct CgenState {
       const auto arg_ti = func_type->getParamType(0);
       CHECK(arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy());
       auto attr_list = func->getAttributes();
+#if LLVM_VERSION_MAJOR > 13
+      llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(0));
+#else
       llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(0));
+#endif
       arr_arg_builder.addAttribute(llvm::Attribute::StructRet);
       func->addParamAttrs(0, arr_arg_builder);
     }
@@ -265,7 +269,11 @@ struct CgenState {
       const auto arg_ti = func_type->getParamType(i);
       if (arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy()) {
         auto attr_list = func->getAttributes();
+#if LLVM_VERSION_MAJOR > 13
+        llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(i));
+#else
         llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(i));
+#endif
         arr_arg_builder.addByValAttr(arg_ti->getPointerElementType());
         func->addParamAttrs(i, arr_arg_builder);
       }
@@ -278,7 +286,9 @@ struct CgenState {
 
   llvm::Value* emitCall(const std::string& fname, const std::vector<llvm::Value*>& args);
 
-  size_t getLiteralBufferUsage(const int device_id) { return literal_bytes_[device_id]; }
+  size_t getLiteralBufferUsage(const int device_id) {
+    return literal_bytes_[device_id];
+  }
 
   llvm::Value* castToTypeIn(llvm::Value* val, const size_t bit_width);
 
@@ -305,7 +315,9 @@ struct CgenState {
         llvm::ConstantFP::get(llvm::Type::getDoubleTy(context_), v));
   }
 
-  llvm::ConstantInt* llBool(const bool v) const { return ::ll_bool(v, context_); }
+  llvm::ConstantInt* llBool(const bool v) const {
+    return ::ll_bool(v, context_);
+  }
 
   void emitErrorCheck(llvm::Value* condition, llvm::Value* errorCode, std::string label);
 

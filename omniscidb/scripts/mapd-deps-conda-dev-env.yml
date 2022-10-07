@@ -20,7 +20,7 @@ dependencies:
   - arrow-cpp  6.0
   - pyarrow    6.0
   - pandas     1.3.3
-  - llvmdev     12.*
+  - llvmdev     14.*
   - openjdk     17.*
   - cmake 
   - tbb-devel
@@ -29,7 +29,7 @@ dependencies:
   - fmt
   - maven
   - boost-cpp
-  - clangdev   12.*
+  - clangdev   14.*
   - llvm
   - double-conversion
   - snappy
@@ -47,7 +47,7 @@ dependencies:
   # when cuda is enabled, install also
   # - arrow-cpp=6.0=*cuda
   - binutils
-  - llvm-spirv 12.0.*
+  - llvm-spirv 14.0.*
   - folly 2022.04.25.00
   - snappy  1.1.8 # 20220830 Currently required < 1.1.9 for proper linking with folly
 
