@@ -2,9 +2,9 @@ name: Build
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        type: string
-        default: DEV
+      reset-cache:
+        type: boolean
+        default: true
 
   push:
     paths-ignore:
@@ -56,10 +56,11 @@ jobs:
     uses: ./.github/workflows/test-docker.yml
     with:
       name: cuda
+      # input for a push event is an empty string, convert it to boolean
+      reset-cache: ${{ !!inputs.reset-cache }}
 
   build-l0-docker:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: l0
       options: -DENABLE_L0=on -DENABLE_CUDA=off
-

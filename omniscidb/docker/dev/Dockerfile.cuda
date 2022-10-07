@@ -4,5 +4,5 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
     apt-get update && \
     apt-get install -y cuda libarrow-cuda-dev
 
-ENV PATH=/usr/local/cuda-11.7/bin${PATH:+:${PATH}}
+ENV PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}
 
