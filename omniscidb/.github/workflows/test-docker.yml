@@ -41,7 +41,7 @@ jobs:
 
       - name: Start the container
         run:  |
-          docker run -id --name omni-build.${{ inputs.name }} --network host  --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl omni-build.${{ inputs.name }}:latest
+          docker run -id --name omni-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl omni-build.${{ inputs.name }}:latest
           docker exec omni-build.${{ inputs.name }} mkdir -p /_work/
           docker cp build.tgz omni-build.${{ inputs.name }}:/_work/
           docker exec omni-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
