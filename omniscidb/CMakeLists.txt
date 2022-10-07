@@ -570,19 +570,7 @@ find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
 include_directories(${Arrow_INCLUDE_DIRS})
 
-option(ENABLE_IMPORT_PARQUET "Enable Parquet Importer support" ON)
-if(ENABLE_IMPORT_PARQUET)
-  find_package(Parquet)
-  if(NOT Parquet_FOUND)
-    set(ENABLE_IMPORT_PARQUET OFF CACHE BOOL "Enable Parquet Importer support" FORCE)
-    message(STATUS "Parquet not found. Disabling Parquet Importer support.")
-  else()
-    add_definitions("-DENABLE_IMPORT_PARQUET")
-    # when we found libparquet it means we're using arrow 11+
-    # and deps scripts must have built parquet as well as snappy
-    find_package(Snappy REQUIRED)
-  endif()
-endif()
+find_package(Parquet REQUIRED)
 
 list(APPEND Arrow_LIBRARIES ${Snappy_LIBRARIES})
 if(ENABLE_AWS_S3)
