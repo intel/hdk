@@ -50,13 +50,13 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.13.3</version>      
+      <version>2.13.4</version>      
     </dependency>
     <!-- Added to override avatica-core pin to vulnerable jackson-databind 2.10 -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
-      <version>2.13.3</version>
+      <version>2.13.4</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
