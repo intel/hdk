@@ -31,7 +31,7 @@ struct CpuSubTasksConfig {
 };
 
 struct JoinConfig {
-  bool allow_loop_joins = true;
+  bool allow_loop_joins = false;
   unsigned trivial_loop_join_threshold = 1'000;
   bool inner_join_fragment_skipping = true;
   size_t huge_join_hash_threshold = 1'000'000;
