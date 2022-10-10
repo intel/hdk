@@ -184,7 +184,9 @@ struct ChunkMetadata {
     }
   }
 
-  std::string toString() const { return dump(); }
+  std::string toString() const {
+    return dump();
+  }
 #endif
 
   ChunkMetadata(const hdk::ir::Type* type_,

@@ -487,7 +487,9 @@ class Skipped {
       ++data_[idx].count_merged_;
     }
   }
-  DEVICE operator bool() const { return data_[0].centroid_; }
+  DEVICE operator bool() const {
+    return data_[0].centroid_;
+  }
   // Shift skipped centroids over merged centroids, and rewind next_idx_.
   DEVICE void shiftCentroidsAndSetNext() {
     shiftCentroids(data_[0]);

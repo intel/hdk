@@ -43,7 +43,9 @@ class CpuCompilationContext : public CompilationContext {
     return execution_engine_->getPointerToFunction(function);
   }
 
-  void* func() const { return func_; }
+  void* func() const {
+    return func_;
+  }
 
   using TableFunctionEntryPointPtr = int32_t (*)(const int8_t* mgr_ptr,
                                                  const int8_t** input_cols,

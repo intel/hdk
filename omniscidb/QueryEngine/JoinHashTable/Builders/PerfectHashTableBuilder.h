@@ -338,7 +338,9 @@ class PerfectJoinHashTableBuilder {
     }
   }
 
-  std::unique_ptr<PerfectHashTable> getHashTable() { return std::move(hash_table_); }
+  std::unique_ptr<PerfectHashTable> getHashTable() {
+    return std::move(hash_table_);
+  }
 
   const bool for_semi_anti_join(const JoinType join_type) {
     return join_type == JoinType::SEMI || join_type == JoinType::ANTI;

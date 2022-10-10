@@ -94,15 +94,23 @@ struct TextEncodingNone {
   int64_t size_;
 
 #ifndef __CUDACC__
-  std::string getString() const { return std::string(ptr_, size_); }
+  std::string getString() const {
+    return std::string(ptr_, size_);
+  }
 #endif
 
   DEVICE ALWAYS_INLINE char& operator[](const unsigned int index) {
     return index < size_ ? ptr_[index] : ptr_[size_ - 1];
   }
-  DEVICE ALWAYS_INLINE operator char*() const { return ptr_; }
-  DEVICE ALWAYS_INLINE int64_t size() const { return size_; }
-  DEVICE ALWAYS_INLINE bool isNull() const { return size_ == 0; }
+  DEVICE ALWAYS_INLINE operator char*() const {
+    return ptr_;
+  }
+  DEVICE ALWAYS_INLINE int64_t size() const {
+    return size_;
+  }
+  DEVICE ALWAYS_INLINE bool isNull() const {
+    return size_ == 0;
+  }
 };
 
 #ifdef __CUDACC__
@@ -131,10 +139,16 @@ struct Column {
     }
     return ptr_[index];
   }
-  DEVICE int64_t size() const { return size_; }
+  DEVICE int64_t size() const {
+    return size_;
+  }
 
-  DEVICE inline bool isNull(int64_t index) const { return is_null(ptr_[index]); }
-  DEVICE inline void setNull(int64_t index) { set_null(ptr_[index]); }
+  DEVICE inline bool isNull(int64_t index) const {
+    return is_null(ptr_[index]);
+  }
+  DEVICE inline void setNull(int64_t index) {
+    set_null(ptr_[index]);
+  }
   DEVICE Column<T>& operator=(const Column<T>& other) {
 #ifndef __CUDACC__
     if (size() == other.size()) {
