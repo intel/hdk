@@ -19,6 +19,7 @@
 #include "QueryEngine/ExecutionEngineWrapper.h"
 
 #include <llvm/IR/InstIterator.h>
+#include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
