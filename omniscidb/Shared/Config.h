@@ -72,7 +72,7 @@ struct HeterogenousConfig {
 struct InterruptConfig {
   bool enable_runtime_query_interrupt = false;
   bool enable_non_kernel_time_query_interrupt = true;
-  double running_query_interrupt_freq = 1000;
+  double running_query_interrupt_freq = 0.5;
 };
 
 struct CodegenConfig {
