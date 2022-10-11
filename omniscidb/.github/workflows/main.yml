@@ -11,20 +11,6 @@ on:
       - 'docs/**'
 
 jobs:
-  clang-format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set the environment
-        run: |
-          conda update conda
-          $CONDA/bin/conda env create -f scripts/mapd-deps-conda-dev-env.yml --force
-
-      - name: Check stlye
-        run: |
-          $CONDA/bin/conda run -n omnisci-dev bash -c "find . -name ThirdParty -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file"
-
   build:
     uses: ./.github/workflows/build.yml
 
@@ -33,17 +19,26 @@ jobs:
     with:
       cuda_compiler_version: 11
 
-  test:
+  style:
     needs: build
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'style'
+
+  smoke:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'smoke'
 
   perf:
     needs: build
-    uses: ./.github/workflows/perf.yml
+    uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'perf'
 
   build-cuda-docker:
     uses: ./.github/workflows/build-docker.yml
