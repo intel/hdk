@@ -96,7 +96,7 @@ class ArrowSQLRunnerImpl {
   ExecutionResult runSqlQuery(const std::string& sql,
                               const CompilationOptions& co,
                               const ExecutionOptions& eo) {
-    VLOG(1) << "Executing sql: " << sql;
+    LOG(INFO) << "Executing sql: " << sql;
     auto ra_executor = makeRelAlgExecutor(sql);
     ExecutionResult res;
 
