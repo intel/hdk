@@ -65,7 +65,7 @@ void createAndPopulateTable() {
        {"ss", ctx.extDict(ctx.text(), 0)},
        {"u", ctx.int32()},
        {"ofd", ctx.int32()},
-       {"ufd", ctx.int16(false)},
+       {"ufd", ctx.int32(false)},
        {"ofq", ctx.int64()},
        {"ufq", ctx.int64(false)},
        {"smallint_nulls", ctx.int16()},
@@ -190,7 +190,6 @@ int main(int argc, char** argv) {
                   << v<int64_t>(row[3]) << std::endl;
       }
     }
-
   } catch (const std::exception& e) {
     LOG(ERROR) << e.what();
     return -1;
