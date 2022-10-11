@@ -18,6 +18,7 @@
 #include "QueryEngine/CodeGenerator.h"
 #include "QueryEngine/ExecutionEngineWrapper.h"
 
+#include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -918,6 +919,14 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
 
   if (requires_libdevice) {
     add_intrinsics_to_module(llvm_module);
+  }
+
+  // LLVM 14 emits
+  //    warning: ignoring debug info with an invalid version (0) in
+  // during CUDA module compilation/PTX generation. Strip the debug info from the module,
+  // since it will not be used anyway, to clear the warning.
+  if (llvm::StripDebugInfo(*llvm_module)) {
+    VLOG(1) << "Removed debug info from CUDA LLVM Module";
   }
 
   llvm_module->print(os, nullptr);
