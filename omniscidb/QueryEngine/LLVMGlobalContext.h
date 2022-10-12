@@ -17,6 +17,4 @@
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/LLVMContext.h>
 
-llvm::LLVMContext& getGlobalLLVMContext();
-
 llvm::orc::ThreadSafeContext& getGlobalLLVMThreadSafeContext();

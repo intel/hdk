@@ -33,13 +33,3 @@ llvm::orc::ThreadSafeContext& getGlobalLLVMThreadSafeContext() {
   });
   return g_global_context;
 }
-
-llvm::LLVMContext& getGlobalLLVMContext() {
-  std::call_once(context_init_flag, []() {
-    auto global_context = std::make_unique<llvm::LLVMContext>();
-    g_global_context = llvm::orc::ThreadSafeContext(std::move(global_context));
-  });
-  auto context = g_global_context.getContext();
-  CHECK(context);
-  return *context;
-}
