@@ -11,7 +11,7 @@ from libcpp.map cimport map
 
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport CSQLTypeInfo, CSystemParameters, CConfig
+from pyhdk._common cimport CType, CSystemParameters, CConfig
 
 cdef extern from "omniscidb/DataMgr/MemoryLevel.h" namespace "Data_Namespace":
   enum MemoryLevel:
@@ -50,10 +50,10 @@ cdef extern from "omniscidb/SchemaMgr/ColumnInfo.h":
 
   cdef cppclass CColumnInfo "ColumnInfo"(CColumnRef):
     string name
-    CSQLTypeInfo type_info
+    const CType* type
     bool is_rowid
 
-    CColumnInfo(int, int, int, string, CSQLTypeInfo, bool)
+    CColumnInfo(int, int, int, string, CType, bool)
     string toString()
 
 ctypedef shared_ptr[CColumnInfo] CColumnInfoPtr
@@ -99,7 +99,7 @@ cdef extern from "omniscidb/DataMgr/AbstractDataProvider.h":
 cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h" namespace "ArrowStorage":
   struct CColumnDescription "ArrowStorage::ColumnDescription":
     string name;
-    CSQLTypeInfo type;
+    CType type;
 
   struct CTableOptions "ArrowStorage::TableOptions":
     size_t fragment_size;

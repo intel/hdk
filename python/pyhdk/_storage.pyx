@@ -70,7 +70,7 @@ cdef class ColumnInfo:
   @property
   def type(self):
     cdef TypeInfo res = TypeInfo()
-    res.c_type_info = self.c_column_info.get().type_info
+    res.c_type_info = self.c_column_info.get().type
     return res
 
   @property

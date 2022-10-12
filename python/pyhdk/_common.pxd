@@ -7,71 +7,78 @@ from libcpp cimport bool
 from libcpp.string cimport string
 from libcpp.memory cimport shared_ptr
 
-cdef extern from "omniscidb/Shared/sqltypes.h":
-  enum CSQLTypes "SQLTypes":
-    kNULLT = 0,
-    kBOOLEAN = 1,
-    kCHAR = 2,
-    kVARCHAR = 3,
-    kNUMERIC = 4,
-    kDECIMAL = 5,
-    kINT = 6,
-    kSMALLINT = 7,
-    kFLOAT = 8,
-    kDOUBLE = 9,
-    kTIME = 10,
-    kTIMESTAMP = 11,
-    kBIGINT = 12,
-    kTEXT = 13,
-    kDATE = 14,
-    kARRAY = 15,
-    kINTERVAL_DAY_TIME = 16,
-    kINTERVAL_YEAR_MONTH = 17,
-    kTINYINT = 18,
-    kEVAL_CONTEXT_TYPE = 19,
-    kVOID = 20,
-    kCURSOR = 21,
-    kCOLUMN = 22,
-    kCOLUMN_LIST = 23,
-    kSQLTYPE_LAST = 24,
+cdef extern from "omniscidb/IR/Type.h":
+  enum CTypeId "hdk::ir::Type::Id":
+      kNull "hdk::ir::Type::Id::kNull" = 0,
+      kBoolean "hdk::ir::Type::Id::kBoolean" = 1,
+      kInteger "hdk::ir::Type::Id::kInteger" = 2,
+      kFloatingPoint "hdk::ir::Type::Id::kFloatingPoint" = 3,
+      kDecimal "hdk::ir::Type::Id::kDecimal" = 4,
+      kVarChar "hdk::ir::Type::Id::kVarChar" = 5,
+      kText "hdk::ir::Type::kText" = 6,
+      kDate "hdk::ir::Type::kDate" = 7,
+      kTime "hdk::ir::Type::Id::kTime" = 8,
+      kTimestamp "hdk::ir::Type::Id::kTimestamp" = 9,
+      kInterval "hdk::ir::Type::Id::kInterval" = 10,
+      kFixedLenArray "hdk::ir::Type::Id::kFixedLenArray" = 11,
+      kVarLenArray "hdk::ir::Type::Id::kVarLenArray" = 12,
+      kExtDictionary "hdk::ir::Type::Id::kExtDictionary" = 13,
+      kColumn "hdk::ir::Type::Id::kColumn" = 14,
+      kColumnList "hdk::ir::Type::Id::kColumnList" = 15,
 
-  enum CEncodingType "EncodingType":
-    kENCODING_NONE = 0,
-    kENCODING_FIXED = 1,
-    kENCODING_RL = 2,
-    kENCODING_DIFF = 3,
-    kENCODING_DICT = 4,
-    kENCODING_SPARSE = 5,
-    kENCODING_DATE_IN_DAYS = 7,
-    kENCODING_LAST = 8,
+cdef extern from "omniscidb/IR/Type.h":
+  cdef cppclass CType "hdk::ir::Type":
+    
+    CTypeId id()
 
-  cdef cppclass CSQLTypeInfo "SQLTypeInfo":
-    CSQLTypeInfo(CSQLTypes t, int d, int s, bool n, CEncodingType c, int p, CSQLTypes st)
-    CSQLTypeInfo(CSQLTypes t, int d, int s, bool n)
-    CSQLTypeInfo(CSQLTypes t, CEncodingType c, int p, CSQLTypes st)
-    CSQLTypeInfo(CSQLTypes t, int d, int s)
-    CSQLTypeInfo(CSQLTypes t, bool n)
-    CSQLTypeInfo(CSQLTypes t)
-    CSQLTypeInfo(CSQLTypes t, bool n, CEncodingType c)
-    CSQLTypeInfo()
+    int size()
+  
+    bool nullable()
 
-    CSQLTypes get_type()
-    CSQLTypes get_subtype()
-    int get_dimension()
-    int get_precision()
-    int get_input_srid()
-    int get_scale()
-    int get_output_srid()
-    bool get_notnull()
-    CEncodingType get_compression()
-    int get_comp_param()
-    int get_size()
-    int get_logical_size()
+    bool isNull()
+    bool isBoolean()
+    bool isInteger()
+    bool isFloatingPoint()
+    bool isDecimal()
+    bool isVarChar()
+    bool isText()
+    bool isDate()
+    bool isTime()
+    bool isTimestamp()
+    bool isInterval()
+    bool isFixedLenArray()
+    bool isVarLenArray()
+    bool isExtDictionary()
+    bool isColumn()
+    bool isColumnList()
+
+    bool isInt8()
+    bool isInt16()
+    bool isInt32()
+    bool isInt64()
+    bool isFp32()
+    bool isFp64()
+
+    bool isNumber()
+    bool isString()
+    bool isDateTime()
+    bool isArray()
+    bool isVarLen()
+    bool isBuffer()
 
     string toString()
 
+    void print()
+
+cdef extern from "omniscidb/IR/Context.h":
+  cdef cppclass CContext "hdk::ir::Context":
+    CContext()
+
+    @staticmethod
+    CContext defaultCtx()
+
 cdef class TypeInfo:
-  cdef CSQLTypeInfo c_type_info
+  cdef const CType* c_type_info
 
 cdef extern from "omniscidb/Shared/SystemParameters.h":
   cdef cppclass CSystemParameters "SystemParameters":
