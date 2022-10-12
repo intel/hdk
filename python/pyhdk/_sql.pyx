@@ -95,7 +95,7 @@ cdef class RelAlgExecutor:
     cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
-    cdef CExecutionOptions c_eo = CExecutionOptions.defaults()
+    cdef CExecutionOptions c_eo = CExecutionOptions.fromConfig(dereference(config))
     c_eo.output_columnar_hint = kwargs.get("enable_columnar_output", config.rs.enable_columnar_output)
     c_eo.with_watchdog = kwargs.get("enable_watchdog", config.exec.watchdog.enable)
     c_eo.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)

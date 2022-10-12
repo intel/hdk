@@ -44,19 +44,22 @@ class TestArrowStorage:
         assert columns[0].db_id == db_id
         assert columns[0].table_id == table.table_id
         assert columns[0].name == "a"
-        assert columns[0].type.type == "BIGINT"
+        assert columns[0].type.type == "INTEGER"
+        assert columns[0].type.size == 8
         assert columns[0].is_rowid == False
 
         assert columns[1].db_id == db_id
         assert columns[1].table_id == table.table_id
         assert columns[1].name == "b"
-        assert columns[1].type.type == "BIGINT"
+        assert columns[1].type.type == "INTEGER"
+        assert columns[1].type.size == 8
         assert columns[1].is_rowid == False
 
         assert columns[2].db_id == db_id
         assert columns[2].table_id == table.table_id
         assert columns[2].name == "rowid"
-        assert columns[2].type.type == "BIGINT"
+        assert columns[2].type.type == "INTEGER"
+        assert columns[2].type.size == 8
         assert columns[2].is_rowid == True
 
 
