@@ -31,12 +31,9 @@
 #include <clang/Parse/ParseAST.h>
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/Program.h>
 #include <llvm/Support/raw_ostream.h>
-
-#if LLVM_VERSION_MAJOR >= 11
-#include <llvm/Support/Host.h>
-#endif
 
 #pragma GCC diagnostic pop
 
@@ -146,13 +143,8 @@ class HandleDeclAction : public ASTFrontendAction {
 
 class ToolFactory : public FrontendActionFactory {
  public:
-#if LLVM_VERSION_MAJOR >= 10
   using FrontendActionPtr = std::unique_ptr<clang::FrontendAction>;
 #define CREATE_FRONTEND_ACTION(ast_file_) std::make_unique<HandleDeclAction>(ast_file_)
-#else
-  using FrontendActionPtr = clang::FrontendAction*;
-#define CREATE_FRONTEND_ACTION(ast_file_) new HandleDeclAction(ast_file_)
-#endif
 
   ToolFactory(llvm::raw_fd_ostream& ast_file) : ast_file_(ast_file) {}
 

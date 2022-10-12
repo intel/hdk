@@ -73,11 +73,7 @@ llvm::StructType* get_buffer_struct_type(CgenState* cgen_state,
     }
 
     llvm::StringRef struct_name = struct_type->getStructName();
-#if LLVM_VERSION_MAJOR >= 12
     return struct_type->getTypeByName(cgen_state->context_, struct_name);
-#else
-    return cgen_state->module_->getTypeByName(struct_name);
-#endif
   }
   return generated_struct_type;
 }

@@ -37,6 +37,7 @@ static_assert(false, "LLVM Version >= 12 is required.");
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/FormattedStream.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
@@ -51,10 +52,6 @@ static_assert(false, "LLVM Version >= 12 is required.");
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/Transforms/Utils/Cloning.h>
-
-#if LLVM_VERSION_MAJOR >= 11
-#include <llvm/Support/Host.h>
-#endif
 
 #include "CudaMgr/CudaMgr.h"
 #include "QueryEngine/CodeGenerator.h"

@@ -207,21 +207,12 @@ std::string CUDABackend::generatePTX(const std::string& cuda_llir,
     llvm::legacy::PassManager ptxgen_pm;
     llvm_module->setDataLayout(nvptx_target_machine->createDataLayout());
 
-#if LLVM_VERSION_MAJOR >= 10
     nvptx_target_machine->addPassesToEmitFile(
         ptxgen_pm, formatted_os, nullptr, llvm::CGFT_AssemblyFile);
-#else
-    nvptx_target_machine->addPassesToEmitFile(
-        ptxgen_pm, formatted_os, nullptr, llvm::TargetMachine::CGFT_AssemblyFile);
-#endif
     ptxgen_pm.run(*llvm_module);
   }
 
-#if LLVM_VERSION_MAJOR >= 11
   return std::string(code_str);
-#else
-  return code_str.str();
-#endif
 }
 
 namespace {
@@ -647,15 +638,12 @@ void CUDABackend::linkModuleWithLibdevice(const std::unique_ptr<llvm::Module>& e
   }
 
   // activate nvvm-reflect-ftz flag on the module
-#if LLVM_VERSION_MAJOR >= 11
   llvm::LLVMContext& ctx = llvm_module.getContext();
   llvm_module.setModuleFlag(llvm::Module::Override,
                             "nvvm-reflect-ftz",
                             llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
                                 llvm::Type::getInt32Ty(ctx), uint32_t(1))));
-#else
-  llvm_module.addModuleFlag(llvm::Module::Override, "nvvm-reflect-ftz", uint32_t(1));
-#endif
+
   for (llvm::Function& fn : llvm_module) {
     fn.addFnAttr("nvptx-f32ftz", "true");
   }
