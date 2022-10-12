@@ -11,9 +11,10 @@
 
 int main(void) {
   int table_id = 0;
-  SQLTypeInfo sql_type(SQLTypes::kINT);
+
+  auto& ctx = hdk::ir::Context::defaultCtx();
 
   const auto col_expr =
-      hdk::ir::makeExpr<hdk::ir::ColumnVar>(sql_type, table_id, /*column_id=*/0, 0);
+      hdk::ir::makeExpr<hdk::ir::ColumnVar>(ctx.int32());
   std::cout << "Test program worked: " << col_expr->toString() << std::endl;
 }

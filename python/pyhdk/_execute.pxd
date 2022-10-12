@@ -11,7 +11,7 @@ from libcpp.utility cimport move
 
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport CSystemParameters, CSQLTypeInfo, CConfig
+from pyhdk._common cimport CType, CSystemParameters, CConfig
 from pyhdk._storage cimport CDataMgr, CBufferProvider
 
 cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
@@ -75,7 +75,7 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     bool preserve_order
 
     @staticmethod
-    CExecutionOptions defaults()
+    CExecutionOptions fromConfig(const CConfig)
 
 cdef extern from "omniscidb/QueryEngine/ResultSet.h":
   cdef cppclass CResultSet "ResultSet":
@@ -86,8 +86,8 @@ ctypedef shared_ptr[CResultSet] CResultSetPtr
 cdef extern from "omniscidb/QueryEngine/TargetMetaInfo.h":
   cdef cppclass CTargetMetaInfo "TargetMetaInfo":
     const string& get_resname()
-    const CSQLTypeInfo& get_type_info()
-    const CSQLTypeInfo& get_physical_type_info()
+    const CType& get_type_info()
+    const CType& get_physical_type_info()
 
 cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
   cdef cppclass CArrowResultSetConverter "ArrowResultSetConverter":
