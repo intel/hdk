@@ -20,7 +20,6 @@
 #include "JoinLoop.h"
 #include "Logger/Logger.h"
 
-#include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>

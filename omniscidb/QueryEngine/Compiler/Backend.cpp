@@ -31,47 +31,12 @@
 #include "LLVMSPIRVLib/LLVMSPIRVLib.h"
 #endif
 
-#ifdef ENABLE_ORCJIT
 #include <llvm/ExecutionEngine/JITSymbol.h>
-#else
-#include <llvm/ExecutionEngine/MCJIT.h>
-#endif
 
 #if LLVM_VERSION_MAJOR > 13
 #include <llvm/MC/TargetRegistry.h>
 #else
 #include <llvm/Support/TargetRegistry.h>
-#endif
-
-#ifndef ENABLE_ORCJIT  // MCJIT
-
-MCJITExecutionEngineWrapper::MCJITExecutionEngineWrapper() {}
-
-MCJITExecutionEngineWrapper::MCJITExecutionEngineWrapper(
-    llvm::ExecutionEngine* execution_engine,
-    const CompilationOptions& co)
-    : execution_engine_(execution_engine) {
-  if (execution_engine_) {
-    if (co.register_intel_jit_listener) {
-#ifdef ENABLE_INTEL_JIT_LISTENER
-      intel_jit_listener_.reset(llvm::JITEventListener::createIntelJITEventListener());
-      CHECK(intel_jit_listener_);
-      execution_engine_->RegisterJITEventListener(intel_jit_listener_.get());
-      LOG(INFO) << "Registered IntelJITEventListener";
-#else
-      LOG(WARNING) << "This build is not Intel JIT Listener enabled. Ignoring Intel JIT "
-                      "listener configuration parameter.";
-#endif  // ENABLE_INTEL_JIT_LISTENER
-    }
-  }
-}
-
-MCJITExecutionEngineWrapper& MCJITExecutionEngineWrapper::operator=(
-    llvm::ExecutionEngine* execution_engine) {
-  execution_engine_.reset(execution_engine);
-  intel_jit_listener_ = nullptr;
-  return *this;
-}
 #endif
 namespace compiler {
 
@@ -88,52 +53,9 @@ void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
 
 std::string assemblyForCPU(ExecutionEngineWrapper& execution_engine,
                            llvm::Module* llvm_module) {
-#ifndef ENABLE_ORCJIT
-  llvm::legacy::PassManager pass_manager;
-  auto cpu_target_machine = execution_engine->getTargetMachine();
-  CHECK(cpu_target_machine);
-  llvm::SmallString<256> code_str;
-  llvm::raw_svector_ostream os(code_str);
-#if LLVM_VERSION_MAJOR >= 10
-  cpu_target_machine->addPassesToEmitFile(
-      pass_manager, os, nullptr, llvm::CGFT_AssemblyFile);
-#else
-  cpu_target_machine->addPassesToEmitFile(
-      pass_manager, os, nullptr, llvm::TargetMachine::CGFT_AssemblyFile);
-#endif
-  pass_manager.run(*llvm_module);
-  return "Assembly for the CPU:\n" + std::string(code_str.str()) + "\nEnd of assembly";
-#else   // ORCJIT
   LOG(FATAL) << "Assembly logger not yet supported for ORCJIT.";
   return "";
-#endif  // !ENABLE_ORCJIT
 }
-
-#ifndef ENABLE_ORCJIT
-
-std::shared_ptr<CpuCompilationContext> create_execution_engine(
-    llvm::Module* llvm_module,
-    llvm::EngineBuilder& eb,
-    const CompilationOptions& co) {
-  auto timer = DEBUG_TIMER(__func__);
-  // Avoids data race in
-  // llvm::sys::DynamicLibrary::getPermanentLibrary and
-  // GDBJITRegistrationListener::notifyObjectLoaded while creating a
-  // new ExecutionEngine instance. Unfortunately we have to use global
-  // mutex here.
-  std::lock_guard<llvm::sys::Mutex> lock(g_ee_create_mutex);
-  ExecutionEngineWrapper execution_engine(eb.create(), co);
-  CHECK(execution_engine.exists());
-  // Force the module data layout to match the layout for the selected target
-  llvm_module->setDataLayout(execution_engine->getDataLayout());
-
-  LOG(ASM) << assemblyForCPU(execution_engine, llvm_module);
-
-  execution_engine->finalizeObject();
-  return std::make_shared<CpuCompilationContext>(std::move(execution_engine));
-}
-
-#endif
 
 }  // namespace
 
@@ -162,9 +84,6 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
   auto init_err = llvm::InitializeNativeTarget();
   CHECK(!init_err);
 
-#ifndef ENABLE_ORCJIT
-  llvm::InitializeAllTargetMCs();
-#endif
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
 
@@ -173,8 +92,6 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
 
   llvm::TargetOptions to;
   to.EnableFastISel = true;
-
-#ifdef ENABLE_ORCJIT
 
   auto llvm_err_to_str = [](const llvm::Error& err) {
     std::string msg;
@@ -218,18 +135,6 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
                                                std::move(data_layout));
   execution_engine->addModule(std::move(owner));
   return std::make_shared<CpuCompilationContext>(std::move(execution_engine));
-#else
-
-  llvm::EngineBuilder eb(std::move(owner));
-  eb.setErrorStr(&err_str);
-  eb.setEngineKind(llvm::EngineKind::JIT);
-  eb.setTargetOptions(to);
-  if (co.opt_level == ExecutorOptLevel::ReductionJIT) {
-    eb.setOptLevel(llvm::CodeGenOpt::None);
-  }
-
-  return create_execution_engine(llvm_module, eb, co);
-#endif
 }
 
 std::unique_ptr<llvm::TargetMachine> CUDABackend::initializeNVPTXBackend(

@@ -25,8 +25,6 @@
 
 struct CompilationOptions;
 
-#ifdef ENABLE_ORCJIT
-
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
@@ -120,43 +118,3 @@ class ORCJITExecutionEngineWrapper {
 };
 
 using ExecutionEngineWrapper = ORCJITExecutionEngineWrapper;
-#else
-class MCJITExecutionEngineWrapper {
- public:
-  MCJITExecutionEngineWrapper();
-  MCJITExecutionEngineWrapper(llvm::ExecutionEngine* execution_engine,
-                              const CompilationOptions& co);
-
-  MCJITExecutionEngineWrapper(const MCJITExecutionEngineWrapper& other) = delete;
-  MCJITExecutionEngineWrapper(MCJITExecutionEngineWrapper&& other) = default;
-
-  void* getPointerToFunction(llvm::Function* function) {
-    CHECK(execution_engine_);
-    return execution_engine_->getPointerToFunction(function);
-  }
-
-  void finalize() {
-    CHECK(execution_engine_);
-    execution_engine_->finalizeObject();
-  }
-
-  bool exists() const { return !(execution_engine_ == nullptr); }
-
-  void removeModule(llvm::Module* module) { execution_engine_->removeModule(module); }
-
-  llvm::ExecutionEngine* operator->() { return execution_engine_.get(); }
-  const llvm::ExecutionEngine* operator->() const { return execution_engine_.get(); }
-
-  MCJITExecutionEngineWrapper& operator=(const MCJITExecutionEngineWrapper& other) =
-      delete;
-  MCJITExecutionEngineWrapper& operator=(MCJITExecutionEngineWrapper&& other) = default;
-
-  MCJITExecutionEngineWrapper& operator=(llvm::ExecutionEngine* execution_engine);
-
- private:
-  std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
-  std::unique_ptr<llvm::JITEventListener> intel_jit_listener_;
-};
-
-using ExecutionEngineWrapper = MCJITExecutionEngineWrapper;
-#endif

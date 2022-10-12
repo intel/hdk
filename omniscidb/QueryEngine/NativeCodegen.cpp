@@ -24,13 +24,7 @@ static_assert(false, "LLVM Version >= 12 is required.");
 #include <llvm/Analysis/TypeBasedAliasAnalysis.h>
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
-
-#ifdef ENABLE_ORCJIT
 #include <llvm/ExecutionEngine/JITSymbol.h>
-#else
-#include <llvm/ExecutionEngine/MCJIT.h>
-#endif
-
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/InstIterator.h>

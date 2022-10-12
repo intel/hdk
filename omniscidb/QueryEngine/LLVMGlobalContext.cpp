@@ -16,26 +16,15 @@
 
 #include "LLVMGlobalContext.h"
 
-#include <llvm/Support/ManagedStatic.h>  // can be removed once MCJIT is removed
 #include <memory>
 #include <mutex>
 
 namespace {
 
-#ifdef ENABLE_ORCJIT
-
 llvm::orc::ThreadSafeContext g_global_context;
 std::once_flag context_init_flag;
 
-#else  // MCJIT
-
-llvm::ManagedStatic<llvm::LLVMContext> g_global_context;
-
-#endif  // ENABLE_ORCJIT
-
 }  // namespace
-
-#ifdef ENABLE_ORCJIT
 
 llvm::orc::ThreadSafeContext& getGlobalLLVMThreadSafeContext() {
   std::call_once(context_init_flag, []() {
@@ -54,12 +43,3 @@ llvm::LLVMContext& getGlobalLLVMContext() {
   CHECK(context);
   return *context;
 }
-
-#else  // MCJIT
-
-llvm::LLVMContext& getGlobalLLVMContext() {
-  // MCJIT, uses old context
-  return *g_global_context;
-}
-
-#endif  // ENABLE_ORCJIT
