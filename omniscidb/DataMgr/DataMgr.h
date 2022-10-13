@@ -21,8 +21,6 @@
 #ifndef DATAMGR_H
 #define DATAMGR_H
 
-#include "../Shared/SystemParameters.h"
-#include "../Shared/mapd_shared_mutex.h"
 #include "AbstractBuffer.h"
 #include "AbstractBufferMgr.h"
 #include "BufferMgr/Buffer.h"
@@ -37,6 +35,8 @@
 #include "PersistentStorageMgr/PersistentStorageMgr.h"
 #include "SchemaMgr/ColumnInfo.h"
 #include "Shared/Config.h"
+#include "Shared/SystemParameters.h"
+#include "Shared/mapd_shared_mutex.h"
 
 #include <fstream>
 #include <iomanip>
