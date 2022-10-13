@@ -1039,8 +1039,7 @@ bool QueryMemoryDescriptor::usesGetGroupValueFast() const {
 }
 
 bool QueryMemoryDescriptor::threadsShareMemory() const {
-  return executor_->gpuMgr()->getPlatform() != GpuMgrPlatform::L0 &&
-         query_desc_type_ != QueryDescriptionType::NonGroupedAggregate;
+  return query_desc_type_ != QueryDescriptionType::NonGroupedAggregate;
 }
 
 bool QueryMemoryDescriptor::blocksShareMemory() const {

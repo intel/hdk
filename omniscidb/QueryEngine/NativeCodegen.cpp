@@ -1087,9 +1087,21 @@ void Executor::createErrorCheckControlFlow(
         auto error_bb = llvm::BasicBlock::Create(
             cgen_state_->context_, ".error_exit", query_func, new_bb);
         const auto error_code_arg = get_arg_by_name(query_func, "error_code");
+        llvm::Value* error_code_arg_val = error_code_arg;
+        auto record_error_code_func =
+            cgen_state_->module_->getFunction("record_error_code");
+
+        if (error_code_arg->getType() != record_error_code_func->getArg(1)->getType()) {
+          error_code_arg_val = ir_builder.CreateAddrSpaceCast(
+              error_code_arg,
+              llvm::PointerType::get(
+                  error_code_arg->getType()->getPointerElementType(),
+                  record_error_code_func->getArg(1)->getType()->getPointerAddressSpace()),
+              "checkflow.error.cast");
+        }
         llvm::CallInst::Create(
             cgen_state_->module_->getFunction("record_error_code"),
-            std::vector<llvm::Value*>{err_lv_returned_from_row_func, error_code_arg},
+            std::vector<llvm::Value*>{err_lv_returned_from_row_func, error_code_arg_val},
             "",
             error_bb);
         llvm::ReturnInst::Create(cgen_state_->context_, error_bb);
