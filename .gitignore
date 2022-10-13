@@ -7,3 +7,6 @@ ThirdParty/gdal-data
 
 # Cython generated files
 python/pyhdk/*.cpp
+
+# Pytest generated files / directories
+__pycache__
