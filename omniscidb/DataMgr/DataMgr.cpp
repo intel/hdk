@@ -40,7 +40,6 @@ namespace Data_Namespace {
 
 DataMgr::DataMgr(const Config& config,
                  const SystemParameters& system_parameters,
-                 std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs,
                  const size_t reservedGpuMem,
                  const size_t numReaderThreads)
     : gpuMgrContext_(nullptr)
@@ -48,7 +47,7 @@ DataMgr::DataMgr(const Config& config,
     , reservedGpuMem_(reservedGpuMem)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
-  populateDeviceMgrs(config, system_parameters, std::move(gpuMgrs));
+  populateDeviceMgrs(config, system_parameters);
   populateMgrs(config, system_parameters, numReaderThreads);
   createTopLevelMetadata();
 }
@@ -171,11 +170,26 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
   }
 }
 
-void DataMgr::populateDeviceMgrs(
-    const Config& config,
-    const SystemParameters& system_parameters,
-    std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs) {
-  for (auto& pair : gpuMgrs) {
+void DataMgr::populateDeviceMgrs(const Config& config,
+                                 const SystemParameters& system_parameters) {
+  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
+#ifdef HAVE_CUDA
+  try {
+    gpu_mgrs[GpuMgrPlatform::CUDA] = std::make_unique<CudaMgr_Namespace::CudaMgr>(-1, 0);
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "Failed to initialize CUDA GPU: " << e.what();
+    gpu_mgrs.erase(GpuMgrPlatform::CUDA);
+  }
+#elif HAVE_L0
+  try {
+    gpu_mgrs[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "Failed to initialize L0 GPU: " << e.what();
+    gpu_mgrs.erase(GpuMgrPlatform::L0);
+  }
+#endif
+
+  for (auto& pair : gpu_mgrs) {
     if (pair.second) {
       CHECK_EQ(pair.first, pair.second->getPlatform()) << "Inconsistent map was passed";
       gpuMgrs_[pair.first] = std::move(pair.second);

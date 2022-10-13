@@ -167,7 +167,6 @@ class DataMgr {
  public:
   explicit DataMgr(const Config& config,
                    const SystemParameters& system_parameters,
-                   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs,
                    const size_t reservedGpuMem = (1 << 27),
                    const size_t numReaderThreads = 0);
   ~DataMgr();
@@ -242,8 +241,7 @@ class DataMgr {
 
  private:
   void populateDeviceMgrs(const Config& config,
-                          const SystemParameters& system_parameters,
-                          std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs);
+                          const SystemParameters& system_parameters);
   void populateMgrs(const Config& config,
                     const SystemParameters& system_parameters,
                     const size_t userSpecifiedNumReaderThreads);
