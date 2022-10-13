@@ -87,7 +87,6 @@ cdef extern from "omniscidb/QueryEngine/TargetMetaInfo.h":
   cdef cppclass CTargetMetaInfo "TargetMetaInfo":
     const string& get_resname()
     const CType& get_type_info()
-    const CType& get_physical_type_info()
 
 cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
   cdef cppclass CArrowResultSetConverter "ArrowResultSetConverter":
