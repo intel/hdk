@@ -241,6 +241,9 @@ class DataMgr {
   DataProvider* getDataProvider() const { return data_provider_.get(); }
 
  private:
+  void populateDeviceMgrs(const Config& config,
+                          const SystemParameters& system_parameters,
+                          std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs);
   void populateMgrs(const Config& config,
                     const SystemParameters& system_parameters,
                     const size_t userSpecifiedNumReaderThreads);

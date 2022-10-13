@@ -48,21 +48,7 @@ DataMgr::DataMgr(const Config& config,
     , reservedGpuMem_(reservedGpuMem)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
-  for (auto& pair : gpuMgrs) {
-    if (pair.second) {
-      CHECK_EQ(pair.first, pair.second->getPlatform()) << "Inconsistent map was passed";
-      gpuMgrs_[pair.first] = std::move(pair.second);
-    }
-  }
-  if (!gpuMgrs_.size()) {
-    LOG(INFO) << "None of the passed GpuMgr instances is valid, falling back to "
-                 "CPU-only mode.";
-    hasGpus_ = false;
-  } else {
-    gpuMgrContext_ = gpuMgrs_.begin()->second.get();
-    hasGpus_ = true;
-  }
-
+  populateDeviceMgrs(config, system_parameters, std::move(gpuMgrs));
   populateMgrs(config, system_parameters, numReaderThreads);
   createTopLevelMetadata();
 }
@@ -182,6 +168,26 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
                                                                 maxCpuSlabSize,
                                                                 page_size,
                                                                 bufferMgrs_[0][0]));
+  }
+}
+
+void DataMgr::populateDeviceMgrs(
+    const Config& config,
+    const SystemParameters& system_parameters,
+    std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>>&& gpuMgrs) {
+  for (auto& pair : gpuMgrs) {
+    if (pair.second) {
+      CHECK_EQ(pair.first, pair.second->getPlatform()) << "Inconsistent map was passed";
+      gpuMgrs_[pair.first] = std::move(pair.second);
+    }
+  }
+  if (!gpuMgrs_.size()) {
+    LOG(INFO) << "None of the passed GpuMgr instances is valid, falling back to "
+                 "CPU-only mode.";
+    hasGpus_ = false;
+  } else {
+    gpuMgrContext_ = gpuMgrs_.begin()->second.get();
+    hasGpus_ = true;
   }
 }
 
