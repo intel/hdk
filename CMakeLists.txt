@@ -189,7 +189,6 @@ add_subdirectory(omniscidb/ArrowStorage)
 add_subdirectory(omniscidb/Analyzer)
 add_subdirectory(omniscidb/IR)
 add_subdirectory(omniscidb/SqliteConnector)
-add_definitions("-DENABLE_ORCJIT")
 add_subdirectory(omniscidb/QueryEngine)
 
 # Source
