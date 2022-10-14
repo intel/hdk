@@ -34,18 +34,6 @@ void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
   throw ParseIRError(ss.str());
 }
 
-llvm::StringRef get_gpu_target_triple_string() {
-  return llvm::StringRef("nvptx64-nvidia-cuda");
-}
-
-llvm::StringRef get_gpu_data_layout() {
-  return llvm::StringRef(
-      "e-p:64:64:64-i1:8:8-i8:8:8-"
-      "i16:16:16-i32:32:32-i64:64:64-"
-      "f32:32:32-f64:64:64-v16:16:16-"
-      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
-}
-
 void verify_function_ir(const llvm::Function* func) {
   std::stringstream err_ss;
   llvm::raw_os_ostream err_os(err_ss);

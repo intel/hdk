@@ -26,10 +26,6 @@ void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
                          std::string src = "",
                          const bool is_gpu = false);
 
-llvm::StringRef get_gpu_target_triple_string();
-
-llvm::StringRef get_gpu_data_layout();
-
 void verify_function_ir(const llvm::Function* func);
 
 void optimize_ir(llvm::Function* query_func,

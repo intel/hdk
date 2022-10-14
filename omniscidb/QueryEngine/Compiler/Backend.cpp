@@ -695,8 +695,6 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
     `gpu_target.cgen_state->module_` appears to be the same as `llvm_module`
    */
   CHECK(gpu_target.cgen_state->module_ == llvm_module);
-  llvm_module->setDataLayout(compiler::get_gpu_data_layout());
-  llvm_module->setTargetTriple(compiler::get_gpu_target_triple_string());
   llvm::PassManagerBuilder pass_manager_builder = llvm::PassManagerBuilder();
 
   pass_manager_builder.OptLevel = 0;
