@@ -41,7 +41,7 @@ jobs:
 
       - name: Build wheels
         run: |
-          docker run --rm -e PLAT=${{ inputs.plat }} -v `pwd`:/io ${{ inputs.image }} ${{ inputs.pre_cmd }} /io/scripts/build-wheels.sh
+          docker run --rm -e PLAT=${{ inputs.plat }} -v `pwd`:/io ${{ inputs.image }} ${{ inputs.pre_cmd }} sh /io/scripts/build-wheels.sh
           ls wheelhouse/
      
       - name: Upload wheels

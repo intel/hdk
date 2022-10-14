@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e -u -x
 
 function repair_wheel {
@@ -28,6 +28,6 @@ done
 
 # Install packages and test
 for PYBIN in /opt/python/*/bin/; do
-    "${PYBIN}/pip" install python-manylinux-demo --no-index -f /io/wheelhouse
-    (cd "$HOME"; "${PYBIN}/nosetests" pymanylinuxdemo)
+    "${PYBIN}/pip" install pyhdk --no-index -f /io/wheelhouse
+    (cd "$HOME"; "${PYBIN}/nosetests" pyhdk)
 done
