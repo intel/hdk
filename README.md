@@ -113,3 +113,5 @@ Conda environments are used for HDK development. Use the yaml file in `scripts/c
 ## Test
 
 Python tests can be run from the python source directory using `pytest`. 
+
+## License
