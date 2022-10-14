@@ -14,3 +14,6 @@ jobs:
   build:
     uses: ./.github/workflows/modin.yml
 
+  build-wheels:
+    uses: ./.github/workflows/build-wheels.yml
+
