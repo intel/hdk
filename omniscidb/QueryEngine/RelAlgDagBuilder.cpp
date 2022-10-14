@@ -1042,9 +1042,10 @@ hdk::ir::ExprPtr makeUOper(SQLOps op, hdk::ir::ExprPtr arg, const hdk::ir::Type*
       return std::make_shared<hdk::ir::UOper>(type, false, op, arg);
     }
     case kNOT:
-    case kISNULL: {
-      return std::make_shared<hdk::ir::UOper>(ctx.boolean(), op, arg);
-    }
+      return std::make_shared<hdk::ir::UOper>(
+          ctx.boolean(arg->type()->nullable()), op, arg);
+    case kISNULL:
+      return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), op, arg);
     case kISNOTNULL: {
       auto is_null = std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kISNULL, arg);
       return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), kNOT, is_null);
