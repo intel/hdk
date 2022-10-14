@@ -6,7 +6,7 @@
 from libcpp.memory cimport unique_ptr, make_unique, shared_ptr
 from cython.operator cimport dereference
 
-cdef class SQLType:
+cdef class TypeId:
   cdef CTypeId c_val
 
   def __cinit__(self, int val):
@@ -17,7 +17,7 @@ cdef class SQLType:
       return <int>self.c_val == val
     if isinstance(val, str):
       return self.__repr__() == val
-    if isinstance(val, SQLType):
+    if isinstance(val, TypeId):
       return <int>self.c_val == <int>val.c_val
     return False
 
@@ -45,7 +45,7 @@ cdef class SQLType:
 cdef class TypeInfo:
   @property
   def type(self):
-    return SQLType(self.c_type_info.id())
+    return TypeId(self.c_type_info.id())
 
   @property
   def nullable(self):
