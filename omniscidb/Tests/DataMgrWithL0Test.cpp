@@ -21,16 +21,9 @@
 #include "TestHelpers.h"
 
 TEST(DataMgrWithL0, SanityTest) {
-  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
-  gpu_mgrs[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
-  l0::L0Manager* original_mgr = (l0::L0Manager*)gpu_mgrs[GpuMgrPlatform::L0].get();
-
   ConfigPtr config_ = std::make_shared<Config>();
   SystemParameters sys_params = {};
-  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_,
-                                                            sys_params,
-                                                            std::move(gpu_mgrs),
-                                                            /*use_gpus=*/true);
+  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_, sys_params);
 
   ASSERT_EQ(original_mgr, data_mgr->getL0Mgr());
   ASSERT_EQ(original_mgr, data_mgr->getGpuMgr());
@@ -39,15 +32,9 @@ TEST(DataMgrWithL0, SanityTest) {
 }
 
 TEST(DataMgrWithL0, SimpleReadWriteTest) {
-  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
-  gpu_mgrs[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
-
   ConfigPtr config_ = std::make_shared<Config>();
   SystemParameters sys_params = {};
-  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_,
-                                                            sys_params,
-                                                            std::move(gpu_mgrs),
-                                                            /*use_gpus=*/true);
+  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_, sys_params);
 
   std::vector<int8_t> ref_data = {10, 20, 30, 40, 50, 60};
   AbstractBuffer* gpuBuff = data_mgr->alloc(
