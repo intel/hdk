@@ -85,14 +85,6 @@ void CommandLineOptions::fillOptions() {
                               ->default_value(system_parameters.cpu_only)
                               ->implicit_value(true),
                           "Run on CPU only, even if GPUs are available.");
-  help_desc.add_options()("cuda-block-size",
-                          po::value<size_t>(&system_parameters.cuda_block_size)
-                              ->default_value(system_parameters.cuda_block_size),
-                          "Size of block to use on GPU.");
-  help_desc.add_options()("cuda-grid-size",
-                          po::value<size_t>(&system_parameters.cuda_grid_size)
-                              ->default_value(system_parameters.cuda_grid_size),
-                          "Size of grid to use on GPU.");
   if (!dist_v5_) {
     help_desc.add_options()(
         "data",
@@ -690,8 +682,6 @@ std::optional<int> CommandLineOptions::parse_command_line(
     LOG(INFO) << " Master Port is " << system_parameters.master_port;
   }
 
-  LOG(INFO) << " cuda block size " << system_parameters.cuda_block_size;
-  LOG(INFO) << " cuda grid size  " << system_parameters.cuda_grid_size;
   LOG(INFO) << " Min CPU buffer pool slab size " << system_parameters.min_cpu_slab_size;
   LOG(INFO) << " Max CPU buffer pool slab size " << system_parameters.max_cpu_slab_size;
   LOG(INFO) << " Min GPU buffer pool slab size " << system_parameters.min_gpu_slab_size;

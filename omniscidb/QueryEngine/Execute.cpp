@@ -148,16 +148,14 @@ Executor::Executor(const ExecutorId executor_id,
                    Data_Namespace::DataMgr* data_mgr,
                    BufferProvider* buffer_provider,
                    ConfigPtr config,
-                   const size_t block_size_x,
-                   const size_t grid_size_x,
                    const size_t max_gpu_slab_size,
                    const std::string& debug_dir,
                    const std::string& debug_file)
     : executor_id_(executor_id)
     , context_(new llvm::LLVMContext())
     , config_(config)
-    , block_size_x_(block_size_x)
-    , grid_size_x_(grid_size_x)
+    , block_size_x_(config->exec.override_gpu_block_size)
+    , grid_size_x_(config->exec.override_gpu_grid_size)
     , max_gpu_slab_size_(max_gpu_slab_size)
     , debug_dir_(debug_dir)
     , debug_file_(debug_file)
@@ -401,8 +399,6 @@ std::shared_ptr<Executor> Executor::getExecutor(
                                     data_mgr,
                                     buffer_provider,
                                     config,
-                                    system_parameters.cuda_block_size,
-                                    system_parameters.cuda_grid_size,
                                     system_parameters.max_gpu_slab_size,
                                     debug_dir,
                                     debug_file);

@@ -260,8 +260,6 @@ class Executor {
            Data_Namespace::DataMgr* data_mgr,
            BufferProvider* buffer_provider,
            ConfigPtr config,
-           const size_t block_size_x,
-           const size_t grid_size_x,
            const size_t max_gpu_slab_size,
            const std::string& debug_dir,
            const std::string& debug_file);

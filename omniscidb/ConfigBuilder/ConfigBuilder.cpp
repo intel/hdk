@@ -334,6 +334,14 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->implicit_value(true),
       "Enable multi-fragment intermediate results to improve execution parallelism for "
       "queries with multiple execution steps");
+  opt_desc.add_options()("gpu-block-size",
+                         po::value<size_t>(&config_->exec.override_gpu_block_size)
+                             ->default_value(config_->exec.override_gpu_block_size),
+                         "Force the size of block to use on GPU.");
+  opt_desc.add_options()("gpu-grid-size",
+                         po::value<size_t>(&config_->exec.override_gpu_grid_size)
+                             ->default_value(config_->exec.override_gpu_grid_size),
+                         "Size of grid to use on GPU.");
 
   // opts.filter_pushdown
   opt_desc.add_options()("enable-filter-push-down",
