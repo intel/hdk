@@ -7,14 +7,9 @@
 #include "HDK.h"
 
 #include <iostream>
-#include <memory>
 
 int main(void) {
-  int table_id = 0;
+  std::cout << "Hello, world" << std::endl;
 
-  auto& ctx = hdk::ir::Context::defaultCtx();
-
-  const auto col_expr =
-      hdk::ir::makeExpr<hdk::ir::ColumnVar>(ctx.int32());
-  std::cout << "Test program worked: " << col_expr->toString() << std::endl;
+  auto hdk = HDK::init();
 }
