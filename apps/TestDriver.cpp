@@ -35,4 +35,8 @@ int main(void) {
 
   HDK hdk;
   hdk.read(table, "test");
+  auto res = hdk.query("SELECT * FROM test;");
+  auto rows = res.getRows();
+  CHECK(rows);
+  std::cout << "Returned " << rows->rowCount() << " rows" << std::endl;
 }
