@@ -25,9 +25,9 @@ TEST(DataMgrWithL0, SanityTest) {
   SystemParameters sys_params = {};
   auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_, sys_params);
 
-  ASSERT_EQ(original_mgr, data_mgr->getL0Mgr());
-  ASSERT_EQ(original_mgr, data_mgr->getGpuMgr());
-  ASSERT_EQ(original_mgr, data_mgr->getGpuMgr(GpuMgrPlatform::L0));
+  auto l0_mgr = data_mgr->getL0Mgr();
+  ASSERT_EQ(l0_mgr, data_mgr->getGpuMgr());
+  ASSERT_EQ(l0_mgr, data_mgr->getGpuMgr(GpuMgrPlatform::L0));
   ASSERT_EQ(nullptr, data_mgr->getCudaMgr());
 }
 
