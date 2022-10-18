@@ -167,7 +167,6 @@ class DataMgr {
  public:
   explicit DataMgr(const Config& config,
                    const SystemParameters& system_parameters,
-                   const size_t reservedGpuMem = (1 << 27),
                    const size_t numReaderThreads = 0);
   ~DataMgr();
   AbstractBuffer* createChunkBuffer(const ChunkKey& key,

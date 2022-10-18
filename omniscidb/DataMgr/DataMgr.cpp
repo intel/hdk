@@ -40,11 +40,10 @@ namespace Data_Namespace {
 
 DataMgr::DataMgr(const Config& config,
                  const SystemParameters& system_parameters,
-                 const size_t reservedGpuMem,
                  const size_t numReaderThreads)
     : gpuMgrContext_(nullptr)
     , hasGpus_(false)
-    , reservedGpuMem_(reservedGpuMem)
+    , reservedGpuMem_(config.mem.gpu.reserved_mem_bytes)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
   populateDeviceMgrs(config, system_parameters);
@@ -251,7 +250,6 @@ void DataMgr::populateMgrs(const Config& config,
     // managers and switch to them in `bufferMgrs_` when the gpuMgr context changes
     CHECK_EQ(gpuMgrs_.size(), (size_t)1)
         << "Multiple GPU managers handling is not implemented yet.";
-    GpuMgrPlatform mgrName = getGpuMgr()->getPlatform();
 
     LOG(INFO) << "Reserved GPU memory is " << (float)reservedGpuMem_ / (1024 * 1024)
               << "MB includes render buffer allocation";
@@ -270,7 +268,7 @@ void DataMgr::populateMgrs(const Config& config,
       size_t deviceMemSize = 0;
       // TODO: get rid of manager-specific branches by introducing some kind of device
       // properties in GpuMgr
-      switch (mgrName) {
+      switch (getGpuMgr()->getPlatform()) {
         case GpuMgrPlatform::CUDA:
           deviceMemSize = getCudaMgr()->getDeviceProperties(gpuNum)->globalMem;
           break;
@@ -282,9 +280,12 @@ void DataMgr::populateMgrs(const Config& config,
           CHECK(false);
       }
 
-      size_t gpuMaxMemSize = system_parameters.gpu_buffer_mem_bytes != 0
-                                 ? system_parameters.gpu_buffer_mem_bytes
-                                 : deviceMemSize - reservedGpuMem_;
+      size_t gpuMaxMemSize = system_parameters.gpu_buffer_mem_bytes;
+      if (gpuMaxMemSize == 0) {
+        CHECK_GT(deviceMemSize, reservedGpuMem_);
+        gpuMaxMemSize = deviceMemSize - reservedGpuMem_;
+      }
+
       size_t minGpuSlabSize =
           std::min(system_parameters.min_gpu_slab_size, gpuMaxMemSize);
       minGpuSlabSize = (minGpuSlabSize / page_size) * page_size;

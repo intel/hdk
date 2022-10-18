@@ -474,6 +474,13 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->notifier(get_range_checker(0.01, 0.99, "gpu-input-mem-limit")),
       "Max part of GPU memory that can be used for input data. Must be in range [0.01, "
       "0.99].");
+  opt_desc.add_options()(
+      "res-gpu-mem",
+      po::value<size_t>(&config_->mem.gpu.reserved_mem_bytes)
+          ->default_value(config_->mem.gpu.reserved_mem_bytes),
+      "Reduces GPU memory available to the OmniSci allocator by this amount. Used for "
+      "compiled code cache and ancillary GPU functions and other processes that may also "
+      "be using the GPU concurrent with OmniSciDB.");
 
   // cache
   opt_desc.add_options()("use-estimator-result-cache",
