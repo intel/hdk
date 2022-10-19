@@ -19,6 +19,11 @@ jobs:
           repository: intel-ai/modin
           ref: ienkovich/pyhdk
 
+      - name: Set environment
+        run: |
+          mkdir -p build
+          touch build/setup.py
+
       - name: Build manylinux2014_x86_64 wheels
         uses: pypa/cibuildwheel@v2.3.1
         with:
@@ -29,7 +34,6 @@ jobs:
             conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
             conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.9
 
-            mkdir -p ${{ env.PREFIX }} build
             cd build
             conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
             conda run -n ${{ env.CONDA_ENV }} sh -c "cd modin && pip install -e ."
