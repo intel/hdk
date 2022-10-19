@@ -342,6 +342,11 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                          po::value<size_t>(&config_->exec.override_gpu_grid_size)
                              ->default_value(config_->exec.override_gpu_grid_size),
                          "Size of grid to use on GPU.");
+  opt_desc.add_options()("cpu-only",
+                         po::value<bool>(&config_->exec.cpu_only)
+                             ->default_value(config_->exec.cpu_only)
+                             ->implicit_value(true),
+                         "Run on CPU only, even if GPUs are available.");
 
   // opts.filter_pushdown
   opt_desc.add_options()("enable-filter-push-down",

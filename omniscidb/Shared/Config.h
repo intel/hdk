@@ -101,6 +101,7 @@ struct ExecutionConfig {
 
   size_t override_gpu_block_size = 0;
   size_t override_gpu_grid_size = 0;
+  bool cpu_only = false;
 };
 
 struct FilterPushdownConfig {
