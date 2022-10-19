@@ -28,8 +28,6 @@ jobs:
         uses: pypa/cibuildwheel@v2.3.1
         with:
           package-dir: build
-          before_build: |
-            echo before_build
         env:
           CCIBW_BEFORE_ALL: |
             conda update conda
