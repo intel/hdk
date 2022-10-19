@@ -22,6 +22,7 @@ jobs:
       - name: Set environment
         run: |
           mkdir -p build
+          touch build/setup.py
           python3 -m pip install cibuildwheel==2.11.1
 
       - name: Build manylinux2014_x86_64 wheels
