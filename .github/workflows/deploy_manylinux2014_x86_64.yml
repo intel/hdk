@@ -46,7 +46,8 @@ jobs:
           # cp37 - cp39 are deployed for manylinux2010
           CIBW_BUILD: cp39-*
         run:
-          python -m cibuildwheel --package-dir build --output-dir wheelhouse
+          cd build
+          python -m cibuildwheel --output-dir wheelhouse
           
       - name: Upload manylinux2014_x86_64 wheels to PyPI
         env:
