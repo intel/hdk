@@ -12,14 +12,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
+      - uses: actions/checkout@v3
+        with:
+          path: modin
+          repository: intel-ai/modin
+          ref: ienkovich/pyhdk
+
       - name: Build manylinux2014_x86_64 wheels
         uses: pypa/cibuildwheel@v2.3.1
         env:
-          CIBW_BEFORE_BUILD: "pip install wheel cython"
+          CIBW_BEFORE_BUILD: |
+            conda update conda
+            conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+            conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.9
+
+            mkdir -p ${{ env.PREFIX }} build
+            cd build
+            conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
+            conda run -n ${{ env.CONDA_ENV }} sh -c "cd modin && pip install -e ."
+            conda run -n ${{ env.CONDA_ENV }} python -c 'import pyhdk'
+            conda run -n ${{ env.CONDA_ENV }} python python/tests/modin/modin_smoke_test.py
+            conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_bindings.py
+            conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
+
+            pip install wheel cython
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           # cp37 - cp39 are deployed for manylinux2010
-          CIBW_BUILD: cp310-*
+          CIBW_BUILD: cp39-*
       - name: Upload manylinux2014_x86_64 wheels to PyPI
         env:
           TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
