@@ -45,6 +45,7 @@ jobs:
             conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
 
             pip install wheel cython
+          CCIBW_BEFORE_BUILD: echo CCIBW_BEFORE_BUILD
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           # cp37 - cp39 are deployed for manylinux2010
