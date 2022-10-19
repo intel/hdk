@@ -171,8 +171,7 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
 
 void DataMgr::populateDeviceMgrs(const Config& config,
                                  const SystemParameters& system_parameters) {
-  // TODO: enable
-  if (system_parameters.cpu_only /* || config.exec.cpu_only */)
+  if (system_parameters.cpu_only || config.exec.cpu_only)
     return;
 
   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
