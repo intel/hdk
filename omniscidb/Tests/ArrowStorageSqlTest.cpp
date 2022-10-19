@@ -37,9 +37,10 @@ std::string getFilePath(const std::string& file_name) {
   return std::string("../../Tests/ArrowStorageDataFiles/") + file_name;
 }
 
-ExecutionResult runSqlQuery(const std::string& sql) {
+ExecutionResult runSqlQuery(const std::string& sql,
+                            ExecutorDeviceType dt = ExecutorDeviceType::CPU) {
   return TestHelpers::ArrowSQLRunner::runSqlQuery(
-      sql, CompilationOptions(), ExecutionOptions::fromConfig(config()));
+      sql, CompilationOptions::defaults(dt), ExecutionOptions::fromConfig(config()));
 }
 
 }  // anonymous namespace
@@ -188,41 +189,73 @@ class ArrowStorageTaxiTest : public ::testing::Test {
   }
 };
 
+bool skip_tests(const ExecutorDeviceType device_type) {
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
+  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
+#else
+  return device_type == ExecutorDeviceType::GPU;
+#endif
+}
+
+#define SKIP_NO_GPU()                                        \
+  if (skip_tests(dt)) {                                      \
+    CHECK(dt == ExecutorDeviceType::GPU);                    \
+    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
+    continue;                                                \
+  }
+
 TEST_F(ArrowStorageTaxiTest, TaxiQuery1) {
-  auto res = runSqlQuery("SELECT cab_type, count(*) FROM trips GROUP BY cab_type;");
-  compare_res_data(res, std::vector<std::string>({"green"s}), std::vector<int32_t>({20}));
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+    auto res = runSqlQuery("SELECT cab_type, count(*) FROM trips GROUP BY cab_type;", dt);
+    compare_res_data(
+        res, std::vector<std::string>({"green"s}), std::vector<int32_t>({20}));
+  }
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery2) {
-  auto res = runSqlQuery(
-      "SELECT passenger_count, AVG(total_amount) FROM trips GROUP BY passenger_count "
-      "ORDER BY passenger_count;");
-  compare_res_data(res,
-                   std::vector<int16_t>({1, 2, 5}),
-                   std::vector<double>({98.19f / 16, 75.0f, 13.58f / 3}));
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+    auto res = runSqlQuery(
+        "SELECT passenger_count, AVG(total_amount) FROM trips GROUP BY passenger_count "
+        "ORDER BY passenger_count;",
+        dt);
+    compare_res_data(res,
+                     std::vector<int16_t>({1, 2, 5}),
+                     std::vector<double>({98.19f / 16, 75.0f, 13.58f / 3}));
+  }
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery3) {
-  auto res = runSqlQuery(
-      "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
-      "count(*) FROM trips GROUP BY passenger_count, pickup_year ORDER BY "
-      "passenger_count;");
-  compare_res_data(res,
-                   std::vector<int16_t>({1, 2, 5}),
-                   std::vector<int64_t>({2013, 2013, 2013}),
-                   std::vector<int32_t>({16, 1, 3}));
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+    auto res = runSqlQuery(
+        "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
+        "count(*) FROM trips GROUP BY passenger_count, pickup_year ORDER BY "
+        "passenger_count;",
+        dt);
+    compare_res_data(res,
+                     std::vector<int16_t>({1, 2, 5}),
+                     std::vector<int64_t>({2013, 2013, 2013}),
+                     std::vector<int32_t>({16, 1, 3}));
+  }
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery4) {
-  auto res = runSqlQuery(
-      "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
-      "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP BY "
-      "passenger_count, pickup_year, distance ORDER BY pickup_year, the_count desc;");
-  compare_res_data(res,
-                   std::vector<int16_t>({1, 5, 2}),
-                   std::vector<int64_t>({2013, 2013, 2013}),
-                   std::vector<int32_t>({0, 0, 0}),
-                   std::vector<int32_t>({16, 3, 1}));
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+    auto res = runSqlQuery(
+        "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
+        "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP "
+        "BY "
+        "passenger_count, pickup_year, distance ORDER BY pickup_year, the_count desc;",
+        dt);
+    compare_res_data(res,
+                     std::vector<int16_t>({1, 5, 2}),
+                     std::vector<int64_t>({2013, 2013, 2013}),
+                     std::vector<int32_t>({0, 0, 0}),
+                     std::vector<int32_t>({16, 3, 1}));
+  }
 }
 
 int main(int argc, char** argv) {
