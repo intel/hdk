@@ -22,7 +22,7 @@ jobs:
       - name: Build manylinux2014_x86_64 wheels
         uses: pypa/cibuildwheel@v2.3.1
         env:
-          CIBW_BEFORE_BUILD: |
+          CCIBW_BEFORE_ALL: |
             conda update conda
             conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
             conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.9
