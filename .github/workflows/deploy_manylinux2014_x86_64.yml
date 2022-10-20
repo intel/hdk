@@ -46,6 +46,7 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           # cp37 - cp39 are deployed for manylinux2010
           CIBW_BUILD: cp39-*
+          CIBW_BUILD_VERBOSITY: 2
         run: |
           cd build
           python -m cibuildwheel --output-dir wheelhouse
