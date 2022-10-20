@@ -23,11 +23,11 @@ jobs:
         run: |
           mkdir -p build
           touch build/setup.py
-          python3 -m pip install --upgrade setuptools pip cibuildwheel
+          python3 -m pip install --upgrade pip cibuildwheel
 
       - name: Build manylinux2014_x86_64 wheels
         env:
-          CCIBW_BEFORE_ALL: |
+          CIBW_BEFORE_ALL: |
             conda update conda
             conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
             conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.9
@@ -41,7 +41,6 @@ jobs:
             conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
 
             pip install wheel cython
-          CCIBW_BEFORE_BUILD: echo CCIBW_BEFORE_BUILD
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           # cp37 - cp39 are deployed for manylinux2010
