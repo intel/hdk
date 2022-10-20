@@ -28,18 +28,8 @@ jobs:
       - name: Build manylinux2014_x86_64 wheels
         env:
           CIBW_BEFORE_ALL: |
-            conda update conda
-            conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
-            conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.9
-
             cd build
-            conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
-            conda run -n ${{ env.CONDA_ENV }} sh -c "cd modin && pip install -e ."
-            conda run -n ${{ env.CONDA_ENV }} python -c 'import pyhdk'
-            conda run -n ${{ env.CONDA_ENV }} python python/tests/modin/modin_smoke_test.py
-            conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_bindings.py
-            conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
-
+            cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install
             pip install wheel cython
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
