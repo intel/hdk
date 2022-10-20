@@ -33,7 +33,7 @@ jobs:
           echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
       - name: Restore Conda env cache
-        id: conda-conda
+        id: conda-cache
         uses: actions/cache@v3
         with:
           path: |
