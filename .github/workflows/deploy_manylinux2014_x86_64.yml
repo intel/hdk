@@ -28,6 +28,8 @@ jobs:
       - name: Build manylinux2014_x86_64 wheels
         env:
           CIBW_BEFORE_ALL: |
+            pwd
+            ls
             cd build
             cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install
             pip install wheel cython
