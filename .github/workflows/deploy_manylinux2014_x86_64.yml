@@ -42,7 +42,6 @@ jobs:
           CIBW_BUILD: cp39-*
           CIBW_BUILD_VERBOSITY: 2
         run: |
-          cd build
           python -m cibuildwheel --output-dir wheelhouse
           
       - name: Upload manylinux2014_x86_64 wheels to PyPI
