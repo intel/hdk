@@ -22,7 +22,7 @@ jobs:
       - name: Set environment
         run: |
           mkdir -p build
-          touch build/setup.py
+          touch setup.py
           python3 -m pip install --upgrade pip cibuildwheel
 
       - name: Build manylinux2014_x86_64 wheels
@@ -34,6 +34,7 @@ jobs:
             ls /project 1>&2
             cd build
             cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install
+            ln -s build/setup.py .
             pip install wheel cython
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
