@@ -30,10 +30,30 @@ jobs:
       - name: Build manylinux2014_x86_64 wheels
         env:
           CIBW_BEFORE_BUILD: |
-            set -vx
-            pwd -P 1>&2
-            ls 1>&2
-            ls /project 1>&2
+            sudo yum groupinstall -y "Development Tools"
+            sudo yum install -y \
+              ca-certificates \
+              zlib-devel \
+              epel-release \
+              which \
+              libssh \
+              openssl-devel \
+              ncurses-devel \
+              git \
+              java-1.8.0-openjdk-devel \
+              java-1.8.0-openjdk-headless \
+              gperftools \
+              gperftools-devel \
+              gperftools-libs \
+              python-devel \
+              wget \
+              curl \
+              python3 \
+              openldap-devel \
+              patchelf \
+              jq \
+              pxz
+
             cd build
             cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install
             ln -s build/setup.py .
