@@ -29,9 +29,9 @@ jobs:
         env:
           CIBW_BEFORE_BUILD: |
             set -vx
-            pwd -P
-            ls
-            ls /project
+            pwd -P 1>&2
+            ls 1>&2
+            ls /project 1>&2
             cd build
             cmake  .. -DENABLE_CUDA=off -DCMAKE_BUILD_TYPE=release && make -j2 && make install
             pip install wheel cython
