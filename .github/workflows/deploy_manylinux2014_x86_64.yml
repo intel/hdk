@@ -27,7 +27,7 @@ jobs:
 
       - name: Build manylinux2014_x86_64 wheels
         env:
-          CIBW_BEFORE_ALL: |
+          CIBW_BEFORE_BUILD: |
             set -vx
             pwd -P
             ls
