@@ -30,6 +30,7 @@ jobs:
       - name: Build manylinux2014_x86_64 wheels
         env:
           CIBW_BEFORE_BUILD: |
+            which -a sudo 1>&2
             sudo echo test 1>&2
             cp scripts/mapd-deps-centos.sh omniscidb/scripts/mapd-deps-centos.sh
             cat /opt/rh/devtoolset-10/root/usr/bin/sudo 1>&2
