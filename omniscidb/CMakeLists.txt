@@ -828,16 +828,6 @@ if(MAPD_IMMERSE_DOWNLOAD)
   list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_BINARY_DIR}/frontend)
 endif()
 
-# systemd
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-  if("${MAPD_EDITION_LOWER}" STREQUAL "ee")
-    install(FILES systemd/omnisci_sd_server.service.in systemd/omnisci_sd_server@.service.in DESTINATION systemd)
-    install(FILES systemd/omnisci-sds.conf.in DESTINATION systemd)
-  endif()
-  install(FILES systemd/omnisci_server.service.in systemd/omnisci_server@.service.in DESTINATION systemd)
-  install(FILES systemd/omnisci.conf.in DESTINATION systemd)
-  install(PROGRAMS systemd/install_omnisci_systemd.sh DESTINATION systemd)
-endif()
 
 set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES}")
 
@@ -862,10 +852,6 @@ endif()
 
 set(CPACK_RESOURCE_FILE_LICENSE "${EULA_FILE}")
 install(FILES "${EULA_FILE}" DESTINATION "."  COMPONENT "doc")
-
-install(PROGRAMS startomnisci DESTINATION ".")
-install(PROGRAMS scripts/inneromnisci DESTINATION "scripts")
-install(PROGRAMS insert_sample_data DESTINATION ".")
 
 exec_program(uname ARGS -m OUTPUT_VARIABLE MAPD_HOST_SYSTEM_ARCHITECTURE) # does not account for cross-compiling or Windows
 set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${MAPD_EDITION_LOWER}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}-${MAPD_HOST_SYSTEM_ARCHITECTURE}${MAPD_PACKAGE_FLAGS}")
