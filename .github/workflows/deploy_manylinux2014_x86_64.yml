@@ -32,6 +32,7 @@ jobs:
           CIBW_BEFORE_BUILD: |
             yum install sudo
             which -a sudo 1>&2
+            exit 0
             sudo echo test 1>&2
             cp scripts/mapd-deps-centos.sh omniscidb/scripts/mapd-deps-centos.sh
             cat /opt/rh/devtoolset-10/root/usr/bin/sudo 1>&2
