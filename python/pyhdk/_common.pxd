@@ -178,6 +178,9 @@ cdef extern from "omniscidb/Shared/Config.h":
     bool enable_interop
     size_t parallel_linearization_threshold
     bool enable_multifrag_rs
+    size_t override_gpu_block_size
+    size_t override_gpu_grid_size
+    bool cpu_only
 
   cdef cppclass CFilterPushdownConfig "FilterPushdownConfig":
     bool enable
@@ -205,6 +208,7 @@ cdef extern from "omniscidb/Shared/Config.h":
     size_t max_memory_allocation_size
     double bump_allocator_step_reduction
     double input_mem_limit_percent
+    size_t reserved_mem_bytes
 
   cdef cppclass CCpuMemoryConfig "CpuMemoryConfig":
     bool enable_tiered_cpu_mem
