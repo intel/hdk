@@ -20,11 +20,8 @@
 #include <array>
 #include <cstdint>
 
-#include "../Shared/funcannotations.h"
-#include "ExtractFromTime.h"
-
-// DateTruncField must be synced with datetrunc_fname
-enum DateTruncField {
+// DatetruncField must be synced with datetrunc_fname
+enum DatetruncField {
   dtYEAR = 0,
   dtQUARTER,
   dtMONTH,

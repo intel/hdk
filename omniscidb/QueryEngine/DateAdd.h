@@ -20,26 +20,7 @@
 #include <cstdint>
 #include <ctime>
 
-#include "../Shared/funcannotations.h"
-#include "ExtractFromTime.h"
-
-/*
- * year
- * month
- * day
- * hour
- * minute
- * second
- *
- * millennium
- * century
- * decade
- * milliseconds
- * microseconds
- * week
- * quarterday
- */
-enum DateAddField {
+enum DateaddField {
   daYEAR,
   daQUARTER,
   daMONTH,

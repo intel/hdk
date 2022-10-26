@@ -15,6 +15,7 @@
  */
 
 #include "DateAdd.h"
+#include "Shared/funcannotations.h"
 
 #ifdef EXECUTE_INCLUDE
 

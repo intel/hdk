@@ -21,6 +21,8 @@
 #include "DateTruncate.h"
 #include "ExtractFromTime.h"
 
+#include "Shared/funcannotations.h"
+
 #ifndef __CUDACC__
 #include <cstdlib>  // abort()
 #endif
