@@ -1209,7 +1209,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
   CodeGenerator code_generator(this);
   auto group_key = code_generator.codegen(group_by_col, true, co).front();
   auto key_to_cache = group_key;
-  if (group_by_col->is<hdk::ir::UOper>() &&
+  if (group_by_col && group_by_col->is<hdk::ir::UOper>() &&
       group_by_col->as<hdk::ir::UOper>()->get_optype() == kUNNEST) {
     auto preheader = cgen_state_->ir_builder_.GetInsertBlock();
     auto array_loop_head = llvm::BasicBlock::Create(cgen_state_->context_,
