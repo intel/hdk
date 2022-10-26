@@ -94,7 +94,7 @@ class TransientDictIdVisitor : public ScalarExprVisitor<int> {
     if (uoper->get_optype() == kCAST && expr_type->isExtDictionary()) {
       return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     }
-    return defaultResult();
+    return ScalarExprVisitor::visitUOper(uoper);
   }
 
   int visitCaseExpr(const hdk::ir::CaseExpr* case_expr) const override {
@@ -102,7 +102,7 @@ class TransientDictIdVisitor : public ScalarExprVisitor<int> {
     if (expr_type->isExtDictionary()) {
       return expr_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     }
-    return defaultResult();
+    return ScalarExprVisitor::visitCaseExpr(case_expr);
   }
 
  protected:

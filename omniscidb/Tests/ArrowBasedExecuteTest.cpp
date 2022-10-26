@@ -9163,9 +9163,10 @@ TEST_F(Select, Subqueries) {
     c("SELECT COUNT(*) FROM test WHERE str IN (SELECT str FROM test_in_bitmap GROUP BY "
       "str);",
       dt);
-    c("SELECT COUNT(*) FROM test WHERE str NOT IN (SELECT str FROM test_in_bitmap GROUP "
-      "BY str);",
-      dt);
+    ASSERT_EQ((int64_t)20,
+              v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE str NOT IN "
+                                        "(SELECT str FROM test_in_bitmap GROUP BY str);",
+                                        dt)));
     c("SELECT COUNT(*) FROM test WHERE str IN (SELECT ss FROM test GROUP BY ss);", dt);
     c("SELECT COUNT(*) FROM test WHERE str NOT IN (SELECT ss FROM test GROUP BY ss);",
       dt);
