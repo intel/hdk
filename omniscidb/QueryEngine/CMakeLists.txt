@@ -220,16 +220,18 @@ add_custom_command(
 
 add_custom_command(
         DEPENDS RuntimeFunctions.h RuntimeFunctions.cpp DecodersImpl.h l0_mapd_rt.cpp JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp
+            ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
         COMMAND ${llvm_clangpp_cmd}
-        ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm -Xclang -ffake-address-space-map -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
+        ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm -Xclang -ffake-address-space-map
         ${CLANG_SDK_INC}
         ${CLANG_CRT_INC}
         ${MAPD_DEFINITIONS}
         -DL0_RUNTIME_ENABLED
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
         ${CMAKE_CURRENT_SOURCE_DIR}/l0_mapd_rt.cpp
-        VERBATIM)
+        COMMAND ${llvm_link_cmd} ARGS -f ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc ${CMAKE_CURRENT_BINARY_DIR}/DateAdd.bc ${CMAKE_CURRENT_BINARY_DIR}/DateTruncate.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtractFromTime.bc -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
+)
 
 if(ENABLE_L0)
     add_custom_target(QueryEngineL0Targets ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc)
