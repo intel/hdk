@@ -29,7 +29,6 @@
 
 #include <cmath>
 #include <ctime>
-#include <iostream>
 #include <limits>
 
 #define DATE_TRUNC_FUNC_JIT(funcname)                                                \

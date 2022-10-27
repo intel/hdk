@@ -181,6 +181,7 @@ if (SUPPRESS_NULL_LOGGER_DEPRECATION_WARNINGS)
 endif ()
 
 find_program(llvm_clangpp_cmd NAME clang++ HINTS ${LLVM_TOOLS_BINARY_DIR})
+find_program(llvm_link_cmd NAME llvm-link HINTS ${LLVM_TOOLS_BINARY_DIR})
 
 list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -205,6 +206,7 @@ endif()
 
 add_custom_command(
         DEPENDS RuntimeFunctions.h RuntimeFunctions.cpp DecodersImpl.h JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp
+            ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc
         COMMAND ${llvm_clangpp_cmd}
         ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm
@@ -212,7 +214,9 @@ add_custom_command(
         ${CLANG_CRT_INC}
         ${MAPD_DEFINITIONS}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
-        ${CMAKE_CURRENT_SOURCE_DIR}/RuntimeFunctions.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/RuntimeFunctions.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtractFromTime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateAdd.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateTruncate.cpp
+        COMMAND ${llvm_link_cmd} ARGS -f ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc ${CMAKE_CURRENT_BINARY_DIR}/DateAdd.bc ${CMAKE_CURRENT_BINARY_DIR}/DateTruncate.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtractFromTime.bc -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc
+)
 
 add_custom_command(
         DEPENDS RuntimeFunctions.h RuntimeFunctions.cpp DecodersImpl.h l0_mapd_rt.cpp JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp

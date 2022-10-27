@@ -19,6 +19,8 @@
 #include "DateTimeUtils.h"
 #include "Execute.h"
 
+#include "DateTruncateLookupTable.h"
+
 using namespace DateTimeUtils;
 
 namespace {
