@@ -50,8 +50,11 @@ std::string SPIRVExecuteTest::generateSimpleSPIRV() {
   Constant* onef = ConstantFP::get(ctx, APFloat(1.f));
   Value* idx = builder.CreateCall(get_global_idj, zero, "idx");
   auto argit = f->args().begin();
-  Value* firstElemSrc = builder.CreateGEP(f->args().begin(), idx, "src.idx");
-  Value* firstElemDst = builder.CreateGEP(++argit, idx, "dst.idx");
+  Value* firstElemSrc =
+      builder.CreateGEP(argit->getType()->getPointerElementType(), argit, idx, "src.idx");
+  ++argit;
+  Value* firstElemDst =
+      builder.CreateGEP(argit->getType()->getPointerElementType(), argit, idx, "dst.idx");
   Value* ldSrc = builder.CreateLoad(Type::getFloatTy(ctx), firstElemSrc, "ld");
   Value* result = builder.CreateFAdd(ldSrc, onef, "foo");
   builder.CreateStore(result, firstElemDst);
