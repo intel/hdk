@@ -1190,11 +1190,8 @@ extern "C" __device__ bool slotEmptyKeyCAS_int8(int8_t* slot,
 }
 
 #include "../Utils/ChunkIter.cpp"
-#include "DateTruncate.cpp"
-#include "ExtractFromTime.cpp"
 #define EXECUTE_INCLUDE
 #include "ArrayOps.cpp"
-#include "DateAdd.cpp"
 #include "StringFunctions.cpp"
 #undef EXECUTE_INCLUDE
 #include "../Utils/Regexp.cpp"
