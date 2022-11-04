@@ -398,9 +398,9 @@ void varlen_buffer_sample(int8_t* this_ptr1,
   const auto rhs_proj_col = *reinterpret_cast<const int64_t*>(that_ptr1);
   if (rhs_proj_col != init_val) {
     *reinterpret_cast<int64_t*>(this_ptr1) = rhs_proj_col;
+    CHECK(this_ptr2 && that_ptr2);
+    *reinterpret_cast<int64_t*>(this_ptr2) = *reinterpret_cast<const int64_t*>(that_ptr2);
   }
-  CHECK(this_ptr2 && that_ptr2);
-  *reinterpret_cast<int64_t*>(this_ptr2) = *reinterpret_cast<const int64_t*>(that_ptr2);
 }
 
 }  // namespace

@@ -1540,12 +1540,12 @@ void ResultSetStorage::reduceOneSlot(
         } else {
           if (rhs_proj_col != init_val) {
             *reinterpret_cast<int64_t*>(this_ptr1) = rhs_proj_col;
-          }
-          if ((target_info.agg_kind == kSAMPLE &&
-               (target_info.type->isString() || target_info.type->isArray()))) {
-            CHECK(this_ptr2 && that_ptr2);
-            *reinterpret_cast<int64_t*>(this_ptr2) =
-                *reinterpret_cast<const int64_t*>(that_ptr2);
+            if ((target_info.agg_kind == kSAMPLE &&
+                 (target_info.type->isString() || target_info.type->isArray()))) {
+              CHECK(this_ptr2 && that_ptr2);
+              *reinterpret_cast<int64_t*>(this_ptr2) =
+                  *reinterpret_cast<const int64_t*>(that_ptr2);
+            }
           }
         }
 

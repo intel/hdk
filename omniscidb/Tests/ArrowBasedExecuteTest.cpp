@@ -15861,6 +15861,19 @@ TEST_F(Select, Sample) {
     };
     {
       const auto rows = run_multiple_agg(
+          "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x % 2 = 0;", dt);
+      const auto crt_row = rows->getNextRow(true, true);
+      ASSERT_EQ(size_t(2), crt_row.size());
+      const auto nullable_str = v<NullableString>(crt_row[0]);
+      const auto str_ptr = boost::get<std::string>(&nullable_str);
+      ASSERT_TRUE(str_ptr);
+      ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
+      ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
+      const auto empty_row = rows->getNextRow(true, true);
+      ASSERT_EQ(size_t(0), empty_row.size());
+    };
+    {
+      const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x > 7 GROUP BY x;", dt);
       const auto crt_row = rows->getNextRow(true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
