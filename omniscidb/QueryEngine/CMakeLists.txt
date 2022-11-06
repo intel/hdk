@@ -229,7 +229,7 @@ add_custom_command(
         ${MAPD_DEFINITIONS}
         -DL0_RUNTIME_ENABLED
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
-        ${CMAKE_CURRENT_SOURCE_DIR}/l0_mapd_rt.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/l0_mapd_rt.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtractFromTime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateAdd.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateTruncate.cpp
         COMMAND ${llvm_link_cmd} ARGS -f ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc ${CMAKE_CURRENT_BINARY_DIR}/DateAdd.bc ${CMAKE_CURRENT_BINARY_DIR}/DateTruncate.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtractFromTime.bc -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
 )
 
