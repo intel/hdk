@@ -1,5 +1,6 @@
 /**
  * Copyright (C) 2022 Intel Corporation
+ * Copyright 2017 MapD Technologies, Inc.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
