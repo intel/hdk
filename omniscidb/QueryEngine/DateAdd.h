@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <ctime>
 
-enum DateaddField {
+enum DateAddField {
   daYEAR,
   daQUARTER,
   daMONTH,

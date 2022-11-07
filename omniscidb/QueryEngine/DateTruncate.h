@@ -19,8 +19,8 @@
 
 #include <cstdint>
 
-// DatetruncField must be synced with datetrunc_fname
-enum DatetruncField {
+// DateTruncField must be synced with datetrunc_fname
+enum DateTruncField {
   dtYEAR = 0,
   dtQUARTER,
   dtMONTH,
@@ -41,7 +41,7 @@ enum DatetruncField {
   dtINVALID
 };
 
-int64_t DateTruncate(DatetruncField field, const int64_t timeval);
+int64_t DateTruncate(DateTruncField field, const int64_t timeval);
 
 // for usage in compiled and linked modules in the binary
 int64_t truncate_high_precision_timestamp_to_date(const int64_t timeval,
