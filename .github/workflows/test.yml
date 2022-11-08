@@ -1,0 +1,102 @@
+name: Reusable test action
+on:
+  workflow_call: 
+    inputs:
+      cuda_compiler_version:
+        type: string
+        default: None
+      cache-suffix:
+        type: string
+        required: true
+      test:
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      cuda_compiler_version: ${{ inputs.cuda_compiler_version }}
+      PREFIX: distr
+      CONDA_ENV: omnisci-dev
+
+    steps:
+      - name: Set env context
+        run: |
+          echo CONDA_PATH=$CONDA >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'CPU' }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.RUN_STAMP }}-build
+
+      - name: Unpack build files
+        run: |
+          tar -zxf build.tgz
+
+      - name: Restore Conda env cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ inputs.cache-suffix }}
+
+      - name: Check style
+        if: inputs.test == 'style'
+        run: |
+          cd omniscidb
+          conda run -n ${{ env.CONDA_ENV }} bash -c "find . -name build -prune -or -name ThirdParty -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file"
+
+      #	The following tests need more memory than a standard instance has:
+      #	  ArrowBasedExecuteTest
+      #   ArrowBasedExecuteTestColumnarOutput
+      #   ArrowBasedExecuteTestSizeAgnostic
+      #   ArrayTest
+      #   CorrelatedSubqueryTest
+      #   NoCatalogSqlTest
+      # that's not possible to manage instance memory with standard actions
+      - name: Set Swap Space
+        if: inputs.test == 'smoke'
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
+      - name: Run smoke tests
+        if: inputs.test == 'smoke'
+        run: |
+          sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory'
+          cd omniscidb
+          conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/test.sh
+
+      - name: Download perf results
+        # there is no way to access other workflow artifacts without dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@v2
+        if: inputs.test == 'perf'
+        with:
+          workflow: main.yml
+          branch: ${{ github.ref_name }}
+          workflow_conclusion: success
+          name: ${{ env.RUN_STAMP }}-taxi
+          search_artifacts: true
+        continue-on-error: true
+
+      - name: Run tests and process results
+        if: inputs.test == 'perf'
+        run: |
+          cd omniscidb
+          git clone --branch trips-reduced https://github.com/intel-ai/datasets.git data
+          rm -rf data/.git
+
+          conda run -n ${{ env.CONDA_ENV }} pip install matplotlib
+          conda run -n ${{ env.CONDA_ENV }} python .github/workflows/scripts/run-perf.py 3x build/bin/taxi_reduced --data data
+
+      - name: Upload perf results
+        uses: actions/upload-artifact@v3
+        if: inputs.test == 'perf'
+        with:
+          name: ${{ env.RUN_STAMP }}-taxi
+          path: |
+            *.pdf
+            perf.json
+
+
