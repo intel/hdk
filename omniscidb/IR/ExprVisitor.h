@@ -161,6 +161,7 @@ class ExprVisitor {
   }
 
   virtual T visitInValues(const hdk::ir::InValues* in_values) {
+    visit(in_values->arg());
     const auto& value_list = in_values->valueList();
     for (const auto& in_value : value_list) {
       visit(in_value.get());
