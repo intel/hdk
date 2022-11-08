@@ -204,37 +204,80 @@ if(NOT MSVC)
     add_dependencies(QueryEngine QueryEngineTableFunctionsFactory_init)
 endif()
 
-add_custom_command(
-        DEPENDS RuntimeFunctions.h RuntimeFunctions.cpp DecodersImpl.h JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp
-            ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc
+set(cpu_runtime_function_sources RuntimeFunctions.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
+set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
+
+
+set(hdk_default_runtime_functions_module_dependencies
+    ${cpu_runtime_function_sources}
+    RuntimeFunctions.h DecodersImpl.h ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp)
+
+# Adds a custom command for producing llvm bitcode modules out of a .cpp source.
+function(precompile_llvm_module SOURCE_FILE SUFFIX CLANG_ARGS)
+    get_filename_component(src_name ${SOURCE_FILE} NAME_WLE)
+    set(result_module_name ${src_name}${SUFFIX})
+    message(STATUS "Adding precompiled llvm module ${result_module_name}")
+    add_custom_command(
+        DEPENDS ${hdk_default_runtime_functions_module_dependencies} ${SOURCE_FILE}
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         COMMAND ${llvm_clangpp_cmd}
         ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm
-        ${CLANG_SDK_INC}
-        ${CLANG_CRT_INC}
-        ${MAPD_DEFINITIONS}
+        ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS} ${CLANG_ARGS}
+        -o ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
-        ${CMAKE_CURRENT_SOURCE_DIR}/RuntimeFunctions.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtractFromTime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateAdd.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateTruncate.cpp
-        COMMAND ${llvm_link_cmd} ARGS -f ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc ${CMAKE_CURRENT_BINARY_DIR}/DateAdd.bc ${CMAKE_CURRENT_BINARY_DIR}/DateTruncate.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtractFromTime.bc -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc
-)
+        ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}
+    )
+endfunction()
 
-add_custom_command(
-        DEPENDS RuntimeFunctions.h RuntimeFunctions.cpp DecodersImpl.h l0_mapd_rt.cpp JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp
-            ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
-        COMMAND ${llvm_clangpp_cmd}
-        ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm -Xclang -ffake-address-space-map
-        ${CLANG_SDK_INC}
-        ${CLANG_CRT_INC}
-        ${MAPD_DEFINITIONS}
-        -DL0_RUNTIME_ENABLED
-        -I ${CMAKE_CURRENT_SOURCE_DIR}/../
-        ${CMAKE_CURRENT_SOURCE_DIR}/l0_mapd_rt.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtractFromTime.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateAdd.cpp ${CMAKE_CURRENT_SOURCE_DIR}/DateTruncate.cpp
-        COMMAND ${llvm_link_cmd} ARGS -f ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc ${CMAKE_CURRENT_BINARY_DIR}/DateAdd.bc ${CMAKE_CURRENT_BINARY_DIR}/DateTruncate.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtractFromTime.bc -o ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc
-)
+# Helper functions to provide easy access to precompile_llvm_module()
+# Funtion names are exported to be used by precompile_modules() to dispatch .bc generation.
+set(intel_gpu_module_internal_suffix "L0_internal.bc")
+function(precompile_intel_gpu_module SOURCE_FILE)
+    set(module_compiler_flags "-Xclang -ffake-address-space-map -DL0_RUNTIME_ENABLED")
+    precompile_llvm_module(${SOURCE_FILE} ${intel_gpu_module_internal_suffix} ${module_compiler_flags})
+endfunction()
+set(precompile_intel_gpu_module_cmd "precompile_intel_gpu_module")
+
+set(cpu_module_internal_suffix "_internal.bc")
+function(precompile_cpu_module SOURCE_FILE)
+    precompile_llvm_module(${SOURCE_FILE} ${cpu_module_internal_suffix} "")
+endfunction()
+set(precompile_cpu_module_cmd "precompile_cpu_module")
+
+# Entry point for generating all .bc files required for a runtime module
+# Adds custom rules for each .cpp file provided
+# Returns a list of .bc targets
+function(precompile_modules OUT_LIST_NAME MODULE_SUFFIX COMPILE_COMMAND SOURCES_LIST)
+    foreach(module ${SOURCES_LIST})
+        cmake_language(CALL ${COMPILE_COMMAND} ${module})
+        get_filename_component(mod_name ${module} NAME_WLE)
+        list(APPEND precompiled_module_list "${mod_name}${MODULE_SUFFIX}")
+    endforeach()
+    set(${OUT_LIST_NAME} ${precompiled_module_list} PARENT_SCOPE)
+endfunction()
+
+# Links final runtime .bc module with a name provided by MOD_NAME
+function(link_runtime_module MOD_NAME PRECOMPILED_MODULE_LIST)
+    add_custom_command(
+        DEPENDS ${PRECOMPILED_MODULE_LIST}
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MOD_NAME}
+        COMMAND ${llvm_link_cmd} ARGS -f ${PRECOMPILED_MODULE_LIST} -o ${CMAKE_CURRENT_BINARY_DIR}/${MOD_NAME}
+    )
+endfunction()
+
+set(cpu_module_name RuntimeFunctions.bc)
+set(intel_gpu_module_name RuntimeFunctionsL0.bc)
+
+precompile_modules("intel_gpu_precompiled_module_list" ${intel_gpu_module_internal_suffix} ${precompile_intel_gpu_module_cmd} "${intel_gpu_runtime_function_sources}")
+precompile_modules("cpu_precompiled_module_list" ${cpu_module_internal_suffix} ${precompile_cpu_module_cmd} "${cpu_runtime_function_sources}")
+
+link_runtime_module(${intel_gpu_module_name} "${intel_gpu_precompiled_module_list}")
+link_runtime_module(${cpu_module_name} "${cpu_precompiled_module_list}")
+
 
 if(ENABLE_L0)
-    add_custom_target(QueryEngineL0Targets ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctionsL0.bc)
+    add_custom_target(IntelGPURuntimeModule DEPENDS ${intel_gpu_module_name})
+    add_dependencies(QueryEngine IntelGPURuntimeModule)
 endif()
 
 find_package(PythonInterp REQUIRED)
