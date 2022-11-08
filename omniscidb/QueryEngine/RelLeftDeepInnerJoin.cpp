@@ -15,9 +15,9 @@
  */
 
 #include "RelLeftDeepInnerJoin.h"
+#include "IR/ExprRewriter.h"
 #include "Logger/Logger.h"
 #include "RelAlgDagBuilder.h"
-#include "IR/ExprRewriter.h"
 
 #include <numeric>
 
