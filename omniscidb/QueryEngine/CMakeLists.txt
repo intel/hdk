@@ -213,7 +213,8 @@ set(hdk_default_runtime_functions_module_dependencies
     RuntimeFunctions.h DecodersImpl.h ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp)
 
 # Adds a custom command for producing llvm bitcode modules out of a .cpp source.
-function(precompile_llvm_module SOURCE_FILE SUFFIX CLANG_ARGS)
+# Any additional arguments are treated as clang args and bypassed as-is.
+function(precompile_llvm_module SOURCE_FILE SUFFIX)
     get_filename_component(src_name ${SOURCE_FILE} NAME_WLE)
     set(result_module_name ${src_name}${SUFFIX})
     message(STATUS "Adding precompiled llvm module ${result_module_name}")
@@ -221,8 +222,8 @@ function(precompile_llvm_module SOURCE_FILE SUFFIX CLANG_ARGS)
         DEPENDS ${hdk_default_runtime_functions_module_dependencies} ${SOURCE_FILE}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         COMMAND ${llvm_clangpp_cmd}
-        ARGS -std=c++17 ${RT_OPT_FLAGS} -c -emit-llvm
-        ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS} ${CLANG_ARGS}
+        ARGS -std=c++17 ${RT_OPT_FLAGS} ${ARGN} -c -emit-llvm
+        ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS}
         -o ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
         ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}
@@ -233,14 +234,14 @@ endfunction()
 # Funtion names are exported to be used by precompile_modules() to dispatch .bc generation.
 set(intel_gpu_module_internal_suffix "L0_internal.bc")
 function(precompile_intel_gpu_module SOURCE_FILE)
-    set(module_compiler_flags "-Xclang -ffake-address-space-map -DL0_RUNTIME_ENABLED")
+    set(module_compiler_flags -Xclang -ffake-address-space-map -DL0_RUNTIME_ENABLED)
     precompile_llvm_module(${SOURCE_FILE} ${intel_gpu_module_internal_suffix} ${module_compiler_flags})
 endfunction()
 set(precompile_intel_gpu_module_cmd "precompile_intel_gpu_module")
 
 set(cpu_module_internal_suffix "_internal.bc")
 function(precompile_cpu_module SOURCE_FILE)
-    precompile_llvm_module(${SOURCE_FILE} ${cpu_module_internal_suffix} "")
+    precompile_llvm_module(${SOURCE_FILE} ${cpu_module_internal_suffix})
 endfunction()
 set(precompile_cpu_module_cmd "precompile_cpu_module")
 
