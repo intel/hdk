@@ -4,7 +4,7 @@ jobs:
   build:
     runs-on: [ self-hosted, linux, x64 ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: update submodule
         run: |
           git submodule init
