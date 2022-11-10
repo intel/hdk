@@ -19,8 +19,8 @@
 
 struct L0BinResult {
   std::shared_ptr<l0::L0Device> device;
-  std::shared_ptr<l0::L0Kernel> kernel;
   std::shared_ptr<l0::L0Module> module;
+  std::shared_ptr<l0::L0Kernel> kernel;
 };
 
 L0BinResult spv_to_bin(const std::string& spv,
@@ -43,8 +43,8 @@ class L0DeviceCompilationContext {
 
  private:
   std::shared_ptr<l0::L0Device> device_;
-  std::shared_ptr<l0::L0Kernel> kernel_;
   std::shared_ptr<l0::L0Module> module_;
+  std::shared_ptr<l0::L0Kernel> kernel_;
   const l0::L0Manager* l0_mgr_;
   const int device_id_;
 };

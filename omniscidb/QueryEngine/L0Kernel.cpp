@@ -35,7 +35,7 @@ L0BinResult spv_to_bin(const std::string& spv,
   auto module = device->create_module((uint8_t*)spv.data(), spv.size(), true);
   auto kernel = module->create_kernel(name.c_str(), 1, 1, 1);
 
-  return {device, kernel, module};
+  return {device, module, kernel};
 }
 
 L0DeviceCompilationContext::L0DeviceCompilationContext(
@@ -47,8 +47,8 @@ L0DeviceCompilationContext::L0DeviceCompilationContext(
     unsigned int num_options,
     void** option_vals)
     : device_(device)
-    , kernel_(kernel)
     , module_(module)
+    , kernel_(kernel)
     , l0_mgr_(l0_mgr)
     , device_id_(device_id) {}
 
