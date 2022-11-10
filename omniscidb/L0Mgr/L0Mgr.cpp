@@ -205,6 +205,7 @@ std::shared_ptr<L0Module> L0Device::create_module(uint8_t* code,
     L0_SAFE_CALL(zeModuleBuildLogGetString(buildlog, &logSize, strLog.data()));
     LOG(INFO) << "L0 module build log: " << strLog;
   }
+  L0_SAFE_CALL(zeModuleBuildLogDestroy(buildlog));
   if (status) {
     throw l0::L0Exception(status);
   }
