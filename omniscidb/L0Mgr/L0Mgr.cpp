@@ -209,7 +209,7 @@ std::shared_ptr<L0Module> L0Device::create_module(uint8_t* code,
   if (status) {
     throw l0::L0Exception(status);
   }
-  return std::make_shared<L0Module>(handle);
+  return L0Module::make(handle);
 }
 
 L0Manager::L0Manager() : drivers_(get_drivers()) {}
@@ -222,8 +222,6 @@ int8_t* L0Manager::allocateDeviceMem(const size_t num_bytes, int device_id) {
   auto& device = drivers_[0]->devices()[device_id];
   return (int8_t*)allocate_device_mem(num_bytes, *device);
 }
-
-L0Module::L0Module(ze_module_handle_t handle) : handle_(handle) {}
 
 ze_module_handle_t L0Module::handle() const {
   return handle_;
@@ -248,11 +246,15 @@ std::shared_ptr<L0Kernel> L0Module::create_kernel(const char* name,
   };
   ze_kernel_handle_t handle;
   L0_SAFE_CALL(zeKernelCreate(this->handle_, &desc, &handle));
-  return std::make_shared<L0Kernel>(handle, x, y, z);
+  return std::make_shared<L0Kernel>(shared_from_this(), handle, x, y, z);
 }
 
-L0Kernel::L0Kernel(ze_kernel_handle_t handle, uint32_t x, uint32_t y, uint32_t z)
-    : handle_(handle), group_size_({x, y, z}) {
+L0Kernel::L0Kernel(std::shared_ptr<const L0Module> parent,
+                   ze_kernel_handle_t handle,
+                   uint32_t x,
+                   uint32_t y,
+                   uint32_t z)
+    : parent_(parent), handle_(handle), group_size_({x, y, z}) {
   L0_SAFE_CALL(zeKernelSetGroupSize(handle_, x, y, z));
 }
 

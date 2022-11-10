@@ -82,21 +82,23 @@ class L0Device {
 #endif
 };
 
-class L0Module {
- private:
-#ifdef HAVE_L0
-  ze_module_handle_t handle_;
-#endif
-
+class L0Module : public std::enable_shared_from_this<L0Module> {
  public:
   std::shared_ptr<L0Kernel> create_kernel(const char* name,
                                           uint32_t x,
                                           uint32_t y,
                                           uint32_t z) const;
 #ifdef HAVE_L0
-  explicit L0Module(ze_module_handle_t handle);
+  static std::shared_ptr<L0Module> make(ze_module_handle_t handle) {
+    return std::shared_ptr<L0Module>(new L0Module(handle));
+  }
   ze_module_handle_t handle() const;
   ~L0Module();
+
+ private:
+  ze_module_handle_t handle_;
+
+  L0Module(ze_module_handle_t handle) : handle_(handle){};
 #endif
 };
 
@@ -118,17 +120,21 @@ void set_kernel_args(ze_kernel_handle_t kernel, Head&& head, Tail&&... tail) {
 #endif
 
 class L0Kernel {
- private:
-#ifdef HAVE_L0
-  ze_kernel_handle_t handle_;
-  ze_group_count_t group_size_;
-#endif
  public:
 #ifdef HAVE_L0
-  L0Kernel(ze_kernel_handle_t handle, uint32_t x, uint32_t y, uint32_t z);
+  L0Kernel(std::shared_ptr<const L0Module> parent,
+           ze_kernel_handle_t handle,
+           uint32_t x,
+           uint32_t y,
+           uint32_t z);
   ze_group_count_t& group_size();
   ze_kernel_handle_t handle() const;
   ~L0Kernel();
+
+ private:
+  std::shared_ptr<const L0Module> parent_;
+  ze_kernel_handle_t handle_;
+  ze_group_count_t group_size_;
 #endif
 };
 
