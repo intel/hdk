@@ -17,7 +17,7 @@
 #ifndef QUERYENGINE_DATETRUNCATE_H
 #define QUERYENGINE_DATETRUNCATE_H
 
-#include "IR/DateTime.h"
+#include "IR/DateTimeEnums.h"
 
 #include <cstdint>
 

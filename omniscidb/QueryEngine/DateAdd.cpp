@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "IR/DateTime.h"
+#include "IR/DateTimeEnums.h"
 #include "Shared/funcannotations.h"
 
 #include <cstdint>

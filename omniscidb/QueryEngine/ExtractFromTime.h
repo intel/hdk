@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <ctime>
 
-#include "IR/DateTime.h"
+#include "IR/DateTimeEnums.h"
 #include "Shared/funcannotations.h"
 
 static constexpr int64_t kNanoSecsPerSec = 1000000000;
