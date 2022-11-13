@@ -255,7 +255,8 @@ std::unordered_set<Vertex> get_join_vertices(const std::vector<Vertex>& vertices
 RaExecutionSequence::RaExecutionSequence(const hdk::ir::Node* sink,
                                          const bool build_sequence) {
   CHECK(sink);
-  if (dynamic_cast<const hdk::ir::Scan*>(sink) || dynamic_cast<const hdk::ir::Join*>(sink)) {
+  if (dynamic_cast<const hdk::ir::Scan*>(sink) ||
+      dynamic_cast<const hdk::ir::Join*>(sink)) {
     throw std::runtime_error("Query not supported yet");
   }
 
