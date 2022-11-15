@@ -65,4 +65,3 @@ jobs:
           $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/modin/modin_smoke_test.py
           $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_bindings.py
           $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} python python/tests/test_pyhdk_sql.py
-
