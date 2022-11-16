@@ -217,7 +217,10 @@ class Scan : public Node {
 
   const size_t getNumFragments() const { return table_info_->fragments; }
 
-  const std::string& getFieldName(const size_t i) const { return column_infos_[i]->name; }
+  const std::string& getFieldName(const size_t i) const {
+    CHECK_LT(i, column_infos_.size());
+    return column_infos_[i]->name;
+  }
 
   int32_t getDatabaseId() const { return table_info_->db_id; }
 
@@ -337,14 +340,20 @@ class Project : public Node {
 
   size_t size() const override { return exprs_.size(); }
 
-  ExprPtr getExpr(size_t idx) const { return exprs_[idx]; }
+  ExprPtr getExpr(size_t idx) const {
+    CHECK_LT(idx, exprs_.size());
+    return exprs_[idx];
+  }
 
   const ExprPtrVector& getExprs() const { return exprs_; }
 
   const std::vector<std::string>& getFields() const { return fields_; }
   void setFields(std::vector<std::string>&& fields) { fields_ = std::move(fields); }
 
-  const std::string getFieldName(const size_t i) const { return fields_[i]; }
+  const std::string getFieldName(const size_t i) const {
+    CHECK_LT(i, fields_.size());
+    return fields_[i];
+  }
 
   void replaceInput(std::shared_ptr<const Node> old_input,
                     std::shared_ptr<const Node> input) override {
@@ -443,11 +452,17 @@ class Aggregate : public Node {
     fields_ = std::move(new_fields);
   }
 
-  const std::string getFieldName(const size_t i) const { return fields_[i]; }
+  const std::string getFieldName(const size_t i) const {
+    CHECK_LT(i, fields_.size());
+    return fields_[i];
+  }
 
   // TODO: rename to getAggExprs when Rex version is removed.
   const ExprPtrVector& getAggs() const { return aggs_; }
-  ExprPtr getAgg(size_t i) const { return aggs_[i]; }
+  ExprPtr getAgg(size_t i) const {
+    CHECK_LT(i, aggs_.size());
+    return aggs_[i];
+  }
 
   void setAggExprs(ExprPtrVector new_aggs) { aggs_ = std::move(new_aggs); }
 
@@ -740,7 +755,10 @@ class Filter : public Node {
     condition_ = std::move(new_condition);
   }
 
-  size_t size() const override { return inputs_[0]->size(); }
+  size_t size() const override {
+    CHECK(!inputs_.empty());
+    return inputs_[0]->size();
+  }
 
   void replaceInput(std::shared_ptr<const Node> old_input,
                     std::shared_ptr<const Node> input) override;
