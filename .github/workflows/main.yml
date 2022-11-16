@@ -59,3 +59,6 @@ jobs:
     with:
       name: l0
       options: -DENABLE_L0=on -DENABLE_CUDA=off
+
+  sanity-test:
+    uses: ./.github/workflows/build-docker-hdk.yml
