@@ -862,14 +862,25 @@ class Compound : public Node {
   void setFilterExpr(ExprPtr new_filter) { filter_ = new_filter; }
 
   ExprPtrVector getGroupByExprs() const { return groupby_exprs_; }
-  ExprPtr getGroupByExpr(size_t i) const { return groupby_exprs_[i]; }
+  
+  ExprPtr getGroupByExpr(size_t i) const {
+   CHECK_LT(i, groupby_exprs_.size());
+   return groupby_exprs_[i];
+  }
 
   ExprPtrVector getExprs() const { return exprs_; }
-  ExprPtr getExpr(size_t i) const { return exprs_[i]; }
+  
+  ExprPtr getExpr(size_t i) const {
+   CHECK_LT(i, exprs_.size());
+   return exprs_[i];
+  }
 
   const std::vector<std::string>& getFields() const { return fields_; }
 
-  const std::string getFieldName(const size_t i) const { return fields_[i]; }
+  const std::string getFieldName(const size_t i) const {
+   CHECK_LT(i, fields_.size());
+   return fields_[i];
+  }
 
   void setFields(std::vector<std::string>&& fields) { fields_ = std::move(fields); }
 
@@ -988,7 +999,10 @@ class Sort : public Node {
     return *hash_;
   }
 
-  size_t size() const override { return inputs_[0]->size(); }
+  size_t size() const override {
+   CHECK(inputs_[0]);
+   return inputs_[0]->size();
+  }
 
   std::shared_ptr<Node> deepCopy() const override {
     return std::make_shared<Sort>(*this);
