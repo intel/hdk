@@ -176,7 +176,7 @@ class CacheMetricTracker {
                 << DataRecyclerUtil::toStringCacheItemType(cache_item_type)
                 << " is set larger than its total cache size, so we force to set the "
                    "maximum item size as equal to the total cache size";
-      max_cache_item_size = total_cache_size_;
+      max_cache_item_size_ = total_cache_size_;
     }
   }
 
