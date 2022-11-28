@@ -77,7 +77,7 @@ cdef class RelAlgExecutor:
     cdef CExecutor* c_executor = executor.c_executor.get()
     cdef CSchemaProviderPtr c_schema_provider = schema_provider.c_schema_provider
     cdef CDataProvider* c_data_provider = data_mgr.c_data_mgr.get().getDataProvider()
-    cdef unique_ptr[CRelAlgDag] c_dag
+    cdef unique_ptr[CQueryDag] c_dag
     cdef int db_id = 0
 
     db_ids = schema_provider.listDatabases()

@@ -48,11 +48,12 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
     string getUserDefinedFunctionWhitelist()
     void setRuntimeExtensionFunctions(const vector[CExtensionFunction]&, const vector[CTableFunction]&, bool)
 
-cdef extern from "omniscidb/QueryEngine/RelAlgDagBuilder.h":
-  cdef cppclass CRelAlgDag "RelAlgDag":
+cdef extern from "omniscidb/IR/Node.h":
+  cdef cppclass CQueryDag "hdk::ir::QueryDag":
     pass
 
-  cdef cppclass CRelAlgDagBuilder "RelAlgDagBuilder"(CRelAlgDag):
+cdef extern from "omniscidb/QueryEngine/RelAlgDagBuilder.h":
+  cdef cppclass CRelAlgDagBuilder "RelAlgDagBuilder"(CQueryDag):
     CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr, shared_ptr[CConfig]) except +
 
 cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h":
@@ -67,7 +68,7 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 
 cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
   cdef cppclass CRelAlgExecutor "RelAlgExecutor":
-    CRelAlgExecutor(CExecutor*, CSchemaProviderPtr, CDataProvider*, unique_ptr[CRelAlgDag])
+    CRelAlgExecutor(CExecutor*, CSchemaProviderPtr, CDataProvider*, unique_ptr[CQueryDag])
 
     CExecutionResult executeRelAlgQuery(const CCompilationOptions&, const CExecutionOptions&, const bool) except +
     CExecutor *getExecutor()
