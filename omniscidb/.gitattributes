@@ -1,0 +1,46 @@
+ThirdParty/* linguist-vendored
+
+* text=auto
+
+*.c       text
+*.cc      text
+*.cpp     text
+*.cu      text
+*.cuh     text
+*.h       text
+*.hpp     text
+
+*.java    text
+*.js      text
+*.py      text
+*.rb      text
+*.sh      text
+
+*.html    text
+*.mapd    text
+*.MAPD    text
+*.md      text
+*.txt     text
+*.TXT     text
+*.wkt     text=CRLF
+
+*.cmake   text
+*.conf    text
+*.service text
+*.sql     text
+
+*.csv     text
+*.json    text
+*.toml    text
+*.xml     text
+*.yml     text
+
+*.def     text=CRLF
+*.ini     text=CRLF
+*.props   text=CRLF
+*.rc      text=CRLF
+*.reg     text=CRLF
+*.sln     text=CRLF
+*.vcxproj text=CRLF
+*.vcxproj.user text=CRLF
+*.vcxproj.filters text=CRLF

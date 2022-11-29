@@ -1,0 +1,56 @@
+name: Docker test
+on:
+  workflow_call:
+    inputs:
+      cuda_compiler_version:
+        type: string
+        default: None
+      name:
+        type: string
+        default: cpu
+      reset-cache:
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Clean
+        run: |
+            docker stop omni-build.${{ inputs.name }} || true
+            docker rm omni-build.${{ inputs.name }} || true
+            rm -rf _work/*
+
+      - name: Set env context
+        run: |
+          echo RUN_STAMP=docker-${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.RUN_STAMP }}-build
+
+      - name: Unpack build files
+        run: |
+          tar -zxf build.tgz
+
+      - name: Build docker image
+        run: |
+          cat docker/dev/Dockerfile docker/dev/Dockerfile.${{ inputs.name }} >Dockerfile
+          docker build . ${{ inputs.reset-cache && '--no-cache' || '' }} --tag omni-build.${{ inputs.name }}
+
+      - name: Start the container
+        run:  |
+          docker run -id --name omni-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl omni-build.${{ inputs.name }}:latest
+          docker exec omni-build.${{ inputs.name }} mkdir -p /_work/
+          docker cp build.tgz omni-build.${{ inputs.name }}:/_work/
+          docker exec omni-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
+          docker exec -u ghrunner omni-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
+
+      - name: Test
+        run: docker exec -u ghrunner omni-build.${{ inputs.name }} bash /_work/scripts/conda/test.sh
+
+      - name: Stop the container
+        if: always()
+        run: docker stop omni-build.${{ inputs.name }} || true
+

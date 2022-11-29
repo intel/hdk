@@ -1,0 +1,80 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake files
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+install_manifest.txt
+_build/
+build/
+build_debug/
+build_release/
+build3.6/
+!docker/build/
+
+# history files
+omnisql_history.txt
+.gdb_history
+
+# Eclipse build files
+Debug/
+.settings/
+
+# VS code settings files
+.vscode/
+*.code-workspace
+
+# VS settings files
+.vs
+CMakeSettings.json
+
+# VIM editor files
+.*.swp
+
+# Emacs editor files
+*~
+
+# sphinx docs
+!docs/**/Makefile
+*.pyc
+docs/build/
+docs/generated-docs/
+docs/sphinx-env
+docs/source/api/*
+
+# java-generated files
+Calcite/java/**/target/
+*.classpath
+*.project
+java/**/target/
+
+ThirdParty/googlebenchmark
+data/
+
+# IntelliJ/CLion settings files
+.idea
+*.iml
+
+# Python
+*.egg-info/

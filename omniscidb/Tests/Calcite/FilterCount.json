@@ -1,0 +1,73 @@
+{
+  "rels": [
+    {
+      "id": "0",
+      "relOp": "LogicalTableScan",
+      "fieldNames": [
+        "b",
+        "dec",
+        "d",
+        "f",
+        "m",
+        "n",
+        "o",
+        "real_str",
+        "str",
+        "fx",
+        "t",
+        "x",
+        "y",
+        "z"
+      ],
+      "table": [
+        "CATALOG",
+        "mapd",
+        "test"
+      ],
+      "inputs": []
+    },
+    {
+      "id": "1",
+      "relOp": "LogicalFilter",
+      "condition": {
+        "op": ">",
+        "operands": [
+          {
+            "input": 11
+          },
+          5
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "relOp": "LogicalProject",
+      "fields": [
+        "y"
+      ],
+      "exprs": [
+        {
+          "input": 12
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "relOp": "LogicalAggregate",
+      "group": [
+        0
+      ],
+      "aggs": [
+        {
+          "agg": "COUNT",
+          "type": {
+            "type": "BIGINT",
+            "nullable": false
+          },
+          "distinct": false,
+          "operands": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+name: Build
+on:
+  workflow_dispatch:
+    inputs:
+      reset-cache:
+        type: boolean
+        default: true
+
+  push:
+    paths-ignore:
+      - 'docs/**'
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  build-cuda:
+    uses: ./.github/workflows/build.yml
+    with:
+      cuda_compiler_version: 11
+
+  style:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'style'
+
+  smoke:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'smoke'
+
+  perf:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: 'perf'
+
+  build-cuda-docker:
+    uses: ./.github/workflows/build-docker.yml
+    with:
+      name: cuda
+      options: ''
+
+  test-cuda-docker:
+    needs: build-cuda-docker
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      name: cuda
+      # input for a push event is an empty string, convert it to boolean
+      reset-cache: ${{ !!inputs.reset-cache }}
+
+  build-l0-docker:
+    uses: ./.github/workflows/build-docker.yml
+    with:
+      name: l0
+      options: -DENABLE_L0=on -DENABLE_CUDA=off

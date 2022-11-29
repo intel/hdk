@@ -1,0 +1,24 @@
+# Intel GPU stack
+# https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-focal.html
+RUN apt-get install -y gpg-agent software-properties-common && \
+    wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | apt-key add - && \
+    apt-add-repository \
+        'deb [arch=amd64] https://repositories.intel.com/graphics/ubuntu focal main' && \
+    apt-get update && \
+        apt-get install -y \
+        intel-igc-cm \
+        intel-level-zero-gpu \
+        intel-media-va-driver-non-free \
+        intel-opencl-icd \
+        level-zero \
+        level-zero-dev \
+        libigc-dev \
+        libigdfcl-dev \
+        libigfxcmrt-dev \
+        libmfx1 \
+        --
+
+RUN git clone -b llvm_release_120 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
+    mkdir SPIRV-LLVM-Translator/build && cd SPIRV-LLVM-Translator/build && \
+    cmake -Wno-dev .. && make llvm-spirv -j`nproc` && make install
+

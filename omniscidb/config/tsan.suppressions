@@ -1,0 +1,13 @@
+# 2019-03-31 Suppress google rawlog.  it is unclear why this issue suddenly started to occur.  Investigation will continue
+race:boost::*::saved_single_repeat
+race:boost::*::saved_state
+race:boost::*::perl_matcher
+race:google::RawLog__SetLastTime
+thread:libcuda.so
+race:libtbbmalloc*
+race:tbb::detail::*
+# TODO: remove TSAN wildcard after TSAN-enabled TBB deps go out 
+race:^tbb*
+# mktime in libarchive uses tzset
+race:^tzset
+
