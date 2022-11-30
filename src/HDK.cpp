@@ -87,10 +87,9 @@ HDK::HDK() : internal_(new Internal()) {
       internal_->schema_id, internal_->db_name, internal_->db_id);
 
   SystemParameters sys_params;
-  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
 
   internal_->data_mgr = std::make_shared<Data_Namespace::DataMgr>(
-      *internal_->config.get(), sys_params, std::move(gpu_mgrs), 1 << 27, 0);
+      *internal_->config.get(), sys_params);
   internal_->data_mgr->getPersistentStorageMgr()->registerDataProvider(
       internal_->schema_id, internal_->storage);
 
