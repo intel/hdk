@@ -17,12 +17,12 @@ RUN apt-get update && apt-get install -y \
     tar \
     vim \
     wget \
-    ca-certificates \
     lsb-release \
+    software-properties-common \
     --
 
 # cmake
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     libssl-dev \
     libcurl4-openssl-dev \
     --
@@ -43,12 +43,12 @@ RUN apt-get update && apt-get install -y \
     gcc-9 \
     g++-9 \
     openjdk-11-jdk \
-    --
-ENV PATH=/usr/lib/llvm-12/bin${PATH:+:${PATH}}
+    -- && \
+    update-alternatives \
+        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
+        --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
-RUN update-alternatives \
-    --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
-    --slave /usr/bin/g++ g++ /usr/bin/g++-9
+ENV PATH=/usr/lib/llvm-12/bin${PATH:+:${PATH}}
 
 # Dependencies
 RUN apt-get update && apt-get install -y \
