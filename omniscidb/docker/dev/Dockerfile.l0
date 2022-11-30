@@ -1,7 +1,6 @@
 # Intel GPU stack
 # https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-focal.html
-RUN apt-get install -y gpg-agent software-properties-common && \
-    wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | apt-key add - && \
+RUN wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | apt-key add - && \
     apt-add-repository \
         'deb [arch=amd64] https://repositories.intel.com/graphics/ubuntu focal main' && \
     apt-get update && \
