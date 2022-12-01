@@ -75,7 +75,7 @@ std::shared_ptr<Config> buildConfig(const bool enable_debug_timer = false) {
 
 }  // namespace
 
-HDK::HDK() : internal_(new Internal()) {
+HDK::HDK() : internal_(std::make_unique<Internal>()) {
   CHECK(internal_);
 
   logger::LogOptions log_options(internal_->db_name.c_str());
@@ -109,8 +109,4 @@ HDK::HDK() : internal_(new Internal()) {
   internal_->executor->setSchemaProvider(internal_->storage);
 }
 
-HDK::~HDK() {
-  if (internal_) {
-    delete internal_;
-  }
-}
+HDK::~HDK() {}

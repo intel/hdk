@@ -23,5 +23,5 @@ class HDK {
   static HDK init();
 
  private:
-  Internal* internal_{nullptr};
+  std::unique_ptr<Internal> internal_;
 };
