@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ExtractFromTime.h"
 #include "IR/DateTimeEnums.h"
 #include "Shared/funcannotations.h"
 

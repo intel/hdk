@@ -553,6 +553,23 @@ declare i64* @get_bin_from_k_heap_double(i64*, i32, i32, i32, i1, i1, i1, double
 )" + gen_array_any_all_sigs() +
     gen_translate_null_key_sigs();
 
+const std::unordered_set<std::string> main_module_ext_list = {
+    "DateDiff",
+    "DateDiffNullable",
+    "DateTruncateHighPrecisionToDateNullable",
+    "DateDiffHighPrecision",
+    "DateDiffHighPrecisionNullable",
+    "DateTruncateHighPrecisionToDateNullable"};
+
+auto insert_emtpy_abort_replacement(llvm::Module* m) {
+  auto ft = llvm::FunctionType::get(llvm::Type::getVoidTy(m->getContext()), false);
+  auto abort_func =
+      llvm::Function::Create(ft, llvm::GlobalValue::ExternalLinkage, "abort", m);
+  auto bb = llvm::BasicBlock::Create(m->getContext(), ".entry", abort_func);
+  llvm::ReturnInst::Create(m->getContext(), bb);
+  return abort_func;
+}
+
 }  // namespace
 
 void CUDABackend::linkModuleWithLibdevice(const std::unique_ptr<llvm::Module>& ext,
@@ -757,7 +774,7 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
 
   std::vector<llvm::Function*> rt_funcs;
   for (auto& Fn : *llvm_module) {
-    if (roots.count(&Fn)) {
+    if (roots.count(&Fn) || main_module_ext_list.count(std::string(Fn.getName()))) {
       continue;
     }
     rt_funcs.push_back(&Fn);
@@ -765,6 +782,7 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
   for (auto& pFn : rt_funcs) {
     pFn->removeFromParent();
   }
+  insert_emtpy_abort_replacement(llvm_module);
 
   if (requires_libdevice) {
     add_intrinsics_to_module(llvm_module);
