@@ -3,5 +3,25 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
- 
-#include "Expression/Expression.h"
+
+#include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"  // ExecutionResult
+
+#include <arrow/api.h>
+
+struct Internal;
+
+class HDK {
+ public:
+  HDK();
+
+  ~HDK();
+
+  void read(std::shared_ptr<arrow::Table>& table, const std::string& table_name);
+
+  ExecutionResult query(const std::string& sql, const bool is_explain = false);
+
+  static HDK init();
+
+ private:
+  std::unique_ptr<Internal> internal_;
+};
