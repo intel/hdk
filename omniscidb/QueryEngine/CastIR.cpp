@@ -137,16 +137,13 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
   CHECK(ts_lv->getType()->isIntegerTy(64));
   if (unit > hdk::ir::TimeUnit::kSecond) {
     if (nullable) {
-      return cgen_state_->emitExternalCall(
-          "DateTruncateHighPrecisionToDateNullable",
-          get_int_type(64, cgen_state_->context_),
-          {{ts_lv,
-            cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)),
-            cgen_state_->inlineIntNull(ctx.int64())}});
+      return cgen_state_->emitCall("DateTruncateHighPrecisionToDateNullable",
+                                   {{ts_lv,
+                                     cgen_state_->llInt(hdk::ir::unitsPerSecond(unit)),
+                                     cgen_state_->inlineIntNull(ctx.int64())}});
     }
-    return cgen_state_->emitExternalCall(
+    return cgen_state_->emitCall(
         "DateTruncateHighPrecisionToDate",
-        get_int_type(64, cgen_state_->context_),
         {{ts_lv, cgen_state_->llInt(hdk::ir::unitsPerSecond(unit))}});
   }
   std::unique_ptr<CodeGenerator::NullCheckCodegen> nullcheck_codegen;
@@ -155,8 +152,7 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
     nullcheck_codegen = std::make_unique<NullCheckCodegen>(
         cgen_state_, executor(), ts_lv, type, "cast_timestamp_nullcheck");
   }
-  auto ret = cgen_state_->emitExternalCall(
-      "datetrunc_day", get_int_type(64, cgen_state_->context_), {ts_lv});
+  auto ret = cgen_state_->emitCall("datetrunc_day", {ts_lv});
   if (nullcheck_codegen) {
     ret = nullcheck_codegen->finalize(ll_int(NULL_BIGINT, cgen_state_->context_), ret);
   }
