@@ -134,9 +134,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
       cgen_state_->ir_builder_.CreateBr(extract_nullcheck_bb);
       cgen_state_->ir_builder_.SetInsertPoint(null_check.cond_false_);
       auto extract_call =
-          cgen_state_->emitExternalCall(extract_fname,
-                                        get_int_type(64, cgen_state_->context_),
-                                        std::vector<llvm::Value*>{from_expr});
+          cgen_state_->emitCall(extract_fname, std::vector<llvm::Value*>{from_expr});
       cgen_state_->ir_builder_.CreateBr(extract_nullcheck_bb);
 
       cgen_state_->ir_builder_.SetInsertPoint(extract_nullcheck_bb);
@@ -154,9 +152,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::ExtractExpr* extract_expr,
     CHECK(extract_nullcheck_value);
     return extract_nullcheck_value;
   } else {
-    return cgen_state_->emitExternalCall(extract_fname,
-                                         get_int_type(64, cgen_state_->context_),
-                                         std::vector<llvm::Value*>{from_expr});
+    return cgen_state_->emitCall(extract_fname, std::vector<llvm::Value*>{from_expr});
   }
 }
 
@@ -208,12 +204,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateAddExpr* dateadd_expr,
     dateadd_args.push_back(cgen_state_->inlineIntNull(datetime_type));
     dateadd_fname += "Nullable";
   }
-  return cgen_state_->emitExternalCall(dateadd_fname,
-                                       get_int_type(64, cgen_state_->context_),
-                                       dateadd_args,
-                                       {llvm::Attribute::NoUnwind,
-                                        llvm::Attribute::ReadNone,
-                                        llvm::Attribute::Speculatable});
+  return cgen_state_->emitCall(dateadd_fname, dateadd_args);
 }
 
 llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
@@ -243,8 +234,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateDiffExpr* datediff_expr,
     datediff_args.push_back(cgen_state_->inlineIntNull(ret_type));
     datediff_fname += "Nullable";
   }
-  return cgen_state_->emitExternalCall(
-      datediff_fname, get_int_type(64, cgen_state_->context_), datediff_args);
+  return cgen_state_->emitCall(datediff_fname, datediff_args);
 }
 
 llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr,
@@ -281,8 +271,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::DateTruncExpr* datetrunc_expr
         cgen_state_, executor(), from_expr, datetrunc_expr_type, "date_trunc_nullcheck");
   }
   char const* const fname = datetrunc_fname_lookup.at((size_t)field);
-  auto ret = cgen_state_->emitExternalCall(
-      fname, get_int_type(64, cgen_state_->context_), {from_expr});
+  auto ret = cgen_state_->emitCall(fname, {from_expr});
   if (is_nullable) {
     ret = nullcheck_codegen->finalize(ll_int(NULL_BIGINT, cgen_state_->context_), ret);
   }
@@ -386,8 +375,7 @@ llvm::Value* CodeGenerator::codegenDateTruncHighPrecisionTimestamps(
         cgen_state_, executor(), ts_lv, type, "date_trunc_hp_nullcheck");
   }
   char const* const fname = datetrunc_fname_lookup.at((size_t)field);
-  ts_lv = cgen_state_->emitExternalCall(
-      fname, get_int_type(64, cgen_state_->context_), {ts_lv});
+  ts_lv = cgen_state_->emitCall(fname, {ts_lv});
   if (is_nullable) {
     ts_lv =
         nullcheck_codegen->finalize(ll_int(NULL_BIGINT, cgen_state_->context_), ts_lv);
