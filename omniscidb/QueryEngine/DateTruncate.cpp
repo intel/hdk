@@ -23,8 +23,8 @@
 
 #include "Shared/funcannotations.h"
 
-#ifndef __CUDACC__
-#include <cstdlib>  // abort()
+#ifdef __CUDACC__
+#error This code is not intended to be compiled with a CUDA C++ compiler
 #endif
 
 #include <cmath>
@@ -294,11 +294,8 @@ int64_t DateTruncate(hdk::ir::DateTruncField field, const int64_t timeval) {
     case hdk::ir::DateTruncField::kMillennium:
       return datetrunc_millennium_impl(timeval);
     default:
-#ifdef __CUDACC__
-      return std::numeric_limits<int64_t>::min();
-#else
       abort();
-#endif
+      return std::numeric_limits<int64_t>::min();
   }
 }
 
@@ -415,11 +412,8 @@ struct EraTime {
         return sgn * (millennia - (rem == 0 && ut.sign(MOY) == -1));
       }
       default:
-#ifdef __CUDACC__
-        return std::numeric_limits<int64_t>::min();
-#else
         abort();
-#endif
+        return std::numeric_limits<int64_t>::min();
     }
   }
 };

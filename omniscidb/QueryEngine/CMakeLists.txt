@@ -223,7 +223,7 @@ function(precompile_llvm_module SOURCE_FILE SUFFIX)
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         COMMAND ${llvm_clangpp_cmd}
         ARGS -std=c++17 ${RT_OPT_FLAGS} ${ARGN} -c -emit-llvm
-        ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS}
+        ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS} -DEXECUTE_INCLUDE
         -o ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
         ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}
