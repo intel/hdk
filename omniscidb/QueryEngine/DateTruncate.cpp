@@ -456,7 +456,8 @@ DateDiffHighPrecision(const hdk::ir::DateTruncField datepart,
                       const int32_t start_dim,
                       const int32_t end_dim) {
   // Return pow(10,i). Only valid for i = 0, 3, 6, 9.
-  constexpr int pow10[10]{1, 0, 0, 1000, 0, 0, 1000 * 1000, 0, 0, 1000 * 1000 * 1000};
+  static constexpr int pow10[10]{
+      1, 0, 0, 1000, 0, 0, 1000 * 1000, 0, 0, 1000 * 1000 * 1000};
   switch (datepart) {
     case hdk::ir::DateTruncField::kNano:
     case hdk::ir::DateTruncField::kMicro:
