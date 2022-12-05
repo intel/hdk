@@ -273,6 +273,7 @@ llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
                   executor()->getRowSetMemoryOwner()->getLiteralStringDictProxy())
             : reinterpret_cast<int64_t>(executor()->getStringDictionaryProxy(
                   operand_dict_id, executor()->getRowSetMemoryOwner(), true));
+    CHECK(string_dictionary_ptr);
     return cgen_state_->emitExternalCall(
         "string_decompress",
         get_int_type(64, cgen_state_->context_),

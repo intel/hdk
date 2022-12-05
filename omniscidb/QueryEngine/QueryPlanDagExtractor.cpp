@@ -339,12 +339,21 @@ struct OpInfo {
 int get_input_idx(const hdk::ir::LeftDeepInnerJoin* rel_left_deep_join,
                   int const tbl_id) {
   for (size_t input_idx = 0; input_idx < rel_left_deep_join->inputCount(); ++input_idx) {
-    auto const input_node = rel_left_deep_join->getInput(input_idx);
-    auto const scan_node = dynamic_cast<const hdk::ir::Scan*>(input_node);
-    int const target_table_id = scan_node ? scan_node->getTableId()
-                                          : -1 * input_node->getId();  // temporary table
-    if (target_table_id == tbl_id) {
-      return input_idx;
+    auto input_node = rel_left_deep_join->getInput(input_idx);
+    while (input_node) {
+      auto const scan_node = dynamic_cast<const hdk::ir::Scan*>(input_node);
+      int const target_table_id = scan_node
+                                      ? scan_node->getTableId()
+                                      : -1 * input_node->getId();  // temporary table
+      if (target_table_id == tbl_id) {
+        return input_idx;
+      }
+
+      if (!input_node->getResult() && input_node->inputCount() == 1) {
+        input_node = input_node->getInput(0);
+      } else {
+        input_node = nullptr;
+      }
     }
   }
   return -1;
@@ -383,6 +392,14 @@ void QueryPlanDagExtractor::handleLeftDeepJoinTree(
   if (!left_deep_join_info) {
     // we should have left_deep_tree_info for input left deep tree node
     VLOG(1) << "Stop DAG extraction (Detect Non-supported join pattern)";
+    clearInternaStatus();
+    return;
+  }
+
+  // Data recycler doesn't support work units which have multiple
+  // join nodes.
+  if (left_deep_join_info->size() >= rel_left_deep_join->inputCount()) {
+    VLOG(1) << "Stop DAG extraction (Detect multiple joins)";
     clearInternaStatus();
     return;
   }

@@ -43,6 +43,8 @@ void reset();
 
 Config& config();
 
+ConfigPtr configPtr();
+
 bool gpusPresent();
 
 void printStats();

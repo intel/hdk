@@ -118,10 +118,10 @@ class Estimator;
 }
 
 struct SortInfo {
-  const std::list<hdk::ir::OrderEntry> order_entries;
-  const SortAlgorithm algorithm;
-  const size_t limit;
-  const size_t offset;
+  std::list<hdk::ir::OrderEntry> order_entries;
+  SortAlgorithm algorithm;
+  size_t limit;
+  size_t offset;
 };
 
 struct JoinCondition {

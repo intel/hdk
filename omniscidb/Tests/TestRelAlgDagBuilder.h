@@ -53,6 +53,8 @@ class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
       : hdk::ir::QueryDag(config), schema_provider_(schema_provider) {}
   ~TestRelAlgDagBuilder() override = default;
 
+  void addNode(hdk::ir::NodePtr node);
+
   hdk::ir::NodePtr addScan(const TableRef& table);
   hdk::ir::NodePtr addScan(int db_id, int table_id);
   hdk::ir::NodePtr addScan(int db_id, const std::string& table_name);
@@ -66,6 +68,8 @@ class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
 
   hdk::ir::NodePtr addProject(hdk::ir::NodePtr input, const std::vector<int>& cols);
   hdk::ir::NodePtr addProject(hdk::ir::NodePtr input, hdk::ir::ExprPtrVector exprs);
+
+  hdk::ir::NodePtr addFilter(hdk::ir::NodePtr input, hdk::ir::ExprPtr expr);
 
   hdk::ir::NodePtr addAgg(hdk::ir::NodePtr input,
                           const std::vector<std::string>& fields,
@@ -102,7 +106,9 @@ class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
   void setRoot(hdk::ir::NodePtr root);
 
   void finalize() {
-    create_left_deep_join(nodes_);
+    if (config_->exec.use_legacy_work_unit_builder) {
+      hdk::ir::create_left_deep_join(nodes_);
+    }
     setRoot(nodes_.back());
   }
 

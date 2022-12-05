@@ -312,6 +312,12 @@ TEST_F(NoCatalogRelAlgTest, InterDatabaseJoin) {
 }
 
 TEST_F(NoCatalogRelAlgTest, StreamingAggregate) {
+  auto orig_use_legacy_work_unit_builder = config_->exec.use_legacy_work_unit_builder;
+  config_->exec.use_legacy_work_unit_builder = true;
+  ScopeGuard g([&]() {
+    config_->exec.use_legacy_work_unit_builder = orig_use_legacy_work_unit_builder;
+  });
+
   auto ra = R"""(
 {
   "rels": [

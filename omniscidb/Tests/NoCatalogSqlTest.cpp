@@ -260,6 +260,12 @@ TEST_F(NoCatalogSqlTest, GroupBySingleColumn) {
 }
 
 TEST_F(NoCatalogSqlTest, StreamingAggregate) {
+  auto orig_use_legacy_work_unit_builder = config_->exec.use_legacy_work_unit_builder;
+  config_->exec.use_legacy_work_unit_builder = true;
+  ScopeGuard g([&]() {
+    config_->exec.use_legacy_work_unit_builder = orig_use_legacy_work_unit_builder;
+  });
+
   auto ra_executor = getExecutor("SELECT SUM(val) FROM test_streaming;");
   ra_executor.prepareStreamingExecution(CompilationOptions(),
                                         ExecutionOptions::fromConfig(config()));

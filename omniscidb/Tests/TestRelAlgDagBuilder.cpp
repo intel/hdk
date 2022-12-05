@@ -16,6 +16,10 @@
 
 #include "QueryEngine/RelAlgTranslator.h"
 
+void TestRelAlgDagBuilder::addNode(hdk::ir::NodePtr node) {
+  nodes_.push_back(node);
+}
+
 hdk::ir::NodePtr TestRelAlgDagBuilder::addScan(const TableRef& table) {
   return addScan(schema_provider_->getTableInfo(table));
 }
@@ -65,6 +69,13 @@ hdk::ir::NodePtr TestRelAlgDagBuilder::addProject(hdk::ir::NodePtr input,
                                                   hdk::ir::ExprPtrVector exprs) {
   auto fields = buildFieldNames(exprs.size());
   return addProject(input, fields, std::move(exprs));
+}
+
+hdk::ir::NodePtr TestRelAlgDagBuilder::addFilter(hdk::ir::NodePtr input,
+                                                 hdk::ir::ExprPtr expr) {
+  auto res = std::make_shared<hdk::ir::Filter>(std::move(expr), std::move(input));
+  nodes_.push_back(res);
+  return res;
 }
 
 hdk::ir::NodePtr TestRelAlgDagBuilder::addAgg(hdk::ir::NodePtr input,

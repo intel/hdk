@@ -34,7 +34,7 @@ RelAlgCache::RelAlgCache(std::shared_ptr<CalciteJNI> calcite,
   build_cache_ = config_->debug.build_ra_cache;
   use_cache_ = config_->debug.use_ra_cache;
 
-  if (!use_cache_.empty()) {
+  if (!use_cache_.empty() && use_cache_ != "dummy") {
     load();
   }
 }

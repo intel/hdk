@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "QueryEngine/Execute.h"
 
 #include "IR/Expr.h"

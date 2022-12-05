@@ -22,6 +22,7 @@
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/JoinFilterPushDown.h"
+#include "QueryEngine/QueryExecutionSequence.h"
 #include "QueryEngine/QueryRewrite.h"
 #include "QueryEngine/RelAlgDagBuilder.h"
 #include "QueryEngine/RelAlgSchemaProvider.h"
@@ -85,6 +86,12 @@ class RelAlgExecutor {
                                    const ExecutionOptions& eo,
                                    const int64_t queue_time_ms,
                                    const bool with_existing_temp_tables = false);
+  std::shared_ptr<const ExecutionResult> execute(
+      const hdk::QueryExecutionSequence& seq,
+      const CompilationOptions& co,
+      const ExecutionOptions& eo,
+      const int64_t queue_time_ms,
+      const bool with_existing_temp_tables = false);
 
   ExecutionResult executeRelAlgSubSeq(const RaExecutionSequence& seq,
                                       const std::pair<size_t, size_t> interval,
@@ -138,6 +145,10 @@ class RelAlgExecutor {
 
   void executePostExecutionCallback();
 
+  static const SpeculativeTopNBlacklist& speculativeTopNBlacklist() {
+    return speculative_topn_blacklist_;
+  }
+
  private:
   ExecutionResult executeRelAlgQueryNoRetry(const CompilationOptions& co,
                                             const ExecutionOptions& eo,
@@ -148,6 +159,15 @@ class RelAlgExecutor {
                          const CompilationOptions&,
                          const ExecutionOptions&,
                          const int64_t queue_time_ms);
+  void executeStep(const hdk::ir::Node* step_root,
+                   const CompilationOptions& co,
+                   const ExecutionOptions& eo,
+                   const int64_t queue_time_ms);
+  ExecutionResult executeStep(const hdk::ir::Node* step_root,
+                              const CompilationOptions& co,
+                              const ExecutionOptions& eo,
+                              const int64_t queue_time_ms,
+                              bool allow_speculative_sort);
 
   ExecutionResult executeCompound(const hdk::ir::Compound*,
                                   const CompilationOptions&,
@@ -280,6 +300,10 @@ class RelAlgExecutor {
   WorkUnit createWorkUnit(const hdk::ir::Node*,
                           const SortInfo&,
                           const ExecutionOptions& eo);
+  WorkUnit createWorkUnit(const hdk::ir::Node* node,
+                          const CompilationOptions& co,
+                          const ExecutionOptions& eo,
+                          bool allow_speculative_sort);
 
   WorkUnit createCompoundWorkUnit(const hdk::ir::Compound*,
                                   const SortInfo&,
@@ -359,5 +383,20 @@ class RelAlgExecutor {
 
   friend class PendingExecutionClosure;
 };
+
+hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr);
+hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
+                           const RelAlgTranslator& translator,
+                           ::ExecutorType executor_type);
+bool first_oe_is_desc(const std::list<hdk::ir::OrderEntry>& order_entries);
+std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort);
+std::vector<JoinType> left_deep_join_types(
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join);
+std::vector<size_t> get_left_deep_join_input_sizes(
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join);
+hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr);
+hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr);
+
+const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr);
 
 #endif  // QUERYENGINE_RELALGEXECUTOR_H

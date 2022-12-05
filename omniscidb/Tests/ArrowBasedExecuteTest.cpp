@@ -15893,6 +15893,19 @@ TEST_F(Select, Sample) {
     };
     {
       const auto rows = run_multiple_agg(
+          "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x % 2 = 0;", dt);
+      const auto crt_row = rows->getNextRow(true, true);
+      ASSERT_EQ(size_t(2), crt_row.size());
+      const auto nullable_str = v<NullableString>(crt_row[0]);
+      const auto str_ptr = boost::get<std::string>(&nullable_str);
+      ASSERT_TRUE(str_ptr);
+      ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
+      ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
+      const auto empty_row = rows->getNextRow(true, true);
+      ASSERT_EQ(size_t(0), empty_row.size());
+    };
+    {
+      const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x > 7 GROUP BY x;", dt);
       const auto crt_row = rows->getNextRow(true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
@@ -16898,7 +16911,6 @@ TEST_F(Select, WindowFunctionComplexExpressions) {
       c(query, query, dt);
     }
     {
-      // TODO(adb): support more complex embedded case expressions
       std::string query =
           "SELECT x, y, t - AVG(f) OVER (PARTITION BY y ORDER BY x ASC) - 1 r1, CASE "
           "WHEN x > 5 THEN AVG(dd) OVER (PARTITION BY y ORDER BY t ASC) ELSE SUM(x) OVER "
@@ -16906,7 +16918,7 @@ TEST_F(Select, WindowFunctionComplexExpressions) {
           table_name +
           " ORDER BY x ASC NULLS FIRST, y ASC NULLS FIRST, t ASC NULLS FIRST, r1 ASC, r2 "
           "ASC;";
-      EXPECT_THROW(run_multiple_agg(query, dt), std::runtime_error);
+      c(query, query, dt);
     }
   }
 }
@@ -17448,14 +17460,22 @@ TEST_F(Select, UnionAll) {
                                   "SELECT fixed_str FROM test ORDER BY str;",
                                   dt),
                  std::runtime_error);
-    // Exception: UNION ALL not yet supported in this context.
-    EXPECT_THROW(run_multiple_agg("SELECT COUNT(*) FROM ("
-                                  " SELECT a0, a1, a2, a3 FROM union_all_a"
-                                  " UNION ALL"
-                                  " SELECT b0, b1, b2, b3 FROM union_all_b"
-                                  ");",
-                                  dt),
-                 std::runtime_error);
+    if (config().exec.use_legacy_work_unit_builder) {
+      // Exception: UNION ALL not yet supported in this context.
+      EXPECT_THROW(run_multiple_agg("SELECT COUNT(*) FROM ("
+                                    " SELECT a0, a1, a2, a3 FROM union_all_a"
+                                    " UNION ALL"
+                                    " SELECT b0, b1, b2, b3 FROM union_all_b"
+                                    ");",
+                                    dt),
+                   std::runtime_error);
+    } else {
+      // With WorkUnitBuilder we don't have Compound which triggers an exception
+      // in this case and query is correctly supported.
+      c("SELECT COUNT(*) FROM ( SELECT a0, a1, a2, a3 FROM union_all_a"
+        " UNION ALL SELECT b0, b1, b2, b3 FROM union_all_b);",
+        dt);
+    }
   }
 }
 
@@ -18008,6 +18028,16 @@ int main(int argc, char** argv) {
                          ->default_value(config->debug.use_ra_cache),
                      "Used in tests to load pre-generated cache of parsed SQL "
                      "queries from the specified file to avoid Calcite usage.");
+  desc.add_options()("legacy-work-units",
+                     po::value<bool>(&config->exec.use_legacy_work_unit_builder)
+                         ->default_value(config->exec.use_legacy_work_unit_builder)
+                         ->implicit_value(true),
+                     "Use legacy query execution sequence with compound and deep join.");
+  desc.add_options()("materialize-inner-join-tables",
+                     po::value<bool>(&config->exec.materialize_inner_join_tables)
+                         ->default_value(config->exec.materialize_inner_join_tables)
+                         ->implicit_value(true),
+                     "Materialize all inner tables for joins.");
   desc.add_options()(
       "test-help",
       "Print all ExecuteTest specific options (for gtest options use `--help`).");
