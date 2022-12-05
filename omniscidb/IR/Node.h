@@ -81,6 +81,11 @@ class Node {
     return dynamic_cast<const T*>(this) != nullptr;
   }
 
+  template <typename T>
+  const T* as() const {
+    return dynamic_cast<const T*>(this);
+  }
+
   void resetQueryExecutionState() {
     context_data_ = nullptr;
     targets_metainfo_ = {};
@@ -1021,13 +1026,13 @@ class TableFunction : public Node {
  public:
   TableFunction(const std::string& function_name,
                 NodeInputs inputs,
-                std::vector<std::string>& fields,
+                std::vector<std::string> fields,
                 ExprPtrVector col_input_exprs,
                 ExprPtrVector table_func_input_exprs,
                 std::vector<TargetMetaInfo> tuple_type)
       : Node(std::move(inputs))
       , function_name_(function_name)
-      , fields_(fields)
+      , fields_(std::move(fields))
       , col_input_exprs_(col_input_exprs)
       , table_func_input_exprs_(table_func_input_exprs)
       , tuple_type_(std::move(tuple_type)) {}

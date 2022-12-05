@@ -64,7 +64,14 @@ class RelAlgDagBuilder : public hdk::ir::QueryDag, public boost::noncopyable {
   RelAlgDagBuilder(const std::string& query_ra,
                    int db_id,
                    SchemaProviderPtr schema_provider,
-                   ConfigPtr config);
+                   ConfigPtr config,
+                   bool coalesce = true);
+
+  RelAlgDagBuilder(const rapidjson::Value& query_ast,
+                   int db_id,
+                   SchemaProviderPtr schema_provider,
+                   ConfigPtr config,
+                   bool coalesce);
 
   /**
    * Constructs a sub-DAG for any subqueries. Should only be called during DAG
@@ -82,11 +89,14 @@ class RelAlgDagBuilder : public hdk::ir::QueryDag, public boost::noncopyable {
 
   const Config& config() const { return *config_; }
 
+  std::unique_ptr<RelAlgDagBuilder> not_coalesced;
+
  private:
   void build(const rapidjson::Value& query_ast, RelAlgDagBuilder& root_dag_builder);
 
   int db_id_;
   SchemaProviderPtr schema_provider_;
+  bool coalesce_ = false;
 };
 
 std::string tree_string(const hdk::ir::Node*, const size_t depth = 0);

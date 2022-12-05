@@ -571,7 +571,8 @@ size_t getNodeColumnCount(const Node* node) {
                 Compound,
                 TableFunction,
                 LogicalUnion,
-                LogicalValues>(node)) {
+                LogicalValues,
+                LeftDeepInnerJoin>(node)) {
     return node->size();
   }
 
@@ -614,14 +615,13 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
     return genColumnRefs(node, getNodeColumnCount(node));
   }
 
-  if (is_one_of<Join>(node)) {
-    CHECK_EQ(size_t(2), node->inputCount());
-    auto lhs_out =
-        genColumnRefs(node->getInput(0), getNodeColumnCount(node->getInput(0)));
-    const auto rhs_out =
-        genColumnRefs(node->getInput(1), getNodeColumnCount(node->getInput(1)));
-    lhs_out.insert(lhs_out.end(), rhs_out.begin(), rhs_out.end());
-    return lhs_out;
+  if (is_one_of<Join, LeftDeepInnerJoin>(node)) {
+    auto res = genColumnRefs(node->getInput(0), node->getInput(0)->size());
+    for (size_t i = 1; i < node->inputCount(); ++i) {
+      auto input_refs = genColumnRefs(node->getInput(i), node->getInput(i)->size());
+      res.insert(res.end(), input_refs.begin(), input_refs.end());
+    }
+    return res;
   }
 
   LOG(FATAL) << "Unhandled ra_node type: " << ::toString(node);
@@ -629,6 +629,8 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
 }
 
 ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
+  CHECK_LT(index, node->size());
+
   if (is_one_of<Scan,
                 Project,
                 Aggregate,
@@ -638,17 +640,19 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
                 LogicalValues,
                 Filter,
                 Sort>(node)) {
-    CHECK_LT(index, node->size());
     return makeExpr<ColumnRef>(getColumnType(node, index), node, index);
   }
 
-  if (is_one_of<Join>(node)) {
-    CHECK_EQ(size_t(2), node->inputCount());
-    auto lhs_size = node->getInput(0)->size();
-    if (index < lhs_size) {
-      return getNodeColumnRef(node->getInput(0), index);
+  if (is_one_of<Join, LeftDeepInnerJoin>(node)) {
+    unsigned offs = 0;
+    for (size_t i = 0; i < node->inputCount(); ++i) {
+      auto input = node->getInput(i);
+      if (index - offs < input->size()) {
+        return getNodeColumnRef(input, index - offs);
+      }
+      offs += input->size();
     }
-    return getNodeColumnRef(node->getInput(1), index - lhs_size);
+    UNREACHABLE();
   }
 
   LOG(FATAL) << "Unhandled node type: " << ::toString(node);

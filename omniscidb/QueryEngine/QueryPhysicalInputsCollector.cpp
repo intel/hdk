@@ -172,6 +172,12 @@ class PhysicalInputsVisitor
         auto input = getNodeColumnRef(join, col_ref->index());
         return visit(input.get());
       }
+      // Filter indirectly uses all columns of its input. So,
+      // walk through filter column references.
+      if (auto filter = source->as<hdk::ir::Filter>()) {
+        auto new_ref = getNodeColumnRef(filter->getInput(0), col_ref->index());
+        return visit(new_ref.get());
+      }
       return InputColDescriptorSet{};
     }
 

@@ -34,6 +34,7 @@
 #include "QueryEngine/RelAlgVisitor.h"
 #include "QueryEngine/ResultSetBuilder.h"
 #include "QueryEngine/WindowContext.h"
+#include "QueryEngine/WorkUnitBuilder.h"
 #include "SessionInfo.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
@@ -373,6 +374,13 @@ ResultSetPtr RelAlgExecutor::finishStreamingExecution() {
   return executor_->finishStreamExecution(stream_execution_context_);
 }
 
+void printTree(const hdk::ir::Node* node, std::string prefix = "|") {
+  std::cout << prefix << node->toString() << std::endl;
+  for (size_t i = 0; i < node->inputCount(); ++i) {
+    printTree(node->getInput(i), prefix + "----");
+  }
+}
+
 ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptions& co,
                                                           const ExecutionOptions& eo,
                                                           const bool just_explain_plan) {
@@ -398,6 +406,31 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
 
   ScopeGuard restore_metainfo_cache = [this] { executor_->clearMetaInfoCache(); };
   auto ed_seq = RaExecutionSequence(ra);
+  if (config_.debug.check_query_exec_seq &&
+      dynamic_cast<const RelAlgDagBuilder*>(query_dag_.get()) &&
+      dynamic_cast<const RelAlgDagBuilder*>(query_dag_.get())->not_coalesced) {
+    hdk::QueryExecutionSequence new_seq(
+        dynamic_cast<const RelAlgDagBuilder*>(query_dag_.get())
+            ->not_coalesced->getRootNode(),
+        executor_->getConfigPtr());
+    if (ed_seq.size() < new_seq.size()) {
+      printTree(ra);
+      std::cout << "Original sequence:" << std::endl;
+      for (size_t i = 0; i < ed_seq.size(); ++i) {
+        std::cout << "Step #" << i << ": "
+                  << ed_seq.getDescriptor(i)->getBody()->toString() << std::endl;
+      }
+
+      printTree(dynamic_cast<const RelAlgDagBuilder*>(query_dag_.get())
+                    ->not_coalesced->getRootNode());
+      std::cout << "New sequence:" << std::endl;
+      for (size_t i = 0; i < new_seq.size(); ++i) {
+        std::cout << "Step #" << i << ": " << new_seq.steps()[i]->toString() << std::endl;
+      }
+
+      CHECK(false);
+    }
+  }
 
   if (just_explain_plan) {
     std::stringstream ss;
@@ -443,7 +476,25 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
   }
   timer_setup.stop();
 
-  // Dispatch the subqueries first
+  if (!config_.exec.use_legacy_work_unit_builder) {
+    // Dispatch the subqueries first
+    for (auto& subquery : getSubqueries()) {
+      auto subquery_ra = subquery->node();
+      CHECK(subquery_ra);
+      if (subquery_ra->hasContextData()) {
+        continue;
+      }
+
+      RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
+      hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
+      ra_executor.execute(subquery_seq, co, eo, 0);
+    }
+
+    hdk::QueryExecutionSequence query_seq(ra, executor_->getConfigPtr());
+    auto shared_res = execute(query_seq, co, eo, queue_time_ms);
+    return std::move(*shared_res);
+  }
+
   for (auto& subquery : getSubqueries()) {
     auto subquery_ra = subquery->node();
     CHECK(subquery_ra);
@@ -645,6 +696,76 @@ ExecutionResult RelAlgExecutor::executeRelAlgSeq(const RaExecutionSequence& seq,
   }
 
   return seq.getDescriptor(exec_desc_count - 1)->getResult();
+}
+
+std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
+    const hdk::QueryExecutionSequence& seq,
+    const CompilationOptions& co,
+    const ExecutionOptions& eo,
+    const int64_t queue_time_ms,
+    const bool with_existing_temp_tables) {
+  INJECT_TIMER(execute);
+  auto timer = DEBUG_TIMER(__func__);
+  if (!with_existing_temp_tables) {
+    decltype(temporary_tables_)().swap(temporary_tables_);
+  }
+  decltype(target_exprs_owned_)().swap(target_exprs_owned_);
+  decltype(left_deep_join_info_)().swap(left_deep_join_info_);
+  executor_->setSchemaProvider(schema_provider_);
+  executor_->temporary_tables_ = &temporary_tables_;
+
+  time(&now_);
+  CHECK(seq.size());
+
+  auto get_descriptor_count = [&seq, &eo]() -> size_t {
+    if (eo.just_explain) {
+      if (dynamic_cast<const hdk::ir::LogicalValues*>(seq.step(0))) {
+        // run the logical values descriptor to generate the result set, then the next
+        // descriptor to generate the explain
+        CHECK_GE(seq.size(), size_t(2));
+        return 2;
+      } else {
+        return 1;
+      }
+    } else {
+      return seq.size();
+    }
+  };
+
+  const auto exec_desc_count = get_descriptor_count();
+  // this join info needs to be maintained throughout an entire query runtime
+  for (size_t i = 0; i < exec_desc_count; i++) {
+    VLOG(1) << "Executing query step " << i;
+    try {
+      executeStep(seq.step(i), co, eo, queue_time_ms);
+    } catch (const QueryMustRunOnCpu&) {
+      // Do not allow per-step retry if flag is off or in distributed mode
+      // TODO(todd): Determine if and when we can relax this restriction
+      // for distributed
+      CHECK(co.device_type == ExecutorDeviceType::GPU);
+      if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
+        throw;
+      }
+      LOG(INFO) << "Retrying current query step " << i << " on CPU";
+      const auto co_cpu = CompilationOptions::makeCpuOnly(co);
+      executeStep(seq.step(i), co_cpu, eo, queue_time_ms);
+    } catch (const NativeExecutionError&) {
+      if (!config_.exec.enable_interop) {
+        throw;
+      }
+      auto eo_extern = eo;
+      eo_extern.executor_type = ::ExecutorType::Extern;
+      const auto body = seq.step(i);
+      const auto compound = dynamic_cast<const hdk::ir::Compound*>(body);
+      if (compound && (compound->getGroupByCount() || compound->isAggregate())) {
+        LOG(INFO) << "Also failed to run the query using interoperability";
+        throw;
+      }
+      executeStep(seq.step(i), co, eo_extern, queue_time_ms);
+    }
+  }
+
+  return seq.step(exec_desc_count - 1)->getResult();
 }
 
 ExecutionResult RelAlgExecutor::executeRelAlgSubSeq(
@@ -1084,15 +1205,6 @@ get_input_desc(const RA* ra_node,
                                                                input_col_descs.end())};
 }
 
-hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr) {
-  auto type = expr->type();
-  if (!type->isString()) {
-    return expr;
-  }
-  auto transient_dict_type = type->ctx().extDict(type, TRANSIENT_DICT_ID);
-  return expr->cast(transient_dict_type);
-}
-
 hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
   try {
     return set_transient_dict(fold_expr(expr.get()));
@@ -1110,34 +1222,6 @@ hdk::ir::ExprPtr cast_dict_to_none(const hdk::ir::ExprPtr& input) {
     return input->cast(input_type->ctx().text(input_type->nullable()));
   }
   return input;
-}
-
-hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
-                           const RelAlgTranslator& translator,
-                           ::ExecutorType executor_type) {
-  auto res = translator.normalize(expr);
-  res = rewrite_array_elements(res.get());
-  res = rewrite_expr(res.get());
-  if (executor_type == ExecutorType::Native) {
-    // This is actually added to get full match of translated legacy
-    // rex expressions and new Exprs. It's done only for testing purposes
-    // and shouldn't have any effect on functionality and performance.
-    // TODO: remove when rex are not used anymore
-    if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
-      if (agg->arg()) {
-        auto new_arg = set_transient_dict_maybe(agg->argShared());
-        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->arg1());
-      }
-    } else {
-      res = set_transient_dict_maybe(res);
-    }
-  } else if (executor_type == ExecutorType::TableFunctions) {
-    res = fold_expr(res.get());
-  } else {
-    res = cast_dict_to_none(fold_expr(res.get()));
-  }
-  return res;
 }
 
 std::list<hdk::ir::ExprPtr> translate_groupby_exprs(const hdk::ir::Compound* compound,
@@ -1244,7 +1328,7 @@ bool is_agg(const hdk::ir::Expr* expr) {
   return false;
 }
 
-inline const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
+const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
   if (is_count_distinct(&expr)) {
     return expr.type()->ctx().int64();
   }
@@ -1272,25 +1356,192 @@ std::vector<TargetMetaInfo> get_targets_meta(
 
 template <>
 std::vector<TargetMetaInfo> get_targets_meta(
+    const hdk::ir::Node* node,
+    const std::vector<const hdk::ir::Expr*>& target_exprs);
+
+template <>
+std::vector<TargetMetaInfo> get_targets_meta(
     const hdk::ir::Filter* filter,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  hdk::ir::Node const* input0 = filter->getInput(0);
-  if (auto const* input = dynamic_cast<hdk::ir::Compound const*>(input0)) {
-    return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<hdk::ir::Project const*>(input0)) {
-    return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<hdk::ir::LogicalUnion const*>(input0)) {
-    return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<hdk::ir::Aggregate const*>(input0)) {
-    return get_targets_meta(input, target_exprs);
-  } else if (auto const* input = dynamic_cast<hdk::ir::Scan const*>(input0)) {
-    return get_targets_meta(input, target_exprs);
+  return get_targets_meta(filter->getInput(0), target_exprs);
+}
+
+template <>
+std::vector<TargetMetaInfo> get_targets_meta(
+    const hdk::ir::Sort* sort,
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
+  return get_targets_meta(sort->getInput(0), target_exprs);
+}
+
+template <>
+std::vector<TargetMetaInfo> get_targets_meta(
+    const hdk::ir::LogicalUnion* logical_union,
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
+  return get_targets_meta(logical_union->getInput(0), target_exprs);
+}
+
+template <>
+std::vector<TargetMetaInfo> get_targets_meta(
+    const hdk::ir::Node* node,
+    const std::vector<const hdk::ir::Expr*>& target_exprs) {
+  if (auto compound = node->as<hdk::ir::Compound>()) {
+    return get_targets_meta(compound, target_exprs);
+  } else if (auto proj = node->as<hdk::ir::Project>()) {
+    return get_targets_meta(proj, target_exprs);
+  } else if (auto logical_union = node->as<hdk::ir::LogicalUnion>()) {
+    return get_targets_meta(logical_union, target_exprs);
+  } else if (auto agg = node->as<hdk::ir::Aggregate>()) {
+    return get_targets_meta(agg, target_exprs);
+  } else if (auto scan = node->as<hdk::ir::Scan>()) {
+    return get_targets_meta(scan, target_exprs);
+  } else if (auto sort = node->as<hdk::ir::Sort>()) {
+    return get_targets_meta(sort, target_exprs);
+  } else if (auto filter = node->as<hdk::ir::Filter>()) {
+    return get_targets_meta(filter, target_exprs);
   }
-  UNREACHABLE() << "Unhandled node type: " << input0->toString();
+  UNREACHABLE() << "Unhandled node type: " << node->toString();
   return {};
 }
 
+bool is_agg_step(const hdk::ir::Node* node) {
+  if (node->getResult() || node->is<hdk::ir::Scan>()) {
+    return false;
+  }
+  if (node->is<hdk::ir::Aggregate>()) {
+    return true;
+  }
+  for (size_t i = 0; i < node->inputCount(); ++i) {
+    if (is_agg_step(node->getInput(i))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
+
+hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr) {
+  auto type = expr->type();
+  if (!type->isString()) {
+    return expr;
+  }
+  auto transient_dict_type = type->ctx().extDict(type, TRANSIENT_DICT_ID);
+  return expr->cast(transient_dict_type);
+}
+
+hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
+                           const RelAlgTranslator& translator,
+                           ::ExecutorType executor_type) {
+  auto res = translator.normalize(expr);
+  res = rewrite_array_elements(res.get());
+  res = rewrite_expr(res.get());
+  if (executor_type == ExecutorType::Native) {
+    // This is actually added to get full match of translated legacy
+    // rex expressions and new Exprs. It's done only for testing purposes
+    // and shouldn't have any effect on functionality and performance.
+    // TODO: remove when rex are not used anymore
+    if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
+      if (agg->arg()) {
+        auto new_arg = set_transient_dict_maybe(agg->argShared());
+        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(
+            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->arg1());
+      }
+    } else {
+      res = set_transient_dict_maybe(res);
+    }
+  } else if (executor_type == ExecutorType::TableFunctions) {
+    res = fold_expr(res.get());
+  } else {
+    res = cast_dict_to_none(fold_expr(res.get()));
+  }
+  return res;
+}
+
+void RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
+                                 const CompilationOptions& co,
+                                 const ExecutionOptions& eo,
+                                 const int64_t queue_time_ms) {
+  ExecutionResult res;
+  try {
+    // TODO: move allow_speculative_sort to ExecutionOptions?
+    res = executeStep(step_root, co, eo, queue_time_ms, true);
+  } catch (const SpeculativeTopNFailed& e) {
+    res = executeStep(step_root, co, eo, queue_time_ms, false);
+  }
+
+  auto shared_res = std::make_shared<ExecutionResult>(std::move(res));
+  step_root->setResult(shared_res);
+  addTemporaryTable(-step_root->getId(), shared_res->getDataPtr());
+}
+
+ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
+                                            const CompilationOptions& co,
+                                            const ExecutionOptions& eo,
+                                            const int64_t queue_time_ms,
+                                            bool allow_speculative_sort) {
+  auto timer = DEBUG_TIMER(__func__);
+  WindowProjectNodeContext::reset(executor_);
+  // Currently, table functions and UNION ALL nodes are not merged
+  // with other nodes. We don't use WorkUnitBuilder for them.
+  if (auto logical_values = step_root->as<hdk::ir::LogicalValues>()) {
+    return executeLogicalValues(logical_values, eo);
+  } else if (auto table_function = step_root->as<hdk::ir::TableFunction>()) {
+    return executeTableFunction(table_function, co, eo, queue_time_ms);
+  }
+
+  WorkUnit work_unit = createWorkUnit(step_root, co, eo, allow_speculative_sort);
+
+  auto sort = step_root->as<hdk::ir::Sort>();
+  ExecutionOptions eo_with_limit =
+      eo.with_just_validate(eo.just_validate || (sort && sort->isEmptyResult()));
+
+  bool cpu_only = false;
+  if (auto project = step_root->as<hdk::ir::Project>()) {
+    if (project->isSimple()) {
+      const auto input_node = project->getInput(0);
+      if (input_node->is<hdk::ir::Sort>()) {
+        cpu_only = true;
+        const auto& input_table =
+            get_temporary_table(&temporary_tables_, -input_node->getId());
+        work_unit.exe_unit.scan_limit =
+            std::min(input_table.getLimit(), input_table.rowCount());
+      }
+    }
+  }
+
+  auto res = executeWorkUnit(work_unit,
+                             step_root->getOutputMetainfo(),
+                             is_agg_step(step_root),
+                             cpu_only ? CompilationOptions::makeCpuOnly(co) : co,
+                             eo_with_limit,
+                             queue_time_ms);
+
+  if (sort) {
+    if (res.isFilterPushDownEnabled()) {
+      return res;
+    }
+    auto rows_to_sort = res.getRows();
+    if (eo.just_explain) {
+      return {rows_to_sort, {}};
+    }
+    const size_t limit = sort->getLimit();
+    const size_t offset = sort->getOffset();
+    if (sort->collationCount() != 0 && !rows_to_sort->definitelyHasNoRows() &&
+        !use_speculative_top_n(work_unit.exe_unit, rows_to_sort->getQueryMemDesc())) {
+      const size_t top_n = limit == 0 ? 0 : limit + offset;
+      rows_to_sort->sort(work_unit.exe_unit.sort_info.order_entries, top_n, executor_);
+    }
+    if (limit || offset) {
+      rows_to_sort->dropFirstN(offset);
+      if (limit) {
+        rows_to_sort->keepFirstN(limit);
+      }
+    }
+    return {rows_to_sort, res.getTargetsMeta()};
+  }
+
+  return res;
+}
 
 ExecutionResult RelAlgExecutor::executeCompound(const hdk::ir::Compound* compound,
                                                 const CompilationOptions& co,
@@ -1642,8 +1893,6 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
   return {rs, tuple_type};
 }
 
-namespace {
-
 // TODO(alex): Once we're fully migrated to the relational algebra model, change
 // the executor interface to use the collation directly and remove this conversion.
 std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort) {
@@ -1658,6 +1907,8 @@ std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort) {
   return result;
 }
 
+namespace {
+
 size_t get_scan_limit(const hdk::ir::Node* ra, const size_t limit) {
   const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(ra);
   if (aggregate) {
@@ -1667,11 +1918,11 @@ size_t get_scan_limit(const hdk::ir::Node* ra, const size_t limit) {
   return (compound && compound->isAggregate()) ? 0 : limit;
 }
 
+}  // namespace
+
 bool first_oe_is_desc(const std::list<hdk::ir::OrderEntry>& order_entries) {
   return !order_entries.empty() && order_entries.front().is_desc;
 }
-
-}  // namespace
 
 ExecutionResult RelAlgExecutor::executeSort(const hdk::ir::Sort* sort,
                                             const CompilationOptions& co,
@@ -2377,26 +2628,111 @@ void RelAlgExecutor::executePostExecutionCallback() {
 }
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* node,
+                                                        const CompilationOptions& co,
+                                                        const ExecutionOptions& eo,
+                                                        bool allow_speculative_sort) {
+  CHECK(!config_.exec.use_legacy_work_unit_builder);
+
+  hdk::WorkUnitBuilder builder(node,
+                               query_dag_.get(),
+                               executor_,
+                               schema_provider_,
+                               temporary_tables_,
+                               eo,
+                               co,
+                               now_,
+                               false,
+                               allow_speculative_sort);
+  auto exe_unit = builder.exeUnit();
+  const auto query_infos = get_table_infos(exe_unit.input_descs, executor_);
+  auto query_rewriter = std::make_unique<QueryRewriter>(query_infos, executor_);
+  auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);
+  const auto targets_meta = get_targets_meta(node, rewritten_exe_unit.target_exprs);
+  node->setOutputMetainfo(targets_meta);
+  RelAlgTranslator translator(
+      executor_, builder.nestLevels(), builder.joinTypes(), now_, eo.just_explain);
+  auto& left_deep_trees_info = getLeftDeepJoinTreesInfo();
+  std::optional<unsigned> left_deep_tree_id = builder.leftDeepTreeId();
+  if (left_deep_tree_id && left_deep_tree_id.has_value()) {
+    left_deep_trees_info.emplace(left_deep_tree_id.value(),
+                                 rewritten_exe_unit.join_quals);
+  }
+  auto dag_info = QueryPlanDagExtractor::extractQueryPlanDag(node,
+                                                             schema_provider_,
+                                                             left_deep_tree_id,
+                                                             left_deep_trees_info,
+                                                             temporary_tables_,
+                                                             executor_,
+                                                             translator);
+  if (is_extracted_dag_valid(dag_info)) {
+    rewritten_exe_unit.query_plan_dag = dag_info.extracted_dag;
+    rewritten_exe_unit.hash_table_build_plan_dag = dag_info.hash_table_plan_dag;
+    rewritten_exe_unit.table_id_to_node_map = dag_info.table_id_to_node_map;
+  }
+
+  target_exprs_owned_ = builder.releaseTargetExprsOwned();
+
+  return {rewritten_exe_unit,
+          node,
+          builder.maxGroupsBufferEntryGuess(),
+          std::move(query_rewriter),
+          builder.releaseInputPermutation(),
+          builder.releaseLeftDeepJoinInputSizes()};
+}
+
+RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* node,
                                                         const SortInfo& sort_info,
                                                         const ExecutionOptions& eo) {
-  const auto compound = dynamic_cast<const hdk::ir::Compound*>(node);
-  if (compound) {
-    return createCompoundWorkUnit(compound, sort_info, eo);
-  }
-  const auto project = dynamic_cast<const hdk::ir::Project*>(node);
-  if (project) {
-    return createProjectWorkUnit(project, sort_info, eo);
-  }
-  const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node);
-  if (aggregate) {
-    return createAggregateWorkUnit(aggregate, sort_info, eo.just_explain);
-  }
-  const auto filter = dynamic_cast<const hdk::ir::Filter*>(node);
-  if (filter) {
-    return createFilterWorkUnit(filter, sort_info, eo.just_explain);
+  if (!config_.exec.use_legacy_work_unit_builder) {
+    CHECK(sort_info.order_entries.empty());
+    return createWorkUnit(node, CompilationOptions::defaults(), eo, true);
+  } else {
+    const auto compound = dynamic_cast<const hdk::ir::Compound*>(node);
+    if (compound) {
+      return createCompoundWorkUnit(compound, sort_info, eo);
+    }
+    const auto project = dynamic_cast<const hdk::ir::Project*>(node);
+    if (project) {
+      return createProjectWorkUnit(project, sort_info, eo);
+    }
+    const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(node);
+    if (aggregate) {
+      return createAggregateWorkUnit(aggregate, sort_info, eo.just_explain);
+    }
+    const auto filter = dynamic_cast<const hdk::ir::Filter*>(node);
+    if (filter) {
+      return createFilterWorkUnit(filter, sort_info, eo.just_explain);
+    }
   }
   LOG(FATAL) << "Unhandled node type: " << node->toString();
   throw std::logic_error("Unexpected node type: " + node->toString());
+}
+
+std::vector<JoinType> left_deep_join_types(
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
+  CHECK_GE(left_deep_join->inputCount(), size_t(2));
+  std::vector<JoinType> join_types(left_deep_join->inputCount() - 1, JoinType::INNER);
+  for (size_t nesting_level = 1; nesting_level <= left_deep_join->inputCount() - 1;
+       ++nesting_level) {
+    if (left_deep_join->getOuterCondition(nesting_level)) {
+      join_types[nesting_level - 1] = JoinType::LEFT;
+    }
+    auto cur_level_join_type = left_deep_join->getJoinType(nesting_level);
+    if (cur_level_join_type == JoinType::SEMI || cur_level_join_type == JoinType::ANTI) {
+      join_types[nesting_level - 1] = cur_level_join_type;
+    }
+  }
+  return join_types;
+}
+
+std::vector<size_t> get_left_deep_join_input_sizes(
+    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
+  std::vector<size_t> input_sizes;
+  for (size_t i = 0; i < left_deep_join->inputCount(); ++i) {
+    auto input_size = getNodeColumnCount(left_deep_join->getInput(i));
+    input_sizes.push_back(input_size);
+  }
+  return input_sizes;
 }
 
 namespace {
@@ -2479,40 +2815,6 @@ hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
   return nullptr;
 }
 
-hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
-  const auto condition = dynamic_cast<const hdk::ir::BinOper*>(expr);
-  if (condition && condition->isAnd()) {
-    auto acc = get_bitwise_equals(condition->leftOperand());
-    if (!acc) {
-      return nullptr;
-    }
-    return hdk::ir::makeExpr<hdk::ir::BinOper>(
-        expr->ctx().boolean(),
-        hdk::ir::OpType::kAnd,
-        hdk::ir::Qualifier::kOne,
-        acc,
-        get_bitwise_equals_conjunction(condition->rightOperand()));
-  }
-  return get_bitwise_equals(expr);
-}
-
-std::vector<JoinType> left_deep_join_types(
-    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
-  CHECK_GE(left_deep_join->inputCount(), size_t(2));
-  std::vector<JoinType> join_types(left_deep_join->inputCount() - 1, JoinType::INNER);
-  for (size_t nesting_level = 1; nesting_level <= left_deep_join->inputCount() - 1;
-       ++nesting_level) {
-    if (left_deep_join->getOuterCondition(nesting_level)) {
-      join_types[nesting_level - 1] = JoinType::LEFT;
-    }
-    auto cur_level_join_type = left_deep_join->getJoinType(nesting_level);
-    if (cur_level_join_type == JoinType::SEMI || cur_level_join_type == JoinType::ANTI) {
-      join_types[nesting_level - 1] = cur_level_join_type;
-    }
-  }
-  return join_types;
-}
-
 template <class RA>
 std::vector<size_t> do_table_reordering(
     std::vector<InputDescriptor>& input_descs,
@@ -2535,16 +2837,6 @@ std::vector<size_t> do_table_reordering(
   return input_permutation;
 }
 
-std::vector<size_t> get_left_deep_join_input_sizes(
-    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
-  std::vector<size_t> input_sizes;
-  for (size_t i = 0; i < left_deep_join->inputCount(); ++i) {
-    auto input_size = getNodeColumnCount(left_deep_join->getInput(i));
-    input_sizes.push_back(input_size);
-  }
-  return input_sizes;
-}
-
 std::list<hdk::ir::ExprPtr> rewrite_quals(const std::list<hdk::ir::ExprPtr>& quals) {
   std::list<hdk::ir::ExprPtr> rewritten_quals;
   for (const auto& qual : quals) {
@@ -2555,6 +2847,23 @@ std::list<hdk::ir::ExprPtr> rewrite_quals(const std::list<hdk::ir::ExprPtr>& qua
 }
 
 }  // namespace
+
+hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
+  const auto condition = dynamic_cast<const hdk::ir::BinOper*>(expr);
+  if (condition && condition->isAnd()) {
+    auto acc = get_bitwise_equals(condition->leftOperand());
+    if (!acc) {
+      return nullptr;
+    }
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(
+        expr->ctx().boolean(),
+        hdk::ir::OpType::kAnd,
+        hdk::ir::Qualifier::kOne,
+        acc,
+        get_bitwise_equals_conjunction(condition->rightOperand()));
+  }
+  return get_bitwise_equals(expr);
+}
 
 RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
     const hdk::ir::Compound* compound,
@@ -2695,6 +3004,8 @@ bool list_contains_expression(const QualsList& haystack, const hdk::ir::ExprPtr&
   return false;
 }
 
+}  // namespace
+
 // Transform `(p AND q) OR (p AND r)` to `p AND (q OR r)`. Avoids redundant
 // evaluations of `p` and allows use of the original form in joins if `p`
 // can be used for hash joins.
@@ -2751,8 +3062,6 @@ hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr) {
   return Analyzer::normalizeOperExpr(
       hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, common_expr, remaining_expr);
 }
-
-}  // namespace
 
 std::list<hdk::ir::ExprPtr> RelAlgExecutor::makeJoinQuals(
     const hdk::ir::Expr* join_condition,

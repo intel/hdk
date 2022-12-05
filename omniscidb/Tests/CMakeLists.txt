@@ -52,6 +52,7 @@ add_executable(NoCatalogSqlTest NoCatalogSqlTest.cpp)
 add_executable(ArrowStorageTest ArrowStorageTest.cpp)
 add_executable(ArrowStorageSqlTest ArrowStorageSqlTest.cpp)
 add_executable(ResultSetArrowConversion ResultSetArrowConversion.cpp)
+add_executable(ExecutionSequenceTest ExecutionSequenceTest.cpp TestRelAlgDagBuilder.cpp)
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_executable(UdfTest UdfTest.cpp)
@@ -126,6 +127,7 @@ target_link_libraries(ArrowStorageTest gtest QueryEngine ArrowStorage)
 target_link_libraries(ArrowStorageSqlTest gtest QueryEngine ArrowQueryRunner ArrowStorage)
 target_link_libraries(ParallelSortTest gtest TBB::tbb Logger)
 target_link_libraries(ResultSetArrowConversion gtest QueryEngine ArrowQueryRunner ArrowStorage)
+target_link_libraries(ExecutionSequenceTest gtest QueryEngine ArrowQueryRunner ArrowStorage ConfigBuilder)
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   target_link_libraries(UdfTest gtest UdfCompiler gtest QueryEngine ArrowQueryRunner)
@@ -145,7 +147,7 @@ set(TEST_ARGS "--gtest_output=xml:../")
 add_test(UtilTest UtilTest ${TEST_ARGS})
 add_test(ArrowBasedExecuteTest ArrowBasedExecuteTest ${TEST_ARGS})
 add_test(NAME ArrowBasedExecuteTestColumnarOutput COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--enable-columnar-output")
-add_test(NAME ArrowBasedExecuteTestSizeAgnostic COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--use-groupby-buffer-desc")
+add_test(NAME ArrowBasedExecuteTestLegacyExecSeq COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--legacy-work-units")
 add_test(CodeGeneratorTest CodeGeneratorTest ${TEST_ARGS})
 add_test(ResultSetTest ResultSetTest ${TEST_ARGS})
 add_test(ColumnarResultsTest ColumnarResultsTest ${TEST_ARGS})
@@ -177,6 +179,7 @@ add_test(ArrowStorageTest ArrowStorageTest ${TEST_ARGS})
 add_test(ArrowStorageSqlTest ArrowStorageSqlTest ${TEST_ARGS})
 add_test(ParallelSortTest ParallelSortTest ${TEST_ARGS})
 add_test(ResultSetArrowConversion ResultSetArrowConversion ${TEST_ARGS})
+add_test(ExecutionSequenceTest ExecutionSequenceTest ${TEST_ARGS})
 
 if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
@@ -229,6 +232,7 @@ set(TEST_PROGRAMS
   ArrowStorageSqlTest
   ParallelSortTest
   ResultSetArrowConversion
+  ExecutionSequenceTest
 )
 
 if(ENABLE_CUDA)
@@ -241,7 +245,7 @@ endif()
 
 set(SANITY_TESTS ${TEST_PROGRAMS})
 list(APPEND SANITY_TESTS ArrowBasedExecuteTestColumnarOutput)
-list(APPEND SANITY_TESTS ArrowBasedExecuteTestSizeAgnostic)
+list(APPEND SANITY_TESTS ArrowBasedExecuteTestLegacyExecSeq)
 list(APPEND SANITY_TESTS StringDictionaryHashTest)
 
 set_tests_properties(${SANITY_TESTS} PROPERTIES LABELS "sanity")

@@ -86,6 +86,7 @@ set(query_engine_source_files
     QueryRewrite.cpp
     QueryTemplateGenerator.cpp
     QueryExecutionContext.cpp
+    QueryExecutionSequence.cpp
     QueryMemoryInitializer.cpp
     RelAlgDagBuilder.cpp
     RelAlgExecutor.cpp
@@ -132,6 +133,7 @@ set(query_engine_source_files
     DataRecycler/HashtableRecycler.cpp
     DataRecycler/HashingSchemeRecycler.cpp
     Visitors/QueryPlanDagChecker.cpp
+    WorkUnitBuilder.cpp
 
     Codec.h
     Execute.h

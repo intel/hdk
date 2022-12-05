@@ -755,11 +755,15 @@ std::vector<int8_t> Executor::serializeLiterals(
         const auto p = boost::get<std::pair<std::string, int>>(&lit);
         CHECK(p);
         const auto str_id =
-            config_->exec.enable_experimental_string_functions
+            (config_->exec.enable_experimental_string_functions ||
+             // With WorkUnitBuilder we might produce complex expressions where encoded
+             // literals are decoded back to plain strings. In this case, we cannot use
+             // INVALID_STR_ID and should add the literal to the dictionary.
+             config_->exec.use_legacy_work_unit_builder)
                 ? getStringDictionaryProxy(p->second, row_set_mem_owner_, true)
-                      ->getOrAddTransient(p->first)
+                      ->getIdOfString(p->first)
                 : getStringDictionaryProxy(p->second, row_set_mem_owner_, true)
-                      ->getIdOfString(p->first);
+                      ->getOrAddTransient(p->first);
         memcpy(&serialized[off - lit_bytes], &str_id, lit_bytes);
         break;
       }
@@ -2169,6 +2173,12 @@ void Executor::addTransientStringLiterals(
 
   for (const auto& group_expr : ra_exe_unit.quals) {
     visit_expr(group_expr.get());
+  }
+
+  for (const auto& quals : ra_exe_unit.join_quals) {
+    for (const auto& qual_expr : quals.quals) {
+      visit_expr(qual_expr.get());
+    }
   }
 
   for (const auto& group_expr : ra_exe_unit.simple_quals) {

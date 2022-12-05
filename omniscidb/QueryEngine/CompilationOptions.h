@@ -141,6 +141,12 @@ struct ExecutionOptions {
     return eo;
   }
 
+  ExecutionOptions with_just_validate(bool enable = true) const {
+    ExecutionOptions eo = *this;
+    eo.just_validate = enable;
+    return eo;
+  }
+
  private:
   ExecutionOptions() {}
 };

@@ -934,6 +934,9 @@ ExprPtr UOper::cast(const Type* new_type, bool is_dict_intersection) const {
       }
     }
   }
+  if (type_->isExtDictionary() && new_type->isExtDictionary()) {
+    return operand_->cast(new_type);
+  }
   return Expr::cast(new_type, is_dict_intersection);
 }
 

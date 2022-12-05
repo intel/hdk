@@ -107,7 +107,7 @@ class InputColDescriptor {
   std::string toString() const {
     return ::typeName(this) + "(table_id=" + std::to_string(getTableId()) +
            ", nest_level=" + std::to_string(getNestLevel()) +
-           "col_id=" + std::to_string(getColId()) + (isVirtual() ? "[virt])" : ")");
+           ", col_id=" + std::to_string(getColId()) + (isVirtual() ? "[virt])" : ")");
   }
 
  private:

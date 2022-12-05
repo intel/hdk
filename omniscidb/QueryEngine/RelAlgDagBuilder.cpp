@@ -2834,15 +2834,32 @@ RelAlgDagBuilder::RelAlgDagBuilder(RelAlgDagBuilder& root_dag_builder,
                                    SchemaProviderPtr schema_provider)
     : hdk::ir::QueryDag(root_dag_builder.config_, root_dag_builder.now())
     , db_id_(db_id)
-    , schema_provider_(schema_provider) {
+    , schema_provider_(schema_provider)
+    , coalesce_(root_dag_builder.coalesce_) {
   build(query_ast, root_dag_builder);
+}
+
+RelAlgDagBuilder::RelAlgDagBuilder(const rapidjson::Value& query_ast,
+                                   int db_id,
+                                   SchemaProviderPtr schema_provider,
+                                   ConfigPtr config,
+                                   bool coalesce)
+    : hdk::ir::QueryDag(config)
+    , db_id_(db_id)
+    , schema_provider_(schema_provider)
+    , coalesce_(coalesce && config->exec.use_legacy_work_unit_builder) {
+  build(query_ast, *this);
 }
 
 RelAlgDagBuilder::RelAlgDagBuilder(const std::string& query_ra,
                                    int db_id,
                                    SchemaProviderPtr schema_provider,
-                                   ConfigPtr config)
-    : hdk::ir::QueryDag(config), db_id_(db_id), schema_provider_(schema_provider) {
+                                   ConfigPtr config,
+                                   bool coalesce)
+    : hdk::ir::QueryDag(config)
+    , db_id_(db_id)
+    , schema_provider_(schema_provider)
+    , coalesce_(coalesce && config->exec.use_legacy_work_unit_builder) {
   rapidjson::Document query_ast;
   query_ast.Parse(query_ra.c_str());
   VLOG(2) << "Parsing query RA JSON: " << query_ra;
@@ -2881,7 +2898,7 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   std::vector<const hdk::ir::Node*> filtered_left_deep_joins;
   std::vector<const hdk::ir::Node*> left_deep_joins;
   for (const auto& node : nodes_) {
-    const auto left_deep_join_root = get_left_deep_join_root(node);
+    const auto left_deep_join_root = hdk::ir::get_left_deep_join_root(node);
     // The filter which starts a left-deep join pattern must not be coalesced
     // since it contains (part of) the join condition.
     if (left_deep_join_root) {
@@ -2901,9 +2918,21 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
       nodes_,
       false /* always_add_project_if_first_project_is_window_expr */,
       query_hint_);
-  coalesce_nodes(nodes_, left_deep_joins, query_hint_);
+  if (coalesce_) {
+    coalesce_nodes(nodes_, left_deep_joins, query_hint_);
+    if (config_->debug.check_query_exec_seq) {
+      // Don't create non coalesced versions for subqueries, they will be
+      // parsed in the root non coalesced builder.
+      if (&lead_dag_builder == this) {
+        not_coalesced.reset(
+            new RelAlgDagBuilder(query_ast, db_id_, schema_provider_, config_, false));
+      }
+    }
+  }
   CHECK(nodes_.back().use_count() == 1);
-  create_left_deep_join(nodes_);
+  if (coalesce_) {
+    hdk::ir::create_left_deep_join(nodes_);
+  }
   CHECK(nodes_.size());
   root_ = nodes_.back();
 }

@@ -39,6 +39,11 @@ class ExprRewriter : public ExprVisitor<ExprPtr> {
   ExprPtr visitUOper(const hdk::ir::UOper* uoper) override {
     auto new_op = visit(uoper->operand());
     if (new_op.get() != uoper->operand()) {
+      // For casts it is better to use cast method to benefit
+      // from additional folding.
+      if (uoper->isCast()) {
+        return new_op->cast(uoper->type());
+      }
       return hdk::ir::makeExpr<hdk::ir::UOper>(
           uoper->type(), uoper->containsAgg(), uoper->opType(), new_op);
     }

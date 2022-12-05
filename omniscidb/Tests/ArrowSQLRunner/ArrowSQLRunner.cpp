@@ -46,6 +46,8 @@ class ArrowSQLRunnerImpl {
 
   Config& config() { return *config_; }
 
+  ConfigPtr configPtr() { return config_; }
+
   bool gpusPresent() { return data_mgr_->gpusPresent(); }
 
   void printStats() {
@@ -342,6 +344,8 @@ class ArrowSQLRunnerImpl {
                                       system_parameters);
     executor_->setSchemaProvider(storage_);
 
+    table_functions::TableFunctionsFactory::init();
+
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
       calcite_ = std::make_shared<CalciteJNI>(storage_, config_, udf_filename, 1024);
 
@@ -356,7 +360,6 @@ class ArrowSQLRunnerImpl {
 #ifdef _WIN32
       calcite_->setRuntimeExtensionFunctions({}, {}, /*is_runtime=*/false);
 #else
-      table_functions::TableFunctionsFactory::init();
       auto udtfs =
           table_functions::TableFunctionsFactory::get_table_funcs(/*is_runtime=*/false);
       std::vector<ExtensionFunction> udfs = {};
@@ -395,6 +398,10 @@ void reset() {
 
 Config& config() {
   return ArrowSQLRunnerImpl::get()->config();
+}
+
+ConfigPtr configPtr() {
+  return ArrowSQLRunnerImpl::get()->configPtr();
 }
 
 bool gpusPresent() {
