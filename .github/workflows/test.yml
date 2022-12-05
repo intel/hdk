@@ -71,7 +71,7 @@ jobs:
       - name: Download perf results
         # there is no way to access other workflow artifacts without dawidd6/action-download-artifact@v2
         uses: dawidd6/action-download-artifact@v2
-        if: inputs.test == 'perf'
+        if: inputs.test == 'perf' && github.ref_name == 'main'
         with:
           workflow: main.yml
           branch: ${{ github.ref_name }}
@@ -96,7 +96,7 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-taxi
           path: |
-            *.pdf
-            perf.json
+            omniscidb/*.pdf
+            omniscidb/perf.json
 
 
