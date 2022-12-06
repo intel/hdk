@@ -42,12 +42,9 @@
 #include <gtest/gtest.h>
 
 // Input files' names
-static const char* TABLE6x4_CSV_FILE =
-    "../../Tests/EmbeddedDataFiles/embedded_db_test_6x4table.csv";
-static const char* JOIN_TABLE_CSV_FILE =
-    "../../Tests/EmbeddedDataFiles/embedded_db_test_join_table.csv";
-static const char* NULLSTABLE6x4_CSV_FILE =
-    "../../Tests/EmbeddedDataFiles/embedded_db_test_nulls_table.csv";
+static const char* TABLE6x4_CSV_FILE = "embedded_db_test_6x4table.csv";
+static const char* JOIN_TABLE_CSV_FILE = "embedded_db_test_join_table.csv";
+static const char* NULLSTABLE6x4_CSV_FILE = "embedded_db_test_nulls_table.csv";
 
 //  Content of the table stored in $TABLE6x4_CSV_FILE file
 static std::array<int64_t, 6> table6x4_col_i64 = {0, 0, 0, 1, 1, 1};
@@ -94,14 +91,19 @@ void parse_cli_args(int argc, char* argv[], ConfigPtr config) {
   }
 }
 
+std::string getFilePath(const std::string& file_name) {
+  return TEST_SOURCE_PATH + std::string("/EmbeddedDataFiles/") + file_name;
+}
+
 void import_data() {
-  getStorage()->importCsvFile(TABLE6x4_CSV_FILE, "test");
+  getStorage()->importCsvFile(getFilePath(TABLE6x4_CSV_FILE), "test");
   getStorage()->importCsvFile(
-      TABLE6x4_CSV_FILE, "test_chunked", ArrowStorage::TableOptions{4});
+      getFilePath(TABLE6x4_CSV_FILE), "test_chunked", ArrowStorage::TableOptions{4});
+  getStorage()->importCsvFile(getFilePath(NULLSTABLE6x4_CSV_FILE),
+                              "chunked_nulls",
+                              ArrowStorage::TableOptions{3});
   getStorage()->importCsvFile(
-      NULLSTABLE6x4_CSV_FILE, "chunked_nulls", ArrowStorage::TableOptions{3});
-  getStorage()->importCsvFile(
-      JOIN_TABLE_CSV_FILE, "join_table", ArrowStorage::TableOptions{2});
+      getFilePath(JOIN_TABLE_CSV_FILE), "join_table", ArrowStorage::TableOptions{2});
 }
 
 std::shared_ptr<arrow::RecordBatch> getArrowRecordBatch(const ExecutionResult& res) {

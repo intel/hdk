@@ -105,7 +105,7 @@ class TestBuffer : public Data_Namespace::AbstractBuffer {
 };
 
 std::string getFilePath(const std::string& file_name) {
-  return std::string("../../Tests/ArrowStorageDataFiles/") + file_name;
+  return TEST_SOURCE_PATH + "/ArrowStorageDataFiles/"s + file_name;
 }
 
 template <typename T>
