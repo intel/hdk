@@ -127,7 +127,7 @@ INSTANTIATE_TEST_SUITE_P(ArrowStorageSqlTest,
 class ArrowStorageTaxiTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    ArrowStorage::TableOptions table_options;
+    ArrowStorage::TableOptions table_options = ArrowStorage::TableOptions(5);
     ArrowStorage::CsvParseOptions parse_options;
     parse_options.header = false;
     getStorage()->importCsvFile(
@@ -259,10 +259,31 @@ TEST_F(ArrowStorageTaxiTest, TaxiQuery4) {
 }
 
 int main(int argc, char** argv) {
-  TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
 
-  init();
+  auto config = std::make_shared<Config>();
+  namespace po = boost::program_options;
+
+  po::options_description desc("Options");
+  desc.add_options()(
+      "enable-heterogeneous",
+      po::value<bool>(&config->exec.heterogeneous.enable_heterogeneous_execution)
+          ->default_value(config->exec.heterogeneous.enable_heterogeneous_execution)
+          ->implicit_value(true),
+      "Allow heterogeneous execution.");
+
+  logger::LogOptions log_options(argv[0]);
+  log_options.severity_ = logger::Severity::FATAL;
+  log_options.set_options();  // update default values
+  desc.add(log_options.get_options());
+
+  po::variables_map vm;
+  po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+  po::notify(vm);
+
+  logger::init(log_options);
+
+  init(config);
 
   int err{0};
   try {
