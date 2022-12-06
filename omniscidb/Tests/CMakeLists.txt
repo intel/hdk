@@ -3,6 +3,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(TEST_BASE_PATH "./tmp")
 add_definitions("-DBASE_PATH=\"${TEST_BASE_PATH}\"")
+add_definitions("-DTEST_SOURCE_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Udf/udf_sample.cpp DESTINATION ${CMAKE_BINARY_DIR}/Tests/Udf)
 

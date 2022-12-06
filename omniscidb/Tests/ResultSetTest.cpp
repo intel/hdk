@@ -35,6 +35,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <filesystem>
 #include <queue>
 #include <random>
 
@@ -2962,6 +2963,14 @@ TEST(ReduceRandomGroups, BaselineHashColumnar_Large_NullVal_0075) {
       target_infos, query_mem_desc, gen1, gen2, prct1, prct2, silent, 2);
 }
 
+namespace {
+
+std::string getFilePath(const std::string& file_name) {
+  return std::string(TEST_SOURCE_PATH) + "/Import/datafiles/" + file_name;
+}
+
+}  // namespace
+
 TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
   // if we try to columnarize intermediate result which 1) is not truncated and
   // has more than 20000 rows, i.e., rows.entryCount() >= 20000, then
@@ -2974,17 +2983,16 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
       "t_large",
       {{"x", ctx().int64(false)}, {"y", ctx().int64(false)}, {"z", ctx().int64(false)}},
       {100000000});
-  getStorage()->appendParquetFile(
-      "../../Tests/Import/datafiles/interrupt_table_very_large.parquet", "t_large");
+  getStorage()->appendParquetFile(getFilePath("interrupt_table_very_large.parquet"),
+                                  "t_large");
 
   // load 50M rows - two frags (use default frag size)
   createTable(
       "t_large_multi_frag",
       {{"x", ctx().int64(false)}, {"y", ctx().int64(false)}, {"z", ctx().int64(false)}},
       {32000000});
-  getStorage()->appendParquetFile(
-      "../../Tests/Import/datafiles/interrupt_table_very_large.parquet",
-      "t_large_multi_frag");
+  getStorage()->appendParquetFile(getFilePath("interrupt_table_very_large.parquet"),
+                                  "t_large_multi_frag");
 
   createTable(
       "t_small",

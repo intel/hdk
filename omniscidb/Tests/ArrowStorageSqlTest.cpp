@@ -33,7 +33,7 @@ using namespace TestHelpers::ArrowSQLRunner;
 namespace {
 
 std::string getFilePath(const std::string& file_name) {
-  return std::string("../../Tests/ArrowStorageDataFiles/") + file_name;
+  return TEST_SOURCE_PATH + "/ArrowStorageDataFiles/"s + file_name;
 }
 
 ExecutionResult runSqlQuery(const std::string& sql,
