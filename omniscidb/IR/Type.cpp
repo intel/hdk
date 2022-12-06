@@ -178,7 +178,7 @@ bool VarCharType::equal(const Type& other) const {
 
 std::string VarCharType::toString() const {
   std::stringstream ss;
-  ss << "VARCHAR[" << max_length_ << "]" << nullableStr();
+  ss << "VARCHAR(" << max_length_ << ")" << nullableStr();
   return ss.str();
 }
 
@@ -376,7 +376,7 @@ bool FixedLenArrayType::equal(const Type& other) const {
 
 std::string FixedLenArrayType::toString() const {
   std::stringstream ss;
-  ss << "ARRAY(" << elem_type_->toString() << "x" << num_elems_ << ")";
+  ss << "ARRAY(" << elem_type_->toString() << ")(" << num_elems_ << ")" << nullableStr();
   return ss.str();
 }
 
@@ -411,7 +411,8 @@ bool VarLenArrayType::equal(const Type& other) const {
 
 std::string VarLenArrayType::toString() const {
   std::stringstream ss;
-  ss << "ARRAY" << (offs_size_ * 8) << "(" << elem_type_->toString() << ")";
+  ss << "ARRAY" << (offs_size_ * 8) << "(" << elem_type_->toString() << ")"
+     << nullableStr();
   return ss.str();
 }
 
@@ -451,8 +452,8 @@ bool ExtDictionaryType::equal(const Type& other) const {
 
 std::string ExtDictionaryType::toString() const {
   std::stringstream ss;
-  ss << "DICT" << (size() * 8) << "(" << elem_type_->toString() << ")[" << dict_id_
-     << "]";
+  ss << "DICT" << (size() * 8) << "(" << elem_type_->toString() << ")[" << dict_id_ << "]"
+     << nullableStr();
   return ss.str();
 }
 

@@ -8,8 +8,10 @@
 #include "Exception.h"
 #include "Type.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/functional/hash.hpp>
 
+#include <regex>
 #include <unordered_map>
 
 namespace hdk::ir {
@@ -172,7 +174,7 @@ class ContextImpl {
     return res.get();
   }
 
-  const VarLenArrayType* arrayVarlen(const Type* elem_type,
+  const VarLenArrayType* arrayVarLen(const Type* elem_type,
                                      int offs_size,
                                      bool nullable) {
     auto& res = varlen_array_types_[std::make_tuple(offs_size, elem_type, nullable)];
@@ -297,7 +299,7 @@ class ContextImpl {
       }
       case Type::kVarLenArray: {
         auto varlen_array_type = static_cast<const VarLenArrayType*>(type);
-        return arrayVarlen(varlen_array_type->elemType(),
+        return arrayVarLen(varlen_array_type->elemType(),
                            varlen_array_type->offsetSize(),
                            varlen_array_type->nullable());
       }
@@ -309,6 +311,147 @@ class ContextImpl {
       default:
         throw InvalidTypeError() << "Unexpected type: " << type;
     }
+  }
+
+  const Type* typeFromString(const std::string& val) {
+    auto val_lower = boost::trim_copy(boost::to_lower_copy(val));
+    std::smatch match_res;
+
+    // Null type.
+    if (val_lower == "nullt") {
+      return null();
+    }
+    // Boolean.
+    if (std::regex_match(val_lower, match_res, std::regex("bool(\\[nn\\])?"))) {
+      return boolean(!match_res[1].matched);
+    }
+    // Integer types.
+    if (std::regex_match(
+            val_lower, match_res, std::regex("int(8|16|32|64)?(\\[nn\\])?"))) {
+      int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 8;
+      return integer(size, !match_res[2].matched);
+    }
+    // Floating point types.
+    if (std::regex_match(val_lower, match_res, std::regex("fp(32|64)?(\\[nn\\])?"))) {
+      FloatingPointType::Precision precision =
+          match_res[1].matched ? (match_res[1].str() == "32" ? FloatingPointType::kFloat
+                                                             : FloatingPointType::kDouble)
+                               : FloatingPointType::kDouble;
+      return fp(precision, !match_res[2].matched);
+    }
+    // Decimal types.
+    if (std::regex_match(val_lower,
+                         match_res,
+                         std::regex("(?:dec|decimal)(?:64)?\\(\\s*(\\d+)\\s*,\\s*(\\d+)"
+                                    "\\s*\\)(\\[nn\\])?"))) {
+      int precision = std::stoi(match_res[1].str());
+      int scale = std::stoi(match_res[2].str());
+      return decimal(8, precision, scale, !match_res[3].matched);
+    }
+    // Varchar type.
+    if (std::regex_match(
+            val_lower, match_res, std::regex("varchar\\((\\d+)\\)(\\[nn\\])?"))) {
+      int max_length = std::stoi(match_res[1].str());
+      return varChar(max_length, !match_res[2].matched);
+    }
+    // Text type.
+    if (std::regex_match(val_lower, match_res, std::regex("text(\\[nn\\])?"))) {
+      return text(!match_res[1].matched);
+    }
+    auto parse_unit = [](const std::string& val) -> TimeUnit {
+      if (val == "m") {
+        return TimeUnit::kMonth;
+      } else if (val == "d") {
+        return TimeUnit::kDay;
+      } else if (val == "s") {
+        return TimeUnit::kSecond;
+      } else if (val == "ms") {
+        return TimeUnit::kMilli;
+      } else if (val == "us") {
+        return TimeUnit::kMicro;
+      } else if (val == "ns") {
+        return TimeUnit::kNano;
+      }
+
+      throw InvalidTypeError() << "Unexpected time unit string: " << val;
+    };
+    // Date types.
+    if (std::regex_match(
+            val_lower,
+            match_res,
+            std::regex("date(16|32|64)?(?:\\[(m|d|s|ms|us|ns)\\])?(\\[nn\\])?"))) {
+      int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 8;
+      auto unit = match_res[2].matched ? parse_unit(match_res[2].str()) : TimeUnit::kDay;
+      return date(size, unit, !match_res[3].matched);
+    }
+    // Time types.
+    if (std::regex_match(
+            val_lower,
+            match_res,
+            std::regex("time(16|32|64)?(?:\\[(m|d|s|ms|us|ns)\\])?(\\[nn\\])?"))) {
+      int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 8;
+      auto unit = match_res[2].matched ? parse_unit(match_res[2].str())
+                  : size == 2          ? TimeUnit::kSecond
+                  : size == 4          ? TimeUnit::kMilli
+                                       : TimeUnit::kMicro;
+      return time(size, unit, !match_res[3].matched);
+    }
+    // Timestamp types.
+    if (std::regex_match(
+            val_lower,
+            match_res,
+            std::regex("timestamp(?:64)?(?:\\[(m|d|s|ms|us|ns)\\])?(\\[nn\\])?"))) {
+      auto unit =
+          match_res[1].matched ? parse_unit(match_res[1].str()) : TimeUnit::kMicro;
+      return timestamp(unit, !match_res[2].matched);
+    }
+    // Interval types.
+    if (std::regex_match(
+            val_lower,
+            match_res,
+            std::regex("interval(16|32|64)?(?:\\[(m|d|s|ms|us|ns)\\])?(\\[nn\\])?"))) {
+      int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 8;
+      auto unit =
+          match_res[2].matched ? parse_unit(match_res[2].str()) : TimeUnit::kMicro;
+      return interval(size, unit, !match_res[3].matched);
+    }
+    // Fixed length array types.
+    if (std::regex_match(
+            val_lower, match_res, std::regex("array\\((.+)\\)\\((\\d+)\\)(\\[nn\\])?"))) {
+      const Type* elem_type = typeFromString(match_res[1].str());
+      int num_elems = std::stoi(match_res[2].str());
+      return arrayFixed(num_elems, elem_type, !match_res[3].matched);
+    }
+    // Varlen array types.
+    if (std::regex_match(
+            val_lower, match_res, std::regex("array\\((.+)\\)(\\[nn\\])?"))) {
+      const Type* elem_type = typeFromString(match_res[1].str());
+      return arrayVarLen(elem_type, 4, !match_res[2].matched);
+    }
+    // Dictionary types.
+    if (std::regex_match(
+            val_lower,
+            match_res,
+            std::regex("dict(8|16|32)?(?:\\((.+)\\))?(?:\\[(-?\\d+)\\])?"))) {
+      int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 4;
+      const Type* elem_type =
+          match_res[2].matched ? typeFromString(match_res[2].str()) : text(true);
+      int dict_id = match_res[3].matched ? std::stoi(match_res[3].str()) : 0;
+      return extDict(elem_type, dict_id, size);
+    }
+
+    // Datetime types
+    // date - date64[m|d|s|ms|us|ns]
+    // time
+    // timestamp - no size
+    // interval
+
+    // Types with subtypes
+    // array fix len - array(SUBTYPEx123
+    // array varlen - array32(SUBTYPE))
+    // dict - dict64(subtype)[dict_id]
+
+    throw InvalidTypeError() << "Invalid type string: " << val;
   }
 
  private:
@@ -489,7 +632,7 @@ const FixedLenArrayType* Context::arrayFixed(int num_elems,
 const VarLenArrayType* Context::arrayVarLen(const Type* elem_type,
                                             int offs_size,
                                             bool nullable) {
-  return impl_->arrayVarlen(elem_type, offs_size, nullable);
+  return impl_->arrayVarLen(elem_type, offs_size, nullable);
 }
 
 const ExtDictionaryType* Context::extDict(const Type* elem_type,
@@ -510,6 +653,10 @@ const ColumnListType* Context::columnList(const Type* column_type,
 
 const Type* Context::copyType(const Type* type) {
   return impl_->copyType(type);
+}
+
+const Type* Context::typeFromString(const std::string& val) {
+  return impl_->typeFromString(val);
 }
 
 Context& Context::defaultCtx() {

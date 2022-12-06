@@ -485,6 +485,21 @@ void LogicalUnion::checkForMatchingMetaInfoTypes() const {
   }
 }
 
+namespace {
+
+void collectNodes(NodePtr node, std::vector<NodePtr> nodes) {
+  for (size_t i = 0; i < node->inputCount(); ++i) {
+    collectNodes(std::const_pointer_cast<Node>(node->getAndOwnInput(i)), nodes);
+  }
+  nodes.push_back(node);
+}
+
+}  // namespace
+
+QueryDag::QueryDag(ConfigPtr config, NodePtr root) : config_(config), root_(root) {
+  collectNodes(root_, nodes_);
+}
+
 void QueryDag::eachNode(std::function<void(Node const*)> const& callback) const {
   for (auto const& node : nodes_) {
     if (node) {

@@ -1281,7 +1281,9 @@ std::shared_ptr<arrow::DataType> get_arrow_type(const hdk::ir::Type* type,
     case hdk::ir::Type::kText:
       return arrow::utf8();
     case hdk::ir::Type::kDecimal:
-      return arrow::decimal(type->as<hdk::ir::DecimalType>()->precision(),
+      // No reason to use 256-bit decimals since we always import 64-bit values.
+      CHECK_EQ(type->size(), 8);
+      return arrow::decimal(std::min(type->as<hdk::ir::DecimalType>()->precision(), 38),
                             type->as<hdk::ir::DecimalType>()->scale());
     case hdk::ir::Type::kTime:
       return time32(arrow::TimeUnit::SECOND);

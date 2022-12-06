@@ -9,6 +9,8 @@ set(ir_source_files
     LeftDeepInnerJoin.h
     Node.cpp
     Node.h
+    QueryBuilder.cpp
+    QueryBuilder.h
     Type.cpp
     Type.h
     TypeUtils.cpp

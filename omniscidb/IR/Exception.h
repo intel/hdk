@@ -19,16 +19,10 @@ class Error : public std::exception {
 
   const char* what() const noexcept override { return desc_.c_str(); }
 
-  template <typename T>
-  Error& operator<<(const T& v) {
-    std::stringstream ss;
-    ss << v;
-    desc_ += ss.str();
-    return *this;
-  }
+  void appendDesc(const std::string& str) const { desc_ += str; }
 
  private:
-  std::string desc_;
+  mutable std::string desc_;
 };
 
 class TypeError : public Error {
@@ -50,3 +44,13 @@ class UnsupportedTypeError : public TypeError {
 };
 
 }  // namespace hdk::ir
+
+template <typename ErrorType, typename T>
+inline typename std::enable_if<std::is_base_of<hdk::ir::Error, ErrorType>::value,
+                               const ErrorType&>::type
+operator<<(const ErrorType& error, const T& v) {
+  std::stringstream ss;
+  ss << v;
+  error.appendDesc(ss.str());
+  return error;
+}

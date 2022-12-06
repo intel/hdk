@@ -22,9 +22,62 @@
 
 namespace ArrowTestHelpers {
 
+void compare_arrow_array_decimal_impl(
+    const std::vector<int64_t>& expected,
+    const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
+  using ArrowColType = arrow::NumericArray<arrow::Decimal128Type>;
+  const arrow::ArrayVector& chunks = actual->chunks();
+
+  int64_t null_val = inline_null_value<int64_t>();
+  size_t compared = 0;
+
+  for (int i = 0; i < actual->num_chunks(); i++) {
+    auto chunk = chunks[i];
+    const arrow::Decimal128* chunk_data = chunk->data()->GetValues<arrow::Decimal128>(1);
+    for (int64_t j = 0; j < chunk->length(); j++, compared++) {
+      if (expected[compared] == null_val) {
+        ASSERT_TRUE(chunk->IsNull(j));
+      } else {
+        ASSERT_TRUE(chunk->IsValid(j));
+        ASSERT_EQ(expected[compared], chunk_data[j].ToInteger<int64_t>().ValueOrDie());
+      }
+    }
+  }
+
+  ASSERT_EQ(compared, expected.size());
+}
+
+void compare_arrow_array_date_impl(const std::vector<int64_t>& expected,
+                                   const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
+  using ArrowColType = arrow::NumericArray<arrow::Date64Type>;
+  const arrow::ArrayVector& chunks = actual->chunks();
+
+  int64_t null_val = inline_null_value<int64_t>();
+  size_t compared = 0;
+
+  for (int i = 0; i < actual->num_chunks(); i++) {
+    auto chunk = chunks[i];
+    auto arrow_row_array = std::static_pointer_cast<ArrowColType>(chunk);
+
+    const int64_t* chunk_data = arrow_row_array->raw_values();
+    for (int64_t j = 0; j < chunk->length(); j++, compared++) {
+      if (expected[compared] == null_val) {
+        ASSERT_TRUE(chunk->IsNull(j));
+      } else {
+        ASSERT_TRUE(chunk->IsValid(j));
+        ASSERT_EQ(expected[compared], chunk_data[j]);
+      }
+    }
+  }
+
+  ASSERT_EQ(compared, expected.size());
+}
+
 template <typename TYPE>
-void compare_arrow_array(const std::vector<TYPE>& expected,
-                         const std::shared_ptr<arrow::ChunkedArray>& actual) {
+void compare_arrow_array_impl(const std::vector<TYPE>& expected,
+                              const std::shared_ptr<arrow::ChunkedArray>& actual) {
   ASSERT_EQ(actual->type()->ToString(),
             arrow::CTypeTraits<TYPE>::type_singleton()->ToString());
   ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
@@ -57,8 +110,8 @@ void compare_arrow_array(const std::vector<TYPE>& expected,
 }
 
 template <>
-void compare_arrow_array(const std::vector<std::string>& expected,
-                         const std::shared_ptr<arrow::ChunkedArray>& actual) {
+void compare_arrow_array_impl(const std::vector<std::string>& expected,
+                              const std::shared_ptr<arrow::ChunkedArray>& actual) {
   ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
   ASSERT_EQ(actual->type()->id(), arrow::Type::DICTIONARY);
   const arrow::ArrayVector& chunks = actual->chunks();
@@ -85,6 +138,24 @@ void compare_arrow_array(const std::vector<std::string>& expected,
   ASSERT_EQ(compared, expected.size());
 }
 
+template <typename TYPE>
+void compare_arrow_array(const std::vector<TYPE>& expected,
+                         const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  compare_arrow_array_impl(expected, actual);
+}
+
+template <>
+void compare_arrow_array<int64_t>(const std::vector<int64_t>& expected,
+                                  const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  if (actual->type()->id() == arrow::Type::DECIMAL) {
+    compare_arrow_array_decimal_impl(expected, actual);
+  } else if (actual->type()->id() == arrow::Type::DATE64) {
+    compare_arrow_array_date_impl(expected, actual);
+  } else {
+    compare_arrow_array_impl(expected, actual);
+  }
+}
+
 void compare_arrow_table_impl(std::shared_ptr<arrow::Table> at, int col_idx) {}
 
 template <typename T, typename... Ts>
@@ -105,17 +176,35 @@ void compare_arrow_table(std::shared_ptr<arrow::Table> at,
   compare_arrow_table_impl(at, 0, expected...);
 }
 
-template <typename... Ts>
-void compare_res_data(const ExecutionResult& res, const std::vector<Ts>&... expected) {
+std::shared_ptr<arrow::Table> toArrow(const ExecutionResult& res) {
   std::vector<std::string> col_names;
   for (auto& target : res.getTargetsMeta()) {
     col_names.push_back(target.get_resname());
   }
   auto converter =
       std::make_unique<ArrowResultSetConverter>(res.getDataPtr(), col_names, -1);
-  auto at = converter->convertToArrowTable();
+  return converter->convertToArrowTable();
+}
 
-  compare_arrow_table(at, expected...);
+template <typename... Ts>
+void compare_res_data(const ExecutionResult& res, const std::vector<Ts>&... expected) {
+  compare_arrow_table(toArrow(res), expected...);
+}
+
+void compareArrowTables(std::shared_ptr<arrow::Table> expected,
+                        std::shared_ptr<arrow::Table> actual) {
+  ASSERT_EQ(expected->num_columns(), actual->num_columns());
+  ASSERT_EQ(expected->num_rows(), actual->num_rows());
+  for (int64_t col_idx = 0; col_idx < expected->num_columns(); ++col_idx) {
+    auto expected_col = expected->column(col_idx);
+    auto actual_col = actual->column(col_idx);
+    ASSERT_TRUE(expected_col->type()->Equals(actual_col->type()));
+    for (int64_t row_idx = 0; row_idx < expected->num_rows(); ++row_idx) {
+      auto expected_val = expected_col->GetScalar(row_idx);
+      auto actual_val = actual_col->GetScalar(row_idx);
+      ASSERT_TRUE(expected_val.ValueOrDie()->Equals(actual_val.ValueOrDie()));
+    }
+  }
 }
 
 }  // namespace ArrowTestHelpers

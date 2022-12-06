@@ -1206,9 +1206,12 @@ class QueryDag {
  public:
   QueryDag(ConfigPtr config) : config_(config) { time(&now_); }
   QueryDag(ConfigPtr config, time_t now) : config_(config), now_(now) {}
+  QueryDag(ConfigPtr config, NodePtr root);
   virtual ~QueryDag() = default;
 
   void eachNode(std::function<void(Node const*)> const& callback) const;
+
+  void setRootNode(NodePtr node) { root_ = node; }
 
   /**
    * Returns the root node of the DAG.
