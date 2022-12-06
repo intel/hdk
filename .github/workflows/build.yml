@@ -24,8 +24,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: true
+
+      - name: Free space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
+          sudo apt-get purge -y gcc
 
       - name: Set env context
         run: |
@@ -70,12 +73,13 @@ jobs:
           CPU_COUNT: 2
           RUN_TESTS: 1
         run: |
+          sh -vx
           cd omniscidb
           mkdir -p ${{ env.PREFIX }}
           rm -rf build
           conda info
           conda list -n ${{ env.CONDA_ENV }}
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/build-install-all.sh
+          conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/build-install-all.sh
           cd ..
           tar -zcf /tmp/build.tgz .
 

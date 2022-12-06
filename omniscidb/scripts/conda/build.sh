@@ -41,6 +41,7 @@ then
    export EXTRA_CMAKE_OPTIONS="$EXTRA_CMAKE_OPTIONS -DENABLE_CUDA=off"
 else
    export EXTRA_CMAKE_OPTIONS="$EXTRA_CMAKE_OPTIONS -DENABLE_CUDA=on"
+   test -z "$CC" || export CUDAFLAGS="--compiler-bindir $CC"
 fi
 
 if [[ "$RUN_TESTS" == "0" ]]
