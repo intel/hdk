@@ -15,6 +15,7 @@
  */
 
 #include "IR/ExprRewriter.h"
+#include "IR/LeftDeepInnerJoin.h"
 
 #include "CalciteDeserializerUtils.h"
 #include "DateTimePlusRewrite.h"
@@ -27,7 +28,6 @@
 #include "JsonAccessors.h"
 #include "RelAlgDagBuilder.h"
 #include "RelAlgOptimizer.h"
-#include "RelLeftDeepInnerJoin.h"
 #include "ScalarExprVisitor.h"
 #include "Shared/sqldefs.h"
 

@@ -7,8 +7,7 @@
 
 #include "Node.h"
 #include "ExprRewriter.h"
-
-#include "QueryEngine/RelLeftDeepInnerJoin.h"
+#include "LeftDeepInnerJoin.h"
 
 namespace hdk::ir {
 
