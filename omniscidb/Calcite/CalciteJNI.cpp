@@ -22,6 +22,7 @@
 #include "OSDependent/omnisci_path.h"
 
 #include <jni.h>
+#include <filesystem>
 
 using namespace std::string_literals;
 
@@ -119,8 +120,19 @@ class JVM {
 
   static std::shared_ptr<JVM> createJVM(size_t max_mem_mb) {
     auto root_abs_path = omnisci::get_root_abs_path();
-    std::string class_path_arg = "-Djava.class.path=" + root_abs_path +
-                                 "/bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar";
+    std::string class_path_arg = "-Djava.class.path=";
+    if (std::filesystem::exists(root_abs_path +
+                                "/bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar")) {
+      class_path_arg +=
+          root_abs_path + "/bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar";
+    } else if (std::filesystem::exists(
+                   root_abs_path +
+                   "/../bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar")) {
+      class_path_arg +=
+          root_abs_path + "/../bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar";
+    } else {
+      LOG(FATAL) << "Cannot find calcite jar library.";
+    }
     std::string max_mem_arg = "-Xmx" + std::to_string(max_mem_mb) + "m";
     JavaVMInitArgs vm_args;
     auto options = std::make_unique<JavaVMOption[]>(2);
