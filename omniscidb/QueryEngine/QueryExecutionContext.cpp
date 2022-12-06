@@ -216,6 +216,7 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
     const uint32_t num_tables,
     const bool allow_runtime_interrupt,
     const std::vector<int64_t>& join_hash_tables) {
+  LOG(INFO) << "Launching GPU kernel\n";
   auto timer = DEBUG_TIMER(__func__);
   INJECT_TIMER(lauchGpuCode);
   CHECK(gpu_allocator_);
@@ -543,6 +544,7 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
     const std::vector<int64_t>& join_hash_tables,
     const int64_t num_rows_to_process) {
   auto timer = DEBUG_TIMER(__func__);
+  LOG(INFO) << "Launching CPU kernel\n";
   INJECT_TIMER(lauchCpuCode);
 
   CHECK(query_buffers_);
