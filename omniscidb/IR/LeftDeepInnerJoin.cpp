@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-#include "RelLeftDeepInnerJoin.h"
-#include "IR/ExprRewriter.h"
+#include "LeftDeepInnerJoin.h"
+#include "ExprRewriter.h"
+#include "Node.h"
+
 #include "Logger/Logger.h"
-#include "RelAlgDagBuilder.h"
 
 #include <numeric>
+
+namespace hdk::ir {
 
 namespace {
 
 void collect_left_deep_join_inputs(
-    std::deque<std::shared_ptr<const hdk::ir::Node>>& inputs,
-    std::vector<std::shared_ptr<const hdk::ir::Join>>& original_joins,
-    const std::shared_ptr<const hdk::ir::Join>& join) {
+    std::deque<std::shared_ptr<const Node>>& inputs,
+    std::vector<std::shared_ptr<const Join>>& original_joins,
+    const std::shared_ptr<const Join>& join) {
   original_joins.push_back(join);
   CHECK_EQ(size_t(2), join->inputCount());
   const auto left_input_join =
-      std::dynamic_pointer_cast<const hdk::ir::Join>(join->getAndOwnInput(0));
+      std::dynamic_pointer_cast<const Join>(join->getAndOwnInput(0));
   if (left_input_join) {
     inputs.push_front(join->getAndOwnInput(1));
     collect_left_deep_join_inputs(inputs, original_joins, left_input_join);
@@ -40,31 +43,30 @@ void collect_left_deep_join_inputs(
   }
 }
 
-std::pair<std::shared_ptr<hdk::ir::LeftDeepInnerJoin>,
-          std::shared_ptr<const hdk::ir::Node>>
-create_left_deep_join(const std::shared_ptr<hdk::ir::Node>& left_deep_join_root) {
+std::pair<std::shared_ptr<LeftDeepInnerJoin>, std::shared_ptr<const Node>>
+create_left_deep_join(const std::shared_ptr<Node>& left_deep_join_root) {
   const auto old_root = get_left_deep_join_root(left_deep_join_root);
   if (!old_root) {
     return {nullptr, nullptr};
   }
-  std::deque<std::shared_ptr<const hdk::ir::Node>> inputs_deque;
+  std::deque<std::shared_ptr<const Node>> inputs_deque;
   const auto left_deep_join_filter =
-      std::dynamic_pointer_cast<hdk::ir::Filter>(left_deep_join_root);
-  const auto join = std::dynamic_pointer_cast<const hdk::ir::Join>(
-      left_deep_join_root->getAndOwnInput(0));
+      std::dynamic_pointer_cast<Filter>(left_deep_join_root);
+  const auto join =
+      std::dynamic_pointer_cast<const Join>(left_deep_join_root->getAndOwnInput(0));
   CHECK(join);
-  std::vector<std::shared_ptr<const hdk::ir::Join>> original_joins;
+  std::vector<std::shared_ptr<const Join>> original_joins;
   collect_left_deep_join_inputs(inputs_deque, original_joins, join);
-  std::vector<std::shared_ptr<const hdk::ir::Node>> inputs(inputs_deque.begin(),
-                                                           inputs_deque.end());
-  return {std::make_shared<hdk::ir::LeftDeepInnerJoin>(
-              left_deep_join_filter, inputs, original_joins),
-          old_root};
+  std::vector<std::shared_ptr<const Node>> inputs(inputs_deque.begin(),
+                                                  inputs_deque.end());
+  return {
+      std::make_shared<LeftDeepInnerJoin>(left_deep_join_filter, inputs, original_joins),
+      old_root};
 }
 
-class RebindInputsFromLeftDeepJoinVisitor : public hdk::ir::ExprRewriter {
+class RebindInputsFromLeftDeepJoinVisitor : public ExprRewriter {
  public:
-  RebindInputsFromLeftDeepJoinVisitor(const hdk::ir::LeftDeepInnerJoin* left_deep_join)
+  RebindInputsFromLeftDeepJoinVisitor(const LeftDeepInnerJoin* left_deep_join)
       : left_deep_join_(left_deep_join) {
     std::vector<size_t> input_sizes;
     input_sizes.reserve(left_deep_join->inputCount());
@@ -77,7 +79,7 @@ class RebindInputsFromLeftDeepJoinVisitor : public hdk::ir::ExprRewriter {
         input_sizes.begin(), input_sizes.end(), input_size_prefix_sums_.begin());
   }
 
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
+  ExprPtr visitColumnRef(const ColumnRef* col_ref) override {
     const auto node = col_ref->node();
     if (left_deep_join_->coversOriginalNode(node)) {
       const auto it = std::lower_bound(input_size_prefix_sums_.begin(),
@@ -93,19 +95,17 @@ class RebindInputsFromLeftDeepJoinVisitor : public hdk::ir::ExprRewriter {
         CHECK_LE(prev_input_count, new_index);
         new_index -= prev_input_count;
       }
-      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(col_ref->type(), new_node, new_index);
+      return makeExpr<ColumnRef>(col_ref->type(), new_node, new_index);
     }
     return defaultResult(col_ref);
   };
 
  private:
   std::vector<size_t> input_size_prefix_sums_;
-  const hdk::ir::LeftDeepInnerJoin* left_deep_join_;
+  const LeftDeepInnerJoin* left_deep_join_;
 };
 
 }  // namespace
-
-namespace hdk::ir {
 
 LeftDeepInnerJoin::LeftDeepInnerJoin(
     const std::shared_ptr<Filter>& filter,
@@ -121,7 +121,7 @@ LeftDeepInnerJoin::LeftDeepInnerJoin(
   for (size_t nesting_level = 0; nesting_level < original_joins.size(); ++nesting_level) {
     const auto& original_join = original_joins[nesting_level];
     const auto condition_true =
-        dynamic_cast<const hdk::ir::Constant*>(original_join->getCondition());
+        dynamic_cast<const Constant*>(original_join->getCondition());
 
     bool cond_is_not_const_true = !condition_true ||
                                   !condition_true->type()->isBoolean() ||
@@ -135,12 +135,11 @@ LeftDeepInnerJoin::LeftDeepInnerJoin(
             if (!condition_) {
               condition_ = original_join->getConditionShared();
             } else {
-              condition_ = hdk::ir::makeExpr<hdk::ir::BinOper>(
-                  condition_->ctx().boolean(),
-                  hdk::ir::OpType::kAnd,
-                  hdk::ir::Qualifier::kOne,
-                  condition_,
-                  original_join->getConditionShared());
+              condition_ = makeExpr<BinOper>(condition_->ctx().boolean(),
+                                             OpType::kAnd,
+                                             Qualifier::kOne,
+                                             condition_,
+                                             original_join->getConditionShared());
             }
           }
           break;
@@ -161,19 +160,18 @@ LeftDeepInnerJoin::LeftDeepInnerJoin(
   if (condition_) {
     condition_ = rebind_inputs_from_left_deep_join(condition_.get(), this);
   } else {
-    condition_ = hdk::ir::Constant::make(hdk::ir::Context::defaultCtx().boolean(), true);
+    condition_ = Constant::make(Context::defaultCtx().boolean(), true);
   }
 }
 
-const hdk::ir::Expr* LeftDeepInnerJoin::getInnerCondition() const {
+const Expr* LeftDeepInnerJoin::getInnerCondition() const {
   return condition_.get();
 }
-hdk::ir::ExprPtr LeftDeepInnerJoin::getInnerConditionShared() const {
+ExprPtr LeftDeepInnerJoin::getInnerConditionShared() const {
   return condition_;
 }
 
-const hdk::ir::Expr* LeftDeepInnerJoin::getOuterCondition(
-    const size_t nesting_level) const {
+const Expr* LeftDeepInnerJoin::getOuterCondition(const size_t nesting_level) const {
   CHECK_GE(nesting_level, size_t(1));
   CHECK_LE(nesting_level, outer_conditions_per_level_.size());
   // Outer join conditions are collected depth-first while the returned condition
@@ -181,8 +179,7 @@ const hdk::ir::Expr* LeftDeepInnerJoin::getOuterCondition(
   return outer_conditions_per_level_[outer_conditions_per_level_.size() - nesting_level]
       .get();
 }
-hdk::ir::ExprPtr LeftDeepInnerJoin::getOuterConditionShared(
-    const size_t nesting_level) const {
+ExprPtr LeftDeepInnerJoin::getOuterConditionShared(const size_t nesting_level) const {
   CHECK_GE(nesting_level, size_t(1));
   CHECK_LE(nesting_level, outer_conditions_per_level_.size());
   // Outer join conditions are collected depth-first while the returned condition
@@ -249,17 +246,13 @@ std::vector<std::shared_ptr<const Join>> LeftDeepInnerJoin::getOriginalJoins() c
   return original_joins;
 }
 
-}  // namespace hdk::ir
-
 // Recognize the left-deep join tree pattern with an optional filter as root
 // with `node` as the parent of the join sub-tree. On match, return the root
 // of the recognized tree (either the filter node or the outermost join).
-std::shared_ptr<const hdk::ir::Node> get_left_deep_join_root(
-    const std::shared_ptr<hdk::ir::Node>& node) {
-  const auto left_deep_join_filter = dynamic_cast<const hdk::ir::Filter*>(node.get());
+std::shared_ptr<const Node> get_left_deep_join_root(const std::shared_ptr<Node>& node) {
+  const auto left_deep_join_filter = dynamic_cast<const Filter*>(node.get());
   if (left_deep_join_filter) {
-    const auto join =
-        dynamic_cast<const hdk::ir::Join*>(left_deep_join_filter->getInput(0));
+    const auto join = dynamic_cast<const Join*>(left_deep_join_filter->getInput(0));
     if (!join) {
       return nullptr;
     }
@@ -271,25 +264,24 @@ std::shared_ptr<const hdk::ir::Node> get_left_deep_join_root(
   if (!node || node->inputCount() != 1) {
     return nullptr;
   }
-  const auto join = dynamic_cast<const hdk::ir::Join*>(node->getInput(0));
+  const auto join = dynamic_cast<const Join*>(node->getInput(0));
   if (!join) {
     return nullptr;
   }
   return node->getAndOwnInput(0);
 }
 
-hdk::ir::ExprPtr rebind_inputs_from_left_deep_join(
-    const hdk::ir::Expr* expr,
-    const hdk::ir::LeftDeepInnerJoin* left_deep_join) {
+ExprPtr rebind_inputs_from_left_deep_join(const Expr* expr,
+                                          const LeftDeepInnerJoin* left_deep_join) {
   RebindInputsFromLeftDeepJoinVisitor visitor(left_deep_join);
   return visitor.visit(expr);
 }
 
-void create_left_deep_join(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
-  std::list<std::shared_ptr<hdk::ir::Node>> new_nodes;
+void create_left_deep_join(std::vector<std::shared_ptr<Node>>& nodes) {
+  std::list<std::shared_ptr<Node>> new_nodes;
   for (auto& left_deep_join_candidate : nodes) {
-    std::shared_ptr<hdk::ir::LeftDeepInnerJoin> left_deep_join;
-    std::shared_ptr<const hdk::ir::Node> old_root;
+    std::shared_ptr<LeftDeepInnerJoin> left_deep_join;
+    std::shared_ptr<const Node> old_root;
     std::tie(left_deep_join, old_root) = create_left_deep_join(left_deep_join_candidate);
     if (!left_deep_join) {
       continue;
@@ -298,19 +290,17 @@ void create_left_deep_join(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
     for (auto& node : nodes) {
       if (node && node->hasInput(old_root.get())) {
         node->replaceInput(left_deep_join_candidate, left_deep_join);
-        std::shared_ptr<const hdk::ir::Join> old_join;
-        if (std::dynamic_pointer_cast<const hdk::ir::Join>(left_deep_join_candidate)) {
-          old_join =
-              std::static_pointer_cast<const hdk::ir::Join>(left_deep_join_candidate);
+        std::shared_ptr<const Join> old_join;
+        if (std::dynamic_pointer_cast<const Join>(left_deep_join_candidate)) {
+          old_join = std::static_pointer_cast<const Join>(left_deep_join_candidate);
         } else {
           CHECK_EQ(size_t(1), left_deep_join_candidate->inputCount());
-          old_join = std::dynamic_pointer_cast<const hdk::ir::Join>(
+          old_join = std::dynamic_pointer_cast<const Join>(
               left_deep_join_candidate->getAndOwnInput(0));
         }
         while (old_join) {
           node->replaceInput(old_join, left_deep_join);
-          old_join =
-              std::dynamic_pointer_cast<const hdk::ir::Join>(old_join->getAndOwnInput(0));
+          old_join = std::dynamic_pointer_cast<const Join>(old_join->getAndOwnInput(0));
         }
       }
     }
@@ -318,8 +308,10 @@ void create_left_deep_join(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
     new_nodes.emplace_back(std::move(left_deep_join));
   }
 
-  // insert the new left join nodes to the front of the owned hdk::ir::Node list.
-  // This is done to ensure all created hdk::ir::Nodes exist in this list for later
+  // insert the new left join nodes to the front of the owned Node list.
+  // This is done to ensure all created Nodes exist in this list for later
   // visitation, such as RelAlgDagBuilder::resetQueryExecutionState.
   nodes.insert(nodes.begin(), new_nodes.begin(), new_nodes.end());
 }
+
+}  // namespace hdk::ir

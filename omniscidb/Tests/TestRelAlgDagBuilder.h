@@ -12,8 +12,8 @@
  * limitations under the License.
  */
 
+#include "IR/LeftDeepInnerJoin.h"
 #include "QueryEngine/RelAlgDagBuilder.h"
-#include "QueryEngine/RelLeftDeepInnerJoin.h"
 
 class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
  public:

@@ -88,7 +88,6 @@ set(query_engine_source_files
     QueryExecutionContext.cpp
     QueryMemoryInitializer.cpp
     RelAlgDagBuilder.cpp
-    RelLeftDeepInnerJoin.cpp
     RelAlgExecutor.cpp
     RelAlgTranslator.cpp
     RelAlgOptimizer.cpp
