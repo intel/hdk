@@ -1858,7 +1858,7 @@ class Taxi : public TestSuite {
     auto res = runQuery(std::move(dag));
     compare_res_data(res,
                      std::vector<int16_t>({1, 2, 5}),
-                     std::vector<int32_t>({2013, 2013, 2013}),
+                     std::vector<int64_t>({2013, 2013, 2013}),
                      std::vector<int32_t>({16, 1, 3}));
   }
 
@@ -2005,7 +2005,7 @@ TEST_F(Taxi, Q3_NoBuilder) {
   auto pickup_datetime_ref = makeExpr<hdk::ir::ColumnRef>(
       pickup_datetime_info->type, scan.get(), pickup_datetime_info->column_id - 1);
   auto pickup_year = makeExpr<ExtractExpr>(
-      ctx().int32(), false, DateExtractField::kYear, pickup_datetime_ref);
+      ctx().int64(), false, DateExtractField::kYear, pickup_datetime_ref);
   auto proj = std::make_shared<Project>(
       ExprPtrVector{passenger_count_ref, pickup_year},
       std::vector<std::string>{"passenger_count", "pickup_year"},
@@ -2181,7 +2181,7 @@ class TPCH : public TestSuite {
     ArrowStorage::CsvParseOptions parse_options;
     parse_options.header = false;
     parse_options.delimiter = '|';
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/part.tbl"),
+    getStorage()->importCsvFile("part.tbl",
                                 "part",
                                 {{"p_partkey", ctx().int32(false)},
                                  {"p_name", ctx().extDict(ctx().text(), 0)},
@@ -2194,7 +2194,7 @@ class TPCH : public TestSuite {
                                  {"p_comment", ctx().text()}},
                                 {20},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/supplier.tbl"),
+    getStorage()->importCsvFile("supplier.tbl",
                                 "supplier",
                                 {{"s_suppkey", ctx().int32(false)},
                                  {"s_name", ctx().extDict(ctx().text(), 0)},
@@ -2205,7 +2205,7 @@ class TPCH : public TestSuite {
                                  {"s_comment", ctx().text()}},
                                 {5},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/partsupp.tbl"),
+    getStorage()->importCsvFile("partsupp.tbl",
                                 "partsupp",
                                 {{"ps_partkey", ctx().int32(false)},
                                  {"ps_suppkey", ctx().int32(false)},
@@ -2214,7 +2214,7 @@ class TPCH : public TestSuite {
                                  {"ps_comment", ctx().text()}},
                                 {80},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/customer.tbl"),
+    getStorage()->importCsvFile("customer.tbl",
                                 "customer",
                                 {{"c_custkey", ctx().int32(false)},
                                  {"c_name", ctx().extDict(ctx().text(), 0)},
@@ -2226,7 +2226,7 @@ class TPCH : public TestSuite {
                                  {"c_comment", ctx().text()}},
                                 {15},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/orders.tbl"),
+    getStorage()->importCsvFile("orders.tbl",
                                 "orders",
                                 {{"o_orderkey", ctx().int32(false)},
                                  {"o_custkey", ctx().int32(false)},
@@ -2239,7 +2239,7 @@ class TPCH : public TestSuite {
                                  {"o_comment", ctx().text()}},
                                 {150},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/lineitem.tbl"),
+    getStorage()->importCsvFile("lineitem.tbl",
                                 "lineitem",
                                 {{"l_orderkey", ctx().int32(false)},
                                  {"l_partkey", ctx().int32(false)},
@@ -2259,7 +2259,7 @@ class TPCH : public TestSuite {
                                  {"l_comment", ctx().text()}},
                                 {600},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/nation.tbl"),
+    getStorage()->importCsvFile("nation.tbl",
                                 "nation",
                                 {{"n_nationkey", ctx().int32(false)},
                                  {"n_name", ctx().extDict(ctx().text(), 0)},
@@ -2267,7 +2267,7 @@ class TPCH : public TestSuite {
                                  {"n_comment", ctx().text()}},
                                 {5},
                                 parse_options);
-    getStorage()->importCsvFile(getFilePath("TPC-H-1MB/region.tbl"),
+    getStorage()->importCsvFile("region.tbl",
                                 "region",
                                 {{"r_regionkey", ctx().int32(false)},
                                  {"r_name", ctx().extDict(ctx().text(), 0)},
