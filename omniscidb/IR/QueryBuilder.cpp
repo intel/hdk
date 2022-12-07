@@ -508,30 +508,42 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
       return {builder_, expr_->cast(new_type), "", true};
     } else if (new_type->isBoolean()) {
       return ne(builder_.cst(0, expr_->type()));
-    } else {
-      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
-                                << " to " << new_type->toString() << " is not supported.";
     }
   } else if (expr_->type()->isFloatingPoint()) {
     if (new_type->isInteger() || new_type->isFloatingPoint()) {
       return {builder_, expr_->cast(new_type), "", true};
-    } else {
-      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
-                                << " to " << new_type->toString() << " is not supported.";
     }
   } else if (expr_->type()->isDecimal()) {
     if (new_type->isNumber() || new_type->isTimestamp()) {
       return {builder_, expr_->cast(new_type), "", true};
     } else if (new_type->isBoolean()) {
       return ne(builder_.cst(0, expr_->type()));
-    } else {
-      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
-                                << " to " << new_type->toString() << " is not supported.";
     }
-  } else {
-    throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
-                              << " is not supported.";
+  } else if (expr_->type()->isBoolean()) {
+    if (new_type->isInteger() || new_type->isDecimal()) {
+      std::list<std::pair<ExprPtr, ExprPtr>> expr_list;
+      expr_list.emplace_back(expr_, builder_.cst(1, new_type).expr());
+      auto case_expr = std::make_shared<CaseExpr>(
+          new_type, expr_->containsAgg(), expr_list, builder_.cst(0, new_type).expr());
+      if (expr_->type()->nullable()) {
+        auto is_null =
+            std::make_shared<UOper>(builder_.ctx_.boolean(false), OpType::kIsNull, expr_);
+        auto is_not_null =
+            std::make_shared<UOper>(builder_.ctx_.boolean(false), OpType::kNot, is_null);
+        auto null_cst = std::make_shared<Constant>(new_type, true, Datum{});
+        std::list<std::pair<ExprPtr, ExprPtr>> expr_list;
+        expr_list.emplace_back(is_not_null, case_expr);
+        case_expr =
+            makeExpr<CaseExpr>(new_type, expr_->containsAgg(), expr_list, null_cst);
+      }
+      return {builder_, case_expr, "", true};
+    } else if (new_type->isFloatingPoint() || new_type->isBoolean()) {
+      return {builder_, expr_->cast(new_type), "", true};
+    }
   }
+
+  throw InvalidQueryError() << "Conversion from " << expr_->type()->toString() << " to "
+                            << new_type->toString() << " is not supported.";
 }
 
 BuilderExpr BuilderExpr::cast(const std::string& new_type) const {

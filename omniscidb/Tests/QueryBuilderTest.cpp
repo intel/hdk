@@ -98,6 +98,45 @@ void checkCast(const BuilderExpr& expr, const Type* type) {
   ASSERT_TRUE(expr.expr()->type()->equal(type));
 }
 
+void checkBoolCastThroughCase(const BuilderExpr& expr,
+                              const Type* type,
+                              bool nullable = true) {
+  ASSERT_TRUE(expr.expr()->is<CaseExpr>());
+  auto case_expr = expr.expr()->as<CaseExpr>();
+  if (nullable) {
+    auto& pairs = case_expr->exprPairs();
+    auto else_expr = case_expr->elseExpr();
+    ASSERT_EQ(pairs.size(), (size_t)1);
+    ASSERT_TRUE(pairs.front().first->is<UOper>());
+    ASSERT_TRUE(pairs.front().first->as<UOper>()->isNot());
+    ASSERT_TRUE(pairs.front().first->as<UOper>()->operand()->is<UOper>());
+    ASSERT_TRUE(pairs.front().first->as<UOper>()->operand()->as<UOper>()->isIsNull());
+    ASSERT_TRUE(else_expr->is<Constant>());
+    ASSERT_TRUE(else_expr->as<Constant>()->isNull());
+    ASSERT_TRUE(else_expr->type()->equal(type));
+    ASSERT_TRUE(pairs.front().second->is<CaseExpr>());
+    case_expr = pairs.front().second->as<CaseExpr>();
+  }
+  auto& pairs = case_expr->exprPairs();
+  auto else_expr = case_expr->elseExpr();
+  ASSERT_EQ(pairs.size(), (size_t)1);
+  ASSERT_TRUE(pairs.front().first->is<hdk::ir::ColumnRef>());
+  ASSERT_TRUE(pairs.front().second->is<Constant>());
+  ASSERT_TRUE(pairs.front().second->type()->equal(type->withNullable(false)));
+  ASSERT_TRUE(else_expr->is<Constant>());
+  ASSERT_TRUE(else_expr->type()->equal(type->withNullable(false)));
+  if (type->isInteger()) {
+    ASSERT_EQ(pairs.front().second->as<Constant>()->intVal(), 1);
+    ASSERT_EQ(else_expr->as<Constant>()->intVal(), 0);
+  } else if (type->isDecimal()) {
+    ASSERT_EQ(pairs.front().second->as<Constant>()->intVal(),
+              (int64_t)exp_to_scale(type->as<DecimalType>()->scale()));
+    ASSERT_EQ(else_expr->as<Constant>()->intVal(), 0);
+  } else {
+    UNREACHABLE();
+  }
+}
+
 void checkBinOper(const BuilderExpr& expr,
                   const Type* type,
                   OpType op_type,
@@ -171,7 +210,32 @@ class QueryBuilderTest : public TestSuite {
                     {"col_timestamp4", ctx().timestamp(hdk::ir::TimeUnit::kNano)},
                     {"col_si", ctx().int16()},
                     {"col_ti", ctx().int8()},
+                    {"col_b_nn", ctx().boolean(false)},
                 });
+
+    createTable("test4",
+                {
+                    {"col_bi", ctx().int64()},
+                    {"col_i", ctx().int32()},
+                    {"col_f", ctx().fp32()},
+                    {"col_d", ctx().fp64()},
+                    {"col_dec", ctx().decimal64(10, 2)},
+                    {"col_b", ctx().boolean()},
+                    {"col_str", ctx().text()},
+                    {"col_dict", ctx().extDict(ctx().text(), 0)},
+                    {"col_date", ctx().date32(hdk::ir::TimeUnit::kDay)},
+                    {"col_time", ctx().time64(hdk::ir::TimeUnit::kSecond)},
+                    {"col_timestamp", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
+                });
+    insertCsvValues(
+        "test4",
+        "10,10,2.2,4.4,12.34,true,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
+    insertCsvValues(
+        "test4",
+        "10,10,2.2,4.4,12.34,false,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
+    insertCsvValues(
+        "test4",
+        "10,10,2.2,4.4,12.34,,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
 
     createTable("sort",
                 {{"x", ctx().int32()}, {"y", ctx().int32()}, {"z", ctx().int32()}});
@@ -1383,7 +1447,7 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_dec").cast("varchar(10)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("dict(text)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("time[s]"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_ded").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("time[ms]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("time[us]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("time[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("date16"), InvalidQueryError);
@@ -1402,12 +1466,49 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_dec").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("array(int)"), InvalidQueryError);
+  // Cast from boolean type.
+  checkBoolCastThroughCase(scan.ref("col_b").cast("int8"), ctx().int8());
+  checkBoolCastThroughCase(scan.ref("col_b").cast("int16"), ctx().int16());
+  checkBoolCastThroughCase(scan.ref("col_b").cast("int32"), ctx().int32());
+  checkBoolCastThroughCase(scan.ref("col_b").cast("int64"), ctx().int64());
+  checkBoolCastThroughCase(
+      scan.ref("col_b_nn").cast("int32[nn]"), ctx().int32(false), false);
+  checkCast(scan.ref("col_b").cast("fp32"), ctx().fp32());
+  checkCast(scan.ref("col_b").cast("fp64"), ctx().fp64());
+  checkBoolCastThroughCase(scan.ref("col_b").cast("decimal(10,2)"),
+                           ctx().decimal(8, 10, 2));
+  ASSERT_TRUE(scan.ref("col_b").cast("bool").expr()->is<hdk::ir::ColumnRef>());
+  EXPECT_THROW(scan.ref("col_b").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("time[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("date32[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("timestamp[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("timestamp[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("timestamp[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("timestamp[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").cast("array(int)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, UserSql) {
   if (!config().debug.sql.empty()) {
     config().debug.dump = true;
-    runSqlQuery(config().debug.sql, ExecutorDeviceType::CPU, false);
+    auto res = runSqlQuery(config().debug.sql, ExecutorDeviceType::CPU, false);
+    auto at = toArrow(res);
+    std::cout << at->ToString() << std::endl;
     config().debug.dump = false;
   }
 }
