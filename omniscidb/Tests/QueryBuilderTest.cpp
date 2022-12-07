@@ -1339,6 +1339,11 @@ TEST_F(QueryBuilderTest, Cast) {
   // TODO: support fp -> dec casts?
   EXPECT_THROW(scan.ref("col_f").cast("dec(10,2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("dict(text)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_f").cast("time[s]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").cast("time[ms]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_f").cast("time[us]"), InvalidQueryError);
@@ -1359,6 +1364,52 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_d").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_f").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").cast("array(int)"), InvalidQueryError);
+  // Cast from decimal type.
+  checkCast(scan.ref("col_dec").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_dec").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_dec").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_dec").cast("int64"), ctx().int64());
+  checkCast(scan.ref("col_dec").cast("fp32"), ctx().fp32());
+  checkCast(scan.ref("col_dec").cast("fp64"), ctx().fp64());
+  ASSERT_TRUE(scan.ref("col_dec").cast("dec(10,2)").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_dec").cast("dec(10,3)"), ctx().decimal(8, 10, 3));
+  checkCast(scan.ref("col_dec").cast("dec(11,2)"), ctx().decimal(8, 11, 2));
+  checkBinOper(scan.ref("col_dec").cast("bool"),
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_dec"),
+               builder.cst(0, "dec(10,2)"));
+  EXPECT_THROW(scan.ref("col_dec").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ded").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("time[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("date32[s]"), InvalidQueryError);
+  checkCast(scan.ref("col_dec").cast("timestamp[s]"), ctx().timestamp(TimeUnit::kSecond));
+  checkCast(scan.ref("col_dec").cast("timestamp[ms]"), ctx().timestamp(TimeUnit::kMilli));
+  checkCast(scan.ref("col_dec").cast("timestamp[us]"), ctx().timestamp(TimeUnit::kMicro));
+  checkCast(scan.ref("col_dec").cast("timestamp[ns]"), ctx().timestamp(TimeUnit::kNano));
+  EXPECT_THROW(scan.ref("col_dec").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, UserSql) {
+  if (!config().debug.sql.empty()) {
+    config().debug.dump = true;
+    runSqlQuery(config().debug.sql, ExecutorDeviceType::CPU, false);
+    config().debug.dump = false;
+  }
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {
@@ -1979,7 +2030,7 @@ class Taxi : public TestSuite {
     auto res = runQuery(std::move(dag));
     compare_res_data(res,
                      std::vector<int16_t>({1, 5, 2}),
-                     std::vector<int32_t>({2013, 2013, 2013}),
+                     std::vector<int64_t>({2013, 2013, 2013}),
                      std::vector<int32_t>({0, 0, 0}),
                      std::vector<int32_t>({16, 3, 1}));
   }
@@ -2205,7 +2256,7 @@ TEST_F(Taxi, Q4_NoBuilder) {
   auto pickup_datetime_ref = makeExpr<hdk::ir::ColumnRef>(
       pickup_datetime_info->type, scan.get(), pickup_datetime_info->column_id - 1);
   auto pickup_year = makeExpr<ExtractExpr>(
-      ctx().int32(), false, DateExtractField::kYear, pickup_datetime_ref);
+      ctx().int64(), false, DateExtractField::kYear, pickup_datetime_ref);
   auto trip_distance_info = getStorage()->getColumnInfo(*table_info, "trip_distance");
   auto trip_distance_ref = makeExpr<hdk::ir::ColumnRef>(
       trip_distance_info->type, scan.get(), trip_distance_info->column_id - 1);
@@ -2237,7 +2288,6 @@ TEST_F(Taxi, Q4_NoBuilder) {
   run_compare_q4(std::move(dag));
 }
 
-#if 0
 TEST_F(Taxi, Q4_1) {
   // SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year,
   // cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP BY
@@ -2249,7 +2299,8 @@ TEST_F(Taxi, Q4_1) {
                         scan.ref("trip_distance").cast(ctx().int32())},
                        {"passenger_count", "pickup_year", "distance"})
                  .agg({"passenger_count", "pickup_year", "distance"}, {builder.count()})
-                 .sort({{"pickup_year"}, {"count", SortDirection::Descending}})
+                 .sort({{"pickup_year", SortDirection::Ascending},
+                        {"count", SortDirection::Descending}})
                  .finalize();
 
   run_compare_q4(std::move(dag));
@@ -2281,12 +2332,11 @@ TEST_F(Taxi, Q4_3) {
                         scan.ref("pickup_datetime").extract("year").name("pickup_year"),
                         scan.ref("trip_distance").cast("int32").name("distance")})
                  .agg({0, 1, 2}, "count(*)")
-                 .sort({{"pickup_year", "asc"}, {"count", "desc"}})
+                 .sort({{"pickup_year"s, "asc"s}, {"count"s, "desc"s}})
                  .finalize();
 
   run_compare_q4(std::move(dag));
 }
-#endif
 
 class TPCH : public TestSuite {
  protected:

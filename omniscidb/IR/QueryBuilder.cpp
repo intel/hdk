@@ -509,15 +509,24 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
     } else if (new_type->isBoolean()) {
       return ne(builder_.cst(0, expr_->type()));
     } else {
-      throw InvalidQueryError() << "Conversion from " << expr_->toString() << " to "
-                                << new_type->toString() << " is not supported.";
+      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
+                                << " to " << new_type->toString() << " is not supported.";
     }
-  } else if (expr_->type()->isFloatingPoint()){
+  } else if (expr_->type()->isFloatingPoint()) {
     if (new_type->isInteger() || new_type->isFloatingPoint()) {
       return {builder_, expr_->cast(new_type), "", true};
     } else {
-      throw InvalidQueryError() << "Conversion from " << expr_->toString() << " to "
-                                << new_type->toString() << " is not supported.";
+      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
+                                << " to " << new_type->toString() << " is not supported.";
+    }
+  } else if (expr_->type()->isDecimal()) {
+    if (new_type->isNumber() || new_type->isTimestamp()) {
+      return {builder_, expr_->cast(new_type), "", true};
+    } else if (new_type->isBoolean()) {
+      return ne(builder_.cst(0, expr_->type()));
+    } else {
+      throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
+                                << " to " << new_type->toString() << " is not supported.";
     }
   } else {
     throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
