@@ -1323,6 +1323,42 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_bi").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").cast("array(int)"), InvalidQueryError);
+  // Casts from floating point types
+  checkCast(scan.ref("col_f").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_f").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_f").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_f").cast("int64"), ctx().int64());
+  checkCast(scan.ref("col_d").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_d").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_d").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_d").cast("int64"), ctx().int64());
+  ASSERT_TRUE(scan.ref("col_f").cast("fp32").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_f").cast("fp64"), ctx().fp64());
+  checkCast(scan.ref("col_d").cast("fp32"), ctx().fp32());
+  ASSERT_TRUE(scan.ref("col_d").cast("fp64").expr()->is<hdk::ir::ColumnRef>());
+  // TODO: support fp -> dec casts?
+  EXPECT_THROW(scan.ref("col_f").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("time[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("date32[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("timestamp[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("timestamp[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("timestamp[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("timestamp[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").cast("array(int)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

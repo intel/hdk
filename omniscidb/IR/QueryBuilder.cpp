@@ -512,6 +512,13 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
       throw InvalidQueryError() << "Conversion from " << expr_->toString() << " to "
                                 << new_type->toString() << " is not supported.";
     }
+  } else if (expr_->type()->isFloatingPoint()){
+    if (new_type->isInteger() || new_type->isFloatingPoint()) {
+      return {builder_, expr_->cast(new_type), "", true};
+    } else {
+      throw InvalidQueryError() << "Conversion from " << expr_->toString() << " to "
+                                << new_type->toString() << " is not supported.";
+    }
   } else {
     throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
                               << " is not supported.";
