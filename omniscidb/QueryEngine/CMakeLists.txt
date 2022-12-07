@@ -355,11 +355,12 @@ if(NOT MSVC)
     list(APPEND TABLE_FUNCTIONS_DEPS ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
 endif()
 
+string(REPLACE " " ";" CUDA_FLAGS_LIST "$ENV{CUDAFLAGS}")
 add_custom_command(
         DEPENDS cuda_mapd_rt.cu JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp GpuInitGroups.cu GroupByRuntime.cpp TopKRuntime.cpp StringFunctions.cpp RegexpFunctions.cpp ../Utils/ChunkIter.cpp ../Utils/StringLike.cpp ../Utils/Regexp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp ${TABLE_FUNCTIONS_DEPS}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cuda_mapd_rt.fatbin
         COMMAND nvcc
-        ARGS
+        ${CUDA_FLAGS_LIST}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
         -I ${CMAKE_CURRENT_BINARY_DIR}
         ${MAPD_HOST_COMPILER_FLAG}
