@@ -52,7 +52,12 @@ class BuilderExpr {
                   double val = HUGE_VAL) const;
 
   BuilderExpr extract(DateExtractField field) const;
-  BuilderExpr extract(const std::string &field) const;
+  BuilderExpr extract(const std::string& field) const;
+
+  BuilderExpr cast(const Type* new_type) const;
+  BuilderExpr cast(const std::string& new_type) const;
+
+  BuilderExpr ne(const BuilderExpr &rhs) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
@@ -347,6 +352,9 @@ class QueryBuilder {
   BuilderNode scan(const TableRef& table_ref) const;
 
   BuilderExpr count() const;
+
+  BuilderExpr cst(int val, const Type* type) const;
+  BuilderExpr cst(int val, const std::string &type = "int") const;
 
  protected:
   friend class BuilderExpr;

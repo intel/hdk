@@ -92,6 +92,26 @@ void checkExtract(const BuilderExpr& expr, DateExtractField field, bool cast = f
   }
 }
 
+void checkCast(const BuilderExpr& expr, const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<UOper>());
+  ASSERT_TRUE(expr.expr()->as<UOper>()->isCast());
+  ASSERT_TRUE(expr.expr()->type()->equal(type));
+}
+
+void checkBinOper(const BuilderExpr& expr,
+                  const Type* type,
+                  OpType op_type,
+                  const BuilderExpr& lhs,
+                  const BuilderExpr& rhs) {
+  ASSERT_TRUE(expr.expr()->is<BinOper>());
+  auto bin_oper = expr.expr()->as<BinOper>();
+  ASSERT_TRUE(bin_oper->type()->equal(type));
+  ASSERT_EQ(bin_oper->opType(), op_type);
+  ASSERT_EQ(bin_oper->qualifier(), Qualifier::kOne);
+  ASSERT_EQ(bin_oper->leftOperand()->toString(), lhs.expr()->toString());
+  ASSERT_EQ(bin_oper->rightOperand()->toString(), rhs.expr()->toString());
+}
+
 }  // anonymous namespace
 
 class QueryBuilderTest : public TestSuite {
@@ -149,6 +169,8 @@ class QueryBuilderTest : public TestSuite {
                     {"col_timestamp2", ctx().timestamp(hdk::ir::TimeUnit::kMilli)},
                     {"col_timestamp3", ctx().timestamp(hdk::ir::TimeUnit::kMicro)},
                     {"col_timestamp4", ctx().timestamp(hdk::ir::TimeUnit::kNano)},
+                    {"col_si", ctx().int16()},
+                    {"col_ti", ctx().int8()},
                 });
 
     createTable("sort",
@@ -1246,6 +1268,61 @@ TEST_F(QueryBuilderTest, ParseType) {
   EXPECT_THROW(ctx().typeFromString("dict[nn]"), TypeError);
   EXPECT_THROW(ctx().typeFromString("dict(10)"), TypeError);
   EXPECT_THROW(ctx().typeFromString("dict(int)"), TypeError);
+}
+
+TEST_F(QueryBuilderTest, Cast) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  // Casts from integer types.
+  checkCast(scan.ref("col_bi").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_bi").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_bi").cast("int32"), ctx().int32());
+  ASSERT_TRUE(scan.ref("col_bi").cast("int64").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_i").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_i").cast("int16"), ctx().int16());
+  ASSERT_TRUE(scan.ref("col_i").cast("int32").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_i").cast("int64"), ctx().int64());
+  checkCast(scan.ref("col_si").cast("int8"), ctx().int8());
+  ASSERT_TRUE(scan.ref("col_si").cast("int16").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_si").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_si").cast("int64"), ctx().int64());
+  ASSERT_TRUE(scan.ref("col_ti").cast("int8").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_ti").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_ti").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_ti").cast("int64"), ctx().int64());
+  checkCast(scan.ref("col_i").cast("fp32"), ctx().fp32());
+  checkCast(scan.ref("col_bi").cast("fp64"), ctx().fp64());
+  checkCast(scan.ref("col_si").cast("dec(10,2)"), ctx().decimal(8, 10, 2));
+  checkBinOper(scan.ref("col_ti").cast("bool"),
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_ti"),
+               builder.cst(0));
+  EXPECT_THROW(scan.ref("col_bi").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").cast("dict"), InvalidQueryError);
+  // TODO: allow conversion of integer tiypes to time, date and intervals
+  // similar to timestamps?
+  EXPECT_THROW(scan.ref("col_bi").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ti").cast("time[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").cast("date32[s]"), InvalidQueryError);
+  checkCast(scan.ref("col_bi").cast("timestamp[s]"), ctx().timestamp(TimeUnit::kSecond));
+  checkCast(scan.ref("col_i").cast("timestamp[ms]"), ctx().timestamp(TimeUnit::kMilli));
+  checkCast(scan.ref("col_si").cast("timestamp[us]"), ctx().timestamp(TimeUnit::kMicro));
+  checkCast(scan.ref("col_ti").cast("timestamp[ns]"), ctx().timestamp(TimeUnit::kNano));
+  EXPECT_THROW(scan.ref("col_bi").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").cast("array(int)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

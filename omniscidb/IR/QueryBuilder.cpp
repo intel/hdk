@@ -502,6 +502,42 @@ BuilderExpr BuilderExpr::extract(const std::string& field) const {
   return extract(allowed_values.at(canonical));
 }
 
+BuilderExpr BuilderExpr::cast(const Type* new_type) const {
+  if (expr_->type()->isInteger()) {
+    if (new_type->isNumber() || new_type->isTimestamp()) {
+      return {builder_, expr_->cast(new_type), "", true};
+    } else if (new_type->isBoolean()) {
+      return ne(builder_.cst(0, expr_->type()));
+    } else {
+      throw InvalidQueryError() << "Conversion from " << expr_->toString() << " to "
+                                << new_type->toString() << " is not supported.";
+    }
+  } else {
+    throw InvalidQueryError() << "Conversion from " << expr_->type()->toString()
+                              << " is not supported.";
+  }
+}
+
+BuilderExpr BuilderExpr::cast(const std::string& new_type) const {
+  return cast(builder_.ctx_.typeFromString(new_type));
+}
+
+BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
+  // TODO: add auto-casts?
+  if (!expr_->type()->equal(rhs.expr()->type()) &&
+      !expr_->type()
+           ->withNullable(rhs.expr()->type()->nullable())
+           ->equal(rhs.expr()->type())) {
+    throw InvalidQueryError() << "Mismatched type for comparison:\n  LHS type: "
+                              << expr_->type()->toString()
+                              << "\n  RHS type: " << rhs.expr()->type()->toString();
+  }
+  auto nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
+  auto bin_oper = makeExpr<BinOper>(
+      builder_.ctx_.boolean(nullable), OpType::kNe, Qualifier::kOne, expr_, rhs.expr());
+  return {builder_, bin_oper, "", true};
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
@@ -1377,6 +1413,15 @@ BuilderExpr QueryBuilder::count() const {
       config_->exec.group_by.bigint_count ? ctx_.int64(false) : ctx_.int32(false);
   auto agg = makeExpr<AggExpr>(count_type, AggType::kCount, nullptr, false, nullptr);
   return {*this, agg, "count", true};
+}
+
+BuilderExpr QueryBuilder::cst(int val, const Type* type) const {
+  auto cst_expr = Constant::make(type, val);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(int val, const std::string& type) const {
+  return cst(val, ctx_.typeFromString(type));
 }
 
 }  // namespace hdk::ir
