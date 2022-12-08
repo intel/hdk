@@ -540,6 +540,40 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
     } else if (new_type->isFloatingPoint() || new_type->isBoolean()) {
       return {builder_, expr_->cast(new_type), "", true};
     }
+  } else if (expr_->type()->isString()) {
+    if (new_type->equal(expr_->type()->withNullable(new_type->nullable()))) {
+      return {builder_, expr_->cast(new_type), "", true};
+    } else if (new_type->isExtDictionary()) {
+      if (new_type->as<ExtDictionaryType>()->dictId() <= TRANSIENT_DICT_ID &&
+          !expr_->is<Constant>()) {
+        throw InvalidQueryError(
+            "Cannot apply transient dictionary encoding to non-literal expression.");
+      }
+      return {builder_, expr_->cast(new_type), "", true};
+    } else if (new_type->isNumber() || new_type->isDateTime() || new_type->isBoolean() ||
+               new_type->isString()) {
+      if (expr_->is<Constant>()) {
+        try {
+          return {builder_, expr_->cast(new_type), "", true};
+        } catch (std::runtime_error& e) {
+          throw InvalidQueryError(e.what());
+        }
+      } else {
+        throw InvalidQueryError(
+            "String conversions for non-literals are not yet supported.");
+      }
+    }
+  } else if (expr_->type()->isExtDictionary()) {
+    if (new_type->isText()) {
+      return {builder_, expr_->cast(new_type), "", true};
+    } else if (new_type->isExtDictionary()) {
+      if (new_type->as<ExtDictionaryType>()->dictId() <= TRANSIENT_DICT_ID &&
+          !expr_->is<Constant>()) {
+        throw InvalidQueryError(
+            "Cannot apply transient dictionary encoding to non-literal expression.");
+      }
+      return {builder_, expr_->cast(new_type), "", true};
+    }
   }
 
   throw InvalidQueryError() << "Conversion from " << expr_->type()->toString() << " to "
@@ -1449,6 +1483,21 @@ BuilderExpr QueryBuilder::cst(int val, const Type* type) const {
 }
 
 BuilderExpr QueryBuilder::cst(int val, const std::string& type) const {
+  return cst(val, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(const std::string& val, const Type* type) const {
+  try {
+    Datum d;
+    d.stringval = new std::string(val);
+    auto cst_expr = std::make_shared<Constant>(ctx_.text(), false, d);
+    return {*this, cst_expr->cast(type)};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError(e.what());
+  }
+}
+
+BuilderExpr QueryBuilder::cst(const std::string& val, const std::string& type) const {
   return cst(val, ctx_.typeFromString(type));
 }
 

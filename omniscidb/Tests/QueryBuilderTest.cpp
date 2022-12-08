@@ -151,6 +151,33 @@ void checkBinOper(const BuilderExpr& expr,
   ASSERT_EQ(bin_oper->rightOperand()->toString(), rhs.expr()->toString());
 }
 
+void checkCst(const BuilderExpr& expr, int64_t val, const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<Constant>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_TRUE(type->isInteger() || type->isDecimal() || type->isBoolean() ||
+              type->isDateTime())
+      << type->toString();
+  ASSERT_EQ(expr.expr()->as<Constant>()->intVal(), val);
+}
+
+void checkCst(const BuilderExpr& expr, double val, const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<Constant>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_TRUE(type->isFloatingPoint());
+  ASSERT_NEAR(expr.expr()->as<Constant>()->fpVal(), val, 0.0001);
+}
+
+void checkCst(const BuilderExpr& expr, const std::string& val, const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<Constant>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_TRUE(type->isString());
+  ASSERT_EQ(*expr.expr()->as<Constant>()->value().stringval, val);
+}
+
+void checkCst(const BuilderExpr& expr, bool val, const Type* type) {
+  checkCst(expr, (int64_t)val, type);
+}
+
 }  // anonymous namespace
 
 class QueryBuilderTest : public TestSuite {
@@ -211,6 +238,7 @@ class QueryBuilderTest : public TestSuite {
                     {"col_si", ctx().int16()},
                     {"col_ti", ctx().int8()},
                     {"col_b_nn", ctx().boolean(false)},
+                    {"col_vc_10", ctx().varChar(10)},
                 });
 
     createTable("test4",
@@ -227,15 +255,15 @@ class QueryBuilderTest : public TestSuite {
                     {"col_time", ctx().time64(hdk::ir::TimeUnit::kSecond)},
                     {"col_timestamp", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
                 });
-    insertCsvValues(
-        "test4",
-        "10,10,2.2,4.4,12.34,true,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
-    insertCsvValues(
-        "test4",
-        "10,10,2.2,4.4,12.34,false,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
-    insertCsvValues(
-        "test4",
-        "10,10,2.2,4.4,12.34,,str1,dict1,2022-02-23,15:00:11,2022-02-23 15:00:11");
+    insertCsvValues("test4",
+                    "10,10,2.2,4.4,12.34,true,str1,dict1,2022-02-23,15:00:11,"
+                    "2022-02-23 15:00:11");
+    insertCsvValues("test4",
+                    "10,10,2.2,4.4,12.34,false,str1,dict1,2022-02-23,15:00:11,"
+                    "2022-02-23 15:00:11");
+    insertCsvValues("test4",
+                    "10,10,2.2,4.4,12.34,,str1,dict1,2022-02-23,15:00:11,2022-"
+                    "02-23 15:00:11");
 
     createTable("sort",
                 {{"x", ctx().int32()}, {"y", ctx().int32()}, {"z", ctx().int32()}});
@@ -1334,10 +1362,9 @@ TEST_F(QueryBuilderTest, ParseType) {
   EXPECT_THROW(ctx().typeFromString("dict(int)"), TypeError);
 }
 
-TEST_F(QueryBuilderTest, Cast) {
+TEST_F(QueryBuilderTest, CastIntegerExpr) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test3");
-  // Casts from integer types.
   checkCast(scan.ref("col_bi").cast("int8"), ctx().int8());
   checkCast(scan.ref("col_bi").cast("int16"), ctx().int16());
   checkCast(scan.ref("col_bi").cast("int32"), ctx().int32());
@@ -1387,7 +1414,11 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_bi").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").cast("array(int)"), InvalidQueryError);
-  // Casts from floating point types
+}
+
+TEST_F(QueryBuilderTest, CastFpExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
   checkCast(scan.ref("col_f").cast("int8"), ctx().int8());
   checkCast(scan.ref("col_f").cast("int16"), ctx().int16());
   checkCast(scan.ref("col_f").cast("int32"), ctx().int32());
@@ -1428,7 +1459,11 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_d").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_f").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").cast("array(int)"), InvalidQueryError);
-  // Cast from decimal type.
+}
+
+TEST_F(QueryBuilderTest, CastDecimalExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
   checkCast(scan.ref("col_dec").cast("int8"), ctx().int8());
   checkCast(scan.ref("col_dec").cast("int16"), ctx().int16());
   checkCast(scan.ref("col_dec").cast("int32"), ctx().int32());
@@ -1466,7 +1501,11 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_dec").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").cast("array(int)"), InvalidQueryError);
-  // Cast from boolean type.
+}
+
+TEST_F(QueryBuilderTest, CastBooleanExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
   checkBoolCastThroughCase(scan.ref("col_b").cast("int8"), ctx().int8());
   checkBoolCastThroughCase(scan.ref("col_b").cast("int16"), ctx().int16());
   checkBoolCastThroughCase(scan.ref("col_b").cast("int32"), ctx().int32());
@@ -1501,6 +1540,183 @@ TEST_F(QueryBuilderTest, Cast) {
   EXPECT_THROW(scan.ref("col_b").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_b").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_b").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CastStringExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  // Unallowed casts for string columns.
+  for (auto col_name : {"col_str"s, "col_vc_10"s}) {
+    EXPECT_THROW(scan.ref(col_name).cast("int8"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("int16"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("int32"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("int64"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("fp32"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("fp64"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("dec(10,2)"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("bool"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("time[s]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("time[ms]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("time[us]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("time[ns]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("date16"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("date32[d]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("date32[s]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("timestamp[s]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("timestamp[ms]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("timestamp[us]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("timestamp[ns]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[m]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[d]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[s]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[ms]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[us]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("interval[ns]"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("array(int)(2)"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(col_name).cast("array(int)"), InvalidQueryError);
+  }
+  EXPECT_THROW(scan.ref("col_str").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_vc_10").cast("text"), InvalidQueryError);
+  // Allowed casts for string columns.
+  ASSERT_TRUE(scan.ref("col_str").cast("text").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_str").cast("dict(text)[1]"), ctx().extDict(ctx().text(), 1));
+  ASSERT_TRUE(scan.ref("col_vc_10").cast("varchar(10)").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_vc_10").cast("dict(text)[1]"), ctx().extDict(ctx().text(), 1));
+  // Casts for string literal.
+  for (auto type : {"text"s, "varchar(20)"s}) {
+    checkCst(builder.cst("10", type).cast("int8"), (int64_t)10, ctx().int8(false));
+    EXPECT_THROW(builder.cst("str", type).cast("int8"), InvalidQueryError);
+    checkCst(builder.cst("11", type).cast("int16"), (int64_t)11, ctx().int16(false));
+    EXPECT_THROW(builder.cst("str", type).cast("int16"), InvalidQueryError);
+    checkCst(builder.cst("12", type).cast("int32"), (int64_t)12, ctx().int32(false));
+    EXPECT_THROW(builder.cst("str", type).cast("int32"), InvalidQueryError);
+    checkCst(builder.cst("13", type).cast("int64"), (int64_t)13, ctx().int64(false));
+    EXPECT_THROW(builder.cst("str", type).cast("int64"), InvalidQueryError);
+    checkCst(builder.cst("1.3", type).cast("fp32"), 1.3, ctx().fp32(false));
+    EXPECT_THROW(builder.cst("str", type).cast("fp32"), InvalidQueryError);
+    checkCst(builder.cst("1.3", type).cast("fp64"), 1.3, ctx().fp64(false));
+    EXPECT_THROW(builder.cst("str", type).cast("fp64"), InvalidQueryError);
+    checkCst(builder.cst("1.3", type).cast("dec(10,2)"),
+             (int64_t)130,
+             ctx().decimal(8, 10, 2, false));
+    EXPECT_THROW(builder.cst("str", type).cast("dec(10,2)"), InvalidQueryError);
+    checkCst(builder.cst("true", type).cast("bool"), true, ctx().boolean(false));
+    checkCst(builder.cst("TRUE", type).cast("bool"), true, ctx().boolean(false));
+    checkCst(builder.cst("t", type).cast("bool"), true, ctx().boolean(false));
+    checkCst(builder.cst("T", type).cast("bool"), true, ctx().boolean(false));
+    checkCst(builder.cst("1", type).cast("bool"), true, ctx().boolean(false));
+    checkCst(builder.cst("false", type).cast("bool"), false, ctx().boolean(false));
+    checkCst(builder.cst("FALSE", type).cast("bool"), false, ctx().boolean(false));
+    checkCst(builder.cst("f", type).cast("bool"), false, ctx().boolean(false));
+    checkCst(builder.cst("F", type).cast("bool"), false, ctx().boolean(false));
+    checkCst(builder.cst("0", type).cast("bool"), false, ctx().boolean(false));
+    EXPECT_THROW(builder.cst("str", type).cast("bool"), InvalidQueryError);
+    checkCst(builder.cst("str", type).cast("text"), "str"s, ctx().text(false));
+    checkCst(
+        builder.cst("str", type).cast("varchar(4)"), "str"s, ctx().varChar(4, false));
+    checkCst(builder.cst("str", type).cast("varchar(2)"), "st"s, ctx().varChar(2, false));
+    checkCast(builder.cst("str", type).cast("dict(text)[0]"),
+              ctx().extDict(ctx().text(), 0));
+    checkCst(builder.cst("01:10:12", type).cast("time[s]"),
+             (int64_t)4212,
+             ctx().time64(TimeUnit::kSecond, false));
+    EXPECT_THROW(builder.cst("str", type).cast("time[s]"), InvalidQueryError);
+    checkCst(builder.cst("01:10:12", type).cast("time[ms]"),
+             (int64_t)4212000,
+             ctx().time64(TimeUnit::kMilli, false));
+    EXPECT_THROW(builder.cst("str", type).cast("time[ms]"), InvalidQueryError);
+    checkCst(builder.cst("01:10:12", type).cast("time[us]"),
+             (int64_t)4212000000,
+             ctx().time64(TimeUnit::kMicro, false));
+    EXPECT_THROW(builder.cst("str", type).cast("time[us]"), InvalidQueryError);
+    checkCst(builder.cst("01:10:12", type).cast("time[ns]"),
+             (int64_t)4212000000000,
+             ctx().time64(TimeUnit::kNano, false));
+    EXPECT_THROW(builder.cst("str", type).cast("time[ns]"), InvalidQueryError);
+    // Day encoded dates are stored in seconds.
+    checkCst(builder.cst("1970-01-02", type).cast("date64[d]"),
+             (int64_t)86400,
+             ctx().date64(TimeUnit::kDay, false));
+    EXPECT_THROW(builder.cst("str", type).cast("date64[d]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02", type).cast("date64[s]"),
+             (int64_t)86400,
+             ctx().date64(TimeUnit::kSecond, false));
+    EXPECT_THROW(builder.cst("str", type).cast("date64[s]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02", type).cast("date64[ms]"),
+             (int64_t)86400000,
+             ctx().date64(TimeUnit::kMilli, false));
+    EXPECT_THROW(builder.cst("str", type).cast("date64[ms]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02", type).cast("date64[us]"),
+             (int64_t)86400000000,
+             ctx().date64(TimeUnit::kMicro, false));
+    EXPECT_THROW(builder.cst("str", type).cast("date64[us]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02", type).cast("date64[ns]"),
+             (int64_t)86400000000000,
+             ctx().date64(TimeUnit::kNano, false));
+    EXPECT_THROW(builder.cst("str", type).cast("date64[ns]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02 01:10:12", type).cast("timestamp[s]"),
+             (int64_t)90612,
+             ctx().timestamp(TimeUnit::kSecond, false));
+    EXPECT_THROW(builder.cst("str", type).cast("timestamp[s]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02 01:10:12", type).cast("timestamp[ms]"),
+             (int64_t)90612000,
+             ctx().timestamp(TimeUnit::kMilli, false));
+    EXPECT_THROW(builder.cst("str", type).cast("timestamp[ms]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02 01:10:12", type).cast("timestamp[us]"),
+             (int64_t)90612000000,
+             ctx().timestamp(TimeUnit::kMicro, false));
+    EXPECT_THROW(builder.cst("str", type).cast("timestamp[us]"), InvalidQueryError);
+    checkCst(builder.cst("1970-01-02 01:10:12", type).cast("timestamp[ns]"),
+             (int64_t)90612000000000,
+             ctx().timestamp(TimeUnit::kNano, false));
+    EXPECT_THROW(builder.cst("str", type).cast("timestamp[ns]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[m]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[d]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[s]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[ms]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[us]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("1", type).cast("interval[ns]"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("[1, 2]", type).cast("array(int)(2)"), InvalidQueryError);
+    EXPECT_THROW(builder.cst("[1, 2, 3]", type).cast("array(int)"), InvalidQueryError);
+  }
+}
+
+TEST_F(QueryBuilderTest, CastDictExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  EXPECT_THROW(scan.ref("col_dict").cast("int8"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("int16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("int32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("int64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("fp32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("fp64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("time[s]"), InvalidQueryError);
+  checkCast(scan.ref("col_dict").cast("text"), ctx().text());
+  EXPECT_THROW(scan.ref("col_dict").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("time[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("date32[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("timestamp[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("timestamp[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("timestamp[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("timestamp[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("array(int)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, UserSql) {
