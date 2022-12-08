@@ -532,7 +532,8 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValuesVarlenArray(
     StringDictionary* dict) {
   auto list_type = std::dynamic_pointer_cast<arrow::ListType>(arr->type());
   if (!list_type) {
-    throw std::runtime_error("Unsupported large Arrow list:: "s + list_type->ToString());
+    throw std::runtime_error("Unsupported large Arrow list:: "s +
+                             arr->type()->ToString());
   }
 
   auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
