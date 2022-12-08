@@ -726,8 +726,8 @@ const Type* getColumnType(const Node* node, size_t col_idx) {
   if (deep_join) {
     CHECK_GT(deep_join->size(), col_idx);
     unsigned offs = 0;
-    for (size_t i = 0; i < join->inputCount(); ++i) {
-      auto input = join->getInput(i);
+    for (size_t i = 0; i < deep_join->inputCount(); ++i) {
+      auto input = deep_join->getInput(i);
       if (col_idx - offs < input->size()) {
         return getColumnType(input, col_idx - offs);
       }
