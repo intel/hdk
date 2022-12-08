@@ -137,6 +137,21 @@ void checkBoolCastThroughCase(const BuilderExpr& expr,
   }
 }
 
+void checkUOper(const BuilderExpr& expr, const Type* type, OpType op_type) {
+  ASSERT_TRUE(expr.expr()->is<UOper>());
+  auto uoper = expr.expr()->as<UOper>();
+  ASSERT_TRUE(uoper->type()->equal(type));
+  ASSERT_EQ(uoper->opType(), op_type);
+}
+
+void checkUOper(const BuilderExpr& expr,
+                const Type* type,
+                OpType op_type,
+                const BuilderExpr& op) {
+  checkUOper(expr, type, op_type);
+  ASSERT_EQ(expr.expr()->as<UOper>()->operand()->toString(), op.expr()->toString());
+}
+
 void checkBinOper(const BuilderExpr& expr,
                   const Type* type,
                   OpType op_type,
@@ -2026,6 +2041,29 @@ TEST_F(QueryBuilderTest, CstExprArray) {
   EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(date)"), InvalidQueryError);
   EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(timestamp)"), InvalidQueryError);
   EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(interval)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, NotExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  EXPECT_THROW(scan.ref("col_bi").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ti").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").logicalNot(), InvalidQueryError);
+  checkUOper(
+      scan.ref("col_b").logicalNot(), ctx().boolean(), OpType::kNot, scan.ref("col_b"));
+  EXPECT_THROW(scan.ref("col_str").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32_3").logicalNot(), InvalidQueryError);
+  checkCst(builder.cst(1, "bool").logicalNot(), false, ctx().boolean(false));
+  checkCst(builder.cst(0, "bool").logicalNot(), true, ctx().boolean(false));
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

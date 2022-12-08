@@ -57,6 +57,8 @@ class BuilderExpr {
   BuilderExpr cast(const Type* new_type) const;
   BuilderExpr cast(const std::string& new_type) const;
 
+  BuilderExpr logicalNot() const;
+
   BuilderExpr ne(const BuilderExpr& rhs) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
@@ -365,12 +367,12 @@ class QueryBuilder {
   BuilderExpr cst(const std::string& val) const;
   BuilderExpr cst(const std::string& val, const Type* type) const;
   BuilderExpr cst(const std::string& val, const std::string& type) const;
-  BuilderExpr cst( std::initializer_list<int>& vals) const;
-  BuilderExpr cst( std::initializer_list<int> vals, const Type* type) const;
-  BuilderExpr cst( std::initializer_list<int> vals, const std::string& type) const;
-  BuilderExpr cst( std::initializer_list<double> vals) const;
-  BuilderExpr cst( std::initializer_list<double> vals, const Type* type) const;
-  BuilderExpr cst( std::initializer_list<double> vals, const std::string& type) const;
+  BuilderExpr cst(std::initializer_list<int>& vals) const;
+  BuilderExpr cst(std::initializer_list<int> vals, const Type* type) const;
+  BuilderExpr cst(std::initializer_list<int> vals, const std::string& type) const;
+  BuilderExpr cst(std::initializer_list<double> vals) const;
+  BuilderExpr cst(std::initializer_list<double> vals, const Type* type) const;
+  BuilderExpr cst(std::initializer_list<double> vals, const std::string& type) const;
   BuilderExpr cst(const std::vector<int>& vals) const;
   BuilderExpr cst(const std::vector<int>& vals, const Type* type) const;
   BuilderExpr cst(const std::vector<int>& vals, const std::string& type) const;

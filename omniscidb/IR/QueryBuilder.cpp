@@ -637,6 +637,20 @@ BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
   return {builder_, bin_oper, "", true};
 }
 
+BuilderExpr BuilderExpr::logicalNot() const {
+  if (!expr_->type()->isBoolean()) {
+    throw InvalidQueryError("Only boolean expressions are allowed for NOT operation.");
+  }
+  if (expr_->is<Constant>()) {
+    return builder_.cst(!expr_->as<Constant>()->intVal(), expr_->type());
+  }
+  auto uoper = makeExpr<UOper>(builder_.ctx_.boolean(expr_->type()->nullable()),
+                               expr_->containsAgg(),
+                               OpType::kNot,
+                               expr_);
+  return {builder_, uoper, "", true};
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
