@@ -241,30 +241,6 @@ class QueryBuilderTest : public TestSuite {
                     {"col_vc_10", ctx().varChar(10)},
                 });
 
-    createTable("test4",
-                {
-                    {"col_bi", ctx().int64()},
-                    {"col_i", ctx().int32()},
-                    {"col_f", ctx().fp32()},
-                    {"col_d", ctx().fp64()},
-                    {"col_dec", ctx().decimal64(10, 2)},
-                    {"col_b", ctx().boolean()},
-                    {"col_str", ctx().text()},
-                    {"col_dict", ctx().extDict(ctx().text(), 0)},
-                    {"col_date", ctx().date32(hdk::ir::TimeUnit::kDay)},
-                    {"col_time", ctx().time64(hdk::ir::TimeUnit::kSecond)},
-                    {"col_timestamp", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
-                });
-    insertCsvValues("test4",
-                    "10,10,2.2,4.4,12.34,true,str1,dict1,1970-01-02,15:00:11,"
-                    "2022-02-23 15:00:11");
-    insertCsvValues("test4",
-                    "10,10,2.2,4.4,12.34,false,str1,dict1,2022-02-23,15:00:11,"
-                    "2022-02-23 15:00:11");
-    insertCsvValues("test4",
-                    "10,10,2.2,4.4,12.34,,str1,dict1,2022-02-23,15:00:11,2022-"
-                    "02-23 15:00:11");
-
     createTable("sort",
                 {{"x", ctx().int32()}, {"y", ctx().int32()}, {"z", ctx().int32()}});
     insertCsvValues("sort",
@@ -1836,16 +1812,6 @@ TEST_F(QueryBuilderTest, CastTimestampExpr) {
   EXPECT_THROW(scan.ref("col_timestamp").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)"), InvalidQueryError);
-}
-
-TEST_F(QueryBuilderTest, UserSql) {
-  if (!config().debug.sql.empty()) {
-    config().debug.dump = true;
-    auto res = runSqlQuery(config().debug.sql, ExecutorDeviceType::CPU, false);
-    auto at = toArrow(res);
-    std::cout << at->ToString() << std::endl;
-    config().debug.dump = false;
-  }
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {
