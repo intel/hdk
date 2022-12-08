@@ -1099,7 +1099,7 @@ const int8_t QueryMemoryDescriptor::getLogicalSlotWidthBytes(
   return col_slot_context_.getSlotInfo(slot_idx).logical_size;
 }
 
-const int8_t QueryMemoryDescriptor::getSlotIndexForSingleSlotCol(
+const size_t QueryMemoryDescriptor::getSlotIndexForSingleSlotCol(
     const size_t col_idx) const {
   const auto& col_slots = col_slot_context_.getSlotsForCol(col_idx);
   CHECK_EQ(col_slots.size(), size_t(1));
