@@ -151,20 +151,36 @@ void checkBinOper(const BuilderExpr& expr,
   ASSERT_EQ(bin_oper->rightOperand()->toString(), rhs.expr()->toString());
 }
 
-void checkCst(const BuilderExpr& expr, int64_t val, const Type* type) {
-  ASSERT_TRUE(expr.expr()->is<Constant>());
-  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+void checkCst(const ExprPtr& expr, int64_t val, const Type* type) {
+  ASSERT_TRUE(expr->is<Constant>());
+  ASSERT_EQ(expr->type()->toString(), type->toString());
   ASSERT_TRUE(type->isInteger() || type->isDecimal() || type->isBoolean() ||
-              type->isDateTime())
+              type->isDateTime() || type->isInterval())
       << type->toString();
-  ASSERT_EQ(expr.expr()->as<Constant>()->intVal(), val);
+  ASSERT_EQ(expr->as<Constant>()->intVal(), val);
+}
+
+void checkCst(const BuilderExpr& expr, int64_t val, const Type* type) {
+  checkCst(expr.expr(), val, type);
+}
+
+void checkCst(const ExprPtr& expr, int val, const Type* type) {
+  checkCst(expr, static_cast<int64_t>(val), type);
+}
+
+void checkCst(const BuilderExpr& expr, int val, const Type* type) {
+  checkCst(expr, static_cast<int64_t>(val), type);
+}
+
+void checkCst(const ExprPtr& expr, double val, const Type* type) {
+  ASSERT_TRUE(expr->is<Constant>());
+  ASSERT_EQ(expr->type()->toString(), type->toString());
+  ASSERT_TRUE(type->isFloatingPoint());
+  ASSERT_NEAR(expr->as<Constant>()->fpVal(), val, 0.0001);
 }
 
 void checkCst(const BuilderExpr& expr, double val, const Type* type) {
-  ASSERT_TRUE(expr.expr()->is<Constant>());
-  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
-  ASSERT_TRUE(type->isFloatingPoint());
-  ASSERT_NEAR(expr.expr()->as<Constant>()->fpVal(), val, 0.0001);
+  checkCst(expr.expr(), val, type);
 }
 
 void checkCst(const BuilderExpr& expr, const std::string& val, const Type* type) {
@@ -176,6 +192,28 @@ void checkCst(const BuilderExpr& expr, const std::string& val, const Type* type)
 
 void checkCst(const BuilderExpr& expr, bool val, const Type* type) {
   checkCst(expr, (int64_t)val, type);
+}
+
+void checkNullCst(const BuilderExpr& expr, const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<Constant>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_TRUE(expr.expr()->as<Constant>()->isNull());
+}
+
+template <typename T>
+void checkCst(const BuilderExpr& expr, std::initializer_list<T> vals, const Type* type) {
+  ASSERT_TRUE(type->isArray());
+  ASSERT_TRUE(expr.expr()->is<Constant>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_FALSE(expr.expr()->as<Constant>()->isNull());
+  auto& exprs = expr.expr()->as<Constant>()->valueList();
+  ASSERT_EQ(exprs.size(), vals.size());
+  auto elem_type = type->as<ArrayBaseType>()->elemType()->withNullable(false);
+  auto val_idx = 0;
+  for (auto& elem_expr : exprs) {
+    checkCst(elem_expr, std::data(vals)[val_idx], elem_type);
+    ++val_idx;
+  }
 }
 
 }  // anonymous namespace
@@ -1812,6 +1850,182 @@ TEST_F(QueryBuilderTest, CastTimestampExpr) {
   EXPECT_THROW(scan.ref("col_timestamp").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CstExprScalar) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  checkCst(builder.cst(120), 120L, ctx().int64(false));
+  checkCst(builder.cst(120, "int8"), 120, ctx().int8(false));
+  checkCst(builder.cst("-120", "int8"), -120, ctx().int8(false));
+  checkCst(builder.cst(1200, "int16"), 1200, ctx().int16(false));
+  checkCst(builder.cst("-1200", "int16"), -1200, ctx().int16(false));
+  checkCst(builder.cst(12000, "int32"), 12000, ctx().int32(false));
+  checkCst(builder.cst("-12000", "int32"), -12000, ctx().int32(false));
+  checkCst(builder.cst(120000, "int64"), 120000, ctx().int64(false));
+  checkCst(builder.cst("-120000", "int64"), -120000, ctx().int64(false));
+  checkCst(builder.cst(12.34), 12.34, ctx().fp64(false));
+  checkCst(builder.cst(12.34, "fp32"), 12.34, ctx().fp32(false));
+  checkCst(builder.cst(12, "fp32"), 12.0, ctx().fp32(false));
+  checkCst(builder.cst("12.34", "fp32"), 12.34, ctx().fp32(false));
+  checkCst(builder.cst(12.3456, "fp64"), 12.3456, ctx().fp64(false));
+  checkCst(builder.cst(12, "fp64"), 12.0, ctx().fp64(false));
+  checkCst(builder.cst("12.3456", "fp64"), 12.3456, ctx().fp64(false));
+  checkCst(builder.cst(1234, "dec(10,2)"), 123400, ctx().decimal(8, 10, 2, false));
+  checkCst(builder.cst(12.34, "dec(10,2)"), 1234, ctx().decimal(8, 10, 2, false));
+  checkCst(builder.cst("1234.56", "dec(10,2)"), 123456, ctx().decimal(8, 10, 2, false));
+  checkCst(builder.trueCst(), true, ctx().boolean(false));
+  checkCst(builder.cst(1, "bool"), true, ctx().boolean(false));
+  checkCst(builder.cst("true", "bool"), true, ctx().boolean(false));
+  checkCst(builder.cst("1", "bool"), true, ctx().boolean(false));
+  checkCst(builder.cst("T", "bool"), true, ctx().boolean(false));
+  checkCst(builder.falseCst(), true, ctx().boolean(false));
+  checkCst(builder.cst(0, "bool"), false, ctx().boolean(false));
+  checkCst(builder.cst("false", "bool"), false, ctx().boolean(false));
+  checkCst(builder.cst("0", "bool"), false, ctx().boolean(false));
+  checkCst(builder.cst("F", "bool"), false, ctx().boolean(false));
+  checkCst(builder.cst("str"), "str"s, ctx().text(false));
+  checkCst(builder.cst("str", "text"), "str"s, ctx().text(false));
+  checkCst(builder.cst(1234, "time[s]"), 1234, ctx().time64(TimeUnit::kSecond, false));
+  checkCst(builder.cst(1234, "time[ms]"), 1234, ctx().time64(TimeUnit::kMilli, false));
+  checkCst(builder.cst(1234, "time[us]"), 1234, ctx().time64(TimeUnit::kMicro, false));
+  checkCst(builder.cst(1234, "time[ns]"), 1234, ctx().time64(TimeUnit::kNano, false));
+  checkCst(
+      builder.cst("00:20:34", "time[s]"), 1234, ctx().time64(TimeUnit::kSecond, false));
+  checkCst(builder.cst("00:20:34", "time[ms]"),
+           1234000,
+           ctx().time64(TimeUnit::kMilli, false));
+  checkCst(builder.cst("00:20:34", "time[us]"),
+           1234000000,
+           ctx().time64(TimeUnit::kMicro, false));
+  checkCst(builder.cst("00:20:34", "time[ns]"),
+           1234000000000,
+           ctx().time64(TimeUnit::kNano, false));
+  EXPECT_THROW(builder.cst(1234, "date[d]"), InvalidQueryError);
+  checkCst(builder.cst(1234, "date[s]"), 1234, ctx().date64(TimeUnit::kSecond, false));
+  checkCst(builder.cst(1234, "date[ms]"), 1234, ctx().date64(TimeUnit::kMilli, false));
+  checkCst(builder.cst(1234, "date[us]"), 1234, ctx().date64(TimeUnit::kMicro, false));
+  checkCst(builder.cst(1234, "date[ns]"), 1234, ctx().date64(TimeUnit::kNano, false));
+  EXPECT_THROW(builder.cst("1970-01-02", "date[d]"), InvalidQueryError);
+  checkCst(builder.cst("1970-01-02", "date[s]"),
+           86400,
+           ctx().date64(TimeUnit::kSecond, false));
+  checkCst(builder.cst("1970-01-02", "date[ms]"),
+           86400000,
+           ctx().date64(TimeUnit::kMilli, false));
+  checkCst(builder.cst("1970-01-02", "date[us]"),
+           86400000000,
+           ctx().date64(TimeUnit::kMicro, false));
+  checkCst(builder.cst("1970-01-02", "date[ns]"),
+           86400000000000,
+           ctx().date64(TimeUnit::kNano, false));
+  checkCst(
+      builder.cst(1234, "timestamp[s]"), 1234, ctx().timestamp(TimeUnit::kSecond, false));
+  checkCst(
+      builder.cst(1234, "timestamp[ms]"), 1234, ctx().timestamp(TimeUnit::kMilli, false));
+  checkCst(
+      builder.cst(1234, "timestamp[us]"), 1234, ctx().timestamp(TimeUnit::kMicro, false));
+  checkCst(
+      builder.cst(1234, "timestamp[ns]"), 1234, ctx().timestamp(TimeUnit::kNano, false));
+  checkCst(builder.cst("1970-01-02 01:02:03", "timestamp[s]"),
+           90123,
+           ctx().timestamp(TimeUnit::kSecond, false));
+  checkCst(builder.cst("1970-01-02 01:02:03", "timestamp[ms]"),
+           90123000,
+           ctx().timestamp(TimeUnit::kMilli, false));
+  checkCst(builder.cst("1970-01-02 01:02:03", "timestamp[us]"),
+           90123000000,
+           ctx().timestamp(TimeUnit::kMicro, false));
+  checkCst(builder.cst("1970-01-02 01:02:03", "timestamp[ns]"),
+           90123000000000,
+           ctx().timestamp(TimeUnit::kNano, false));
+  checkCst(
+      builder.cst(1234, "interval[d]"), 1234, ctx().interval64(TimeUnit::kDay, false));
+  checkCst(
+      builder.cst(1234, "interval[s]"), 1234, ctx().interval64(TimeUnit::kSecond, false));
+  checkCst(
+      builder.cst(1234, "interval[ms]"), 1234, ctx().interval64(TimeUnit::kMilli, false));
+  checkCst(
+      builder.cst(1234, "interval[us]"), 1234, ctx().interval64(TimeUnit::kMicro, false));
+  checkCst(
+      builder.cst(1234, "interval[ns]"), 1234, ctx().interval64(TimeUnit::kNano, false));
+
+  checkNullCst(builder.nullCst(), ctx().null());
+  checkNullCst(builder.nullCst("int64"), ctx().int64());
+  checkNullCst(builder.nullCst("fp64"), ctx().fp64());
+  checkNullCst(builder.nullCst("text"), ctx().text());
+
+  EXPECT_THROW(builder.cst(10, "text"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10, "array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10, "array(int)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "text"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "date"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "time"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "timestamp"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "interval"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst(10.1, "array(int)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst("1234", "interval[d]"), InvalidQueryError);
+  EXPECT_THROW(builder.cst("[1, 2]", "array(int)(2)").expr()->print(), InvalidQueryError);
+  EXPECT_THROW(builder.cst("[1, 2]", "array(int)").expr()->print(), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CstExprArray) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  checkCst(builder.cst({1, 2, 3, 4}, "array(int8)"),
+           {1, 2, 3, 4},
+           ctx().arrayVarLen(ctx().int8()));
+  checkCst(builder.cst({"1", "2", "3", "4"}, "array(int8)"),
+           {1, 2, 3, 4},
+           ctx().arrayVarLen(ctx().int8()));
+  EXPECT_THROW(builder.cst({1.1, 2.2, 3.3}, "array(int8)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int8)(2)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int8)(5)"), InvalidQueryError);
+  checkCst(builder.cst({1, 2, 3}, "array(int8)(3)"),
+           {1, 2, 3},
+           ctx().arrayFixed(3, ctx().int8()));
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int16)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int16)(4)"), InvalidQueryError);
+  checkCst(builder.cst({1, 2, 3, 4}, "array(int32)"),
+           {1, 2, 3, 4},
+           ctx().arrayVarLen(ctx().int32()));
+  checkCst(builder.cst({"1", "2", "3", "4"}, "array(int32)"),
+           {1, 2, 3, 4},
+           ctx().arrayVarLen(ctx().int32()));
+  EXPECT_THROW(builder.cst({1.1, 2.2, 3.3}, "array(int32)"), InvalidQueryError);
+  checkCst(builder.cst({1, 2, 3}, "array(int32)(3)"),
+           {1, 2, 3},
+           ctx().arrayFixed(3, ctx().int32()));
+  checkCst(builder.cst({"1", "2", "3"}, "array(int32)(3)"),
+           {1, 2, 3},
+           ctx().arrayFixed(3, ctx().int32()));
+  EXPECT_THROW(builder.cst({1.1, 2.2, 3.3}, "array(int32)(3)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int64)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(int64)(4)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1.1, 2.2, 3.3}, "array(fp32)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1.1, 2.2, 3.3}, "array(fp32)(3)"), InvalidQueryError);
+  checkCst(builder.cst({1, 2, 3, 4}, "array(fp64)"),
+           {1.0, 2.0, 3.0, 4.0},
+           ctx().arrayVarLen(ctx().fp64()));
+  checkCst(builder.cst({1.1, 2.2, 3.3, 4.4}, "array(fp64)"),
+           {1.1, 2.2, 3.3, 4.4},
+           ctx().arrayVarLen(ctx().fp64()));
+  checkCst(builder.cst({"1.1", "2.2", "3.3", "4.4"}, "array(fp64)"),
+           {1.1, 2.2, 3.3, 4.4},
+           ctx().arrayVarLen(ctx().fp64()));
+  checkCst(builder.cst({1, 2, 3}, "array(fp64)(3)"),
+           {1.0, 2.0, 3.0},
+           ctx().arrayFixed(3, ctx().fp64()));
+  checkCst(builder.cst({1.1, 2.2, 3.3}, "array(fp64)(3)"),
+           {1.1, 2.2, 3.3},
+           ctx().arrayFixed(3, ctx().fp64()));
+  checkCst(builder.cst({"1.1", "2.2", "3.3"}, "array(fp64)(3)"),
+           {1.1, 2.2, 3.3},
+           ctx().arrayFixed(3, ctx().fp64()));
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(bool)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(time)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(date)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(timestamp)"), InvalidQueryError);
+  EXPECT_THROW(builder.cst({1, 2, 3, 4}, "array(interval)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

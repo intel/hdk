@@ -8,6 +8,8 @@
 #include "ExprCollector.h"
 #include "ExprRewriter.h"
 
+#include "Shared/SqlTypesLayout.h"
+
 #include <boost/algorithm/string.hpp>
 
 namespace hdk::ir {
@@ -236,6 +238,29 @@ std::vector<BuilderExpr> replaceInput(const std::vector<BuilderExpr>& exprs,
     res.emplace_back(expr.rewrite(rewriter));
   }
   return res;
+}
+
+void checkCstArrayType(const Type* type, size_t elems) {
+  if (!type->isArray()) {
+    throw InvalidQueryError()
+        << "Only array types can be used to translate a vector to a literal. Provided: "
+        << type->toString();
+  }
+  auto elem_type = type->as<ArrayBaseType>()->elemType();
+  // Only few types are actually supported by codegen.
+  if (!elem_type->isInt8() && !elem_type->isInt32() && !elem_type->isFp64()) {
+    throw InvalidQueryError() << "Only int8, int32, and fp64 elements are supported in "
+                                 "array literals. Requested: "
+                              << elem_type->toString();
+  }
+  if (type->isFixedLenArray()) {
+    auto num_elems = type->as<FixedLenArrayType>()->numElems();
+    if (static_cast<size_t>(num_elems) != elems) {
+      throw InvalidQueryError()
+          << "Literal array elements count mismatch. Expected " << num_elems
+          << " elements, provided " << elems << " elements.";
+    }
+  }
 }
 
 }  // namespace
@@ -1489,16 +1514,75 @@ BuilderExpr QueryBuilder::count() const {
   return {*this, agg, "count", true};
 }
 
+BuilderExpr QueryBuilder::cst(int val) const {
+  return cst(static_cast<int64_t>(val));
+}
+
 BuilderExpr QueryBuilder::cst(int val, const Type* type) const {
+  return cst(static_cast<int64_t>(val), type);
+}
+
+BuilderExpr QueryBuilder::cst(int val, const std::string& type) const {
+  return cst(static_cast<int64_t>(val), type);
+}
+
+BuilderExpr QueryBuilder::cst(int64_t val) const {
+  return cst(val, ctx_.int64(false));
+}
+
+BuilderExpr QueryBuilder::cst(int64_t val, const Type* type) const {
+  if (!type->isNumber() && !type->isDateTime() && !type->isInterval() &&
+      !type->isBoolean()) {
+    throw InvalidQueryError()
+        << "Cannot create a literal from an integer value for type: " << type->toString();
+  }
+  if (type->isDate() && type->as<DateType>()->unit() == TimeUnit::kDay) {
+    throw InvalidQueryError("Literals of date type with DAY time unit are not allowed.");
+  }
   auto cst_expr = Constant::make(type, val);
   return {*this, cst_expr};
 }
 
-BuilderExpr QueryBuilder::cst(int val, const std::string& type) const {
+BuilderExpr QueryBuilder::cst(int64_t val, const std::string& type) const {
   return cst(val, ctx_.typeFromString(type));
 }
 
+BuilderExpr QueryBuilder::cst(double val) const {
+  return cst(val, ctx_.fp64());
+}
+
+BuilderExpr QueryBuilder::cst(double val, const Type* type) const {
+  Datum d;
+  if (type->isFp32()) {
+    d.floatval = static_cast<float>(val);
+  } else if (type->isFp64()) {
+    d.doubleval = val;
+  } else if (type->isDecimal()) {
+    d.bigintval =
+        static_cast<int64_t>(val * exp_to_scale(type->as<DecimalType>()->scale()));
+  } else {
+    throw InvalidQueryError() << "Cannot create a literal from a double value for type: "
+                              << type->toString();
+  }
+  auto cst_expr = std::make_shared<Constant>(type, false, d);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(double val, const std::string& type) const {
+  return cst(val, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(const std::string& val) const {
+  return cst(val, ctx_.text());
+}
+
 BuilderExpr QueryBuilder::cst(const std::string& val, const Type* type) const {
+  if (type->isDate() && type->as<DateType>()->unit() == TimeUnit::kDay) {
+    throw InvalidQueryError("Literals of date type with DAY time unit are not allowed.");
+  }
+  if (type->isArray()) {
+    throw InvalidQueryError("Cannot parse string to an array literal.");
+  }
   try {
     Datum d;
     d.stringval = new std::string(val);
@@ -1511,6 +1595,117 @@ BuilderExpr QueryBuilder::cst(const std::string& val, const Type* type) const {
 
 BuilderExpr QueryBuilder::cst(const std::string& val, const std::string& type) const {
   return cst(val, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::trueCst() const {
+  Datum d;
+  d.boolval = true;
+  auto cst_expr = std::make_shared<Constant>(ctx_.boolean(false), false, d);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::falseCst() const {
+  Datum d;
+  d.boolval = true;
+  auto cst_expr = std::make_shared<Constant>(ctx_.boolean(false), false, d);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::nullCst() const {
+  return nullCst(ctx_.null());
+}
+
+BuilderExpr QueryBuilder::nullCst(const Type* type) const {
+  auto cst_expr = std::make_shared<Constant>(type, true, Datum{});
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::nullCst(const std::string& type) const {
+  return nullCst(ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<int>& vals) const {
+  return cst(std::vector<int>(vals));
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<int> vals, const Type* type) const {
+  return cst(std::vector<int>(vals), type);
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<int> vals,
+                              const std::string& type) const {
+  return cst(std::vector<int>(vals), type);
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<double> vals) const {
+  return cst(std::vector<double>(vals));
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<double> vals,
+                              const Type* type) const {
+  return cst(std::vector<double>(vals), type);
+}
+
+BuilderExpr QueryBuilder::cst(std::initializer_list<double> vals,
+                              const std::string& type) const {
+  return cst(std::vector<double>(vals), type);
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<int>& vals) const {
+  return cst(vals, ctx_.arrayVarLen(ctx_.int32()));
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<int>& vals, const Type* type) const {
+  checkCstArrayType(type, vals.size());
+  auto elem_type = type->as<ArrayBaseType>()->elemType();
+  ExprPtrList exprs;
+  for (auto val : vals) {
+    exprs.emplace_back(cst(val, elem_type).expr());
+  }
+  auto cst_expr = std::make_shared<Constant>(type, false, exprs);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<int>& vals,
+                              const std::string& type) const {
+  return cst(vals, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<double>& vals) const {
+  return cst(vals, ctx_.arrayVarLen(ctx_.fp64()));
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<double>& vals, const Type* type) const {
+  checkCstArrayType(type, vals.size());
+  auto elem_type = type->as<ArrayBaseType>()->elemType();
+  ExprPtrList exprs;
+  for (auto val : vals) {
+    exprs.emplace_back(cst(val, elem_type).expr());
+  }
+  auto cst_expr = std::make_shared<Constant>(type, false, exprs);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<double>& vals,
+                              const std::string& type) const {
+  return cst(vals, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
+                              const Type* type) const {
+  checkCstArrayType(type, vals.size());
+  auto elem_type = type->as<ArrayBaseType>()->elemType();
+  ExprPtrList exprs;
+  for (auto val : vals) {
+    exprs.emplace_back(cst(val, elem_type).expr());
+  }
+  auto cst_expr = std::make_shared<Constant>(type, false, exprs);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
+                              const std::string& type) const {
+  return cst(vals, ctx_.typeFromString(type));
 }
 
 }  // namespace hdk::ir

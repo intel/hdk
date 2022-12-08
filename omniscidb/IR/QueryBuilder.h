@@ -353,10 +353,37 @@ class QueryBuilder {
 
   BuilderExpr count() const;
 
+  BuilderExpr cst(int val) const;
   BuilderExpr cst(int val, const Type* type) const;
-  BuilderExpr cst(int val, const std::string& type = "int") const;
+  BuilderExpr cst(int val, const std::string& type) const;
+  BuilderExpr cst(int64_t val) const;
+  BuilderExpr cst(int64_t val, const Type* type) const;
+  BuilderExpr cst(int64_t val, const std::string& type) const;
+  BuilderExpr cst(double val) const;
+  BuilderExpr cst(double val, const Type* type) const;
+  BuilderExpr cst(double val, const std::string& type) const;
+  BuilderExpr cst(const std::string& val) const;
   BuilderExpr cst(const std::string& val, const Type* type) const;
-  BuilderExpr cst(const std::string& val, const std::string& type = "text") const;
+  BuilderExpr cst(const std::string& val, const std::string& type) const;
+  BuilderExpr cst( std::initializer_list<int>& vals) const;
+  BuilderExpr cst( std::initializer_list<int> vals, const Type* type) const;
+  BuilderExpr cst( std::initializer_list<int> vals, const std::string& type) const;
+  BuilderExpr cst( std::initializer_list<double> vals) const;
+  BuilderExpr cst( std::initializer_list<double> vals, const Type* type) const;
+  BuilderExpr cst( std::initializer_list<double> vals, const std::string& type) const;
+  BuilderExpr cst(const std::vector<int>& vals) const;
+  BuilderExpr cst(const std::vector<int>& vals, const Type* type) const;
+  BuilderExpr cst(const std::vector<int>& vals, const std::string& type) const;
+  BuilderExpr cst(const std::vector<double>& vals) const;
+  BuilderExpr cst(const std::vector<double>& vals, const Type* type) const;
+  BuilderExpr cst(const std::vector<double>& vals, const std::string& type) const;
+  BuilderExpr cst(const std::vector<std::string>& vals, const Type* type) const;
+  BuilderExpr cst(const std::vector<std::string>& vals, const std::string& type) const;
+  BuilderExpr trueCst() const;
+  BuilderExpr falseCst() const;
+  BuilderExpr nullCst() const;
+  BuilderExpr nullCst(const Type* type) const;
+  BuilderExpr nullCst(const std::string& type) const;
 
  protected:
   friend class BuilderExpr;
