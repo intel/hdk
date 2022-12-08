@@ -57,7 +57,7 @@ class BuilderExpr {
   BuilderExpr cast(const Type* new_type) const;
   BuilderExpr cast(const std::string& new_type) const;
 
-  BuilderExpr ne(const BuilderExpr &rhs) const;
+  BuilderExpr ne(const BuilderExpr& rhs) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
@@ -354,7 +354,9 @@ class QueryBuilder {
   BuilderExpr count() const;
 
   BuilderExpr cst(int val, const Type* type) const;
-  BuilderExpr cst(int val, const std::string &type = "int") const;
+  BuilderExpr cst(int val, const std::string& type = "int") const;
+  BuilderExpr cst(const std::string& val, const Type* type) const;
+  BuilderExpr cst(const std::string& val, const std::string& type = "text") const;
 
  protected:
   friend class BuilderExpr;

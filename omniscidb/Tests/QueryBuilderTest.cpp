@@ -256,7 +256,7 @@ class QueryBuilderTest : public TestSuite {
                     {"col_timestamp", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
                 });
     insertCsvValues("test4",
-                    "10,10,2.2,4.4,12.34,true,str1,dict1,2022-02-23,15:00:11,"
+                    "10,10,2.2,4.4,12.34,true,str1,dict1,1970-01-02,15:00:11,"
                     "2022-02-23 15:00:11");
     insertCsvValues("test4",
                     "10,10,2.2,4.4,12.34,false,str1,dict1,2022-02-23,15:00:11,"
@@ -1694,10 +1694,10 @@ TEST_F(QueryBuilderTest, CastDictExpr) {
   EXPECT_THROW(scan.ref("col_dict").cast("fp64"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("dec(10,2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("bool"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_dict").cast("time[s]"), InvalidQueryError);
   checkCast(scan.ref("col_dict").cast("text"), ctx().text());
   EXPECT_THROW(scan.ref("col_dict").cast("dict(text)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").cast("time[s]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("time[ms]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("time[us]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("time[ns]"), InvalidQueryError);
@@ -1717,6 +1717,125 @@ TEST_F(QueryBuilderTest, CastDictExpr) {
   EXPECT_THROW(scan.ref("col_dict").cast("interval[ns]"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("array(int)(2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CastDateExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  EXPECT_THROW(scan.ref("col_date").cast("int8"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("int16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("int32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("int64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("fp32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("fp64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("time[ns]"), InvalidQueryError);
+  ASSERT_TRUE(scan.ref("col_date").cast("date32[d]").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_date").cast("date32[s]"), ctx().date32(TimeUnit::kSecond));
+  checkCast(scan.ref("col_date").cast("date64[ms]"), ctx().date64(TimeUnit::kMilli));
+  checkCast(scan.ref("col_date").cast("date64[us]"), ctx().date64(TimeUnit::kMicro));
+  checkCast(scan.ref("col_date").cast("date64[ns]"), ctx().date64(TimeUnit::kNano));
+  checkCast(scan.ref("col_date").cast("timestamp[s]"),
+            ctx().timestamp(TimeUnit::kSecond));
+  checkCast(scan.ref("col_date").cast("timestamp[ms]"),
+            ctx().timestamp(TimeUnit::kMilli));
+  checkCast(scan.ref("col_date").cast("timestamp[us]"),
+            ctx().timestamp(TimeUnit::kMicro));
+  checkCast(scan.ref("col_date").cast("timestamp[ns]"), ctx().timestamp(TimeUnit::kNano));
+  EXPECT_THROW(scan.ref("col_date").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CastTimeExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  EXPECT_THROW(scan.ref("col_time").cast("int8"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("int16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("int32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("int64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("fp32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("fp64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("dec(10,2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("varchar(10)"), InvalidQueryError);
+  ASSERT_TRUE(scan.ref("col_time").cast("time[s]").expr()->as<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_time").cast("time[ms]"), ctx().time64(TimeUnit::kMilli));
+  checkCast(scan.ref("col_time").cast("time[us]"), ctx().time64(TimeUnit::kMicro));
+  checkCast(scan.ref("col_time").cast("time[ns]"), ctx().time64(TimeUnit::kNano));
+  EXPECT_THROW(scan.ref("col_time").cast("date16"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("date32[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("date32[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("timestamp[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("timestamp[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("timestamp[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("timestamp[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").cast("array(int)"), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, CastTimestampExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkCast(scan.ref("col_timestamp").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_timestamp").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_timestamp").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_timestamp").cast("int64"), ctx().int64());
+  checkCast(scan.ref("col_timestamp").cast("fp32"), ctx().fp32());
+  checkCast(scan.ref("col_timestamp").cast("fp64"), ctx().fp64());
+  checkCast(scan.ref("col_timestamp").cast("dec(10,2)"), ctx().decimal(8, 10, 2));
+  EXPECT_THROW(scan.ref("col_timestamp").cast("bool"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("text"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("varchar(10)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("dict(text)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("time[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("time[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("time[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("time[ns]"), InvalidQueryError);
+  checkCast(scan.ref("col_timestamp").cast("date32[d]"), ctx().date32(TimeUnit::kDay));
+  checkCast(scan.ref("col_timestamp").cast("date32[s]"), ctx().date32(TimeUnit::kSecond));
+  checkCast(scan.ref("col_timestamp").cast("date64[ms]"), ctx().date64(TimeUnit::kMilli));
+  checkCast(scan.ref("col_timestamp").cast("date64[us]"), ctx().date64(TimeUnit::kMicro));
+  checkCast(scan.ref("col_timestamp").cast("date64[ns]"), ctx().date64(TimeUnit::kNano));
+  ASSERT_TRUE(
+      scan.ref("col_timestamp").cast("timestamp[s]").expr()->is<hdk::ir::ColumnRef>());
+  checkCast(scan.ref("col_timestamp").cast("timestamp[ms]"),
+            ctx().timestamp(TimeUnit::kMilli));
+  checkCast(scan.ref("col_timestamp").cast("timestamp[us]"),
+            ctx().timestamp(TimeUnit::kMicro));
+  checkCast(scan.ref("col_timestamp").cast("timestamp[ns]"),
+            ctx().timestamp(TimeUnit::kNano));
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[m]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[d]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[s]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[ms]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[us]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("interval[ns]"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)(2)"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("array(int)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, UserSql) {
