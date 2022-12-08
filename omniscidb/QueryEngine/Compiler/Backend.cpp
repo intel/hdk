@@ -43,23 +43,6 @@
 namespace compiler {
 
 static llvm::sys::Mutex g_ee_create_mutex;
-namespace {
-void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
-                         std::string src = "",
-                         const bool is_gpu = false) {
-  std::string excname = (is_gpu ? "NVVM IR ParseError: " : "LLVM IR ParseError: ");
-  llvm::raw_string_ostream ss(excname);
-  parse_error.print(src.c_str(), ss, false, false);
-  throw ParseIRError(ss.str());
-}
-
-std::string assemblyForCPU(ExecutionEngineWrapper& execution_engine,
-                           llvm::Module* llvm_module) {
-  LOG(FATAL) << "Assembly logger not yet supported for ORCJIT.";
-  return "";
-}
-
-}  // namespace
 
 std::shared_ptr<CompilationContext> CPUBackend::generateNativeCode(
     llvm::Function* func,
@@ -563,6 +546,7 @@ const std::unordered_set<std::string> main_module_ext_list = {
     "DateDiffHighPrecisionNullable",
     "DateTruncateHighPrecisionToDateNullable"};
 
+#ifdef HAVE_CUDA
 auto insert_emtpy_abort_replacement(llvm::Module* m) {
   auto ft = llvm::FunctionType::get(llvm::Type::getVoidTy(m->getContext()), false);
   auto abort_func =
@@ -571,6 +555,7 @@ auto insert_emtpy_abort_replacement(llvm::Module* m) {
   llvm::ReturnInst::Create(m->getContext(), bb);
   return abort_func;
 }
+#endif
 
 }  // namespace
 
