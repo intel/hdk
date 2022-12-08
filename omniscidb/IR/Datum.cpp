@@ -470,7 +470,7 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
     }
     case hdk::ir::Type::kTimestamp: {
       auto unit = type->as<hdk::ir::TimestampType>()->unit();
-      size_t const len = shared::formatDateTime(buf, buf_size, d.bigintval, unit);
+      shared::formatDateTime(buf, buf_size, d.bigintval, unit);
       return buf;
     }
     case hdk::ir::Type::kDate: {
