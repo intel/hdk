@@ -1014,7 +1014,7 @@ void collect_used_input_desc(
     const hdk::ir::Node* ra_node,
     const ColumnRefSet& source_used_inputs,
     const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level) {
-  for (const auto col_ref : source_used_inputs) {
+  for (const auto& col_ref : source_used_inputs) {
     const auto source = col_ref.node();
     const int table_id = table_id_from_ra(source);
     const auto col_id = col_ref.index();
