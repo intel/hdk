@@ -50,19 +50,7 @@
     <dependency>
       <groupId>org.apache.calcite.avatica</groupId>
       <artifactId>avatica-core</artifactId>
-      <version>1.17.0</version>
-    </dependency>
-    <!-- Added to override avatica-core pin to vulnerable jackson-databind 2.10 -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>2.14.0-rc1</version>      
-    </dependency>
-    <!-- Added to override avatica-core pin to vulnerable jackson-databind 2.10 -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-core</artifactId>
-      <version>2.14.0-rc1</version>
+      <version>1.22.0</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -72,7 +60,7 @@
     <dependency>
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-core</artifactId>
-      <version>1.25.0</version>
+      <version>1.32.0</version>
       <exclusions>
         <exclusion>
           <groupId>org.pentaho</groupId>

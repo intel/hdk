@@ -1024,8 +1024,8 @@ public final class MapDParser {
       } else {
         assert proj instanceof SqlBasicCall;
         SqlBasicCall proj_call = (SqlBasicCall) proj;
-        if (proj_call.operands.length > 0) {
-          for (int i = 0; i < proj_call.operands.length; i++) {
+        if (proj_call.getOperandList().size() > 0) {
+          for (int i = 0; i < proj_call.getOperandList().size(); i++) {
             if (proj_call.operand(i) instanceof SqlCase) {
               SqlNode new_op = expandCase(proj_call.operand(i), typeFactory);
               proj_call.setOperand(i, new_op);
@@ -1069,7 +1069,7 @@ public final class MapDParser {
       return;
     }
     SqlBasicCall basic_call = (SqlBasicCall) node;
-    for (SqlNode operator : basic_call.getOperands()) {
+    for (SqlNode operator : basic_call.getOperandList()) {
       if (operator instanceof SqlOrderBy) {
         desugarExpression(((SqlOrderBy) operator).query, typeFactory);
       } else {
@@ -1084,9 +1084,9 @@ public final class MapDParser {
     MAPDLOGGER.debug("expand: " + node.toString());
     if (node instanceof SqlBasicCall) {
       SqlBasicCall node_call = (SqlBasicCall) node;
-      SqlNode[] operands = node_call.getOperands();
-      for (int i = 0; i < operands.length; ++i) {
-        node_call.setOperand(i, expand(operands[i], id_to_expr, typeFactory));
+      List<SqlNode> operands = node_call.getOperandList();
+      for (int i = 0; i < operands.size(); ++i) {
+        node_call.setOperand(i, expand(operands.get(i), id_to_expr, typeFactory));
       }
       SqlNode expanded_variance = expandVariance(node_call, typeFactory);
       if (expanded_variance != null) {
@@ -1474,7 +1474,7 @@ public final class MapDParser {
         SqlBasicCall basicCall = (SqlBasicCall) call;
         if (basicCall.getKind() == SqlKind.OR) {
           String targetString = targetExpression.toString();
-          for (SqlNode listedOperand : basicCall.operands) {
+          for (SqlNode listedOperand : basicCall.getOperandList()) {
             if (listedOperand.toString().contains(targetString)) {
               throw Util.FoundOne.NULL;
             }
@@ -1502,7 +1502,7 @@ public final class MapDParser {
 
     public boolean isEqualityJoinOperator(SqlBasicCall basicCall) {
       if (null != basicCall) {
-        if (basicCall.operands.length == 2 && basicCall.getKind() == SqlKind.EQUALS
+        if (basicCall.getOperandList().size() == 2 && basicCall.getKind() == SqlKind.EQUALS
                 && basicCall.operand(0) instanceof SqlIdentifier
                 && basicCall.operand(1) instanceof SqlIdentifier) {
           return true;
