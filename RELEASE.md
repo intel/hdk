@@ -4,9 +4,9 @@ HDK uses a semantic versioning scheme for software version numbers. The version 
 
 ### Release Checklist
 
-1. Create a new release branch with the name `vMAJOR.MINOR.PATCH`.
+1. Create a new release branch with the name `release/vMAJOR.MINOR.PATCH`.
     * For major and minor version releases, create a branch from `main`.
-    * For patch version releases, create a branch from the existing release branch on which the patch is going to be based (e.g. `v0.1.1` would be branched from `v0.1.0`).
+    * For patch version releases, create a branch from the existing release branch on which the patch is going to be based (e.g. `release/v0.1.1` would be branched from `release/v0.1.0`).
 2. Bump the version number in `CMakeLists.txt` in the release branch.
 3. Ensure CI on the release branch is green.
 4. Create a tag for the release. 
