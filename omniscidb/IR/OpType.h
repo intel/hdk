@@ -31,8 +31,6 @@ enum class OpType {
   kMod,
   kUMinus,
   kIsNull,
-  kIsNotNull,
-  kExists,
   kCast,
   kArrayAt,
   kUnnest,
@@ -62,7 +60,7 @@ inline OpType commuteComparison(OpType op) {
 }
 inline bool isUnary(OpType op) {
   return op == OpType::kNot || op == OpType::kUMinus || op == OpType::kIsNull ||
-         op == OpType::kExists || op == OpType::kCast;
+         op == OpType::kCast;
 }
 inline bool isEquivalence(OpType op) {
   return op == OpType::kEq || op == OpType::kBwEq;
@@ -139,10 +137,6 @@ inline std::string toString(hdk::ir::OpType op) {
       return "UMINUS";
     case hdk::ir::OpType::kIsNull:
       return "ISNULL";
-    case hdk::ir::OpType::kIsNotNull:
-      return "ISNOTNULL";
-    case hdk::ir::OpType::kExists:
-      return "EXISTS";
     case hdk::ir::OpType::kCast:
       return "CAST";
     case hdk::ir::OpType::kArrayAt:

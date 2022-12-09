@@ -296,7 +296,7 @@ class Constant : public Expr {
 /*
  * @type UOper
  * @brief represents unary operator expressions.  operator types include
- * kUMINUS, kISNULL, kEXISTS, kCAST
+ * kUMINUS, kISNULL, kCAST
  */
 class UOper : public Expr {
  public:
@@ -317,8 +317,6 @@ class UOper : public Expr {
   bool isNot() const { return op_type_ == OpType::kNot; }
   bool isUMinus() const { return op_type_ == OpType::kUMinus; }
   bool isIsNull() const { return op_type_ == OpType::kIsNull; }
-  bool isIsNotNull() const { return op_type_ == OpType::kIsNotNull; }
-  bool isExists() const { return op_type_ == OpType::kExists; }
   bool isCast() const { return op_type_ == OpType::kCast; }
   bool isUnnest() const { return op_type_ == OpType::kUnnest; }
 
@@ -333,7 +331,7 @@ class UOper : public Expr {
   size_t hash() const override;
 
  protected:
-  OpType op_type_;   // operator type, e.g., kUMINUS, kISNULL, kEXISTS
+  OpType op_type_;   // operator type, e.g., kUMINUS, kISNULL
   ExprPtr operand_;  // operand expression
   bool is_dict_intersection_;
 };
