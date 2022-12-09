@@ -521,6 +521,7 @@ if(ENABLE_L0)
   find_package(PkgConfig REQUIRED)
   pkg_search_module(LLVMSPIRVLib REQUIRED IMPORTED_TARGET LLVMSPIRVLib)
   message(STATUS "Found LLVMSPIRVLib of version ${LLVMSPIRVLib_VERSION}")
+  list(PREPEND llvm_libs PkgConfig::LLVMSPIRVLib)
 endif()
 
 # Boost
