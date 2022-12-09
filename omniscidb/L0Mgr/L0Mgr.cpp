@@ -341,4 +341,15 @@ void L0Manager::synchronizeDevices() const {
                                            std::numeric_limits<uint32_t>::max()));
   }
 }
+
+size_t L0Manager::getMaxAllocationSize(const int device_num) const {
+  CHECK_EQ(device_num, 0);
+  ze_device_properties_t device_properties;
+  L0_SAFE_CALL(zeDeviceGetProperties(drivers_[0]->devices()[device_num]->device(),
+                                     &device_properties));
+  CHECK_EQ(ZE_DEVICE_TYPE_GPU, device_properties.type);
+  LOG(INFO) << "Intel GPU max memory allocation size: "
+            << device_properties.maxMemAllocSize / (1024 * 1024) << "MB\n";
+  return device_properties.maxMemAllocSize;
+}
 }  // namespace l0
