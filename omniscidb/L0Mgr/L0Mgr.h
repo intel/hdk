@@ -224,6 +224,9 @@ class L0Manager : public GpuMgr {
       // to every manager's method
   };
 
+  size_t getMaxAllocationSize(const int device_num) const;
+  size_t getPageSize(const int device_num) const { return 4096u; }
+
   virtual unsigned getMaxBlockSize() const override { return 1u; }
   virtual int8_t getSubGroupSize() const override { return 1; }
   virtual unsigned getGridSize() const override { return 1u; }
