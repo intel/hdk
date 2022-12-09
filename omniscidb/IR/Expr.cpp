@@ -1336,9 +1336,6 @@ std::string UOper::toString() const {
     case OpType::kIsNull:
       op = "IS NULL ";
       break;
-    case OpType::kExists:
-      op = "EXISTS ";
-      break;
     case OpType::kCast:
       op = "CAST " + type_->toString() + " ";
       break;

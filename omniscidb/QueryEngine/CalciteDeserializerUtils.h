@@ -77,9 +77,6 @@ inline hdk::ir::OpType to_sql_op(const std::string& op_str) {
   if (op_str == std::string("IS NULL")) {
     return hdk::ir::OpType::kIsNull;
   }
-  if (op_str == std::string("IS NOT NULL")) {
-    return hdk::ir::OpType::kIsNotNull;
-  }
   if (op_str == std::string("PG_UNNEST")) {
     return hdk::ir::OpType::kUnnest;
   }

@@ -503,12 +503,6 @@ hdk::ir::ExprPtr makeUOper(hdk::ir::OpType op,
           ctx.boolean(arg->type()->nullable()), op, arg);
     case hdk::ir::OpType::kIsNull:
       return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), op, arg);
-    case hdk::ir::OpType::kIsNotNull: {
-      auto is_null = std::make_shared<hdk::ir::UOper>(
-          ctx.boolean(false), hdk::ir::OpType::kIsNull, arg);
-      return std::make_shared<hdk::ir::UOper>(
-          ctx.boolean(false), hdk::ir::OpType::kNot, is_null);
-    }
     case hdk::ir::OpType::kMinus: {
       return std::make_shared<hdk::ir::UOper>(
           arg->type(), false, hdk::ir::OpType::kUMinus, arg);
@@ -1147,6 +1141,12 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
                                        RelAlgDagBuilder& root_dag_builder) {
   if (fn_name == "PG_ANY"sv || fn_name == "PG_ALL"sv) {
     return hdk::ir::makeExpr<hdk::ir::FunctionOper>(type, fn_name, operands);
+  }
+  if (fn_name == "IS NOT NULL") {
+    CHECK_EQ(operands.size(), (size_t)1);
+    return makeUOper(hdk::ir::OpType::kNot,
+                     makeUOper(hdk::ir::OpType::kIsNull, operands[0], type),
+                     type);
   }
   if (fn_name == "LIKE"sv || fn_name == "PG_ILIKE"sv) {
     return parseLike(fn_name, operands);
