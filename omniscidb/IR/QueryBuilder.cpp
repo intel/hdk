@@ -651,8 +651,36 @@ BuilderExpr BuilderExpr::logicalNot() const {
   return {builder_, uoper, "", true};
 }
 
+BuilderExpr BuilderExpr::uminus() const {
+  if (!expr_->type()->isNumber()) {
+    throw InvalidQueryError("Only numeric expressions are allowed for UMINUS operation.");
+  }
+  if (expr_->is<Constant>()) {
+    auto cst_expr = expr_->as<Constant>();
+    if (cst_expr->type()->isInteger()) {
+      return builder_.cst(-cst_expr->intVal(), cst_expr->type());
+    } else if (cst_expr->type()->isFloatingPoint()) {
+      return builder_.cst(-cst_expr->fpVal(), cst_expr->type());
+    } else {
+      CHECK(cst_expr->type()->isDecimal());
+      return builder_.cstNoScale(-cst_expr->intVal(), cst_expr->type());
+    }
+  }
+  auto uoper =
+      makeExpr<UOper>(expr_->type(), expr_->containsAgg(), OpType::kUMinus, expr_);
+  return {builder_, uoper, "", true};
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
+}
+
+BuilderExpr BuilderExpr::operator!() const {
+  return logicalNot();
+}
+
+BuilderExpr BuilderExpr::operator-() const {
+  return uminus();
 }
 
 BuilderSortField::BuilderSortField(int col_idx,
@@ -1609,6 +1637,22 @@ BuilderExpr QueryBuilder::cst(const std::string& val, const Type* type) const {
 
 BuilderExpr QueryBuilder::cst(const std::string& val, const std::string& type) const {
   return cst(val, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cstNoScale(int64_t val, const Type* type) const {
+  if (!type->isDecimal()) {
+    throw InvalidQueryError()
+        << "Only decimal types are allowed for QueryBuilder::cstNoScale. Provided: "
+        << type->toString();
+  }
+  Datum d;
+  d.bigintval = val;
+  auto cst_expr = std::make_shared<Constant>(type, false, d);
+  return {*this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cstNoScale(int64_t val, const std::string& type) const {
+  return cstNoScale(val, ctx_.typeFromString(type));
 }
 
 BuilderExpr QueryBuilder::trueCst() const {

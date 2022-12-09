@@ -1888,6 +1888,7 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst(1234, "dec(10,2)"), 123400, ctx().decimal(8, 10, 2, false));
   checkCst(builder.cst(12.34, "dec(10,2)"), 1234, ctx().decimal(8, 10, 2, false));
   checkCst(builder.cst("1234.56", "dec(10,2)"), 123456, ctx().decimal(8, 10, 2, false));
+  checkCst(builder.cstNoScale(1234, "dec(10,2)"), 1234, ctx().decimal(8, 10, 2, false));
   checkCst(builder.trueCst(), true, ctx().boolean(false));
   checkCst(builder.cst(1, "bool"), true, ctx().boolean(false));
   checkCst(builder.cst("true", "bool"), true, ctx().boolean(false));
@@ -1982,6 +1983,8 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   EXPECT_THROW(builder.cst("1234", "interval[d]"), InvalidQueryError);
   EXPECT_THROW(builder.cst("[1, 2]", "array(int)(2)").expr()->print(), InvalidQueryError);
   EXPECT_THROW(builder.cst("[1, 2]", "array(int)").expr()->print(), InvalidQueryError);
+  EXPECT_THROW(builder.cstNoScale(10, "int64"), InvalidQueryError);
+  EXPECT_THROW(builder.cstNoScale(10, "fp32"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, CstExprArray) {
@@ -2047,14 +2050,17 @@ TEST_F(QueryBuilderTest, NotExpr) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test3");
   EXPECT_THROW(scan.ref("col_bi").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(!scan.ref("col_bi"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_i").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_si").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_ti").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_f").logicalNot(), InvalidQueryError);
+  EXPECT_THROW(!scan.ref("col_f"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dec").logicalNot(), InvalidQueryError);
   checkUOper(
       scan.ref("col_b").logicalNot(), ctx().boolean(), OpType::kNot, scan.ref("col_b"));
+  checkUOper(!scan.ref("col_b"), ctx().boolean(), OpType::kNot, scan.ref("col_b"));
   EXPECT_THROW(scan.ref("col_str").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_dict").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_date").logicalNot(), InvalidQueryError);
@@ -2063,7 +2069,47 @@ TEST_F(QueryBuilderTest, NotExpr) {
   EXPECT_THROW(scan.ref("col_arr_i32").logicalNot(), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_arr_i32_3").logicalNot(), InvalidQueryError);
   checkCst(builder.cst(1, "bool").logicalNot(), false, ctx().boolean(false));
+  checkCst(!builder.cst(1, "bool"), false, ctx().boolean(false));
   checkCst(builder.cst(0, "bool").logicalNot(), true, ctx().boolean(false));
+  checkCst(!builder.cst(0, "bool"), true, ctx().boolean(false));
+}
+
+TEST_F(QueryBuilderTest, UMinusExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkUOper(
+      scan.ref("col_bi").uminus(), ctx().int64(), OpType::kUMinus, scan.ref("col_bi"));
+  checkUOper(-scan.ref("col_i"), ctx().int32(), OpType::kUMinus, scan.ref("col_i"));
+  checkUOper(
+      scan.ref("col_si").uminus(), ctx().int16(), OpType::kUMinus, scan.ref("col_si"));
+  checkUOper(-scan.ref("col_ti"), ctx().int8(), OpType::kUMinus, scan.ref("col_ti"));
+  checkUOper(
+      scan.ref("col_f").uminus(), ctx().fp32(), OpType::kUMinus, scan.ref("col_f"));
+  checkUOper(-scan.ref("col_d"), ctx().fp64(), OpType::kUMinus, scan.ref("col_d"));
+  checkUOper(scan.ref("col_dec").uminus(),
+             ctx().decimal(8, 10, 2),
+             OpType::kUMinus,
+             scan.ref("col_dec"));
+  EXPECT_THROW(scan.ref("col_b").uminus(), InvalidQueryError);
+  EXPECT_THROW(-scan.ref("col_b"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").uminus(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").uminus(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").uminus(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").uminus(), InvalidQueryError);
+  EXPECT_THROW(-scan.ref("col_time"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").uminus(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").uminus(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32_3").uminus(), InvalidQueryError);
+  checkCst(builder.cst(1, "int8").uminus(), -1, ctx().int8(false));
+  checkCst(-builder.cst(2, "int16"), -2, ctx().int16(false));
+  checkCst(builder.cst(3, "int32").uminus(), -3, ctx().int32(false));
+  checkCst(-builder.cst(4, "int64"), -4, ctx().int64(false));
+  checkCst(builder.cst(12.34, "fp32").uminus(), -12.34, ctx().fp32(false));
+  checkCst(-builder.cst(12.3456, "fp64"), -12.3456, ctx().fp64(false));
+  checkCst(
+      builder.cst(12.34, "dec(10,2)").uminus(), -1234, ctx().decimal(8, 10, 2, false));
+  checkCst(
+      -builder.cst(12.34, "dec(10,2)").uminus(), 1234, ctx().decimal(8, 10, 2, false));
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

@@ -58,10 +58,14 @@ class BuilderExpr {
   BuilderExpr cast(const std::string& new_type) const;
 
   BuilderExpr logicalNot() const;
+  BuilderExpr uminus() const;
 
   BuilderExpr ne(const BuilderExpr& rhs) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
+
+  BuilderExpr operator!() const;
+  BuilderExpr operator-() const;
 
  protected:
   friend class QueryBuilder;
@@ -381,6 +385,8 @@ class QueryBuilder {
   BuilderExpr cst(const std::vector<double>& vals, const std::string& type) const;
   BuilderExpr cst(const std::vector<std::string>& vals, const Type* type) const;
   BuilderExpr cst(const std::vector<std::string>& vals, const std::string& type) const;
+  BuilderExpr cstNoScale(int64_t val, const Type* type) const;
+  BuilderExpr cstNoScale(int64_t val, const std::string& type) const;
   BuilderExpr trueCst() const;
   BuilderExpr falseCst() const;
   BuilderExpr nullCst() const;
