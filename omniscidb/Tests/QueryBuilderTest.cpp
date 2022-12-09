@@ -2143,6 +2143,32 @@ TEST_F(QueryBuilderTest, IsNullExpr) {
            ctx().boolean(false));
 }
 
+TEST_F(QueryBuilderTest, UnnestExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  EXPECT_THROW(scan.ref("col_bi").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ti").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").unnest(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").unnest(), InvalidQueryError);
+  checkUOper(scan.ref("col_arr_i32").unnest(),
+             ctx().int32(),
+             OpType::kUnnest,
+             scan.ref("col_arr_i32"));
+  checkUOper(scan.ref("col_arr_i32_3").unnest(),
+             ctx().int32(),
+             OpType::kUnnest,
+             scan.ref("col_arr_i32_3"));
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));

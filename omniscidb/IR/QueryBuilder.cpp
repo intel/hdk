@@ -685,6 +685,15 @@ BuilderExpr BuilderExpr::isNull() const {
   return {builder_, uoper, "", true};
 }
 
+BuilderExpr BuilderExpr::unnest() const {
+  if (!expr_->type()->isArray()) {
+    throw InvalidQueryError("Only array expressions are allowed for UNNEST operation.");
+  }
+  auto elem_type = expr_->type()->as<ArrayBaseType>()->elemType();
+  auto uoper = makeExpr<UOper>(elem_type, expr_->containsAgg(), OpType::kUnnest, expr_);
+  return {builder_, uoper, "", true};
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
