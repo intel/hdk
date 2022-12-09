@@ -113,6 +113,10 @@ void L0Manager::synchronizeDevices() const {
   CHECK(false);
 }
 
+size_t L0Manager::getMaxAllocationSize(const int device_num) const {
+  CHECK(false);
+}
+
 const std::vector<std::shared_ptr<L0Driver>>& L0Manager::drivers() const {
   return drivers_;
 }
