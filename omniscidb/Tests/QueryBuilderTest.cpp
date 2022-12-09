@@ -1894,7 +1894,7 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst("true", "bool"), true, ctx().boolean(false));
   checkCst(builder.cst("1", "bool"), true, ctx().boolean(false));
   checkCst(builder.cst("T", "bool"), true, ctx().boolean(false));
-  checkCst(builder.falseCst(), true, ctx().boolean(false));
+  checkCst(builder.falseCst(), false, ctx().boolean(false));
   checkCst(builder.cst(0, "bool"), false, ctx().boolean(false));
   checkCst(builder.cst("false", "bool"), false, ctx().boolean(false));
   checkCst(builder.cst("0", "bool"), false, ctx().boolean(false));
@@ -2110,6 +2110,37 @@ TEST_F(QueryBuilderTest, UMinusExpr) {
       builder.cst(12.34, "dec(10,2)").uminus(), -1234, ctx().decimal(8, 10, 2, false));
   checkCst(
       -builder.cst(12.34, "dec(10,2)").uminus(), 1234, ctx().decimal(8, 10, 2, false));
+}
+
+TEST_F(QueryBuilderTest, IsNullExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  for (auto& col_name : {"col_bi"s,
+                         "col_i"s,
+                         "col_si"s,
+                         "col_ti"s,
+                         "col_f"s,
+                         "col_d"s,
+                         "col_dec"s,
+                         "col_b"s,
+                         "col_str"s,
+                         "col_dict"s,
+                         "col_time"s,
+                         "col_date"s,
+                         "col_timestamp"s,
+                         "col_arr_i32"s,
+                         "col_arr_i32_3"s}) {
+    checkUOper(scan.ref(col_name).isNull(),
+               ctx().boolean(false),
+               OpType::kIsNull,
+               scan.ref(col_name));
+  }
+  checkCst(scan.ref("col_b_nn").isNull(), false, ctx().boolean(false));
+  checkCst(builder.nullCst().isNull(), true, ctx().boolean(false));
+  checkCst(builder.nullCst(ctx().int32()).isNull(), true, ctx().boolean(false));
+  checkCst(builder.nullCst(ctx().arrayVarLen(ctx().int32())).isNull(),
+           true,
+           ctx().boolean(false));
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

@@ -59,6 +59,7 @@ class BuilderExpr {
 
   BuilderExpr logicalNot() const;
   BuilderExpr uminus() const;
+  BuilderExpr isNull() const;
 
   BuilderExpr ne(const BuilderExpr& rhs) const;
 

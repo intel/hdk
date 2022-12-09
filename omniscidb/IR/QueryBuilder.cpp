@@ -671,6 +671,20 @@ BuilderExpr BuilderExpr::uminus() const {
   return {builder_, uoper, "", true};
 }
 
+BuilderExpr BuilderExpr::isNull() const {
+  if (expr_->type()->isNull()) {
+    return builder_.trueCst();
+  } else if (!expr_->type()->nullable()) {
+    return builder_.falseCst();
+  } else if (expr_->is<Constant>()) {
+    return builder_.cst((int)expr_->as<Constant>()->isNull(),
+                        builder_.ctx_.boolean(false));
+  }
+  auto uoper = makeExpr<UOper>(
+      builder_.ctx_.boolean(false), expr_->containsAgg(), OpType::kIsNull, expr_);
+  return {builder_, uoper, "", true};
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
@@ -1664,7 +1678,7 @@ BuilderExpr QueryBuilder::trueCst() const {
 
 BuilderExpr QueryBuilder::falseCst() const {
   Datum d;
-  d.boolval = true;
+  d.boolval = false;
   auto cst_expr = std::make_shared<Constant>(ctx_.boolean(false), false, d);
   return {*this, cst_expr};
 }
