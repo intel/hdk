@@ -11,7 +11,7 @@
 #include "ConfigBuilder/ConfigBuilder.h"
 #include "IR/Expr.h"
 #include "IR/Node.h"
-#include "IR/QueryBuilder.h"
+#include "QueryBuilder/QueryBuilder.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 #include "QueryEngine/QueryExecutionSequence.h"
 #include "QueryEngine/RelAlgExecutor.h"
@@ -2299,6 +2299,127 @@ TEST_F(QueryBuilderTest, PlusExpr) {
   EXPECT_THROW(scan.ref("col_dec").add(scan.ref("col_timestamp")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_i").add(scan.ref("col_arr_i32")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").add(scan.ref("col_arr_i32_3")), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, MinusExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi").sub(scan.ref("col_bi")),
+               ctx().int64(),
+               OpType::kMinus,
+               scan.ref("col_bi"),
+               scan.ref("col_bi"));
+  checkBinOper(scan.ref("col_bi").sub(1),
+               ctx().int64(),
+               OpType::kMinus,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_si").sub(1),
+               ctx().int32(),
+               OpType::kMinus,
+               scan.ref("col_si"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_si").sub(scan.ref("col_f")),
+               ctx().fp32(),
+               OpType::kMinus,
+               scan.ref("col_si"),
+               scan.ref("col_f"));
+  checkBinOper(scan.ref("col_i").sub(2.0),
+               ctx().fp64(),
+               OpType::kMinus,
+               scan.ref("col_i"),
+               builder.cst(2.0));
+  checkBinOper(scan.ref("col_i").sub(scan.ref("col_dec")),
+               ctx().decimal64(13, 2),
+               OpType::kMinus,
+               scan.ref("col_i"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_f").sub(scan.ref("col_i")),
+               ctx().fp32(),
+               OpType::kMinus,
+               scan.ref("col_f"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_f").sub(scan.ref("col_d")),
+               ctx().fp64(),
+               OpType::kMinus,
+               scan.ref("col_f"),
+               scan.ref("col_d"));
+  checkBinOper(scan.ref("col_f").sub(scan.ref("col_dec")),
+               ctx().fp32(),
+               OpType::kMinus,
+               scan.ref("col_f"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_dec").sub(scan.ref("col_dec")),
+               ctx().decimal64(11, 2),
+               OpType::kMinus,
+               scan.ref("col_dec"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_dec").sub(scan.ref("col_ti")),
+               ctx().decimal64(11, 2),
+               OpType::kMinus,
+               scan.ref("col_dec"),
+               scan.ref("col_ti"));
+  checkBinOper(scan.ref("col_dec").sub(scan.ref("col_f")),
+               ctx().fp32(),
+               OpType::kMinus,
+               scan.ref("col_dec"),
+               scan.ref("col_f"));
+  checkBinOper(builder.cst(12, "interval[d]").sub(builder.cst(15, "interval[s]")),
+               ctx().interval64(TimeUnit::kSecond, false),
+               OpType::kMinus,
+               builder.cst(12, "interval[d]"),
+               builder.cst(15, "interval[s]"));
+  checkBinOper(builder.cst(12, "interval[d]").sub(builder.cst(15, "interval[d]")),
+               ctx().interval64(TimeUnit::kDay, false),
+               OpType::kMinus,
+               builder.cst(12, "interval[d]"),
+               builder.cst(15, "interval[d]"));
+  checkBinOper(builder.cst(12, "interval[ms]").sub(builder.cst(15, "interval[ns]")),
+               ctx().interval64(TimeUnit::kNano, false),
+               OpType::kMinus,
+               builder.cst(12, "interval[ms]"),
+               builder.cst(15, "interval[ns]"));
+  checkDateAdd(scan.ref("col_date").sub(builder.cst(123, "interval32[d]")),
+               ctx().date32(TimeUnit::kDay),
+               DateAddField::kDay,
+               builder.cst(-123, "interval32[d]"),
+               scan.ref("col_date"));
+  checkDateAdd(scan.ref("col_date").sub(builder.cst(123, "interval64[s]")),
+               ctx().date64(TimeUnit::kSecond),
+               DateAddField::kSecond,
+               builder.cst(-123, "interval64[s]"),
+               scan.ref("col_date"));
+  checkDateAdd(scan.ref("col_timestamp").sub(builder.cst(123, "interval[ms]")),
+               ctx().timestamp(TimeUnit::kMilli),
+               DateAddField::kMilli,
+               builder.cst(-123, "interval[ms]"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").sub(builder.cst(123, "interval[us]")),
+               ctx().timestamp(TimeUnit::kMicro),
+               DateAddField::kMicro,
+               builder.cst(-123, "interval[us]"),
+               scan.ref("col_timestamp"));
+  EXPECT_THROW(builder.cst(123, "interval64[s]").sub(scan.ref("col_date")),
+               InvalidQueryError);
+  EXPECT_THROW(builder.cst(123, "interval[us]").sub(scan.ref("col_time")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").sub(builder.cst(123, "interval[ms]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").sub(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").sub(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").sub(scan.ref("col_i")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").sub(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").sub(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").sub(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").sub(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").sub(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").sub(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").sub(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").sub(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").sub(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").sub(scan.ref("col_timestamp")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").sub(scan.ref("col_arr_i32")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").sub(scan.ref("col_arr_i32_3")), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

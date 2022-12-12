@@ -135,7 +135,7 @@ target_link_libraries(ArrowStorageSqlTest gtest QueryEngine ArrowQueryRunner Arr
 target_link_libraries(ParallelSortTest gtest TBB::tbb Logger)
 target_link_libraries(ResultSetArrowConversion gtest QueryEngine ArrowQueryRunner ArrowStorage)
 target_link_libraries(ExecutionSequenceTest gtest QueryEngine ArrowQueryRunner ArrowStorage ConfigBuilder)
-target_link_libraries(QueryBuilderTest gtest QueryEngine ArrowQueryRunner IR ArrowStorage ConfigBuilder)
+target_link_libraries(QueryBuilderTest gtest QueryBuilder QueryEngine ArrowQueryRunner IR ArrowStorage ConfigBuilder)
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   target_link_libraries(UdfTest gtest UdfCompiler gtest QueryEngine ArrowQueryRunner)

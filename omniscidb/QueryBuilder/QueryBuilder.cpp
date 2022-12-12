@@ -5,10 +5,10 @@
  */
 
 #include "QueryBuilder.h"
-#include "ExprCollector.h"
-#include "ExprRewriter.h"
 
 #include "Analyzer/Analyzer.h"
+#include "IR/ExprCollector.h"
+#include "IR/ExprRewriter.h"
 #include "Shared/SqlTypesLayout.h"
 
 #include <boost/algorithm/string.hpp>
@@ -657,7 +657,7 @@ BuilderExpr BuilderExpr::logicalNot() const {
 }
 
 BuilderExpr BuilderExpr::uminus() const {
-  if (!expr_->type()->isNumber()) {
+  if (!expr_->type()->isNumber() && !expr_->type()->isInterval()) {
     throw InvalidQueryError("Only numeric expressions are allowed for UMINUS operation.");
   }
   if (expr_->is<Constant>()) {
@@ -666,9 +666,11 @@ BuilderExpr BuilderExpr::uminus() const {
       return builder_.cst(-cst_expr->intVal(), cst_expr->type());
     } else if (cst_expr->type()->isFloatingPoint()) {
       return builder_.cst(-cst_expr->fpVal(), cst_expr->type());
-    } else {
-      CHECK(cst_expr->type()->isDecimal());
+    } else if (cst_expr->type()->isDecimal()) {
       return builder_.cstNoScale(-cst_expr->intVal(), cst_expr->type());
+    } else {
+      CHECK(cst_expr->type()->isInterval());
+      return builder_.cst(-cst_expr->intVal(), cst_expr->type());
     }
   }
   auto uoper =
@@ -761,6 +763,38 @@ BuilderExpr BuilderExpr::add(float val) const {
 
 BuilderExpr BuilderExpr::add(double val) const {
   return add(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs) const {
+  if ((expr_->type()->isDate() || expr_->type()->isTimestamp()) &&
+      rhs.expr()->type()->isInterval()) {
+    return add(rhs.uminus());
+  }
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kMinus, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply MINUS operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::sub(int val) const {
+  return sub(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::sub(int64_t val) const {
+  return sub(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::sub(float val) const {
+  return sub(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::sub(double val) const {
+  return sub(builder_.cst(val, builder_.ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {

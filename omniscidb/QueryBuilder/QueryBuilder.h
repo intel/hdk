@@ -6,9 +6,8 @@
 
 #pragma once
 
-#include "Exception.h"
-#include "Node.h"
-
+#include "IR/Exception.h"
+#include "IR/Node.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/Config.h"
 
@@ -69,6 +68,12 @@ class BuilderExpr {
   BuilderExpr add(int64_t val) const;
   BuilderExpr add(float val) const;
   BuilderExpr add(double val) const;
+
+  BuilderExpr sub(const BuilderExpr& rhs) const;
+  BuilderExpr sub(int val) const;
+  BuilderExpr sub(int64_t val) const;
+  BuilderExpr sub(float val) const;
+  BuilderExpr sub(double val) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
