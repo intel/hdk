@@ -48,11 +48,8 @@ void run_test_kernel(DeviceFuncPtr func, std::vector<void*>& params, GpuMgr* mgr
   auto device = mgr_->drivers()[0]->devices()[0];
   auto q = device->command_queue();
   auto q_list = device->create_command_list();
-  func->group_size() = {1, 1, 1};
-  ze_group_count_t dispatchTraits;
-  dispatchTraits.groupCountX = 1u;
-  dispatchTraits.groupCountY = 1u;
-  dispatchTraits.groupCountZ = 1u;
+  ze_group_count_t dispatchTraits = {1, 1, 1};
+
   for (unsigned i = 0; i < params.size(); ++i) {
     L0_SAFE_CALL(zeKernelSetArgumentValue(func->handle(), i, sizeof(void*), params[i]));
   }

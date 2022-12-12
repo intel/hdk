@@ -193,12 +193,12 @@ class L0Kernel : public DeviceKernel {
     CHECK(kernel);
     CHECK(device);
 
-    // todo: allocate buffer for params and set it as kernel argument
-
     auto q = device->command_queue();
     auto q_list = device->create_command_list();
-    kernel->group_size() = {ko.gridDimX, ko.gridDimY, ko.gridDimZ};
-    q_list->launch(kernel, kernelParams);
+    l0::GroupCount gc = {ko.gridDimX, ko.gridDimY, ko.gridDimZ};
+    LOG(INFO) << "Launching L0 kernel with group size: {" << ko.gridDimX << ","
+              << ko.gridDimY << "," << ko.gridDimZ << "}\n";
+    q_list->launch(kernel, kernelParams, gc);
     q_list->submit(*q.get());
   }
 
