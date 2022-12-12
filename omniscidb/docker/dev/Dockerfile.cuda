@@ -2,7 +2,7 @@
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
     dpkg -i cuda-keyring_1.0-1_all.deb && \
     apt-get update && \
-    apt-get install -y cuda libarrow-cuda-dev
+    apt-get install -y cuda=11.* libarrow-cuda-dev
 
-ENV PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}
+ENV PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
 
