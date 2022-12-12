@@ -64,6 +64,12 @@ class BuilderExpr {
 
   BuilderExpr ne(const BuilderExpr& rhs) const;
 
+  BuilderExpr add(const BuilderExpr& rhs) const;
+  BuilderExpr add(int val) const;
+  BuilderExpr add(int64_t val) const;
+  BuilderExpr add(float val) const;
+  BuilderExpr add(double val) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;

@@ -482,8 +482,16 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
       switch (type->as<hdk::ir::IntervalType>()->unit()) {
         case hdk::ir::TimeUnit::kMonth:
           return std::to_string(d.bigintval) + " month(s) (year-month interval)";
+        case hdk::ir::TimeUnit::kDay:
+          return std::to_string(d.bigintval) + " day(s)";
+        case hdk::ir::TimeUnit::kSecond:
+          return std::to_string(d.bigintval) + " sec";
         case hdk::ir::TimeUnit::kMilli:
           return std::to_string(d.bigintval) + " ms (day-time interval)";
+        case hdk::ir::TimeUnit::kMicro:
+          return std::to_string(d.bigintval) + " us";
+        case hdk::ir::TimeUnit::kNano:
+          return std::to_string(d.bigintval) + " ns";
         default:
           break;
       }

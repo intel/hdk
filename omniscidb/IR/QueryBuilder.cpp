@@ -8,6 +8,7 @@
 #include "ExprCollector.h"
 #include "ExprRewriter.h"
 
+#include "Analyzer/Analyzer.h"
 #include "Shared/SqlTypesLayout.h"
 
 #include <boost/algorithm/string.hpp>
@@ -261,6 +262,26 @@ void checkCstArrayType(const Type* type, size_t elems) {
           << " elements, provided " << elems << " elements.";
     }
   }
+}
+
+DateAddField timeUnitToDateAddField(TimeUnit unit) {
+  switch (unit) {
+    case TimeUnit::kMonth:
+      return DateAddField::kMonth;
+    case TimeUnit::kDay:
+      return DateAddField::kDay;
+    case TimeUnit::kSecond:
+      return DateAddField::kSecond;
+    case TimeUnit::kMilli:
+      return DateAddField::kMilli;
+    case TimeUnit::kMicro:
+      return DateAddField::kMicro;
+    case TimeUnit::kNano:
+      return DateAddField::kNano;
+    default:
+      break;
+  }
+  throw InvalidQueryError() << "unknown time unit: " << unit;
 }
 
 }  // namespace
@@ -621,22 +642,6 @@ BuilderExpr BuilderExpr::cast(const std::string& new_type) const {
   return cast(builder_.ctx_.typeFromString(new_type));
 }
 
-BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
-  // TODO: add auto-casts?
-  if (!expr_->type()->equal(rhs.expr()->type()) &&
-      !expr_->type()
-           ->withNullable(rhs.expr()->type()->nullable())
-           ->equal(rhs.expr()->type())) {
-    throw InvalidQueryError() << "Mismatched type for comparison:\n  LHS type: "
-                              << expr_->type()->toString()
-                              << "\n  RHS type: " << rhs.expr()->type()->toString();
-  }
-  auto nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
-  auto bin_oper = makeExpr<BinOper>(
-      builder_.ctx_.boolean(nullable), OpType::kNe, Qualifier::kOne, expr_, rhs.expr());
-  return {builder_, bin_oper, "", true};
-}
-
 BuilderExpr BuilderExpr::logicalNot() const {
   if (!expr_->type()->isBoolean()) {
     throw InvalidQueryError("Only boolean expressions are allowed for NOT operation.");
@@ -692,6 +697,70 @@ BuilderExpr BuilderExpr::unnest() const {
   auto elem_type = expr_->type()->as<ArrayBaseType>()->elemType();
   auto uoper = makeExpr<UOper>(elem_type, expr_->containsAgg(), OpType::kUnnest, expr_);
   return {builder_, uoper, "", true};
+}
+
+BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
+  // TODO: add auto-casts?
+  if (!expr_->type()->equal(rhs.expr()->type()) &&
+      !expr_->type()
+           ->withNullable(rhs.expr()->type()->nullable())
+           ->equal(rhs.expr()->type())) {
+    throw InvalidQueryError() << "Mismatched type for comparison:\n  LHS type: "
+                              << expr_->type()->toString()
+                              << "\n  RHS type: " << rhs.expr()->type()->toString();
+  }
+  auto nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
+  auto bin_oper = makeExpr<BinOper>(
+      builder_.ctx_.boolean(nullable), OpType::kNe, Qualifier::kOne, expr_, rhs.expr());
+  return {builder_, bin_oper, "", true};
+}
+
+BuilderExpr BuilderExpr::add(const BuilderExpr& rhs) const {
+  if ((expr_->type()->isDate() || expr_->type()->isTimestamp()) &&
+      rhs.expr()->type()->isInterval()) {
+    // Generate DATEADD expression.
+    auto res_size = std::max(expr_->type()->size(), rhs.expr()->type()->size());
+    auto date_unit = expr_->type()->as<DateTimeBaseType>()->unit();
+    auto interval_unit = rhs.expr()->type()->as<IntervalType>()->unit();
+    auto res_unit = std::max(date_unit, interval_unit);
+    auto res_nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
+    const Type* res_type =
+        expr_->type()->isDate()
+            ? (const Type*)builder_.ctx_.date(res_size, res_unit, res_nullable)
+            : (const Type*)builder_.ctx_.timestamp(res_unit, res_nullable);
+    auto add_expr = std::make_shared<DateAddExpr>(
+        res_type, timeUnitToDateAddField(interval_unit), rhs.expr(), expr_);
+    return {builder_, add_expr, "", true};
+  }
+  if ((rhs.expr()->type()->isDate() || rhs.expr()->type()->isTimestamp()) &&
+      expr_->type()->isInterval()) {
+    return rhs.add(*this);
+  }
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kPlus, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply PLUS operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::add(int val) const {
+  return add(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::add(int64_t val) const {
+  return add(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::add(float val) const {
+  return add(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::add(double val) const {
+  return add(builder_.cst(val, builder_.ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
