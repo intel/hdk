@@ -515,9 +515,23 @@ std::string ColumnListType::toString() const {
   return ss.str();
 }
 
-}  // namespace hdk::ir
+std::ostream& operator<<(std::ostream& os, hdk::ir::Type::Id type_id) {
+  os << toString(type_id);
+  return os;
+}
 
-std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* precision);
+std::ostream& operator<<(std::ostream& os,
+                         hdk::ir::FloatingPointType::Precision precision) {
+  os << toString(precision);
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* type) {
+  os << type->toString();
+  return os;
+}
+
+}  // namespace hdk::ir
 
 std::string toString(hdk::ir::Type::Id type_id) {
   switch (type_id) {
@@ -558,11 +572,6 @@ std::string toString(hdk::ir::Type::Id type_id) {
   }
 }
 
-std::ostream& operator<<(std::ostream& os, hdk::ir::Type::Id type_id) {
-  os << toString(type_id);
-  return os;
-}
-
 std::string toString(hdk::ir::FloatingPointType::Precision precision) {
   switch (precision) {
     case hdk::ir::FloatingPointType::kFloat:
@@ -572,15 +581,4 @@ std::string toString(hdk::ir::FloatingPointType::Precision precision) {
     default:
       return "InvalidPrecision";
   }
-}
-
-std::ostream& operator<<(std::ostream& os,
-                         hdk::ir::FloatingPointType::Precision precision) {
-  os << toString(precision);
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* type) {
-  os << type->toString();
-  return os;
 }
