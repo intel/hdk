@@ -91,6 +91,9 @@ class BuilderExpr {
   BuilderExpr mod(int val) const;
   BuilderExpr mod(int64_t val) const;
 
+  BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
+  BuilderExpr logicalOr(const BuilderExpr& rhs) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;
@@ -488,3 +491,8 @@ hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int rhs);
 hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
 hdk::ir::BuilderExpr operator%(int lhs, const hdk::ir::BuilderExpr& rhs);
 hdk::ir::BuilderExpr operator%(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
+
+hdk::ir::BuilderExpr operator&&(const hdk::ir::BuilderExpr& lhs,
+                                const hdk::ir::BuilderExpr& rhs);
+hdk::ir::BuilderExpr operator||(const hdk::ir::BuilderExpr& lhs,
+                                const hdk::ir::BuilderExpr& rhs);

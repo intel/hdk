@@ -873,6 +873,30 @@ BuilderExpr BuilderExpr::mod(int64_t val) const {
   return mod(builder_.cst(val, builder_.ctx_.int64(false)));
 }
 
+BuilderExpr BuilderExpr::logicalAnd(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kAnd, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply AND operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::logicalOr(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kOr, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply OR operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
@@ -2145,4 +2169,14 @@ hdk::ir::BuilderExpr operator%(int lhs, const hdk::ir::BuilderExpr& rhs) {
 
 hdk::ir::BuilderExpr operator%(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
   return rhs.builder().cst(lhs, rhs.ctx().int64(false)).mod(rhs);
+}
+
+hdk::ir::BuilderExpr operator&&(const hdk::ir::BuilderExpr& lhs,
+                                const hdk::ir::BuilderExpr& rhs) {
+  return lhs.logicalAnd(rhs);
+}
+
+hdk::ir::BuilderExpr operator||(const hdk::ir::BuilderExpr& lhs,
+                                const hdk::ir::BuilderExpr& rhs) {
+  return lhs.logicalOr(rhs);
 }
