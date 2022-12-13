@@ -489,13 +489,12 @@ class ColumnListType : public Type {
   int length_;
 };
 
+std::ostream& operator<<(std::ostream& os, hdk::ir::Type::Id precision);
+std::ostream& operator<<(std::ostream& os,
+                         hdk::ir::FloatingPointType::Precision precision);
+std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* type);
+
 }  // namespace hdk::ir
 
 std::string toString(hdk::ir::Type::Id precision);
-std::ostream& operator<<(std::ostream& os, hdk::ir::Type::Id precision);
-
 std::string toString(hdk::ir::FloatingPointType::Precision precision);
-std::ostream& operator<<(std::ostream& os,
-                         hdk::ir::FloatingPointType::Precision precision);
-
-std::ostream& operator<<(std::ostream& os, const hdk::ir::Type* precision);

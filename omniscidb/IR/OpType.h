@@ -152,10 +152,6 @@ inline std::string toString(hdk::ir::OpType op) {
   return "";
 }
 
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::OpType op) {
-  return os << toString(op);
-}
-
 inline std::string toString(hdk::ir::Qualifier qualifier) {
   switch (qualifier) {
     case hdk::ir::Qualifier::kOne:
@@ -167,10 +163,6 @@ inline std::string toString(hdk::ir::Qualifier qualifier) {
   }
   LOG(FATAL) << "Invalid Qualifier: " << int(qualifier);
   return "";
-}
-
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::Qualifier qualifier) {
-  return os << toString(qualifier);
 }
 
 inline std::string toString(hdk::ir::AggType agg) {
@@ -196,10 +188,6 @@ inline std::string toString(hdk::ir::AggType agg) {
   }
   LOG(FATAL) << "Invalid aggregate kind: " << (int)agg;
   return "";
-}
-
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
-  return os << toString(agg);
 }
 
 inline std::string toString(hdk::ir::WindowFunctionKind kind) {
@@ -241,6 +229,22 @@ inline std::string toString(hdk::ir::WindowFunctionKind kind) {
   return "";
 }
 
+namespace hdk::ir {
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::OpType op) {
+  return os << toString(op);
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::Qualifier qualifier) {
+  return os << toString(qualifier);
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
+  return os << toString(agg);
+}
+
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::WindowFunctionKind kind) {
   return os << toString(kind);
 }
+
+}  // namespace hdk::ir
