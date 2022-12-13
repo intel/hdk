@@ -81,6 +81,16 @@ class BuilderExpr {
   BuilderExpr mul(float val) const;
   BuilderExpr mul(double val) const;
 
+  BuilderExpr div(const BuilderExpr& rhs) const;
+  BuilderExpr div(int val) const;
+  BuilderExpr div(int64_t val) const;
+  BuilderExpr div(float val) const;
+  BuilderExpr div(double val) const;
+
+  BuilderExpr mod(const BuilderExpr& rhs) const;
+  BuilderExpr mod(int val) const;
+  BuilderExpr mod(int64_t val) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;

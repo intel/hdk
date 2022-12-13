@@ -825,6 +825,54 @@ BuilderExpr BuilderExpr::mul(double val) const {
   return mul(builder_.cst(val, builder_.ctx_.fp64(false)));
 }
 
+BuilderExpr BuilderExpr::div(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kDiv, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply DIV operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::div(int val) const {
+  return div(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::div(int64_t val) const {
+  return div(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::div(float val) const {
+  return div(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::div(double val) const {
+  return div(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::mod(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kMod, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply MOD operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::mod(int val) const {
+  return mod(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::mod(int64_t val) const {
+  return mod(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
