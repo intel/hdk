@@ -75,6 +75,12 @@ class BuilderExpr {
   BuilderExpr sub(float val) const;
   BuilderExpr sub(double val) const;
 
+  BuilderExpr mul(const BuilderExpr& rhs) const;
+  BuilderExpr mul(int val) const;
+  BuilderExpr mul(int64_t val) const;
+  BuilderExpr mul(float val) const;
+  BuilderExpr mul(double val) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;

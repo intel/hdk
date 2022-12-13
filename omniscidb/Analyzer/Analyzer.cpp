@@ -260,6 +260,13 @@ const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
         !(right_type->isNumber() || right_type->isInterval())) {
       throw std::runtime_error("non-numeric operands in arithmetic operations.");
     }
+    if (op == hdk::ir::OpType::kMul &&
+        (left_type->isInterval() && right_type->isInterval())) {
+      throw std::runtime_error("cannot multiply two intervals.");
+    }
+    if (op == hdk::ir::OpType::kDiv && left_type->isInterval()) {
+      throw std::runtime_error("cannot use interval as a divisor.");
+    }
     if (op == hdk::ir::OpType::kMod &&
         (!left_type->isInteger() || !right_type->isInteger())) {
       throw std::runtime_error("non-integer operands in modulo operation.");

@@ -159,7 +159,8 @@ void checkBinOper(const BuilderExpr& expr,
                   const BuilderExpr& rhs) {
   ASSERT_TRUE(expr.expr()->is<BinOper>());
   auto bin_oper = expr.expr()->as<BinOper>();
-  ASSERT_TRUE(bin_oper->type()->equal(type));
+  ASSERT_TRUE(bin_oper->type()->equal(type))
+      << bin_oper->type()->toString() << " " << type->toString();
   ASSERT_EQ(bin_oper->opType(), op_type);
   ASSERT_EQ(bin_oper->qualifier(), Qualifier::kOne);
   ASSERT_EQ(bin_oper->leftOperand()->toString(), lhs.expr()->toString());
@@ -2420,6 +2421,117 @@ TEST_F(QueryBuilderTest, MinusExpr) {
   EXPECT_THROW(scan.ref("col_dec").sub(scan.ref("col_timestamp")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_i").sub(scan.ref("col_arr_i32")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_bi").sub(scan.ref("col_arr_i32_3")), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, MulExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi").mul(scan.ref("col_bi")),
+               ctx().int64(),
+               OpType::kMul,
+               scan.ref("col_bi"),
+               scan.ref("col_bi"));
+  checkBinOper(scan.ref("col_bi").mul(1),
+               ctx().int64(),
+               OpType::kMul,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_si").mul(1),
+               ctx().int32(),
+               OpType::kMul,
+               scan.ref("col_si"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_si").mul(scan.ref("col_f")),
+               ctx().fp32(),
+               OpType::kMul,
+               scan.ref("col_si"),
+               scan.ref("col_f"));
+  checkBinOper(scan.ref("col_i").mul(2.0),
+               ctx().fp64(),
+               OpType::kMul,
+               scan.ref("col_i"),
+               builder.cst(2.0));
+  checkBinOper(scan.ref("col_i").mul(scan.ref("col_dec")),
+               ctx().decimal64(12, 2),
+               OpType::kMul,
+               scan.ref("col_i"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_f").mul(scan.ref("col_i")),
+               ctx().fp32(),
+               OpType::kMul,
+               scan.ref("col_f"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_f").mul(scan.ref("col_d")),
+               ctx().fp64(),
+               OpType::kMul,
+               scan.ref("col_f"),
+               scan.ref("col_d"));
+  checkBinOper(scan.ref("col_f").mul(scan.ref("col_dec")),
+               ctx().fp32(),
+               OpType::kMul,
+               scan.ref("col_f"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_dec").mul(scan.ref("col_dec")),
+               ctx().decimal64(20, 4),
+               OpType::kMul,
+               scan.ref("col_dec"),
+               scan.ref("col_dec"));
+  checkBinOper(scan.ref("col_dec").mul(scan.ref("col_ti")),
+               ctx().decimal64(10, 2),
+               OpType::kMul,
+               scan.ref("col_dec"),
+               scan.ref("col_ti"));
+  checkBinOper(scan.ref("col_dec").mul(scan.ref("col_f")),
+               ctx().fp32(),
+               OpType::kMul,
+               scan.ref("col_dec"),
+               scan.ref("col_f"));
+  checkBinOper(builder.cst(12, "interval[s]").mul(builder.cst(15, "int32")),
+               ctx().interval64(TimeUnit::kSecond, false),
+               OpType::kMul,
+               builder.cst(12, "interval[s]"),
+               builder.cst(15, "int32"));
+  checkBinOper(builder.cst(15, "int64").mul(builder.cst(12, "interval[d]")),
+               ctx().interval64(TimeUnit::kDay, false),
+               OpType::kMul,
+               builder.cst(15, "int64"),
+               builder.cst(12, "interval[d]"));
+  EXPECT_THROW(builder.cst(12, "interval[ms]").mul(builder.cst(15.0)), InvalidQueryError);
+  EXPECT_THROW(builder.cst(12, "dec(10,2)").mul(builder.cst(15, "interval[ns]")),
+               InvalidQueryError);
+  EXPECT_THROW(builder.cst(12, "interval[ms]").mul(builder.cst(15, "interval[ns]")),
+               InvalidQueryError);
+  EXPECT_THROW(builder.cst(12, "interval[ms]").mul(builder.cst(15, "interval[ns]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").mul(builder.cst(123, "interval32[d]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").mul(builder.cst(123, "interval64[s]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").mul(builder.cst(123, "interval[ms]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").mul(builder.cst(123, "interval[us]")),
+               InvalidQueryError);
+  EXPECT_THROW(builder.cst(123, "interval64[s]").mul(scan.ref("col_date")),
+               InvalidQueryError);
+  EXPECT_THROW(builder.cst(123, "interval[us]").mul(scan.ref("col_time")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").mul(builder.cst(123, "interval[ms]")),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").mul(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").mul(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").mul(scan.ref("col_i")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").mul(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").mul(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").mul(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").mul(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").mul(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").mul(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").mul(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").mul(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").mul(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").mul(scan.ref("col_timestamp")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").mul(scan.ref("col_arr_i32")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").mul(scan.ref("col_arr_i32_3")), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

@@ -797,6 +797,34 @@ BuilderExpr BuilderExpr::sub(double val) const {
   return sub(builder_.cst(val, builder_.ctx_.fp64(false)));
 }
 
+BuilderExpr BuilderExpr::mul(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kMul, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply MUL operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::mul(int val) const {
+  return mul(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::mul(int64_t val) const {
+  return mul(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::mul(float val) const {
+  return mul(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::mul(double val) const {
+  return mul(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
