@@ -885,6 +885,14 @@ BuilderExpr BuilderExpr::operator-() const {
   return uminus();
 }
 
+const QueryBuilder& BuilderExpr::builder() const {
+  return builder_;
+}
+
+Context& BuilderExpr::ctx() const {
+  return const_cast<Context&>(builder_.ctx_);
+}
+
 BuilderSortField::BuilderSortField(int col_idx,
                                    SortDirection dir,
                                    NullSortedPosition null_pos)
@@ -1969,3 +1977,172 @@ BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
 }
 
 }  // namespace hdk::ir
+
+hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs,
+                               const hdk::ir::BuilderExpr& rhs) {
+  return lhs.add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, int rhs) {
+  return lhs.add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, int64_t rhs) {
+  return lhs.add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, float rhs) {
+  return lhs.add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, double rhs) {
+  return lhs.add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(int lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(float lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).add(rhs);
+}
+
+hdk::ir::BuilderExpr operator+(double lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).add(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs,
+                               const hdk::ir::BuilderExpr& rhs) {
+  return lhs.sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, int rhs) {
+  return lhs.sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, int64_t rhs) {
+  return lhs.sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, float rhs) {
+  return lhs.sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, double rhs) {
+  return lhs.sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(int lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(float lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator-(double lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).sub(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs,
+                               const hdk::ir::BuilderExpr& rhs) {
+  return lhs.mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, int rhs) {
+  return lhs.mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, int64_t rhs) {
+  return lhs.mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, float rhs) {
+  return lhs.mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, double rhs) {
+  return lhs.mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(int lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(float lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator*(double lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).mul(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs,
+                               const hdk::ir::BuilderExpr& rhs) {
+  return lhs.div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, int rhs) {
+  return lhs.div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, int64_t rhs) {
+  return lhs.div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, float rhs) {
+  return lhs.div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, double rhs) {
+  return lhs.div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(int lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(float lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).div(rhs);
+}
+
+hdk::ir::BuilderExpr operator/(double lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).div(rhs);
+}
+
+hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs,
+                               const hdk::ir::BuilderExpr& rhs) {
+  return lhs.mod(rhs);
+}
+
+hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int rhs) {
+  return lhs.mod(rhs);
+}
+
+hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int64_t rhs) {
+  return lhs.mod(rhs);
+}
+
+hdk::ir::BuilderExpr operator%(int lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).mod(rhs);
+}
+
+hdk::ir::BuilderExpr operator%(int64_t lhs, const hdk::ir::BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).mod(rhs);
+}

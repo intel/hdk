@@ -2196,12 +2196,27 @@ TEST_F(QueryBuilderTest, PlusExpr) {
                OpType::kPlus,
                scan.ref("col_bi"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").add(1),
+  checkBinOper(scan.ref("col_si") + 1,
                ctx().int32(),
                OpType::kPlus,
                scan.ref("col_si"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").add(scan.ref("col_f")),
+  checkBinOper(1 + scan.ref("col_si"),
+               ctx().int32(),
+               OpType::kPlus,
+               builder.cst(1, "int32"),
+               scan.ref("col_si"));
+  checkBinOper(1L + scan.ref("col_si"),
+               ctx().int64(),
+               OpType::kPlus,
+               builder.cst(1, "int64"),
+               scan.ref("col_si"));
+  checkBinOper(scan.ref("col_si") + 1L,
+               ctx().int64(),
+               OpType::kPlus,
+               scan.ref("col_si"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_si") + scan.ref("col_f"),
                ctx().fp32(),
                OpType::kPlus,
                scan.ref("col_si"),
@@ -2211,6 +2226,26 @@ TEST_F(QueryBuilderTest, PlusExpr) {
                OpType::kPlus,
                scan.ref("col_i"),
                builder.cst(2.0));
+  checkBinOper(scan.ref("col_i") + 2.0f,
+               ctx().fp32(),
+               OpType::kPlus,
+               scan.ref("col_i"),
+               builder.cst(2.0, "fp32"));
+  checkBinOper(scan.ref("col_i") + 2.0,
+               ctx().fp64(),
+               OpType::kPlus,
+               scan.ref("col_i"),
+               builder.cst(2.0));
+  checkBinOper(2.0f + scan.ref("col_i"),
+               ctx().fp32(),
+               OpType::kPlus,
+               builder.cst(2.0, "fp32"),
+               scan.ref("col_i"));
+  checkBinOper(2.0 + scan.ref("col_i"),
+               ctx().fp64(),
+               OpType::kPlus,
+               builder.cst(2.0),
+               scan.ref("col_i"));
   checkBinOper(scan.ref("col_i").add(scan.ref("col_dec")),
                ctx().decimal64(13, 2),
                OpType::kPlus,
@@ -2315,12 +2350,27 @@ TEST_F(QueryBuilderTest, MinusExpr) {
                OpType::kMinus,
                scan.ref("col_bi"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").sub(1),
+  checkBinOper(scan.ref("col_si") - 1,
                ctx().int32(),
                OpType::kMinus,
                scan.ref("col_si"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").sub(scan.ref("col_f")),
+  checkBinOper(scan.ref("col_si") - 1L,
+               ctx().int64(),
+               OpType::kMinus,
+               scan.ref("col_si"),
+               builder.cst(1, "int64"));
+  checkBinOper(1 - scan.ref("col_si"),
+               ctx().int32(),
+               OpType::kMinus,
+               builder.cst(1, "int32"),
+               scan.ref("col_si"));
+  checkBinOper(1L - scan.ref("col_si"),
+               ctx().int64(),
+               OpType::kMinus,
+               builder.cst(1, "int64"),
+               scan.ref("col_si"));
+  checkBinOper(scan.ref("col_si") - scan.ref("col_f"),
                ctx().fp32(),
                OpType::kMinus,
                scan.ref("col_si"),
@@ -2330,6 +2380,26 @@ TEST_F(QueryBuilderTest, MinusExpr) {
                OpType::kMinus,
                scan.ref("col_i"),
                builder.cst(2.0));
+  checkBinOper(scan.ref("col_i") - 2.0f,
+               ctx().fp32(),
+               OpType::kMinus,
+               scan.ref("col_i"),
+               builder.cst(2.0, "fp32"));
+  checkBinOper(scan.ref("col_i") - 2.0,
+               ctx().fp64(),
+               OpType::kMinus,
+               scan.ref("col_i"),
+               builder.cst(2.0));
+  checkBinOper(2.0f - scan.ref("col_i"),
+               ctx().fp32(),
+               OpType::kMinus,
+               builder.cst(2.0, "fp32"),
+               scan.ref("col_i"));
+  checkBinOper(2.0 - scan.ref("col_i"),
+               ctx().fp64(),
+               OpType::kMinus,
+               builder.cst(2.0),
+               scan.ref("col_i"));
   checkBinOper(scan.ref("col_i").sub(scan.ref("col_dec")),
                ctx().decimal64(13, 2),
                OpType::kMinus,
@@ -2436,12 +2506,27 @@ TEST_F(QueryBuilderTest, MulExpr) {
                OpType::kMul,
                scan.ref("col_bi"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").mul(1),
+  checkBinOper(scan.ref("col_si") * 1,
                ctx().int32(),
                OpType::kMul,
                scan.ref("col_si"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").mul(scan.ref("col_f")),
+  checkBinOper(scan.ref("col_si") * 1L,
+               ctx().int64(),
+               OpType::kMul,
+               scan.ref("col_si"),
+               builder.cst(1, "int64"));
+  checkBinOper(1 * scan.ref("col_si"),
+               ctx().int32(),
+               OpType::kMul,
+               builder.cst(1, "int32"),
+               scan.ref("col_si"));
+  checkBinOper(1L * scan.ref("col_si"),
+               ctx().int64(),
+               OpType::kMul,
+               builder.cst(1, "int64"),
+               scan.ref("col_si"));
+  checkBinOper(scan.ref("col_si") * scan.ref("col_f"),
                ctx().fp32(),
                OpType::kMul,
                scan.ref("col_si"),
@@ -2451,6 +2536,26 @@ TEST_F(QueryBuilderTest, MulExpr) {
                OpType::kMul,
                scan.ref("col_i"),
                builder.cst(2.0));
+  checkBinOper(scan.ref("col_i") * 2.0f,
+               ctx().fp32(),
+               OpType::kMul,
+               scan.ref("col_i"),
+               builder.cst(2.0, "fp32"));
+  checkBinOper(scan.ref("col_i") * 2.0,
+               ctx().fp64(),
+               OpType::kMul,
+               scan.ref("col_i"),
+               builder.cst(2.0, "fp64"));
+  checkBinOper(2.0f * scan.ref("col_i"),
+               ctx().fp32(),
+               OpType::kMul,
+               builder.cst(2.0, "fp32"),
+               scan.ref("col_i"));
+  checkBinOper(2.0 * scan.ref("col_i"),
+               ctx().fp64(),
+               OpType::kMul,
+               builder.cst(2.0, "fp64"),
+               scan.ref("col_i"));
   checkBinOper(scan.ref("col_i").mul(scan.ref("col_dec")),
                ctx().decimal64(12, 2),
                OpType::kMul,
@@ -2547,12 +2652,27 @@ TEST_F(QueryBuilderTest, DivExpr) {
                OpType::kDiv,
                scan.ref("col_bi"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").div(1),
+  checkBinOper(scan.ref("col_si") / 1,
                ctx().int32(),
                OpType::kDiv,
                scan.ref("col_si"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").div(scan.ref("col_f")),
+  checkBinOper(scan.ref("col_si") / 1L,
+               ctx().int64(),
+               OpType::kDiv,
+               scan.ref("col_si"),
+               builder.cst(1, "int64"));
+  checkBinOper(1 / scan.ref("col_si"),
+               ctx().int32(),
+               OpType::kDiv,
+               builder.cst(1, "int32"),
+               scan.ref("col_si"));
+  checkBinOper(1L / scan.ref("col_si"),
+               ctx().int64(),
+               OpType::kDiv,
+               builder.cst(1, "int64"),
+               scan.ref("col_si"));
+  checkBinOper(scan.ref("col_si") / scan.ref("col_f"),
                ctx().fp32(),
                OpType::kDiv,
                scan.ref("col_si"),
@@ -2562,6 +2682,26 @@ TEST_F(QueryBuilderTest, DivExpr) {
                OpType::kDiv,
                scan.ref("col_i"),
                builder.cst(2.0));
+  checkBinOper(scan.ref("col_i") / 2.0f,
+               ctx().fp32(),
+               OpType::kDiv,
+               scan.ref("col_i"),
+               builder.cst(2.0, "fp32"));
+  checkBinOper(scan.ref("col_i") / 2.0,
+               ctx().fp64(),
+               OpType::kDiv,
+               scan.ref("col_i"),
+               builder.cst(2.0));
+  checkBinOper(2.0f / scan.ref("col_i"),
+               ctx().fp32(),
+               OpType::kDiv,
+               builder.cst(2.0, "fp32"),
+               scan.ref("col_i"));
+  checkBinOper(2.0 / scan.ref("col_i"),
+               ctx().fp64(),
+               OpType::kDiv,
+               builder.cst(2.0),
+               scan.ref("col_i"));
   checkBinOper(scan.ref("col_i").div(scan.ref("col_dec")),
                ctx().decimal64(12, 2),
                OpType::kDiv,
@@ -2655,12 +2795,27 @@ TEST_F(QueryBuilderTest, ModExpr) {
                OpType::kMod,
                scan.ref("col_bi"),
                builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").mod(1),
+  checkBinOper(scan.ref("col_si") % 12,
                ctx().int32(),
                OpType::kMod,
                scan.ref("col_si"),
-               builder.cst(1, "int32"));
-  checkBinOper(scan.ref("col_si").mod(scan.ref("col_ti")),
+               builder.cst(12, "int32"));
+  checkBinOper(scan.ref("col_si") % 12L,
+               ctx().int64(),
+               OpType::kMod,
+               scan.ref("col_si"),
+               builder.cst(12, "int64"));
+  checkBinOper(123 % scan.ref("col_si"),
+               ctx().int32(),
+               OpType::kMod,
+               builder.cst(123, "int32"),
+               scan.ref("col_si"));
+  checkBinOper(123L % scan.ref("col_si"),
+               ctx().int64(),
+               OpType::kMod,
+               builder.cst(123, "int64"),
+               scan.ref("col_si"));
+  checkBinOper(scan.ref("col_si") % scan.ref("col_ti"),
                ctx().int16(),
                OpType::kMod,
                scan.ref("col_si"),
