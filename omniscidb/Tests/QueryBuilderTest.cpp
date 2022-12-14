@@ -2341,6 +2341,217 @@ TEST_F(QueryBuilderTest, PlusExpr) {
   EXPECT_THROW(scan.ref("col_bi").add(scan.ref("col_arr_i32x3")), InvalidQueryError);
 }
 
+TEST_F(QueryBuilderTest, DateAddExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkDateAdd(scan.ref("col_date").add(scan.ref("col_bi"), "year"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kYear,
+               scan.ref("col_bi"),
+               scan.ref("col_date"));
+  checkDateAdd(scan.ref("col_date2").add(scan.ref("col_i"), "YEARS"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kYear,
+               scan.ref("col_i"),
+               scan.ref("col_date2"));
+  checkDateAdd(scan.ref("col_date3").add(scan.ref("col_si"), "quarter"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kQuarter,
+               scan.ref("col_si"),
+               scan.ref("col_date3"));
+  checkDateAdd(scan.ref("col_date4").add(scan.ref("col_ti"), " quarterS "),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kQuarter,
+               scan.ref("col_ti"),
+               scan.ref("col_date4"));
+  checkDateAdd(scan.ref("col_timestamp").add(1, "month"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kMonth,
+               builder.cst(1, "int32"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp2").add(1, "months"),
+               ctx().timestamp(TimeUnit::kMilli),
+               DateAddField::kMonth,
+               builder.cst(1, "int32"),
+               scan.ref("col_timestamp2"));
+  checkDateAdd(scan.ref("col_timestamp3").add(1L, "day"),
+               ctx().timestamp(TimeUnit::kMicro),
+               DateAddField::kDay,
+               builder.cst(1, "int64"),
+               scan.ref("col_timestamp3"));
+  checkDateAdd(scan.ref("col_timestamp4").add(1L, "days"),
+               ctx().timestamp(TimeUnit::kNano),
+               DateAddField::kDay,
+               builder.cst(1, "int64"),
+               scan.ref("col_timestamp4"));
+  checkDateAdd(scan.ref("col_timestamp").add(1, "hour"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kHour,
+               builder.cst(1, "int32"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").add(1, "hours"),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kHour,
+               builder.cst(1, "int32"),
+               scan.ref("col_timestamp"));
+  for (auto& field : {"min"s, "mins"s, "minute"s, "minutes"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kMinute,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"sec"s, "secs"s, "second"s, "SECONDS"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kSecond,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"ms"s, "milli"s, "millisecond"s, "milliseconds"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kMilli,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"us"s, "micro"s, "microsecond"s, "microseconds"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kMicro,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"ns"s, "nano"s, "nanosecond"s, "nanoseconds"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kNano,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"week"s, "weeks"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kWeek,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"quarterday"s,
+                      "quarter day"s,
+                      "quarter_day"s,
+                      "quarterdays"s,
+                      "quarter_days"s,
+                      "quarter days"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kQuarterDay,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field :
+       {"weekday"s, "week day"s, "week_day"s, "weekdays"s, "week_days"s, "week days"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kWeekDay,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"dayofyear"s, "day_of_year"s, "day of year"s, "doy"s}) {
+    checkDateAdd(scan.ref("col_timestamp").add(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kDayOfYear,
+                 builder.cst(1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"millennium"s, "millenniums"s}) {
+    checkDateAdd(scan.ref("col_timestamp").sub(scan.ref("col_i"), field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kMillennium,
+                 scan.ref("col_i").uminus(),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"century"s, "centuries"s}) {
+    checkDateAdd(scan.ref("col_timestamp").sub(1, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kCentury,
+                 builder.cst(-1, "int32"),
+                 scan.ref("col_timestamp"));
+  }
+  for (auto& field : {"decade"s, "decades"s}) {
+    checkDateAdd(scan.ref("col_timestamp").sub(1L, field),
+                 ctx().timestamp(TimeUnit::kSecond),
+                 DateAddField::kDecade,
+                 builder.cst(-1, "int64"),
+                 scan.ref("col_timestamp"));
+  }
+  checkDateAdd(scan.ref("col_timestamp").add(scan.ref("col_i"), DateAddField::kMilli),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kMilli,
+               scan.ref("col_i"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").add(1, DateAddField::kSecond),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kSecond,
+               builder.cst(1, "int32"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").add(1L, DateAddField::kDay),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kDay,
+               builder.cst(1, "int64"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").sub(scan.ref("col_i"), DateAddField::kMilli),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kMilli,
+               scan.ref("col_i").uminus(),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").sub(1, DateAddField::kSecond),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kSecond,
+               builder.cst(-1, "int32"),
+               scan.ref("col_timestamp"));
+  checkDateAdd(scan.ref("col_timestamp").sub(1L, DateAddField::kDay),
+               ctx().timestamp(TimeUnit::kSecond),
+               DateAddField::kDay,
+               builder.cst(-1, "int64"),
+               scan.ref("col_timestamp"));
+  EXPECT_THROW(scan.ref("col_timestamp").add(1, "mss"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(1, "nanos"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(1, "milli seconds"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ti").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32x3").add(1, "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_f"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(scan.ref("col_d"), "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_dec"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(scan.ref("col_b"), "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_str"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(scan.ref("col_dict"), "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_date"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(scan.ref("col_time"), "day"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_timestamp"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(scan.ref("col_arr_i32"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").add(scan.ref("col_arr_i32x3"), "day"),
+               InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").add(builder.cst(123, "interval[s]"), "day"),
+               InvalidQueryError);
+}
+
 TEST_F(QueryBuilderTest, MinusExpr) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test3");

@@ -284,6 +284,69 @@ DateAddField timeUnitToDateAddField(TimeUnit unit) {
   throw InvalidQueryError() << "unknown time unit: " << unit;
 }
 
+DateAddField parseDateAddField(const std::string& field) {
+  static const std::unordered_map<std::string, DateAddField> field_names = {
+      {"year", DateAddField::kYear},
+      {"years", DateAddField::kYear},
+      {"quarter", DateAddField::kQuarter},
+      {"quarters", DateAddField::kQuarter},
+      {"month", DateAddField::kMonth},
+      {"months", DateAddField::kMonth},
+      {"day", DateAddField::kDay},
+      {"days", DateAddField::kDay},
+      {"hour", DateAddField::kHour},
+      {"hours", DateAddField::kHour},
+      {"min", DateAddField::kMinute},
+      {"mins", DateAddField::kMinute},
+      {"minute", DateAddField::kMinute},
+      {"minutes", DateAddField::kMinute},
+      {"sec", DateAddField::kSecond},
+      {"secs", DateAddField::kSecond},
+      {"second", DateAddField::kSecond},
+      {"seconds", DateAddField::kSecond},
+      {"millennium", DateAddField::kMillennium},
+      {"millenniums", DateAddField::kMillennium},
+      {"century", DateAddField::kCentury},
+      {"centuries", DateAddField::kCentury},
+      {"decade", DateAddField::kDecade},
+      {"decades", DateAddField::kDecade},
+      {"ms", DateAddField::kMilli},
+      {"milli", DateAddField::kMilli},
+      {"millisecond", DateAddField::kMilli},
+      {"milliseconds", DateAddField::kMilli},
+      {"us", DateAddField::kMicro},
+      {"micro", DateAddField::kMicro},
+      {"microsecond", DateAddField::kMicro},
+      {"microseconds", DateAddField::kMicro},
+      {"ns", DateAddField::kNano},
+      {"nano", DateAddField::kNano},
+      {"nanosecond", DateAddField::kNano},
+      {"nanoseconds", DateAddField::kNano},
+      {"week", DateAddField::kWeek},
+      {"weeks", DateAddField::kWeek},
+      {"quarterday", DateAddField::kQuarterDay},
+      {"quarter_day", DateAddField::kQuarterDay},
+      {"quarter day", DateAddField::kQuarterDay},
+      {"quarterdays", DateAddField::kQuarterDay},
+      {"quarter_days", DateAddField::kQuarterDay},
+      {"quarter days", DateAddField::kQuarterDay},
+      {"weekday", DateAddField::kWeekDay},
+      {"week_day", DateAddField::kWeekDay},
+      {"week day", DateAddField::kWeekDay},
+      {"weekdays", DateAddField::kWeekDay},
+      {"week_days", DateAddField::kWeekDay},
+      {"week days", DateAddField::kWeekDay},
+      {"dayofyear", DateAddField::kDayOfYear},
+      {"day_of_year", DateAddField::kDayOfYear},
+      {"day of year", DateAddField::kDayOfYear},
+      {"doy", DateAddField::kDayOfYear}};
+  auto canonical = boost::trim_copy(boost::to_lower_copy(field));
+  if (!field_names.count(canonical)) {
+    throw InvalidQueryError() << "Cannot parse date add field: '" << field << "'";
+  }
+  return field_names.at(canonical);
+}
+
 }  // namespace
 
 BuilderExpr::BuilderExpr(const QueryBuilder& builder,
@@ -749,6 +812,48 @@ BuilderExpr BuilderExpr::add(double val) const {
   return add(builder_.cst(val, builder_.ctx_.fp64(false)));
 }
 
+BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, DateAddField field) const {
+  if (!expr_->type()->isDate() && !expr_->type()->isTimestamp()) {
+    throw InvalidQueryError()
+        << "Left operand of DATE_ADD operation should be DATE or TIMESTAMP. Actual type: "
+        << expr_->type()->toString();
+  }
+  if (!rhs.expr()->type()->isInteger()) {
+    throw InvalidQueryError()
+        << "Right operand of DATE_ADD operation should be INTEGER. Actual type: "
+        << rhs.expr()->type()->toString();
+  }
+  auto res_type = expr_->type()->withNullable(expr_->type()->nullable() ||
+                                              rhs.expr()->type()->nullable());
+  if (res_type->isDate()) {
+    auto unit = res_type->as<DateType>()->unit();
+    unit = unit == TimeUnit::kDay ? TimeUnit::kSecond : unit;
+    res_type = res_type->ctx().timestamp(unit, res_type->nullable());
+  }
+  auto date_add_expr = makeExpr<DateAddExpr>(res_type, field, rhs.expr(), expr_);
+  return {builder_, date_add_expr};
+}
+
+BuilderExpr BuilderExpr::add(int val, DateAddField field) const {
+  return add(builder_.cst(val, builder_.ctx_.int32(false)), field);
+}
+
+BuilderExpr BuilderExpr::add(int64_t val, DateAddField field) const {
+  return add(builder_.cst(val, builder_.ctx_.int64(false)), field);
+}
+
+BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, const std::string& field) const {
+  return add(rhs, parseDateAddField(field));
+}
+
+BuilderExpr BuilderExpr::add(int val, const std::string& field) const {
+  return add(builder_.cst(val, builder_.ctx_.int32(false)), parseDateAddField(field));
+}
+
+BuilderExpr BuilderExpr::add(int64_t val, const std::string& field) const {
+  return add(builder_.cst(val, builder_.ctx_.int64(false)), parseDateAddField(field));
+}
+
 BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs) const {
   if ((expr_->type()->isDate() || expr_->type()->isTimestamp()) &&
       rhs.expr()->type()->isInterval()) {
@@ -779,6 +884,30 @@ BuilderExpr BuilderExpr::sub(float val) const {
 
 BuilderExpr BuilderExpr::sub(double val) const {
   return sub(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, DateAddField field) const {
+  return add(rhs.uminus(), field);
+}
+
+BuilderExpr BuilderExpr::sub(int val, DateAddField field) const {
+  return sub(builder_.cst(val, builder_.ctx_.int32(false)), field);
+}
+
+BuilderExpr BuilderExpr::sub(int64_t val, DateAddField field) const {
+  return sub(builder_.cst(val, builder_.ctx_.int64(false)), field);
+}
+
+BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, const std::string& field) const {
+  return sub(rhs, parseDateAddField(field));
+}
+
+BuilderExpr BuilderExpr::sub(int val, const std::string& field) const {
+  return sub(builder_.cst(val, builder_.ctx_.int32(false)), parseDateAddField(field));
+}
+
+BuilderExpr BuilderExpr::sub(int64_t val, const std::string& field) const {
+  return sub(builder_.cst(val, builder_.ctx_.int64(false)), parseDateAddField(field));
 }
 
 BuilderExpr BuilderExpr::mul(const BuilderExpr& rhs) const {

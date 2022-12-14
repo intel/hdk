@@ -67,11 +67,25 @@ class BuilderExpr {
   BuilderExpr add(float val) const;
   BuilderExpr add(double val) const;
 
+  BuilderExpr add(const BuilderExpr& rhs, DateAddField field) const;
+  BuilderExpr add(int val, DateAddField field) const;
+  BuilderExpr add(int64_t val, DateAddField field) const;
+  BuilderExpr add(const BuilderExpr& rhs, const std::string& field) const;
+  BuilderExpr add(int val, const std::string& field) const;
+  BuilderExpr add(int64_t val, const std::string& field) const;
+
   BuilderExpr sub(const BuilderExpr& rhs) const;
   BuilderExpr sub(int val) const;
   BuilderExpr sub(int64_t val) const;
   BuilderExpr sub(float val) const;
   BuilderExpr sub(double val) const;
+
+  BuilderExpr sub(const BuilderExpr& rhs, DateAddField field) const;
+  BuilderExpr sub(int val, DateAddField field) const;
+  BuilderExpr sub(int64_t val, DateAddField field) const;
+  BuilderExpr sub(const BuilderExpr& rhs, const std::string& field) const;
+  BuilderExpr sub(int val, const std::string& field) const;
+  BuilderExpr sub(int64_t val, const std::string& field) const;
 
   BuilderExpr mul(const BuilderExpr& rhs) const;
   BuilderExpr mul(int val) const;
