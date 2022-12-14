@@ -205,6 +205,10 @@ void Executor::initialize_extension_module_sources() {
     CHECK(boost::filesystem::exists(l0_template_path));
     Executor::extension_module_sources[ExtModuleKinds::l0_template_module] =
         l0_template_path;
+    auto genx_path = root_path + "/QueryEngine/genx.bc";
+    CHECK(boost::filesystem::exists(genx_path));
+    Executor::extension_module_sources[ExtModuleKinds::spirv_helper_funcs_module] =
+        genx_path;
 #endif
   }
 }
@@ -240,6 +244,7 @@ void Executor::update_extension_modules(bool update_runtime_modules_only) {
     switch (module_kind) {
       case ExtModuleKinds::template_module:
       case ExtModuleKinds::l0_template_module:
+      case ExtModuleKinds::spirv_helper_funcs_module:
       case ExtModuleKinds::rt_libdevice_module: {
         return read_llvm_module_from_bc_file(source, getContext());
       }
@@ -308,6 +313,7 @@ void Executor::update_extension_modules(bool update_runtime_modules_only) {
 #endif
 #ifdef HAVE_L0
     update_module(ExtModuleKinds::l0_template_module);
+    update_module(ExtModuleKinds::spirv_helper_funcs_module);
 #endif
   }
   // run-time modules, these are optional and erasable:

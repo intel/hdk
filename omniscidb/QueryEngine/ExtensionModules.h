@@ -19,13 +19,14 @@
 #include <memory>
 
 enum class ExtModuleKinds {
-  template_module,     // RuntimeFunctions.bc
-  l0_template_module,  // RuntimeFunctionsL0.bc
-  udf_cpu_module,      // Load-time UDFs for CPU execution
-  udf_gpu_module,      // Load-time UDFs for GPU execution
-  rt_udf_cpu_module,   // Run-time UDF/UDTFs for CPU execution
-  rt_udf_gpu_module,   // Run-time UDF/UDTFs for GPU execution
-  rt_libdevice_module  // math library functions for GPU execution
+  template_module,      // RuntimeFunctions.bc
+  l0_template_module,   // RuntimeFunctionsL0.bc
+  udf_cpu_module,       // Load-time UDFs for CPU execution
+  udf_gpu_module,       // Load-time UDFs for GPU execution
+  rt_udf_cpu_module,    // Run-time UDF/UDTFs for CPU execution
+  rt_udf_gpu_module,    // Run-time UDF/UDTFs for GPU execution
+  rt_libdevice_module,  // math library functions for GPU execution
+  spirv_helper_funcs_module
 };
 
 class ExtensionModuleContext {
@@ -55,6 +56,10 @@ class ExtensionModuleContext {
   const std::unique_ptr<llvm::Module>& getUdfModule(bool is_gpu = false) const {
     return getExtensionModule(
         (is_gpu ? ExtModuleKinds::udf_gpu_module : ExtModuleKinds::udf_cpu_module));
+  }
+
+  const std::unique_ptr<llvm::Module>& getSpirvHelperFuncModule() const {
+    return getExtensionModule(ExtModuleKinds::spirv_helper_funcs_module);
   }
 
   // defined in Execute.cpp
