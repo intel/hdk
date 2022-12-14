@@ -977,6 +977,102 @@ BuilderExpr BuilderExpr::lt(const std::string& val) const {
   return lt(builder_.cst(val));
 }
 
+BuilderExpr BuilderExpr::le(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kLe, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply LE operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::le(int val) const {
+  return le(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::le(int64_t val) const {
+  return le(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::le(float val) const {
+  return le(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::le(double val) const {
+  return le(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::le(const std::string& val) const {
+  return le(builder_.cst(val));
+}
+
+BuilderExpr BuilderExpr::gt(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kGt, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply GT operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::gt(int val) const {
+  return gt(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::gt(int64_t val) const {
+  return gt(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::gt(float val) const {
+  return gt(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::gt(double val) const {
+  return gt(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::gt(const std::string& val) const {
+  return gt(builder_.cst(val));
+}
+
+BuilderExpr BuilderExpr::ge(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kGe, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply GE operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::ge(int val) const {
+  return ge(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::ge(int64_t val) const {
+  return ge(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::ge(float val) const {
+  return ge(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::ge(double val) const {
+  return ge(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::ge(const std::string& val) const {
+  return ge(builder_.cst(val));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
@@ -1600,7 +1696,6 @@ BuilderNode BuilderNode::agg(const std::vector<BuilderExpr>& group_keys,
 }
 
 namespace {
-
 template <typename ColsType, typename... Ts>
 std::vector<BuilderSortField> toSortFields(ColsType&& cols, Ts... args) {
   std::vector<BuilderSortField> res;
