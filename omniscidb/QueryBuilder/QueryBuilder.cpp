@@ -701,22 +701,6 @@ BuilderExpr BuilderExpr::unnest() const {
   return {builder_, uoper, "", true};
 }
 
-BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
-  // TODO: add auto-casts?
-  if (!expr_->type()->equal(rhs.expr()->type()) &&
-      !expr_->type()
-           ->withNullable(rhs.expr()->type()->nullable())
-           ->equal(rhs.expr()->type())) {
-    throw InvalidQueryError() << "Mismatched type for comparison:\n  LHS type: "
-                              << expr_->type()->toString()
-                              << "\n  RHS type: " << rhs.expr()->type()->toString();
-  }
-  auto nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
-  auto bin_oper = makeExpr<BinOper>(
-      builder_.ctx_.boolean(nullable), OpType::kNe, Qualifier::kOne, expr_, rhs.expr());
-  return {builder_, bin_oper, "", true};
-}
-
 BuilderExpr BuilderExpr::add(const BuilderExpr& rhs) const {
   if ((expr_->type()->isDate() || expr_->type()->isTimestamp()) &&
       rhs.expr()->type()->isInterval()) {
@@ -927,6 +911,38 @@ BuilderExpr BuilderExpr::eq(double val) const {
 
 BuilderExpr BuilderExpr::eq(const std::string& val) const {
   return eq(builder_.cst(val));
+}
+
+BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kNe, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply NE operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::ne(int val) const {
+  return ne(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::ne(int64_t val) const {
+  return ne(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::ne(float val) const {
+  return ne(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::ne(double val) const {
+  return ne(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::ne(const std::string& val) const {
+  return ne(builder_.cst(val));
 }
 
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {

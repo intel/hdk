@@ -61,8 +61,6 @@ class BuilderExpr {
   BuilderExpr isNull() const;
   BuilderExpr unnest() const;
 
-  BuilderExpr ne(const BuilderExpr& rhs) const;
-
   BuilderExpr add(const BuilderExpr& rhs) const;
   BuilderExpr add(int val) const;
   BuilderExpr add(int64_t val) const;
@@ -94,12 +92,19 @@ class BuilderExpr {
   BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
   BuilderExpr logicalOr(const BuilderExpr& rhs) const;
 
-  BuilderExpr eq(const BuilderExpr &rhs) const;
+  BuilderExpr eq(const BuilderExpr& rhs) const;
   BuilderExpr eq(int val) const;
   BuilderExpr eq(int64_t val) const;
   BuilderExpr eq(float val) const;
   BuilderExpr eq(double val) const;
   BuilderExpr eq(const std::string& val) const;
+
+  BuilderExpr ne(const BuilderExpr& rhs) const;
+  BuilderExpr ne(int val) const;
+  BuilderExpr ne(int64_t val) const;
+  BuilderExpr ne(float val) const;
+  BuilderExpr ne(double val) const;
+  BuilderExpr ne(const std::string& val) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
