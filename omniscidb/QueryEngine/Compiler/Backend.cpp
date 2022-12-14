@@ -880,8 +880,12 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
     vmap[&*j] = &*pos_fn_arg_it++;
   }
   llvm::SmallVector<llvm::ReturnInst*, 8> returns;
+#if LLVM_VERSION_MAJOR > 12
   llvm::CloneFunctionInto(
       target_fn, from_fn, vmap, llvm::CloneFunctionChangeType::DifferentModule, returns);
+#else
+  llvm::CloneFunctionInto(target_fn, from_fn, vmap, true, returns);
+#endif
 
   for (auto& BB : *target_fn) {
     for (llvm::BasicBlock::iterator bbi = BB.begin(); bbi != BB.end();) {
