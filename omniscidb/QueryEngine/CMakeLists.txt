@@ -179,8 +179,12 @@ if (SUPPRESS_NULL_LOGGER_DEPRECATION_WARNINGS)
     list(APPEND MAPD_DEFINITIONS "-DSUPPRESS_NULL_LOGGER_DEPRECATION_WARNINGS")
 endif ()
 
-find_program(llvm_clangpp_cmd NAME clang++ HINTS ${LLVM_TOOLS_BINARY_DIR})
-find_program(llvm_link_cmd NAME llvm-link HINTS ${LLVM_TOOLS_BINARY_DIR})
+find_program(llvm_clangpp_cmd REQUIRED NAMES clang++ PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
+find_program(llvm_as_cmd REQUIRED NAMES llvm-as PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
+find_program(llvm_link_cmd REQUIRED NAMES llvm-link PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
+message(STATUS "llvm_as_cmd=${llvm_as_cmd}")
+message(STATUS "llvm_clangpp_cmd=${llvm_clangpp_cmd}")
+message(STATUS "llvm_link_cmd=${llvm_link_cmd}")
 
 list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -274,9 +278,16 @@ precompile_modules("cpu_precompiled_module_list" ${cpu_module_internal_suffix} $
 link_runtime_module(${intel_gpu_module_name} "${intel_gpu_precompiled_module_list}")
 link_runtime_module(${cpu_module_name} "${cpu_precompiled_module_list}")
 
+# SPIRV helper functions & intrinsics
+set(spirv_helper_functions_module genx.bc)
+add_custom_command(
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Compiler/genx.ll
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/genx.bc
+    COMMAND ${llvm_as_cmd} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/Compiler/genx.ll -o ${CMAKE_CURRENT_BINARY_DIR}/${spirv_helper_functions_module}
+)
 
 if(ENABLE_L0)
-    add_custom_target(IntelGPURuntimeModule DEPENDS ${intel_gpu_module_name})
+    add_custom_target(IntelGPURuntimeModule DEPENDS ${intel_gpu_module_name} ${spirv_helper_functions_module})
     add_dependencies(QueryEngine IntelGPURuntimeModule)
 endif()
 

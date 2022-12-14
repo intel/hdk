@@ -197,7 +197,12 @@ std::vector<void*> ScalarCodeGenerator::generateNativeGPUCode(
     }
     case GpuMgrPlatform::L0: {
       auto l0_context = compiler::L0Backend::generateNativeGPUCode(
-          func, wrapper_func, {func, wrapper_func}, co, gpu_target);
+          executor->getExtensionModuleContext()->getExtensionModules(),
+          func,
+          wrapper_func,
+          {func, wrapper_func},
+          co,
+          gpu_target);
       gpu_compilation_context_ = l0_context;
       return l0_context->getNativeFunctionPointers();
     }
