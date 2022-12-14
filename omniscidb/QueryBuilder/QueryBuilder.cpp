@@ -897,6 +897,38 @@ BuilderExpr BuilderExpr::logicalOr(const BuilderExpr& rhs) const {
   }
 }
 
+BuilderExpr BuilderExpr::eq(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kEq, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply EQ operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::eq(int val) const {
+  return eq(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::eq(int64_t val) const {
+  return eq(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::eq(float val) const {
+  return eq(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::eq(double val) const {
+  return eq(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::eq(const std::string& val) const {
+  return eq(builder_.cst(val));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }

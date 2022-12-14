@@ -227,14 +227,6 @@ const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
             CHECK(false);
         }
       } else if ((left_type->isString() || left_type->isExtDictionary()) &&
-                 right_type->isTime()) {
-        *new_left_type = right_type->withNullable(left_type->nullable());
-        *new_right_type = right_type;
-      } else if (left_type->isTime() &&
-                 (right_type->isString() || right_type->isExtDictionary())) {
-        *new_left_type = left_type;
-        *new_right_type = left_type->withNullable(right_type->nullable());
-      } else if ((left_type->isString() || left_type->isExtDictionary()) &&
                  (right_type->isString() || right_type->isExtDictionary())) {
         *new_left_type = left_type;
         *new_right_type = right_type;

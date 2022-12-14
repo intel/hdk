@@ -94,6 +94,13 @@ class BuilderExpr {
   BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
   BuilderExpr logicalOr(const BuilderExpr& rhs) const;
 
+  BuilderExpr eq(const BuilderExpr &rhs) const;
+  BuilderExpr eq(int val) const;
+  BuilderExpr eq(int64_t val) const;
+  BuilderExpr eq(float val) const;
+  BuilderExpr eq(double val) const;
+  BuilderExpr eq(const std::string& val) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;
