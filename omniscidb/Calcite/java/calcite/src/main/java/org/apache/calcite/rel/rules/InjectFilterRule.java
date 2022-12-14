@@ -35,6 +35,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.immutables.value.Value;
+
+@Value.Enclosing
 public class InjectFilterRule extends RelRule<InjectFilterRule.Config> {
   // goal: customer entitlements first swipe
 
@@ -97,9 +100,11 @@ public class InjectFilterRule extends RelRule<InjectFilterRule.Config> {
   };
 
   /** Rule configuration. */
+  @Value.Immutable
+  @SuppressWarnings("immutables")
   public interface Config extends RelRule.Config {
     Config DEFAULT =
-            EMPTY.withOperandSupplier(b0 -> b0.operand(LogicalTableScan.class).noInputs())
+            ImmutableInjectFilterRule.Config.of().withOperandSupplier(b0 -> b0.operand(LogicalTableScan.class).noInputs())
                     .as(Config.class);
 
     @Override
