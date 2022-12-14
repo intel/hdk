@@ -945,6 +945,38 @@ BuilderExpr BuilderExpr::ne(const std::string& val) const {
   return ne(builder_.cst(val));
 }
 
+BuilderExpr BuilderExpr::lt(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kLt, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply LT operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::lt(int val) const {
+  return lt(builder_.cst(val, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::lt(int64_t val) const {
+  return lt(builder_.cst(val, builder_.ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::lt(float val) const {
+  return lt(builder_.cst(val, builder_.ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::lt(double val) const {
+  return lt(builder_.cst(val, builder_.ctx_.fp64(false)));
+}
+
+BuilderExpr BuilderExpr::lt(const std::string& val) const {
+  return lt(builder_.cst(val));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }

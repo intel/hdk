@@ -3272,6 +3272,159 @@ TEST_F(QueryBuilderTest, NeArrExpr) {
   }
 }
 
+TEST_F(QueryBuilderTest, LtNumberExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  std::vector<std::string> num_cols = {
+      "col_bi"s, "col_i"s, "col_si"s, "col_ti"s, "col_f"s, "col_d"s, "col_dec"s};
+  for (auto& lhs_name : num_cols) {
+    for (auto& rhs_name : num_cols) {
+      checkBinOper(scan.ref(lhs_name).lt(scan.ref(rhs_name)),
+                   ctx().boolean(),
+                   OpType::kLt,
+                   scan.ref(lhs_name),
+                   scan.ref(rhs_name));
+    }
+    checkBinOper(scan.ref(lhs_name).lt(1),
+                 ctx().boolean(),
+                 OpType::kLt,
+                 scan.ref(lhs_name),
+                 builder.cst(1, "int32"));
+    checkBinOper(scan.ref(lhs_name).lt(1L),
+                 ctx().boolean(),
+                 OpType::kLt,
+                 scan.ref(lhs_name),
+                 builder.cst(1, "int64"));
+    checkBinOper(scan.ref(lhs_name).lt(1.0f),
+                 ctx().boolean(),
+                 OpType::kLt,
+                 scan.ref(lhs_name),
+                 builder.cst(1.0, "fp32"));
+    checkBinOper(scan.ref(lhs_name).lt(1.0),
+                 ctx().boolean(),
+                 OpType::kLt,
+                 scan.ref(lhs_name),
+                 builder.cst(1.0, "fp64"));
+    EXPECT_THROW(scan.ref(lhs_name).lt("str"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_str")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dict")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_date")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_time")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_timestamp")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32x3")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(builder.cst(123, "interval[s]")),
+                 InvalidQueryError);
+  }
+}
+
+TEST_F(QueryBuilderTest, LtStrExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  for (auto& lhs_name : {"col_str"s, "col_dict"s}) {
+    for (auto& rhs_name : {"col_str"s, "col_dict"s, "col_dict2"s}) {
+      checkBinOper(scan.ref(lhs_name).lt(scan.ref(rhs_name)),
+                   ctx().boolean(),
+                   OpType::kLt,
+                   scan.ref(lhs_name),
+                   scan.ref(rhs_name));
+    }
+    checkBinOper(scan.ref(lhs_name).lt("str"),
+                 ctx().boolean(),
+                 OpType::kLt,
+                 scan.ref(lhs_name),
+                 builder.cst("str"));
+    EXPECT_THROW(scan.ref(lhs_name).lt(1), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1L), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0f), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_bi")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_i")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_si")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_ti")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_f")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_d")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dec")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_date")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_time")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_timestamp")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32x3")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(builder.cst(123, "interval[s]")),
+                 InvalidQueryError);
+  }
+}
+
+TEST_F(QueryBuilderTest, LtDateTimeExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  for (auto& lhs_name : {"col_date4"s, "col_time"s, "col_timestamp"s}) {
+    for (auto& rhs_name : {"col_date3"s, "col_time2"s, "col_timestamp2"s}) {
+      auto lhs_ref = scan.ref(lhs_name);
+      auto rhs_ref = scan.ref(rhs_name);
+      if ((lhs_ref.expr()->type()->isTime() && !rhs_ref.expr()->type()->isTime()) ||
+          (!lhs_ref.expr()->type()->isTime() && rhs_ref.expr()->type()->isTime())) {
+        EXPECT_THROW(lhs_ref.lt(rhs_ref), InvalidQueryError);
+      } else {
+        checkBinOper(lhs_ref.lt(rhs_ref), ctx().boolean(), OpType::kLt, lhs_ref, rhs_ref);
+      }
+    }
+    EXPECT_THROW(scan.ref(lhs_name).lt("str"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1L), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0f), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_bi")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_i")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_si")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_ti")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_f")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_d")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dec")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_str")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dict")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_arr_i32x3")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(builder.cst(123, "interval[s]")),
+                 InvalidQueryError);
+  }
+}
+
+TEST_F(QueryBuilderTest, LtArrExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  for (auto& lhs_name : {"col_arr_i32"s, "col_arr_i32x3"s}) {
+    for (auto& rhs_name : {"col_arr_i32_2"s, "col_arr_i64"s, "col_arr_i32x3_2"s}) {
+      auto lhs_ref = scan.ref(lhs_name);
+      auto rhs_ref = scan.ref(rhs_name);
+      if (lhs_ref.expr()->type()->equal(rhs_ref.expr()->type())) {
+        checkBinOper(lhs_ref.lt(rhs_ref), ctx().boolean(), OpType::kLt, lhs_ref, rhs_ref);
+      } else {
+        EXPECT_THROW(lhs_ref.lt(rhs_ref), InvalidQueryError);
+      }
+    }
+    EXPECT_THROW(scan.ref(lhs_name).lt("str"), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1L), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0f), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(1.0), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_bi")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_i")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_si")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_ti")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_f")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_d")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dec")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_str")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_dict")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_date")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_time")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(scan.ref("col_timestamp")), InvalidQueryError);
+    EXPECT_THROW(scan.ref(lhs_name).lt(builder.cst(123, "interval[s]")),
+                 InvalidQueryError);
+  }
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));

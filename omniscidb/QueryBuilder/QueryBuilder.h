@@ -106,6 +106,13 @@ class BuilderExpr {
   BuilderExpr ne(double val) const;
   BuilderExpr ne(const std::string& val) const;
 
+  BuilderExpr lt(const BuilderExpr& rhs) const;
+  BuilderExpr lt(int val) const;
+  BuilderExpr lt(int64_t val) const;
+  BuilderExpr lt(float val) const;
+  BuilderExpr lt(double val) const;
+  BuilderExpr lt(const std::string& val) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;
