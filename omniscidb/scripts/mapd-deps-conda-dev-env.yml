@@ -11,6 +11,7 @@
 name: omnisci-dev
 channels:
   - conda-forge
+  - intel
 
 dependencies:
   - gxx_linux-64   9.*
@@ -49,4 +50,5 @@ dependencies:
   - binutils
   - llvm-spirv 14.0.*
   - folly 2022.11.07.00
+  - dpcpp_cpp_rt
 
