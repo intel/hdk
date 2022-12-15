@@ -147,10 +147,9 @@ endif()
 
 option(ENABLE_CUDA "Enable CUDA support" ON)
 if(ENABLE_CUDA)
-  set(CMAKE_CUDA_COMPILER_ID_TEST_FLAGS_FIRST "-allow-unsupported-compiler")
+  set(ENV{"NVCC_APPEND_FLAGS"} "--allow-unsupported-compiler")
   set(CMAKE_CUDA_ARCHITECTURES 60) # Set something here so that we can pick up nvcc
   enable_language(CUDA)
-  set(CUDA_NVCC_FLAGS "-allow-unsupported-compiler")
 
   find_package(CUDAToolkit REQUIRED)
   # A temporary workaround for non-conda envs
