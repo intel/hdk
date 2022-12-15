@@ -381,7 +381,9 @@ class ContextImpl {
             match_res,
             std::regex("date(16|32|64)?(?:\\[(m|d|s|ms|us|ns)\\])?(\\[nn\\])?"))) {
       int size = match_res[1].matched ? std::stoi(match_res[1].str()) / 8 : 8;
-      auto unit = match_res[2].matched ? parse_unit(match_res[2].str()) : TimeUnit::kDay;
+      auto unit = match_res[2].matched ? parse_unit(match_res[2].str())
+                  : size == 2          ? TimeUnit::kDay
+                                       : TimeUnit::kSecond;
       return date(size, unit, !match_res[3].matched);
     }
     // Time types.

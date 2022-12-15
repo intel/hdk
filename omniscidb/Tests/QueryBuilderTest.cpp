@@ -1261,11 +1261,13 @@ TEST_F(QueryBuilderTest, ParseType) {
   ASSERT_TRUE(ctx().typeFromString("text[nn]")->equal(ctx().text(false)));
   EXPECT_THROW(ctx().typeFromString("text32"), TypeError);
   // DATE
-  ASSERT_TRUE(ctx().typeFromString("date")->equal(ctx().date(8, TimeUnit::kDay, true)));
-  ASSERT_TRUE(ctx().typeFromString("date16")->equal(ctx().date(2, TimeUnit::kDay, true)));
-  ASSERT_TRUE(ctx().typeFromString("date32")->equal(ctx().date(4, TimeUnit::kDay, true)));
   ASSERT_TRUE(
-      ctx().typeFromString("date64[nn]")->equal(ctx().date(8, TimeUnit::kDay, false)));
+      ctx().typeFromString("date")->equal(ctx().date(8, TimeUnit::kSecond, true)));
+  ASSERT_TRUE(ctx().typeFromString("date16")->equal(ctx().date(2, TimeUnit::kDay, true)));
+  ASSERT_TRUE(
+      ctx().typeFromString("date32")->equal(ctx().date(4, TimeUnit::kSecond, true)));
+  ASSERT_TRUE(
+      ctx().typeFromString("date64[nn]")->equal(ctx().date(8, TimeUnit::kSecond, false)));
   ASSERT_TRUE(
       ctx().typeFromString("date32[s]")->equal(ctx().date(4, TimeUnit::kSecond, true)));
   ASSERT_TRUE(
@@ -1937,6 +1939,7 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst("00:20:34", "time[ns]"),
            1234000000000,
            ctx().time64(TimeUnit::kNano, false));
+  checkCst(builder.time("01:10:11"), 4211000000, ctx().time64(TimeUnit::kMicro, false));
   EXPECT_THROW(builder.cst(1234, "date[d]"), InvalidQueryError);
   checkCst(builder.cst(1234, "date[s]"), 1234, ctx().date64(TimeUnit::kSecond, false));
   checkCst(builder.cst(1234, "date[ms]"), 1234, ctx().date64(TimeUnit::kMilli, false));
@@ -1955,6 +1958,7 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst("1970-01-02", "date[ns]"),
            86400000000000,
            ctx().date64(TimeUnit::kNano, false));
+  checkCst(builder.date("1970-01-02"), 86400, ctx().date64(TimeUnit::kSecond, false));
   checkCst(
       builder.cst(1234, "timestamp[s]"), 1234, ctx().timestamp(TimeUnit::kSecond, false));
   checkCst(
@@ -1975,6 +1979,9 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst("1970-01-02 01:02:03", "timestamp[ns]"),
            90123000000000,
            ctx().timestamp(TimeUnit::kNano, false));
+  checkCst(builder.timestamp("1970-01-02 01:02:03"),
+           90123000000,
+           ctx().timestamp(TimeUnit::kMicro, false));
   checkCst(
       builder.cst(1234, "interval[d]"), 1234, ctx().interval64(TimeUnit::kDay, false));
   checkCst(

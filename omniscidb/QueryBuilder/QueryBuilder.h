@@ -491,6 +491,9 @@ class QueryBuilder {
   BuilderExpr nullCst() const;
   BuilderExpr nullCst(const Type* type) const;
   BuilderExpr nullCst(const std::string& type) const;
+  BuilderExpr date(const std::string& val) const;
+  BuilderExpr time(const std::string& val) const;
+  BuilderExpr timestamp(const std::string& val) const;
 
  protected:
   friend class BuilderExpr;

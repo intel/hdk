@@ -2267,6 +2267,18 @@ BuilderExpr QueryBuilder::nullCst(const std::string& type) const {
   return nullCst(ctx_.typeFromString(type));
 }
 
+BuilderExpr QueryBuilder::date(const std::string& val) const {
+  return cst(val, "date");
+}
+
+BuilderExpr QueryBuilder::time(const std::string& val) const {
+  return cst(val, "time");
+}
+
+BuilderExpr QueryBuilder::timestamp(const std::string& val) const {
+  return cst(val, "timestamp");
+}
+
 BuilderExpr QueryBuilder::cst(std::initializer_list<int>& vals) const {
   return cst(std::vector<int>(vals));
 }
