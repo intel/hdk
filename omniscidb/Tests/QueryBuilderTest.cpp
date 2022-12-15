@@ -3934,6 +3934,24 @@ TEST_F(QueryBuilderTest, SimpleProjection) {
   EXPECT_THROW(builder.scan("test1").proj(std::vector<int>(), {}), InvalidQueryError);
 }
 
+TEST_F(QueryBuilderTest, ProjFilter) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test1");
+  auto filter = scan.filter(scan.ref("col_bi").gt(3));
+  auto dag = filter.proj({filter.ref("col_i").add(1), filter.ref("col_f")}).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int32_t>({45, 56}), std::vector<float>({4.4f, 5.5f}));
+}
+
+TEST_F(QueryBuilderTest, FilterProj) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test1");
+  auto proj = scan.proj({scan["col_bi"], (scan["col_i"] + 1).name("inc")});
+  auto dag = proj.filter(proj["inc"] > 40).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int64_t>({4, 5}), std::vector<int32_t>({45, 56}));
+}
+
 TEST_F(QueryBuilderTest, Aggregate) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test2_agg(
@@ -4385,6 +4403,22 @@ TEST_F(QueryBuilderTest, Sort) {
   EXPECT_THROW(builder.scan("test3").sort("col_arr_i32x3"), InvalidQueryError);
   EXPECT_THROW(builder.scan("sort").sort(builder.scan("test3").ref(0)),
                InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, SortAggFilterProj) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test2");
+  auto proj = scan.proj(
+      {scan["id1"], scan["id2"], scan["val1"], (scan["val2"] + 10).name("val2")});
+  auto dag = proj.filter(!proj["val1"].isNull())
+                 .agg({"id1", "id2"}, "sum(val2)")
+                 .sort({"id1", "id2"})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int32_t>({1, 1, 2, 2}),
+                   std::vector<int32_t>({1, 2, 1, 2}),
+                   std::vector<int64_t>({65, 100, 33, 73}));
 }
 
 class Taxi : public TestSuite {

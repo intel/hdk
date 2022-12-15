@@ -254,6 +254,8 @@ class BuilderNode {
   BuilderNode proj(const std::vector<BuilderExpr>& exprs,
                    const std::vector<std::string>& fields) const;
 
+  BuilderNode filter(BuilderExpr condition) const;
+
   BuilderNode agg(int group_key, const std::string& agg_str) const;
   BuilderNode agg(int group_key, std::initializer_list<std::string> aggs) const;
   BuilderNode agg(int group_key, const std::vector<std::string>& aggs) const;

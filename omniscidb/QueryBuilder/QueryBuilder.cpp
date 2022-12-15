@@ -35,6 +35,9 @@ std::string getFieldName(const Node* node, int col_idx) {
   if (auto proj = node->as<Project>()) {
     return proj->getFieldName(col_idx);
   }
+  if (auto filter = node->as<Filter>()) {
+    return getFieldName(filter->getInput(0), col_idx);
+  }
   if (auto agg = node->as<Aggregate>()) {
     return agg->getFieldName(col_idx);
   }
@@ -42,6 +45,8 @@ std::string getFieldName(const Node* node, int col_idx) {
   throw InvalidQueryError() << "getFieldName error: unsupported node: "
                             << node->toString();
 }
+
+ExprPtr getRefByName(const Node* node, const std::string& col_name);
 
 ExprPtr getRefByName(const Scan* scan, const std::string& col_name) {
   for (size_t i = 0; i < scan->size(); ++i) {
@@ -61,6 +66,14 @@ ExprPtr getRefByName(const Project* proj, const std::string& col_name) {
   return nullptr;
 }
 
+ExprPtr getRefByName(const Filter* filter, const std::string& col_name) {
+  auto input_ref = getRefByName(filter->getInput(0), col_name);
+  if (input_ref) {
+    return getNodeColumnRef(filter, input_ref->as<hdk::ir::ColumnRef>()->index());
+  }
+  return nullptr;
+}
+
 ExprPtr getRefByName(const Aggregate* agg, const std::string& col_name) {
   for (size_t i = 0; i < agg->size(); ++i) {
     if (agg->getFieldName(i) == col_name) {
@@ -76,6 +89,8 @@ ExprPtr getRefByName(const Node* node, const std::string& col_name) {
     res = getRefByName(scan, col_name);
   } else if (auto proj = node->as<Project>()) {
     res = getRefByName(proj, col_name);
+  } else if (auto filter = node->as<Filter>()) {
+    res = getRefByName(filter, col_name);
   } else if (auto agg = node->as<Aggregate>()) {
     res = getRefByName(agg, col_name);
   } else {
@@ -1490,6 +1505,12 @@ BuilderNode BuilderNode::proj(const ExprPtrVector& exprs,
   checkExprInput(exprs, {node_.get()}, "projection");
   auto proj = std::make_shared<Project>(exprs, fields, node_);
   return {builder_, proj};
+}
+
+BuilderNode BuilderNode::filter(BuilderExpr condition) const {
+  checkExprInput(condition.expr(), {node_.get()}, "filter");
+  auto filter = std::make_shared<Filter>(condition.expr(), node_);
+  return {builder_, filter};
 }
 
 BuilderExpr BuilderNode::parseAggString(const std::string& agg_str) const {
