@@ -147,13 +147,15 @@ endif()
 
 option(ENABLE_CUDA "Enable CUDA support" ON)
 if(ENABLE_CUDA)
+  set(CMAKE_CUDA_ARCHITECTURES 60) # Set something here so that we can pick up nvcc
   enable_language(CUDA)
+  set(CUDA_NVCC_FLAGS "-allow-unsupported-compiler")
+
   find_package(CUDAToolkit REQUIRED)
   # A temporary workaround for non-conda envs
   include_directories(${CUDAToolkit_INCLUDE_DIRS})
   list(APPEND CUDA_LIBRARIES CUDA::cudart CUDA::cuda_driver)
   add_definitions("-DHAVE_CUDA")
-
 else()
   set(CUDA_LIBRARIES "")
   set(MAPD_PACKAGE_FLAGS "${MAPD_PACKAGE_FLAGS}-cpu")
