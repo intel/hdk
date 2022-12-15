@@ -357,6 +357,11 @@ set(QUERY_ENGINE_LIBS
 
 list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})
 
+
+if(ENABLE_DWARF_BENCH)
+    list(APPEND QUERY_ENGINE_LIBS dbench::dbench)
+endif()
+
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
 set(TABLE_FUNCTIONS_DEPS "")
