@@ -493,60 +493,125 @@ class QueryBuilder {
   ConfigPtr config_;
 };
 
+BuilderExpr operator+(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator+(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator+(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator+(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator+(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator+(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator+(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator+(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator+(double lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator-(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator-(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator-(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator-(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator-(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator-(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator-(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator-(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator-(double lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator*(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator*(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator*(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator*(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator*(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator*(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator*(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator*(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator*(double lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator/(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator/(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator/(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator/(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator/(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator/(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator/(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator/(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator/(double lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator%(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator%(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator%(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator%(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator%(int64_t lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator&&(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator||(const BuilderExpr& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator==(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator==(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator==(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator==(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator==(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator==(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator==(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator==(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator==(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator==(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator==(const std::string& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator!=(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator!=(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator!=(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator!=(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator!=(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator!=(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator!=(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator!=(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator!=(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator!=(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator!=(const std::string& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator<(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator<(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator<(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator<(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator<(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator<(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator<(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator<(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator<(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator<(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator<(const std::string& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator<=(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator<=(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator<=(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator<=(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator<=(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator<=(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator<=(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator<=(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator<=(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator<=(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator<=(const std::string& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator>(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator>(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator>(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator>(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator>(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator>(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator>(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator>(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator>(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator>(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator>(const std::string& lhs, const BuilderExpr& rhs);
+
+BuilderExpr operator>=(const BuilderExpr& lhs, const BuilderExpr& rhs);
+BuilderExpr operator>=(const BuilderExpr& lhs, int rhs);
+BuilderExpr operator>=(const BuilderExpr& lhs, int64_t rhs);
+BuilderExpr operator>=(const BuilderExpr& lhs, float rhs);
+BuilderExpr operator>=(const BuilderExpr& lhs, double rhs);
+BuilderExpr operator>=(const BuilderExpr& lhs, const std::string& rhs);
+BuilderExpr operator>=(int lhs, const BuilderExpr& rhs);
+BuilderExpr operator>=(int64_t lhs, const BuilderExpr& rhs);
+BuilderExpr operator>=(float lhs, const BuilderExpr& rhs);
+BuilderExpr operator>=(double lhs, const BuilderExpr& rhs);
+BuilderExpr operator>=(const std::string& lhs, const BuilderExpr& rhs);
+
 }  // namespace hdk::ir
-
-hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs,
-                               const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, int rhs);
-hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
-hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, float rhs);
-hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs, double rhs);
-hdk::ir::BuilderExpr operator+(int lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator+(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator+(float lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator+(double lhs, const hdk::ir::BuilderExpr& rhs);
-
-hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs,
-                               const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, int rhs);
-hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
-hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, float rhs);
-hdk::ir::BuilderExpr operator-(const hdk::ir::BuilderExpr& lhs, double rhs);
-hdk::ir::BuilderExpr operator-(int lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator-(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator-(float lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator-(double lhs, const hdk::ir::BuilderExpr& rhs);
-
-hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs,
-                               const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, int rhs);
-hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
-hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, float rhs);
-hdk::ir::BuilderExpr operator*(const hdk::ir::BuilderExpr& lhs, double rhs);
-hdk::ir::BuilderExpr operator*(int lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator*(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator*(float lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator*(double lhs, const hdk::ir::BuilderExpr& rhs);
-
-hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs,
-                               const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, int rhs);
-hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
-hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, float rhs);
-hdk::ir::BuilderExpr operator/(const hdk::ir::BuilderExpr& lhs, double rhs);
-hdk::ir::BuilderExpr operator/(int lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator/(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator/(float lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator/(double lhs, const hdk::ir::BuilderExpr& rhs);
-
-hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs,
-                               const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int rhs);
-hdk::ir::BuilderExpr operator%(const hdk::ir::BuilderExpr& lhs, int64_t rhs);
-hdk::ir::BuilderExpr operator%(int lhs, const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator%(int64_t lhs, const hdk::ir::BuilderExpr& rhs);
-
-hdk::ir::BuilderExpr operator&&(const hdk::ir::BuilderExpr& lhs,
-                                const hdk::ir::BuilderExpr& rhs);
-hdk::ir::BuilderExpr operator||(const hdk::ir::BuilderExpr& lhs,
-                                const hdk::ir::BuilderExpr& rhs);

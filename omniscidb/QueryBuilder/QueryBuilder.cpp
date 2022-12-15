@@ -2304,8 +2304,6 @@ BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
   return cst(vals, ctx_.typeFromString(type));
 }
 
-}  // namespace hdk::ir
-
 hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs,
                                const hdk::ir::BuilderExpr& rhs) {
   return lhs.add(rhs);
@@ -2484,3 +2482,269 @@ hdk::ir::BuilderExpr operator||(const hdk::ir::BuilderExpr& lhs,
                                 const hdk::ir::BuilderExpr& rhs) {
   return lhs.logicalOr(rhs);
 }
+
+BuilderExpr operator==(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(const BuilderExpr& lhs, int rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(const BuilderExpr& lhs, float rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(const BuilderExpr& lhs, double rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.eq(rhs);
+}
+
+BuilderExpr operator==(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).eq(rhs);
+}
+
+BuilderExpr operator==(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).eq(rhs);
+}
+
+BuilderExpr operator==(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).eq(rhs);
+}
+
+BuilderExpr operator==(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).eq(rhs);
+}
+
+BuilderExpr operator==(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).eq(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, int rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, float rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, double rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.ne(rhs);
+}
+
+BuilderExpr operator!=(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).ne(rhs);
+}
+
+BuilderExpr operator!=(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).ne(rhs);
+}
+
+BuilderExpr operator!=(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).ne(rhs);
+}
+
+BuilderExpr operator!=(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).ne(rhs);
+}
+
+BuilderExpr operator!=(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).ne(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, int rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, float rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, double rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.lt(rhs);
+}
+
+BuilderExpr operator<(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).lt(rhs);
+}
+
+BuilderExpr operator<(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).lt(rhs);
+}
+
+BuilderExpr operator<(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).lt(rhs);
+}
+
+BuilderExpr operator<(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).lt(rhs);
+}
+
+BuilderExpr operator<(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).lt(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, int rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, float rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, double rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.le(rhs);
+}
+
+BuilderExpr operator<=(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).le(rhs);
+}
+
+BuilderExpr operator<=(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).le(rhs);
+}
+
+BuilderExpr operator<=(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).le(rhs);
+}
+
+BuilderExpr operator<=(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).le(rhs);
+}
+
+BuilderExpr operator<=(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).le(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, int rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, float rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, double rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.gt(rhs);
+}
+
+BuilderExpr operator>(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).gt(rhs);
+}
+
+BuilderExpr operator>(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).gt(rhs);
+}
+
+BuilderExpr operator>(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).gt(rhs);
+}
+
+BuilderExpr operator>(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).gt(rhs);
+}
+
+BuilderExpr operator>(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).gt(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, const BuilderExpr& rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, int rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, int64_t rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, float rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, double rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(const BuilderExpr& lhs, const std::string& rhs) {
+  return lhs.ge(rhs);
+}
+
+BuilderExpr operator>=(int lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int32(false)).ge(rhs);
+}
+
+BuilderExpr operator>=(int64_t lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().int64(false)).ge(rhs);
+}
+
+BuilderExpr operator>=(float lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp32(false)).ge(rhs);
+}
+
+BuilderExpr operator>=(double lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs, rhs.ctx().fp64(false)).ge(rhs);
+}
+
+BuilderExpr operator>=(const std::string& lhs, const BuilderExpr& rhs) {
+  return rhs.builder().cst(lhs).ge(rhs);
+}
+
+}  // namespace hdk::ir

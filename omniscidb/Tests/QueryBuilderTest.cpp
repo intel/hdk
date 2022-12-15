@@ -3434,6 +3434,366 @@ TEST_F(QueryBuilderTest, CmpArrExpr) {
   testBuildCmpArrExpr<CmpGe>(builder);
 }
 
+TEST_F(QueryBuilderTest, EqOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") == scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") == 1,
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") == 1L,
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") == 1.0f,
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") == 1.0,
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") == "str",
+               ctx().boolean(),
+               OpType::kEq,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 == scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kEq,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L == scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kEq,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f == scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kEq,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 == scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kEq,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" == scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kEq,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
+TEST_F(QueryBuilderTest, NeOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") != scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") != 1,
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") != 1L,
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") != 1.0f,
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") != 1.0,
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") != "str",
+               ctx().boolean(),
+               OpType::kNe,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 != scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kNe,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L != scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kNe,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f != scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kNe,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 != scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kNe,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" != scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kNe,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
+TEST_F(QueryBuilderTest, LtOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") < scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") < 1,
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") < 1L,
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") < 1.0f,
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") < 1.0,
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") < "str",
+               ctx().boolean(),
+               OpType::kLt,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 < scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLt,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L < scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLt,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f < scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLt,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 < scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLt,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" < scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kLt,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
+TEST_F(QueryBuilderTest, LeOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") <= scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") <= 1,
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") <= 1L,
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") <= 1.0f,
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") <= 1.0,
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") <= "str",
+               ctx().boolean(),
+               OpType::kLe,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 <= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLe,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L <= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLe,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f <= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLe,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 <= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kLe,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" <= scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kLe,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
+TEST_F(QueryBuilderTest, GtOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") > scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") > 1,
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") > 1L,
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") > 1.0f,
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") > 1.0,
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") > "str",
+               ctx().boolean(),
+               OpType::kGt,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 > scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGt,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L > scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGt,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f > scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGt,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 > scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGt,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" > scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kGt,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
+TEST_F(QueryBuilderTest, GeOperators) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_bi") >= scan.ref("col_i"),
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_bi"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_bi") >= 1,
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_bi") >= 1L,
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_bi"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_bi") >= 1.0f,
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp32"));
+  checkBinOper(scan.ref("col_bi") >= 1.0,
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_bi"),
+               builder.cst(1.0, "fp64"));
+  checkBinOper(scan.ref("col_str") >= "str",
+               ctx().boolean(),
+               OpType::kGe,
+               scan.ref("col_str"),
+               builder.cst("str"));
+  checkBinOper(1 >= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGe,
+               builder.cst(1, "int32"),
+               scan.ref("col_bi"));
+  checkBinOper(1L >= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGe,
+               builder.cst(1, "int64"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0f >= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGe,
+               builder.cst(1.0, "fp32"),
+               scan.ref("col_bi"));
+  checkBinOper(1.0 >= scan.ref("col_bi"),
+               ctx().boolean(),
+               OpType::kGe,
+               builder.cst(1.0, "fp64"),
+               scan.ref("col_bi"));
+  checkBinOper("str" >= scan.ref("col_str"),
+               ctx().boolean(),
+               OpType::kGe,
+               builder.cst("str"),
+               scan.ref("col_str"));
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));
