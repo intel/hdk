@@ -77,9 +77,12 @@ if(ENABLE_L0)
   add_test(DataMgrWithL0Test DataMgrWithL0Test ${TEST_ARGS})
 endif()
 
-if (ENABLE_COST_MODEL) 
-  add_executable(CostModelTest CostModel/CostModelTest.cpp)
-  target_link_libraries(CostModelTest gtest)
+add_executable(CostModelTest CostModel/CostModelTest.cpp)
+target_link_libraries(CostModelTest gtest QueryEngine)
+
+if(ENABLE_DWARF_BENCH)
+  add_executable(DwarfBenchIntegrationTest CostModel/DwarfBenchIntegrationTest.cpp)
+  target_link_libraries(DwarfBenchIntegrationTest gtest QueryEngine)
 endif()
 
 target_link_libraries(ResultSetTest gtest QueryEngine ArrowQueryRunner ArrowStorage)
