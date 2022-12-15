@@ -1202,6 +1202,33 @@ BuilderExpr BuilderExpr::ge(const std::string& val) const {
   return ge(builder_.cst(val));
 }
 
+BuilderExpr BuilderExpr::at(const BuilderExpr& idx) const {
+  if (!expr_->type()->isArray()) {
+    throw InvalidQueryError() << "Cannot use ARRAY_AT for " << expr_->type()->toString();
+  }
+  if (!idx.expr()->type()->isInteger()) {
+    throw InvalidQueryError()
+        << "Only integer indexes can be used in ARRAY_AT. Provided: "
+        << idx.expr()->type()->toString();
+  }
+  auto res_type = expr_->type()->as<ArrayBaseType>()->elemType();
+  auto at_expr = makeExpr<BinOper>(res_type,
+                                   expr_->containsAgg() || idx.expr()->containsAgg(),
+                                   OpType::kArrayAt,
+                                   Qualifier::kOne,
+                                   expr_,
+                                   idx.expr());
+  return {builder_, at_expr, "", true};
+}
+
+BuilderExpr BuilderExpr::at(int idx) const {
+  return at(builder_.cst(idx, builder_.ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::at(int64_t idx) const {
+  return at(builder_.cst(idx, builder_.ctx_.int64(false)));
+}
+
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
   return {builder_, rewriter.visit(expr_.get()), name_, auto_name_};
 }
@@ -1212,6 +1239,18 @@ BuilderExpr BuilderExpr::operator!() const {
 
 BuilderExpr BuilderExpr::operator-() const {
   return uminus();
+}
+
+BuilderExpr BuilderExpr::operator[](const BuilderExpr& idx) const {
+  return at(idx);
+}
+
+BuilderExpr BuilderExpr::operator[](int idx) const {
+  return at(idx);
+}
+
+BuilderExpr BuilderExpr::operator[](int64_t idx) const {
+  return at(idx);
 }
 
 const QueryBuilder& BuilderExpr::builder() const {

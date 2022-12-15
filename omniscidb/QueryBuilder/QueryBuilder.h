@@ -148,10 +148,17 @@ class BuilderExpr {
   BuilderExpr ge(double val) const;
   BuilderExpr ge(const std::string& val) const;
 
+  BuilderExpr at(const BuilderExpr& idx) const;
+  BuilderExpr at(int idx) const;
+  BuilderExpr at(int64_t idx) const;
+
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
   BuilderExpr operator!() const;
   BuilderExpr operator-() const;
+  BuilderExpr operator[](const BuilderExpr& idx) const;
+  BuilderExpr operator[](int idx) const;
+  BuilderExpr operator[](int64_t idx) const;
 
   const QueryBuilder& builder() const;
   Context& ctx() const;

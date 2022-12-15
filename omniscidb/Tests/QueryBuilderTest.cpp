@@ -3794,6 +3794,63 @@ TEST_F(QueryBuilderTest, GeOperators) {
                scan.ref("col_str"));
 }
 
+TEST_F(QueryBuilderTest, ArrayAtExpr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkBinOper(scan.ref("col_arr_i64").at(scan.ref("col_i")),
+               ctx().int64(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i64"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_arr_i32").at(1),
+               ctx().int32(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i32"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_arr_i32x3").at(1L),
+               ctx().int32(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i32x3"),
+               builder.cst(1, "int64"));
+  checkBinOper(scan.ref("col_arr_i64")[scan.ref("col_i")],
+               ctx().int64(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i64"),
+               scan.ref("col_i"));
+  checkBinOper(scan.ref("col_arr_i32")[1],
+               ctx().int32(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i32"),
+               builder.cst(1, "int32"));
+  checkBinOper(scan.ref("col_arr_i32x3")[1L],
+               ctx().int32(),
+               OpType::kArrayAt,
+               scan.ref("col_arr_i32x3"),
+               builder.cst(1, "int64"));
+  EXPECT_THROW(scan.ref("col_arr_i64").at(scan.ref("col_f")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64")[scan.ref("col_d")], InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64").at(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64")[scan.ref("col_dec")], InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64").at(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64")[scan.ref("col_dict")], InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64").at(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64")[scan.ref("col_time")], InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i64").at(scan.ref("col_timestamp")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_si").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_ti").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dec").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").at(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").at(1), InvalidQueryError);
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));
