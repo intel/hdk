@@ -348,6 +348,10 @@ if(ENABLE_L0)
     list(APPEND QUERY_ENGINE_LIBS PkgConfig::LLVMSPIRVLib)
 endif()
 
+if(ENABLE_DWARF_BENCH)
+    list(APPEND QUERY_ENGINE_LIBS dbench::dbench)
+endif()
+
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
 set(TABLE_FUNCTIONS_DEPS "")
