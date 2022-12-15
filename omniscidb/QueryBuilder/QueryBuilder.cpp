@@ -2058,6 +2058,14 @@ BuilderNode BuilderNode::sort(const std::vector<BuilderSortField>& fields,
   return {builder_, sort_node};
 }
 
+BuilderExpr BuilderNode::operator[](int col_idx) const {
+  return ref(col_idx);
+}
+
+BuilderExpr BuilderNode::operator[](const std::string& col_name) const {
+  return ref(col_name);
+}
+
 std::unique_ptr<QueryDag> BuilderNode::finalize() const {
   // Scan and join nodes are not supposed to be a root of a query DAG.
   // Add a projection in such cases.

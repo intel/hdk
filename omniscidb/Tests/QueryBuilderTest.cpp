@@ -472,6 +472,9 @@ TEST_F(QueryBuilderTest, ScanRef) {
   checkRef(scan.ref(2), scan.node(), 2, "col_f");
   checkRef(scan.ref(-1), scan.node(), 4, "rowid");
   checkRef(scan.ref(-4), scan.node(), 1, "col_i");
+  checkRef(scan["col_i"], scan.node(), 1, "col_i");
+  checkRef(scan[2], scan.node(), 2, "col_f");
+  checkRef(scan[-1], scan.node(), 4, "rowid");
   auto refs1 = scan.ref({2, 0, -2});
   checkRef(refs1[0], scan.node(), 2, "col_f");
   checkRef(refs1[1], scan.node(), 0, "col_bi");

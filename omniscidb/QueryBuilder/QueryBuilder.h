@@ -425,6 +425,9 @@ class BuilderNode {
                    size_t limit = 0,
                    size_t offset = 0) const;
 
+  BuilderExpr operator[](int col_idx) const;
+  BuilderExpr operator[](const std::string& col_name) const;
+
   std::unique_ptr<QueryDag> finalize() const;
 
   NodePtr node() const { return node_; }
