@@ -30,7 +30,10 @@ Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
     const std::vector<AnalyticalTemplate>& templates) {
   Detail::DeviceMeasurements dm;
   for (AnalyticalTemplate templ : templates) {
+    if (!isTemplateSupported(templ)) continue;    // Or should we throw an exception?
     for (ExecutorDeviceType device : devices) {
+      if (!isDeviceSupported(device)) continue;   // Same here?
+
       dm[device][templ] = measureTemplateOnDevice(device, templ);
     }
   }
@@ -64,7 +67,7 @@ DwarfBench::Dwarf DwarfBenchDataSource::convertToDwarf(AnalyticalTemplate templ)
       return DwarfBench::Dwarf::DPLScan;
     case AnalyticalTemplate::Join:
       return DwarfBench::Dwarf::Join;
-    default:
+    case AnalyticalTemplate::Reduce:
       throw UnsupportedAnalyticalTemplate(templ);
   }
 }
@@ -73,8 +76,8 @@ DwarfBench::DeviceType DwarfBenchDataSource::convertDeviceType(ExecutorDeviceTyp
   switch (device) {
     case ExecutorDeviceType::CPU:
       return DwarfBench::DeviceType::CPU;
-    default:
-      throw UnsupportedDevice(device);
+    case ExecutorDeviceType::GPU:
+      return DwarfBench::DeviceType::GPU;
   }
 }
 
