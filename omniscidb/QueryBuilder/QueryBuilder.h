@@ -68,10 +68,8 @@ class BuilderExpr {
   BuilderExpr add(double val) const;
 
   BuilderExpr add(const BuilderExpr& rhs, DateAddField field) const;
-  BuilderExpr add(int val, DateAddField field) const;
   BuilderExpr add(int64_t val, DateAddField field) const;
   BuilderExpr add(const BuilderExpr& rhs, const std::string& field) const;
-  BuilderExpr add(int val, const std::string& field) const;
   BuilderExpr add(int64_t val, const std::string& field) const;
 
   BuilderExpr sub(const BuilderExpr& rhs) const;

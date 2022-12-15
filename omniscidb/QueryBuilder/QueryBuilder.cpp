@@ -838,19 +838,20 @@ BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, DateAddField field) const {
         << "Right operand of DATE_ADD operation should be INTEGER. Actual type: "
         << rhs.expr()->type()->toString();
   }
+  auto number_expr = rhs.expr();
+  if (!number_expr->type()->isInt64()) {
+    number_expr =
+        rhs.cast(number_expr->ctx().int64(number_expr->type()->nullable())).expr();
+  }
   auto res_type = expr_->type()->withNullable(expr_->type()->nullable() ||
-                                              rhs.expr()->type()->nullable());
+                                              number_expr->type()->nullable());
   if (res_type->isDate()) {
     auto unit = res_type->as<DateType>()->unit();
     unit = unit == TimeUnit::kDay ? TimeUnit::kSecond : unit;
     res_type = res_type->ctx().timestamp(unit, res_type->nullable());
   }
-  auto date_add_expr = makeExpr<DateAddExpr>(res_type, field, rhs.expr(), expr_);
+  auto date_add_expr = makeExpr<DateAddExpr>(res_type, field, number_expr, expr_);
   return {builder_, date_add_expr};
-}
-
-BuilderExpr BuilderExpr::add(int val, DateAddField field) const {
-  return add(builder_.cst(val, builder_.ctx_.int32(false)), field);
 }
 
 BuilderExpr BuilderExpr::add(int64_t val, DateAddField field) const {
@@ -859,10 +860,6 @@ BuilderExpr BuilderExpr::add(int64_t val, DateAddField field) const {
 
 BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, const std::string& field) const {
   return add(rhs, parseDateAddField(field));
-}
-
-BuilderExpr BuilderExpr::add(int val, const std::string& field) const {
-  return add(builder_.cst(val, builder_.ctx_.int32(false)), parseDateAddField(field));
 }
 
 BuilderExpr BuilderExpr::add(int64_t val, const std::string& field) const {

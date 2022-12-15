@@ -2362,88 +2362,88 @@ TEST_F(QueryBuilderTest, DateAddExpr) {
   checkDateAdd(scan.ref("col_date2").add(scan.ref("col_i"), "YEARS"),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kYear,
-               scan.ref("col_i"),
+               scan.ref("col_i").cast("int64"),
                scan.ref("col_date2"));
   checkDateAdd(scan.ref("col_date3").add(scan.ref("col_si"), "quarter"),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kQuarter,
-               scan.ref("col_si"),
+               scan.ref("col_si").cast("int64"),
                scan.ref("col_date3"));
   checkDateAdd(scan.ref("col_date4").add(scan.ref("col_ti"), " quarterS "),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kQuarter,
-               scan.ref("col_ti"),
+               scan.ref("col_ti").cast("int64"),
                scan.ref("col_date4"));
   checkDateAdd(scan.ref("col_timestamp").add(1, "month"),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kMonth,
-               builder.cst(1, "int32"),
+               builder.cst(1),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp2").add(1, "months"),
                ctx().timestamp(TimeUnit::kMilli),
                DateAddField::kMonth,
-               builder.cst(1, "int32"),
+               builder.cst(1),
                scan.ref("col_timestamp2"));
   checkDateAdd(scan.ref("col_timestamp3").add(1L, "day"),
                ctx().timestamp(TimeUnit::kMicro),
                DateAddField::kDay,
-               builder.cst(1, "int64"),
+               builder.cst(1),
                scan.ref("col_timestamp3"));
   checkDateAdd(scan.ref("col_timestamp4").add(1L, "days"),
                ctx().timestamp(TimeUnit::kNano),
                DateAddField::kDay,
-               builder.cst(1, "int64"),
+               builder.cst(1),
                scan.ref("col_timestamp4"));
   checkDateAdd(scan.ref("col_timestamp").add(1, "hour"),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kHour,
-               builder.cst(1, "int32"),
+               builder.cst(1),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").add(1, "hours"),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kHour,
-               builder.cst(1, "int32"),
+               builder.cst(1),
                scan.ref("col_timestamp"));
   for (auto& field : {"min"s, "mins"s, "minute"s, "minutes"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kMinute,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"sec"s, "secs"s, "second"s, "SECONDS"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kSecond,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"ms"s, "milli"s, "millisecond"s, "milliseconds"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kMilli,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"us"s, "micro"s, "microsecond"s, "microseconds"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kMicro,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"ns"s, "nano"s, "nanosecond"s, "nanoseconds"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kNano,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"week"s, "weeks"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kWeek,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"quarterday"s,
@@ -2455,7 +2455,7 @@ TEST_F(QueryBuilderTest, DateAddExpr) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kQuarterDay,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field :
@@ -2463,28 +2463,28 @@ TEST_F(QueryBuilderTest, DateAddExpr) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kWeekDay,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"dayofyear"s, "day_of_year"s, "day of year"s, "doy"s}) {
     checkDateAdd(scan.ref("col_timestamp").add(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kDayOfYear,
-                 builder.cst(1, "int32"),
+                 builder.cst(1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"millennium"s, "millenniums"s}) {
     checkDateAdd(scan.ref("col_timestamp").sub(scan.ref("col_i"), field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kMillennium,
-                 scan.ref("col_i").uminus(),
+                 scan.ref("col_i").uminus().cast("int64"),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"century"s, "centuries"s}) {
     checkDateAdd(scan.ref("col_timestamp").sub(1, field),
                  ctx().timestamp(TimeUnit::kSecond),
                  DateAddField::kCentury,
-                 builder.cst(-1, "int32"),
+                 builder.cst(-1),
                  scan.ref("col_timestamp"));
   }
   for (auto& field : {"decade"s, "decades"s}) {
@@ -2497,32 +2497,32 @@ TEST_F(QueryBuilderTest, DateAddExpr) {
   checkDateAdd(scan.ref("col_timestamp").add(scan.ref("col_i"), DateAddField::kMilli),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kMilli,
-               scan.ref("col_i"),
+               scan.ref("col_i").cast("int64"),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").add(1, DateAddField::kSecond),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kSecond,
-               builder.cst(1, "int32"),
+               builder.cst(1),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").add(1L, DateAddField::kDay),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kDay,
-               builder.cst(1, "int64"),
+               builder.cst(1),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").sub(scan.ref("col_i"), DateAddField::kMilli),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kMilli,
-               scan.ref("col_i").uminus(),
+               scan.ref("col_i").uminus().cast("int64"),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").sub(1, DateAddField::kSecond),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kSecond,
-               builder.cst(-1, "int32"),
+               builder.cst(-1),
                scan.ref("col_timestamp"));
   checkDateAdd(scan.ref("col_timestamp").sub(1L, DateAddField::kDay),
                ctx().timestamp(TimeUnit::kSecond),
                DateAddField::kDay,
-               builder.cst(-1, "int64"),
+               builder.cst(-1),
                scan.ref("col_timestamp"));
   EXPECT_THROW(scan.ref("col_timestamp").add(1, "mss"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").add(1, "nanos"), InvalidQueryError);
@@ -5002,7 +5002,7 @@ TEST_F(TPCH, Q1_SQL) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1) {
+TEST_F(TPCH, Q1_NoBuilder) {
   // Create 'lineitem' scan.
   auto table_info = getStorage()->getTableInfo(TEST_DB_ID, "lineitem");
   auto col_infos = getStorage()->listColumns(*table_info);
@@ -5124,36 +5124,27 @@ TEST_F(TPCH, Q1) {
   compare_q1(res);
 }
 
-#if 0
-TEST_F(TPCH, Q1WithBuilder1) {
-  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+TEST_F(TPCH, Q1_1) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("lineitem");
   auto filter = scan.filter(scan.ref("l_shipdate")
                                 .le(builder.cst("1998-12-01")
                                         .cast(ctx().date32())
-                                        .minus(90, DateAddField::kDay)));
+                                        .sub(90, DateAddField::kDay)));
   auto disc_price =
-      filter.ref("l_extendedprice").mul(builder.cst(1).minus(filter.ref("l_discount")));
+      filter.ref("l_extendedprice").mul(builder.cst(1).sub(filter.ref("l_discount")));
   auto dag = filter
                  .agg({"l_returnflag", "l_linestatus"},
-                      {filter.ref("l_quantity").sum(),
-                       filter.ref("l_extendedprice").sum(),
-                       disc_price.sum(),
-                       disc_price.mul(builder.cst(1).plus(filter.ref("l_tax"))).sum(),
-                       filter.ref("l_quantity").avg(),
-                       filter.ref("l_extendedprice").avg(),
-                       filter.ref("l_discount").avg(),
-                       builder.count()},
-                      {"l_returnflag",
-                       "l_linestatus",
-                       "sum_qty",
-                       "sum_base_price",
-                       "sum_disc_price",
-                       "sum_charge",
-                       "avg_qty",
-                       "avg_price",
-                       "avg_disc",
-                       "count_order"})
+                      {filter.ref("l_quantity").sum().name("sum_qty"),
+                       filter.ref("l_extendedprice").sum().name("sum_base_price"),
+                       disc_price.sum().name("sum_disc_price"),
+                       disc_price.mul(builder.cst(1).add(filter.ref("l_tax")))
+                           .sum()
+                           .name("sum_charge"),
+                       filter.ref("l_quantity").avg().name("avg_qty"),
+                       filter.ref("l_extendedprice").avg().name("avg_price"),
+                       filter.ref("l_discount").avg().name("avg_disc"),
+                       builder.count().name("count_order")})
                  .sort({{"l_returnflag"}, {"l_linestatus"}})
                  .finalize();
 
@@ -5161,14 +5152,14 @@ TEST_F(TPCH, Q1WithBuilder1) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1WithBuilder2) {
-  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+TEST_F(TPCH, Q1_2) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("lineitem");
   auto filter =
-      scan.filter(scan.ref("l_shipdate").le(builder.date("1998-12-01").minus(90, "day")));
+      scan.filter(scan.ref("l_shipdate").le(builder.date("1998-12-01").sub(90, "day")));
   auto disc_price =
-      filter.ref("l_extendedprice").mul(builder.cst(1).minus(filter.ref("l_discount")));
-  auto charge = disc_price.mul(builder.cst(1).plus(filter.ref("l_tax")));
+      filter.ref("l_extendedprice").mul(builder.cst(1).sub(filter.ref("l_discount")));
+  auto charge = disc_price.mul(builder.cst(1).add(filter.ref("l_tax")));
   auto dag = filter
                  .agg({"l_returnflag", "l_linestatus"},
                       {filter.ref("l_quantity").sum().name("sum_qty"),
@@ -5185,7 +5176,30 @@ TEST_F(TPCH, Q1WithBuilder2) {
   auto res = runQuery(std::move(dag));
   compare_q1(res);
 }
-#endif
+
+TEST_F(TPCH, Q1_3) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
+  auto scan = builder.scan("lineitem");
+  auto filter =
+      scan.filter(scan["l_shipdate"] <= builder.date("1998-12-01").sub(90, "day"));
+  auto disc_price = filter["l_extendedprice"] * (1 - filter["l_discount"]);
+  auto charge = disc_price * (1 + filter["l_tax"]);
+  auto dag = filter
+                 .agg({"l_returnflag", "l_linestatus"},
+                      {filter.ref("l_quantity").sum().name("sum_qty"),
+                       filter.ref("l_extendedprice").sum().name("sum_base_price"),
+                       disc_price.sum().name("sum_disc_price"),
+                       charge.sum().name("sum_charge"),
+                       filter.ref("l_quantity").avg().name("avg_qty"),
+                       filter.ref("l_extendedprice").avg().name("avg_price"),
+                       filter.ref("l_discount").avg().name("avg_disc"),
+                       builder.count().name("count_order")})
+                 .sort({"l_returnflag", "l_linestatus"})
+                 .finalize();
+
+  auto res = runQuery(std::move(dag));
+  compare_q1(res);
+}
 
 TEST_F(TPCH, Q3_SQL) {
   auto query = R"""(
