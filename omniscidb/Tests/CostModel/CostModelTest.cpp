@@ -14,7 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "QueryEngine/CostModel/DataSources/DataSource.h"
-#include "QueryEngine/CostModel/DataSources/DwarfBench.h"
 #include "QueryEngine/CostModel/ExtrapolationModels/LinearExtrapolation.h"
 
 using namespace costmodel;
@@ -41,23 +40,6 @@ TEST(DataSourceTests, SupportCheckTest) {
   ASSERT_TRUE(ds.isTemplateSupported(AnalyticalTemplate::GroupBy));
   ASSERT_FALSE(ds.isDeviceSupported(ExecutorDeviceType::GPU));
   ASSERT_FALSE(ds.isTemplateSupported(AnalyticalTemplate::Join));
-}
-
-TEST(DataSourceTests, DwarfBenchSupportCheckTest) {
-  DwarfBench db;
-  ASSERT_EQ(db.getName(), "DwarfBench");
-
-  ASSERT_TRUE(db.isDeviceSupported(ExecutorDeviceType::CPU));
-  ASSERT_TRUE(db.isDeviceSupported(ExecutorDeviceType::GPU));
-
-  ASSERT_TRUE(db.isTemplateSupported(AnalyticalTemplate::GroupBy));
-  ASSERT_TRUE(db.isTemplateSupported(AnalyticalTemplate::Join));
-  ASSERT_TRUE(db.isTemplateSupported(AnalyticalTemplate::Reduce));
-  ASSERT_TRUE(db.isTemplateSupported(AnalyticalTemplate::Scan));
-}
-
-TEST(DataSourceTests, DwarfBenchGetMeasurements) {
-  // TODO
 }
 
 TEST(ExtrapolationModelsTests, LinearExtrapolationTest1) {
