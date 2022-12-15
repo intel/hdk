@@ -112,6 +112,14 @@ add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
+# Dwarf Bench
+option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)
+if(ENABLE_DWARF_BENCH)
+  find_package(dbench REQUIRED)
+  message("Dwarf Bench enabled")
+  add_definitions("-DENABLE_DWARF_BENCH")
+endif()
+
 option(ENABLE_L0 "Enable level zero support" OFF)
 if(ENABLE_L0)
   find_package(LevelZero REQUIRED COMPONENTS ${LevelZero_COMPONENTS})
