@@ -34,11 +34,16 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.MapDPlanner;
 import org.apache.calcite.prepare.SqlIdentifierCapturer;
+import org.apache.calcite.rel.RelHomogeneousShuttle;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.RelVisitor;
+import org.apache.calcite.rel.core.Correlate;
+import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rel.core.TableModify.Operation;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableModify;
 import org.apache.calcite.rel.rules.CoreRules;
@@ -60,6 +65,7 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.*;
 import org.apache.calcite.util.Pair;
@@ -171,119 +177,7 @@ public final class MapDParser {
 
   private MapDPlanner getPlanner(
           final boolean allowSubQueryExpansion, final boolean isWatchdogEnabled) {
-    BiPredicate<SqlNode, SqlNode> expandPredicate = new BiPredicate<SqlNode, SqlNode>() {
-      @Override
-      public boolean test(SqlNode root, SqlNode expression) {
-        if (!allowSubQueryExpansion) {
-          return false;
-        }
-
-        if (expression.isA(EXISTS) || expression.isA(IN)) {
-          // try to expand subquery by EXISTS and IN clauses by default
-          // note that current Calcite decorrelator fails to flat
-          // NOT-IN clause in some cases, so we do not decorrelate it for now
-
-          if (expression.isA(IN)) {
-            // If we enable watchdog, we suffer from large projection exception in many
-            // cases since decorrelation needs de-duplication step which adds project -
-            // aggregate logic. And the added project is the source of the exception when
-            // its underlying table is large. Thus, we enable IN-clause decorrelation
-            // under watchdog iff we explicitly have correlated join in IN-clause
-            if (isWatchdogEnabled) {
-              boolean found_expression = false;
-              if (expression instanceof SqlCall) {
-                SqlCall call = (SqlCall) expression;
-                if (call.getOperandList().size() == 2) {
-                  // if IN clause is correlated, its second operand of corresponding
-                  // expression is SELECT clause which indicates a correlated subquery.
-                  // Here, an expression "f.val IN (SELECT ...)" has two operands.
-                  // Since we have interest in its subquery, so try to check whether
-                  // the second operand, i.e., call.getOperandList().get(1)
-                  // is a type of SqlSelect and also is correlated.
-                  if (call.getOperandList().get(1) instanceof SqlSelect) {
-                    expression = call.getOperandList().get(1);
-                    SqlSelect select_call = (SqlSelect) expression;
-                    if (select_call.hasWhere()) {
-                      // IN-clause may have correlated join within subquery's WHERE clause
-                      // i.e., f.val IN (SELECT r.val FROM R r WHERE f.val2 = r.val2)
-                      // then we have to deccorrelate the IN-clause
-                      JoinOperatorChecker joinOperatorChecker = new JoinOperatorChecker();
-                      if (joinOperatorChecker.containsExpression(
-                                  select_call.getWhere())) {
-                        found_expression = true;
-                      }
-                    }
-                  }
-                }
-              }
-              if (!found_expression) {
-                return false;
-              }
-            }
-
-            if (root instanceof SqlSelect) {
-              SqlSelect selectCall = (SqlSelect) root;
-              if (new ExpressionListedInSelectClauseChecker().containsExpression(
-                          selectCall, expression)) {
-                // occasionally, Calcite cannot properly decorrelate IN-clause listed in
-                // SELECT clause e.g., SELECT x, CASE WHEN x in (SELECT x FROM R) ... FROM
-                // ... in that case we disable input query's decorrelation
-                return false;
-              }
-              if (null != selectCall.getWhere()) {
-                if (new ExpressionListedAsChildOROperatorChecker().containsExpression(
-                            selectCall.getWhere(), expression)) {
-                  // Decorrelation logic of the current Calcite cannot cover IN-clause
-                  // well if it is listed as a child operand of OR-op
-                  return false;
-                }
-              }
-              if (null != selectCall.getHaving()) {
-                if (new ExpressionListedAsChildOROperatorChecker().containsExpression(
-                            selectCall.getHaving(), expression)) {
-                  // Decorrelation logic of the current Calcite cannot cover IN-clause
-                  // well if it is listed as a child operand of OR-op
-                  return false;
-                }
-              }
-            }
-          }
-
-          // otherwise, let's decorrelate the expression
-          return true;
-        }
-
-        // special handling of sub-queries
-        if (expression.isA(SCALAR) && isCorrelated(expression)) {
-          // only expand if it is correlated.
-          SqlSelect select = null;
-          if (expression instanceof SqlCall) {
-            SqlCall call = (SqlCall) expression;
-            if (call.getOperator().equals(SqlStdOperatorTable.SCALAR_QUERY)) {
-              expression = call.getOperandList().get(0);
-            }
-          }
-
-          if (expression instanceof SqlSelect) {
-            select = (SqlSelect) expression;
-          }
-
-          if (null != select) {
-            if (null != select.getFetch() || null != select.getOffset()
-                    || (null != select.getOrderList()
-                            && select.getOrderList().size() != 0)) {
-              throw new CalciteException(
-                      "Correlated sub-queries with ordering not supported.", null);
-            }
-          }
-          return true;
-        }
-
-        // per default we do not want to expand
-        return false;
-      }
-    };
-
+    
     // create the default schema
     final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
     final MapDSchema defaultSchema = new MapDSchema(this, mapdUser, null, schemaJson);
@@ -319,8 +213,8 @@ public final class MapDParser {
                     .sqlToRelConverterConfig(
                             SqlToRelConverter
                                     .configBuilder()
-                                    // enable sub-query expansion (de-correlation)
-                                    .withExpandPredicate(expandPredicate)
+                                    .withExpand(allowSubQueryExpansion)
+                                    .withDecorrelationEnabled(true) // this is default 
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
@@ -745,13 +639,57 @@ public final class MapDParser {
     return convertSqlToRelNode(sqlNode, planner, parserOptions);
   }
 
+  private static class RexShuttleRelVisitor extends RelHomogeneousShuttle {
+    private final DeduplicateCorrelateVariablesShuttle dedupRex;
+
+    protected RexShuttleRelVisitor() {
+      dedupRex = new DeduplicateCorrelateVariablesShuttle(this);
+    }
+
+    @Override public RelNode visit(RelNode other) {
+      RelNode next = super.visit(other);
+      return next.accept(dedupRex);
+    }
+
+    static boolean hasCorrelatedVariable(RelNode node) {
+      final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor(); 
+      node.accept(visitor);
+
+      return visitor.dedupRex.hasCorrelatedExpr; //hasCorrelatedExpr();
+    }
+
+  private static class DeduplicateCorrelateVariablesShuttle extends RexShuttle {
+    private boolean hasCorrelatedExpr = false;
+    private final RexShuttleRelVisitor shuttle;
+
+    DeduplicateCorrelateVariablesShuttle(RexShuttleRelVisitor shuttle) {
+      this.shuttle = shuttle;
+    }
+
+    @Override public RexNode visitCorrelVariable(RexCorrelVariable variable) {
+      hasCorrelatedExpr = true;
+      return variable;
+    }
+
+    @Override public RexNode visitSubQuery(RexSubQuery subQuery) {
+      if (shuttle != null) {
+        RelNode r = subQuery.rel.accept(shuttle); // look inside sub-queries
+        if (r != subQuery.rel) {
+          subQuery = subQuery.clone(r);
+        }
+      }
+      return super.visitSubQuery(subQuery);
+    }
+  }
+}
+
   RelRoot convertSqlToRelNode(final SqlNode sqlNode,
           final MapDPlanner mapDPlanner,
           final MapDParserOptions parserOptions)
           throws SqlParseException, ValidationException, RelConversionException {
     SqlNode node = sqlNode;
     MapDPlanner planner = mapDPlanner;
-    boolean allowCorrelatedSubQueryExpansion = true;
+    boolean allowCorrelatedSubQueryExpansion = false;
     boolean patchUpdateToDelete = false;
 
     if (node.isA(DELETE)) {
@@ -798,10 +736,23 @@ public final class MapDParser {
       node = parseSql(
               node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
     }
-
+  
     SqlNode validateR = planner.validate(node);
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot relR = planner.rel(validateR);
+
+      if (RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
+      planner.close(); // replace planner 
+      allowCorrelatedSubQueryExpansion = true;
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+              validateR = planner.validate(node);
+              planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
+               relR = planner.rel(validateR);
+      }
+
     relR = replaceIsTrue(planner.getTypeFactory(), relR);
     planner.close();
 

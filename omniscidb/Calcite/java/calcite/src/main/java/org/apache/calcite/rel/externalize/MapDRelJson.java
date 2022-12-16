@@ -72,6 +72,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableSet;
+
 /**
  * Utilities for converting {@link org.apache.calcite.rel.RelNode} into JSON
  * format.
@@ -257,6 +259,12 @@ public class MapDRelJson {
       final List<Object> list = jsonBuilder.list();
       for (Integer integer : (ImmutableBitSet) value) {
         list.add(toJson(integer));
+      }
+      return list;
+    } else if (value instanceof ImmutableSet) {
+      final List<Object> list = jsonBuilder.list();
+      for (Object element : (ImmutableSet) value) {
+        list.add(toJson(element));
       }
       return list;
     } else if (value instanceof AggregateCall) {
