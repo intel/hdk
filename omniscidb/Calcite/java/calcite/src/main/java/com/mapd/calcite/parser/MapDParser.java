@@ -706,6 +706,16 @@ public final class MapDParser {
     MapDPlanner planner = mapDPlanner;
     boolean allowCorrelatedSubQueryExpansion = false;
 
+    if (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax()) {
+      // close original planner
+      planner.close();
+      // create a new one
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+    }
+
     SqlNode validateR = planner.validate(node);
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot relR = planner.rel(validateR);
@@ -720,15 +730,6 @@ public final class MapDParser {
       validateR = planner.validate(node);
       planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
       relR = planner.rel(validateR);
-    }     
-    if (allowCorrelatedSubQueryExpansion && parserOptions.isLegacySyntax()) {
-      // close original planner
-      planner.close();
-      // create a new one
-      planner = getPlanner(
-              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
-      node = parseSql(
-              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
     }
 
     relR = replaceIsTrue(planner.getTypeFactory(), relR);

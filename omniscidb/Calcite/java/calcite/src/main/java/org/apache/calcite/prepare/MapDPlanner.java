@@ -78,6 +78,10 @@ public class MapDPlanner extends PlannerImpl {
     this.config = config;
   }
 
+  public boolean isExpand() {
+    return config.getSqlToRelConverterConfig().isExpand();
+  }
+
   private static SchemaPlus rootSchema(SchemaPlus schema) {
     for (;;) {
       if (schema.getParentSchema() == null) {
