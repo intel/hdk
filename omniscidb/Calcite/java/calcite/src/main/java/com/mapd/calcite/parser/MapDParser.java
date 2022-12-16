@@ -45,6 +45,7 @@ import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rel.core.TableModify.Operation;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableModify;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.type.RelDataType;
@@ -177,7 +178,6 @@ public final class MapDParser {
 
   private MapDPlanner getPlanner(
           final boolean allowSubQueryExpansion, final boolean isWatchdogEnabled) {
-    
     // create the default schema
     final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
     final MapDSchema defaultSchema = new MapDSchema(this, mapdUser, null, schemaJson);
@@ -211,10 +211,9 @@ public final class MapDParser {
                                           .setParserFactory(ExtendedSqlParser.FACTORY)
                                           .build())
                     .sqlToRelConverterConfig(
-                            SqlToRelConverter
-                                    .configBuilder()
+                            SqlToRelConverter.configBuilder()
                                     .withExpand(allowSubQueryExpansion)
-                                    .withDecorrelationEnabled(true) // this is default 
+                                    .withDecorrelationEnabled(true) // this is default
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
@@ -641,47 +640,63 @@ public final class MapDParser {
 
   private static class RexShuttleRelVisitor extends RelHomogeneousShuttle {
     private final DeduplicateCorrelateVariablesShuttle dedupRex;
+    private boolean containsSort = false;
 
     protected RexShuttleRelVisitor() {
       dedupRex = new DeduplicateCorrelateVariablesShuttle(this);
     }
 
-    @Override public RelNode visit(RelNode other) {
+    @Override
+    public RelNode visit(RelNode other) {
       RelNode next = super.visit(other);
       return next.accept(dedupRex);
     }
 
-    static boolean hasCorrelatedVariable(RelNode node) {
-      final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor(); 
+    @Override
+    public RelNode visit(LogicalSort sort) {
+      containsSort = true;
+      RelNode next = super.visit(sort);
+      return next.accept(dedupRex);
+    }
+
+    // really this is "should we decorrelate"
+    public static boolean hasCorrelatedVariable(RelNode node) {
+      final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor();
       node.accept(visitor);
 
-      return visitor.dedupRex.hasCorrelatedExpr; //hasCorrelatedExpr();
+      //  if (visitor.containsSort) {
+      //    return false;
+      //  }
+
+      return visitor.dedupRex.hasCorrelatedExpr;
     }
 
-  private static class DeduplicateCorrelateVariablesShuttle extends RexShuttle {
-    private boolean hasCorrelatedExpr = false;
-    private final RexShuttleRelVisitor shuttle;
+    private static class DeduplicateCorrelateVariablesShuttle extends RexShuttle {
+      private boolean hasCorrelatedExpr = false;
+      private final RexShuttleRelVisitor shuttle;
 
-    DeduplicateCorrelateVariablesShuttle(RexShuttleRelVisitor shuttle) {
-      this.shuttle = shuttle;
-    }
-
-    @Override public RexNode visitCorrelVariable(RexCorrelVariable variable) {
-      hasCorrelatedExpr = true;
-      return variable;
-    }
-
-    @Override public RexNode visitSubQuery(RexSubQuery subQuery) {
-      if (shuttle != null) {
-        RelNode r = subQuery.rel.accept(shuttle); // look inside sub-queries
-        if (r != subQuery.rel) {
-          subQuery = subQuery.clone(r);
-        }
+      DeduplicateCorrelateVariablesShuttle(RexShuttleRelVisitor shuttle) {
+        this.shuttle = shuttle;
       }
-      return super.visitSubQuery(subQuery);
+
+      @Override
+      public RexNode visitCorrelVariable(RexCorrelVariable variable) {
+        hasCorrelatedExpr = true;
+        return variable;
+      }
+
+      @Override
+      public RexNode visitSubQuery(RexSubQuery subQuery) {
+        if (shuttle != null) {
+          RelNode r = subQuery.rel.accept(shuttle); // look inside sub-queries
+          if (r != subQuery.rel) {
+            subQuery = subQuery.clone(r);
+          }
+        }
+        return super.visitSubQuery(subQuery);
+      }
     }
   }
-}
 
   RelRoot convertSqlToRelNode(final SqlNode sqlNode,
           final MapDPlanner mapDPlanner,
@@ -690,44 +705,23 @@ public final class MapDParser {
     SqlNode node = sqlNode;
     MapDPlanner planner = mapDPlanner;
     boolean allowCorrelatedSubQueryExpansion = false;
-    boolean patchUpdateToDelete = false;
 
-    if (node.isA(DELETE)) {
-      SqlDelete sqlDelete = (SqlDelete) node;
-      node = new SqlUpdate(node.getParserPosition(),
-              sqlDelete.getTargetTable(),
-              SqlNodeList.EMPTY,
-              SqlNodeList.EMPTY,
-              sqlDelete.getCondition(),
-              sqlDelete.getSourceSelect(),
-              sqlDelete.getAlias());
+    SqlNode validateR = planner.validate(node);
+    planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
+    RelRoot relR = planner.rel(validateR);
 
-      patchUpdateToDelete = true;
-    }
-
-    if (node.isA(UPDATE)) {
-      SqlUpdate update = (SqlUpdate) node;
-      update = (SqlUpdate) planner.validate(update);
-      RelRoot root = rewriteUpdateAsSelect(update, parserOptions);
-
-      if (patchUpdateToDelete) {
-        LogicalTableModify modify = (LogicalTableModify) root.rel;
-
-        try {
-          Field f = TableModify.class.getDeclaredField("operation");
-          f.setAccessible(true);
-          f.set(modify, Operation.DELETE);
-        } catch (Throwable e) {
-          throw new RuntimeException(e);
-        }
-
-        root = RelRoot.of(modify, SqlKind.DELETE);
-      }
-
-      return root;
-    }
-
-    if (parserOptions.isLegacySyntax()) {
+    if (RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
+      planner.close(); // replace planner
+      allowCorrelatedSubQueryExpansion = true;
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      validateR = planner.validate(node);
+      planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
+      relR = planner.rel(validateR);
+    }     
+    if (allowCorrelatedSubQueryExpansion && parserOptions.isLegacySyntax()) {
       // close original planner
       planner.close();
       // create a new one
@@ -736,22 +730,6 @@ public final class MapDParser {
       node = parseSql(
               node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
     }
-  
-    SqlNode validateR = planner.validate(node);
-    planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
-    RelRoot relR = planner.rel(validateR);
-
-      if (RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
-      planner.close(); // replace planner 
-      allowCorrelatedSubQueryExpansion = true;
-      planner = getPlanner(
-              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
-      node = parseSql(
-              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
-              validateR = planner.validate(node);
-              planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
-               relR = planner.rel(validateR);
-      }
 
     relR = replaceIsTrue(planner.getTypeFactory(), relR);
     planner.close();
