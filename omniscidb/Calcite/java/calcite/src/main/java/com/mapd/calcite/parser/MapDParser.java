@@ -728,14 +728,16 @@ public final class MapDParser {
 
     SqlHavingVisitor hasHavingVisitor = new SqlHavingVisitor();
     node.accept(hasHavingVisitor);
-    boolean expandOverride = false;
+    boolean expandOverride = true;
     if (hasHavingVisitor.hasHaving) {
-      expandOverride= true;
+      expandOverride= false;
+      allowCorrelatedSubQueryExpansion = false;
+      // allowCorrelatedSubQueryExpansion = true;
       // throw new RuntimeException("SqlNode: " + validateR.toString());
     }
 
 
-    if ((expandOverride || !mapDPlanner.isExpand()) && parserOptions.isLegacySyntax()) {
+    if ((!expandOverride || !mapDPlanner.isExpand()) && parserOptions.isLegacySyntax()) {
       // close original planner
       planner.close();
       // create a new one
@@ -752,7 +754,7 @@ public final class MapDParser {
     /*if (true) {
       throw new RuntimeException("PLAN:\n\n" + RelOptUtil.dumpPlan("", relR.project(), SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
     }*/
-    if (RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
+    if (expandOverride && RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
       planner.close(); // replace planner
       allowCorrelatedSubQueryExpansion = true;
       planner = getPlanner(
