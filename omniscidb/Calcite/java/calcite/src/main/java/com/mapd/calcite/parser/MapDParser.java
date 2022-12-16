@@ -729,15 +729,17 @@ public final class MapDParser {
     SqlHavingVisitor hasHavingVisitor = new SqlHavingVisitor();
     node.accept(hasHavingVisitor);
     boolean expandOverride = true;
+    boolean forceLegacySyntax = false;
     if (hasHavingVisitor.hasHaving) {
       expandOverride= false;
       allowCorrelatedSubQueryExpansion = false;
+      forceLegacySyntax = true;
       // allowCorrelatedSubQueryExpansion = true;
       // throw new RuntimeException("SqlNode: " + validateR.toString());
     }
 
 
-    if ((!expandOverride || !mapDPlanner.isExpand()) && parserOptions.isLegacySyntax()) {
+    if (forceLegacySyntax || (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax())) {
       // close original planner
       planner.close();
       // create a new one
