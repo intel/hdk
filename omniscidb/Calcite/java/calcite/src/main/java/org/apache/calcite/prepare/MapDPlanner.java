@@ -49,6 +49,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlMoniker;
 import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +76,10 @@ public class MapDPlanner extends PlannerImpl {
   public MapDPlanner(FrameworkConfig config) {
     super(config);
     this.config = config;
+  }
+
+  public boolean isExpand() {
+    return config.getSqlToRelConverterConfig().isExpand();
   }
 
   private static SchemaPlus rootSchema(SchemaPlus schema) {
@@ -174,7 +179,7 @@ public class MapDPlanner extends PlannerImpl {
 
   @Override
   public RelRoot rel(SqlNode sql) {
-    RelRoot root = super.rel(sql);
+    RelRoot root = super.rel(sql);    
     if (restriction != null) {
       root = applyInjectFilterRule(root, restriction);
     }
