@@ -638,6 +638,21 @@ public final class MapDParser {
     return convertSqlToRelNode(sqlNode, planner, parserOptions);
   }
 
+
+    private static class SqlHavingVisitor extends SqlBasicVisitor<Void> {
+      boolean hasHaving = false;
+
+      @Override public Void visit(SqlCall call) {
+        if (call instanceof SqlSelect) {
+          final SqlSelect select = (SqlSelect)call;
+          if (select.getHaving() != null) {
+            this.hasHaving = true;
+          }
+        }
+        return call.getOperator().acceptCall(this, call);
+      }
+    }
+
   private static class RexShuttleRelVisitor extends RelHomogeneousShuttle {
     private final DeduplicateCorrelateVariablesShuttle dedupRex;
     private boolean containsSort = false;
@@ -711,7 +726,16 @@ public final class MapDParser {
     MapDPlanner planner = mapDPlanner;
     boolean allowCorrelatedSubQueryExpansion = false;
 
-    if (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax()) {
+    SqlHavingVisitor hasHavingVisitor = new SqlHavingVisitor();
+    node.accept(hasHavingVisitor);
+    boolean expandOverride = false;
+    if (hasHavingVisitor.hasHaving) {
+      expandOverride= true;
+      // throw new RuntimeException("SqlNode: " + validateR.toString());
+    }
+
+
+    if ((expandOverride || !mapDPlanner.isExpand()) && parserOptions.isLegacySyntax()) {
       // close original planner
       planner.close();
       // create a new one
