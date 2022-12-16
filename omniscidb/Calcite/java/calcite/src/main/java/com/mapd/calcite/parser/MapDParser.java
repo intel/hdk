@@ -664,9 +664,11 @@ public final class MapDParser {
       final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor();
       node.accept(visitor);
 
-      //  if (visitor.containsSort) {
-      //    return false;
-      //  }
+        if (visitor.dedupRex.hasCorrelatedExpr && visitor.containsSort) {
+          throw new CalciteException(
+                      "Correlated sub-queries with ordering not supported.", null);
+          // return false;
+        }
 
       return visitor.dedupRex.hasCorrelatedExpr;
     }
@@ -693,6 +695,9 @@ public final class MapDParser {
             subQuery = subQuery.clone(r);
           }
         }
+        // if (true) {
+        //   throw new RuntimeException("subQuery: " + subQuery.toString());
+        // }
         return super.visitSubQuery(subQuery);
       }
     }
@@ -720,6 +725,9 @@ public final class MapDParser {
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot relR = planner.rel(validateR);
 
+    /*if (true) {
+      throw new RuntimeException("PLAN:\n\n" + RelOptUtil.dumpPlan("", relR.project(), SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
+    }*/
     if (RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
       planner.close(); // replace planner
       allowCorrelatedSubQueryExpansion = true;
