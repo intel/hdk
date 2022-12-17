@@ -30,9 +30,9 @@ Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
     const std::vector<AnalyticalTemplate>& templates) {
   Detail::DeviceMeasurements dm;
   for (AnalyticalTemplate templ : templates) {
-    if (!isTemplateSupported(templ)) continue;    // Or should we throw an exception?
+    CHECK(isTemplateSupported(templ));
     for (ExecutorDeviceType device : devices) {
-      if (!isDeviceSupported(device)) continue;   // Same here?
+      CHECK(isDeviceSupported(device));
 
       dm[device][templ] = measureTemplateOnDevice(device, templ);
     }
