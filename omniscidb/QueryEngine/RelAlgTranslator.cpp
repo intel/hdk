@@ -158,9 +158,11 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
   if (row_count == size_t(0)) {
     if (row_set->isValidationOnlyRes()) {
       Datum d{0};
-      return hdk::ir::makeExpr<hdk::ir::Constant>(type, false, d);
+      return hdk::ir::makeExpr<hdk::ir::Constant>(type, /*is_null=*/false, d);
+    } else {
+      Datum d{0};
+      return hdk::ir::makeExpr<hdk::ir::Constant>(type, /*is_null=*/true, d);
     }
-    throw std::runtime_error("Scalar sub-query returned no results");
   }
   CHECK_EQ(row_count, size_t(1));
   row_set->moveToBegin();
