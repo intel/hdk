@@ -219,7 +219,8 @@ public final class MapDParser {
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
-                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE))
+                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
+                                    .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
