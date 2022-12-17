@@ -153,7 +153,7 @@ public final class MapDParser {
   };
 
   private MapDPlanner getPlanner() {
-    return getPlanner(true, false);
+    return getPlanner(false, false);
   }
 
   private boolean isCorrelated(SqlNode expression) {
@@ -240,7 +240,7 @@ public final class MapDParser {
   public Pair<String, SqlIdentifierCapturer> process(
           String sql, final MapDParserOptions parserOptions)
           throws SqlParseException, ValidationException, RelConversionException {
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
     String res = processSql(sqlNode, parserOptions);
     SqlIdentifierCapturer capture = captureIdentifiers(sqlNode);
@@ -250,7 +250,7 @@ public final class MapDParser {
   public String optimizeRAQuery(String query, final MapDParserOptions parserOptions)
           throws IOException {
     MapDSchema schema = new MapDSchema(this, mapdUser, null, schemaJson);
-    MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
 
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot optRel = planner.optimizeRaQuery(query, schema);
@@ -262,7 +262,7 @@ public final class MapDParser {
           throws SqlParseException, ValidationException, RelConversionException {
     callCount++;
 
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
 
     return processSql(sqlNode, parserOptions);
@@ -280,7 +280,7 @@ public final class MapDParser {
       return sqlNode.toString();
     }
 
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     planner.advanceToValidate();
 
     final RelRoot sqlRel = convertSqlToRelNode(sqlNode, planner, parserOptions);
@@ -633,13 +633,6 @@ public final class MapDParser {
     return RelRoot.of(modify, SqlKind.UPDATE);
   }
 
-  RelRoot queryToRelNode(final String sql, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
-    final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
-    return convertSqlToRelNode(sqlNode, planner, parserOptions);
-  }
-
   private static class SqlHavingVisitor extends SqlBasicVisitor<Void> {
     boolean hasHaving = false;
 
@@ -768,10 +761,30 @@ public final class MapDParser {
     boolean forceLegacySyntax = false;
     if (hasHavingVisitor.hasHaving) {
       expandOverride = false;
-      allowCorrelatedSubQueryExpansion = false;
-      forceLegacySyntax = true;
-      // allowCorrelatedSubQueryExpansion = true;
-      // throw new RuntimeException("SqlNode: " + validateR.toString());
+      allowCorrelatedSubQueryExpansion = true;
+      forceLegacySyntax = false;
+
+      /*
+      // close original planner
+      planner.close();
+      // create a new one
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), forceLegacySyntax,
+      planner);
+      */
+      /*
+              SqlNode validateR = planner.validate(node);
+
+    planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
+    RelRoot relR = planner.rel(validateR);
+
+    relR = replaceIsTrue(planner.getTypeFactory(), relR);
+    planner.close();
+
+    return relR;
+ */
     }
 
     /*
@@ -812,7 +825,7 @@ public final class MapDParser {
     final boolean hasCorrelatedExpr = visitor.dedupRex.hasCorrelatedExpr;
     final boolean hasSort = visitor.containsSort;
 
-    if (hasCorrelatedExpr || hasHavingVisitor.hasHaving) {
+    if (hasHavingVisitor.hasHaving || hasCorrelatedExpr) {
       planner.close(); // replace planner
       allowCorrelatedSubQueryExpansion = true; //! hasHavingVisitor.hasHaving;
       planner = getPlanner(
