@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
@@ -638,20 +639,20 @@ public final class MapDParser {
     return convertSqlToRelNode(sqlNode, planner, parserOptions);
   }
 
+  private static class SqlHavingVisitor extends SqlBasicVisitor<Void> {
+    boolean hasHaving = false;
 
-    private static class SqlHavingVisitor extends SqlBasicVisitor<Void> {
-      boolean hasHaving = false;
-
-      @Override public Void visit(SqlCall call) {
-        if (call instanceof SqlSelect) {
-          final SqlSelect select = (SqlSelect)call;
-          if (select.getHaving() != null) {
-            this.hasHaving = true;
-          }
+    @Override
+    public Void visit(SqlCall call) {
+      if (call instanceof SqlSelect) {
+        final SqlSelect select = (SqlSelect) call;
+        if (select.getHaving() != null) {
+          this.hasHaving = true;
         }
-        return call.getOperator().acceptCall(this, call);
       }
+      return call.getOperator().acceptCall(this, call);
     }
+  }
 
   private static class RexShuttleRelVisitor extends RelHomogeneousShuttle {
     private final DeduplicateCorrelateVariablesShuttle dedupRex;
@@ -679,11 +680,11 @@ public final class MapDParser {
       final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor();
       node.accept(visitor);
 
-        if (visitor.dedupRex.hasCorrelatedExpr && visitor.containsSort) {
-          throw new CalciteException(
-                      "Correlated sub-queries with ordering not supported.", null);
-          // return false;
-        }
+      /*if (visitor.dedupRex.hasCorrelatedExpr && visitor.containsSort) {
+        throw new CalciteException(
+                    "Correlated sub-queries with ordering not supported.", null);
+        // return false;
+      }*/
 
       return visitor.dedupRex.hasCorrelatedExpr;
     }
@@ -731,15 +732,15 @@ public final class MapDParser {
     boolean expandOverride = true;
     boolean forceLegacySyntax = false;
     if (hasHavingVisitor.hasHaving) {
-      expandOverride= false;
+      expandOverride = false;
       allowCorrelatedSubQueryExpansion = false;
       forceLegacySyntax = true;
       // allowCorrelatedSubQueryExpansion = true;
       // throw new RuntimeException("SqlNode: " + validateR.toString());
     }
 
-
-    if (forceLegacySyntax || (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax())) {
+    if (forceLegacySyntax
+            || (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax())) {
       // close original planner
       planner.close();
       // create a new one
@@ -749,12 +750,28 @@ public final class MapDParser {
               node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
     }
 
-    SqlNode validateR = planner.validate(node);
+    SqlNode validateR;
+    // sometimes validation fails due to optimizations applied to other parts of the
+    // query. Run a cleanup pass here in case validate fails, disabling legacy syntax and
+    // rebuilding the RA tree from the Sql.
+    try {
+      validateR = planner.validate(node);
+    } catch (Exception e) {
+      // close original planner
+      planner.close();
+      // create a new one
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      validateR = planner.validate(node);
+    }
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot relR = planner.rel(validateR);
 
     /*if (true) {
-      throw new RuntimeException("PLAN:\n\n" + RelOptUtil.dumpPlan("", relR.project(), SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
+      throw new RuntimeException("PLAN:\n\n" + RelOptUtil.dumpPlan("", relR.project(),
+    SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
     }*/
     if (expandOverride && RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
       planner.close(); // replace planner
