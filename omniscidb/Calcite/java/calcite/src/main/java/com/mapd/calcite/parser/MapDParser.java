@@ -689,7 +689,7 @@ public final class MapDParser {
     private final DeduplicateCorrelateVariablesShuttle dedupRex;
     private boolean containsSort = false;
 
-    protected RexShuttleRelVisitor() {
+    public RexShuttleRelVisitor() {
       dedupRex = new DeduplicateCorrelateVariablesShuttle(this);
     }
 
@@ -711,11 +711,11 @@ public final class MapDParser {
       final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor();
       node.accept(visitor);
 
-      /*if (visitor.dedupRex.hasCorrelatedExpr && visitor.containsSort) {
+      if (visitor.dedupRex.hasCorrelatedExpr && visitor.containsSort) {
         throw new CalciteException(
-                    "Correlated sub-queries with ordering not supported.", null);
+                "Correlated sub-queries with ordering not supported.", null);
         // return false;
-      }*/
+      }
 
       return visitor.dedupRex.hasCorrelatedExpr;
     }
@@ -782,17 +782,6 @@ public final class MapDParser {
     }
  */
 
-    // TODO: exists and order by should not go through this section
-    if (forceLegacySyntax || mapDPlanner.isExpand() || parserOptions.isLegacySyntax()) {
-      // close original planner
-      planner.close();
-      // create a new one
-      planner = getPlanner(
-              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
-      node = parseSql(
-              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
-    }
-
     SqlNode validateR;
     // sometimes validation fails due to optimizations applied to other parts of the
     // query. Run a cleanup pass here in case validate fails, disabling legacy syntax and
@@ -816,14 +805,26 @@ public final class MapDParser {
       throw new RuntimeException("PLAN:\n\n" + RelOptUtil.dumpPlan("", relR.project(),
     SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
     }*/
-    if (expandOverride && RexShuttleRelVisitor.hasCorrelatedVariable(relR.project())) {
+
+    final RexShuttleRelVisitor visitor = new RexShuttleRelVisitor();
+    relR.project().accept(visitor);
+
+    final boolean hasCorrelatedExpr = visitor.dedupRex.hasCorrelatedExpr;
+    final boolean hasSort = visitor.containsSort;
+
+    if (hasCorrelatedExpr || hasHavingVisitor.hasHaving) {
       planner.close(); // replace planner
-      allowCorrelatedSubQueryExpansion = true;
+      allowCorrelatedSubQueryExpansion = true; //! hasHavingVisitor.hasHaving;
       planner = getPlanner(
               allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
-      node = parseSql(
-              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      try {
+        node = parseSql(
+                node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      } catch (Exception e) {
+        throw new RuntimeException("Bad query in correlated expr block: " + e);
+      }
       validateR = planner.validate(node);
+
       planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
       relR = planner.rel(validateR);
     }
