@@ -213,14 +213,13 @@ public final class MapDParser {
                                           .setParserFactory(ExtendedSqlParser.FACTORY)
                                           .build())
                     .sqlToRelConverterConfig(
-                            SqlToRelConverter.configBuilder()
+                            SqlToRelConverter.config()
                                     .withExpand(allowSubQueryExpansion)
                                     .withDecorrelationEnabled(true) // this is default
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
-                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
-                                    .build())
+                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE))
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
@@ -825,11 +824,32 @@ public final class MapDParser {
     final boolean hasCorrelatedExpr = visitor.dedupRex.hasCorrelatedExpr;
     final boolean hasSort = visitor.containsSort;
 
-    if (hasHavingVisitor.hasHaving || hasCorrelatedExpr) {
+    if (hasCorrelatedExpr) {
       planner.close(); // replace planner
       allowCorrelatedSubQueryExpansion = true; //! hasHavingVisitor.hasHaving;
       planner = getPlanner(
               allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      if (hasSort) {
+        if (node instanceof SqlOrderBy) {
+          SqlOrderBy order_by_node = (SqlOrderBy) node;
+          if (order_by_node.query instanceof SqlSelect) {
+            SqlNodeList baseOrderList = order_by_node.orderList;
+            SqlNodeList orderList = ((SqlSelect) order_by_node.query).getOrderList();
+            if (baseOrderList.size() != orderList.size()) {
+              throw new CalciteException(
+                      "Correlated sub-query with sort not supported. " + baseOrderList.size() + " vs " + orderList.size(), null);
+            }
+            for (int i = 0; i < baseOrderList.size(); i++) {
+              if (baseOrderList.get(i) != orderList.get(i)) {
+                throw new CalciteException(
+                        "Correlated sub-query with sort not supported.", null);
+              }
+            }
+            // drop duplicate order by
+            node = order_by_node.query;
+          }
+        }
+      }
       try {
         node = parseSql(
                 node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
@@ -1502,7 +1522,8 @@ public final class MapDParser {
 
     public boolean isEqualityJoinOperator(SqlBasicCall basicCall) {
       if (null != basicCall) {
-        if (basicCall.getOperandList().size() == 2 && basicCall.getKind() == SqlKind.EQUALS
+        if (basicCall.getOperandList().size() == 2
+                && basicCall.getKind() == SqlKind.EQUALS
                 && basicCall.operand(0) instanceof SqlIdentifier
                 && basicCall.operand(1) instanceof SqlIdentifier) {
           return true;
