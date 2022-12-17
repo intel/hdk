@@ -220,7 +220,9 @@ public final class MapDParser {
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
                                             OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
-                                    .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
+                                    .addRelBuilderConfigTransform(c
+                                            -> c.withPruneInputOfAggregate(false)
+                                                       .withSimplify(false)))
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
