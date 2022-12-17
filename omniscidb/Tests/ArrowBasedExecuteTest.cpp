@@ -2309,7 +2309,7 @@ TEST_F(Select, FilterAndSimpleAggregation) {
                 v<double>(run_simple_agg("SELECT COVAR_SAMP(x, y) FROM test;", dt)),
                 static_cast<double>(0.001));
     ASSERT_NEAR(static_cast<double>(0.131),
-                v<double>(run_simple_agg("SELECT COVAR_SAMP_FLOAT(x, y) FROM test;", dt)),
+                v<float>(run_simple_agg("SELECT COVAR_SAMP_FLOAT(x, y) FROM test;", dt)),
                 static_cast<double>(0.001));
     ASSERT_NEAR(
         static_cast<double>(0.131),  // covar_samp expansion

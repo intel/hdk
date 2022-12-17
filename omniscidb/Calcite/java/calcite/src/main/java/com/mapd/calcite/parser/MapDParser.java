@@ -220,7 +220,9 @@ public final class MapDParser {
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
                                             OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
-                                    .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
+                                    .addRelBuilderConfigTransform(c
+                                            -> c.withPruneInputOfAggregate(false)
+                                                       .withSimplify(false)))
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
@@ -837,8 +839,9 @@ public final class MapDParser {
             SqlNodeList baseOrderList = order_by_node.orderList;
             SqlNodeList orderList = ((SqlSelect) order_by_node.query).getOrderList();
             if (baseOrderList.size() != orderList.size()) {
-              throw new CalciteException(
-                      "Correlated sub-query with sort not supported. " + baseOrderList.size() + " vs " + orderList.size(), null);
+              throw new CalciteException("Correlated sub-query with sort not supported. "
+                              + baseOrderList.size() + " vs " + orderList.size(),
+                      null);
             }
             for (int i = 0; i < baseOrderList.size(); i++) {
               if (baseOrderList.get(i) != orderList.get(i)) {
