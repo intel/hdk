@@ -737,6 +737,9 @@ public final class MapDParser {
       @Override
       public RexNode visitSubQuery(RexSubQuery subQuery) {
         if (shuttle != null) {
+          if (subQuery.getKind() == SqlKind.EXISTS) {
+            hasCorrelatedExpr = true;
+          }
           RelNode r = subQuery.rel.accept(shuttle); // look inside sub-queries
           if (r != subQuery.rel) {
             subQuery = subQuery.clone(r);
