@@ -57,6 +57,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.fun.SqlCase;
+import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -654,6 +655,36 @@ public final class MapDParser {
     }
   }
 
+  private static class SqlNotInVisitor extends SqlBasicVisitor<Void> {
+    boolean hasNotIn = false;
+
+    @Override
+    public Void visit(SqlCall call) {
+      if (call instanceof SqlSelect) {
+        final SqlSelect select = (SqlSelect) call;
+        final SqlNode whereNode = select.getWhere();
+        if (whereNode != null) {
+          final SqlCall whereCall = (SqlCall) whereNode;
+          assert (whereCall != null);
+          final SqlOperator op = whereCall.getOperator();
+          if (op.getKind() == SqlKind.NOT_IN) {
+            hasNotIn = true;
+          }
+        }
+      }
+
+      /*
+      if (op instanceof SqlInOperator) {
+        final SqlInOperator inOp = (SqlInOperator)op;
+        if (inOp.isNotIn()) {
+          this.hasNotIn = true;
+        }
+      }
+*/
+      return call.getOperator().acceptCall(this, call);
+    }
+  }
+
   private static class RexShuttleRelVisitor extends RelHomogeneousShuttle {
     private final DeduplicateCorrelateVariablesShuttle dedupRex;
     private boolean containsSort = false;
@@ -729,6 +760,7 @@ public final class MapDParser {
 
     SqlHavingVisitor hasHavingVisitor = new SqlHavingVisitor();
     node.accept(hasHavingVisitor);
+
     boolean expandOverride = true;
     boolean forceLegacySyntax = false;
     if (hasHavingVisitor.hasHaving) {
@@ -739,8 +771,16 @@ public final class MapDParser {
       // throw new RuntimeException("SqlNode: " + validateR.toString());
     }
 
-    if (forceLegacySyntax
-            || (!mapDPlanner.isExpand() && parserOptions.isLegacySyntax())) {
+    /*
+    SqlNotInVisitor hasNotInVisitor = new SqlNotInVisitor();
+    node.accept(hasNotInVisitor);
+    if (hasNotInVisitor.hasNotIn) {
+      expandOverride = false;
+    }
+ */
+
+    // TODO: exists and order by should not go through this section
+    if (forceLegacySyntax || mapDPlanner.isExpand() || parserOptions.isLegacySyntax()) {
       // close original planner
       planner.close();
       // create a new one
