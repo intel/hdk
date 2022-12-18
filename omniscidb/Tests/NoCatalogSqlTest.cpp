@@ -354,8 +354,7 @@ TEST(CalciteReinitTest, SingleThread) {
   for (int i = 0; i < 10; ++i) {
     auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
     auto query_ra = calcite->process("test_db", "SELECT 1;");
-    CHECK(query_ra.find("LogicalValues") != std::string::npos);
-    CHECK(query_ra.find("LogicalProject") != std::string::npos);
+    CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
   }
 }
 
@@ -366,8 +365,7 @@ TEST(CalciteReinitTest, MultipleThreads) {
     auto f = std::async(std::launch::async, [schema_provider, config]() {
       auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
       auto query_ra = calcite->process("test_db", "SELECT 1;");
-      CHECK(query_ra.find("LogicalValues") != std::string::npos);
-      CHECK(query_ra.find("LogicalProject") != std::string::npos);
+      CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
     });
     f.wait();
   }
