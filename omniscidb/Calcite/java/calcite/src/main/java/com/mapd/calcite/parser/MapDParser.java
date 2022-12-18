@@ -204,14 +204,14 @@ public final class MapDParser {
             Frameworks.newConfigBuilder()
                     .defaultSchema(defaultSchemaPlus)
                     .operatorTable(mapDSqlOperatorTable.get())
-                    .parserConfig(SqlParser.configBuilder()
-                                          .setConformance(SqlConformanceEnum.LENIENT)
-                                          .setUnquotedCasing(Casing.UNCHANGED)
-                                          .setCaseSensitive(false)
+                    .parserConfig(SqlParser.config()
+                                          .withConformance(SqlConformanceEnum.LENIENT)
+                                          .withUnquotedCasing(Casing.UNCHANGED)
+                                          .withCaseSensitive(false)
                                           // allow identifiers of up to 512 chars
-                                          .setIdentifierMaxLength(512)
-                                          .setParserFactory(ExtendedSqlParser.FACTORY)
-                                          .build())
+                                          .withIdentifierMaxLength(512)
+                                          .withParserFactory(ExtendedSqlParser.FACTORY)
+                                          )
                     .sqlToRelConverterConfig(
                             SqlToRelConverter.config()
                                     .withExpand(allowSubQueryExpansion)
@@ -222,7 +222,8 @@ public final class MapDParser {
                                             OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
                                     .addRelBuilderConfigTransform(c
                                             -> c.withPruneInputOfAggregate(false)
-                                                       .withSimplify(false)))
+                                                       .withSimplify(false))
+                                                                                                              )
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
