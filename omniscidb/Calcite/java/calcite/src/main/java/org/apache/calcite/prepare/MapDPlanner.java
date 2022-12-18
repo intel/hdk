@@ -38,7 +38,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.externalize.MapDRelJsonReader;
-import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.rules.*;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
@@ -49,7 +48,6 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlMoniker;
 import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -179,7 +177,7 @@ public class MapDPlanner extends PlannerImpl {
 
   @Override
   public RelRoot rel(SqlNode sql) {
-    RelRoot root = super.rel(sql);    
+    RelRoot root = super.rel(sql);
     if (restriction != null) {
       root = applyInjectFilterRule(root, restriction);
     }
