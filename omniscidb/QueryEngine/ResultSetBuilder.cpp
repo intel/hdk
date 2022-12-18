@@ -129,6 +129,14 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
             *reinterpret_cast<int64_t*>(ptr) =
                 static_cast<int64_t>(separate_varlen_storage.size() - 1);
 
+          } else if (type->isFp32()) {
+            // Initialize the entire 8-byte slot, but with 0s
+            *reinterpret_cast<int64_t*>(ptr) = 0;
+
+            const auto sz = type->size();
+            CHECK_EQ(sz, int(4));
+            auto dptr = reinterpret_cast<double*>(ptr);
+            *dptr = static_cast<const double>(datum.floatval);
           } else {
             // Initialize the entire 8-byte slot
             *reinterpret_cast<int64_t*>(ptr) = EMPTY_KEY_64;
