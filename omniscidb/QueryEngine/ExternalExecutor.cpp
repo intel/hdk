@@ -458,15 +458,14 @@ std::unique_ptr<ResultSet> SqliteMemDatabase::runSelect(
       switch (col_type->id()) {
         case hdk::ir::Type::kBoolean:
         case hdk::ir::Type::kInteger: {
-          static const std::string overflow_message{"Overflow or underflow"};
           if (sqlite_col_type != SQLITE_INTEGER && sqlite_col_type != SQLITE_NULL) {
-            throw std::runtime_error(overflow_message);
+            throw OverflowOrUnderflow();
           }
           if (!connector.isNull(row_idx, col_idx)) {
             const auto limits = inline_int_max_min(col_type->canonicalSize());
             const auto val = connector.getData<int64_t>(row_idx, col_idx);
             if (val > limits.first || val < limits.second) {
-              throw std::runtime_error(overflow_message);
+              throw OverflowOrUnderflow();
             }
             row[slot_idx] = val;
           } else {

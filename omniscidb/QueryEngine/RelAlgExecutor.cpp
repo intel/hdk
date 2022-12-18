@@ -1096,7 +1096,10 @@ hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr) {
 hdk::ir::ExprPtr set_transient_dict_maybe(hdk::ir::ExprPtr expr) {
   try {
     return set_transient_dict(fold_expr(expr.get()));
-  } catch (...) {
+  } catch (const OverflowOrUnderflow& e) {
+    throw e;
+  } catch (const std::exception& e) {
+    LOG(WARNING) << "Caught exception trying to set transient dictionary source.";
     return expr;
   }
 }
