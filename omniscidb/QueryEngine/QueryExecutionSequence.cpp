@@ -75,7 +75,7 @@ class QueryExecutionSequenceImpl {
       return;
     }
 
-    size_t vertex = node_to_vertex_.size();
+    auto vertex = boost::add_vertex(graph_);
     node_to_vertex_.emplace(node, vertex);
 
     for (size_t i = 0; i < node->inputCount(); ++i) {
