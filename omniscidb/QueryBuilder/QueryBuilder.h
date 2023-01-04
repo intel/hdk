@@ -28,6 +28,9 @@ class BuilderExpr {
   BuilderExpr(const BuilderExpr& other) = default;
   BuilderExpr(BuilderExpr&& other) = default;
 
+  BuilderExpr& operator=(const BuilderExpr& other) = default;
+  BuilderExpr& operator=(BuilderExpr&& other) = default;
+
   BuilderExpr name(const std::string& name) const;
   const std::string& name() const { return name_; }
   bool isAutoNamed() const { return auto_name_; }
@@ -165,12 +168,12 @@ class BuilderExpr {
   friend class QueryBuilder;
   friend class BuilderNode;
 
-  BuilderExpr(const QueryBuilder& builder,
+  BuilderExpr(const QueryBuilder* builder,
               ExprPtr expr,
               const std::string& name = "",
               bool auto_name = true);
 
-  const QueryBuilder& builder_;
+  const QueryBuilder* builder_;
   ExprPtr expr_;
   std::string name_;
   bool auto_name_;
@@ -425,6 +428,29 @@ class BuilderNode {
                    size_t limit = 0,
                    size_t offset = 0) const;
 
+  BuilderNode join(const BuilderNode& rhs, JoinType join_type = JoinType::INNER) const;
+  BuilderNode join(const BuilderNode& rhs, const std::string& join_type) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const std::vector<std::string>& col_names,
+                   JoinType join_type = JoinType::INNER) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const std::vector<std::string>& col_names,
+                   const std::string& join_type) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const std::vector<std::string>& lhs_col_names,
+                   const std::vector<std::string>& rhs_col_names,
+                   JoinType join_type = JoinType::INNER) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const std::vector<std::string>& lhs_col_names,
+                   const std::vector<std::string>& rhs_col_names,
+                   const std::string& join_type) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const BuilderExpr& cond,
+                   JoinType join_type = JoinType::INNER) const;
+  BuilderNode join(const BuilderNode& rhs,
+                   const BuilderExpr& cond,
+                   const std::string& join_type) const;
+
   BuilderExpr operator[](int col_idx) const;
   BuilderExpr operator[](const std::string& col_name) const;
 
@@ -435,7 +461,7 @@ class BuilderNode {
  protected:
   friend class QueryBuilder;
 
-  BuilderNode(const QueryBuilder& builder, NodePtr node);
+  BuilderNode(const QueryBuilder* builder, NodePtr node);
 
   BuilderNode proj() const;
   BuilderNode proj(const ExprPtrVector& exprs,
@@ -443,7 +469,7 @@ class BuilderNode {
   BuilderExpr parseAggString(const std::string& agg_str) const;
   std::vector<BuilderExpr> parseAggString(const std::vector<std::string>& aggs) const;
 
-  const QueryBuilder& builder_;
+  const QueryBuilder* builder_;
   NodePtr node_;
 };
 

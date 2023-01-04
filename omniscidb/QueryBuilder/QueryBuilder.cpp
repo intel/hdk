@@ -27,10 +27,40 @@ int normalizeColIndex(const Node* node, int col_idx) {
   return col_idx < 0 ? size + col_idx : col_idx;
 }
 
+std::unordered_set<std::string> getColNames(const Node* node) {
+  std::unordered_set<std::string> res;
+  res.reserve(node->size());
+  if (auto scan = node->as<Scan>()) {
+    for (size_t col_idx = 0; col_idx < node->size(); ++col_idx) {
+      if (!scan->isVirtualCol(col_idx)) {
+        res.insert(scan->getFieldName(col_idx));
+      }
+    }
+  } else if (auto proj = node->as<Project>()) {
+    auto fields = proj->getFields();
+    res.insert(fields.begin(), fields.end());
+  } else if (auto filter = node->as<Filter>()) {
+    res = getColNames(filter->getInput(0));
+  } else if (auto agg = node->as<Aggregate>()) {
+    auto fields = agg->getFields();
+    res.insert(fields.begin(), fields.end());
+  } else if (auto sort = node->as<Sort>()) {
+    res = getColNames(sort->getInput(0));
+  } else if (auto join = node->as<Join>()) {
+    res = getColNames(join->getInput(0));
+    auto rhs_names = getColNames(join->getInput(1));
+    res.insert(rhs_names.begin(), rhs_names.end());
+  } else {
+    throw InvalidQueryError() << "getColNames error: unsupported node: "
+                              << node->toString();
+  }
+  return res;
+}
+
 std::string getFieldName(const Node* node, int col_idx) {
   col_idx = normalizeColIndex(node, col_idx);
   if (auto scan = node->as<Scan>()) {
-    return scan->getColumnInfo(col_idx)->name;
+    return scan->getFieldName(col_idx);
   }
   if (auto proj = node->as<Project>()) {
     return proj->getFieldName(col_idx);
@@ -41,12 +71,40 @@ std::string getFieldName(const Node* node, int col_idx) {
   if (auto agg = node->as<Aggregate>()) {
     return agg->getFieldName(col_idx);
   }
+  if (auto sort = node->as<Sort>()) {
+    return getFieldName(sort->getInput(0), col_idx);
+  }
+  if (auto join = node->as<Join>()) {
+    if (col_idx < (int)join->getInput(0)->size()) {
+      return getFieldName(join->getInput(0), col_idx);
+    }
+    return getFieldName(join->getInput(1), col_idx - join->getInput(0)->size());
+  }
 
   throw InvalidQueryError() << "getFieldName error: unsupported node: "
                             << node->toString();
 }
 
-ExprPtr getRefByName(const Node* node, const std::string& col_name);
+ExprPtr getRefByName(const Node* node,
+                     const std::string& col_name,
+                     bool allow_null_res = false);
+
+int getRefIndexByName(const Node* node, const std::string& col_name) {
+  if (node->is<Join>()) {
+    auto lhs_ref_idx = getRefIndexByName(node->getInput(0), col_name);
+    if (lhs_ref_idx >= 0) {
+      return lhs_ref_idx;
+    }
+    auto rhs_ref_idx = getRefIndexByName(node->getInput(1), col_name);
+    if (rhs_ref_idx >= 0) {
+      return rhs_ref_idx + node->getInput(0)->size();
+    }
+    return -1;
+  }
+
+  auto ref = getRefByName(node, col_name, true);
+  return ref ? ref->as<ir::ColumnRef>()->index() : -1;
+}
 
 ExprPtr getRefByName(const Scan* scan, const std::string& col_name) {
   for (size_t i = 0; i < scan->size(); ++i) {
@@ -67,9 +125,9 @@ ExprPtr getRefByName(const Project* proj, const std::string& col_name) {
 }
 
 ExprPtr getRefByName(const Filter* filter, const std::string& col_name) {
-  auto input_ref = getRefByName(filter->getInput(0), col_name);
-  if (input_ref) {
-    return getNodeColumnRef(filter, input_ref->as<hdk::ir::ColumnRef>()->index());
+  auto idx = getRefIndexByName(filter->getInput(0), col_name);
+  if (idx >= 0) {
+    return getNodeColumnRef(filter, idx);
   }
   return nullptr;
 }
@@ -83,7 +141,25 @@ ExprPtr getRefByName(const Aggregate* agg, const std::string& col_name) {
   return nullptr;
 }
 
-ExprPtr getRefByName(const Node* node, const std::string& col_name) {
+ExprPtr getRefByName(const Sort* sort, const std::string& col_name) {
+  auto idx = getRefIndexByName(sort->getInput(0), col_name);
+  if (idx >= 0) {
+    return getNodeColumnRef(sort, idx);
+  }
+  return nullptr;
+}
+
+ExprPtr getRefByName(const Join* join, const std::string& col_name) {
+  auto lhs_input_ref = getRefByName(join->getInput(0), col_name, true);
+  auto rhs_input_ref = getRefByName(join->getInput(1), col_name, true);
+  if (lhs_input_ref && rhs_input_ref) {
+    throw InvalidQueryError() << "ambiguous column name '" << col_name
+                              << "' for Join node: " << join->toString();
+  }
+  return lhs_input_ref ? lhs_input_ref : rhs_input_ref;
+}
+
+ExprPtr getRefByName(const Node* node, const std::string& col_name, bool allow_null_res) {
   ExprPtr res = nullptr;
   if (auto scan = node->as<Scan>()) {
     res = getRefByName(scan, col_name);
@@ -93,12 +169,16 @@ ExprPtr getRefByName(const Node* node, const std::string& col_name) {
     res = getRefByName(filter, col_name);
   } else if (auto agg = node->as<Aggregate>()) {
     res = getRefByName(agg, col_name);
+  } else if (auto sort = node->as<Sort>()) {
+    res = getRefByName(sort, col_name);
+  } else if (auto join = node->as<Join>()) {
+    res = getRefByName(join, col_name);
   } else {
     throw InvalidQueryError() << "getRefByName error: unsupported node: "
                               << node->toString();
   }
 
-  if (!res) {
+  if (!res && !allow_null_res) {
     throw InvalidQueryError() << "getRefByName error: unknown column name.\n"
                               << "  Column name: " << col_name << "\n"
                               << "  Node: " << node->toString() << "\n";
@@ -181,6 +261,24 @@ class InputNodesCollector
   }
 };
 
+void expandAllowedInput(const Node* node,
+                        std::unordered_set<const Node*>& allowed_nodes) {
+  allowed_nodes.insert(node);
+  if (node->is<Join>()) {
+    expandAllowedInput(node->getInput(0), allowed_nodes);
+    expandAllowedInput(node->getInput(1), allowed_nodes);
+  }
+}
+
+std::unordered_set<const Node*> expandAllowedInput(
+    const std::vector<const Node*>& nodes) {
+  std::unordered_set<const Node*> allowed;
+  for (auto node : nodes) {
+    expandAllowedInput(node, allowed);
+  }
+  return allowed;
+}
+
 void checkExprInput(const ExprPtr& expr,
                     const std::unordered_set<const Node*>& allowed_nodes,
                     const std::string& node_name) {
@@ -204,7 +302,7 @@ void checkExprInput(const ExprPtr& expr,
 void checkExprInput(const ExprPtrVector& exprs,
                     const std::vector<const Node*>& nodes,
                     const std::string& node_name) {
-  std::unordered_set<const Node*> allowed(nodes.begin(), nodes.end());
+  std::unordered_set<const Node*> allowed = expandAllowedInput(nodes);
   for (auto& expr : exprs) {
     checkExprInput(expr, allowed, node_name);
   }
@@ -213,10 +311,17 @@ void checkExprInput(const ExprPtrVector& exprs,
 void checkExprInput(const std::vector<BuilderExpr>& exprs,
                     const std::vector<const Node*>& nodes,
                     const std::string& node_name) {
-  std::unordered_set<const Node*> allowed(nodes.begin(), nodes.end());
+  std::unordered_set<const Node*> allowed = expandAllowedInput(nodes);
   for (auto& expr : exprs) {
     checkExprInput(expr.expr(), allowed, node_name);
   }
+}
+
+void checkExprInput(const BuilderExpr& expr,
+                    const std::vector<const Node*>& nodes,
+                    const std::string& node_name) {
+  std::unordered_set<const Node*> allowed = expandAllowedInput(nodes);
+  checkExprInput(expr.expr(), allowed, node_name);
 }
 
 bool isIdentShuffle(const std::vector<int>& shuffle) {
@@ -362,9 +467,22 @@ DateAddField parseDateAddField(const std::string& field) {
   return field_names.at(canonical);
 }
 
+JoinType parseJoinType(const std::string& join_type) {
+  static const std::unordered_map<std::string, JoinType> join_types = {
+      {"left", JoinType::LEFT},
+      {"inner", JoinType::INNER},
+      {"semi", JoinType::SEMI},
+      {"anti", JoinType::ANTI}};
+  auto canonical = boost::trim_copy(boost::to_lower_copy(join_type));
+  if (!join_types.count(canonical)) {
+    throw InvalidQueryError() << "Cannot parse join type: '" << join_type << "'";
+  }
+  return join_types.at(canonical);
+}
+
 }  // namespace
 
-BuilderExpr::BuilderExpr(const QueryBuilder& builder,
+BuilderExpr::BuilderExpr(const QueryBuilder* builder,
                          ExprPtr expr,
                          const std::string& name,
                          bool auto_name)
@@ -380,7 +498,7 @@ BuilderExpr BuilderExpr::avg() const {
                               << expr_->type()->toString();
   }
   auto agg =
-      makeExpr<AggExpr>(builder_.ctx_.fp64(), AggType::kAvg, expr_, false, nullptr);
+      makeExpr<AggExpr>(builder_->ctx_.fp64(), AggType::kAvg, expr_, false, nullptr);
   auto name = name_.empty() ? "avg" : name_ + "_avg";
   return {builder_, agg, name, true};
 }
@@ -412,7 +530,7 @@ BuilderExpr BuilderExpr::sum() const {
   }
   auto res_type = expr_->type();
   if (res_type->isInteger() && res_type->size() < 8) {
-    res_type = builder_.ctx_.int64(res_type->nullable());
+    res_type = builder_->ctx_.int64(res_type->nullable());
   }
   auto agg = makeExpr<AggExpr>(res_type, AggType::kSum, expr_, false, nullptr);
   auto name = name_.empty() ? "sum" : name_ + "_sum";
@@ -425,9 +543,9 @@ BuilderExpr BuilderExpr::count(bool is_distinct) const {
         << "Count method is valid for column references only. Used for: "
         << expr_->toString();
   }
-  auto count_type = builder_.config_->exec.group_by.bigint_count
-                        ? builder_.ctx_.int64(false)
-                        : builder_.ctx_.int32(false);
+  auto count_type = builder_->config_->exec.group_by.bigint_count
+                        ? builder_->ctx_.int64(false)
+                        : builder_->ctx_.int32(false);
   auto agg = makeExpr<AggExpr>(count_type, AggType::kCount, expr_, is_distinct, nullptr);
   auto name = name_.empty() ? "count" : name_ + "_count";
   if (is_distinct) {
@@ -442,9 +560,9 @@ BuilderExpr BuilderExpr::approxCountDist() const {
         << "ApproxCountDist method is valid for column references only. Used for: "
         << expr_->toString();
   }
-  auto count_type = builder_.config_->exec.group_by.bigint_count
-                        ? builder_.ctx_.int64(false)
-                        : builder_.ctx_.int32(false);
+  auto count_type = builder_->config_->exec.group_by.bigint_count
+                        ? builder_->ctx_.int64(false)
+                        : builder_->ctx_.int32(false);
   auto agg =
       makeExpr<AggExpr>(count_type, AggType::kApproxCountDistinct, expr_, true, nullptr);
   auto name = name_.empty() ? "approx_count_dist" : name_ + "_approx_count_dist";
@@ -462,9 +580,9 @@ BuilderExpr BuilderExpr::approxQuantile(double val) const {
   }
   Datum d;
   d.doubleval = val;
-  auto cst = makeExpr<Constant>(builder_.ctx_.fp64(), false, d);
+  auto cst = makeExpr<Constant>(builder_->ctx_.fp64(), false, d);
   auto agg = makeExpr<AggExpr>(
-      builder_.ctx_.fp64(), AggType::kApproxQuantile, expr_, false, cst);
+      builder_->ctx_.fp64(), AggType::kApproxQuantile, expr_, false, cst);
   auto name = name_.empty() ? "approx_quantile" : name_ + "_approx_quantile";
   return {builder_, agg, name, true};
 }
@@ -569,7 +687,7 @@ BuilderExpr BuilderExpr::extract(DateExtractField field) const {
         << expr_->type()->toString();
   }
   auto extract_expr =
-      makeExpr<ExtractExpr>(builder_.ctx_.int64(expr_->type()->nullable()),
+      makeExpr<ExtractExpr>(builder_->ctx_.int64(expr_->type()->nullable()),
                             expr_->containsAgg(),
                             field,
                             expr_->decompress());
@@ -631,7 +749,7 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
     if (new_type->isNumber() || new_type->isTimestamp()) {
       return {builder_, expr_->cast(new_type), "", true};
     } else if (new_type->isBoolean()) {
-      return ne(builder_.cst(0, expr_->type()));
+      return ne(builder_->cst(0, expr_->type()));
     }
   } else if (expr_->type()->isFloatingPoint()) {
     if (new_type->isInteger() || new_type->isFloatingPoint()) {
@@ -641,19 +759,19 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
     if (new_type->isNumber() || new_type->isTimestamp()) {
       return {builder_, expr_->cast(new_type), "", true};
     } else if (new_type->isBoolean()) {
-      return ne(builder_.cst(0, expr_->type()));
+      return ne(builder_->cst(0, expr_->type()));
     }
   } else if (expr_->type()->isBoolean()) {
     if (new_type->isInteger() || new_type->isDecimal()) {
       std::list<std::pair<ExprPtr, ExprPtr>> expr_list;
-      expr_list.emplace_back(expr_, builder_.cst(1, new_type).expr());
+      expr_list.emplace_back(expr_, builder_->cst(1, new_type).expr());
       auto case_expr = std::make_shared<CaseExpr>(
-          new_type, expr_->containsAgg(), expr_list, builder_.cst(0, new_type).expr());
+          new_type, expr_->containsAgg(), expr_list, builder_->cst(0, new_type).expr());
       if (expr_->type()->nullable()) {
-        auto is_null =
-            std::make_shared<UOper>(builder_.ctx_.boolean(false), OpType::kIsNull, expr_);
+        auto is_null = std::make_shared<UOper>(
+            builder_->ctx_.boolean(false), OpType::kIsNull, expr_);
         auto is_not_null =
-            std::make_shared<UOper>(builder_.ctx_.boolean(false), OpType::kNot, is_null);
+            std::make_shared<UOper>(builder_->ctx_.boolean(false), OpType::kNot, is_null);
         auto null_cst = std::make_shared<Constant>(new_type, true, Datum{});
         std::list<std::pair<ExprPtr, ExprPtr>> expr_list;
         expr_list.emplace_back(is_not_null, case_expr);
@@ -717,7 +835,7 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
 }
 
 BuilderExpr BuilderExpr::cast(const std::string& new_type) const {
-  return cast(builder_.ctx_.typeFromString(new_type));
+  return cast(builder_->ctx_.typeFromString(new_type));
 }
 
 BuilderExpr BuilderExpr::logicalNot() const {
@@ -725,9 +843,9 @@ BuilderExpr BuilderExpr::logicalNot() const {
     throw InvalidQueryError("Only boolean expressions are allowed for NOT operation.");
   }
   if (expr_->is<Constant>()) {
-    return builder_.cst(!expr_->as<Constant>()->intVal(), expr_->type());
+    return builder_->cst(!expr_->as<Constant>()->intVal(), expr_->type());
   }
-  auto uoper = makeExpr<UOper>(builder_.ctx_.boolean(expr_->type()->nullable()),
+  auto uoper = makeExpr<UOper>(builder_->ctx_.boolean(expr_->type()->nullable()),
                                expr_->containsAgg(),
                                OpType::kNot,
                                expr_);
@@ -741,14 +859,14 @@ BuilderExpr BuilderExpr::uminus() const {
   if (expr_->is<Constant>()) {
     auto cst_expr = expr_->as<Constant>();
     if (cst_expr->type()->isInteger()) {
-      return builder_.cst(-cst_expr->intVal(), cst_expr->type());
+      return builder_->cst(-cst_expr->intVal(), cst_expr->type());
     } else if (cst_expr->type()->isFloatingPoint()) {
-      return builder_.cst(-cst_expr->fpVal(), cst_expr->type());
+      return builder_->cst(-cst_expr->fpVal(), cst_expr->type());
     } else if (cst_expr->type()->isDecimal()) {
-      return builder_.cstNoScale(-cst_expr->intVal(), cst_expr->type());
+      return builder_->cstNoScale(-cst_expr->intVal(), cst_expr->type());
     } else {
       CHECK(cst_expr->type()->isInterval());
-      return builder_.cst(-cst_expr->intVal(), cst_expr->type());
+      return builder_->cst(-cst_expr->intVal(), cst_expr->type());
     }
   }
   auto uoper =
@@ -758,15 +876,15 @@ BuilderExpr BuilderExpr::uminus() const {
 
 BuilderExpr BuilderExpr::isNull() const {
   if (expr_->type()->isNull()) {
-    return builder_.trueCst();
+    return builder_->trueCst();
   } else if (!expr_->type()->nullable()) {
-    return builder_.falseCst();
+    return builder_->falseCst();
   } else if (expr_->is<Constant>()) {
-    return builder_.cst((int)expr_->as<Constant>()->isNull(),
-                        builder_.ctx_.boolean(false));
+    return builder_->cst((int)expr_->as<Constant>()->isNull(),
+                         builder_->ctx_.boolean(false));
   }
   auto uoper = makeExpr<UOper>(
-      builder_.ctx_.boolean(false), expr_->containsAgg(), OpType::kIsNull, expr_);
+      builder_->ctx_.boolean(false), expr_->containsAgg(), OpType::kIsNull, expr_);
   return {builder_, uoper, "", true};
 }
 
@@ -790,8 +908,8 @@ BuilderExpr BuilderExpr::add(const BuilderExpr& rhs) const {
     auto res_nullable = expr_->type()->nullable() || rhs.expr()->type()->nullable();
     const Type* res_type =
         expr_->type()->isDate()
-            ? (const Type*)builder_.ctx_.date(res_size, res_unit, res_nullable)
-            : (const Type*)builder_.ctx_.timestamp(res_unit, res_nullable);
+            ? (const Type*)builder_->ctx_.date(res_size, res_unit, res_nullable)
+            : (const Type*)builder_->ctx_.timestamp(res_unit, res_nullable);
     auto add_expr = std::make_shared<DateAddExpr>(
         res_type, timeUnitToDateAddField(interval_unit), rhs.expr(), expr_);
     return {builder_, add_expr, "", true};
@@ -812,19 +930,19 @@ BuilderExpr BuilderExpr::add(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::add(int val) const {
-  return add(builder_.cst(val, builder_.ctx_.int32(false)));
+  return add(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::add(int64_t val) const {
-  return add(builder_.cst(val, builder_.ctx_.int64(false)));
+  return add(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::add(float val) const {
-  return add(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return add(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::add(double val) const {
-  return add(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return add(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, DateAddField field) const {
@@ -855,7 +973,7 @@ BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, DateAddField field) const {
 }
 
 BuilderExpr BuilderExpr::add(int64_t val, DateAddField field) const {
-  return add(builder_.cst(val, builder_.ctx_.int64(false)), field);
+  return add(builder_->cst(val, builder_->ctx_.int64(false)), field);
 }
 
 BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, const std::string& field) const {
@@ -863,7 +981,7 @@ BuilderExpr BuilderExpr::add(const BuilderExpr& rhs, const std::string& field) c
 }
 
 BuilderExpr BuilderExpr::add(int64_t val, const std::string& field) const {
-  return add(builder_.cst(val, builder_.ctx_.int64(false)), parseDateAddField(field));
+  return add(builder_->cst(val, builder_->ctx_.int64(false)), parseDateAddField(field));
 }
 
 BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs) const {
@@ -883,19 +1001,19 @@ BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::sub(int val) const {
-  return sub(builder_.cst(val, builder_.ctx_.int32(false)));
+  return sub(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::sub(int64_t val) const {
-  return sub(builder_.cst(val, builder_.ctx_.int64(false)));
+  return sub(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::sub(float val) const {
-  return sub(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return sub(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::sub(double val) const {
-  return sub(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return sub(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, DateAddField field) const {
@@ -903,11 +1021,11 @@ BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, DateAddField field) const {
 }
 
 BuilderExpr BuilderExpr::sub(int val, DateAddField field) const {
-  return sub(builder_.cst(val, builder_.ctx_.int32(false)), field);
+  return sub(builder_->cst(val, builder_->ctx_.int32(false)), field);
 }
 
 BuilderExpr BuilderExpr::sub(int64_t val, DateAddField field) const {
-  return sub(builder_.cst(val, builder_.ctx_.int64(false)), field);
+  return sub(builder_->cst(val, builder_->ctx_.int64(false)), field);
 }
 
 BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, const std::string& field) const {
@@ -915,11 +1033,11 @@ BuilderExpr BuilderExpr::sub(const BuilderExpr& rhs, const std::string& field) c
 }
 
 BuilderExpr BuilderExpr::sub(int val, const std::string& field) const {
-  return sub(builder_.cst(val, builder_.ctx_.int32(false)), parseDateAddField(field));
+  return sub(builder_->cst(val, builder_->ctx_.int32(false)), parseDateAddField(field));
 }
 
 BuilderExpr BuilderExpr::sub(int64_t val, const std::string& field) const {
-  return sub(builder_.cst(val, builder_.ctx_.int64(false)), parseDateAddField(field));
+  return sub(builder_->cst(val, builder_->ctx_.int64(false)), parseDateAddField(field));
 }
 
 BuilderExpr BuilderExpr::mul(const BuilderExpr& rhs) const {
@@ -935,19 +1053,19 @@ BuilderExpr BuilderExpr::mul(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::mul(int val) const {
-  return mul(builder_.cst(val, builder_.ctx_.int32(false)));
+  return mul(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::mul(int64_t val) const {
-  return mul(builder_.cst(val, builder_.ctx_.int64(false)));
+  return mul(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::mul(float val) const {
-  return mul(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return mul(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::mul(double val) const {
-  return mul(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return mul(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::div(const BuilderExpr& rhs) const {
@@ -963,19 +1081,19 @@ BuilderExpr BuilderExpr::div(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::div(int val) const {
-  return div(builder_.cst(val, builder_.ctx_.int32(false)));
+  return div(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::div(int64_t val) const {
-  return div(builder_.cst(val, builder_.ctx_.int64(false)));
+  return div(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::div(float val) const {
-  return div(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return div(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::div(double val) const {
-  return div(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return div(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::mod(const BuilderExpr& rhs) const {
@@ -991,11 +1109,11 @@ BuilderExpr BuilderExpr::mod(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::mod(int val) const {
-  return mod(builder_.cst(val, builder_.ctx_.int32(false)));
+  return mod(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::mod(int64_t val) const {
-  return mod(builder_.cst(val, builder_.ctx_.int64(false)));
+  return mod(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::logicalAnd(const BuilderExpr& rhs) const {
@@ -1035,23 +1153,23 @@ BuilderExpr BuilderExpr::eq(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::eq(int val) const {
-  return eq(builder_.cst(val, builder_.ctx_.int32(false)));
+  return eq(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::eq(int64_t val) const {
-  return eq(builder_.cst(val, builder_.ctx_.int64(false)));
+  return eq(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::eq(float val) const {
-  return eq(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return eq(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::eq(double val) const {
-  return eq(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return eq(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::eq(const std::string& val) const {
-  return eq(builder_.cst(val));
+  return eq(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
@@ -1067,23 +1185,23 @@ BuilderExpr BuilderExpr::ne(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::ne(int val) const {
-  return ne(builder_.cst(val, builder_.ctx_.int32(false)));
+  return ne(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::ne(int64_t val) const {
-  return ne(builder_.cst(val, builder_.ctx_.int64(false)));
+  return ne(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::ne(float val) const {
-  return ne(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return ne(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::ne(double val) const {
-  return ne(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return ne(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::ne(const std::string& val) const {
-  return ne(builder_.cst(val));
+  return ne(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::lt(const BuilderExpr& rhs) const {
@@ -1099,23 +1217,23 @@ BuilderExpr BuilderExpr::lt(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::lt(int val) const {
-  return lt(builder_.cst(val, builder_.ctx_.int32(false)));
+  return lt(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::lt(int64_t val) const {
-  return lt(builder_.cst(val, builder_.ctx_.int64(false)));
+  return lt(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::lt(float val) const {
-  return lt(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return lt(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::lt(double val) const {
-  return lt(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return lt(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::lt(const std::string& val) const {
-  return lt(builder_.cst(val));
+  return lt(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::le(const BuilderExpr& rhs) const {
@@ -1131,23 +1249,23 @@ BuilderExpr BuilderExpr::le(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::le(int val) const {
-  return le(builder_.cst(val, builder_.ctx_.int32(false)));
+  return le(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::le(int64_t val) const {
-  return le(builder_.cst(val, builder_.ctx_.int64(false)));
+  return le(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::le(float val) const {
-  return le(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return le(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::le(double val) const {
-  return le(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return le(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::le(const std::string& val) const {
-  return le(builder_.cst(val));
+  return le(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::gt(const BuilderExpr& rhs) const {
@@ -1163,23 +1281,23 @@ BuilderExpr BuilderExpr::gt(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::gt(int val) const {
-  return gt(builder_.cst(val, builder_.ctx_.int32(false)));
+  return gt(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::gt(int64_t val) const {
-  return gt(builder_.cst(val, builder_.ctx_.int64(false)));
+  return gt(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::gt(float val) const {
-  return gt(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return gt(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::gt(double val) const {
-  return gt(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return gt(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::gt(const std::string& val) const {
-  return gt(builder_.cst(val));
+  return gt(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::ge(const BuilderExpr& rhs) const {
@@ -1195,23 +1313,23 @@ BuilderExpr BuilderExpr::ge(const BuilderExpr& rhs) const {
 }
 
 BuilderExpr BuilderExpr::ge(int val) const {
-  return ge(builder_.cst(val, builder_.ctx_.int32(false)));
+  return ge(builder_->cst(val, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::ge(int64_t val) const {
-  return ge(builder_.cst(val, builder_.ctx_.int64(false)));
+  return ge(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::ge(float val) const {
-  return ge(builder_.cst(val, builder_.ctx_.fp32(false)));
+  return ge(builder_->cst(val, builder_->ctx_.fp32(false)));
 }
 
 BuilderExpr BuilderExpr::ge(double val) const {
-  return ge(builder_.cst(val, builder_.ctx_.fp64(false)));
+  return ge(builder_->cst(val, builder_->ctx_.fp64(false)));
 }
 
 BuilderExpr BuilderExpr::ge(const std::string& val) const {
-  return ge(builder_.cst(val));
+  return ge(builder_->cst(val));
 }
 
 BuilderExpr BuilderExpr::at(const BuilderExpr& idx) const {
@@ -1234,11 +1352,11 @@ BuilderExpr BuilderExpr::at(const BuilderExpr& idx) const {
 }
 
 BuilderExpr BuilderExpr::at(int idx) const {
-  return at(builder_.cst(idx, builder_.ctx_.int32(false)));
+  return at(builder_->cst(idx, builder_->ctx_.int32(false)));
 }
 
 BuilderExpr BuilderExpr::at(int64_t idx) const {
-  return at(builder_.cst(idx, builder_.ctx_.int64(false)));
+  return at(builder_->cst(idx, builder_->ctx_.int64(false)));
 }
 
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
@@ -1266,11 +1384,11 @@ BuilderExpr BuilderExpr::operator[](int64_t idx) const {
 }
 
 const QueryBuilder& BuilderExpr::builder() const {
-  return builder_;
+  return *builder_;
 }
 
 Context& BuilderExpr::ctx() const {
-  return const_cast<Context&>(builder_.ctx_);
+  return const_cast<Context&>(builder_->ctx_);
 }
 
 BuilderSortField::BuilderSortField(int col_idx,
@@ -1343,7 +1461,7 @@ NullSortedPosition BuilderSortField::parseNullPosition(const std::string& val) {
                             << val << "'";
 }
 
-BuilderNode::BuilderNode(const QueryBuilder& builder, NodePtr node)
+BuilderNode::BuilderNode(const QueryBuilder* builder, NodePtr node)
     : builder_(builder), node_(node) {}
 
 BuilderExpr BuilderNode::ref(int col_idx) const {
@@ -1386,7 +1504,7 @@ std::vector<BuilderExpr> BuilderNode::ref(std::vector<std::string> col_names) co
 }
 
 BuilderExpr BuilderNode::count() const {
-  return builder_.count();
+  return builder_->count();
 }
 
 BuilderExpr BuilderNode::count(int col_idx, bool is_distinct) const {
@@ -1505,7 +1623,7 @@ BuilderNode BuilderNode::proj(const ExprPtrVector& exprs,
 }
 
 BuilderNode BuilderNode::filter(BuilderExpr condition) const {
-  checkExprInput(condition.expr(), {node_.get()}, "filter");
+  checkExprInput(condition, {node_.get()}, "filter");
   auto filter = std::make_shared<Filter>(condition.expr(), node_);
   return {builder_, filter};
 }
@@ -2076,6 +2194,99 @@ BuilderNode BuilderNode::sort(const std::vector<BuilderSortField>& fields,
   return {builder_, sort_node};
 }
 
+BuilderNode BuilderNode::join(const BuilderNode& rhs, JoinType join_type) const {
+  auto lhs_cols = getColNames(node_.get());
+  auto rhs_cols = getColNames(rhs.node().get());
+  std::vector<std::string> common_cols;
+  for (auto& rhs_col : rhs_cols) {
+    if (lhs_cols.count(rhs_col)) {
+      common_cols.push_back(rhs_col);
+    }
+  }
+  if (common_cols.empty()) {
+    throw InvalidQueryError()
+        << "Cannot find common columns to generate default equi join."
+        << "\n  LHS columns: " << toString(lhs_cols)
+        << "\n  RHS columns: " << toString(rhs_cols);
+  }
+  return join(rhs, common_cols, join_type);
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const std::string& join_type) const {
+  return join(rhs, parseJoinType(join_type));
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const std::vector<std::string>& col_names,
+                              JoinType join_type) const {
+  return join(rhs, col_names, col_names, join_type);
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const std::vector<std::string>& col_names,
+                              const std::string& join_type) const {
+  return join(rhs, col_names, parseJoinType(join_type));
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const std::vector<std::string>& lhs_col_names,
+                              const std::vector<std::string>& rhs_col_names,
+                              JoinType join_type) const {
+  if (lhs_col_names.size() != rhs_col_names.size()) {
+    throw InvalidQueryError() << "Mismatched number of key columns for equi join: "
+                              << lhs_col_names.size() << " vs. " << rhs_col_names.size();
+  }
+  if (lhs_col_names.empty()) {
+    throw InvalidQueryError("Columns set for equi join should not be empty.");
+  }
+  auto cond = ref(lhs_col_names[0]).eq(rhs.ref(rhs_col_names[0]));
+  for (size_t col_idx = 1; col_idx < lhs_col_names.size(); ++col_idx) {
+    cond =
+        cond.logicalAnd(ref(lhs_col_names[col_idx]).eq(rhs.ref(rhs_col_names[col_idx])));
+  }
+  auto join_node = join(rhs, cond, join_type);
+  std::vector<int> proj_cols;
+  proj_cols.reserve(join_node.node()->size());
+  auto lhs_scan = node_->as<Scan>();
+  for (int i = 0; i < (int)node_->size(); ++i) {
+    if (!lhs_scan || !lhs_scan->isVirtualCol(i)) {
+      proj_cols.emplace_back(i);
+    }
+  }
+  std::unordered_set<std::string> exclude_cols(rhs_col_names.begin(),
+                                               rhs_col_names.end());
+  auto rhs_scan = rhs.node()->as<Scan>();
+  for (int i = 0; i < (int)rhs.node()->size(); ++i) {
+    if (!exclude_cols.count(getFieldName(rhs.node().get(), i)) &&
+        (!rhs_scan || !rhs_scan->isVirtualCol(i))) {
+      proj_cols.emplace_back(i + node_->size());
+    }
+  }
+  return join_node.proj(proj_cols);
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const std::vector<std::string>& lhs_col_names,
+                              const std::vector<std::string>& rhs_col_names,
+                              const std::string& join_type) const {
+  return join(rhs, lhs_col_names, rhs_col_names, parseJoinType(join_type));
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const BuilderExpr& cond,
+                              JoinType join_type) const {
+  checkExprInput(cond, {node_.get(), rhs.node().get()}, "join");
+  NodePtr join_node = std::make_shared<Join>(node_, rhs.node(), cond.expr(), join_type);
+  return {builder_, join_node};
+}
+
+BuilderNode BuilderNode::join(const BuilderNode& rhs,
+                              const BuilderExpr& cond,
+                              const std::string& join_type) const {
+  return join(rhs, cond, parseJoinType(join_type));
+}
+
 BuilderExpr BuilderNode::operator[](int col_idx) const {
   return ref(col_idx);
 }
@@ -2097,8 +2308,22 @@ std::unique_ptr<QueryDag> BuilderNode::finalize() const {
     }
     return proj(cols).finalize();
   }
+  // For join of scan nodes, we exclude virtual columns from the final
+  // projection.
+  if (auto join = node_->as<Join>()) {
+    std::vector<int> cols;
+    cols.reserve(join->size());
+    for (int i = 0; i < (int)node_->size(); ++i) {
+      auto col_ref = std::dynamic_pointer_cast<const ir::ColumnRef>(ref(i).expr());
+      if (!col_ref->node()->is<Scan>() ||
+          !col_ref->node()->as<Scan>()->isVirtualCol(col_ref->index())) {
+        cols.push_back(i);
+      }
+    }
+    return proj(cols).finalize();
+  }
 
-  return std::make_unique<QueryDag>(builder_.config_, node_);
+  return std::make_unique<QueryDag>(builder_->config_, node_);
 }
 
 QueryBuilder::QueryBuilder(Context& ctx,
@@ -2149,14 +2374,14 @@ BuilderNode QueryBuilder::scan(const TableRef& table_ref) const {
 BuilderNode QueryBuilder::scan(TableInfoPtr table_info) const {
   auto scan =
       std::make_shared<Scan>(table_info, schema_provider_->listColumns(*table_info));
-  return {*this, scan};
+  return {this, scan};
 }
 
 BuilderExpr QueryBuilder::count() const {
   auto count_type =
       config_->exec.group_by.bigint_count ? ctx_.int64(false) : ctx_.int32(false);
   auto agg = makeExpr<AggExpr>(count_type, AggType::kCount, nullptr, false, nullptr);
-  return {*this, agg, "count", true};
+  return {this, agg, "count", true};
 }
 
 BuilderExpr QueryBuilder::cst(int val) const {
@@ -2185,7 +2410,7 @@ BuilderExpr QueryBuilder::cst(int64_t val, const Type* type) const {
     throw InvalidQueryError("Literals of date type with DAY time unit are not allowed.");
   }
   auto cst_expr = Constant::make(type, val);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cst(int64_t val, const std::string& type) const {
@@ -2210,7 +2435,7 @@ BuilderExpr QueryBuilder::cst(double val, const Type* type) const {
                               << type->toString();
   }
   auto cst_expr = std::make_shared<Constant>(type, false, d);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cst(double val, const std::string& type) const {
@@ -2232,7 +2457,7 @@ BuilderExpr QueryBuilder::cst(const std::string& val, const Type* type) const {
     Datum d;
     d.stringval = new std::string(val);
     auto cst_expr = std::make_shared<Constant>(ctx_.text(), false, d);
-    return {*this, cst_expr->cast(type)};
+    return {this, cst_expr->cast(type)};
   } catch (std::runtime_error& e) {
     throw InvalidQueryError(e.what());
   }
@@ -2251,7 +2476,7 @@ BuilderExpr QueryBuilder::cstNoScale(int64_t val, const Type* type) const {
   Datum d;
   d.bigintval = val;
   auto cst_expr = std::make_shared<Constant>(type, false, d);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cstNoScale(int64_t val, const std::string& type) const {
@@ -2262,14 +2487,14 @@ BuilderExpr QueryBuilder::trueCst() const {
   Datum d;
   d.boolval = true;
   auto cst_expr = std::make_shared<Constant>(ctx_.boolean(false), false, d);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::falseCst() const {
   Datum d;
   d.boolval = false;
   auto cst_expr = std::make_shared<Constant>(ctx_.boolean(false), false, d);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::nullCst() const {
@@ -2278,7 +2503,7 @@ BuilderExpr QueryBuilder::nullCst() const {
 
 BuilderExpr QueryBuilder::nullCst(const Type* type) const {
   auto cst_expr = std::make_shared<Constant>(type, true, Datum{});
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::nullCst(const std::string& type) const {
@@ -2336,7 +2561,7 @@ BuilderExpr QueryBuilder::cst(const std::vector<int>& vals, const Type* type) co
     exprs.emplace_back(cst(val, elem_type).expr());
   }
   auto cst_expr = std::make_shared<Constant>(type, false, exprs);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cst(const std::vector<int>& vals,
@@ -2356,7 +2581,7 @@ BuilderExpr QueryBuilder::cst(const std::vector<double>& vals, const Type* type)
     exprs.emplace_back(cst(val, elem_type).expr());
   }
   auto cst_expr = std::make_shared<Constant>(type, false, exprs);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cst(const std::vector<double>& vals,
@@ -2373,7 +2598,7 @@ BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
     exprs.emplace_back(cst(val, elem_type).expr());
   }
   auto cst_expr = std::make_shared<Constant>(type, false, exprs);
-  return {*this, cst_expr};
+  return {this, cst_expr};
 }
 
 BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,

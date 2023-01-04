@@ -319,6 +319,12 @@ class QueryBuilderTest : public TestSuite {
 
     createTable("ambiguous", {{"x", ctx().int32()}});
     storage2_->createTable("ambiguous", {{"x", ctx().int32()}});
+
+    createTable("join1", {{"id", ctx().int32()}, {"val1", ctx().int32()}});
+    insertCsvValues("join1", "1,101\n2,102\n,103\n4,104\n5,105");
+
+    createTable("join2", {{"id", ctx().int32()}, {"val2", ctx().int32()}});
+    insertCsvValues("join2", "2,101\n3,102\n4,103\n,104\n6,105");
   }
 
   static void TearDownTestSuite() {}
@@ -4421,6 +4427,88 @@ TEST_F(QueryBuilderTest, SortAggFilterProj) {
                    std::vector<int64_t>({65, 100, 33, 73}));
 }
 
+TEST_F(QueryBuilderTest, Join) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  {
+    auto dag = builder.scan("join1").join(builder.scan("join2")).finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({2, 4}),
+                     std::vector<int32_t>({102, 104}),
+                     std::vector<int32_t>({101, 103}));
+  }
+
+  {
+    auto dag = builder.scan("join1").join(builder.scan("join2"), "left").finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({1, 2, inline_null_value<int32_t>(), 4, 5}),
+                     std::vector<int32_t>({101, 102, 103, 104, 105}),
+                     std::vector<int32_t>({inline_null_value<int32_t>(),
+                                           101,
+                                           inline_null_value<int32_t>(),
+                                           103,
+                                           inline_null_value<int32_t>()}));
+  }
+
+  {
+    auto dag = builder.scan("join1")
+                   .join(builder.scan("join2"), std::vector<std::string>{"id"})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({2, 4}),
+                     std::vector<int32_t>({102, 104}),
+                     std::vector<int32_t>({101, 103}));
+  }
+
+  {
+    auto dag = builder.scan("join1")
+                   .join(builder.scan("join2"),
+                         std::vector<std::string>{"val1"},
+                         std::vector<std::string>{"val2"})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({1, 2, inline_null_value<int32_t>(), 4, 5}),
+                     std::vector<int32_t>({101, 102, 103, 104, 105}),
+                     std::vector<int32_t>({2, 3, 4, inline_null_value<int32_t>(), 6}));
+  }
+
+  {
+    auto scan1 = builder.scan("join1");
+    auto scan2 = builder.scan("join2");
+    auto dag = scan1.join(scan2, scan1["id"] == scan2["id"]).finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({2, 4}),
+                     std::vector<int32_t>({102, 104}),
+                     std::vector<int32_t>({2, 4}),
+                     std::vector<int32_t>({101, 103}));
+  }
+
+  {
+    auto scan1 = builder.scan("join1");
+    auto scan2 = builder.scan("join2");
+    auto dag = scan1.join(scan2, scan1["id"] == scan2["id"], "left").finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<int32_t>({1, 2, inline_null_value<int32_t>(), 4, 5}),
+                     std::vector<int32_t>({101, 102, 103, 104, 105}),
+                     std::vector<int32_t>({inline_null_value<int32_t>(),
+                                           2,
+                                           inline_null_value<int32_t>(),
+                                           4,
+                                           inline_null_value<int32_t>()}),
+                     std::vector<int32_t>({inline_null_value<int32_t>(),
+                                           101,
+                                           inline_null_value<int32_t>(),
+                                           103,
+                                           inline_null_value<int32_t>()}));
+  }
+}
+
 class Taxi : public TestSuite {
  protected:
   static void SetUpTestSuite() {
@@ -5231,7 +5319,7 @@ TEST_F(TPCH, Q3_SQL) {
   compare_q3(res);
 }
 
-TEST_F(TPCH, Q3) {
+TEST_F(TPCH, Q3_NoBuilder) {
   // Create scans.
   auto c_table_info = getStorage()->getTableInfo(TEST_DB_ID, "customer");
   auto c_col_infos = getStorage()->listColumns(*c_table_info);
@@ -5375,9 +5463,8 @@ TEST_F(TPCH, Q3) {
   compare_q3(res);
 }
 
-#if 0
-TEST_F(TPCH, Q3WithBuilder1) {
-  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+TEST_F(TPCH, Q3_1) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto lineitem = builder.scan("lineitem");
   auto orders = builder.scan("orders");
   auto customer = builder.scan("customer");
@@ -5385,44 +5472,42 @@ TEST_F(TPCH, Q3WithBuilder1) {
       lineitem.join(orders, lineitem.ref("l_orderkey").eq(orders.ref("o_orderkey")));
   auto join2 = join1.join(customer, join1.ref("o_custkey").eq(customer.ref("c_custkey")));
   auto filter = join2.filter(
-      {join2.ref("c_mktsegment").eq(builder.cst("BUILDING")),
-       join2.ref("o_orderdate").lt(builder.cst("1995-03-15").cast(ctx().date32())),
-       join2.ref("l_shipdate").gt(builder.cst("1995-03-15").cast(ctx().date32()))});
+      join2.ref("c_mktsegment")
+          .eq(builder.cst("BUILDING"))
+          .logicalAnd(join2.ref("o_orderdate").lt(builder.date("1995-03-15")))
+          .logicalAnd(join2.ref("l_shipdate").gt(builder.date("1995-03-15"))));
   auto revenue =
-      filter.ref("l_extendedprice").mul(builder.cst(1).minus(filter.ref("l_discount")));
+      filter.ref("l_extendedprice").mul(builder.cst(1).sub(filter.ref("l_discount")));
   auto dag = filter
                  .agg({"l_orderkey", "o_orderdate", "o_shippriority"},
-                      {revenue.sum()},
-                      {"l_orderkey", "o_orderdate", "o_shippriority", "revenue"})
+                      {revenue.sum().name("revenue")})
                  .proj({"l_orderkey", "revenue", "o_orderdate", "o_shippriority"})
-                 .sort({{"revenue", SortDirection::Descending}, {"o_orderdate"}})
+                 .sort({{"revenue"s, "desc"s}, {"o_orderdate"s, "asc"s}})
                  .finalize();
 
   auto res = runQuery(std::move(dag));
   compare_q3(res);
 }
 
-TEST_F(TPCH, Q3WithBuilder2) {
-  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+TEST_F(TPCH, Q3_2) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto join = builder.scan("lineitem")
-                  .join(builder.scan("orders"), {"l_orderkey"}, {"o_orderkey"})
-                  .join(builder.scan("customer"), {"o_custkey"}, {"c_custkey"});
-  auto filter = join.filter({join.ref("c_mktsegment").eq(builder.cst("BUILDING")),
-                             join.ref("o_orderdate").lt(builder.date("1995-03-15")),
-                             join.ref("l_shipdate").gt(builder.date("1995-03-15"))});
-  auto revenue =
-      filter.ref("l_extendedprice").mul(builder.cst(1).minus(filter.ref("l_discount")));
+                  .join(builder.scan("orders"), {"l_orderkey"}, {"o_orderkey"}, "inner")
+                  .join(builder.scan("customer"), {"o_custkey"}, {"c_custkey"}, "inner");
+  auto filter = join.filter(join["c_mktsegment"] == builder.cst("BUILDING") &&
+                            join["o_orderdate"] < builder.date("1995-03-15") &&
+                            join["l_shipdate"] > builder.date("1995-03-15"));
+  auto revenue = filter["l_extendedprice"] * (1 - filter["l_discount"]);
   auto dag = filter
                  .agg({"l_orderkey", "o_orderdate", "o_shippriority"},
                       {revenue.sum().name("revenue")})
                  .proj({0, 3, 1, 2})
-                 .sort({{1, SortDirection::Descending}, {2}})
+                 .sort({{1, "desc"}, {2, "asc"}})
                  .finalize();
 
   auto res = runQuery(std::move(dag));
   compare_q3(res);
 }
-#endif
 
 int main(int argc, char* argv[]) {
   TestHelpers::init_logger_stderr_only(argc, argv);
@@ -5432,12 +5517,8 @@ int main(int argc, char* argv[]) {
   builder.parseCommandLineArgs(argc, argv, true);
   auto config = builder.config();
 
-  // Avoid Calcite initialization for this suite.
-  // config->debug.use_ra_cache = "dummy";
   // Enable table function. Must be done before init.
   g_enable_table_functions = true;
-
-  // config->debug.dump = true;
 
   int err{0};
   try {
