@@ -1,6 +1,5 @@
 set(utils_source_files
     ChunkIter.cpp
-    CommandLineOptions.cpp
     Regexp.cpp
     StringLike.cpp
 )
