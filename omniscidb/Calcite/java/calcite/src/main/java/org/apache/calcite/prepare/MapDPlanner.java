@@ -36,14 +36,21 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.externalize.MapDRelJsonReader;
 import org.apache.calcite.rel.rules.*;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.advise.SqlAdvisor;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlMoniker;
@@ -56,6 +63,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
@@ -275,6 +283,74 @@ public class MapDPlanner extends PlannerImpl {
 
   public void setRestriction(Restriction restriction) {
     this.restriction = restriction;
+  }
+
+  private RelRoot acceptShuttleOnTree(RexShuttle shuttle, RelRoot root) {
+    RelNode node = root.rel.accept(new RelShuttleImpl() {
+      @Override
+      protected RelNode visitChild(RelNode parent, int i, RelNode child) {
+        RelNode node = super.visitChild(parent, i, child);
+        return node.accept(shuttle);
+      }
+    });
+
+    return new RelRoot(node,
+            root.validatedRowType,
+            root.kind,
+            root.fields,
+            root.collation,
+            Collections.emptyList());
+  }
+
+  public RelRoot expandSearch(RelRoot root) {
+    final RexShuttle callShuttle = new RexShuttle() {
+      RexBuilder builder = new RexBuilder(getTypeFactory());
+
+      public RexNode visitCall(RexCall call) {
+        call = (RexCall) super.visitCall(call);
+        if (call.getKind() == SqlKind.SEARCH) {
+          return RexUtil.expandSearch(builder, null, call);
+        }
+        return call;
+      }
+    };
+
+    return acceptShuttleOnTree(callShuttle, root);
+  }
+
+  public RelRoot replaceIsTrue(RelRoot root) {
+    final RexShuttle callShuttle = new RexShuttle() {
+      RexBuilder builder = new RexBuilder(getTypeFactory());
+
+      public RexNode visitCall(RexCall call) {
+        call = (RexCall) super.visitCall(call);
+        if (call.getKind() == SqlKind.IS_TRUE) {
+          return builder.makeCall(SqlStdOperatorTable.AND,
+                  builder.makeCall(
+                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
+                  call.getOperands().get(0));
+        } else if (call.getKind() == SqlKind.IS_NOT_TRUE) {
+          return builder.makeCall(SqlStdOperatorTable.OR,
+                  builder.makeCall(
+                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
+                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
+        } else if (call.getKind() == SqlKind.IS_FALSE) {
+          return builder.makeCall(SqlStdOperatorTable.AND,
+                  builder.makeCall(
+                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
+                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
+        } else if (call.getKind() == SqlKind.IS_NOT_FALSE) {
+          return builder.makeCall(SqlStdOperatorTable.OR,
+                  builder.makeCall(
+                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
+                  call.getOperands().get(0));
+        }
+
+        return call;
+      }
+    };
+
+    return acceptShuttleOnTree(callShuttle, root);
   }
 }
 

@@ -205,7 +205,8 @@ public final class MapDParser {
 
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot optRel = planner.optimizeRaQuery(query, schema);
-    optRel = replaceIsTrue(planner.getTypeFactory(), optRel);
+    optRel = planner.expandSearch(optRel); // remove SARGs
+
     return MapDSerializer.toString(optRel.project());
   }
 
@@ -447,7 +448,7 @@ public final class MapDParser {
       relR = planner.rel(validateR);
     }
 
-    relR = replaceIsTrue(planner.getTypeFactory(), relR);
+    relR = planner.replaceIsTrue(relR);
     planner.close();
 
     if (!parserOptions.isViewOptimizeEnabled()) {
@@ -465,54 +466,6 @@ public final class MapDParser {
 
       return relR;
     }
-  }
-
-  private RelRoot replaceIsTrue(final RelDataTypeFactory typeFactory, RelRoot root) {
-    final RexShuttle callShuttle = new RexShuttle() {
-      RexBuilder builder = new RexBuilder(typeFactory);
-
-      public RexNode visitCall(RexCall call) {
-        call = (RexCall) super.visitCall(call);
-        if (call.getKind() == SqlKind.IS_TRUE) {
-          return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
-        } else if (call.getKind() == SqlKind.IS_NOT_TRUE) {
-          return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
-        } else if (call.getKind() == SqlKind.IS_FALSE) {
-          return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
-        } else if (call.getKind() == SqlKind.IS_NOT_FALSE) {
-          return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
-        }
-
-        return call;
-      }
-    };
-
-    RelNode node = root.rel.accept(new RelShuttleImpl() {
-      @Override
-      protected RelNode visitChild(RelNode parent, int i, RelNode child) {
-        RelNode node = super.visitChild(parent, i, child);
-        return node.accept(callShuttle);
-      }
-    });
-
-    return new RelRoot(node,
-            root.validatedRowType,
-            root.kind,
-            root.fields,
-            root.collation,
-            Collections.emptyList());
   }
 
   private SqlNode parseSql(String sql, final boolean legacy_syntax, Planner planner)
