@@ -45,7 +45,8 @@ int64_t dateTimeParse(std::string_view const s, hdk::ir::TimeUnit unit) {
   if (auto const time = dateTimeParseOptional<TYPE>(s, unit)) {
     return *time;
   } else {
-    throw std::runtime_error(cat("Invalid ", toString(TYPE), " string (", s, ')'));
+    throw std::runtime_error(
+        cat("Invalid date/time (", std::to_string(TYPE), ") string (", s, ')'));
   }
 }
 
@@ -71,7 +72,8 @@ int64_t dateTimeParse(std::string_view const s, int dim) {
   if (auto const time = dateTimeParseOptional<TYPE>(s, unit)) {
     return *time;
   } else {
-    throw std::runtime_error(cat("Invalid ", toString(TYPE), " string (", s, ')'));
+    throw std::runtime_error(
+        cat("Invalid date/time (", std::to_string(TYPE), ") string (", s, ')'));
   }
 }
 
