@@ -18,6 +18,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Force -O0 optimization level for debug builds.
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+
 # set default build type to "Release w/ Debug Info" 
 set(default_build_type "RelWithDebInfo")
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
