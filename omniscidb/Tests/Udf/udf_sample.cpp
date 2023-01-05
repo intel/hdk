@@ -2,7 +2,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "../../QueryEngine/OmniSciTypes.h"
+#include "QueryEngine/OmniSciTypes.h"
 
 EXTENSION_NOINLINE
 bool array_is_null_double(Array<double> arr) {

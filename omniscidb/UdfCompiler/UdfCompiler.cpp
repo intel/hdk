@@ -591,6 +591,7 @@ std::string UdfCompiler::compileToLLVMIR(const std::string& udf_file_name) const
                                         cpu_out_filename,
                                         "-std=c++17",
                                         "-DNO_BOOST",
+                                        "-I" UDF_INCLUDE_PATH,
                                         udf_file_name};
   auto res = compileFromCommandLine(command_line);
   if (res != 0) {
@@ -616,6 +617,7 @@ void UdfCompiler::generateAST(const std::string& file_name) const {
   arg_vector.emplace_back("--");
   arg_vector.emplace_back("-DNO_BOOST");
   arg_vector.emplace_back(include_option);
+  arg_vector.emplace_back("-I" UDF_INCLUDE_PATH);
   arg_vector.emplace_back("-std=c++17");
 
   if (clang_options_.size() > 0) {

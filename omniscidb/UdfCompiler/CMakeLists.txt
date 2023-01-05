@@ -1,6 +1,8 @@
 set(udf_compiler_source_files
     UdfCompiler.cpp)
 
+add_definitions("-DUDF_INCLUDE_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
+
 # Suppress multi-line comment warning which is not disabled by a diagnostic pragma
 # for some reason.
 if(NOT WIN32)
