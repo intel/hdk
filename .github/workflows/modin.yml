@@ -52,8 +52,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: modin
-          repository: intel-ai/modin
-          ref: ienkovich/pyhdk
+          repository: modin-project/modin
+          ref: master
 
       - name: Install python dependencies
         run: |
