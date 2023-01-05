@@ -16,7 +16,7 @@ import pyhdk
 class TestSql:
     @classmethod
     def setup_class(cls):
-        pyhdk.initLogger(debug_logs=True)
+        #pyhdk.initLogger(debug_logs=True)
         cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
