@@ -205,6 +205,7 @@ public final class MapDParser {
 
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot optRel = planner.optimizeRaQuery(query, schema);
+    optRel = planner.replaceIsTrue(optRel);
     optRel = planner.expandSearch(optRel); // remove SARGs
 
     return MapDSerializer.toString(optRel.project());
