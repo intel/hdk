@@ -13,8 +13,8 @@ channels:
   - conda-forge
 
 dependencies:
-  - gxx_linux-64   9.*
-  - gcc_linux-64   9.*
+  - gxx_linux-64   11.*
+  - gcc_linux-64   11.*
   - ccache
   - sysroot_linux-64 >=2.14
   - arrow-cpp  8.0
