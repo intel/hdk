@@ -169,13 +169,13 @@ class PhysicalInputsVisitor
     if (!scan) {
       const auto join = dynamic_cast<const hdk::ir::Join*>(source);
       if (join) {
-        auto input = getNodeColumnRef(join, col_ref->index());
+        auto input = getJoinInputColumnRef(col_ref);
         return visit(input.get());
       }
-      // Filter indirectly uses all columns of its input. So,
-      // walk through filter column references.
-      if (auto filter = source->as<hdk::ir::Filter>()) {
-        auto new_ref = getNodeColumnRef(filter->getInput(0), col_ref->index());
+      // Filter and sort indirectly use all columns of its input.
+      // So, walk through such column references.
+      if (source->is<hdk::ir::Filter>() || source->is<hdk::ir::Scan>()) {
+        auto new_ref = getNodeColumnRef(source->getInput(0), col_ref->index());
         return visit(new_ref.get());
       }
       return InputColDescriptorSet{};
