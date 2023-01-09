@@ -611,11 +611,12 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
                 LogicalUnion,
                 LogicalValues,
                 Filter,
-                Sort>(node)) {
+                Sort,
+                Join>(node)) {
     return genColumnRefs(node, getNodeColumnCount(node));
   }
 
-  if (is_one_of<Join, LeftDeepInnerJoin>(node)) {
+  if (is_one_of<LeftDeepInnerJoin>(node)) {
     auto res = genColumnRefs(node->getInput(0), node->getInput(0)->size());
     for (size_t i = 1; i < node->inputCount(); ++i) {
       auto input_refs = genColumnRefs(node->getInput(i), node->getInput(i)->size());
@@ -639,11 +640,12 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
                 LogicalUnion,
                 LogicalValues,
                 Filter,
-                Sort>(node)) {
+                Sort,
+                Join>(node)) {
     return makeExpr<ColumnRef>(getColumnType(node, index), node, index);
   }
 
-  if (is_one_of<Join, LeftDeepInnerJoin>(node)) {
+  if (is_one_of<LeftDeepInnerJoin>(node)) {
     unsigned offs = 0;
     for (size_t i = 0; i < node->inputCount(); ++i) {
       auto input = node->getInput(i);
@@ -657,6 +659,16 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
 
   LOG(FATAL) << "Unhandled node type: " << ::toString(node);
   return nullptr;
+}
+
+ExprPtr getJoinInputColumnRef(const ColumnRef* col_ref) {
+  auto* node = col_ref->node();
+  CHECK(node->is<Join>());
+  CHECK(col_ref->index() < node->size());
+  return col_ref->index() < node->getInput(0)->size()
+             ? getNodeColumnRef(node->getInput(0), col_ref->index())
+             : getNodeColumnRef(node->getInput(1),
+                                col_ref->index() - node->getInput(0)->size());
 }
 
 const Type* getColumnType(const Node* node, size_t col_idx) {

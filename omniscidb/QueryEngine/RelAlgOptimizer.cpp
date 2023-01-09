@@ -41,12 +41,7 @@ class ProjectInputRedirector : public hdk::ir::ExprRewriter {
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(
           source->getExpr(col_ref->index()).get());
       if (new_col_ref) {
-        if (auto join = dynamic_cast<const hdk::ir::Join*>(new_source)) {
-          CHECK(new_col_ref->node() == join->getInput(0) ||
-                new_col_ref->node() == join->getInput(1));
-        } else {
-          CHECK_EQ(new_col_ref->node(), new_source);
-        }
+        CHECK_EQ(new_col_ref->node(), new_source);
         return new_col_ref->shared();
       }
     }

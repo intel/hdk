@@ -1269,5 +1269,6 @@ const Type* getColumnType(const Node* node, size_t col_idx);
 ExprPtr getNodeColumnRef(const Node* node, unsigned index);
 ExprPtrVector getNodeColumnRefs(const Node* node);
 size_t getNodeColumnCount(const Node* node);
+ExprPtr getJoinInputColumnRef(const ColumnRef* col_ref);
 
 }  // namespace hdk::ir
