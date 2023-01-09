@@ -11304,23 +11304,26 @@ TEST_F(Select, DesugarTransform) {
 }
 
 TEST_F(Select, ArrowOutput) {
+  const bool print_res = false;
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
-    c_arrow("SELECT str, COUNT(*) FROM test GROUP BY str ORDER BY str ASC;", dt);
-    c_arrow("SELECT x, y, w, z, t, f, d, str, ofd, ofq FROM test ORDER BY x ASC, y ASC;",
+    c_arrow("SELECT str, COUNT(*) FROM test GROUP BY str ORDER BY str ASC;", print_res, dt);
+    c_arrow("SELECT x, y, w, z, t, f, d, str, ofd, ofq FROM test ORDER BY x ASC, y ASC;", print_res,
             dt);
-    c_arrow("SELECT null_str, COUNT(*) FROM test GROUP BY null_str;", dt);
-    c_arrow("SELECT m,m_3,m_6,m_9 from test", dt);
-    c_arrow("SELECT o, o1, o2 from test", dt);
-    c_arrow("SELECT n from test", dt);
+    c_arrow("SELECT null_str, COUNT(*) FROM test GROUP BY null_str;", print_res, dt);
+    c_arrow("SELECT m,m_3,m_6,m_9 from test", print_res, dt);
+    c_arrow("SELECT o, o1, o2 from test", print_res, dt);
+    c_arrow("SELECT n from test", print_res, dt);
     c_arrow(
         "SELECT x, CASE WHEN x = 7 THEN 'foo' ELSE 'bar' END AS case_x FROM test "
-        "WHERE str IN ('bar', 'baz') ORDER BY x ASC;",
+        "WHERE str IN ('bar', 'baz') ORDER BY x ASC;", 
+        print_res,
         dt);
   }
 }
 
 TEST_F(Select, ArrowDictionaries) {
+  const bool print_res = false;
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
 
@@ -11330,6 +11333,7 @@ TEST_F(Select, ArrowDictionaries) {
         "ORDER "
         "BY "
         "t ASC;",
+        print_res,
         dt,
         10000L,
         0.25);
@@ -11338,6 +11342,7 @@ TEST_F(Select, ArrowDictionaries) {
     c_arrow(
         "SELECT t_unique FROM test_window_func_large_multi_frag WHERE i_1000 < 40 "
         "AND t <> 'd' ORDER BY t_unique ASC;",
+        print_res,
         dt,
         10000L,
         0.25);
@@ -11346,6 +11351,7 @@ TEST_F(Select, ArrowDictionaries) {
     c_arrow(
         "SELECT t, COUNT(*) as n FROM test_window_func_large_multi_frag WHERE "
         "i_1000 < 800 AND t <> 'd' GROUP by t ORDER BY n DESC;",
+        print_res,
         dt,
         3L,
         2.0);
@@ -11355,6 +11361,7 @@ TEST_F(Select, ArrowDictionaries) {
         "SELECT t_unique, COUNT(*) as n FROM test_window_func_large_multi_frag WHERE "
         "i_1000 < 40 and t <> 'd' GROUP by t_unique ORDER BY "
         "t_unique ASC;",
+        print_res,
         dt,
         10000L,
         0.25);

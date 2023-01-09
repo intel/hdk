@@ -100,6 +100,7 @@ void cta(const std::string& query_string, const ExecutorDeviceType device_type);
 
 void c_arrow(
     const std::string& query_string,
+    const bool print_res,
     const ExecutorDeviceType device_type,
     size_t min_result_size_for_bulk_dictionary_fetch =
         ArrowResultSetConverter::default_min_result_size_for_bulk_dictionary_fetch,

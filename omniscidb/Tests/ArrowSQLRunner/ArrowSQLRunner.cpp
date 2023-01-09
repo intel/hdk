@@ -268,7 +268,8 @@ class ArrowSQLRunnerImpl {
     }
   }
 
-  void c_arrow(const std::string& query_string,
+  void c_arrow(const std::string& query_string, 
+               const bool print_res,
                const ExecutorDeviceType device_type,
                size_t min_result_size_for_bulk_dictionary_fetch,
                double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
@@ -279,6 +280,15 @@ class ArrowSQLRunnerImpl {
         device_type,
         min_result_size_for_bulk_dictionary_fetch,
         max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
+    
+    if(print_res){
+      std::cout << "________________________________________" << '\n';
+      std::cout << "For Query:" << query_string << std::endl;
+      std::cout << "Output:" << std::endl;
+      std::cout << arrow_omnisci_results->toString() << std::endl;
+      std::cout << "________________________________________" << '\n';
+    }
+
     sqlite_comparator_.compare_arrow_output(
         arrow_omnisci_results, query_string, device_type);
     // Below we test the newly added sparse dictionary capability,
@@ -491,11 +501,13 @@ void cta(const std::string& query_string, const ExecutorDeviceType device_type) 
 }
 
 void c_arrow(const std::string& query_string,
+             const bool print_res,
              const ExecutorDeviceType device_type,
              size_t min_result_size_for_bulk_dictionary_fetch,
              double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
   ArrowSQLRunnerImpl::get()->c_arrow(
       query_string,
+      print_res,
       device_type,
       min_result_size_for_bulk_dictionary_fetch,
       max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
