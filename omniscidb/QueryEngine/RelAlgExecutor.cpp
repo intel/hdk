@@ -1494,6 +1494,14 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
   auto sort = step_root->as<hdk::ir::Sort>();
   ExecutionOptions eo_with_limit =
       eo.with_just_validate(eo.just_validate || (sort && sort->isEmptyResult()));
+  // Use additional result fragments sort for UNION ALL case.
+  // Detect it via a check for two outer tables in the input
+  // descriptors vector.
+  if (work_unit.exe_unit.input_descs.size() >= 2 &&
+      work_unit.exe_unit.input_descs[0].getNestLevel() ==
+          work_unit.exe_unit.input_descs[1].getNestLevel()) {
+    eo_with_limit = eo_with_limit.with_preserve_order(true);
+  }
 
   bool cpu_only = false;
   if (auto project = step_root->as<hdk::ir::Project>()) {

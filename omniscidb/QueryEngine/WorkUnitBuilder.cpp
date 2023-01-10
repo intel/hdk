@@ -494,7 +494,13 @@ int WorkUnitBuilder::assignNestLevels(const ir::Node* node, int start_idx) {
 
   if (node->is<ir::LogicalUnion>()) {
     for (size_t i = 0; i < node->inputCount(); ++i) {
-      assignNestLevels(node->getInput(i), start_idx);
+      auto input_node = node->getInput(i);
+      assignNestLevels(input_node, start_idx);
+      if (auto scan = input_node->as<ir::Scan>()) {
+        union_order_[{scan->getDatabaseId(), scan->getTableId()}] = i;
+      } else {
+        union_order_[{-1, -(int)input_node->getId()}] = i;
+      }
     }
     ++start_idx;
   } else {
@@ -547,8 +553,13 @@ void WorkUnitBuilder::computeInputDescs() {
 
   std::sort(input_descs_.begin(),
             input_descs_.end(),
-            [](const InputDescriptor& lhs, const InputDescriptor& rhs) {
-              return lhs.getNestLevel() < rhs.getNestLevel();
+            [this](const InputDescriptor& lhs, const InputDescriptor& rhs) {
+              if (lhs.getNestLevel() != rhs.getNestLevel()) {
+                return lhs.getNestLevel() < rhs.getNestLevel();
+              }
+              TableRef lhs_ref{lhs.getDatabaseId(), lhs.getTableId()};
+              TableRef rhs_ref{rhs.getDatabaseId(), rhs.getTableId()};
+              return union_order_.at(lhs_ref) < union_order_.at(rhs_ref);
             });
 }
 
