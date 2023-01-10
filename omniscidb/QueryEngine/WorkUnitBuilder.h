@@ -120,6 +120,9 @@ class WorkUnitBuilder {
   std::unordered_map<const ir::Node*, int> input_nest_levels_;
   // Stores nest level for each node to process.
   std::unordered_map<const ir::Node*, int> all_nest_levels_;
+  // Stores order for each UNION ALL input node for proper
+  // result ordering.
+  std::unordered_map<TableRef, int> union_order_;
   std::vector<JoinType> join_types_;
   bool is_agg_ = false;
 
