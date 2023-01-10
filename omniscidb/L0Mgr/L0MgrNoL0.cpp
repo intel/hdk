@@ -117,6 +117,22 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   CHECK(false);
 }
 
+unsigned L0Manager::getMaxBlockSize() const {
+  CHECK(false);
+}
+
+int8_t L0Manager::getSubGroupSize() const {
+  CHECK(false);
+}
+
+unsigned L0Manager::getGridSize() const {
+  CHECK(false);
+}
+
+unsigned L0Manager::getMinEUNumForAllDevices() const {
+  CHECK(false);
+}
+
 const std::vector<std::shared_ptr<L0Driver>>& L0Manager::drivers() const {
   return drivers_;
 }
