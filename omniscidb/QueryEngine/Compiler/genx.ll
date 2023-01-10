@@ -21,15 +21,14 @@ define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     ret i32 %pos_start
 }
 
-; Causes GPU hang
-; define i32 @pos_step_impl() {
-;     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
-;     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
-;     %gid.i32 = trunc i64 %gid to i32
-;     %gsize.i32 = trunc i64 %gsize to i32
-;     %res = mul i32 %gid.i32, %gsize.i32
-;     ret i32 %res
-; }
+define i32 @pos_step_impl() {
+    %gid = call i64 @__spirv_BuiltInNumWorkgroups(i32 0)
+    %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
+    %gid.i32 = trunc i64 %gid to i32
+    %gsize.i32 = trunc i64 %gsize to i32
+    %res = mul i32 %gid.i32, %gsize.i32
+    ret i32 %res
+}
 
 define i64 @get_thread_index() {
     %tid = call i64 @__spirv_BuiltInLocalInvocationId(i32 0)
