@@ -60,6 +60,8 @@ class L0Device {
  private:
 #ifdef HAVE_L0
   ze_device_handle_t device_;
+  ze_device_properties_t props_;
+  ze_device_compute_properties_t compute_props_;
 #endif
 
   const L0Driver& driver_;
@@ -75,6 +77,8 @@ class L0Device {
 
 #ifdef HAVE_L0
   L0Device(const L0Driver& driver, ze_device_handle_t device);
+  unsigned maxGroupCount() const;
+  unsigned maxGroupSize() const;
   ze_device_handle_t device() const;
   ze_context_handle_t ctx() const;
   ~L0Device();
@@ -234,10 +238,10 @@ class L0Manager : public GpuMgr {
   size_t getMaxAllocationSize(const int device_num) const;
   size_t getPageSize(const int device_num) const { return 4096u; }
 
-  virtual unsigned getMaxBlockSize() const override { return 1u; }
-  virtual int8_t getSubGroupSize() const override { return 1; }
-  virtual unsigned getGridSize() const override { return 1u; }
-  virtual unsigned getMinEUNumForAllDevices() const override { return 1u; }
+  virtual unsigned getMaxBlockSize() const override;
+  virtual int8_t getSubGroupSize() const override;
+  virtual unsigned getGridSize() const override;
+  virtual unsigned getMinEUNumForAllDevices() const override;
 
   const std::vector<std::shared_ptr<L0Driver>>& drivers() const;
 
