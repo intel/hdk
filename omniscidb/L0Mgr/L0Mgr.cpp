@@ -146,6 +146,9 @@ L0Device::L0Device(const L0Driver& driver, ze_device_handle_t device)
                                                 ZE_COMMAND_QUEUE_PRIORITY_NORMAL};
   L0_SAFE_CALL(
       zeCommandQueueCreate(driver_.ctx(), device_, &command_queue_desc, &queue_handle));
+  L0_SAFE_CALL(zeDeviceGetProperties(device_, &props_));
+  CHECK_EQ(ZE_DEVICE_TYPE_GPU, props_.type);
+  L0_SAFE_CALL(zeDeviceGetComputeProperties(device_, &compute_props_));
 
   command_queue_ = std::make_shared<L0CommandQueue>(queue_handle);
 }
@@ -172,6 +175,13 @@ std::unique_ptr<L0CommandList> L0Device::create_command_list() const {
   ze_command_list_handle_t res;
   L0_SAFE_CALL(zeCommandListCreate(ctx(), device_, &desc, &res));
   return std::make_unique<L0CommandList>(res);
+}
+
+unsigned L0Device::maxGroupCount() const {
+  return props_.numSlices * props_.numSubslicesPerSlice;
+}
+unsigned L0Device::maxGroupSize() const {
+  return compute_props_.maxGroupSizeX;
 }
 
 L0CommandQueue::L0CommandQueue(ze_command_queue_handle_t handle) : handle_(handle) {}
@@ -370,4 +380,31 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
             << device_properties.maxMemAllocSize / (1024 * 1024) << "MB\n";
   return device_properties.maxMemAllocSize;
 }
+
+unsigned L0Manager::getMaxBlockSize() const {
+  unsigned sz = drivers_[0]->devices()[0]->maxGroupSize();
+  for (auto d : drivers_[0]->devices()) {
+    sz = d->maxGroupSize() < sz ? d->maxGroupSize() : sz;
+  }
+  CHECK_GT(sz, 0);
+  return sz;
+}
+
+int8_t L0Manager::getSubGroupSize() const {
+  return 1;
+}
+
+unsigned L0Manager::getGridSize() const {
+  unsigned cnt = drivers_[0]->devices()[0]->maxGroupCount();
+  for (auto d : drivers_[0]->devices()) {
+    cnt = d->maxGroupCount() < cnt ? d->maxGroupCount() : cnt;
+  }
+  CHECK_GT(cnt, 0);
+  return cnt * getMaxBlockSize() /*fixme: refactor on smem enabling*/;
+}
+
+unsigned L0Manager::getMinEUNumForAllDevices() const {
+  return 1u;
+}
+
 }  // namespace l0
