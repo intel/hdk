@@ -11,6 +11,7 @@ boost::filesystem::path g_data_path;
 size_t num_threads = 64;
 size_t g_fragment_size = 160000000 / num_threads;
 bool g_use_parquet{false};
+ExecutorDeviceType g_device_type = ExecutorDeviceType::GPU;
 
 using namespace TestHelpers::ArrowSQLRunner;
 
@@ -223,7 +224,7 @@ static void table_count(benchmark::State& state) {
 #endif
 
     auto res =
-        v<int64_t>(run_simple_agg("select count(*) from trips", ExecutorDeviceType::CPU));
+        v<int64_t>(run_simple_agg("select count(*) from trips", g_device_type));
     std::cout << "Number of loaded tuples: " << res << std::endl;
   }
 }
@@ -236,7 +237,7 @@ static void taxi_q1(benchmark::State& state) {
 #endif
 
     run_multiple_agg("select cab_type, count(*) from trips group by cab_type",
-                     ExecutorDeviceType::CPU);
+                     g_device_type);
   }
 }
 
@@ -249,7 +250,7 @@ static void taxi_q2(benchmark::State& state) {
 
     run_multiple_agg(
         "SELECT passenger_count, avg(total_amount) FROM trips GROUP BY passenger_count",
-        ExecutorDeviceType::CPU);
+        g_device_type);
   }
 }
 
@@ -263,7 +264,7 @@ static void taxi_q3(benchmark::State& state) {
     run_multiple_agg(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "count(*) FROM trips GROUP BY passenger_count, pickup_year",
-        ExecutorDeviceType::CPU);
+        g_device_type);
   }
 }
 
@@ -279,7 +280,7 @@ static void taxi_q4(benchmark::State& state) {
         "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP "
         "BY passenger_count, pickup_year, distance ORDER BY pickup_year, the_count "
         "desc",
-        ExecutorDeviceType::CPU);
+        g_device_type);
   }
 }
 
