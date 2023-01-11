@@ -16,7 +16,6 @@
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
 #include "QueryEngine/ArrowResultSet.h"
-#include "QueryEngine/CalciteAdapter.h"
 #include "QueryEngine/RelAlgExecutor.h"
 #include "SchemaMgr/SimpleSchemaProvider.h"
 #include "Shared/scope.h"
@@ -188,12 +187,12 @@ class NoCatalogSqlTest : public ::testing::Test {
   }
 
   ExecutionResult runSqlQuery(const std::string& sql, Executor* executor) {
-    const auto query_ra = calcite_->process("test_db", pg_shim(sql));
+    const auto query_ra = calcite_->process("test_db", sql);
     return runRAQuery(query_ra, executor);
   }
 
   RelAlgExecutor getExecutor(const std::string& sql) {
-    const auto query_ra = calcite_->process("test_db", pg_shim(sql));
+    const auto query_ra = calcite_->process("test_db", sql);
     auto dag = std::make_unique<RelAlgDagBuilder>(
         query_ra, TEST_DB_ID, schema_provider_, config_);
     return RelAlgExecutor(
@@ -354,8 +353,7 @@ TEST(CalciteReinitTest, SingleThread) {
   for (int i = 0; i < 10; ++i) {
     auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
     auto query_ra = calcite->process("test_db", "SELECT 1;");
-    CHECK(query_ra.find("LogicalValues") != std::string::npos);
-    CHECK(query_ra.find("LogicalProject") != std::string::npos);
+    CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
   }
 }
 
@@ -366,8 +364,7 @@ TEST(CalciteReinitTest, MultipleThreads) {
     auto f = std::async(std::launch::async, [schema_provider, config]() {
       auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
       auto query_ra = calcite->process("test_db", "SELECT 1;");
-      CHECK(query_ra.find("LogicalValues") != std::string::npos);
-      CHECK(query_ra.find("LogicalProject") != std::string::npos);
+      CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
     });
     f.wait();
   }

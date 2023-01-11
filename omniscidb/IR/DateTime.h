@@ -31,11 +31,6 @@ inline std::string toString(hdk::ir::TimeUnit unit) {
   }
 }
 
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::TimeUnit unit) {
-  os << toString(unit);
-  return os;
-}
-
 inline std::string toString(hdk::ir::DateAddField field) {
   switch (field) {
     case hdk::ir::DateAddField::kYear:
@@ -79,11 +74,6 @@ inline std::string toString(hdk::ir::DateAddField field) {
   }
 }
 
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::DateAddField field) {
-  os << toString(field);
-  return os;
-}
-
 inline std::string toString(hdk::ir::DateTruncField field) {
   switch (field) {
     case hdk::ir::DateTruncField::kYear:
@@ -125,11 +115,6 @@ inline std::string toString(hdk::ir::DateTruncField field) {
     default:
       return "InvalidDateTruncField";
   }
-}
-
-inline std::ostream& operator<<(std::ostream& os, hdk::ir::DateTruncField field) {
-  os << toString(field);
-  return os;
 }
 
 inline std::string toString(hdk::ir::DateExtractField field) {
@@ -178,6 +163,21 @@ inline std::string toString(hdk::ir::DateExtractField field) {
 }
 
 namespace hdk::ir {
+
+inline std::ostream& operator<<(std::ostream& os, TimeUnit unit) {
+  os << toString(unit);
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, DateAddField field) {
+  os << toString(field);
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, DateTruncField field) {
+  os << toString(field);
+  return os;
+}
 
 inline int64_t unitsPerSecond(TimeUnit unit) {
   switch (unit) {

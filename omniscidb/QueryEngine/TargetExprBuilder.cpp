@@ -435,6 +435,8 @@ void TargetExprCodegen::codegenAggregate(
         agg_args.push_back(null_lv);
       }
       if (!target_info.is_distinct) {
+#warning "Shared functions temporarily disabled for L0"
+#ifndef HAVE_L0
         if (co.device_type == ExecutorDeviceType::GPU &&
             query_mem_desc.threadsShareMemory()) {
           agg_fname += "_shared";
@@ -442,6 +444,7 @@ void TargetExprCodegen::codegenAggregate(
             agg_fname = patch_agg_fname(agg_fname);
           }
         }
+#endif
         auto agg_fname_call_ret_lv = row_func_builder->emitCall(agg_fname, agg_args);
 
         if (agg_fname.find("checked") != std::string::npos) {

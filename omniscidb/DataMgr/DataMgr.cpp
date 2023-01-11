@@ -276,8 +276,8 @@ void DataMgr::populateMgrs(const Config& config,
           deviceMemSize = getCudaMgr()->getDeviceProperties(gpuNum)->globalMem;
           break;
         case GpuMgrPlatform::L0:
-          deviceMemSize = 1024 * 4 * 1024;  // 4MB for now
-          page_size = 4096UL;
+          deviceMemSize = getL0Mgr()->getMaxAllocationSize(gpuNum);
+          page_size = getL0Mgr()->getPageSize(gpuNum);
           break;
         default:
           CHECK(false);

@@ -100,7 +100,7 @@ public class SqlIdentifierCapturer {
       SqlBasicCall call = (SqlBasicCall) root;
       if (call.getOperator().getKind() == SqlKind.AS) {
         // only really interested in the first operand
-        scan(call.getOperands()[0]);
+        scan(call.getOperandList().get(0));
         return;
       }
     }

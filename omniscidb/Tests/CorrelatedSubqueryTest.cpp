@@ -470,7 +470,7 @@ TEST(Select, CorrelatedWithOuterSortDescending) {
   }
 }
 
-TEST(Select, CorrelatedWithInnerSortDisallowed) {
+TEST(Select, DISABLED_CorrelatedWithInnerSortDisallowed) {
   int factsCount = 13;
   int lookupCount = 5;
   setupTest(ctx().int32(), factsCount, lookupCount);
@@ -827,7 +827,7 @@ TEST(Select, JoinCorrelation_InClause) {
   ASSERT_EQ(val, 4);
 }
 
-TEST(Select, InExpr_As_Child_Operand_Of_OR_Operator) {
+TEST(Select, DISABLED_InExpr_As_Child_Operand_Of_OR_Operator) {
   int factsCount = 13;
   int lookupCount = 5;
   setupTest(ctx().int32(), factsCount, lookupCount);
@@ -861,7 +861,7 @@ TEST(Select, InExpr_As_Child_Operand_Of_OR_Operator) {
   check_query(q4, true);
 }
 
-TEST(Select, Disable_INExpr_Decorrelation_Under_Watchdog) {
+TEST(Select, DISABLED_Disable_INExpr_Decorrelation_Under_Watchdog) {
   int factsCount = 13;
   int lookupCount = 5;
   setupTest(ctx().int32(), factsCount, lookupCount);

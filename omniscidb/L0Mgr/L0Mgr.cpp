@@ -83,14 +83,19 @@ std::vector<std::shared_ptr<L0Driver>> get_drivers() {
 
 L0CommandList::L0CommandList(ze_command_list_handle_t handle) : handle_(handle) {}
 
-void L0CommandList::launch(L0Kernel* kernel, std::vector<int8_t*>& params) {
+void L0CommandList::launch(L0Kernel* kernel,
+                           std::vector<int8_t*>& params,
+                           const GroupCount& gc) {
   for (unsigned i = 0; i < params.size(); ++i) {
     L0_SAFE_CALL(zeKernelSetArgumentValue(
         kernel->handle(), i, sizeof(params[i]), params[i] ? &params[i] : nullptr));
   }
 
+  LOG(INFO) << "L0 kernel group count: {" << gc.groupCountX << "," << gc.groupCountY
+            << "," << gc.groupCountZ << "}\n";
+  ze_group_count_t group_count = {gc.groupCountX, gc.groupCountY, gc.groupCountZ};
   L0_SAFE_CALL(zeCommandListAppendLaunchKernel(
-      handle_, kernel->handle(), &kernel->group_size(), nullptr, 0, nullptr));
+      handle_, kernel->handle(), &group_count, nullptr, 0, nullptr));
 
   L0_SAFE_CALL(zeCommandListAppendBarrier(handle_, nullptr, 0, nullptr));
 }
@@ -254,16 +259,29 @@ L0Kernel::L0Kernel(std::shared_ptr<const L0Module> parent,
                    uint32_t x,
                    uint32_t y,
                    uint32_t z)
-    : parent_(parent), handle_(handle), group_size_({x, y, z}) {
+    : parent_(parent), handle_(handle) {
+  LOG(INFO) << "Setting group size: {" << x << "," << y << "," << z << "}\n";
   L0_SAFE_CALL(zeKernelSetGroupSize(handle_, x, y, z));
-}
-
-ze_group_count_t& L0Kernel::group_size() {
-  return group_size_;
 }
 
 ze_kernel_handle_t L0Kernel::handle() const {
   return handle_;
+}
+
+std::string L0Kernel::desc() const {
+  ze_kernel_properties_t props;
+  L0_SAFE_CALL(zeKernelGetProperties(handle_, &props));
+  std::ostringstream os;
+  os << "kernel:{numargs:" << props.numKernelArgs
+     << ",reqGroupSizeX:" << props.requiredGroupSizeX
+     << ",reqGroupSizeY:" << props.requiredGroupSizeY
+     << ",reqGroupSizeZ:" << props.requiredGroupSizeZ
+     << ",maxNumSubgroups:" << props.maxNumSubgroups
+     << ",maxSubgroupSize:" << props.maxSubgroupSize
+     << ",privateMemSize:" << props.privateMemSize
+     << ",requiredNumSubGroups:" << props.requiredNumSubGroups
+     << ",requiredSubgroupSize:" << props.requiredSubgroupSize << "}";
+  return os.str();
 }
 
 L0Kernel::~L0Kernel() {
@@ -340,5 +358,16 @@ void L0Manager::synchronizeDevices() const {
     L0_SAFE_CALL(zeCommandQueueSynchronize(device->command_queue()->handle(),
                                            std::numeric_limits<uint32_t>::max()));
   }
+}
+
+size_t L0Manager::getMaxAllocationSize(const int device_num) const {
+  CHECK_EQ(device_num, 0);
+  ze_device_properties_t device_properties;
+  L0_SAFE_CALL(zeDeviceGetProperties(drivers_[0]->devices()[device_num]->device(),
+                                     &device_properties));
+  CHECK_EQ(ZE_DEVICE_TYPE_GPU, device_properties.type);
+  LOG(INFO) << "Intel GPU max memory allocation size: "
+            << device_properties.maxMemAllocSize / (1024 * 1024) << "MB\n";
+  return device_properties.maxMemAllocSize;
 }
 }  // namespace l0

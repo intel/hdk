@@ -24,27 +24,41 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: 'style'
+      test: style
 
   smoke:
     needs: build
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: 'smoke'
+      test: smoke
+
+  asan:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: asan
+
+  test-asan-docker:
+    needs: asan
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      build-name: asan
+      reset-cache: ${{ !!inputs.reset-cache }}
 
   perf:
     needs: build
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: 'perf'
+      test: perf
 
   build-cuda-docker:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: cuda
-      options: ''
+      options:
 
   test-cuda-docker:
     needs: build-cuda-docker
@@ -62,4 +76,3 @@ jobs:
 
   sanity-test:
     uses: ./.github/workflows/build-docker-hdk.yml
-

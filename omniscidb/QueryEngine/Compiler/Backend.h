@@ -145,7 +145,9 @@ class CUDABackend : public Backend {
 
 class L0Backend : public Backend {
  public:
-  L0Backend(GPUTarget& gpu_target) : gpu_target_(gpu_target) {}
+  L0Backend(const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
+            GPUTarget& gpu_target)
+      : gpu_target_(gpu_target), exts_(exts) {}
 
   std::shared_ptr<CompilationContext> generateNativeCode(
       llvm::Function* func,
@@ -159,6 +161,7 @@ class L0Backend : public Backend {
   };
 
   static std::shared_ptr<L0CompilationContext> generateNativeGPUCode(
+      const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
       llvm::Function* func,
       llvm::Function* wrapper_func,
       const std::unordered_set<llvm::Function*>& live_funcs,
@@ -167,6 +170,7 @@ class L0Backend : public Backend {
 
  private:
   GPUTarget& gpu_target_;
+  const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts_;
 };
 
 std::shared_ptr<Backend> getBackend(

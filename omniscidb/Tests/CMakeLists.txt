@@ -68,8 +68,8 @@ if(ENABLE_L0)
   add_executable(SpirvBuildTest SpirvBuildTest.cpp)
   add_executable(DataMgrWithL0Test DataMgrWithL0Test.cpp)
 
-  target_link_libraries(L0MgrExecuteTest L0Mgr PkgConfig::LLVMSPIRVLib gtest ${llvm_libs} Logger)
-  target_link_libraries(SpirvBuildTest PkgConfig::LLVMSPIRVLib gtest ${llvm_libs})
+  target_link_libraries(L0MgrExecuteTest L0Mgr gtest ${llvm_libs} Logger)
+  target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
   target_link_libraries(DataMgrWithL0Test DataMgr gtest)
 
   add_test(L0MgrExecuteTest L0MgrExecuteTest ${TEST_ARGS})

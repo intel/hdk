@@ -16,7 +16,7 @@ import pyhdk
 class TestSql:
     @classmethod
     def setup_class(cls):
-        #pyhdk.initLogger(debug_logs=False)
+        #pyhdk.initLogger(debug_logs=True)
         cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
@@ -61,6 +61,13 @@ class TestSql:
         assert df.shape == (3, 2)
         assert df["a"].tolist() == [1, 2, 3]
         assert df["b"].tolist() == [10, 20, 30]
+
+
+    def test_simple_filter(self):
+        res = self.execute_sql("SELECT COUNT(*) FROM test WHERE a < 3;")
+        df = res.to_arrow().to_pandas()
+        assert df.shape == (1,1)
+        assert df["EXPR$0"].tolist()[0] == 2
 
     def test_explain(self):
         res = self.execute_sql("SELECT * FROM test;", just_explain=True)

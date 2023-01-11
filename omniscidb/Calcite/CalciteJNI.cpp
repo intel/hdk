@@ -15,6 +15,7 @@
  */
 
 #include "CalciteJNI.h"
+#include "CalciteAdapter.h"
 #include "SchemaJson.h"
 
 #include "Logger/Logger.h"
@@ -194,7 +195,8 @@ class CalciteJNI::Impl {
                       const bool is_view_optimize) {
     auto env = jvm_->getEnv();
     jstring arg_catalog = env->NewStringUTF(db_name.c_str());
-    jstring arg_query = env->NewStringUTF(sql_string.c_str());
+    std::string modified_sql = pg_shim(sql_string);
+    jstring arg_query = env->NewStringUTF(modified_sql.c_str());
     jobject arg_parsing_options = env->NewObject(parsing_opts_cls_,
                                                  parsing_opts_ctor_,
                                                  (jboolean)legacy_syntax,

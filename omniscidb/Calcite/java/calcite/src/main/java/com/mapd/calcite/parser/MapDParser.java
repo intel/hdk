@@ -28,20 +28,17 @@ import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.plan.Context;
-import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.hep.HepPlanner;
-import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.MapDPlanner;
 import org.apache.calcite.prepare.SqlIdentifierCapturer;
+import org.apache.calcite.rel.RelHomogeneousShuttle;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
-import org.apache.calcite.rel.core.TableModify;
-import org.apache.calcite.rel.core.TableModify.Operation;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalTableModify;
-import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.rel.RelVisitor;
+import org.apache.calcite.rel.core.Correlate;
+import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
@@ -58,7 +55,6 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
-import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.*;
@@ -69,9 +65,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -81,14 +76,6 @@ import java.util.stream.Stream;
  */
 public final class MapDParser {
   public static final ThreadLocal<MapDParser> CURRENT_PARSER = new ThreadLocal<>();
-  private static final EnumSet<SqlKind> SCALAR =
-          EnumSet.of(SqlKind.SCALAR_QUERY, SqlKind.SELECT);
-  private static final EnumSet<SqlKind> EXISTS = EnumSet.of(SqlKind.EXISTS);
-  private static final EnumSet<SqlKind> DELETE = EnumSet.of(SqlKind.DELETE);
-  private static final EnumSet<SqlKind> UPDATE = EnumSet.of(SqlKind.UPDATE);
-  private static final EnumSet<SqlKind> IN = EnumSet.of(SqlKind.IN);
-  private static final EnumSet<SqlKind> ARRAY_VALUE =
-          EnumSet.of(SqlKind.ARRAY_VALUE_CONSTRUCTOR);
 
   final static Logger MAPDLOGGER = LoggerFactory.getLogger(MapDParser.class);
 
@@ -98,15 +85,9 @@ public final class MapDParser {
   private MapDUser mapdUser;
   private String schemaJson;
 
-  private static Map<String, Boolean> SubqueryCorrMemo = new ConcurrentHashMap<>();
-
   public MapDParser(final Supplier<MapDSqlOperatorTable> mapDSqlOperatorTable) {
     this.mapDSqlOperatorTable = mapDSqlOperatorTable;
     this.schemaJson = "{}";
-  }
-
-  public void clearMemo() {
-    SubqueryCorrMemo.clear();
   }
 
   private static final Context MAPD_CONNECTION_CONTEXT = new Context() {
@@ -144,146 +125,11 @@ public final class MapDParser {
   };
 
   private MapDPlanner getPlanner() {
-    return getPlanner(true, false);
-  }
-
-  private boolean isCorrelated(SqlNode expression) {
-    String queryString = expression.toSqlString(CalciteSqlDialect.DEFAULT).getSql();
-    Boolean isCorrelatedSubquery = SubqueryCorrMemo.get(queryString);
-    if (null != isCorrelatedSubquery) {
-      return isCorrelatedSubquery;
-    }
-
-    try {
-      MapDParser parser = new MapDParser(mapDSqlOperatorTable);
-      parser.setSchema(schemaJson);
-      MapDParserOptions options = new MapDParserOptions();
-      parser.setUser(mapdUser);
-      parser.processSql(expression, options);
-    } catch (Exception e) {
-      // if we are not able to parse, then assume correlated
-      SubqueryCorrMemo.put(queryString, true);
-      return true;
-    }
-    SubqueryCorrMemo.put(queryString, false);
-    return false;
+    return getPlanner(false, false);
   }
 
   private MapDPlanner getPlanner(
           final boolean allowSubQueryExpansion, final boolean isWatchdogEnabled) {
-    BiPredicate<SqlNode, SqlNode> expandPredicate = new BiPredicate<SqlNode, SqlNode>() {
-      @Override
-      public boolean test(SqlNode root, SqlNode expression) {
-        if (!allowSubQueryExpansion) {
-          return false;
-        }
-
-        if (expression.isA(EXISTS) || expression.isA(IN)) {
-          // try to expand subquery by EXISTS and IN clauses by default
-          // note that current Calcite decorrelator fails to flat
-          // NOT-IN clause in some cases, so we do not decorrelate it for now
-
-          if (expression.isA(IN)) {
-            // If we enable watchdog, we suffer from large projection exception in many
-            // cases since decorrelation needs de-duplication step which adds project -
-            // aggregate logic. And the added project is the source of the exception when
-            // its underlying table is large. Thus, we enable IN-clause decorrelation
-            // under watchdog iff we explicitly have correlated join in IN-clause
-            if (isWatchdogEnabled) {
-              boolean found_expression = false;
-              if (expression instanceof SqlCall) {
-                SqlCall call = (SqlCall) expression;
-                if (call.getOperandList().size() == 2) {
-                  // if IN clause is correlated, its second operand of corresponding
-                  // expression is SELECT clause which indicates a correlated subquery.
-                  // Here, an expression "f.val IN (SELECT ...)" has two operands.
-                  // Since we have interest in its subquery, so try to check whether
-                  // the second operand, i.e., call.getOperandList().get(1)
-                  // is a type of SqlSelect and also is correlated.
-                  if (call.getOperandList().get(1) instanceof SqlSelect) {
-                    expression = call.getOperandList().get(1);
-                    SqlSelect select_call = (SqlSelect) expression;
-                    if (select_call.hasWhere()) {
-                      // IN-clause may have correlated join within subquery's WHERE clause
-                      // i.e., f.val IN (SELECT r.val FROM R r WHERE f.val2 = r.val2)
-                      // then we have to deccorrelate the IN-clause
-                      JoinOperatorChecker joinOperatorChecker = new JoinOperatorChecker();
-                      if (joinOperatorChecker.containsExpression(
-                                  select_call.getWhere())) {
-                        found_expression = true;
-                      }
-                    }
-                  }
-                }
-              }
-              if (!found_expression) {
-                return false;
-              }
-            }
-
-            if (root instanceof SqlSelect) {
-              SqlSelect selectCall = (SqlSelect) root;
-              if (new ExpressionListedInSelectClauseChecker().containsExpression(
-                          selectCall, expression)) {
-                // occasionally, Calcite cannot properly decorrelate IN-clause listed in
-                // SELECT clause e.g., SELECT x, CASE WHEN x in (SELECT x FROM R) ... FROM
-                // ... in that case we disable input query's decorrelation
-                return false;
-              }
-              if (null != selectCall.getWhere()) {
-                if (new ExpressionListedAsChildOROperatorChecker().containsExpression(
-                            selectCall.getWhere(), expression)) {
-                  // Decorrelation logic of the current Calcite cannot cover IN-clause
-                  // well if it is listed as a child operand of OR-op
-                  return false;
-                }
-              }
-              if (null != selectCall.getHaving()) {
-                if (new ExpressionListedAsChildOROperatorChecker().containsExpression(
-                            selectCall.getHaving(), expression)) {
-                  // Decorrelation logic of the current Calcite cannot cover IN-clause
-                  // well if it is listed as a child operand of OR-op
-                  return false;
-                }
-              }
-            }
-          }
-
-          // otherwise, let's decorrelate the expression
-          return true;
-        }
-
-        // special handling of sub-queries
-        if (expression.isA(SCALAR) && isCorrelated(expression)) {
-          // only expand if it is correlated.
-          SqlSelect select = null;
-          if (expression instanceof SqlCall) {
-            SqlCall call = (SqlCall) expression;
-            if (call.getOperator().equals(SqlStdOperatorTable.SCALAR_QUERY)) {
-              expression = call.getOperandList().get(0);
-            }
-          }
-
-          if (expression instanceof SqlSelect) {
-            select = (SqlSelect) expression;
-          }
-
-          if (null != select) {
-            if (null != select.getFetch() || null != select.getOffset()
-                    || (null != select.getOrderList()
-                            && select.getOrderList().size() != 0)) {
-              throw new CalciteException(
-                      "Correlated sub-queries with ordering not supported.", null);
-            }
-          }
-          return true;
-        }
-
-        // per default we do not want to expand
-        return false;
-      }
-    };
-
     // create the default schema
     final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
     final MapDSchema defaultSchema = new MapDSchema(this, mapdUser, null, schemaJson);
@@ -308,24 +154,24 @@ public final class MapDParser {
             Frameworks.newConfigBuilder()
                     .defaultSchema(defaultSchemaPlus)
                     .operatorTable(mapDSqlOperatorTable.get())
-                    .parserConfig(SqlParser.configBuilder()
-                                          .setConformance(SqlConformanceEnum.LENIENT)
-                                          .setUnquotedCasing(Casing.UNCHANGED)
-                                          .setCaseSensitive(false)
+                    .parserConfig(SqlParser.config()
+                                          .withConformance(SqlConformanceEnum.LENIENT)
+                                          .withUnquotedCasing(Casing.UNCHANGED)
+                                          .withCaseSensitive(false)
                                           // allow identifiers of up to 512 chars
-                                          .setIdentifierMaxLength(512)
-                                          .setParserFactory(ExtendedSqlParser.FACTORY)
-                                          .build())
+                                          .withIdentifierMaxLength(512)
+                                          .withParserFactory(ExtendedSqlParser.FACTORY))
                     .sqlToRelConverterConfig(
-                            SqlToRelConverter
-                                    .configBuilder()
-                                    // enable sub-query expansion (de-correlation)
-                                    .withExpandPredicate(expandPredicate)
+                            SqlToRelConverter.config()
+                                    .withExpand(allowSubQueryExpansion)
+                                    .withDecorrelationEnabled(true) // this is default
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
                                     .withHintStrategyTable(
                                             OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
-                                    .build())
+                                    .addRelBuilderConfigTransform(c
+                                            -> c.withPruneInputOfAggregate(false)
+                                                       .withSimplify(false)))
                     .typeSystem(createTypeSystem())
                     .context(MAPD_CONNECTION_CONTEXT)
                     .build();
@@ -345,7 +191,7 @@ public final class MapDParser {
   public Pair<String, SqlIdentifierCapturer> process(
           String sql, final MapDParserOptions parserOptions)
           throws SqlParseException, ValidationException, RelConversionException {
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
     String res = processSql(sqlNode, parserOptions);
     SqlIdentifierCapturer capture = captureIdentifiers(sqlNode);
@@ -355,11 +201,13 @@ public final class MapDParser {
   public String optimizeRAQuery(String query, final MapDParserOptions parserOptions)
           throws IOException {
     MapDSchema schema = new MapDSchema(this, mapdUser, null, schemaJson);
-    MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
 
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot optRel = planner.optimizeRaQuery(query, schema);
-    optRel = replaceIsTrue(planner.getTypeFactory(), optRel);
+    optRel = planner.replaceIsTrue(optRel);
+    optRel = planner.expandSearch(optRel); // remove SARGs
+
     return MapDSerializer.toString(optRel.project());
   }
 
@@ -367,7 +215,7 @@ public final class MapDParser {
           throws SqlParseException, ValidationException, RelConversionException {
     callCount++;
 
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
 
     return processSql(sqlNode, parserOptions);
@@ -385,7 +233,7 @@ public final class MapDParser {
       return sqlNode.toString();
     }
 
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
+    final MapDPlanner planner = getPlanner(false, parserOptions.isWatchdogEnabled());
     planner.advanceToValidate();
 
     final RelRoot sqlRel = convertSqlToRelNode(sqlNode, planner, parserOptions);
@@ -421,328 +269,102 @@ public final class MapDParser {
     return resolved;
   }
 
-  private String getTableName(SqlNode node) {
-    if (node.isA(EnumSet.of(SqlKind.AS))) {
-      node = ((SqlCall) node).getOperandList().get(1);
-    }
-    if (node instanceof SqlIdentifier) {
-      SqlIdentifier id = (SqlIdentifier) node;
-      return id.names.get(id.names.size() - 1);
-    }
-    return null;
-  }
+  private static class SqlHavingVisitor extends SqlBasicVisitor<Void> {
+    boolean hasHaving = false;
 
-  private SqlSelect rewriteSimpleUpdateAsSelect(final SqlUpdate update) {
-    SqlNode where = update.getCondition();
-
-    if (update.getSourceExpressionList().size() != 1) {
-      return null;
-    }
-
-    if (!(update.getSourceExpressionList().get(0) instanceof SqlSelect)) {
-      return null;
-    }
-
-    final SqlSelect inner = (SqlSelect) update.getSourceExpressionList().get(0);
-
-    if (null != inner.getGroup() || null != inner.getFetch() || null != inner.getOffset()
-            || (null != inner.getOrderList() && inner.getOrderList().size() != 0)
-            || (null != inner.getGroup() && inner.getGroup().size() != 0)
-            || null == getTableName(inner.getFrom())) {
-      return null;
-    }
-
-    if (!isCorrelated(inner)) {
-      return null;
-    }
-
-    final String updateTableName = getTableName(update.getTargetTable());
-
-    if (null != where) {
-      where = where.accept(new SqlShuttle() {
-        @Override
-        public SqlNode visit(SqlIdentifier id) {
-          if (id.isSimple()) {
-            id = new SqlIdentifier(Arrays.asList(updateTableName, id.getSimple()),
-                    id.getParserPosition());
-          }
-
-          return id;
+    @Override
+    public Void visit(SqlCall call) {
+      if (call instanceof SqlSelect) {
+        final SqlSelect select = (SqlSelect) call;
+        if (select.getHaving() != null) {
+          this.hasHaving = true;
         }
-      });
-    }
-
-    SqlJoin join = new SqlJoin(ZERO,
-            update.getTargetTable(),
-            SqlLiteral.createBoolean(false, ZERO),
-            SqlLiteral.createSymbol(JoinType.LEFT, ZERO),
-            inner.getFrom(),
-            SqlLiteral.createSymbol(JoinConditionType.ON, ZERO),
-            inner.getWhere());
-
-    SqlNode select0 = inner.getSelectList().get(0);
-
-    boolean wrapInSingleValue = true;
-    if (select0 instanceof SqlCall) {
-      SqlCall selectExprCall = (SqlCall) select0;
-      if (Util.isSingleValue(selectExprCall)) {
-        wrapInSingleValue = false;
       }
+      return call.getOperator().acceptCall(this, call);
     }
-
-    if (wrapInSingleValue) {
-      if (select0.isA(EnumSet.of(SqlKind.AS))) {
-        select0 = ((SqlCall) select0).getOperandList().get(0);
-      }
-      select0 = new SqlBasicCall(
-              SqlStdOperatorTable.SINGLE_VALUE, new SqlNode[] {select0}, ZERO);
-    }
-
-    SqlNodeList selectList = new SqlNodeList(ZERO);
-    selectList.add(select0);
-    selectList.add(new SqlBasicCall(SqlStdOperatorTable.AS,
-            new SqlNode[] {new SqlBasicCall(
-                                   new SqlUnresolvedFunction(
-                                           new SqlIdentifier("OFFSET_IN_FRAGMENT", ZERO),
-                                           null,
-                                           null,
-                                           null,
-                                           null,
-                                           SqlFunctionCategory.USER_DEFINED_FUNCTION),
-                                   new SqlNode[0],
-                                   SqlParserPos.ZERO),
-                    new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO)},
-            ZERO));
-
-    SqlNodeList groupBy = new SqlNodeList(ZERO);
-    groupBy.add(new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO));
-
-    SqlSelect select = new SqlSelect(ZERO,
-            null,
-            selectList,
-            join,
-            where,
-            groupBy,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
-    return select;
   }
 
-  private LogicalTableModify getDummyUpdate(SqlUpdate update)
-          throws SqlParseException, ValidationException, RelConversionException {
-    SqlIdentifier targetTable = (SqlIdentifier) update.getTargetTable();
-    String targetTableName = targetTable.names.get(targetTable.names.size() - 1);
-    MapDPlanner planner = getPlanner();
-    String dummySql = "DELETE FROM " + targetTableName;
-    SqlNode dummyNode = planner.parse(dummySql);
-    dummyNode = planner.validate(dummyNode);
-    RelRoot dummyRoot = planner.rel(dummyNode);
-    LogicalTableModify dummyModify = (LogicalTableModify) dummyRoot.rel;
-    return dummyModify;
+  private static class SqlNotInVisitor extends SqlBasicVisitor<Void> {
+    boolean hasNotIn = false;
+
+    @Override
+    public Void visit(SqlCall call) {
+      if (call instanceof SqlSelect) {
+        final SqlSelect select = (SqlSelect) call;
+        final SqlNode whereNode = select.getWhere();
+        if (whereNode != null && whereNode instanceof SqlCall) {
+          final SqlCall whereCall = (SqlCall) whereNode;
+          assert (whereCall != null);
+          final SqlOperator op = whereCall.getOperator();
+          if (op.getKind() == SqlKind.NOT_IN) {
+            hasNotIn = true;
+          }
+        }
+      }
+
+      return call.getOperator().acceptCall(this, call);
+    }
   }
 
-  private RelRoot rewriteUpdateAsSelect(SqlUpdate update, MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
-    int correlatedQueriesCount[] = new int[1];
-    SqlBasicVisitor<Void> correlatedQueriesCounter = new SqlBasicVisitor<Void>() {
+  private static class SubqueryExpansionRelVisitor extends RelHomogeneousShuttle {
+    private final SubqueryExpansionRexVisitor subqueryRexVisitor;
+    private boolean containsSort = false;
+
+    public SubqueryExpansionRelVisitor() {
+      subqueryRexVisitor = new SubqueryExpansionRexVisitor(this);
+    }
+
+    @Override
+    public RelNode visit(RelNode other) {
+      RelNode next = super.visit(other);
+      return next.accept(subqueryRexVisitor);
+    }
+
+    @Override
+    public RelNode visit(LogicalSort sort) {
+      containsSort = true;
+      RelNode next = super.visit(sort);
+      return next.accept(subqueryRexVisitor);
+    }
+
+    public boolean requiresSubqueryExpansion() {
+      if (subqueryRexVisitor != null) {
+        return subqueryRexVisitor.requiresSubqueryExpansion;
+      }
+      return false;
+    }
+
+    private static class SubqueryExpansionRexVisitor extends RexShuttle {
+      private boolean requiresSubqueryExpansion = false;
+      private final SubqueryExpansionRelVisitor shuttle;
+
+      SubqueryExpansionRexVisitor(SubqueryExpansionRelVisitor shuttle) {
+        this.shuttle = shuttle;
+      }
+
       @Override
-      public Void visit(SqlCall call) {
-        if (call.isA(SCALAR)
-                && ((call instanceof SqlBasicCall && call.operandCount() == 1
-                            && !call.operand(0).isA(SCALAR))
-                        || !(call instanceof SqlBasicCall))) {
-          if (isCorrelated(call)) {
-            correlatedQueriesCount[0]++;
+      public RexNode visitCorrelVariable(RexCorrelVariable variable) {
+        requiresSubqueryExpansion = true;
+        return variable;
+      }
+
+      @Override
+      public RexNode visitSubQuery(RexSubQuery subQuery) {
+        if (shuttle != null) {
+          if (subQuery.getKind() == SqlKind.EXISTS) {
+            requiresSubqueryExpansion = true;
+          }
+          if (subQuery.getKind() == SqlKind.IN) {
+            requiresSubqueryExpansion = true;
+          }
+          RelNode r = subQuery.rel.accept(shuttle); // look inside sub-queries
+          if (r != subQuery.rel) {
+            subQuery = subQuery.clone(r);
           }
         }
-        return super.visit(call);
-      }
-    };
-
-    update.accept(correlatedQueriesCounter);
-    if (correlatedQueriesCount[0] > 1) {
-      throw new CalciteException(
-              "table modifications with multiple correlated sub-queries not supported.",
-              null);
-    }
-
-    boolean allowSubqueryDecorrelation = true;
-    SqlNode updateCondition = update.getCondition();
-    if (null != updateCondition) {
-      boolean hasInClause =
-              new FindSqlOperator().containsSqlOperator(updateCondition, SqlKind.IN);
-      if (hasInClause) {
-        SqlNode updateTargetTable = update.getTargetTable();
-        if (null != updateTargetTable && updateTargetTable instanceof SqlIdentifier) {
-          SqlIdentifier targetTable = (SqlIdentifier) updateTargetTable;
-          if (targetTable.names.size() == 2) {
-            final MetaConnect mc =
-                    new MetaConnect(mapdUser, this, targetTable.names.get(0), schemaJson);
-          }
-        }
+        return super.visitSubQuery(subQuery);
       }
     }
-
-    SqlNodeList sourceExpression = new SqlNodeList(SqlParserPos.ZERO);
-    LogicalTableModify dummyModify = getDummyUpdate(update);
-    RelOptTable targetTable = dummyModify.getTable();
-    RelDataType targetTableType = targetTable.getRowType();
-
-    SqlSelect select = rewriteSimpleUpdateAsSelect(update);
-    boolean applyRexCast = null == select;
-
-    if (null == select) {
-      for (int i = 0; i < update.getSourceExpressionList().size(); i++) {
-        SqlNode targetColumn = update.getTargetColumnList().get(i);
-        SqlNode expression = update.getSourceExpressionList().get(i);
-
-        if (!(targetColumn instanceof SqlIdentifier)) {
-          throw new RuntimeException("Unknown identifier type!");
-        }
-        SqlIdentifier id = (SqlIdentifier) targetColumn;
-        RelDataType fieldType =
-                targetTableType.getField(id.names.get(id.names.size() - 1), false, false)
-                        .getType();
-
-        if (expression.isA(ARRAY_VALUE) && null != fieldType.getComponentType()) {
-          // apply a cast to all array value elements
-
-          SqlDataTypeSpec elementType = new SqlDataTypeSpec(
-                  new SqlBasicTypeNameSpec(fieldType.getComponentType().getSqlTypeName(),
-                          fieldType.getPrecision(),
-                          fieldType.getScale(),
-                          null == fieldType.getCharset() ? null
-                                                         : fieldType.getCharset().name(),
-                          SqlParserPos.ZERO),
-                  SqlParserPos.ZERO);
-          SqlCall array_expression = (SqlCall) expression;
-          ArrayList<SqlNode> values = new ArrayList<>();
-
-          for (SqlNode value : array_expression.getOperandList()) {
-            if (value.isA(EnumSet.of(SqlKind.LITERAL))) {
-              SqlNode casted_value = new SqlBasicCall(SqlStdOperatorTable.CAST,
-                      new SqlNode[] {value, elementType},
-                      value.getParserPosition());
-              values.add(casted_value);
-            } else {
-              values.add(value);
-            }
-          }
-
-          expression = new SqlBasicCall(MapDSqlOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
-                  values.toArray(new SqlNode[0]),
-                  expression.getParserPosition());
-        }
-        sourceExpression.add(expression);
-      }
-
-      sourceExpression.add(new SqlBasicCall(SqlStdOperatorTable.AS,
-              new SqlNode[] {
-                      new SqlBasicCall(new SqlUnresolvedFunction(
-                                               new SqlIdentifier("OFFSET_IN_FRAGMENT",
-                                                       SqlParserPos.ZERO),
-                                               null,
-                                               null,
-                                               null,
-                                               null,
-                                               SqlFunctionCategory.USER_DEFINED_FUNCTION),
-                              new SqlNode[0],
-                              SqlParserPos.ZERO),
-                      new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO)},
-              ZERO));
-
-      select = new SqlSelect(SqlParserPos.ZERO,
-              null,
-              sourceExpression,
-              update.getTargetTable(),
-              update.getCondition(),
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null);
-    }
-
-    MapDPlanner planner =
-            getPlanner(allowSubqueryDecorrelation, parserOptions.isWatchdogEnabled());
-    SqlNode node = null;
-    try {
-      node = planner.parse(select.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
-      node = planner.validate(node);
-    } catch (Exception e) {
-      MAPDLOGGER.error("Error processing UPDATE rewrite, rewritten stmt was: "
-              + select.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
-      throw e;
-    }
-
-    RelRoot root = planner.rel(node);
-    LogicalProject project = (LogicalProject) root.project();
-
-    ArrayList<String> fields = new ArrayList<String>();
-    ArrayList<RexNode> nodes = new ArrayList<RexNode>();
-    final RexBuilder builder = new RexBuilder(planner.getTypeFactory());
-
-    for (SqlNode n : update.getTargetColumnList()) {
-      if (n instanceof SqlIdentifier) {
-        SqlIdentifier id = (SqlIdentifier) n;
-        fields.add(id.names.get(id.names.size() - 1));
-      } else {
-        throw new RuntimeException("Unknown identifier type!");
-      }
-    }
-
-    // The magical number here when processing the projection
-    // is skipping the OFFSET_IN_FRAGMENT() expression used by
-    // update and delete
-    int idx = 0;
-    for (RexNode exp : project.getProjects()) {
-      if (applyRexCast && idx + 1 < project.getProjects().size()) {
-        RelDataType expectedFieldType =
-                targetTableType.getField(fields.get(idx), false, false).getType();
-        if (!exp.getType().equals(expectedFieldType) && !exp.isA(ARRAY_VALUE)) {
-          exp = builder.makeCast(expectedFieldType, exp);
-        }
-      }
-
-      nodes.add(exp);
-      idx++;
-    }
-
-    ArrayList<RexNode> inputs = new ArrayList<RexNode>();
-    int n = 0;
-    for (int i = 0; i < fields.size(); i++) {
-      inputs.add(
-              new RexInputRef(n, project.getRowType().getFieldList().get(n).getType()));
-      n++;
-    }
-
-    fields.add("EXPR$DELETE_OFFSET_IN_FRAGMENT");
-    inputs.add(new RexInputRef(n, project.getRowType().getFieldList().get(n).getType()));
-
-    project = project.copy(
-            project.getTraitSet(), project.getInput(), nodes, project.getRowType());
-
-    LogicalTableModify modify = LogicalTableModify.create(targetTable,
-            dummyModify.getCatalogReader(),
-            project,
-            Operation.UPDATE,
-            fields,
-            inputs,
-            true);
-    return RelRoot.of(modify, SqlKind.UPDATE);
-  }
-
-  RelRoot queryToRelNode(final String sql, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
-    final MapDPlanner planner = getPlanner(true, parserOptions.isWatchdogEnabled());
-    final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
-    return convertSqlToRelNode(sqlNode, planner, parserOptions);
   }
 
   RelRoot convertSqlToRelNode(final SqlNode sqlNode,
@@ -751,45 +373,29 @@ public final class MapDParser {
           throws SqlParseException, ValidationException, RelConversionException {
     SqlNode node = sqlNode;
     MapDPlanner planner = mapDPlanner;
-    boolean allowCorrelatedSubQueryExpansion = true;
-    boolean patchUpdateToDelete = false;
+    boolean allowCorrelatedSubQueryExpansion = false;
+    boolean expandOverride = true;
 
-    if (node.isA(DELETE)) {
-      SqlDelete sqlDelete = (SqlDelete) node;
-      node = new SqlUpdate(node.getParserPosition(),
-              sqlDelete.getTargetTable(),
-              SqlNodeList.EMPTY,
-              SqlNodeList.EMPTY,
-              sqlDelete.getCondition(),
-              sqlDelete.getSourceSelect(),
-              sqlDelete.getAlias());
+    SqlHavingVisitor hasHavingVisitor = new SqlHavingVisitor();
+    node.accept(hasHavingVisitor);
 
-      patchUpdateToDelete = true;
+    if (hasHavingVisitor.hasHaving) {
+      allowCorrelatedSubQueryExpansion = true; // TODO: is this doing anything?
     }
 
-    if (node.isA(UPDATE)) {
-      SqlUpdate update = (SqlUpdate) node;
-      update = (SqlUpdate) planner.validate(update);
-      RelRoot root = rewriteUpdateAsSelect(update, parserOptions);
-
-      if (patchUpdateToDelete) {
-        LogicalTableModify modify = (LogicalTableModify) root.rel;
-
-        try {
-          Field f = TableModify.class.getDeclaredField("operation");
-          f.setAccessible(true);
-          f.set(modify, Operation.DELETE);
-        } catch (Throwable e) {
-          throw new RuntimeException(e);
-        }
-
-        root = RelRoot.of(modify, SqlKind.DELETE);
-      }
-
-      return root;
+    SqlNotInVisitor hasNotInVisitor = new SqlNotInVisitor();
+    node.accept(hasNotInVisitor);
+    if (hasNotInVisitor.hasNotIn) {
+      expandOverride = false;
     }
 
-    if (parserOptions.isLegacySyntax()) {
+    SqlNode validateR;
+    // sometimes validation fails due to optimizations applied to other parts of the
+    // query. Run a cleanup pass here in case validate fails, disabling legacy syntax and
+    // rebuilding the RA tree from the Sql.
+    try {
+      validateR = planner.validate(node);
+    } catch (Exception e) {
       // close original planner
       planner.close();
       // create a new one
@@ -797,12 +403,53 @@ public final class MapDParser {
               allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
       node = parseSql(
               node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      validateR = planner.validate(node);
     }
-
-    SqlNode validateR = planner.validate(node);
     planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot relR = planner.rel(validateR);
-    relR = replaceIsTrue(planner.getTypeFactory(), relR);
+
+    final SubqueryExpansionRelVisitor visitor = new SubqueryExpansionRelVisitor();
+    relR.project().accept(visitor);
+
+    final boolean requiresSubqueryExpansion = visitor.requiresSubqueryExpansion();
+    final boolean hasSort = visitor.containsSort;
+
+    if (expandOverride && requiresSubqueryExpansion) {
+      planner.close(); // replace planner
+      allowCorrelatedSubQueryExpansion = true;
+      planner = getPlanner(
+              allowCorrelatedSubQueryExpansion, parserOptions.isWatchdogEnabled());
+      if (hasSort) {
+        if (node instanceof SqlOrderBy) {
+          SqlOrderBy order_by_node = (SqlOrderBy) node;
+          if (order_by_node.query instanceof SqlSelect) {
+            SqlNodeList baseOrderList = order_by_node.orderList;
+            SqlNodeList orderList = ((SqlSelect) order_by_node.query).getOrderList();
+            if (baseOrderList.size() != orderList.size()) {
+              throw new CalciteException("Correlated sub-query with sort not supported. "
+                              + baseOrderList.size() + " vs " + orderList.size(),
+                      null);
+            }
+            for (int i = 0; i < baseOrderList.size(); i++) {
+              if (baseOrderList.get(i) != orderList.get(i)) {
+                throw new CalciteException(
+                        "Correlated sub-query with sort not supported.", null);
+              }
+            }
+            // drop duplicate order by
+            node = order_by_node.query;
+          }
+        }
+      }
+      node = parseSql(
+              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      validateR = planner.validate(node);
+
+      planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
+      relR = planner.rel(validateR);
+    }
+
+    relR = planner.replaceIsTrue(relR);
     planner.close();
 
     if (!parserOptions.isViewOptimizeEnabled()) {
@@ -820,54 +467,6 @@ public final class MapDParser {
 
       return relR;
     }
-  }
-
-  private RelRoot replaceIsTrue(final RelDataTypeFactory typeFactory, RelRoot root) {
-    final RexShuttle callShuttle = new RexShuttle() {
-      RexBuilder builder = new RexBuilder(typeFactory);
-
-      public RexNode visitCall(RexCall call) {
-        call = (RexCall) super.visitCall(call);
-        if (call.getKind() == SqlKind.IS_TRUE) {
-          return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
-        } else if (call.getKind() == SqlKind.IS_NOT_TRUE) {
-          return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
-        } else if (call.getKind() == SqlKind.IS_FALSE) {
-          return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
-        } else if (call.getKind() == SqlKind.IS_NOT_FALSE) {
-          return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
-        }
-
-        return call;
-      }
-    };
-
-    RelNode node = root.rel.accept(new RelShuttleImpl() {
-      @Override
-      protected RelNode visitChild(RelNode parent, int i, RelNode child) {
-        RelNode node = super.visitChild(parent, i, child);
-        return node.accept(callShuttle);
-      }
-    });
-
-    return new RelRoot(node,
-            root.validatedRowType,
-            root.kind,
-            root.fields,
-            root.collation,
-            Collections.emptyList());
   }
 
   private SqlNode parseSql(String sql, final boolean legacy_syntax, Planner planner)
@@ -984,8 +583,8 @@ public final class MapDParser {
       } else {
         assert proj instanceof SqlBasicCall;
         SqlBasicCall proj_call = (SqlBasicCall) proj;
-        if (proj_call.operands.length > 0) {
-          for (int i = 0; i < proj_call.operands.length; i++) {
+        if (proj_call.getOperandList().size() > 0) {
+          for (int i = 0; i < proj_call.getOperandList().size(); i++) {
             if (proj_call.operand(i) instanceof SqlCase) {
               SqlNode new_op = expandCase(proj_call.operand(i), typeFactory);
               proj_call.setOperand(i, new_op);
@@ -1029,7 +628,7 @@ public final class MapDParser {
       return;
     }
     SqlBasicCall basic_call = (SqlBasicCall) node;
-    for (SqlNode operator : basic_call.getOperands()) {
+    for (SqlNode operator : basic_call.getOperandList()) {
       if (operator instanceof SqlOrderBy) {
         desugarExpression(((SqlOrderBy) operator).query, typeFactory);
       } else {
@@ -1044,9 +643,9 @@ public final class MapDParser {
     MAPDLOGGER.debug("expand: " + node.toString());
     if (node instanceof SqlBasicCall) {
       SqlBasicCall node_call = (SqlBasicCall) node;
-      SqlNode[] operands = node_call.getOperands();
-      for (int i = 0; i < operands.length; ++i) {
-        node_call.setOperand(i, expand(operands[i], id_to_expr, typeFactory));
+      List<SqlNode> operands = node_call.getOperandList();
+      for (int i = 0; i < operands.size(); ++i) {
+        node_call.setOperand(i, expand(operands.get(i), id_to_expr, typeFactory));
       }
       SqlNode expanded_variance = expandVariance(node_call, typeFactory);
       if (expanded_variance != null) {
@@ -1395,135 +994,5 @@ public final class MapDParser {
   protected RelDataTypeSystem createTypeSystem() {
     final MapDTypeSystem typeSystem = new MapDTypeSystem();
     return typeSystem;
-  }
-
-  private static class ExpressionListedInSelectClauseChecker
-          extends SqlBasicVisitor<Void> {
-    @Override
-    public Void visit(SqlCall call) {
-      if (call instanceof SqlSelect) {
-        SqlSelect selectNode = (SqlSelect) call;
-        String targetString = targetExpression.toString();
-        for (SqlNode listedNode : selectNode.getSelectList()) {
-          if (listedNode.toString().contains(targetString)) {
-            throw Util.FoundOne.NULL;
-          }
-        }
-      }
-      return super.visit(call);
-    }
-
-    boolean containsExpression(SqlNode node, SqlNode targetExpression) {
-      try {
-        this.targetExpression = targetExpression;
-        node.accept(this);
-        return false;
-      } catch (Util.FoundOne e) {
-        return true;
-      }
-    }
-
-    SqlNode targetExpression;
-  }
-
-  private static class ExpressionListedAsChildOROperatorChecker
-          extends SqlBasicVisitor<Void> {
-    @Override
-    public Void visit(SqlCall call) {
-      if (call instanceof SqlBasicCall) {
-        SqlBasicCall basicCall = (SqlBasicCall) call;
-        if (basicCall.getKind() == SqlKind.OR) {
-          String targetString = targetExpression.toString();
-          for (SqlNode listedOperand : basicCall.operands) {
-            if (listedOperand.toString().contains(targetString)) {
-              throw Util.FoundOne.NULL;
-            }
-          }
-        }
-      }
-      return super.visit(call);
-    }
-
-    boolean containsExpression(SqlNode node, SqlNode targetExpression) {
-      try {
-        this.targetExpression = targetExpression;
-        node.accept(this);
-        return false;
-      } catch (Util.FoundOne e) {
-        return true;
-      }
-    }
-
-    SqlNode targetExpression;
-  }
-
-  private static class JoinOperatorChecker extends SqlBasicVisitor<Void> {
-    Set<SqlBasicCall> targetCalls = new HashSet<>();
-
-    public boolean isEqualityJoinOperator(SqlBasicCall basicCall) {
-      if (null != basicCall) {
-        if (basicCall.operands.length == 2 && basicCall.getKind() == SqlKind.EQUALS
-                && basicCall.operand(0) instanceof SqlIdentifier
-                && basicCall.operand(1) instanceof SqlIdentifier) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public Void visit(SqlCall call) {
-      if (call instanceof SqlBasicCall) {
-        targetCalls.add((SqlBasicCall) call);
-      }
-      for (SqlNode node : call.getOperandList()) {
-        if (!targetCalls.contains(node)) {
-          node.accept(this);
-        }
-      }
-      return super.visit(call);
-    }
-
-    boolean containsExpression(SqlNode node) {
-      try {
-        node.accept(this);
-        for (SqlBasicCall basicCall : targetCalls) {
-          if (isEqualityJoinOperator(basicCall)) {
-            throw Util.FoundOne.NULL;
-          }
-        }
-        return false;
-      } catch (Util.FoundOne e) {
-        return true;
-      }
-    }
-  }
-
-  // this visitor checks whether a parse tree contains at least one
-  // specific SQL operator we have an interest in
-  // (do not count the accurate # operators we found)
-  private static class FindSqlOperator extends SqlBasicVisitor<Void> {
-    @Override
-    public Void visit(SqlCall call) {
-      if (call instanceof SqlBasicCall) {
-        SqlBasicCall basicCall = (SqlBasicCall) call;
-        if (basicCall.getKind().equals(targetKind)) {
-          throw Util.FoundOne.NULL;
-        }
-      }
-      return super.visit(call);
-    }
-
-    boolean containsSqlOperator(SqlNode node, SqlKind operatorKind) {
-      try {
-        targetKind = operatorKind;
-        node.accept(this);
-        return false;
-      } catch (Util.FoundOne e) {
-        return true;
-      }
-    }
-
-    private SqlKind targetKind;
   }
 }

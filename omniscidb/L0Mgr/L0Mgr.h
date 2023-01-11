@@ -22,6 +22,7 @@
 #include "DataMgr/GpuMgr.h"
 #include "L0Mgr/L0Exception.h"
 #include "L0Mgr/Utils.h"
+#include "Logger/Logger.h"
 
 #ifdef HAVE_L0
 #include <level_zero/ze_api.h>
@@ -127,14 +128,13 @@ class L0Kernel {
            uint32_t x,
            uint32_t y,
            uint32_t z);
-  ze_group_count_t& group_size();
   ze_kernel_handle_t handle() const;
+  std::string desc() const;
   ~L0Kernel();
 
  private:
   std::shared_ptr<const L0Module> parent_;
   ze_kernel_handle_t handle_;
-  ze_group_count_t group_size_;
 #endif
 };
 
@@ -150,6 +150,12 @@ class L0CommandQueue {
 #endif
 };
 
+struct GroupCount {
+  uint32_t groupCountX;
+  uint32_t groupCountY;
+  uint32_t groupCountZ;
+};
+
 class L0CommandList {
  private:
 #ifdef HAVE_L0
@@ -160,18 +166,19 @@ class L0CommandList {
   void copy(void* dst, const void* src, const size_t num_bytes);
 
   template <typename... Args>
-  void launch(L0Kernel& kernel, Args&&... args) {
+  void launch(L0Kernel& kernel, const GroupCount& gc, Args&&... args) {
 #ifdef HAVE_L0
     set_kernel_args<0>(kernel.handle(), std::forward<Args>(args)...);
 
+    ze_group_count_t group_count = {gc.groupCountX, gc.groupCountY, gc.groupCountZ};
     L0_SAFE_CALL(zeCommandListAppendLaunchKernel(
-        handle_, kernel.handle(), &kernel.group_size(), nullptr, 0, nullptr));
+        handle_, kernel.handle(), &group_count, nullptr, 0, nullptr));
 
     L0_SAFE_CALL(zeCommandListAppendBarrier(handle_, nullptr, 0, nullptr));
 #endif
   }
 
-  void launch(L0Kernel* kernel, std::vector<int8_t*>& params);
+  void launch(L0Kernel* kernel, std::vector<int8_t*>& params, const GroupCount& gc);
 
   void submit(L0CommandQueue& queue);
 
@@ -223,6 +230,9 @@ class L0Manager : public GpuMgr {
       // nothing to do here as the actual context is explicitly passed as a parameter
       // to every manager's method
   };
+
+  size_t getMaxAllocationSize(const int device_num) const;
+  size_t getPageSize(const int device_num) const { return 4096u; }
 
   virtual unsigned getMaxBlockSize() const override { return 1u; }
   virtual int8_t getSubGroupSize() const override { return 1; }

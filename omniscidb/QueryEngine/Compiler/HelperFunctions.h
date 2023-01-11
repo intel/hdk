@@ -19,8 +19,31 @@
 
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/raw_os_ostream.h>
+#ifdef HAVE_L0
+#include "LLVMSPIRVLib/LLVMSPIRVLib.h"
+#endif
+
+#include "QueryEngine/CompilationOptions.h"
 
 namespace compiler {
+
+#define MODULE_DUMP_ENABLE 1
+#ifdef MODULE_DUMP_ENABLE
+#define DUMP_MODULE(MODULE, LL_NAME)      \
+  {                                       \
+    std::error_code ec;                   \
+    llvm::raw_fd_ostream os(LL_NAME, ec); \
+    MODULE->print(os, nullptr);           \
+  }
+#else
+#define DUMP_MODULE(MODULE, LL_NAME) \
+  {}
+#endif
+
+#ifdef HAVE_L0
+std::string mangle_spirv_builtin(const llvm::Function& func);
+#endif
 
 void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
                          std::string src = "",

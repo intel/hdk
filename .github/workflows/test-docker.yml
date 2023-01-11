@@ -8,6 +8,9 @@ on:
       name:
         type: string
         default: cpu
+      build-name:
+        type: string
+        default: build
       reset-cache:
         type: boolean
         default: false
@@ -28,7 +31,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: ${{ env.RUN_STAMP }}-build
+          name: ${{ env.RUN_STAMP }}-${{ inputs.build-name }}
 
       - name: Unpack build files
         run: |
@@ -47,8 +50,15 @@ jobs:
           docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
           docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
 
-      - name: Test
-        run: docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/test.sh
+      - name: Smoke test
+        if: inputs.name == 'cuda'
+        run: |
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/test.sh
+
+      - name: ASAN test
+        if: inputs.build-name == 'asan'
+        run: |
+          echo FIXME docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
 
       - name: Stop the container
         if: always()

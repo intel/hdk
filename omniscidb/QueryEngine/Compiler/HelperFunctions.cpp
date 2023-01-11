@@ -25,6 +25,15 @@
 #include "QueryEngine/Optimization/AnnotateInternalFunctionsPass.h"
 
 namespace compiler {
+#ifdef HAVE_L0
+std::string mangle_spirv_builtin(const llvm::Function& func) {
+  CHECK(func.getName().startswith("__spirv_")) << func.getName().str();
+  std::string new_name;
+  mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
+  return new_name;
+}
+#endif
+
 void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
                          std::string src,
                          const bool is_gpu) {

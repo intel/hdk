@@ -23,7 +23,7 @@ jobs:
       - name: Set env context
         run: |
           echo CONDA_PATH=$CONDA >>$GITHUB_ENV
-          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'CPU' }} >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
           echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
 
       - uses: actions/download-artifact@v3
@@ -56,7 +56,7 @@ jobs:
       #   NoCatalogSqlTest
       # that's not possible to manage instance memory with standard actions
       - name: Set Swap Space
-        if: inputs.test == 'smoke'
+        if: inputs.test == 'smoke' || inputs.test == 'asan'
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 12
@@ -68,10 +68,36 @@ jobs:
           cd omniscidb
           conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/test.sh
 
+      - name: Run ASAN test
+        if: inputs.test == 'asan'
+        env:
+          ASAN_OPTIONS: verbosity=1
+
+        run: |
+          sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory'
+          cd omniscidb
+
+          cd build/Tests # build cache
+          conda run -n ${{ env.CONDA_ENV }} ./ArrowBasedExecuteTest --build-rel-alg-cache=cache.txt
+
+          cd ../.. # rebuild with ASAN
+          conda run -n ${{ env.CONDA_ENV }} cmake -B ./build -S . -DENABLE_TESTS=on -DENABLE_CUDA=off -DENABLE_ASAN=on
+          conda run -n ${{ env.CONDA_ENV }} cmake --build ./build/ --parallel 2
+
+          cd ..
+          tar -zcf /tmp/build.tgz .
+
+      - name: Upload build and src files
+        if: inputs.test == 'asan'
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-${{ env.RUN_STAMP }}-asan
+          path: /tmp/build.tgz
+
       - name: Download perf results
         # there is no way to access other workflow artifacts without dawidd6/action-download-artifact@v2
         uses: dawidd6/action-download-artifact@v2
-        if: inputs.test == 'perf'
+        if: inputs.test == 'perf' && github.ref_name == 'main'
         with:
           workflow: main.yml
           branch: ${{ github.ref_name }}
@@ -96,7 +122,7 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-taxi
           path: |
-            *.pdf
-            perf.json
+            omniscidb/*.pdf
+            omniscidb/perf.json
 
 

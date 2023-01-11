@@ -26,6 +26,8 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #ifdef HAVE_L0
 #include "LLVMSPIRVLib/LLVMSPIRVLib.h"
@@ -41,23 +43,6 @@
 namespace compiler {
 
 static llvm::sys::Mutex g_ee_create_mutex;
-namespace {
-void throw_parseIR_error(const llvm::SMDiagnostic& parse_error,
-                         std::string src = "",
-                         const bool is_gpu = false) {
-  std::string excname = (is_gpu ? "NVVM IR ParseError: " : "LLVM IR ParseError: ");
-  llvm::raw_string_ostream ss(excname);
-  parse_error.print(src.c_str(), ss, false, false);
-  throw ParseIRError(ss.str());
-}
-
-std::string assemblyForCPU(ExecutionEngineWrapper& execution_engine,
-                           llvm::Module* llvm_module) {
-  LOG(FATAL) << "Assembly logger not yet supported for ORCJIT.";
-  return "";
-}
-
-}  // namespace
 
 std::shared_ptr<CompilationContext> CPUBackend::generateNativeCode(
     llvm::Function* func,
@@ -561,6 +546,7 @@ const std::unordered_set<std::string> main_module_ext_list = {
     "DateDiffHighPrecisionNullable",
     "DateTruncateHighPrecisionToDateNullable"};
 
+#ifdef HAVE_CUDA
 auto insert_emtpy_abort_replacement(llvm::Module* m) {
   auto ft = llvm::FunctionType::get(llvm::Type::getVoidTy(m->getContext()), false);
   auto abort_func =
@@ -569,6 +555,7 @@ auto insert_emtpy_abort_replacement(llvm::Module* m) {
   llvm::ReturnInst::Create(m->getContext(), bb);
   return abort_func;
 }
+#endif
 
 }  // namespace
 
@@ -849,10 +836,62 @@ std::shared_ptr<CompilationContext> L0Backend::generateNativeCode(
     llvm::Function* wrapper_func,
     const std::unordered_set<llvm::Function*>& live_funcs,
     const CompilationOptions& co) {
-  return generateNativeGPUCode(func, wrapper_func, live_funcs, co, gpu_target_);
+  return generateNativeGPUCode(exts_, func, wrapper_func, live_funcs, co, gpu_target_);
+}
+
+void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string& fname) {
+  auto fn = from->getFunction(fname);
+  CHECK(fn);
+  CHECK(fn->isDeclaration());
+
+  llvm::Function::Create(
+      fn->getFunctionType(), llvm::GlobalValue::ExternalLinkage, fn->getName(), *to);
+}
+
+void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname) {
+  auto target_fn = to->getFunction(fname);
+  auto from_fn = from->getFunction(fname);
+  CHECK(target_fn);
+  CHECK(from_fn);
+
+  target_fn->deleteBody();
+
+  llvm::ValueToValueMapTy vmap;
+  llvm::Function::arg_iterator pos_fn_arg_it = target_fn->arg_begin();
+  for (llvm::Function::const_arg_iterator j = from_fn->arg_begin();
+       j != from_fn->arg_end();
+       ++j) {
+    pos_fn_arg_it->setName(j->getName());
+    vmap[&*j] = &*pos_fn_arg_it++;
+  }
+  llvm::SmallVector<llvm::ReturnInst*, 8> returns;
+#if LLVM_VERSION_MAJOR > 12
+  llvm::CloneFunctionInto(
+      target_fn, from_fn, vmap, llvm::CloneFunctionChangeType::DifferentModule, returns);
+#else
+  llvm::CloneFunctionInto(target_fn, from_fn, vmap, true, returns);
+#endif
+
+  for (auto& BB : *target_fn) {
+    for (llvm::BasicBlock::iterator bbi = BB.begin(); bbi != BB.end();) {
+      llvm::Instruction* inst = &*bbi++;
+      if (auto* call = llvm::dyn_cast<llvm::CallInst>(&*inst)) {
+        auto local_callee = to->getFunction(call->getCalledFunction()->getName());
+        CHECK(local_callee);
+        CHECK(local_callee->isDeclaration());
+        std::vector<llvm::Value*> args;
+        std::copy(call->arg_begin(), call->arg_end(), std::back_inserter(args));
+
+        auto new_call = llvm::CallInst::Create(local_callee, args, call->getName());
+
+        llvm::ReplaceInstWithInst(call, new_call);
+      }
+    }
+  }
 }
 
 std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
+    const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
     llvm::Function* func,
     llvm::Function* wrapper_func,
     const std::unordered_set<llvm::Function*>& live_funcs,
@@ -864,10 +903,36 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   CHECK(module);
   CHECK(wrapper_func);
 
+  DUMP_MODULE(module, "before.linking.spirv.ll")
+
+  CHECK(exts.find(ExtModuleKinds::spirv_helper_funcs_module) != exts.end());
+
+  for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
+    if (F.isDeclaration()) {
+      insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
+                         module,
+                         F.getName().str());
+    }
+  }
+
+  for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
+    if (!F.isDeclaration()) {
+      replace_function(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
+                       module,
+                       F.getName().str());
+    }
+  }
+
+  DUMP_MODULE(module, "after.linking.spirv.ll")
+
+  // set proper calling conv & mangle spirv built-ins
   for (auto& Fn : *module) {
     Fn.setCallingConv(llvm::CallingConv::SPIR_FUNC);
+    if (Fn.getName().startswith("__spirv_")) {
+      CHECK(Fn.isDeclaration());
+      Fn.setName(compiler::mangle_spirv_builtin(Fn));
+    }
   }
-  wrapper_func->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
 
   for (auto& Fn : *module) {
     for (auto I = llvm::inst_begin(Fn), E = llvm::inst_end(Fn); I != E; ++I) {
@@ -876,11 +941,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
       }
     }
   }
-
-  auto pass_manager_builder = llvm::PassManagerBuilder();
-  llvm::legacy::PassManager PM;
-  pass_manager_builder.populateModulePassManager(PM);
-  compiler::optimize_ir(func, module, PM, live_funcs, false /*smem_used*/, co);
+  wrapper_func->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
 
   module->setTargetTriple("spir64-unknown-unknown");
 
@@ -894,6 +955,11 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
                                                            102000 /*OpenCL ver 1.2*/))};
   llvm::NamedMDNode* spirv_src = module->getOrInsertNamedMetadata("spirv.Source");
   spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
+
+  auto pass_manager_builder = llvm::PassManagerBuilder();
+  llvm::legacy::PassManager PM;
+  pass_manager_builder.populateModulePassManager(PM);
+  compiler::optimize_ir(func, module, PM, live_funcs, false /*smem_used*/, co);
 
   SPIRV::TranslatorOpts opts;
   opts.enableAllExtensions();
@@ -950,7 +1016,7 @@ std::shared_ptr<Backend> getBackend(
         return std::make_shared<CUDABackend>(exts, is_gpu_smem_used_, gpu_target);
       if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
         CHECK(!is_gpu_smem_used_);
-        return std::make_shared<L0Backend>(gpu_target);
+        return std::make_shared<L0Backend>(exts, gpu_target);
       }
     default:
       CHECK(false);

@@ -48,7 +48,7 @@ TO safeNarrow(FROM const from) {
   static_assert(sizeof(TO) < sizeof(FROM));
   if (from < static_cast<FROM>(std::numeric_limits<TO>::min()) ||
       static_cast<FROM>(std::numeric_limits<TO>::max()) < from) {
-    throw std::runtime_error("Overflow or underflow");
+    throw OverflowOrUnderflow();
   }
   return static_cast<TO>(from);
 }
@@ -85,7 +85,7 @@ TO safeRound(FROM const from) {
   constexpr FROM max_float = maxRound<FROM, TO>();
   FROM const n = std::round(from);
   if (n < static_cast<FROM>(std::numeric_limits<TO>::min()) || max_float < n) {
-    throw std::runtime_error("Overflow or underflow");
+    throw OverflowOrUnderflow();
   }
   return static_cast<TO>(n);
 }
@@ -116,7 +116,7 @@ int64_t safeScale(T from, unsigned const scale) {
   if (from == 0) {
     return 0;
   }
-  throw std::runtime_error("Overflow or underflow");
+  throw OverflowOrUnderflow();
 }
 
 // TODO(adb): we should revisit this, as one could argue a Datum should never contain

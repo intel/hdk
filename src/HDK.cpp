@@ -12,7 +12,6 @@
 #include "Calcite/CalciteJNI.h"
 #include "DataMgr/DataMgr.h"
 #include "Logger/Logger.h"
-#include "QueryEngine/CalciteAdapter.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/RelAlgExecutor.h"
 #include "Shared/Config.h"
@@ -42,8 +41,8 @@ void HDK::read(std::shared_ptr<arrow::Table>& table, const std::string& table_na
 ExecutionResult HDK::query(const std::string& sql, const bool is_explain) {
   CHECK(internal_);
   CHECK(internal_->calcite);
-  auto ra = internal_->calcite->process(
-      internal_->db_name, pg_shim(sql), {}, /*legacy_syntax=*/true);
+  auto ra =
+      internal_->calcite->process(internal_->db_name, sql, {}, /*legacy_syntax=*/true);
 
   CHECK(internal_->storage);
   CHECK(internal_->config);
@@ -88,8 +87,8 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
 
   SystemParameters sys_params;
 
-  internal_->data_mgr = std::make_shared<Data_Namespace::DataMgr>(
-      *internal_->config.get(), sys_params);
+  internal_->data_mgr =
+      std::make_shared<Data_Namespace::DataMgr>(*internal_->config.get(), sys_params);
   internal_->data_mgr->getPersistentStorageMgr()->registerDataProvider(
       internal_->schema_id, internal_->storage);
 

@@ -1129,6 +1129,8 @@ inline std::string toString(const ExtModuleKinds& kind) {
       return "template_module";
     case ExtModuleKinds::l0_template_module:
       return "l0_template_module";
+    case ExtModuleKinds::spirv_helper_funcs_module:
+      return "spirv_helper_funcs_module";
     case ExtModuleKinds::rt_libdevice_module:
       return "rt_libdevice_module";
     case ExtModuleKinds::udf_cpu_module:
