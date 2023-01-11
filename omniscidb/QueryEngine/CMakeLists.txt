@@ -141,12 +141,15 @@ set(query_engine_source_files
 
 list(APPEND query_engine_source_files
         CostModel/CostModel.cpp
-        CostModel/DataSources/DwarfBench.cpp
         CostModel/DataSources/EmptyDataSource.cpp
         CostModel/ExtrapolationModels/LinearExtrapolation.cpp
         CostModel/DummyCostModel.cpp
         CostModel/DataSources/DataSource.cpp
         CostModel/Measurements.cpp)
+
+if(ENABLE_DWARF_BENCH)
+    list(APPEND query_engine_source_files CostModel/DataSources/DwarfBench.cpp)
+endif()
 
 if(NOT MSVC)
     list(APPEND query_engine_source_files ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
@@ -354,6 +357,10 @@ set(QUERY_ENGINE_LIBS
         )
 
 list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})
+
+if(ENABLE_DWARF_BENCH)
+    list(APPEND QUERY_ENGINE_LIBS dbench::dbench)
+endif()
 
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 

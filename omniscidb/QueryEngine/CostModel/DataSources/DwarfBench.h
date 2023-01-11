@@ -21,55 +21,38 @@
 
 #include "DataSource.h"
 
+#include <bench.hpp>
+
 namespace costmodel {
 
 // This is a temporary implementation while there is no
 // library for interaction in dwarf bench
-class DwarfBench : public DataSource {
+class DwarfBenchDataSource : public DataSource {
  public:
-  DwarfBench();
+  DwarfBenchDataSource();
 
   Detail::DeviceMeasurements getMeasurements(
       const std::vector<ExecutorDeviceType>& devices,
       const std::vector<AnalyticalTemplate>& templates) override;
 
  private:
-  class DwarfCsvParser {
-   public:
-    std::vector<Detail::Measurement> parseMeasurement(const boost::filesystem::path& csv);
-
-   private:
-    struct CsvColumnIndexes {
-      size_t timeIndex;
-      size_t sizeIndex;
-    };
-    std::string line;
-    std::vector<std::string> entries;
-
-    size_t getCsvColumnIndex(const std::string& columnName);
-    CsvColumnIndexes parseHeader(std::ifstream& in);
-    Detail::Measurement parseLine(const CsvColumnIndexes& indexes);
-    std::vector<Detail::Measurement> parseMeasurements(std::ifstream& in,
-                                                       const CsvColumnIndexes& indexes);
+  const size_t dwarfBenchIterations = 10;
+  const std::vector<size_t> dwarfBenchInputSizes = {
+      256,
+      512,
+      1024,
+      2048
   };
 
-  DwarfCsvParser parser;
+  std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device, AnalyticalTemplate templ);
 
-  boost::filesystem::path runDwarfAndGetReportFile(AnalyticalTemplate templ,
-                                                   ExecutorDeviceType device);
 
-  std::string deviceToDwarfString(ExecutorDeviceType device);
-  std::string templateToDwarfString(AnalyticalTemplate templ);
+  DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
+  DwarfBench::DeviceType convertDeviceType(ExecutorDeviceType device);
 
-  static const std::string sizeHeader;
-  static const std::string timeHeader;
-  static std::string getDwarfBenchPath();
-};
+  std::vector<Detail::Measurement> convertMeasurement(const std::vector<DwarfBench::Measurement> measurements);
 
-class DwarfBenchException : public std::runtime_error {
- public:
-  DwarfBenchException(const std::string& msg)
-      : std::runtime_error("DwarfBench data source exception: " + msg){};
+  DwarfBench::DwarfBench db;
 };
 
 }  // namespace costmodel
