@@ -17,7 +17,6 @@
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
 #include "QueryEngine/ArrowResultSet.h"
-#include "QueryEngine/CalciteAdapter.h"
 #include "QueryEngine/RelAlgExecutor.h"
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"

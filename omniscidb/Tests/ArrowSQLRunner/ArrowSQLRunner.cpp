@@ -18,7 +18,6 @@
 #include "Calcite/CalciteJNI.h"
 #include "DataMgr/DataMgr.h"
 #include "DataMgr/DataMgrDataProvider.h"
-#include "QueryEngine/CalciteAdapter.h"
 #include "QueryEngine/RelAlgExecutor.h"
 
 #include "SQLiteComparator.h"
@@ -78,7 +77,7 @@ class ArrowSQLRunnerImpl {
     std::string query_ra;
 
     calcite_time_ += measure<std::chrono::microseconds>::execution(
-        [&]() { query_ra = rel_alg_cache_->process("test_db", pg_shim(sql), {}, true); });
+        [&]() { query_ra = rel_alg_cache_->process("test_db", sql, {}, true); });
 
     return query_ra;
   }
