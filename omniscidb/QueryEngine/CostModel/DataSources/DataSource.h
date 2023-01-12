@@ -52,15 +52,15 @@ class DataSourceException : public std::runtime_error {
       : std::runtime_error("Data Source exception: " + msg){};
 };
 
-class UnsupportedAnalyticalTemplate: public DataSourceException {
-  public:
-    UnsupportedAnalyticalTemplate(AnalyticalTemplate templ)
+class UnsupportedAnalyticalTemplate : public DataSourceException {
+ public:
+  UnsupportedAnalyticalTemplate(AnalyticalTemplate templ)
       : DataSourceException("unsupported template: " + templateToString(templ)){};
 };
 
-class UnsupportedDevice: public DataSourceException {
-  public:
-    UnsupportedDevice(ExecutorDeviceType device)
+class UnsupportedDevice : public DataSourceException {
+ public:
+  UnsupportedDevice(ExecutorDeviceType device)
       : DataSourceException("unsupported device: " + deviceToString(device)){};
 };
 
