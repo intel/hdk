@@ -43,8 +43,6 @@ class UnsupportedTypeError : public TypeError {
   UnsupportedTypeError(std::string desc) : TypeError(std::move(desc)) {}
 };
 
-}  // namespace hdk::ir
-
 template <typename ErrorType, typename T>
 inline typename std::enable_if<std::is_base_of<hdk::ir::Error, ErrorType>::value,
                                const ErrorType&>::type
@@ -54,3 +52,5 @@ operator<<(const ErrorType& error, const T& v) {
   error.appendDesc(ss.str());
   return error;
 }
+
+}  // namespace hdk::ir
