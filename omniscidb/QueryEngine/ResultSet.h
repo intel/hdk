@@ -25,6 +25,7 @@
 #ifndef QUERYENGINE_RESULTSET_H
 #define QUERYENGINE_RESULTSET_H
 
+#include <boost/optional/optional_io.hpp>
 #include "BufferProvider/BufferProvider.h"
 #include "CardinalityEstimator.h"
 #include "DataMgr/Chunk/Chunk.h"
@@ -203,6 +204,8 @@ class ResultSet {
            ", query_mem_desc=" + ::toString(query_mem_desc_) + ")";
   }
 
+  std::string getStrScalarVal(const ScalarTargetValue& current_scalar, const hdk::ir::Type* col_type) const;
+  std::string contentToString() const; 
   std::string summaryToString() const;
 
   inline ResultSetRowIterator rowIterator(size_t from_logical_index,
