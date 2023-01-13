@@ -21,6 +21,10 @@
 
 #include "ExtractFromTime.h"
 
+#include <sstream>
+#include <iomanip>
+#include <cmath>
+
 #ifndef __CUDACC__
 #include <cstdlib>  // abort()
 #endif
@@ -311,4 +315,65 @@ DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t ti
 #else
   abort();
 #endif
+}
+
+
+std::string getStrDayFromSeconds(const int64_t seconds_tstamp){
+  std::ostringstream oss;
+  oss << std::setfill('0') << std::setw(2) << extract_day(seconds_tstamp);
+  return oss.str();
+}
+
+std::string getStrMonthFromSeconds(const int64_t seconds_tstamp){
+  std::ostringstream oss;
+  oss << std::setfill('0') << std::setw(2) << extract_month_fast(seconds_tstamp);
+  return oss.str();
+}
+
+std::string getStrYearFromSeconds(const int64_t seconds_tstamp){
+  std::ostringstream oss;
+  oss << std::setfill('0') << std::setw(2) << extract_year_fast(seconds_tstamp);
+  return oss.str();
+}
+
+std::string getStrDateFromSeconds(const int64_t seconds_tstamp){
+  std::ostringstream oss;
+  oss << getStrYearFromSeconds(seconds_tstamp) << "-" \
+  << getStrMonthFromSeconds(seconds_tstamp) << "-" \
+  << getStrDayFromSeconds(seconds_tstamp);
+  return oss.str();
+}
+
+std::string getStrTimeFromSeconds(const int64_t seconds_tstamp){
+  std::ostringstream oss;
+  oss << std::setfill('0') << std::setw(2) << extract_hour(seconds_tstamp) << ":" \
+  << std::setfill('0') << std::setw(2) << extract_minute(seconds_tstamp) << ":" \
+  << std::setfill('0') << std::setw(2) << extract_second(seconds_tstamp);
+  return oss.str();
+}
+
+std::string getStrTimeStampSecondsScaled(const int64_t tstamp, const int64_t seconds_scale){
+  std::ostringstream oss;
+  oss << getStrDateFromSeconds(tstamp / seconds_scale) << " " << getStrTimeFromSeconds(tstamp / seconds_scale);
+  if(seconds_scale > 1){
+    oss << "." << std::setfill('0') << std::setw(log10(seconds_scale)) << tstamp % seconds_scale;
+  }
+  return oss.str();
+}
+
+std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit){
+  switch (unit) {
+    case hdk::ir::TimeUnit::kSecond:
+      return getStrTimeStampSecondsScaled(tstamp);
+    case hdk::ir::TimeUnit::kMilli:
+      return getStrTimeStampSecondsScaled(tstamp, kMilliSecsPerSec);
+    case hdk::ir::TimeUnit::kMicro:
+      return getStrTimeStampSecondsScaled(tstamp, kMicroSecsPerSec);
+    case hdk::ir::TimeUnit::kNano:
+      return getStrTimeStampSecondsScaled(tstamp, kNanoSecsPerSec);
+    case hdk::ir::TimeUnit::kMonth:
+      return getStrMonthFromSeconds(tstamp);
+    case hdk::ir::TimeUnit::kDay:
+      return getStrDayFromSeconds(tstamp);
+  }
 }

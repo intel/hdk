@@ -19,7 +19,7 @@
 
 #include <cstdint>
 #include <ctime>
-
+#include <string>
 #include "IR/DateTimeEnums.h"
 #include "Shared/funcannotations.h"
 
@@ -73,6 +73,13 @@ constexpr unsigned MARJAN = 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31;
 constexpr unsigned JANMAR = 31 + 28;  // leap day handled separately
 
 DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t timeval);
+std::string getStrDayFromSeconds(const int64_t seconds_tstamp);
+std::string getStrMonthFromSeconds(const int64_t seconds_tstamp);
+std::string getStrYearFromSeconds(const int64_t seconds_tstamp);
+std::string getStrDateFromSeconds(const int64_t seconds_tstamp);
+std::string getStrTimeFromSeconds(const int64_t seconds_tstamp);
+std::string getStrTimeStampSecondsScaled(const int64_t tstamp, const int64_t seconds_scale = 1);
+std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit field);
 
 // Return floor(dividend / divisor).
 // Assumes 0 < divisor.
