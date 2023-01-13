@@ -314,10 +314,10 @@ class Project : public Node {
  public:
   // Takes memory ownership of the expressions.
   Project(ExprPtrVector exprs,
-          const std::vector<std::string>& fields,
+          std::vector<std::string> fields,
           std::shared_ptr<const Node> input)
       : exprs_(std::move(exprs))
-      , fields_(fields)
+      , fields_(std::move(fields))
       , hint_applied_(false)
       , hints_(std::make_unique<Hints>()) {
     inputs_.push_back(input);
@@ -353,7 +353,7 @@ class Project : public Node {
   const ExprPtrVector& getExprs() const { return exprs_; }
 
   const std::vector<std::string>& getFields() const { return fields_; }
-  void setFields(std::vector<std::string>&& fields) { fields_ = std::move(fields); }
+  void setFields(std::vector<std::string> fields) { fields_ = std::move(fields); }
 
   const std::string getFieldName(const size_t i) const {
     CHECK_LT(i, fields_.size());
@@ -434,14 +434,14 @@ class Aggregate : public Node {
   // Takes ownership of the aggregate expressions.
   Aggregate(const size_t groupby_count,
             ExprPtrVector aggs,
-            const std::vector<std::string>& fields,
+            std::vector<std::string> fields,
             std::shared_ptr<const Node> input)
       : groupby_count_(groupby_count)
-      , aggs_(aggs)
-      , fields_(fields)
+      , aggs_(std::move(aggs))
+      , fields_(std::move(fields))
       , hint_applied_(false)
       , hints_(std::make_unique<Hints>()) {
-    inputs_.push_back(input);
+    inputs_.emplace_back(std::move(input));
   }
 
   Aggregate(Aggregate const&);
@@ -453,9 +453,7 @@ class Aggregate : public Node {
   const size_t getAggsCount() const { return aggs_.size(); }
 
   const std::vector<std::string>& getFields() const { return fields_; }
-  void setFields(std::vector<std::string>&& new_fields) {
-    fields_ = std::move(new_fields);
-  }
+  void setFields(std::vector<std::string> new_fields) { fields_ = std::move(new_fields); }
 
   const std::string getFieldName(const size_t i) const {
     CHECK_LT(i, fields_.size());
@@ -550,8 +548,8 @@ class Join : public Node {
       , join_type_(join_type)
       , hint_applied_(false)
       , hints_(std::make_unique<Hints>()) {
-    inputs_.push_back(lhs);
-    inputs_.push_back(rhs);
+    inputs_.emplace_back(std::move(lhs));
+    inputs_.emplace_back(std::move(rhs));
   }
 
   Join(Join const&);
@@ -744,7 +742,7 @@ class Filter : public Node {
   Filter(ExprPtr condition, std::shared_ptr<const Node> input)
       : condition_(std::move(condition)) {
     CHECK(condition_);
-    inputs_.push_back(input);
+    inputs_.emplace_back(std::move(input));
   }
 
   // for dummy filter node for data recycler
@@ -939,12 +937,15 @@ class Compound : public Node {
 
 class Sort : public Node {
  public:
-  Sort(const std::vector<SortField>& collation,
+  Sort(std::vector<SortField> collation,
        const size_t limit,
        const size_t offset,
        std::shared_ptr<const Node> input)
-      : collation_(collation), limit_(limit), offset_(offset), empty_result_(false) {
-    inputs_.push_back(input);
+      : collation_(std::move(collation))
+      , limit_(limit)
+      , offset_(offset)
+      , empty_result_(false) {
+    inputs_.emplace_back(std::move(input));
   }
 
   bool operator==(const Sort& that) const {
@@ -959,7 +960,7 @@ class Sort : public Node {
     return collation_[i];
   }
 
-  void setCollation(std::vector<SortField>&& collation) {
+  void setCollation(std::vector<SortField> collation) {
     collation_ = std::move(collation);
   }
 
@@ -1033,8 +1034,8 @@ class TableFunction : public Node {
       : Node(std::move(inputs))
       , function_name_(function_name)
       , fields_(std::move(fields))
-      , col_input_exprs_(col_input_exprs)
-      , table_func_input_exprs_(table_func_input_exprs)
+      , col_input_exprs_(std::move(col_input_exprs))
+      , table_func_input_exprs_(std::move(table_func_input_exprs))
       , tuple_type_(std::move(tuple_type)) {}
 
   TableFunction(TableFunction const&);
@@ -1118,9 +1119,8 @@ class TableFunction : public Node {
 
 class LogicalValues : public Node {
  public:
-  LogicalValues(const std::vector<TargetMetaInfo>& tuple_type,
-                std::vector<ExprPtrVector> values)
-      : tuple_type_(tuple_type), values_(std::move(values)) {}
+  LogicalValues(std::vector<TargetMetaInfo> tuple_type, std::vector<ExprPtrVector> values)
+      : tuple_type_(std::move(tuple_type)), values_(std::move(values)) {}
 
   LogicalValues(LogicalValues const&);
 
