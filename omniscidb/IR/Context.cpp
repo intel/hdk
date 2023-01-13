@@ -442,17 +442,6 @@ class ContextImpl {
       return extDict(elem_type, dict_id, size);
     }
 
-    // Datetime types
-    // date - date64[m|d|s|ms|us|ns]
-    // time
-    // timestamp - no size
-    // interval
-
-    // Types with subtypes
-    // array fix len - array(SUBTYPEx123
-    // array varlen - array32(SUBTYPE))
-    // dict - dict64(subtype)[dict_id]
-
     throw InvalidTypeError() << "Invalid type string: " << val;
   }
 
