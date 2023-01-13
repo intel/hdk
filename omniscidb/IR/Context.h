@@ -83,7 +83,7 @@ class Context {
   // Return the same type but attached to this context.
   const Type* copyType(const Type* type);
 
-  const Type* typeFromString(const std::string &val);
+  const Type* typeFromString(const std::string& val);
 
   static Context& defaultCtx();
 
