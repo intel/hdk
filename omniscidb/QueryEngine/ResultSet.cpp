@@ -24,11 +24,11 @@
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "Execute.h"
+#include "ExtractFromTime.h"
 #include "GpuMemUtils.h"
 #include "InPlaceSort.h"
 #include "OutputBufferInitialization.h"
 #include "RuntimeFunctions.h"
-#include "ExtractFromTime.h"
 #include "Shared/InlineNullValues.h"
 #include "Shared/Intervals.h"
 #include "Shared/SqlTypesLayout.h"
@@ -193,42 +193,46 @@ ResultSet::~ResultSet() {
   }
 }
 
-std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar, const hdk::ir::Type* col_type) const{
+std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar,
+                                       const hdk::ir::Type* col_type) const {
   std::ostringstream oss;
-  if(current_scalar.type() == typeid(NullableString)){
-    if(boost::get<NullableString>(current_scalar).type() == typeid(void*)){
+  if (current_scalar.type() == typeid(NullableString)) {
+    if (boost::get<NullableString>(current_scalar).type() == typeid(void*)) {
       oss << "null";
-    }
-    else{
+    } else {
       oss << boost::get<std::string>(boost::get<NullableString>(current_scalar));
     }
-  }
-  else{
-    if(col_type->isExtDictionary()){
+  } else {
+    if (col_type->isExtDictionary()) {
       const int32_t dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       const auto sdp = getStringDictionaryProxy(dict_id);
-      oss << "idx:" << ((sdp->storageEntryCount()) ? current_scalar : "null") << ", str:" << "\"" << sdp->getString(boost::get<int64_t>(current_scalar)) << "\"";
-    }else{
-      if( (col_type->isInt64() && boost::get<int64_t>(current_scalar) == std::numeric_limits<int64_t>::min()) ||
-      (col_type->isInt32() && boost::get<int64_t>(current_scalar) == std::numeric_limits<int32_t>::min()) || 
-      (col_type->isInt16() && boost::get<int64_t>(current_scalar) == std::numeric_limits<int16_t>::min()) ||
-      (col_type->isInt8() && boost::get<int64_t>(current_scalar) == std::numeric_limits<int8_t>::min()) ||
-      (col_type->isFp32() && boost::get<float>(current_scalar) == std::numeric_limits<float>::min()) || 
-      (col_type->isFp64() && boost::get<double>(current_scalar) == std::numeric_limits<double>::min()) || 
-      (col_type->isDateTime() && boost::get<int64_t>(current_scalar) == std::numeric_limits<int64_t>::min())
-      ){
+      oss << "idx:" << ((sdp->storageEntryCount()) ? current_scalar : "null") << ", str:"
+          << "\"" << sdp->getString(boost::get<int64_t>(current_scalar)) << "\"";
+    } else {
+      if ((col_type->isInt64() &&
+           boost::get<int64_t>(current_scalar) == std::numeric_limits<int64_t>::min()) ||
+          (col_type->isInt32() &&
+           boost::get<int64_t>(current_scalar) == std::numeric_limits<int32_t>::min()) ||
+          (col_type->isInt16() &&
+           boost::get<int64_t>(current_scalar) == std::numeric_limits<int16_t>::min()) ||
+          (col_type->isInt8() &&
+           boost::get<int64_t>(current_scalar) == std::numeric_limits<int8_t>::min()) ||
+          (col_type->isFp32() &&
+           boost::get<float>(current_scalar) == std::numeric_limits<float>::min()) ||
+          (col_type->isFp64() &&
+           boost::get<double>(current_scalar) == std::numeric_limits<double>::min()) ||
+          (col_type->isDateTime() &&
+           boost::get<int64_t>(current_scalar) == std::numeric_limits<int64_t>::min())) {
         oss << "null";
       } else {
-        if(col_type->isDate()){
+        if (col_type->isDate()) {
           oss << getStrDateFromSeconds(boost::get<int64_t>(current_scalar));
-        }
-        else if(col_type->isTime()){
+        } else if (col_type->isTime()) {
           oss << getStrTimeFromSeconds(boost::get<int64_t>(current_scalar));
-        }
-        else if(col_type->isTimestamp()){
-          oss << getStrTStamp(boost::get<int64_t>(current_scalar), col_type->as<hdk::ir::DateTimeBaseType>()->unit());
-        } 
-        else{
+        } else if (col_type->isTimestamp()) {
+          oss << getStrTStamp(boost::get<int64_t>(current_scalar),
+                              col_type->as<hdk::ir::DateTimeBaseType>()->unit());
+        } else {
           oss << current_scalar;
         }
       }
@@ -241,7 +245,7 @@ std::string ResultSet::contentToString() const {
   std::ostringstream oss;
   constexpr char col_delimiter = '|';
   oss << "ColTypes:\n";
-  for(size_t col = 0; col < colCount(); col++){
+  for (size_t col = 0; col < colCount(); col++) {
     oss << colType(col)->toString() << col_delimiter;
   }
   oss << "\nData:\n";
@@ -249,27 +253,19 @@ std::string ResultSet::contentToString() const {
     const auto row = getNextRow(false, false);
     if (row.empty()) {
       break;
-    }
-    else
-    {
-      for(size_t col_idx = 0; col_idx < row.size(); col_idx++)
-      {
-        if(row[col_idx].type() == typeid(ScalarTargetValue))
-        {
+    } else {
+      for (size_t col_idx = 0; col_idx < row.size(); col_idx++) {
+        if (row[col_idx].type() == typeid(ScalarTargetValue)) {
           const auto scalar_col_val = boost::get<ScalarTargetValue>(row[col_idx]);
           oss << getStrScalarVal(scalar_col_val, colType(col_idx));
-        }
-        else
-        {
+        } else {
           const auto array_col_val = boost::get<ArrayTargetValue>(&row[col_idx]);
           if (!array_col_val->is_initialized()) {
             oss << "null";
-          }
-          else
-          {
+          } else {
             const auto& scalar_vector = array_col_val->get();
             oss << "[";
-            for(const auto& scalar_val: scalar_vector){
+            for (const auto& scalar_val : scalar_vector) {
               oss << getStrScalarVal(scalar_val, colType(col_idx)) << ",";
             }
             oss << "]";

@@ -78,7 +78,8 @@ std::string getStrMonthFromSeconds(const int64_t seconds_tstamp);
 std::string getStrYearFromSeconds(const int64_t seconds_tstamp);
 std::string getStrDateFromSeconds(const int64_t seconds_tstamp);
 std::string getStrTimeFromSeconds(const int64_t seconds_tstamp);
-std::string getStrTimeStampSecondsScaled(const int64_t tstamp, const int64_t seconds_scale = 1);
+std::string getStrTimeStampSecondsScaled(const int64_t tstamp,
+                                         const int64_t seconds_scale = 1);
 std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit field);
 
 // Return floor(dividend / divisor).

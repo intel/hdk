@@ -21,9 +21,9 @@
 
 #include "ExtractFromTime.h"
 
-#include <sstream>
-#include <iomanip>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 #ifndef __CUDACC__
 #include <cstdlib>  // abort()
@@ -317,51 +317,53 @@ DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t ti
 #endif
 }
 
-
-std::string getStrDayFromSeconds(const int64_t seconds_tstamp){
+std::string getStrDayFromSeconds(const int64_t seconds_tstamp) {
   std::ostringstream oss;
   oss << std::setfill('0') << std::setw(2) << extract_day(seconds_tstamp);
   return oss.str();
 }
 
-std::string getStrMonthFromSeconds(const int64_t seconds_tstamp){
+std::string getStrMonthFromSeconds(const int64_t seconds_tstamp) {
   std::ostringstream oss;
   oss << std::setfill('0') << std::setw(2) << extract_month_fast(seconds_tstamp);
   return oss.str();
 }
 
-std::string getStrYearFromSeconds(const int64_t seconds_tstamp){
+std::string getStrYearFromSeconds(const int64_t seconds_tstamp) {
   std::ostringstream oss;
   oss << std::setfill('0') << std::setw(2) << extract_year_fast(seconds_tstamp);
   return oss.str();
 }
 
-std::string getStrDateFromSeconds(const int64_t seconds_tstamp){
+std::string getStrDateFromSeconds(const int64_t seconds_tstamp) {
   std::ostringstream oss;
-  oss << getStrYearFromSeconds(seconds_tstamp) << "-" \
-  << getStrMonthFromSeconds(seconds_tstamp) << "-" \
-  << getStrDayFromSeconds(seconds_tstamp);
+  oss << getStrYearFromSeconds(seconds_tstamp) << "-"
+      << getStrMonthFromSeconds(seconds_tstamp) << "-"
+      << getStrDayFromSeconds(seconds_tstamp);
   return oss.str();
 }
 
-std::string getStrTimeFromSeconds(const int64_t seconds_tstamp){
+std::string getStrTimeFromSeconds(const int64_t seconds_tstamp) {
   std::ostringstream oss;
-  oss << std::setfill('0') << std::setw(2) << extract_hour(seconds_tstamp) << ":" \
-  << std::setfill('0') << std::setw(2) << extract_minute(seconds_tstamp) << ":" \
-  << std::setfill('0') << std::setw(2) << extract_second(seconds_tstamp);
+  oss << std::setfill('0') << std::setw(2) << extract_hour(seconds_tstamp) << ":"
+      << std::setfill('0') << std::setw(2) << extract_minute(seconds_tstamp) << ":"
+      << std::setfill('0') << std::setw(2) << extract_second(seconds_tstamp);
   return oss.str();
 }
 
-std::string getStrTimeStampSecondsScaled(const int64_t tstamp, const int64_t seconds_scale){
+std::string getStrTimeStampSecondsScaled(const int64_t tstamp,
+                                         const int64_t seconds_scale) {
   std::ostringstream oss;
-  oss << getStrDateFromSeconds(tstamp / seconds_scale) << " " << getStrTimeFromSeconds(tstamp / seconds_scale);
-  if(seconds_scale > 1){
-    oss << "." << std::setfill('0') << std::setw(log10(seconds_scale)) << tstamp % seconds_scale;
+  oss << getStrDateFromSeconds(tstamp / seconds_scale) << " "
+      << getStrTimeFromSeconds(tstamp / seconds_scale);
+  if (seconds_scale > 1) {
+    oss << "." << std::setfill('0') << std::setw(log10(seconds_scale))
+        << tstamp % seconds_scale;
   }
   return oss.str();
 }
 
-std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit){
+std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit) {
   switch (unit) {
     case hdk::ir::TimeUnit::kSecond:
       return getStrTimeStampSecondsScaled(tstamp);

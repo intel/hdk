@@ -138,10 +138,8 @@ class ArrowResultSet {
   size_t colCount() const;
 
   const hdk::ir::Type* colType(size_t col_idx) const;
-  
-  std::string toString() const{
-    return record_batch_->ToString();
-  }
+
+  std::string toString() const { return record_batch_->ToString(); }
   bool definitelyHasNoRows() const;
 
   size_t rowCount() const;
