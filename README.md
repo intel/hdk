@@ -18,35 +18,35 @@ We are committed to supporting a baseline set of functionality on all x86 CPUs, 
 
 `ArrowStorage` is currently the default (and only available) HDK storage layer. `ArrowStorage` provides storage support for [Apache Arrow](https://github.com/apache/arrow) format data. The storage layer must be explicitly initialized:
 
-```
+```python
 import pyhdk
 storage = pyhdk.storage.ArrowStorage(1)
 ```
 
-The parameter applied to the `ArrowStorage` constructor is the database ID. The database ID allows storage instances to be kept logically separate.
+The parameter applied to the `ArrowStorage` constructor is the database ID. The database ID allows storage instances to *be* kept logically separate.
 
 `ArrowStorage` automatically converts Arrow format datatypes to `omniscidb` datatypes. Some variable length types are not yet supported, but scalar types are available. `pyarrow` can be used to convert Pandas DataFrames to Arrow:
 
-```
-       at = pyarrow.Table.from_pandas(
-            pandas.DataFrame({"a": [1, 2, 3], "b": [10, 20, 30]})
-        )
+```python
+at = pyarrow.Table.from_pandas(
+    pandas.DataFrame({"a": [1, 2, 3], "b": [10, 20, 30]})
+)
 ```
 
 The arrow table can then be imported using the Arrow storage interface.
 
-```
-        opt = pyhdk.storage.TableOptions(2)
-        storage.importArrowTable(at, "test", opt)
+```python
+opt = pyhdk.storage.TableOptions(2)
+storage.importArrowTable(at, "test", opt)
 ```
 
 ### Data Manager
 
 The Data Manager controls the storage and in-memory buffer pools for all queries. Storage engines must be registered with the data manager:
 
-```
-        data_mgr = pyhdk.storage.DataMgr()
-        data_mgr.registerDataProvider(storage)
+```python
+data_mgr = pyhdk.storage.DataMgr()
+data_mgr.registerDataProvider(storage)
 ```
 
 ### Query Execution
@@ -59,57 +59,119 @@ Three high level components are required to execute a query:
 
 The complete flow is as follows:
 
-```
-        calcite = pyhdk.sql.Calcite(storage)
-        executor = pyhdk.Executor(data_mgr)
-        ra = calcite.process("SELECT * FROM t;")
-        rel_alg_executor = pyhdk.sql.RelAlgExecutor(
-            executor, storage, data_mgr, ra
-        )
-        res = rel_alg_executor.execute()
+```python
+calcite = pyhdk.sql.Calcite(storage)
+executor = pyhdk.Executor(data_mgr)
+ra = calcite.process("SELECT * FROM t;")
+rel_alg_executor = pyhdk.sql.RelAlgExecutor(
+    executor, storage, data_mgr, ra
+)
+res = rel_alg_executor.execute()
 ```
 
 Calcite reads the schema information from storage, and the Executor stores a reference to Data Manager for buffer/storage access during a query. 
 
 The return from RelAlgExecutor is a ResultSet object which can be converted to Arrow and to pandas:
-```
-     df = res.to_arrow().to_pandas()
+```python
+df = res.to_arrow().to_pandas()
 ```
 
 ## Examples
 
 Standalone examples are available in the `examples` directory. Most examples run via Jupyter notebooks. 
 
+
 ## Build
-
-HDK includes components from external libraries as submodules. To clone the project, either use `git clone --recurse-submodules` to initially clone the repo, or clone without using flags and then run:
-
-```
-git submodule init
-git submodule update
-```
-
-When pulling changes from upstream, be sure to update submodule references using `git submodule update`.
-
-If using a Conda enviornment, run the following to build and install HDK:
-
-```
-mkdir build
-cd build
-cmake -DENABLE_CONDA=on ..
-make -j
-make install
-```
 
 ### Dependencies 
 
-Conda environments are used for HDK development. Use the yaml file in `scripts/conda`:
+Miniconda installation required. (Anaconda may produce build issues.) Use one of this [miniconda installers](https://docs.conda.io/en/latest/miniconda.html).
 
+Conda environments are used for HDK development. Use the yaml file in `omniscidb/scripts/`:
+
+```bash
+conda env create -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+conda activate omnisci-dev
 ```
-     conda env create -f scripts/conda/hdk-conda-dev-env.yml
-     conda activate hdk-dev
+
+### Compilation
+
+If using a Conda enviornment, run the following to build and install HDK:
+
+```bash
+mkdir build && cd build
+cmake ..
+make -j 
+make install
 ```
+
+By default CUDA support disabled.
+
+To verify check `python -c 'import pyhdk'` executed without an error.
+
+#### Compilation with CUDA support
+
+##### Dependencies
+
+Install extra dependencies into existing environment or into a new one.
+
+```bash
+conda install -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda arrow-cpp=8.0=*cuda
+```
+
+##### Compilation
+
+```bash
+mkdir build && cd build
+cmake -DENABLE_CUDA=on  ..
+make -j 
+make install
+```
+
+### Issues
+
+If you meet issues during build refer to [`.github/workflows/build.yml`](.github/workflows/build.yml). This file describes compilation steps used for CI build.
+
+If you are still facing issues please create github issue. 
 
 ## Test
 
 Python tests can be run from the python source directory using `pytest`. 
+
+### HDK interface tests
+
+```bash
+pytest python/tests/*.py 
+```
+
+### Modin integration tests
+
+```bash
+pytest python/tests/modin
+```
+
+### All pytests
+```bash
+pytest python/tests/ 
+```
+
+## (Optional dependecy) Modin installation
+
+Installation into conda environment. 
+
+Clone [Modin](https://github.com/modin-project/modin). 
+
+```bash
+cd modin && pip install -e .
+```
+
+## Pytest logging 
+
+To enable logging enable with this function: 
+```python
+pyhdk.initLogger(debug_logs=True)
+```
+
+In `setup_class(..)` body.
+
+Logs are by default located at `hdk_log/` folder. 
