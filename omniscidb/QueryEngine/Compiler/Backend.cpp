@@ -966,7 +966,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   opts.setDesiredBIsRepresentation(SPIRV::BIsRepresentation::OpenCL12);
   opts.setDebugInfoEIS(SPIRV::DebugInfoEIS::OpenCL_DebugInfo_100);
 
-#if 0
+#if 1
   std::error_code ec;
   llvm::raw_fd_ostream os("gen.ll", ec);
   module->print(os, nullptr);

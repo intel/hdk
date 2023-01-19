@@ -965,6 +965,7 @@ void init_group_by_buffer_on_device(int64_t* groups_buffer,
                                     const size_t block_size_x,
                                     const size_t grid_size_x) {
   /*todo*/
+  LOG(INFO) << "Initializing group by buffers on device (" <<( keyless ? "Keyless" : "With key size " + std::to_string(key_width)) << ").";
 }
 void init_columnar_group_by_buffer_on_device(int64_t* groups_buffer,
                                              const int64_t* init_vals,
@@ -992,6 +993,7 @@ GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
     const bool can_sort_on_gpu,
     const bool output_columnar) {
 #if defined(HAVE_CUDA) || defined(HAVE_L0)
+  LOG(INFO) << "Creating group by buffers";
   if (query_mem_desc.useStreamingTopN()) {
     const auto n = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
     CHECK(!output_columnar);
@@ -1029,6 +1031,7 @@ GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
         static_cast<int64_t>(reinterpret_cast<std::uintptr_t>(varlen_output_buffer_));
     varlen_output_info_->cpu_buffer_ptr = varlen_output_buffer_host_ptr_;
   }
+  LOG(INFO) << "is lazy group init: " << query_mem_desc.lazyInitGroups(ExecutorDeviceType::GPU);
   if (query_mem_desc.lazyInitGroups(ExecutorDeviceType::GPU)) {
     const size_t step{query_mem_desc.threadsShareMemory() ? block_size_x : 1};
     size_t groups_buffer_size{query_mem_desc.getBufferSizeBytes(

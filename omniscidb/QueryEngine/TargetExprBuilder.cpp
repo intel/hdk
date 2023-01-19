@@ -319,13 +319,16 @@ void TargetExprCodegen::codegenAggregate(
     llvm::Value* agg_col_ptr{nullptr};
     const auto chosen_bytes =
         static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index));
+    LOG(INFO) << "Chosen bytes: " << chosen_bytes;
     auto chosen_type = get_compact_type(target_info);
+    LOG(INFO) << "Chosen type: " << toString(chosen_type);
     auto arg_type =
         ((arg_expr && !arg_expr->type()->isNull()) && !target_info.is_distinct)
             ? target_info.agg_arg_type
             : target_info.type;
     const bool is_fp_arg =
         !lazy_fetched && !arg_type->isNull() && arg_type->isFloatingPoint();
+    LOG(INFO) << "is group by: " << is_group_by;
     if (is_group_by) {
       agg_col_ptr = row_func_builder->codegenAggColumnPtr(output_buffer_byte_stream,
                                                           out_row_idx,
@@ -365,6 +368,7 @@ void TargetExprCodegen::codegenAggregate(
     }
 
     const bool is_simple_count_target = is_simple_count(target_info);
+    LOG(INFO) << "is_simple_count_target: " << is_simple_count_target;
     llvm::Value* str_target_lv{nullptr};
     if (target_lvs.size() == 3) {
       // none encoding string
@@ -404,6 +408,7 @@ void TargetExprCodegen::codegenAggregate(
       agg_fname += "_int8";
     }
 
+    LOG(INFO) << "is_distinct_target: " << is_distinct_target(target_info);
     if (is_distinct_target(target_info)) {
       CHECK_EQ(agg_chosen_bytes, sizeof(int64_t));
       CHECK(!chosen_type->isFloatingPoint());
@@ -434,6 +439,7 @@ void TargetExprCodegen::codegenAggregate(
             executor->cgen_state_->castToTypeIn(null_in_lv, (agg_chosen_bytes << 3));
         agg_args.push_back(null_lv);
       }
+      LOG(INFO) << "!target_info.is_distinct: " << !target_info.is_distinct;
       if (!target_info.is_distinct) {
 #warning "Shared functions temporarily disabled for L0"
 #ifndef HAVE_L0

@@ -262,7 +262,9 @@ int main(int argc, char** argv) {
   TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
 
-  init();
+  auto config = std::make_shared<Config>();
+  config->exec.heterogeneous.allow_cpu_retry = false;
+  init(config);
 
   int err{0};
   try {

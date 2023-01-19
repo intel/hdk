@@ -1646,6 +1646,11 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                                                  *query_mem_desc,
                                                  getConfig().exec.group_by.bigint_count);
 
+  LOG(INFO) << "init_agg_vals (size=" <<plan_state_->init_agg_vals_.size() << "): ";
+  for(auto& x: plan_state_->init_agg_vals_) {
+    LOG(INFO) << " " << x;
+  }
+
   /*
    * If we have decided to use GPU shared memory (decision is not made here), then
    * we generate proper code for extra components that it needs (buffer initialization

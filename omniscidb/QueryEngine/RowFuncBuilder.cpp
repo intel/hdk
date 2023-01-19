@@ -846,6 +846,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     const size_t target_idx) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   llvm::Value* agg_col_ptr{nullptr};
+  LOG(INFO) << "Did output columnar: " << query_mem_desc.didOutputColumnar();
   if (query_mem_desc.didOutputColumnar()) {
     // TODO(Saman): remove the second columnar branch, and support all query description
     // types through the first branch. Then, input arguments should also be cleaned up
@@ -892,8 +893,10 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     }
   } else {
     uint32_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
+    LOG(INFO) << "Col offset:" << col_off;
     CHECK_EQ(size_t(0), col_off % chosen_bytes);
     col_off /= chosen_bytes;
+    LOG(INFO) << "Col offset:" << col_off;
     auto* bit_cast = LL_BUILDER.CreateBitCast(
         std::get<0>(agg_out_ptr_w_idx),
         llvm::PointerType::get(

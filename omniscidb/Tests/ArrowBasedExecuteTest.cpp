@@ -17,6 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "ArrowSQLRunner/SQLiteComparator.h"
 #include "TestHelpers.h"
+#include "ArrowTestHelpers.h"
 
 #include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/Execute.h"
@@ -2021,6 +2022,83 @@ TEST_F(Select, NullGroupBy) {
     run_simple_agg("SELECT val FROM table_null_group_by GROUP BY val;", dt);
     dropTable("table_null_group_by");
   }
+}
+
+TEST_F(Select, igpCPU) {
+    c("SELECT COUNT(*) FROM test;", ExecutorDeviceType::CPU);
+}
+
+TEST_F(Select, igpGPU) {
+    c("SELECT COUNT(*) FROM test;", ExecutorDeviceType::GPU);
+}
+
+TEST_F(Select, SimpleQ2) {
+  auto dt = ExecutorDeviceType::GPU;
+  createTable("YO", {{"x", ctx().int64()}});
+  for(int i = 1; i <=9; i++) {
+    insertCsvValues("YO", std::to_string(i));
+  }
+  auto cnt = v<int64_t>(run_simple_agg("SELECT count(x) FROM YO;", dt));
+  ASSERT_EQ(9, cnt);
+  auto sum = v<int64_t>(run_simple_agg("SELECT SUM(x) FROM YO;", dt));
+  ASSERT_EQ(1+2+3+4+5+6+7+8+9, sum);
+  auto avg = v<double>(run_simple_agg("SELECT AVG(x) FROM YO;", dt));
+  ASSERT_LT((1+2+3+4+5+6+7+8+9)/9 - sum, 0.001);
+  for(int i = 1; i <=9; i++) {
+    insertCsvValues("YO", std::to_string(i));
+  }
+  auto cntx2 = v<int64_t>(run_simple_agg("SELECT count(x) FROM YO;", dt));
+  ASSERT_EQ(9*2, cntx2);
+  auto sumx2 = v<int64_t>(run_simple_agg("SELECT SUM(x) FROM YO;", dt));
+  ASSERT_EQ((1+2+3+4+5+6+7+8+9)*2, sumx2);
+}
+
+TEST_F(Select, SimpleAgg) {
+  auto dt = ExecutorDeviceType::GPU;
+  createTable("YO", {{"x", ctx().int32()}, {"y", ctx().int32()}});
+  for(int i = 1; i <=4; i++) {
+    insertCsvValues("YO", std::to_string(i) + "," + std::to_string(i%2));
+  }
+  // auto cnt = v<int64_t>(run_simple_agg("SELECT count(*) FROM YO;", dt));
+  // ASSERT_EQ(4, cnt);
+  auto cnt2 = v<int64_t>(run_simple_agg("SELECT count(x) FROM YO;", dt));
+  ASSERT_EQ(4, cnt2);
+}
+
+TEST_F(Select, SimpleQ2GroupBy) {
+  auto dt = ExecutorDeviceType::GPU;
+  createTable("YO", {{"x", ctx().int64()}, {"y", ctx().int64()}});
+  for(int i = 1; i <=9; i++) {
+    insertCsvValues("YO", std::to_string(i) + "," + std::to_string(i%2));
+  }
+  // auto cnt = v<int64_t>(run_simple_agg("SELECT count(*) FROM YO;", dt));
+  // ASSERT_EQ(9, cnt);
+  // auto cntgb = runSqlQuery("SELECT count(*) FROM YO GROUP BY y;", dt, true);
+  // ArrowTestHelpers::compare_res_data(cntgb, std::vector<int32_t>({4, 5}));
+
+  // auto cntgb = runSqlQuery("SELECT count(*) FROM YO GROUP BY y;", dt, true);
+  // ArrowTestHelpers::compare_res_data(cntgb, std::vector<int32_t>({4, 5}));
+
+  auto cntgbx = runSqlQuery("SELECT count(x) FROM YO GROUP BY y;", dt, true);
+  ArrowTestHelpers::compare_res_data(cntgbx, std::vector<int32_t>({4, 5}));
+}
+
+TEST_F(Select, SimpleQ2GroupBy2) {
+  auto dt = ExecutorDeviceType::GPU;
+  createTable("YO", {{"x", ctx().int64()}, {"y", ctx().int64()}});
+  for(int i = 1; i <=9; i++) {
+    insertCsvValues("YO", std::to_string(i) + "," + std::to_string(i%2));
+  }
+  auto cnt = v<int64_t>(run_simple_agg("SELECT count(*) FROM YO;", dt));
+  ASSERT_EQ(9, cnt);
+  auto cntgb = runSqlQuery("SELECT count(*) FROM YO GROUP BY y;", dt, true);
+  ArrowTestHelpers::compare_res_data(cntgb, std::vector<int32_t>({4, 5}));
+
+  auto cntgb2 = runSqlQuery("SELECT count(*) FROM YO GROUP BY y;", dt, true);
+  ArrowTestHelpers::compare_res_data(cntgb2, std::vector<int32_t>({4, 5}));
+
+  auto cntgbx = runSqlQuery("SELECT count(x) FROM YO GROUP BY y;", dt, true);
+  ArrowTestHelpers::compare_res_data(cntgbx, std::vector<int32_t>({4, 5}));
 }
 
 TEST_F(Select, FilterAndSimpleAggregation) {
@@ -18041,6 +18119,7 @@ int main(int argc, char** argv) {
 
   config->exec.window_func.enable = true;
   config->exec.enable_interop = false;
+  config->exec.heterogeneous.allow_cpu_retry = false;
 
   init(config);
 

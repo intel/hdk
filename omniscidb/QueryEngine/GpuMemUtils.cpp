@@ -75,6 +75,7 @@ GpuGroupByBuffers create_dev_group_by_buffers(
     const bool use_bump_allocator,
     const bool has_varlen_output,
     Allocator* insitu_allocator) {
+  LOG(INFO) << "Group by empty: " << group_by_buffers.empty();
   if (group_by_buffers.empty() && !insitu_allocator) {
     return {0, 0, 0, 0};
   }
@@ -85,6 +86,7 @@ GpuGroupByBuffers create_dev_group_by_buffers(
   size_t mem_size{0};
   size_t entry_count{0};
 
+  LOG(INFO) << "Has bump allocator: " << use_bump_allocator;
   if (use_bump_allocator) {
     CHECK(!prepend_index_buffer);
     CHECK(!insitu_allocator);

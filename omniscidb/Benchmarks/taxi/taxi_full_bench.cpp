@@ -337,6 +337,7 @@ int main(int argc, char* argv[]) {
   }
 
   logger::init(log_options);
+  config->exec.heterogeneous.allow_cpu_retry = false;
   init(config);
 
   try {
