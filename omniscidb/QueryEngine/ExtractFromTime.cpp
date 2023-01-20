@@ -363,6 +363,7 @@ std::string getStrTimeStampSecondsScaled(const int64_t tstamp,
   return oss.str();
 }
 
+#ifndef __CUDACC__
 std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit) {
   switch (unit) {
     case hdk::ir::TimeUnit::kSecond:
@@ -379,3 +380,4 @@ std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit) {
       return getStrDayFromSeconds(tstamp);
   }
 }
+#endif
