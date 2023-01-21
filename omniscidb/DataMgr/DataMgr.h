@@ -58,6 +58,8 @@ struct DictDescriptor;
 
 namespace Data_Namespace {
 
+class ArenaBufferMgr;
+
 //! Parse /proc/meminfo into key/value pairs.
 class ProcMeminfoParser {
   std::unordered_map<std::string, size_t> items_;
@@ -146,21 +148,11 @@ class ProcBuddyinfoParser {
     fragmentationPercent_ = (scaled * 100) / total;
   }
 
-  auto operator[](size_t order) {
-    return orders_[order];
-  }
-  auto begin() {
-    return orders_.begin();
-  }
-  auto end() {
-    return orders_.end();
-  }
-  auto getFragmentationPercent() {
-    return fragmentationPercent_;
-  }
-  auto getInputText() {
-    return inputText_;
-  }
+  auto operator[](size_t order) { return orders_[order]; }
+  auto begin() { return orders_.begin(); }
+  auto end() { return orders_.end(); }
+  auto getFragmentationPercent() { return fragmentationPercent_; }
+  auto getInputText() { return inputText_; }
 };
 
 class DataMgr {
@@ -238,6 +230,13 @@ class DataMgr {
 
   DataProvider* getDataProvider() const { return data_provider_.get(); }
 
+  bool useArenaBufferMgr() const {
+    // TODO: Flag
+    return true;
+  }
+
+  AbstractBuffer* getChunkBufferFromArena(const ChunkKey& key, const size_t numBytes = 0);
+
  private:
   void populateDeviceMgrs(const Config& config,
                           const SystemParameters& system_parameters);
@@ -255,6 +254,7 @@ class DataMgr {
                             const std::vector<size_t>& cpu_tier_sizes);
 
   std::vector<std::vector<AbstractBufferMgr*>> bufferMgrs_;
+  std::unique_ptr<ArenaBufferMgr> arena_buffer_mgr_;
   GpuMgr* gpuMgrContext_;
   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpuMgrs_;
   bool hasGpus_;

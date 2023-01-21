@@ -20,11 +20,14 @@
  */
 
 #include "DataMgr/DataMgr.h"
+#include "ArenaBufferMgr/ArenaBufferMgr.h"
 #include "BufferMgr/CpuBufferMgr/CpuBufferMgr.h"
 #include "BufferMgr/CpuBufferMgr/TieredCpuBufferMgr.h"
 #include "BufferMgr/GpuBufferMgr/GpuBufferMgr.h"
 #include "CudaMgr/CudaMgr.h"
 #include "PersistentStorageMgr/PersistentStorageMgr.h"
+
+#include "DataMgr/ArenaBufferMgr/ArenaBuffer.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -167,6 +170,12 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
                                                                 page_size,
                                                                 bufferMgrs_[0][0]));
   }
+}
+
+AbstractBuffer* DataMgr::getChunkBufferFromArena(const ChunkKey& key,
+                                                 const size_t num_bytes) {
+  CHECK(arena_buffer_mgr_);
+  return arena_buffer_mgr_->getChunkBuffer(key, num_bytes);
 }
 
 void DataMgr::populateDeviceMgrs(const Config& config,
@@ -321,6 +330,10 @@ void DataMgr::populateMgrs(const Config& config,
                          cpu_tier_sizes);
     levelSizes_.push_back(1);  // levelSizes_[CPU_LEVEL] = 1
   }
+
+  // TODO: init with flag
+  arena_buffer_mgr_ =
+      std::make_unique<ArenaBufferMgr>(/*storage_mgr=*/bufferMgrs_[0].front());
 }
 
 void DataMgr::convertDB(const std::string basePath) {

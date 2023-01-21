@@ -62,37 +62,41 @@ void Chunk::getChunkBuffer(DataMgr* data_mgr,
                            const int device_id,
                            const size_t num_bytes,
                            const size_t num_elems) {
-  if (column_info_->type->isVarLen()) {
-    ChunkKey subKey = key;
-    subKey.push_back(1);  // 1 for the main buffer_
-    buffer_ = data_mgr->getChunkBuffer(subKey, mem_level, device_id, num_bytes);
-    subKey.pop_back();
-    subKey.push_back(2);  // 2 for the index buffer_
-    index_buf_ = data_mgr->getChunkBuffer(
-        subKey,
-        mem_level,
-        device_id,
-        (num_elems + 1) * sizeof(StringOffsetT));  // always record n+1 offsets so string
-                                                   // length can be calculated
-    switch (column_info_->type->id()) {
-      case hdk::ir::Type::kVarLenArray: {
-        auto array_encoder = dynamic_cast<ArrayNoneEncoder*>(buffer_->getEncoder());
-        CHECK(array_encoder);
-        array_encoder->setIndexBuffer(index_buf_);
-        break;
-      }
-      case hdk::ir::Type::kText:
-      case hdk::ir::Type::kVarChar: {
-        auto str_encoder = dynamic_cast<StringNoneEncoder*>(buffer_->getEncoder());
-        CHECK(str_encoder);
-        str_encoder->setIndexBuffer(index_buf_);
-        break;
-      }
-      default:
-        UNREACHABLE();
-    }
+  if (data_mgr->useArenaBufferMgr()) {
+    buffer_ = data_mgr->getChunkBufferFromArena(key, num_bytes);
   } else {
-    buffer_ = data_mgr->getChunkBuffer(key, mem_level, device_id, num_bytes);
+    if (column_info_->type->isVarLen()) {
+      ChunkKey subKey = key;
+      subKey.push_back(1);  // 1 for the main buffer_
+      buffer_ = data_mgr->getChunkBuffer(subKey, mem_level, device_id, num_bytes);
+      subKey.pop_back();
+      subKey.push_back(2);  // 2 for the index buffer_
+      index_buf_ = data_mgr->getChunkBuffer(
+          subKey,
+          mem_level,
+          device_id,
+          (num_elems + 1) * sizeof(StringOffsetT));  // always record n+1 offsets so
+                                                     // string length can be calculated
+      switch (column_info_->type->id()) {
+        case hdk::ir::Type::kVarLenArray: {
+          auto array_encoder = dynamic_cast<ArrayNoneEncoder*>(buffer_->getEncoder());
+          CHECK(array_encoder);
+          array_encoder->setIndexBuffer(index_buf_);
+          break;
+        }
+        case hdk::ir::Type::kText:
+        case hdk::ir::Type::kVarChar: {
+          auto str_encoder = dynamic_cast<StringNoneEncoder*>(buffer_->getEncoder());
+          CHECK(str_encoder);
+          str_encoder->setIndexBuffer(index_buf_);
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+    } else {
+      buffer_ = data_mgr->getChunkBuffer(key, mem_level, device_id, num_bytes);
+    }
   }
 }
 
