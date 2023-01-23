@@ -1060,7 +1060,8 @@ bool QueryMemoryDescriptor::blocksShareMemory() const {
 
 bool QueryMemoryDescriptor::lazyInitGroups(const ExecutorDeviceType device_type) const {
 #ifdef HAVE_L0
-  return false; /* L0 path currently does not provide lazy group by buffers initialization */
+  return false; /* L0 path currently does not provide lazy group by buffers initialization
+                 */
 #else
   return device_type == ExecutorDeviceType::GPU &&
          countDescriptorsLogicallyEmpty(count_distinct_descriptors_);
