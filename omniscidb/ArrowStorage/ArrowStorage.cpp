@@ -852,10 +852,12 @@ void ArrowStorage::compareSchemas(std::shared_ptr<arrow::Schema> lhs,
     auto lhs_type = lhs_fields[i]->type();
     auto rhs_type = rhs_fields[i]->type();
 
-    if (!lhs_type->Equals(rhs_type)) {
-      throw std::runtime_error("Mismatched type for column "s + lhs_fields[i]->name() +
-                               ": "s + lhs_type->ToString() + " vs. "s +
-                               rhs_type->ToString());
+    if (!lhs_type->Equals(rhs_type) && !(lhs_type->id() == arrow::Type::NA) &&
+        !(rhs_type->id() == arrow::Type::NA)) {
+      throw std::runtime_error(
+          "Mismatched type for column "s + lhs_fields[i]->name() + ": "s +
+          lhs_type->ToString() + " [id: " + std::to_string(lhs_type->id()) + "] vs. "s +
+          rhs_type->ToString() + " [id: " + std::to_string(lhs_type->id()) + "]");
     }
   }
 }
