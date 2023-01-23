@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <boost/program_options.hpp>
 #include <memory>
 #include <string>
 
@@ -174,6 +175,12 @@ struct Config {
   MemoryConfig mem;
   CacheConfig cache;
   DebugConfig debug;
+
+  boost::program_options::options_description const& getOptions() const;
+  void setOptions();
+
+ private:
+  std::unique_ptr<boost::program_options::options_description> options_;
 };
 
 using ConfigPtr = std::shared_ptr<Config>;
