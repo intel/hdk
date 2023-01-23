@@ -1847,11 +1847,12 @@ TemporaryTable Executor::executeWorkUnitImpl(
   INJECT_TIMER(Exec_executeWorkUnit);
   std::unique_ptr<policy::ExecutionPolicy> exe_policy;
   const auto device_type = getDeviceTypeForTargets(ra_exe_unit, co.device_type);
+  LOG(DEBUG1) << "Device type for targets: " << device_type;
   CHECK(!query_infos.empty());
   if (!max_groups_buffer_entry_guess) {
-    // The query has failed the first execution attempt because of running out
-    // of group by slots. Make the conservative choice: allocate fragment size
-    // slots and run on the CPU.
+    LOG(DEBUG1) << "The query has failed the first execution attempt because of running "
+                   "out of group by slots. Make the conservative choice: allocate "
+                   "fragment size slots and run on the CPU.";
     CHECK(device_type == ExecutorDeviceType::CPU);
     max_groups_buffer_entry_guess = compute_buffer_entry_guess(query_infos);
     exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
@@ -2209,14 +2210,16 @@ ExecutorDeviceType Executor::getDeviceTypeForTargets(
     const auto agg_info =
         get_target_info(target_expr, getConfig().exec.group_by.bigint_count);
     if (!ra_exe_unit.groupby_exprs.empty() &&
-        !isArchPascalOrLater(requested_device_type)) {
+        !deviceSupportsFP64(requested_device_type)) {
       if ((agg_info.agg_kind == hdk::ir::AggType::kAvg ||
            agg_info.agg_kind == hdk::ir::AggType::kSum) &&
           agg_info.agg_arg_type->isFp64()) {
+        LOG(DEBUG1) << "Falling back to CPU for AVG or SUM of DOUBLE";
         return ExecutorDeviceType::CPU;
       }
     }
     if (dynamic_cast<const hdk::ir::RegexpExpr*>(target_expr)) {
+      LOG(DEBUG1) << "Falling back to CPU for REGEXP";
       return ExecutorDeviceType::CPU;
     }
   }
