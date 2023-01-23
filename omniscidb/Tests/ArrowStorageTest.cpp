@@ -270,7 +270,7 @@ void checkChunkData(ArrowStorage& storage,
   auto max =
       std::accumulate(expected_chunk.begin(),
                       expected_chunk.end(),
-                      std::numeric_limits<T>::min(),
+                      std::numeric_limits<T>::lowest(),
                       [](T max, T val) -> T {
                         return val == inline_null_value<T>() ? max : std::max(max, val);
                       });
@@ -827,6 +827,33 @@ TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_Numbers_NoHeader) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
   Test_ImportCsv_Numbers("numbers_noheader.csv", parse_options, false);
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Header) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 32'000'000;
+  ArrowStorage::CsvParseOptions parse_options;
+  TableInfoPtr tinfo = storage.importCsvFile(
+      getFilePath("nulls_header.csv"), "table1", table_options, parse_options);
+  std::vector<double> col1(9, inline_null_value<double>());
+  checkData(
+      storage, tinfo->table_id, 9, table_options.fragment_size, col1, range(9, 10.0));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_Header) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 32'000'000;
+  ArrowStorage::CsvParseOptions parse_options;
+  TableInfoPtr tinfo = storage.importCsvFile(getFilePath("nulls_header.csv"),
+                                             "table1",
+                                             {{"col1", ctx.fp32()}, {"col2", ctx.fp32()}},
+                                             table_options,
+                                             parse_options);
+  std::vector<float> col1(9, inline_null_value<float>());
+  checkData(
+      storage, tinfo->table_id, 9, table_options.fragment_size, col1, range(9, 10.0f));
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_DateTime) {

@@ -103,9 +103,7 @@ void copyArrayDataReplacingNulls(T* dst,
                                  std::shared_ptr<arrow::Array> arr,
                                  size_t offs,
                                  size_t length) {
-  auto src = reinterpret_cast<const T*>(arr->data()->buffers[1]->data());
   auto null_value = inline_null_value<T>();
-
   if (arr->null_count() == arr->length()) {
     if constexpr (std::is_same_v<T, bool>) {
       std::fill(reinterpret_cast<int8_t*>(dst),
@@ -114,7 +112,11 @@ void copyArrayDataReplacingNulls(T* dst,
     } else {
       std::fill(dst, dst + length, null_value);
     }
-  } else if (arr->null_count() == 0) {
+    return;
+  }
+
+  auto src = reinterpret_cast<const T*>(arr->data()->buffers[1]->data());
+  if (arr->null_count() == 0) {
     if constexpr (std::is_same_v<T, bool>) {
       convertBoolBitmapBufferWithoutNulls(reinterpret_cast<int8_t*>(dst),
                                           reinterpret_cast<const uint8_t*>(src),
@@ -123,45 +125,46 @@ void copyArrayDataReplacingNulls(T* dst,
     } else {
       std::copy(src + offs, src + offs + length, dst);
     }
-  } else {
-    const uint8_t* bitmap_data = arr->null_bitmap_data();
-    if constexpr (std::is_same_v<T, bool>) {
-      convertBoolBitmapBufferWithNulls(reinterpret_cast<int8_t*>(dst),
-                                       reinterpret_cast<const uint8_t*>(src),
-                                       bitmap_data,
-                                       offs,
-                                       length,
-                                       null_value);
-    } else {
-      size_t start_full_byte = (offs + 7) / 8;
-      size_t end_full_byte = (offs + length) / 8;
-      size_t head_bits = (offs % 8) ? std::min(8 - (offs % 8), length) : 0;
-      size_t tail_bits = head_bits == length ? 0 : (offs + length) % 8;
-      size_t dst_offs = 0;
-      size_t src_offs = offs;
+    return;
+  }
 
-      for (size_t i = 0; i < head_bits; ++i) {
-        auto is_null = (~bitmap_data[offs / 8] >> (offs % 8 + i)) & 1;
-        auto val = src[src_offs++];
-        dst[dst_offs++] = is_null ? null_value : val;
-      }
+  const uint8_t* bitmap_data = arr->null_bitmap_data();
+  if constexpr (std::is_same_v<T, bool>) {
+    convertBoolBitmapBufferWithNulls(reinterpret_cast<int8_t*>(dst),
+                                     reinterpret_cast<const uint8_t*>(src),
+                                     bitmap_data,
+                                     offs,
+                                     length,
+                                     null_value);
+    return;
+  }
 
-      for (size_t bitmap_idx = start_full_byte; bitmap_idx < end_full_byte;
-           ++bitmap_idx) {
-        auto inversed_bitmap = ~bitmap_data[bitmap_idx];
-        for (int8_t bitmap_offset = 0; bitmap_offset < 8; ++bitmap_offset) {
-          auto is_null = (inversed_bitmap >> bitmap_offset) & 1;
-          auto val = src[src_offs++];
-          dst[dst_offs++] = is_null ? null_value : val;
-        }
-      }
+  size_t start_full_byte = (offs + 7) / 8;
+  size_t end_full_byte = (offs + length) / 8;
+  size_t head_bits = (offs % 8) ? std::min(8 - (offs % 8), length) : 0;
+  size_t tail_bits = head_bits == length ? 0 : (offs + length) % 8;
+  size_t dst_offs = 0;
+  size_t src_offs = offs;
 
-      for (size_t i = 0; i < tail_bits; ++i) {
-        auto is_null = (~bitmap_data[end_full_byte] >> i) & 1;
-        auto val = src[src_offs++];
-        dst[dst_offs++] = is_null ? null_value : val;
-      }
+  for (size_t i = 0; i < head_bits; ++i) {
+    auto is_null = (~bitmap_data[offs / 8] >> (offs % 8 + i)) & 1;
+    auto val = src[src_offs++];
+    dst[dst_offs++] = is_null ? null_value : val;
+  }
+
+  for (size_t bitmap_idx = start_full_byte; bitmap_idx < end_full_byte; ++bitmap_idx) {
+    auto inversed_bitmap = ~bitmap_data[bitmap_idx];
+    for (int8_t bitmap_offset = 0; bitmap_offset < 8; ++bitmap_offset) {
+      auto is_null = (inversed_bitmap >> bitmap_offset) & 1;
+      auto val = src[src_offs++];
+      dst[dst_offs++] = is_null ? null_value : val;
     }
+  }
+
+  for (size_t i = 0; i < tail_bits; ++i) {
+    auto is_null = (~bitmap_data[end_full_byte] >> i) & 1;
+    auto val = src[src_offs++];
+    dst[dst_offs++] = is_null ? null_value : val;
   }
 }
 
@@ -196,6 +199,8 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValuesImpl(
   std::shared_ptr<arrow::Array> array;
   if constexpr (std::is_same_v<T, bool>) {
     array = std::make_shared<arrow::Int8Array>(arr->length(), std::move(resultBuf));
+  } else if (arr->type()->id() == arrow::Type::NA) {
+    array = std::make_shared<arrow::DoubleArray>(arr->length(), std::move(resultBuf));
   } else {
     array = std::make_shared<arrow::PrimitiveArray>(
         arr->type(), arr->length(), std::move(resultBuf));
@@ -975,6 +980,8 @@ const hdk::ir::Type* getTargetImportType(hdk::ir::Context& ctx,
       return ctx.fp64();
     case Type::STRING:
       return ctx.extDict(ctx.text(), 0);
+    case Type::NA:
+      return ctx.fp64();
     case arrow::Type::DICTIONARY: {
       const auto& dict_type = static_cast<const arrow::DictionaryType&>(type);
       if (dict_type.value_type()->id() == Type::STRING) {
@@ -1007,7 +1014,7 @@ const hdk::ir::Type* getTargetImportType(hdk::ir::Context& ctx,
     default:
       break;
   }
-  throw std::runtime_error(type.ToString() + " is not yet supported.");
+  throw std::runtime_error(type.ToString() + " is not yet supported. id: " + type.name());
 }
 
 std::shared_ptr<arrow::DataType> getArrowImportType(hdk::ir::Context& ctx,
@@ -1082,6 +1089,9 @@ std::shared_ptr<arrow::DataType> getArrowImportType(hdk::ir::Context& ctx,
         return list(getArrowImportType(ctx, elem_type));
       }
     }
+    case hdk::ir::Type::kNull:
+      throw std::runtime_error(
+          "Null should be converted to ArrowType according to getTargetImportType(...).");
     default:
       break;
   }
