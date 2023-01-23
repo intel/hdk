@@ -230,10 +230,7 @@ class DataMgr {
 
   DataProvider* getDataProvider() const { return data_provider_.get(); }
 
-  bool useArenaBufferMgr() const {
-    // TODO: Flag
-    return true;
-  }
+  bool useArenaBufferMgr() const { return !(arena_buffer_mgr_ == nullptr); }
 
   AbstractBuffer* getChunkBufferFromArena(const ChunkKey& key, const size_t numBytes = 0);
 
