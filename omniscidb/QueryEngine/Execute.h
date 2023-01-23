@@ -466,6 +466,14 @@ class Executor {
     return false;
   }
 
+  bool deviceSupportsFP64(const ExecutorDeviceType dt) const {
+    if (dt == ExecutorDeviceType::GPU) {
+      return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA ? isArchPascalOrLater(dt)
+                                                             : true;
+    }
+    return true;
+  }
+
   bool needFetchAllFragments(const InputColDescriptor& col_desc,
                              const RelAlgExecutionUnit& ra_exe_unit,
                              const FragmentsList& selected_fragments) const;
