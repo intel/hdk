@@ -11,12 +11,27 @@ boost::filesystem::path g_data_path;
 size_t num_threads = 64;
 size_t g_fragment_size = 160000000 / num_threads;
 bool g_use_parquet{false};
-ExecutorDeviceType g_device_type{ExecutorDeviceType::CPU};
+ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
 using namespace TestHelpers::ArrowSQLRunner;
 
 #define USE_HOT_DATA
 #define PARALLEL_IMPORT_ENABLED
+
+namespace {
+std::istream& operator>>(std::istream& in, ExecutorDeviceType& device_type) {
+  std::string token;
+  in >> token;
+  if (token == "CPU") {
+    device_type = ExecutorDeviceType::CPU;
+  } else if (token == "GPU") {
+    device_type = ExecutorDeviceType::GPU;
+  } else {
+    throw std::runtime_error("Invalid device type: " + token);
+  }
+  return in;
+}
+}  // namespace
 
 static void createTaxiTableParquet() {
   getStorage()->dropTable("trips");
@@ -333,6 +348,11 @@ int main(int argc, char* argv[]) {
                          ->implicit_value(false),
                      "Allow the queries which failed on GPU to retry on CPU, even "
                      "when watchdog is enabled.");
+  desc.add_options()("device",
+                     po::value<ExecutorDeviceType>(&g_device_type)
+                         ->implicit_value(ExecutorDeviceType::GPU)
+                         ->default_value(ExecutorDeviceType::CPU),
+                     "Device type to use.");
 
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
