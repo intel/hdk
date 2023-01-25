@@ -184,10 +184,52 @@ struct ExecuteTestBase {
   }
 };
 
-class GPUEnablingTest : public ExecuteTestBase, public ::testing::Test {};
+class AggregationTest : public ExecuteTestBase, public ::testing::Test {};
 
-TEST_F(GPUEnablingTest, StandaloneCount) {
+TEST_F(AggregationTest, StandaloneCount) {
   c("SELECT COUNT(*) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, StandaloneCountWithProjection) {
+  c("SELECT COUNT(x) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, ConsequentCount) {
+  c("SELECT COUNT(*) FROM test;", g_dt);
+  c("SELECT COUNT(*) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, ConsequentCountWithProjection) {
+  c("SELECT COUNT(x) FROM test;", g_dt);
+  c("SELECT COUNT(x) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, CountStarAfterCountWithProjection) {
+  c("SELECT COUNT(x) FROM test;", g_dt);
+  c("SELECT COUNT(*) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, CountWithProjectionAfterCountStar) {
+  c("SELECT COUNT(*) FROM test;", g_dt);
+  c("SELECT COUNT(x) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, Sum) {
+  GTEST_SKIP();
+  c("SELECT SUM(x) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, ConsequentSum) {
+  GTEST_SKIP();
+  c("SELECT SUM(x) FROM test;", g_dt);
+  c("SELECT SUM(x) FROM test;", g_dt);
+}
+
+class BasicTest : public ExecuteTestBase, public ::testing::Test {};
+
+TEST_F(BasicTest, SimpleFilter) {
+  GTEST_SKIP();
+  c("SELECT * FROM test WHERE x > 0;", g_dt);
 }
 
 int main(int argc, char* argv[]) {
@@ -213,14 +255,15 @@ int main(int argc, char* argv[]) {
 
   init(config);
 
+  int result = 0;
   try {
     ExecuteTestBase::createAndPopulateTestTables();
-    return RUN_ALL_TESTS();
+    result = RUN_ALL_TESTS();
   } catch (const std::exception& e) {
     LOG(ERROR) << "Exception: " << e.what();
     return 1;
   }
 
   reset();
-  return 0;
+  return result;
 }
