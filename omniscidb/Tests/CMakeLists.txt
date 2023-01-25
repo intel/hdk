@@ -294,3 +294,19 @@ add_custom_target(topk_tests
     COMMAND touch tmp/DictPayload
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose --tests-regex "\"(TopKTest)\""
     DEPENDS TopKTest)
+
+if(ENABLE_L0)
+  set(ENABLING_TESTS
+    ArrowStorageSqlTest # taxi queries
+    SpirvBuildTest
+    L0MgrExecuteTest
+  )
+  set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
+
+  add_custom_target(enabling_tests
+      COMMAND mkdir -p tmp
+      COMMAND touch tmp/DictPayload
+      COMMAND ${CMAKE_CTEST_COMMAND} --verbose --label-regex enabling
+      DEPENDS ${ENABLING_TESTS}
+      USES_TERMINAL)
+endif()
