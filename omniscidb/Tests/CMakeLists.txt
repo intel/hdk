@@ -69,14 +69,17 @@ if(ENABLE_L0)
   add_executable(L0MgrExecuteTest L0MgrExecuteTest.cpp)
   add_executable(SpirvBuildTest SpirvBuildTest.cpp)
   add_executable(DataMgrWithL0Test DataMgrWithL0Test.cpp)
+  add_executable(IntelGPUEnablingTest IntelGPUEnablingTest.cpp)
 
   target_link_libraries(L0MgrExecuteTest L0Mgr gtest ${llvm_libs} Logger)
   target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
   target_link_libraries(DataMgrWithL0Test DataMgr gtest)
+  target_link_libraries(IntelGPUEnablingTest gtest QueryEngine ArrowQueryRunner)
 
   add_test(L0MgrExecuteTest L0MgrExecuteTest ${TEST_ARGS})
   add_test(SpirvBuildTest SpirvBuildTest ${TEST_ARGS})
   add_test(DataMgrWithL0Test DataMgrWithL0Test ${TEST_ARGS})
+  add_test(IntelGPUEnablingTest IntelGPUEnablingTest ${TEST_ARGS})
 endif()
 
 if (ENABLE_COST_MODEL) 
