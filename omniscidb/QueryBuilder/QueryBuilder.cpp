@@ -2245,9 +2245,12 @@ BuilderNode BuilderNode::join(const BuilderNode& rhs,
     cond =
         cond.logicalAnd(ref(lhs_col_names[col_idx]).eq(rhs.ref(rhs_col_names[col_idx])));
   }
-  auto join_node = join(rhs, cond, join_type);
+  NodePtr join_node = std::make_shared<Join>(node_, rhs.node(), cond.expr(), join_type);
+
+  // Create a projection to filter out virtual columns and RHS key
+  // columns.
   std::vector<int> proj_cols;
-  proj_cols.reserve(join_node.node()->size());
+  proj_cols.reserve(join_node->size());
   auto lhs_scan = node_->as<Scan>();
   for (int i = 0; i < (int)node_->size(); ++i) {
     if (!lhs_scan || !lhs_scan->isVirtualCol(i)) {
@@ -2263,7 +2266,7 @@ BuilderNode BuilderNode::join(const BuilderNode& rhs,
       proj_cols.emplace_back(i + node_->size());
     }
   }
-  return join_node.proj(proj_cols);
+  return BuilderNode(builder_, join_node).proj(proj_cols);
 }
 
 BuilderNode BuilderNode::join(const BuilderNode& rhs,
@@ -2278,7 +2281,24 @@ BuilderNode BuilderNode::join(const BuilderNode& rhs,
                               JoinType join_type) const {
   checkExprInput(cond, {node_.get(), rhs.node().get()}, "join");
   NodePtr join_node = std::make_shared<Join>(node_, rhs.node(), cond.expr(), join_type);
-  return {builder_, join_node};
+
+  // Create a projection to filter out virtual columns if any
+  // This will also assign new names to matching LHS and RHS
+  // column names.
+  std::vector<int> proj_cols;
+  auto lhs_scan = node_->as<Scan>();
+  for (int i = 0; i < (int)node_->size(); ++i) {
+    if (!lhs_scan || !lhs_scan->isVirtualCol(i)) {
+      proj_cols.push_back(i);
+    }
+  }
+  auto rhs_scan = rhs.node()->as<Scan>();
+  for (int i = 0; i < (int)rhs.node()->size(); ++i) {
+    if (!rhs_scan || !rhs_scan->isVirtualCol(i)) {
+      proj_cols.push_back(i + node_->size());
+    }
+  }
+  return BuilderNode(builder_, join_node).proj(proj_cols);
 }
 
 BuilderNode BuilderNode::join(const BuilderNode& rhs,
