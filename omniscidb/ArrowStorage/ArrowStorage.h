@@ -128,6 +128,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   void dropTable(const std::string& table_name, bool throw_if_not_exist = false);
   void dropTable(int table_id, bool throw_if_not_exist = false);
 
+  int dbId() const { return db_id_; }
+
  private:
   struct DataFragment {
     size_t offset = 0;

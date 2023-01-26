@@ -99,10 +99,12 @@ cdef extern from "omniscidb/DataMgr/AbstractDataProvider.h":
 cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h" namespace "ArrowStorage":
   struct CColumnDescription "ArrowStorage::ColumnDescription":
     string name;
-    CType type;
+    const CType *type;
 
   struct CTableOptions "ArrowStorage::TableOptions":
     size_t fragment_size;
+
+    CTableOptions()
 
   struct CCsvParseOptions "ArrowStorage::CsvParseOptions":
     char delimiter;
@@ -121,8 +123,14 @@ cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
   cdef cppclass CArrowStorage "ArrowStorage"(CSchemaProvider, CAbstractDataProvider):
     CArrowStorage(int, string, int) except +;
 
+    CTableInfoPtr createTable(const string&, const vector[CColumnDescription]&, const CTableOptions&) except +
+
     CTableInfoPtr importArrowTable(shared_ptr[CArrowTable], string&, CTableOptions&) except +;
+    void appendArrowTable(shared_ptr[CArrowTable], const string&) except +
+    CTableInfoPtr importCsvFile(string&, string&, CTableOptions&, CCsvParseOptions) except +
     void dropTable(const string&, bool) except +;
+
+    int dbId() const
 
 cdef extern from "omniscidb/BufferProvider/BufferProvider.h" namespace "Data_Namespace":
   cdef cppclass CBufferProvider "BufferProvider":

@@ -4,9 +4,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from pyhdk._common import buildConfig
-from pyhdk._storage import ArrowStorage, DataMgr
+from pyhdk._storage import TableOptions, ArrowStorage, DataMgr
 from pyhdk._sql import Calcite, RelAlgExecutor
 from pyhdk._execute import Executor
+from pyhdk._builder import QueryBuilder, QueryExpr, QueryNode
+
+import pyarrow
+import uuid
+from collections.abc import Iterable
 
 
 def not_implemented(func):
@@ -16,8 +21,7 @@ def not_implemented(func):
     return wrapper
 
 
-class QueryExpr:
-    @not_implemented
+class QueryExprAPI:
     def rename(self, name):
         """
         Create a copy of the expression with a new assigned name.
@@ -60,7 +64,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def avg(self):
         """
         Create AVG aggregate expression with the current expression as its
@@ -84,7 +87,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def min(self):
         """
         Create MIN aggregate expression with the current expression as its
@@ -108,7 +110,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def max(self):
         """
         Create MAX aggregate expression with the current expression as its
@@ -132,7 +133,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def sum(self):
         """
         Create SUM aggregate expression with the current expression as its
@@ -156,7 +156,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def count(self, is_distinct=False, approx=False):
         """
         Create COUNT, COUNT DISTINCT or APPROX COUNT DISTINCT aggregate expression
@@ -188,7 +187,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def approx_quantile(self, prob):
         """
         Create APROX QUANTILE aggregate expression with the current expression as
@@ -218,7 +216,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def sample(self):
         """
         Create SAMPLE aggregate expression with the current expression as its
@@ -242,7 +239,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def single_value(self):
         """
         Create SINGLE VALUE aggregate expression with the current expression as its
@@ -266,7 +262,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def extract(self, field):
         """
         Create EXTRACT expression to extract a part of date from the current expression.
@@ -318,7 +313,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def cast(self, new_type):
         """
         Create CAST expression for the current expression.
@@ -359,7 +353,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def uminus(self):
         """
         Create unary minus expression for the current expression.
@@ -385,7 +378,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def is_null(self):
         """
         Create IS NULL expression for the current expression.
@@ -411,7 +403,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def is_not_null(self):
         """
         Create IS NOT NULL expression for the current expression.
@@ -437,7 +428,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def unnest(self):
         """
         Create UNNEST expression for the current expression.
@@ -466,7 +456,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def add(self, value, field=None):
         """
         Create ADD binary expression.
@@ -532,7 +521,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def sub(self, value, field=None):
         """
         Create SUB binary expression.
@@ -598,7 +586,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def mul(self, value):
         """
         Create MUL binary expression.
@@ -698,7 +685,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def div(self, value):
         """
         Create DIV binary expression.
@@ -733,7 +719,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def mod(self, value):
         """
         Create MOD binary expression.
@@ -764,7 +749,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def logical_not(self):
         """
         Create logical NOT expression.
@@ -788,7 +772,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def logical_and(self, value):
         """
         Create logical AND expression.
@@ -819,7 +802,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def logical_or(self, value):
         """
         Create logical OR expression.
@@ -850,7 +832,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def eq(self, value):
         """
         Create EQUAL comparison expression.
@@ -885,7 +866,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def ne(self, value):
         """
         Create UNEQUAL comparison expression.
@@ -922,7 +902,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def lt(self, value):
         """
         Create LESS comparison expression.
@@ -957,7 +936,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def le(self, value):
         """
         Create LESS OR EQUAL comparison expression.
@@ -994,7 +972,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def gt(self, value):
         """
         Create GREATER comparison expression.
@@ -1028,7 +1005,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def ge(self, value):
         """
         Create GREATER OR EQUAL comparison expression.
@@ -1064,7 +1040,6 @@ class QueryExpr:
         """
         pass
 
-    @not_implemented
     def at(self, index):
         """
         Create subscript expression to extract array element by index.
@@ -1114,8 +1089,7 @@ class QueryExpr:
     __getitem__ = at
 
 
-class QueryNode:
-    @not_implemented
+class QueryNodeAPI:
     def proj(self, *args, exprs=None, **kwargs):
         """
         Create a projection node with the current node as its input.
@@ -1164,7 +1138,6 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def agg(self, group_keys, *args, aggs=None, **kwargs):
         """
         Create an aggregation node with the current node as its input.
@@ -1238,9 +1211,7 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def sort(self, *args, fields=None, limit=0, offset=0, **kwargs):
-        ht.agg(["id1", "id2"], cnt="count", x_sum=ht["x"].sum(), y_min=ht["y"].min())
         """
         Create a sort node with the current node as its input.
 
@@ -1308,7 +1279,6 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def join(self, rhs_node, lhs_cols=None, rhs_cols=None, cond=None, how="inner"):
         """
         Create a join node with the current node as its left input.
@@ -1394,7 +1364,6 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def filter(self, *args):
         """
         Create a filter node with the current node as its input.
@@ -1428,7 +1397,6 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def ref(self, col):
         """
         Create a column reference expression for the current node.
@@ -1556,7 +1524,6 @@ class QueryNode:
         """
         pass
 
-    @not_implemented
     def run(self):
         """
         Run query with the current node as a query root node.
@@ -1582,6 +1549,102 @@ class QueryNode:
         pass
 
 
+class QueryOptions:
+    def __init__(self, config):
+        self._config = config
+        self._opts = {}
+
+    @property
+    def enable_lazy_fetch(self):
+        return self._opts.get("enable_lazy_fetch", self._config.rs.enable_lazy_fetch)
+
+    @enable_lazy_fetch.setter
+    def enable_lazy_fetch(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'enable_lazy_fetch' option. Got: {type(value)}."
+            )
+        self._opts["enable_lazy_fetch"] = value
+
+    @property
+    def enable_dynamic_watchdog(self):
+        return self._opts.get(
+            "enable_dynamic_watchdog", self._config.exec.watchdog.enable_dynamic
+        )
+
+    @enable_dynamic_watchdog.setter
+    def enable_dynamic_watchdog(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'enable_dynamic_watchdog' option. Got: {type(value)}."
+            )
+        self._opts["enable_dynamic_watchdog"] = value
+
+    @property
+    def enable_columnar_output(self):
+        return self._opts.get(
+            "enable_columnar_output", self._config.rs.enable_columnar_output
+        )
+
+    @enable_columnar_output.setter
+    def enable_columnar_output(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'enable_columnar_output' option. Got: {type(value)}."
+            )
+        self._opts["enable_columnar_output"] = value
+
+    @property
+    def enable_watchdog(self):
+        return self._opts.get("enable_watchdog", self._config.exec.watchdog.enable)
+
+    @enable_watchdog.setter
+    def enable_watchdog(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'enable_watchdog' option. Got: {type(value)}."
+            )
+        self._opts["enable_watchdog"] = value
+
+    @property
+    def enable_dynamic_watchdog(self):
+        return self._opts.get(
+            "enable_dynamic_watchdog", self._config.exec.watchdog.enable_dynamic
+        )
+
+    @enable_dynamic_watchdog.setter
+    def enable_dynamic_watchdog(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'enable_dynamic_watchdog' option. Got: {type(value)}."
+            )
+        self._opts["enable_dynamic_watchdog"] = value
+
+    @property
+    def just_explain(self):
+        return self._opts.get("just_explain", False)
+
+    @just_explain.setter
+    def just_explain(self, value):
+        if type(value) != type(True):
+            raise TypeError(
+                f"Expected bool value for 'just_explain' option. Got: {type(value)}."
+            )
+        self._opts["just_explain"] = value
+
+    @property
+    def device_type(self):
+        return self._opts.get("device_type", "auto")
+
+    @device_type.setter
+    def device_type(self, value):
+        if value.upper() not in ("CPU", "GPU", "AUTO"):
+            raise ValueError(
+                "Expected 'CPU', 'GPU' or 'auto' device type. Got: {value}."
+            )
+        self._opts["device_type"] = value
+
+
 class HDK:
     def __init__(self, **kwargs):
         self._config = buildConfig(**kwargs)
@@ -1590,9 +1653,8 @@ class HDK:
         self._data_mgr.registerDataProvider(self._storage)
         self._calcite = Calcite(self._storage, self._config)
         self._executor = Executor(self._data_mgr, self._config)
-        # self._builder = QueryBuilder(self._storage, self._config)
+        self._builder = QueryBuilder(self._storage, self._config, self)
 
-    @not_implemented
     def create_table(self, table_name, scheme, fragment_size=None):
         """
         Create an empty table in HDK in-memory storage. Data can be appended to
@@ -1626,9 +1688,12 @@ class HDK:
         >>> ht2
         hdk::ir::Scan#2(test2, ["id", "val1", "val2", "rowid"])
         """
-        pass
+        opts = TableOptions()
+        if fragment_size is not None:
+            opts.fragment_size = fragment_size
+        self._storage.createTable(table_name, scheme, opts)
+        return self.scan(table_name)
 
-    @not_implemented
     def drop_table(self, table):
         """
         Drop existing table from HDK in-memory storage.
@@ -1652,7 +1717,15 @@ class HDK:
         RuntimeError: Unknown table: test1
         >>> 
         """
-        pass
+        if isinstance(table, QueryNode) and table.is_scan:
+            table = table.table_name
+
+        if isinstance(table, str):
+            self._storage.dropTable(table)
+        else:
+            raise TypeError(
+                f"Only str and QueryNode scans are allowed for 'table' arg. Provided: {table}"
+            )
 
     @not_implemented
     def import_csv(
@@ -1734,7 +1807,6 @@ class HDK:
         """
         pass
 
-    @not_implemented
     def import_arrow(self, at, table_name=None, fragment_size=None):
         """
         Import Arrow table into HDK in-memory storage.
@@ -1757,9 +1829,36 @@ class HDK:
         QueryExpr
             Scan expression referencing created table.
         """
-        pass
+        append = False
+        real_name = table_name
+        if isinstance(table_name, QueryNode):
+            if not table_name.is_scan:
+                raise TypeError("Non-scan QueryNode is not allowed as a table name.")
+            real_name = table_name.table_name
+            if self._storage.tableInfo(real_name) is None:
+                raise RuntimeError(
+                    "Table referred by scan QueryNode does not exist anymore: {real_name}."
+                )
+            append = True
+        elif isinstance(table_name, str):
+            append = self._storage.tableInfo(table_name) is not None
+        elif table_name is None:
+            real_name = "tabe_" + uuid.uuid4().hex
+        else:
+            raise TypeError(
+                f"Expected str or QueryNode for 'table_name' arg. Got: {type(table_name)}."
+            )
 
-    @not_implemented
+        if append:
+            self._storage.appendArrowTable(at, real_name)
+        else:
+            opts = TableOptions()
+            if fragment_size is not None:
+                opts.fragment_size = fragment_size
+            self._storage.importArrowTable(at, real_name, opts)
+
+        return table_name if isinstance(table_name, QueryNode) else self.scan(real_name)
+
     def import_pydict(self, values, table_name=None, fragment_size=None):
         """
         Import Python dictionary into HDK in-memory storage.
@@ -1791,10 +1890,16 @@ class HDK:
         >>> ht.schema
         {'a': a(db_id=16777217, table_id=9, column_id=1 type=INT64), 'b': b(db_id=16777217, table_id=9, column_id=2 type=FP64)}
         """
-        pass
+        return self.import_arrow(
+            pyarrow.Table.from_pydict(values),
+            table_name=table_name,
+            fragment_size=fragment_size,
+        )
 
-    @not_implemented
-    def sql(self, sql_query, **kwargs):
+    def query_opts(self):
+        return QueryOptions(self._config)
+
+    def sql(self, sql_query, query_opts=None, **kwargs):
         """
         Execute SQL query.
 
@@ -1802,6 +1907,8 @@ class HDK:
         ----------
         sql_query : str
             SQL query to execute.
+        query_opts : QueryOptions or dict, default: None
+            Query execution options.
         **kwargs : dict
             Table aliases for the query. Keys are alises for tables referenced
             by values. Each value should be either a string or a scan expression.
@@ -1821,11 +1928,35 @@ class HDK:
         >>> test = hdk.import_csv("test.csv")
         >>> res = hdk.sql("SELCT type, count(*) FROM test GROUP BY type;", test=test)
         """
+        if query_opts is None:
+            query_opts = {}
+        elif isinstance(query_opts, QueryOptions):
+            query_opts = query_opts._opts
+        elif not isinstance(query_opts, dict):
+            raise TypeError(
+                f"Expected dict or QueryOptions for 'query_opts' arg. Got: {type(query_opts)}."
+            )
+
+        parts = []
+        for name, orig_table in kwargs.items():
+            if isinstance(orig_table, QueryNode) and orig_table.is_scan:
+                orig_table = orig_table.table_name
+            if not isinstance(orig_table, str):
+                raise TypeError(
+                    f"Expected str or table scan QueryNode for a table name alias. Got: {type(orig_table)}."
+                )
+
+            if len(parts) == 0:
+                parts.append("WITH\n  ")
+            else:
+                parts.append(", ")
+            parts.append(f"{name} AS (SELECT * FROM {orig_table})\n")
+
+        sql_query = "".join(parts) + sql_query
         ra = self._calcite.process(sql_query)
         ra_executor = RelAlgExecutor(self._executor, self._storage, self._data_mgr, ra)
-        return ra_executor.execute()
+        return ra_executor.execute(**query_opts)
 
-    @not_implemented
     def scan(self, table_name):
         """
         Create a scan query node referencing specified table.
@@ -1846,9 +1977,8 @@ class HDK:
         >>> hdk.scan("t1")
         hdk::ir::Scan#2(t1, ["a", "b", "rowid"])
         """
-        pass
+        return self._builder.scan(table_name)
 
-    @not_implemented
     def type(self, type_str):
         """
         Parse string type representation into TypeInfo object.
@@ -1921,9 +2051,8 @@ class HDK:
         >>> hdk.type("array(int)")
         ARRAY32(INT64)
         """
-        pass
+        return self._builder.typeFromString(type_str)
 
-    @not_implemented
     def const(self, value, cst_type=None, scale_decimal=True):
         """
         Create an expression representing a constant value.
@@ -1976,11 +2105,10 @@ class HDK:
         >>> hdk.cst("2001-02-03 15:00:00", "timestamp")
         (Const 2001-02-03 15:00:00.000000)
         """
-        pass
+        return self._builder.cst(value, cst_type, scale_decimal)
 
     cst = const
 
-    @not_implemented
     def date(self, value):
         """
         Create a date literal from string.
@@ -1997,9 +2125,8 @@ class HDK:
         >>> hdk.date("2001-02-03")
         (Const 2001-02-03)
         """
-        pass
+        return self._builder.date(value)
 
-    @not_implemented
     def time(self, value):
         """
         Create a time literal from string.
@@ -2016,9 +2143,8 @@ class HDK:
         >>> hdk.time("15:00:00")
         (Const 15:00:00)
         """
-        pass
+        return self._builder.time(value)
 
-    @not_implemented
     def timestamp(self, value):
         """
         Create a timestamp literal from string.
@@ -2035,7 +2161,7 @@ class HDK:
         >>> hdk.timestamp("2001-02-03 15:00:00")
         (Const 2001-02-03 15:00:00.000000)
         """
-        pass
+        return self._builder.timestamp(value)
 
     def count(self):
         """
@@ -2052,7 +2178,7 @@ class HDK:
         Data:
         5
         """
-        pass
+        return self._builder.count()
 
 
 def init(**kwargs):

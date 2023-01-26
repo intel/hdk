@@ -41,13 +41,6 @@ cdef class Calcite:
     return self.calcite.get().process(db_name, sql, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
 
 cdef class ExecutionResult:
-  cdef CExecutionResult c_result
-  # DataMgr has to outlive ResultSet objects to avoid use-after-free errors.
-  # Currently, C++ library doesn't enforce this and user is responsible for
-  # obects lifetime control. In Python we achieve it by holding DataMgr in
-  # each ExecutionResult object.
-  cdef shared_ptr[CDataMgr] c_data_mgr
-
   def row_count(self):
     cdef shared_ptr[CResultSet] c_res
     c_res = self.c_result.getRows()
@@ -98,11 +91,7 @@ cdef class ExecutionResult:
     return self.__str__()
 
 cdef class RelAlgExecutor:
-  cdef shared_ptr[CRelAlgExecutor] c_rel_alg_executor
-  # DataMgr is used only to pass it to each produced ExecutionResult
-  cdef shared_ptr[CDataMgr] c_data_mgr
-
-  def __cinit__(self, Executor executor, SchemaProvider schema_provider, DataMgr data_mgr, string ra_json):
+  def __cinit__(self, Executor executor, SchemaProvider schema_provider, DataMgr data_mgr, ra_json=None, QueryDag dag=None):
     cdef CExecutor* c_executor = executor.c_executor.get()
     cdef CSchemaProviderPtr c_schema_provider = schema_provider.c_schema_provider
     cdef CDataProvider* c_data_provider = data_mgr.c_data_mgr.get().getDataProvider()
@@ -114,14 +103,22 @@ cdef class RelAlgExecutor:
     if len(db_ids) == 1:
       db_id = db_ids[0]
 
-    c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider, c_executor.getConfigPtr()))
+    if ra_json is not None:
+      c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider, c_executor.getConfigPtr()))
+    else:
+      assert dag is not None
+      c_dag = move(dag.c_dag)
 
     self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, c_data_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
   def execute(self, **kwargs):
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
-    cdef CCompilationOptions c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
+    cdef CCompilationOptions c_co
+    if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU)
+    else:
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))

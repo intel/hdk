@@ -13,7 +13,9 @@ from cython.operator cimport dereference, preincrement
 from pyarrow.lib cimport pyarrow_unwrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport TypeInfo, Config, CConfig
+from pyhdk._common cimport TypeInfo, Config, CConfig, CContext
+
+from collections.abc import Iterable
 
 cdef class TableInfo:
   @property
@@ -140,6 +142,9 @@ cdef class SchemaProvider:
       table_id = table
       table_info = self.c_schema_provider.get().getTableInfo(db_id, table_id)
 
+    if not table_info:
+      return None
+
     cdef TableInfo res = TableInfo()
     res.c_table_info = table_info
     return res
@@ -170,8 +175,58 @@ cdef class SchemaProvider:
 cdef class TableOptions:
   cdef CTableOptions c_options
 
-  def __cinit__(self, int fragment_size):
-    self.c_options.fragment_size = fragment_size
+  def __cinit__(self):
+    self.c_options = CTableOptions()
+
+  @property
+  def fragment_size(self):
+    return self.c_options.fragment_size
+
+  @fragment_size.setter
+  def fragment_size(self, value):
+    if not isinstance(value, int):
+      raise TypeError("Only integer values are allowed for fragment_size.")
+    self.c_options.fragment_size = value
+
+cdef class CsvParseOptions:
+  cdef CCsvParseOptions c_options
+
+  def __cinit__(self):
+    self.c_options = CCsvParseOptions()
+
+  @property
+  def delimiter(self):
+    return self.delimiter
+
+  @delimiter.setter
+  def delimiter(self, value):
+    if not isinstance(value, str) or not (len(value) == 1):
+      raise TypeError("Only single-character strings are allowed for delimiter.")
+    self.delimiter = value
+
+  @property
+  def header(self):
+    return self.header
+
+  @header.setter
+  def header(self, value):
+    self.header = value
+
+  @property
+  def skip_rows(self):
+    return self.skip_rows
+
+  @skip_rows.setter
+  def skip_rows(self, value):
+    self.skip_rows = value
+
+  @property
+  def block_size(self):
+    return self.block_size
+
+  @block_size.setter
+  def block_size(self, value):
+    self.block_size = value
 
 cdef class ArrowStorage(Storage):
   cdef shared_ptr[CArrowStorage] c_storage
@@ -183,12 +238,65 @@ cdef class ArrowStorage(Storage):
     self.c_schema_provider = static_pointer_cast[CSchemaProvider, CArrowStorage](self.c_storage)
     self.c_abstract_buffer_mgr = static_pointer_cast[CAbstractBufferMgr, CArrowStorage](self.c_storage)
 
+  def createTable(self, table_name, scheme, TableOptions table_opts):
+    if not isinstance(table_name, str):
+      raise TypeError(f"Expected str for 'table_name' arg. Got: {type(table_name)}.")
+
+    cdef vector[CColumnDescription] col_descs
+    cdef CColumnDescription col_desc
+
+    if isinstance(scheme, dict):
+      for key, val in scheme.items():
+        col_desc.name = self._process_col_name(key)
+        col_desc.type = (<TypeInfo>self._process_type(val)).c_type_info
+        col_descs.push_back(col_desc)
+    elif isinstance(scheme, Iterable):
+      for val in scheme:
+        if not isinstance(val, tuple) or len(val) != 2:
+          raise TypeError(f"Expected tuple of 2 as a column descriptor. Got: {type(val)}.")
+        col_desc.name = self._process_col_name(val[0])
+        col_desc.type = (<TypeInfo>self._process_type(val[1])).c_type_info
+        col_descs.push_back(col_desc)
+    else:
+      raise TypeError(f"Expected dict or list of tuples for 'scheme' arg. Got: {type(scheme)}.")
+
+    self.c_storage.get().createTable(table_name, col_descs, table_opts.c_options)
+
+  def _process_col_name(self, val):
+    if not isinstance(val, str):
+      raise TypeError(f"Expected str for column name. Got: {type(val)}.")
+    return val
+
+  def _process_type(self, val):
+    if isinstance(val, str):
+      res = TypeInfo()
+      res.c_type_info = CContext.defaultCtx().typeFromString(val)
+      return res
+    elif isinstance(val, TypeInfo):
+      return val
+    else:
+      raise TypeError(f"Expected TypeInfo or str for column type. Got: {type(val)}.")
+
   def importArrowTable(self, table, name, TableOptions options):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().importArrowTable(at, name, options.c_options)
 
+  def appendArrowTable(self, table, name):
+    cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
+    self.c_storage.get().appendArrowTable(at, name)
+
+  def importCsvFile(self, file_name, table_name, TableOptions table_opts = None, CsvParseOptions csv_opts = None):
+    if table_opts is None:
+      table_opts = TableOptions()
+    if csv_opts is None:
+      csv_opts = CsvParseOptions()
+    self.c_storage.get().importCsvFile(file_name, table_name, table_opts.c_options, csv_opts.c_options)
+
   def dropTable(self, string name, bool throw_if_not_exist = False):
     self.c_storage.get().dropTable(name, throw_if_not_exist)
+
+  def tableInfo(self, string table_name):
+    return self.getTableInfo(self.c_storage.get().dbId(), table_name)
 
 cdef class DataMgr:
   def __cinit__(self, Config config):
