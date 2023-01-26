@@ -842,7 +842,6 @@ std::shared_ptr<CompilationContext> L0Backend::generateNativeCode(
 void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string& fname) {
   auto fn = from->getFunction(fname);
   CHECK(fn);
-  CHECK(fn->isDeclaration());
 
   llvm::Function::Create(
       fn->getFunctionType(), llvm::GlobalValue::ExternalLinkage, fn->getName(), *to);
@@ -853,6 +852,7 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
   auto from_fn = from->getFunction(fname);
   CHECK(target_fn);
   CHECK(from_fn);
+  CHECK(!from_fn->isDeclaration());
 
   target_fn->deleteBody();
 
@@ -878,7 +878,6 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
       if (auto* call = llvm::dyn_cast<llvm::CallInst>(&*inst)) {
         auto local_callee = to->getFunction(call->getCalledFunction()->getName());
         CHECK(local_callee);
-        CHECK(local_callee->isDeclaration());
         std::vector<llvm::Value*> args;
         std::copy(call->arg_begin(), call->arg_end(), std::back_inserter(args));
 
@@ -908,11 +907,9 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   CHECK(exts.find(ExtModuleKinds::spirv_helper_funcs_module) != exts.end());
 
   for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
-    if (F.isDeclaration()) {
-      insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
-                         module,
-                         F.getName().str());
-    }
+    insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
+                       module,
+                       F.getName().str());
   }
 
   for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
