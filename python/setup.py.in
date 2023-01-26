@@ -84,13 +84,35 @@ storage = Extension(
     extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
 )
 
+ir = Extension(
+    "pyhdk._ir",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_ir.pyx"],
+    language="c++",
+    include_dirs=include_dirs,
+    library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
+    runtime_library_dirs=pa.get_library_dirs() + extra_library_dirs,
+    libraries=pa.get_libraries() + ["IR"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
+)
+
+builder = Extension(
+    "pyhdk._builder",
+    ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_builder.pyx"],
+    language="c++",
+    include_dirs=include_dirs,
+    library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
+    runtime_library_dirs=pa.get_library_dirs() + extra_library_dirs,
+    libraries=pa.get_libraries() + ["QueryBuilder", "IR"],
+    extra_compile_args=["-std=c++17", "-D__STDC_FORMAT_MACROS"],
+)
+
 setup(
     name="pyhdk",
     version="@HDK_VERSION_RAW@",
     packages=["pyhdk"],
     package_dir={"pyhdk": "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
     ext_modules=cythonize(
-        [common, execute, sql, storage],
+        [common, execute, sql, storage, ir, builder],
         compiler_directives={
             "c_string_type": "str",
             "c_string_encoding": "utf8",

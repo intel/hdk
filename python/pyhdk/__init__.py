@@ -18,6 +18,7 @@ from pyhdk._common import TypeInfo, buildConfig, initLogger
 from pyhdk._execute import Executor
 import pyhdk.sql as sql
 import pyhdk.storage as storage
+from pyhdk.hdk import init
 
 if sys.platform == "linux":
     sys.setdlopenflags(prev)

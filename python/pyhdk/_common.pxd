@@ -70,12 +70,25 @@ cdef extern from "omniscidb/IR/Type.h":
 
     void print()
 
+  cdef cppclass CArrayBaseType "hdk::ir::ArrayBaseType"(CType):
+    const CType* elemType() const
+
+  cdef cppclass CVarLenArrayType "hdk::ir::VarLenArrayType"(CType):
+    pass
+
+  cdef cppclass CExtDictionaryType "hdk::ir::ExtDictionaryType"(CType):
+    const CType* elemType() const
+
 cdef extern from "omniscidb/IR/Context.h":
   cdef cppclass CContext "hdk::ir::Context":
     CContext()
 
+    const CVarLenArrayType* arrayVarLen(const CType*, int, bool) except +
+
     @staticmethod
-    CContext defaultCtx()
+    CContext& defaultCtx()
+
+    const CType* typeFromString(const string&) except +
 
 cdef class TypeInfo:
   cdef const CType* c_type_info
@@ -241,12 +254,14 @@ cdef extern from "omniscidb/Shared/Config.h":
     CCacheConfig cache
     CDebugConfig debug
 
+ctypedef shared_ptr[CConfig] CConfigPtr
+
 cdef class Config:
-  cdef shared_ptr[CConfig] c_config
+  cdef CConfigPtr c_config
 
 cdef extern from "omniscidb/ConfigBuilder/ConfigBuilder.h":
   cdef cppclass CConfigBuilder "ConfigBuilder":
     CConfigBuilder()
 
     bool parseCommandLineArgs(const string&, const string&, bool) except +
-    shared_ptr[CConfig] config()
+    CConfigPtr config()
