@@ -62,7 +62,6 @@ jobs:
 
       - name: Configure the project
         run: |
-          docker exec -u ghrunner build.${{ inputs.name }} python3 /_work/omniscidb/scripts/conda/make-m2-proxy.py
           docker exec -u ghrunner build.${{ inputs.name }} cmake -B/_work/omniscidb/build -S/_work/omniscidb ${{ inputs.options }}
  
       - name: Build the project

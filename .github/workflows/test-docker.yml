@@ -59,7 +59,7 @@ jobs:
       - name: ASAN test
         if: inputs.build-name == 'asan'
         run: |
-          echo FIXME docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
 
       - name: Stop the container
         if: always()

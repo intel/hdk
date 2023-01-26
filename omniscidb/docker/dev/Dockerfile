@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -36,17 +36,14 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.24.1/cmake-3.24.1
 
 # Toolchains
 RUN apt-get update && apt-get install -y \
-    llvm-12 \
-    llvm-12-dev \
-    clang-12 \
-    libclang-12-dev \
-    gcc-9 \
-    g++-9 \
+    llvm-14 \
+    llvm-14-dev \
+    clang-14 \
+    libclang-14-dev \
+    gcc \
+    g++ \
     openjdk-11-jdk \
-    -- && \
-    update-alternatives \
-        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
-        --slave /usr/bin/g++ g++ /usr/bin/g++-9
+    --
 
 ENV PATH=/usr/lib/llvm-12/bin${PATH:+:${PATH}}
 

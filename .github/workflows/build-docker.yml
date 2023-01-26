@@ -66,7 +66,6 @@ jobs:
 
       - name: Configure the project
         run: |
-          docker exec -u ghrunner build.${{ inputs.name }} python3 /_work/omniscidb/scripts/conda/make-m2-proxy.py
           docker exec -u ghrunner build.${{ inputs.name }} dpkg -l
           docker exec -u ghrunner build.${{ inputs.name }} cmake -B/_work/omniscidb/build -S/_work/omniscidb -DENABLE_TESTS=on ${{ inputs.options }}
  
@@ -81,6 +80,11 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-build
           path: build.tgz
+
+      - name: Print NVIDIA logs
+        if: failure()
+        run: |
+          docker exec build.${{ inputs.name }} sh -c 'cat /var/lib/dkms/nvidia/*/build/make.log'
 
       - name: Upload logs
         if: always()
