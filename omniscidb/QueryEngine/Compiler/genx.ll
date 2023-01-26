@@ -54,9 +54,7 @@ define i64 @agg_count_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_va
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-;;  todo: %old = call i64 @agg_count(i64* %agg, i64 %val)
-    %ld = load i64, i64* %agg
-    %old = atomicrmw add i64* %agg, i64 1 monotonic
+    %old = call i64 @agg_count(i64* %agg, i64 %val)
     ret i64 %old
 .skip:
     ret i64 0
