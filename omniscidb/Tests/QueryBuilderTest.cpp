@@ -3911,14 +3911,14 @@ TEST_F(QueryBuilderTest, SimpleProjection) {
   compare_test1_data(builder.scan("test1").proj(std::vector<int>({1, -2})), {1, 3});
   auto scan1 = builder.scan("test1");
   compare_test1_data(scan1.proj(scan1.ref(2)), {2});
-  compare_test1_data(scan1.proj(scan1.ref(2).name("c2")), {2}, {"c2"});
+  compare_test1_data(scan1.proj(scan1.ref(2).rename("c2")), {2}, {"c2"});
   compare_test1_data(scan1.proj({scan1.ref(1)}), {1});
-  compare_test1_data(scan1.proj({scan1.ref(1).name("c1")}), {1}, {"c1"});
+  compare_test1_data(scan1.proj({scan1.ref(1).rename("c1")}), {1}, {"c1"});
   compare_test1_data(scan1.proj({scan1.ref(-2)}), {3});
-  compare_test1_data(scan1.proj({scan1.ref(-2).name("c")}), {3}, {"c"});
+  compare_test1_data(scan1.proj({scan1.ref(-2).rename("c")}), {3}, {"c"});
   compare_test1_data(scan1.proj(std::vector<BuilderExpr>({scan1.ref(3)})), {3});
   compare_test1_data(
-      scan1.proj(std::vector<BuilderExpr>({scan1.ref(3).name("c1")})), {3}, {"c1"});
+      scan1.proj(std::vector<BuilderExpr>({scan1.ref(3).rename("c1")})), {3}, {"c1"});
   compare_test1_data(scan1.proj(scan1.ref("col_i")), {1});
   compare_test1_data(
       scan1.proj({scan1.ref("col_i"), scan1.ref("col_i")}), {1, 1}, {"col_i", "col_i_1"});
@@ -3932,8 +3932,9 @@ TEST_F(QueryBuilderTest, SimpleProjection) {
   EXPECT_THROW(builder.scan("test1").proj({1, 2}, {"c1", "c1"}), InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj({"col_bi", "col_i"}, {"c1", "c1"}),
                InvalidQueryError);
-  EXPECT_THROW(scan1.proj({scan1.ref("col_bi").name("c"), scan1.ref("col_i").name("c")}),
-               InvalidQueryError);
+  EXPECT_THROW(
+      scan1.proj({scan1.ref("col_bi").rename("c"), scan1.ref("col_i").rename("c")}),
+      InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj(scan1.ref(0)), InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj({0, 1}, {"c1", "c2", "c3"}), InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj({"col_bi"}, {}), InvalidQueryError);
@@ -3952,7 +3953,7 @@ TEST_F(QueryBuilderTest, ProjFilter) {
 TEST_F(QueryBuilderTest, FilterProj) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test1");
-  auto proj = scan.proj({scan["col_bi"], (scan["col_i"] + 1).name("inc")});
+  auto proj = scan.proj({scan["col_bi"], (scan["col_i"] + 1).rename("inc")});
   auto dag = proj.filter(proj["inc"] > 40).finalize();
   auto res = runQuery(std::move(dag));
   compare_res_data(res, std::vector<int64_t>({4, 5}), std::vector<int32_t>({45, 56}));
@@ -4123,7 +4124,7 @@ TEST_F(QueryBuilderTest, Aggregate) {
   EXPECT_THROW(builder.scan("test2").agg(0, "count(2)"), InvalidQueryError);
   EXPECT_THROW(builder.scan("test2").agg(std::vector<int>(), std::vector<std::string>()),
                InvalidQueryError);
-  EXPECT_THROW(scan.agg({scan.ref(0).name("id1"), scan.ref(0).name("id1")}, "count"),
+  EXPECT_THROW(scan.agg({scan.ref(0).rename("id1"), scan.ref(0).rename("id1")}, "count"),
                InvalidQueryError);
   EXPECT_THROW(scan.agg("", "approx_quantile(val2,1.1)"), InvalidQueryError);
   EXPECT_THROW(scan.agg("", "approx_quantile(val2,1..1)").node()->print(),
@@ -4415,7 +4416,7 @@ TEST_F(QueryBuilderTest, SortAggFilterProj) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test2");
   auto proj = scan.proj(
-      {scan["id1"], scan["id2"], scan["val1"], (scan["val2"] + 10).name("val2")});
+      {scan["id1"], scan["id2"], scan["val1"], (scan["val2"] + 10).rename("val2")});
   auto dag = proj.filter(!proj["val1"].isNull())
                  .agg({"id1", "id2"}, "sum(val2)")
                  .sort({"id1", "id2"})
@@ -4802,11 +4803,12 @@ TEST_F(Taxi, Q3_3) {
   // FROM trips GROUP BY passenger_count, pickup_year ORDER BY passenger_count;
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("trips");
-  auto dag = scan.proj({scan.ref("passenger_count"),
-                        scan.ref("pickup_datetime").extract("year").name("pickup_year")})
-                 .agg({0, 1}, {"count"})
-                 .sort({"passenger_count", SortDirection::Ascending})
-                 .finalize();
+  auto dag =
+      scan.proj({scan.ref("passenger_count"),
+                 scan.ref("pickup_datetime").extract("year").rename("pickup_year")})
+          .agg({0, 1}, {"count"})
+          .sort({"passenger_count", SortDirection::Ascending})
+          .finalize();
 
   run_compare_q3(std::move(dag));
 }
@@ -4884,8 +4886,8 @@ TEST_F(Taxi, Q4_2) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("trips");
   auto dag = scan.proj({scan.ref("passenger_count"),
-                        scan.ref("pickup_datetime").extract("year").name("pickup_year"),
-                        scan.ref("trip_distance").cast("int32").name("distance")})
+                        scan.ref("pickup_datetime").extract("year").rename("pickup_year"),
+                        scan.ref("trip_distance").cast("int32").rename("distance")})
                  .agg({0, 1, 2}, {"count"})
                  .sort({{1, SortDirection::Ascending}, {3, SortDirection::Descending}})
                  .finalize();
@@ -4900,8 +4902,8 @@ TEST_F(Taxi, Q4_3) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("trips");
   auto dag = scan.proj({scan.ref("passenger_count"),
-                        scan.ref("pickup_datetime").extract("year").name("pickup_year"),
-                        scan.ref("trip_distance").cast("int32").name("distance")})
+                        scan.ref("pickup_datetime").extract("year").rename("pickup_year"),
+                        scan.ref("trip_distance").cast("int32").rename("distance")})
                  .agg({0, 1, 2}, "count(*)")
                  .sort({{"pickup_year"s, "asc"s}, {"count"s, "desc"s}})
                  .finalize();
@@ -5223,16 +5225,16 @@ TEST_F(TPCH, Q1_1) {
       filter.ref("l_extendedprice").mul(builder.cst(1).sub(filter.ref("l_discount")));
   auto dag = filter
                  .agg({"l_returnflag", "l_linestatus"},
-                      {filter.ref("l_quantity").sum().name("sum_qty"),
-                       filter.ref("l_extendedprice").sum().name("sum_base_price"),
-                       disc_price.sum().name("sum_disc_price"),
+                      {filter.ref("l_quantity").sum().rename("sum_qty"),
+                       filter.ref("l_extendedprice").sum().rename("sum_base_price"),
+                       disc_price.sum().rename("sum_disc_price"),
                        disc_price.mul(builder.cst(1).add(filter.ref("l_tax")))
                            .sum()
-                           .name("sum_charge"),
-                       filter.ref("l_quantity").avg().name("avg_qty"),
-                       filter.ref("l_extendedprice").avg().name("avg_price"),
-                       filter.ref("l_discount").avg().name("avg_disc"),
-                       builder.count().name("count_order")})
+                           .rename("sum_charge"),
+                       filter.ref("l_quantity").avg().rename("avg_qty"),
+                       filter.ref("l_extendedprice").avg().rename("avg_price"),
+                       filter.ref("l_discount").avg().rename("avg_disc"),
+                       builder.count().rename("count_order")})
                  .sort({{"l_returnflag"}, {"l_linestatus"}})
                  .finalize();
 
@@ -5250,14 +5252,14 @@ TEST_F(TPCH, Q1_2) {
   auto charge = disc_price.mul(builder.cst(1).add(filter.ref("l_tax")));
   auto dag = filter
                  .agg({"l_returnflag", "l_linestatus"},
-                      {filter.ref("l_quantity").sum().name("sum_qty"),
-                       filter.ref("l_extendedprice").sum().name("sum_base_price"),
-                       disc_price.sum().name("sum_disc_price"),
-                       charge.sum().name("sum_charge"),
-                       filter.ref("l_quantity").avg().name("avg_qty"),
-                       filter.ref("l_extendedprice").avg().name("avg_price"),
-                       filter.ref("l_discount").avg().name("avg_disc"),
-                       builder.count().name("count_order")})
+                      {filter.ref("l_quantity").sum().rename("sum_qty"),
+                       filter.ref("l_extendedprice").sum().rename("sum_base_price"),
+                       disc_price.sum().rename("sum_disc_price"),
+                       charge.sum().rename("sum_charge"),
+                       filter.ref("l_quantity").avg().rename("avg_qty"),
+                       filter.ref("l_extendedprice").avg().rename("avg_price"),
+                       filter.ref("l_discount").avg().rename("avg_disc"),
+                       builder.count().rename("count_order")})
                  .sort({"l_returnflag", "l_linestatus"})
                  .finalize();
 
@@ -5274,14 +5276,14 @@ TEST_F(TPCH, Q1_3) {
   auto charge = disc_price * (1 + filter["l_tax"]);
   auto dag = filter
                  .agg({"l_returnflag", "l_linestatus"},
-                      {filter.ref("l_quantity").sum().name("sum_qty"),
-                       filter.ref("l_extendedprice").sum().name("sum_base_price"),
-                       disc_price.sum().name("sum_disc_price"),
-                       charge.sum().name("sum_charge"),
-                       filter.ref("l_quantity").avg().name("avg_qty"),
-                       filter.ref("l_extendedprice").avg().name("avg_price"),
-                       filter.ref("l_discount").avg().name("avg_disc"),
-                       builder.count().name("count_order")})
+                      {filter.ref("l_quantity").sum().rename("sum_qty"),
+                       filter.ref("l_extendedprice").sum().rename("sum_base_price"),
+                       disc_price.sum().rename("sum_disc_price"),
+                       charge.sum().rename("sum_charge"),
+                       filter.ref("l_quantity").avg().rename("avg_qty"),
+                       filter.ref("l_extendedprice").avg().rename("avg_price"),
+                       filter.ref("l_discount").avg().rename("avg_disc"),
+                       builder.count().rename("count_order")})
                  .sort({"l_returnflag", "l_linestatus"})
                  .finalize();
 
@@ -5480,7 +5482,7 @@ TEST_F(TPCH, Q3_1) {
       filter.ref("l_extendedprice").mul(builder.cst(1).sub(filter.ref("l_discount")));
   auto dag = filter
                  .agg({"l_orderkey", "o_orderdate", "o_shippriority"},
-                      {revenue.sum().name("revenue")})
+                      {revenue.sum().rename("revenue")})
                  .proj({"l_orderkey", "revenue", "o_orderdate", "o_shippriority"})
                  .sort({{"revenue"s, "desc"s}, {"o_orderdate"s, "asc"s}})
                  .finalize();
@@ -5500,7 +5502,7 @@ TEST_F(TPCH, Q3_2) {
   auto revenue = filter["l_extendedprice"] * (1 - filter["l_discount"]);
   auto dag = filter
                  .agg({"l_orderkey", "o_orderdate", "o_shippriority"},
-                      {revenue.sum().name("revenue")})
+                      {revenue.sum().rename("revenue")})
                  .proj({0, 3, 1, 2})
                  .sort({{1, "desc"}, {2, "asc"}})
                  .finalize();

@@ -31,7 +31,7 @@ class BuilderExpr {
   BuilderExpr& operator=(const BuilderExpr& other) = default;
   BuilderExpr& operator=(BuilderExpr&& other) = default;
 
-  BuilderExpr name(const std::string& name) const;
+  BuilderExpr rename(const std::string& name) const;
   const std::string& name() const { return name_; }
   bool isAutoNamed() const { return auto_name_; }
 

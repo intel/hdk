@@ -488,7 +488,7 @@ BuilderExpr::BuilderExpr(const QueryBuilder* builder,
                          bool auto_name)
     : builder_(builder), expr_(expr), name_(name), auto_name_(auto_name) {}
 
-BuilderExpr BuilderExpr::name(const std::string& name) const {
+BuilderExpr BuilderExpr::rename(const std::string& name) const {
   return {builder_, expr_, name, false};
 }
 
@@ -1984,7 +1984,7 @@ BuilderNode BuilderNode::agg(const std::vector<BuilderExpr>& group_keys,
       if (group_keys[i].isAutoNamed()) {
         new_keys.emplace_back(base.ref(i));
       } else {
-        new_keys.emplace_back(base.ref(i).name(group_keys[i].name()));
+        new_keys.emplace_back(base.ref(i).rename(group_keys[i].name()));
       }
     }
     return base.agg(new_keys, replaceInput(aggs, base.node_.get(), rev_shuffle));
