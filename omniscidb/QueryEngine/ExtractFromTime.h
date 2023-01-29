@@ -72,6 +72,14 @@ static constexpr uint32_t kSecsJanToMar1900 = 5097600;
 constexpr unsigned MARJAN = 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31;
 constexpr unsigned JANMAR = 31 + 28;  // leap day handled separately
 
+extern "C" int64_t extract_month(const int64_t timeval);
+extern "C" int64_t extract_day(const int64_t timeval);
+extern "C" int64_t extract_hour(const int64_t timeval);
+extern "C" int64_t extract_minute(const int64_t timeval);
+extern "C" int64_t extract_second(const int64_t timeval);
+extern "C" int32_t extract_month_fast(const int64_t timeval);
+extern "C" int32_t extract_year_fast(const int64_t timeval);
+
 DEVICE int64_t ExtractFromTime(hdk::ir::DateExtractField field, const int64_t timeval);
 std::string getStrDayFromSeconds(const int64_t seconds_tstamp);
 std::string getStrMonthFromSeconds(const int64_t seconds_tstamp);

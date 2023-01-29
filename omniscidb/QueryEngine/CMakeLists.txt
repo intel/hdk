@@ -53,6 +53,7 @@ set(query_engine_source_files
     ExtensionFunctions.ast
     ExtensionsIR.cpp
     ExternalExecutor.cpp
+    ExtractStringFromTime.cpp
     ExtractFromTime.cpp
     FromTableReordering.cpp
     GpuInterrupt.cpp
