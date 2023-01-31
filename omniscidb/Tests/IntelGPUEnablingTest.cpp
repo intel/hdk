@@ -56,6 +56,41 @@ struct ExecuteTestBase {
     }
   }
 
+  static void createSmallTestsTable() {
+    createTable(
+        "small_tests",
+        {{"x", ctx().int32(false)}, {"y", ctx().int32(false)}, {"z", ctx().int32(false)}},
+        {5});
+    run_sqlite_query("DROP TABLE IF EXISTS small_tests;");
+    run_sqlite_query(
+        "CREATE TABLE small_tests(x int not null, y int not null, z int not null);");
+    {
+      const std::string insert_query{"INSERT INTO small_tests VALUES(7, 43, 2);"};
+      run_sqlite_query(insert_query);
+      insertCsvValues("small_tests", "7,43,2");
+    }
+    {
+      const std::string insert_query{"INSERT INTO small_tests VALUES(9, 72, 1);"};
+      run_sqlite_query(insert_query);
+      insertCsvValues("small_tests", "9,72,1");
+    }
+    {
+      const std::string insert_query{"INSERT INTO small_tests VALUES(0, 0, 2);"};
+      run_sqlite_query(insert_query);
+      insertCsvValues("small_tests", "0,0,2");
+    }
+    {
+      const std::string insert_query{"INSERT INTO small_tests VALUES(1, 1, 1);"};
+      run_sqlite_query(insert_query);
+      insertCsvValues("small_tests", "1,1,1");
+    }
+    {
+      const std::string insert_query{"INSERT INTO small_tests VALUES(2, 2, 2);"};
+      run_sqlite_query(insert_query);
+      insertCsvValues("small_tests", "2,2,2");
+    }
+  }
+
   static void createTestTable() {
     auto test_inner = getStorage()->getTableInfo(TEST_DB_ID, "test_inner");
     auto test_inner_str = getStorage()->getColumnInfo(*test_inner, "str");
@@ -181,6 +216,7 @@ struct ExecuteTestBase {
   static void createAndPopulateTestTables() {
     createTestInnerTable();
     createTestTable();
+    createSmallTestsTable();
   }
 };
 
@@ -188,6 +224,11 @@ class AggregationTest : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(AggregationTest, StandaloneCount) {
   c("SELECT COUNT(*) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, StandaloneCountFilter) {
+  c("SELECT COUNT(*) FROM small_tests WHERE x > y;", g_dt);
+  c("SELECT COUNT(*) FROM small_tests WHERE y > z;", g_dt);
 }
 
 TEST_F(AggregationTest, StandaloneCountWithProjection) {
@@ -215,14 +256,29 @@ TEST_F(AggregationTest, CountWithProjectionAfterCountStar) {
 }
 
 TEST_F(AggregationTest, Sum) {
-  GTEST_SKIP();
   c("SELECT SUM(x) FROM test;", g_dt);
 }
 
+TEST_F(AggregationTest, Sum2) {
+  c("SELECT SUM(x + y) FROM test;", g_dt);
+}
+
 TEST_F(AggregationTest, ConsequentSum) {
+  c("SELECT SUM(x) FROM test;", g_dt);
+  c("SELECT SUM(y) FROM test;", g_dt);
+}
+
+class GroupByAggTest : public ExecuteTestBase, public ::testing::Test {};
+
+TEST_F(GroupByAggTest, GroupByCount) {
+  c("SELECT COUNT(*) FROM small_tests GROUP BY z;", g_dt);
+  c("SELECT COUNT(x) FROM small_tests GROUP BY z;", g_dt);
+}
+
+TEST_F(GroupByAggTest, GroupBySum) {
   GTEST_SKIP();
-  c("SELECT SUM(x) FROM test;", g_dt);
-  c("SELECT SUM(x) FROM test;", g_dt);
+  c("SELECT SUM(x) FROM small_tests GROUP BY z;", g_dt);
+  c("SELECT SUM(x + y) FROM small_tests GROUP BY z;", g_dt);
 }
 
 class BasicTest : public ExecuteTestBase, public ::testing::Test {};
