@@ -31,6 +31,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <boost/functional/hash.hpp>
+
 #include "IR/Context.h"
 #include "IR/Type.h"
 #include "Logger/Logger.h"

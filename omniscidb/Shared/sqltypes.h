@@ -26,8 +26,6 @@
 #include "StringTransform.h"
 #include "funcannotations.h"
 
-#include <boost/functional/hash.hpp>
-
 #include <cassert>
 #include <cfloat>
 #include <cmath>
