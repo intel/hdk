@@ -984,7 +984,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   L0BinResult bin_result;
   const auto l0_mgr = dynamic_cast<const l0::L0Manager*>(gpu_target.gpu_mgr);
   try {
-    bin_result = spv_to_bin(ss.str(), func_name, 1 /*todo block size*/, l0_mgr);
+    bin_result = spv_to_bin(ss.str(), func_name, gpu_target.block_size, l0_mgr);
   } catch (l0::L0Exception& e) {
     llvm::errs() << e.what() << "\n";
     return {};
