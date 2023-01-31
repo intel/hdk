@@ -12,6 +12,7 @@
 #include "Shared/SqlTypesLayout.h"
 
 #include <boost/algorithm/string.hpp>
+#include <numeric>
 
 namespace hdk::ir {
 
@@ -1601,9 +1602,7 @@ BuilderNode BuilderNode::proj(const std::vector<BuilderExpr>& exprs,
 
 BuilderNode BuilderNode::proj() const {
   std::vector<int> col_indexes(node_->size());
-  for (int i = 0; i < (int)col_indexes.size(); ++i) {
-    col_indexes[i] = i;
-  }
+  std::iota(col_indexes.begin(), col_indexes.end(), 0);
   return proj(col_indexes);
 }
 
@@ -2165,7 +2164,7 @@ BuilderNode BuilderNode::sort(const std::vector<BuilderSortField>& fields,
                               size_t limit,
                               size_t offset) const {
   std::vector<SortField> collation;
-  for (auto field : fields) {
+  for (auto& field : fields) {
     ExprPtr col_ref;
     if (field.hasColIdx()) {
       col_ref = ref(field.colIdx()).expr();
