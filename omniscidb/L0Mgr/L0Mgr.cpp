@@ -400,7 +400,7 @@ uint32_t L0Manager::getGridSize() const {
     cnt = d->maxGroupCount() < cnt ? d->maxGroupCount() : cnt;
   }
   CHECK_GT(cnt, 0);
-  return cnt * getMaxBlockSize() /*fixme: refactor on smem enabling*/;
+  return cnt;
 }
 
 uint32_t L0Manager::getMinEUNumForAllDevices() const {
