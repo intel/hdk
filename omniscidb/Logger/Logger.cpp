@@ -85,7 +85,7 @@ std::string filename(char const* path) {
 }
 
 LogOptions::LogOptions(char const* argv0)
-    : log_dir_(std::make_unique<boost::filesystem::path>("mapd_log")) {
+    : log_dir_(std::make_unique<boost::filesystem::path>("hdk_log")) {
   // Log file base_name matches name of program.
   std::string const base_name =
       argv0 == nullptr ? std::string("omnisci_server") : filename(argv0);
