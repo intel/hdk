@@ -36,7 +36,7 @@ extern bool g_enable_table_functions;
 namespace {
 
 std::string getFilePath(const std::string& file_name) {
-  return std::string("../../Tests/ArrowStorageDataFiles/") + file_name;
+  return TEST_SOURCE_PATH + "/ArrowStorageDataFiles/"s + file_name;
 }
 
 class TestSuite : public ::testing::Test {
