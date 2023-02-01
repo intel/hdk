@@ -3,5 +3,9 @@ set(EXECUTE_TEST_LIBS gtest ArrowQueryRunner ArrowStorage ${MAPD_LIBRARIES} ${Ar
 add_executable(${bench_name} taxi_reduced_bench.cpp)
 target_link_libraries(${bench_name} ${EXECUTE_TEST_LIBS} benchmark)
 
+include_directories("/opt/intel/oneapi/vtune/latest/include")
+link_directories("/opt/intel/oneapi/vtune/latest/lib64")
+
 add_executable(taxi_full taxi_full_bench.cpp)
 target_link_libraries(taxi_full ${EXECUTE_TEST_LIBS} benchmark)
+target_link_libraries(taxi_full ittnotify)

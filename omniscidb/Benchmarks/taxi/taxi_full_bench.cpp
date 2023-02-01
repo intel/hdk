@@ -7,6 +7,16 @@
 
 #include <tbb/parallel_for.h>
 
+#include <ittnotify.h>
+__itt_domain* domain = __itt_domain_create("HDK.Taxi.Bench");
+__itt_string_handle* handle_import_csv = __itt_string_handle_create("Import CSV");
+__itt_string_handle* handle_import = __itt_string_handle_create("Import Parquet");
+__itt_string_handle* handle_count = __itt_string_handle_create("Count");
+__itt_string_handle* handle_q1 = __itt_string_handle_create("Q1");
+__itt_string_handle* handle_q2 = __itt_string_handle_create("Q2");
+__itt_string_handle* handle_q3 = __itt_string_handle_create("Q3");
+__itt_string_handle* handle_q4 = __itt_string_handle_create("Q4");
+
 boost::filesystem::path g_data_path;
 size_t num_threads = 64;
 size_t g_fragment_size = 160000000 / num_threads;
@@ -141,6 +151,8 @@ static void createTaxiTable() {
 }
 
 static void populateTaxiTableCsv() {
+  __itt_task_begin(domain, __itt_null, __itt_null, handle_import_csv);
+
   namespace fs = boost::filesystem;
   ArrowStorage::CsvParseOptions po;
   po.header = false;
@@ -165,9 +177,13 @@ static void populateTaxiTableCsv() {
   } else {
     getStorage()->appendCsvFile(g_data_path.string(), "trips", po);
   }
+
+  __itt_task_end(domain);
 }
 
 static void populateTaxiTableParquet() {
+  __itt_task_begin(domain, __itt_null, __itt_null, handle_import);
+
   namespace fs = boost::filesystem;
   ArrowStorage::CsvParseOptions po;
   po.header = false;
@@ -198,6 +214,8 @@ static void populateTaxiTableParquet() {
   } else {
     getStorage()->appendParquetFile(g_data_path.string(), "trips");
   }
+
+  __itt_task_end(domain);
 }
 
 static void populateTaxiTable() {
@@ -221,10 +239,11 @@ static void table_count(benchmark::State& state) {
     createTaxiTable();
     populateTaxiTable();
 #endif
-
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_count);
     auto res =
         v<int64_t>(run_simple_agg("select count(*) from trips", ExecutorDeviceType::CPU));
     std::cout << "Number of loaded tuples: " << res << std::endl;
+    __itt_task_end(domain);
   }
 }
 
@@ -235,8 +254,10 @@ static void taxi_q1(benchmark::State& state) {
     populateTaxiTable();
 #endif
 
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_q1);
     run_multiple_agg("select cab_type, count(*) from trips group by cab_type",
                      ExecutorDeviceType::CPU);
+    __itt_task_end(domain);
   }
 }
 
@@ -247,9 +268,11 @@ static void taxi_q2(benchmark::State& state) {
     populateTaxiTable();
 #endif
 
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_q2);
     run_multiple_agg(
         "SELECT passenger_count, avg(total_amount) FROM trips GROUP BY passenger_count",
         ExecutorDeviceType::CPU);
+    __itt_task_end(domain);
   }
 }
 
@@ -260,10 +283,12 @@ static void taxi_q3(benchmark::State& state) {
     populateTaxiTable();
 #endif
 
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_q3);
     run_multiple_agg(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "count(*) FROM trips GROUP BY passenger_count, pickup_year",
         ExecutorDeviceType::CPU);
+    __itt_task_end(domain);
   }
 }
 
@@ -274,12 +299,14 @@ static void taxi_q4(benchmark::State& state) {
     populateTaxiTable();
 #endif
 
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_q4);
     run_multiple_agg(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP "
         "BY passenger_count, pickup_year, distance ORDER BY pickup_year, the_count "
         "desc",
         ExecutorDeviceType::CPU);
+    __itt_task_end(domain);
   }
 }
 
