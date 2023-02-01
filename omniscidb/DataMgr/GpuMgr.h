@@ -61,4 +61,6 @@ struct GpuMgr {
   virtual int8_t getSubGroupSize() const = 0;
   virtual uint32_t getGridSize() const = 0;
   virtual uint32_t getMinEUNumForAllDevices() const = 0;
+  virtual bool hasSharedMemoryAtomicsSupport() const = 0;
+  virtual size_t getMinSharedMemoryPerBlockForAllDevices() const = 0;
 };

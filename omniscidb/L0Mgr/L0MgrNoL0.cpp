@@ -133,6 +133,14 @@ unsigned L0Manager::getMinEUNumForAllDevices() const {
   CHECK(false);
 }
 
+bool L0Manager::hasSharedMemoryAtomicsSupport() const {
+  CHECK(false);
+};
+
+size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
+  CHECK(false);
+};
+
 const std::vector<std::shared_ptr<L0Driver>>& L0Manager::drivers() const {
   return drivers_;
 }

@@ -672,22 +672,29 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
     const GpuMgr* gpu_mgr,
     Executor* executor,
     const ExecutorDeviceType device_type) const {
-  if (device_type == ExecutorDeviceType::CPU) {
+  if (device_type == ExecutorDeviceType::CPU || !gpu_mgr) {
+    return 0;
+  }
+  /* We only use shared memory strategy if GPU hardware provides native shared
+   * memory atomics support. */
+  if (!gpu_mgr->hasSharedMemoryAtomicsSupport()) {
     return 0;
   }
 
-  if (gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
-    return 0;
-  }
-
-  CHECK(gpu_mgr->getPlatform() == GpuMgrPlatform::CUDA);
-  const auto cuda_mgr = dynamic_cast<const CudaMgr_Namespace::CudaMgr*>(gpu_mgr);
-
-  if (!cuda_mgr) {
-    return 0;
-  }
   const auto gpu_blocksize = executor->blockSize();
   const auto num_blocks_per_mp = executor->numBlocksPerMP();
+
+  /**
+   * To simplify the implementation for practical purposes, we
+   * initially provide shared memory support for cases where there are at most as many
+   * entries in the output buffer as there are threads within each GPU device. In
+   * order to relax this assumption later, we need to add a for loop in generated
+   * codes such that each thread loops over multiple entries.
+   * TODO: relax this if necessary
+   */
+  if (gpu_blocksize < query_mem_desc->getEntryCount()) {
+    return 0;
+  }
 
   CHECK(query_mem_desc);
   if (query_mem_desc->didOutputColumnar()) {
@@ -695,42 +702,22 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
   }
 
   const Config& config = executor->getConfig();
-  /*
-   * We only use shared memory strategy if GPU hardware provides native shared
-   * memory atomics support. From CUDA Toolkit documentation:
-   * https://docs.nvidia.com/cuda/pascal-tuning-guide/index.html#atomic-ops "Like
-   * Maxwell, Pascal [and Volta] provides native shared memory atomic operations
-   * for 32-bit integer arithmetic, along with native 32 or 64-bit compare-and-swap
-   * (CAS)."
-   *
-   **/
-  if (!cuda_mgr->isArchMaxwellOrLaterForAll()) {
-    return 0;
-  }
 
   if (query_mem_desc->getQueryDescriptionType() ==
           QueryDescriptionType::NonGroupedAggregate &&
       config.exec.group_by.enable_gpu_smem_non_grouped_agg &&
       query_mem_desc->countDistinctDescriptorsLogicallyEmpty()) {
-    // TODO: relax this, if necessary
-    if (gpu_blocksize < query_mem_desc->getEntryCount()) {
-      return 0;
-    }
     // skip shared memory usage when dealing with 1) variable length targets, 2)
     // not a COUNT aggregate
     const auto target_infos = target_exprs_to_infos(
         ra_exe_unit_.target_exprs, *query_mem_desc, config.exec.group_by.bigint_count);
-    std::unordered_set<hdk::ir::AggType> supported_aggs{hdk::ir::AggType::kCount};
-    if (std::find_if(target_infos.begin(),
-                     target_infos.end(),
-                     [&supported_aggs](const TargetInfo& ti) {
-                       if (ti.type->isString() || ti.type->isArray() ||
-                           !supported_aggs.count(ti.agg_kind)) {
-                         return true;
-                       } else {
-                         return false;
-                       }
-                     }) == target_infos.end()) {
+    const std::unordered_set<hdk::ir::AggType> supported_aggs{hdk::ir::AggType::kCount};
+    auto is_supported = [&supported_aggs](const TargetInfo& ti) {
+      return !(ti.type->isString() || ti.type->isArray() ||
+               !supported_aggs.count(ti.agg_kind));
+    };
+
+    if (std::all_of(target_infos.begin(), target_infos.end(), is_supported)) {
       return query_mem_desc->getRowSize() * query_mem_desc->getEntryCount();
     }
   }
@@ -738,18 +725,6 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
   if (query_mem_desc->getQueryDescriptionType() ==
           QueryDescriptionType::GroupByPerfectHash &&
       config.exec.group_by.enable_gpu_smem_group_by) {
-    /**
-     * To simplify the implementation for practical purposes, we
-     * initially provide shared memory support for cases where there are at most as many
-     * entries in the output buffer as there are threads within each GPU device. In
-     * order to relax this assumption later, we need to add a for loop in generated
-     * codes such that each thread loops over multiple entries.
-     * TODO: relax this if necessary
-     */
-    if (gpu_blocksize < query_mem_desc->getEntryCount()) {
-      return 0;
-    }
-
     // Fundamentally, we should use shared memory whenever the output buffer
     // is small enough so that we can fit it in the shared memory and yet expect
     // good occupancy.
@@ -758,11 +733,12 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
     if (query_mem_desc->hasKeylessHash() &&
         query_mem_desc->countDistinctDescriptorsLogicallyEmpty() &&
         !query_mem_desc->useStreamingTopN()) {
+      const size_t smem_threshold = config.exec.group_by.gpu_smem_threshold == 0
+                                        ? SIZE_MAX
+                                        : config.exec.group_by.gpu_smem_threshold;
       const size_t shared_memory_threshold_bytes = std::min(
-          config.exec.group_by.gpu_smem_threshold == 0
-              ? SIZE_MAX
-              : config.exec.group_by.gpu_smem_threshold,
-          cuda_mgr->getMinSharedMemoryPerBlockForAllDevices() / num_blocks_per_mp);
+          smem_threshold,
+          gpu_mgr->getMinSharedMemoryPerBlockForAllDevices() / num_blocks_per_mp);
       const auto output_buffer_size =
           query_mem_desc->getRowSize() * query_mem_desc->getEntryCount();
       if (output_buffer_size > shared_memory_threshold_bytes) {
@@ -782,16 +758,12 @@ size_t MemoryLayoutBuilder::gpuSharedMemorySize(
                           hdk::ir::AggType::kSum,
                           hdk::ir::AggType::kAvg};
       }
-      if (std::find_if(target_infos.begin(),
-                       target_infos.end(),
-                       [&supported_aggs](const TargetInfo& ti) {
-                         if (ti.type->isString() || ti.type->isArray() ||
-                             !supported_aggs.count(ti.agg_kind)) {
-                           return true;
-                         } else {
-                           return false;
-                         }
-                       }) == target_infos.end()) {
+      auto is_supported = [&supported_aggs](const TargetInfo& ti) {
+        return !(ti.type->isString() || ti.type->isArray() ||
+                 !supported_aggs.count(ti.agg_kind));
+      };
+
+      if (std::all_of(target_infos.begin(), target_infos.end(), is_supported)) {
         return query_mem_desc->getRowSize() * query_mem_desc->getEntryCount();
       }
     }
