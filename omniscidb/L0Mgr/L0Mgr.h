@@ -242,6 +242,8 @@ class L0Manager : public GpuMgr {
   virtual int8_t getSubGroupSize() const override;
   virtual unsigned getGridSize() const override;
   virtual unsigned getMinEUNumForAllDevices() const override;
+  virtual bool hasSharedMemoryAtomicsSupport() const override;
+  virtual size_t getMinSharedMemoryPerBlockForAllDevices() const override;
 
   const std::vector<std::shared_ptr<L0Driver>>& drivers() const;
 
