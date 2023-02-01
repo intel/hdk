@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <boost/functional/hash.hpp>
+#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include "DataMgr/ArenaBufferMgr/ArenaBuffer.h"
@@ -132,27 +133,6 @@ struct TableArena {
   const size_t num_cols;
 };
 
-struct ArenaKey {
-  ChunkKey key;
-
-  bool operator==(const ArenaKey& b) const { return key == b.key; }
-};
-
-struct ArenaKeyHash {
-  size_t operator()(const ArenaKey& val) const {
-    if (val.key.size() == 0) {
-      return 0;
-    }
-    size_t h = 0;
-
-    boost::hash_combine(h, val.key.front());
-    for (size_t i = 1; i < val.key.size(); i++) {
-      boost::hash_combine(h, val.key[i]);
-    }
-    return h;
-  }
-};
-
 class ArenaBufferMgr {
  public:
   ArenaBufferMgr(AbstractBufferMgr* storage_mgr) {
@@ -164,15 +144,16 @@ class ArenaBufferMgr {
   AbstractBuffer* getChunkBuffer(const ChunkKey& key, const size_t num_bytes) {
     CHECK_GE(key.size(), size_t(4));
 
-    std::lock_guard<std::mutex> big_lock(global_mutex_);  // TODO: remove
-
-    ArenaKey a_key{key};
-
+    std::unique_lock arenas_per_table_write_lock(arenas_per_table_mutex_);
     const auto table_key =
         std::make_pair(key[CHUNK_KEY_DB_IDX], key[CHUNK_KEY_TABLE_IDX]);
     if (arenas_per_table_.find(table_key) == arenas_per_table_.end()) {
       initializeTableArena(table_key);
     }
+    // once we're here the arena object will be initialized, and concurrent access will be
+    // safe
+    arenas_per_table_write_lock.unlock();
+    std::shared_lock arenas_per_table_read_lock(arenas_per_table_mutex_);
     auto table_arena_itr = arenas_per_table_.find(table_key);
     CHECK(table_arena_itr != arenas_per_table_.end())
         << table_key.first << " , " << table_key.second;
@@ -193,10 +174,7 @@ class ArenaBufferMgr {
   int getChunkBufferNumaNode(const ChunkKey& key) const {
     CHECK_GE(key.size(), size_t(4));
 
-    std::lock_guard<std::mutex> big_lock(global_mutex_);  // TODO: remove
-
-    ArenaKey a_key{key};
-
+    std::shared_lock arenas_per_table_read_lock(arenas_per_table_mutex_);
     const auto table_key =
         std::make_pair(key[CHUNK_KEY_DB_IDX], key[CHUNK_KEY_TABLE_IDX]);
     if (arenas_per_table_.find(table_key) == arenas_per_table_.end()) {
@@ -271,10 +249,9 @@ class ArenaBufferMgr {
 
   // db_id, table
   std::unordered_map<std::pair<int, int>, std::unique_ptr<TableArena>> arenas_per_table_;
+  mutable std::shared_mutex arenas_per_table_mutex_;
 
   PersistentStorageMgr* storage_mgr_;
-
-  mutable std::mutex global_mutex_;
 };
 
 }  // namespace Data_Namespace
