@@ -20,6 +20,8 @@
 #include "QueryEngine/Execute.h"
 #include "Shared/misc.h"
 
+#include "DataMgr/ArenaBufferMgr/ArenaBufferMgr.h"  // TODO: remove
+
 #include "QueryEngine/Dispatchers/DefaultExecutionPolicy.h"
 
 QueryFragmentDescriptor::QueryFragmentDescriptor(
@@ -149,8 +151,21 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
       checkDeviceMemoryUsage(fragment, device_id, num_bytes_for_row);
     }
 
+    // see if we can determine the numa node
+    auto data_mgr = executor->getDataMgr();
+    auto arena_buff_mgr = data_mgr->getArenaBufferMgrPtr();
+    CHECK(arena_buff_mgr);
+
+    ChunkKey key = {table_desc.getDatabaseId(),
+                    table_desc.getTableId(),
+                    /*col_idx=*/-1,
+                    fragment.fragmentId};
+    const auto numa_node = arena_buff_mgr->getChunkBufferNumaNode(key);
+    // LOG(ERROR) << "NUMA NODE: " << numa_node << " for fragment " <<
+    // fragment.fragmentId;
+
     ExecutionKernelDescriptor execution_kernel_desc{
-        device_id, {}, get_fragment_tuple_count(fragment)};
+        device_id, {}, get_fragment_tuple_count(fragment), numa_node};
     if (table_desc_offset) {
       const auto frag_ids =
           executor->getTableFragmentIndices(ra_exe_unit,

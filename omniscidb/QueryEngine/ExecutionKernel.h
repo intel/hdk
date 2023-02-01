@@ -44,22 +44,14 @@ class SharedKernelContext {
 
   std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& getFragmentResults();
 
-  const std::vector<InputTableInfo>& getQueryInfos() const {
-    return query_infos_;
-  }
+  const std::vector<InputTableInfo>& getQueryInfos() const { return query_infos_; }
 
   std::atomic_flag dynamic_watchdog_set = ATOMIC_FLAG_INIT;
 
 #ifdef HAVE_TBB
-  auto getThreadPool() {
-    return task_group_;
-  }
-  void setThreadPool(threading::task_group* tg) {
-    task_group_ = tg;
-  }
-  auto& getTlsExecutionContext() {
-    return tls_execution_context_;
-  }
+  auto getThreadPool() { return task_group_; }
+  void setThreadPool(threading::task_group* tg) { task_group_ = tg; }
+  auto& getTlsExecutionContext() { return tls_execution_context_; }
 #endif  // HAVE_TBB
 
  private:
@@ -88,7 +80,8 @@ class ExecutionKernel {
                   const QueryMemoryDescriptor& query_mem_desc,
                   const FragmentsList& frag_list,
                   const ExecutorDispatchMode kernel_dispatch_mode,
-                  const int64_t rowid_lookup_key)
+                  const int64_t rowid_lookup_key,
+                  const int numa_node = -1)
       : ra_exe_unit_(ra_exe_unit)
       , chosen_device_type(chosen_device_type)
       , chosen_device_id(chosen_device_id)
@@ -98,11 +91,14 @@ class ExecutionKernel {
       , query_mem_desc(query_mem_desc)
       , frag_list(frag_list)
       , kernel_dispatch_mode(kernel_dispatch_mode)
-      , rowid_lookup_key(rowid_lookup_key) {}
+      , rowid_lookup_key(rowid_lookup_key)
+      , numa_node(numa_node) {}
 
   void run(Executor* executor,
            const size_t thread_idx,
            SharedKernelContext& shared_context);
+
+  const int getNumaNode() const { return numa_node; }
 
   const RelAlgExecutionUnit& ra_exe_unit_;
 
@@ -116,6 +112,7 @@ class ExecutionKernel {
   const FragmentsList frag_list;
   const ExecutorDispatchMode kernel_dispatch_mode;
   const int64_t rowid_lookup_key;
+  const int numa_node;
 
   ResultSetPtr device_results_;
 

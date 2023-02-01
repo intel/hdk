@@ -232,6 +232,8 @@ class DataMgr {
 
   bool useArenaBufferMgr() const { return !(arena_buffer_mgr_ == nullptr); }
 
+  ArenaBufferMgr* getArenaBufferMgrPtr() const { return arena_buffer_mgr_.get(); }
+
   AbstractBuffer* getChunkBufferFromArena(const ChunkKey& key, const size_t numBytes = 0);
 
  private:

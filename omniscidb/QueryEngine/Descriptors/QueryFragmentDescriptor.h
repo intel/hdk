@@ -59,7 +59,8 @@ struct ExecutionKernelDescriptor {
   int device_id;
   FragmentsList fragments;
   std::optional<size_t> outer_tuple_count;  // only for fragments with an exact tuple
-                                            // count available in metadata
+  // count available in metadata
+  int numa_node;
 };
 
 class QueryFragmentDescriptor {
@@ -137,7 +138,8 @@ class QueryFragmentDescriptor {
             f(device_itr.first,
               execution_kernel.fragments,
               rowid_lookup_key_,
-              device_type_itr.first);
+              device_type_itr.first,
+              execution_kernel.numa_node);
             if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
               return;
             }

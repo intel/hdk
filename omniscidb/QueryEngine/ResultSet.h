@@ -798,8 +798,11 @@ class ResultSet {
 
   size_t rowCountImpl(const bool force_parallel) const;
 
-  Data_Namespace::DataMgr* getDataManager() const;
+  // TODO: remove
+ public:
+  Data_Namespace::DataMgr* getDataManager() const { return data_mgr_; }
 
+ private:
   int getGpuCount() const;
 
   void serializeProjection(TSerializedRows& serialized_rows) const;

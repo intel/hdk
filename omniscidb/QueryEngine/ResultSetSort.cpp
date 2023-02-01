@@ -189,10 +189,6 @@ bool ResultSet::canUseFastBaselineSort(
          top_n;
 }
 
-Data_Namespace::DataMgr* ResultSet::getDataManager() const {
-  return data_mgr_;
-}
-
 int ResultSet::getGpuCount() const {
   const auto data_mgr = getDataManager();
   if (!data_mgr) {

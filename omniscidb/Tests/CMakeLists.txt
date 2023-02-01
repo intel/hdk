@@ -93,7 +93,7 @@ target_link_libraries(StringTransformTest Logger Shared gtest ${Boost_LIBRARIES}
 target_link_libraries(StringFunctionsTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(CodeGeneratorTest gtest ${llvm_libs} QueryEngine)
 target_link_libraries(ArrowBasedExecuteTest gtest QueryEngine ArrowQueryRunner)
-target_link_libraries(StandaloneQueryRunner gtest QueryEngine ArrowQueryRunner)
+target_link_libraries(StandaloneQueryRunner gtest QueryEngine ArrowQueryRunner DataMgr)
 target_link_libraries(TableFunctionsTest gtest QueryEngine ArrowQueryRunner ConfigBuilder)
 target_link_libraries(ArrayTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(GroupByTest gtest QueryEngine ArrowQueryRunner)

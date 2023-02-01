@@ -30,6 +30,7 @@
 #include <memory>
 #include <mutex>
 #include <numeric>
+#include <random>
 #include <thread>
 
 #include "CudaMgr/CudaMgr.h"
@@ -2479,7 +2480,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
                                             const int device_id,
                                             const FragmentsList& frag_list,
                                             const int64_t rowid_lookup_key,
-                                            const ExecutorDeviceType device_type) {
+                                            const ExecutorDeviceType device_type,
+                                            const int numa_node) {
       if (!frag_list.size()) {
         return;
       }
@@ -2494,7 +2496,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
                                             query_mem_desc,
                                             frag_list,
                                             ExecutorDispatchMode::KernelPerFragment,
-                                            rowid_lookup_key));
+                                            rowid_lookup_key,
+                                            numa_node));
       ++frag_list_idx;
     };
 
@@ -2567,7 +2570,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
                                           const int device_id,
                                           const FragmentsList& frag_list,
                                           const int64_t rowid_lookup_key,
-                                          const ExecutorDeviceType device_type) {
+                                          const ExecutorDeviceType device_type,
+                                          const int numa_node) {
     if (!frag_list.size()) {
       return;
     }
@@ -2585,7 +2589,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
                                           *query_mem_descs.at(device_type).get(),
                                           frag_list,
                                           ExecutorDispatchMode::KernelPerFragment,
-                                          rowid_lookup_key));
+                                          rowid_lookup_key,
+                                          numa_node));
     ++frag_list_idx;
   };
 
@@ -2603,16 +2608,30 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
   std::lock_guard<std::mutex> kernel_lock(kernel_mutex_);
   kernel_queue_time_ms_ += timer_stop(clock_begin);
 
-  threading::task_group tg;
+  // BEGIN tbb numa nodes
+  std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
+  CHECK_EQ(numa_nodes.size(), size_t(2));
+  std::vector<tbb::task_arena> arenas(numa_nodes.size());
+  std::vector<tbb::task_group> task_groups(numa_nodes.size());
+  for (int i = 0; i < numa_nodes.size(); i++) {
+    arenas[i].initialize(tbb::task_arena::constraints(numa_nodes[i]));
+  }
+
+  std::mt19937 rand_gen;
+  std::uniform_int_distribution<> numa_nodes_dist(0, int(numa_nodes.size() - 1));
+
+  // END tbb numa nodes
+
   // A hack to have unused unit for results collection.
   const RelAlgExecutionUnit* ra_exe_unit =
       kernels.empty() ? nullptr : &kernels[0]->ra_exe_unit_;
 
 #ifdef HAVE_TBB
-  if (config_->exec.sub_tasks.enable && device_type == ExecutorDeviceType::CPU) {
-    shared_context.setThreadPool(&tg);
-  }
-  ScopeGuard pool_guard([&shared_context]() { shared_context.setThreadPool(nullptr); });
+// if (config_->exec.sub_tasks.enable && device_type == ExecutorDeviceType::CPU) {
+// shared_context.setThreadPool(&tg);
+// }
+// ScopeGuard pool_guard([&shared_context]() { shared_context.setThreadPool(nullptr);
+// });
 #endif  // HAVE_TBB
 
   VLOG(1) << "Launching " << kernels.size() << " kernels for query on "
@@ -2620,17 +2639,35 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
   size_t kernel_idx = 1;
   for (auto& kernel : kernels) {
     CHECK(kernel.get());
-    tg.run([this,
-            &kernel,
-            &shared_context,
-            parent_thread_id = logger::thread_id(),
-            crt_kernel_idx = kernel_idx++] {
-      DEBUG_TIMER_NEW_THREAD(parent_thread_id);
-      const size_t thread_i = crt_kernel_idx % cpu_threads();
-      kernel->run(this, thread_i, shared_context);
+    auto kernel_numa_node = kernel->getNumaNode();
+    if (kernel_numa_node == -1) {
+      // random node
+      kernel_numa_node = numa_nodes_dist(rand_gen);
+    }
+    CHECK_GE(kernel_numa_node, 0);
+    CHECK_LT(kernel_numa_node, arenas.size());
+    // LOG(ERROR) << "KERNEL NUMA NODE: " << kernel->getNumaNode();
+    arenas[kernel_numa_node].execute([this,
+                                      &task_groups,
+                                      kernel_numa_node,
+                                      &kernel,
+                                      &shared_context,
+                                      parent_thread_id = logger::thread_id(),
+                                      crt_kernel_idx = kernel_idx++
+
+    ] {
+      task_groups[kernel_numa_node].run(
+          [this, &kernel, &shared_context, parent_thread_id, crt_kernel_idx] {
+            DEBUG_TIMER_NEW_THREAD(parent_thread_id);
+            const size_t thread_i = crt_kernel_idx % cpu_threads();
+            kernel->run(this, thread_i, shared_context);
+          });
     });
   }
-  tg.wait();
+
+  for (int i = 0; i < numa_nodes.size(); i++) {
+    arenas[i].execute([&task_groups, i] { task_groups[i].wait(); });
+  }
 
   for (auto& exec_ctx : shared_context.getTlsExecutionContext()) {
     // The first arg is used for GPU only, it's not our case.
