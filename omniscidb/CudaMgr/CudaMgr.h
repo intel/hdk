@@ -117,7 +117,7 @@ class CudaMgr : public GpuMgr {
                     const size_t num_bytes,
                     const int device_num) override;
 
-  size_t getMinSharedMemoryPerBlockForAllDevices() const {
+  size_t getMinSharedMemoryPerBlockForAllDevices() const override {
     return min_shared_memory_per_block_for_all_devices;
   }
 
@@ -162,6 +162,18 @@ class CudaMgr : public GpuMgr {
   unsigned getGridSize() const override { return 2 * getMinNumMPsForAllDevices(); }
   unsigned getMinEUNumForAllDevices() const override {
     return getMinNumMPsForAllDevices();
+  };
+
+  bool hasSharedMemoryAtomicsSupport() const override {
+    /*
+     * From CUDA Toolkit documentation:
+     * https://docs.nvidia.com/cuda/pascal-tuning-guide/index.html#atomic-ops "Like
+     * Maxwell, Pascal [and Volta] provides native shared memory atomic operations
+     * for 32-bit integer arithmetic, along with native 32 or 64-bit compare-and-swap
+     * (CAS)."
+     *
+     **/
+    return isArchMaxwellOrLaterForAll();
   };
 
   static std::string deviceArchToSM(const NvidiaDeviceArch arch) {
@@ -221,12 +233,8 @@ class CudaMgr : public GpuMgr {
 
   void printDeviceProperties() const;
 
-  const std::vector<CUcontext>& getDeviceContexts() const {
-    return device_contexts_;
-  }
-  const int getGpuDriverVersion() const {
-    return gpu_driver_version_;
-  }
+  const std::vector<CUcontext>& getDeviceContexts() const { return device_contexts_; }
+  const int getGpuDriverVersion() const { return gpu_driver_version_; }
 
   void loadGpuModuleData(CUmodule* module,
                          const void* image,
