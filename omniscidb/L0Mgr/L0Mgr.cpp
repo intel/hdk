@@ -407,4 +407,12 @@ uint32_t L0Manager::getMinEUNumForAllDevices() const {
   return 1u;
 }
 
+bool L0Manager::hasSharedMemoryAtomicsSupport() const {
+  return false;
+}
+
+size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
+  return 0;
+};
+
 }  // namespace l0
