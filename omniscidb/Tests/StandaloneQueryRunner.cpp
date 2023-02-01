@@ -16,6 +16,7 @@
  */
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "DataMgr/ArenaBufferMgr/ArenaBufferMgr.h"
 #include "QueryEngine/Execute.h"
 #include "Tests/TestHelpers.h"
 
@@ -144,29 +145,34 @@ int main(int argc, char** argv) {
   try {
     createAndPopulateTable();
 
-    {
-      const ExecutorDeviceType dt =
-          g_cpu_only ? ExecutorDeviceType::CPU : ExecutorDeviceType::GPU;
+    for (int i = 0; i < 2; i++) {
+      const ExecutorDeviceType dt = ExecutorDeviceType::CPU;
       const auto device_type_str = dt == ExecutorDeviceType::CPU ? " CPU: " : " GPU: ";
       auto eo =
           ArrowSQLRunner::getExecutionOptions(/*allow_loop_joins=*/false, just_explain);
       auto co = ArrowSQLRunner::getCompilationOptions(dt);
       auto res = ArrowSQLRunner::runSqlQuery(
-          R"(SELECT COUNT(*), AVG(x), SUM(y), SUM(w), AVG(t) FROM test;)", co, eo);
+          R"(SELECT x, COUNT(*) FROM test GROUP BY x;)", co, eo);
       if (just_explain) {
         std::cout << "Explanation for " << device_type_str << res.getExplanation()
                   << std::endl;
       } else {
         auto rows = res.getRows();
-        CHECK_EQ(rows->rowCount(), size_t(1));
+        CHECK_EQ(rows->rowCount(), size_t(2));
         auto row =
             rows->getNextRow(/*translate_strings=*/true, /*decimal_to_double=*/true);
-        CHECK_EQ(row.size(), size_t(5));
+        CHECK_EQ(row.size(), size_t(2));
         std::cout << "Result for " << device_type_str << v<int64_t>(row[0]) << " : "
-                  << v<double>(row[1]) << " : " << v<int64_t>(row[2]) << " : "
-                  << v<int64_t>(row[3]) << " : " << v<double>(row[4]) << std::endl;
+                  << v<int64_t>(row[1]) << std::endl;
+
+        auto data_mgr = rows->getDataManager();
+        CHECK(data_mgr);
+        auto arena_buffer_mgr = data_mgr->getArenaBufferMgrPtr();
+        CHECK(arena_buffer_mgr);
+        // LOG(ERROR) << arena_buffer_mgr->arenasToString();
       }
     }
+#if 0
     {
       const ExecutorDeviceType dt =
           g_cpu_only ? ExecutorDeviceType::CPU : ExecutorDeviceType::GPU;
@@ -190,6 +196,7 @@ int main(int argc, char** argv) {
                   << v<int64_t>(row[3]) << std::endl;
       }
     }
+#endif
   } catch (const std::exception& e) {
     LOG(ERROR) << e.what();
     return -1;
