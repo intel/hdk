@@ -53,6 +53,7 @@ jobs:
       - name: Smoke test
         if: inputs.name == 'cuda'
         run: |
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l
           docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/test.sh
 
       - name: ASAN test
