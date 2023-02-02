@@ -84,13 +84,18 @@ struct TableArena {
   // fragment_id
   std::unordered_map<int, std::unique_ptr<RowArena>> row_arenas;
 
+  std::shared_mutex row_arena_mutex;
+
   RowArena* getArenaForFragment(const int fragment_id) {
+    std::unique_lock write_lock(row_arena_mutex);
     if (row_arenas.find(fragment_id) == row_arenas.end()) {
       // initialize row arena
       auto row_arena = std::make_unique<RowArena>(num_cols);
       row_arenas.insert(
           std::pair<int, std::unique_ptr<RowArena>>(fragment_id, std::move(row_arena)));
     }
+    write_lock.unlock();
+    std::shared_lock read_lock(row_arena_mutex);
     auto row_arena_itr = row_arenas.find(fragment_id);
     CHECK(row_arena_itr != row_arenas.end());
     const int cpu = sched_getcpu();
@@ -159,6 +164,7 @@ class ArenaBufferMgr {
         << table_key.first << " , " << table_key.second;
     auto table_arena = table_arena_itr->second.get();
     CHECK(table_arena);
+    arenas_per_table_read_lock.unlock();
 
     auto row_arena = table_arena->getArenaForFragment(key[CHUNK_KEY_FRAGMENT_IDX]);
     CHECK(row_arena);
