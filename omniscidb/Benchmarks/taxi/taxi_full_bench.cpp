@@ -311,11 +311,11 @@ static void taxi_q4(benchmark::State& state) {
 }
 
 // functions as warmup for hot data
-BENCHMARK(table_count)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q1)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q2)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q3)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q4)->Unit(benchmark::kMillisecond);
+BENCHMARK(table_count)->Unit(benchmark::kMillisecond)->Iterations(1);
+BENCHMARK(taxi_q1)->Unit(benchmark::kMillisecond)->Iterations(2);
+BENCHMARK(taxi_q2)->Unit(benchmark::kMillisecond)->Iterations(2);
+BENCHMARK(taxi_q3)->Unit(benchmark::kMillisecond)->Iterations(2);
+BENCHMARK(taxi_q4)->Unit(benchmark::kMillisecond)->Iterations(2);
 
 int main(int argc, char* argv[]) {
   ::benchmark::Initialize(&argc, argv);
