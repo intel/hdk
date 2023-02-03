@@ -200,7 +200,9 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValuesImpl(
   if constexpr (std::is_same_v<T, bool>) {
     array = std::make_shared<arrow::Int8Array>(arr->length(), std::move(resultBuf));
   } else if (arr->type()->id() == arrow::Type::NA) {
-    array = std::make_shared<arrow::DoubleArray>(arr->length(), std::move(resultBuf));
+    using ResultArrowType = typename arrow::CTypeTraits<T>::ArrowType;
+    using ArrayType = typename arrow::TypeTraits<ResultArrowType>::ArrayType;
+    array = std::make_shared<ArrayType>(arr->length(), std::move(resultBuf));
   } else {
     array = std::make_shared<arrow::PrimitiveArray>(
         arr->type(), arr->length(), std::move(resultBuf));
@@ -1089,9 +1091,6 @@ std::shared_ptr<arrow::DataType> getArrowImportType(hdk::ir::Context& ctx,
         return list(getArrowImportType(ctx, elem_type));
       }
     }
-    case hdk::ir::Type::kNull:
-      throw std::runtime_error(
-          "Null should be converted to ArrowType according to getTargetImportType(...).");
     default:
       break;
   }

@@ -18,6 +18,14 @@
 
 #include <gtest/gtest.h>
 
+#define EXPECT_THROW_WITH_MESSAGE(stmt, etype, whatstring) \
+  EXPECT_THROW(                                            \
+      try { stmt; } catch (const etype& ex) {              \
+        EXPECT_EQ(std::string(ex.what()), whatstring);     \
+        throw;                                             \
+      },                                                   \
+      etype)
+
 constexpr int TEST_SCHEMA_ID = 1;
 constexpr int TEST_DB_ID = (TEST_SCHEMA_ID << 24) + 1;
 
@@ -854,6 +862,76 @@ TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_Header) {
   std::vector<float> col1(9, inline_null_value<float>());
   checkData(
       storage, tinfo->table_id, 9, table_options.fragment_size, col1, range(9, 10.0f));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Append_Header) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+
+  table_options.fragment_size = 32'000'000;
+  ArrowStorage::CsvParseOptions parse_options;
+  TableInfoPtr tinfo = storage.importCsvFile(
+      getFilePath("nulls_header.csv"), "table1", table_options, parse_options);
+
+  storage.appendCsvFile(getFilePath("nulls_header.csv"), "table1");
+  std::vector<double> col1(18, inline_null_value<double>());
+  auto inc = range(9, 10.0);
+  inc.insert(inc.end(), inc.begin(), inc.end());
+  checkData(storage, tinfo->table_id, 18, table_options.fragment_size, col1, inc);
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportToCreated_Header) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+
+  TableInfoPtr tinfo =
+      storage.createTable("table1", {{"col1", ctx.int32()}, {"col2", ctx.fp32()}});
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 32'000'000;
+  ArrowStorage::CsvParseOptions parse_options;
+  storage.appendCsvFile(getFilePath("nulls_header.csv"), "table1", parse_options);
+  parse_options.header = false;
+  storage.appendCsvData("80,100.0", tinfo->table_id, parse_options);
+  std::vector<int32_t> col1(9, inline_null_value<int32_t>());
+  col1.push_back(80);
+  checkData(
+      storage, tinfo->table_id, 10, table_options.fragment_size, col1, range(10, 10.0f));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_NullableTypeHeader) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+
+  TableInfoPtr tinfo = storage.createTable(
+      "table1", {{"col1", ctx.int32(false)}, {"col2", ctx.fp32(false)}});
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 32'000'000;
+
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.header = false;
+  storage.appendCsvData("1, 10.0", tinfo->table_id, parse_options);
+  EXPECT_THROW_WITH_MESSAGE(
+      storage.appendCsvFile(getFilePath("nulls_header.csv"), "table1"),
+      std::runtime_error,
+      "Null values used in non-nullable type: "s + ctx.int32(false)->toString());
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportCsvToCsv_Header) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 32'000'000;
+  ArrowStorage::CsvParseOptions parse_options;
+
+  TableInfoPtr tinfo = storage.importCsvFile(
+      getFilePath("numbers_header.csv"), "table1", table_options, parse_options);
+
+  storage.appendCsvFile(getFilePath("nulls_header.csv"), "table1", parse_options);
+  std::vector<int64_t> col1 = range(9, (int64_t)1);
+  std::vector<int64_t> colNull(9, inline_null_value<int64_t>());
+  col1.insert(col1.end(), colNull.begin(), colNull.end());
+
+  auto inc = range(9, 10.0);
+  inc.insert(inc.end(), inc.begin(), inc.end());
+  checkData(storage, tinfo->table_id, 18, table_options.fragment_size, col1, inc);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_DateTime) {
