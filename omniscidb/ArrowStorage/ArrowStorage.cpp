@@ -478,6 +478,15 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
           auto col_info = getColumnInfo(db_id_, table_id, col_idx + 1);
           auto col_type = col_info->type;
           auto col_arr = at->column(col_idx);
+
+          // Conversion of empty string to Nulls and further processing handled
+          // separately.
+          if (!col_type->nullable() && col_arr->null_count() != 0 &&
+              col_arr->type()->id() != arrow::Type::STRING) {
+            throw std::runtime_error("Null values used in non-nullable type: "s +
+                                     col_type->toString());
+          }
+
           StringDictionary* dict = nullptr;
           auto elem_type =
               col_type->isArray()
@@ -852,8 +861,8 @@ void ArrowStorage::compareSchemas(std::shared_ptr<arrow::Schema> lhs,
     auto lhs_type = lhs_fields[i]->type();
     auto rhs_type = rhs_fields[i]->type();
 
-    if (!lhs_type->Equals(rhs_type) && !(lhs_type->id() == arrow::Type::NA) &&
-        !(rhs_type->id() == arrow::Type::NA)) {
+    if (!lhs_type->Equals(rhs_type) && (lhs_type->id() != arrow::Type::NA) &&
+        (rhs_type->id() != arrow::Type::NA)) {
       throw std::runtime_error(
           "Mismatched type for column "s + lhs_fields[i]->name() + ": "s +
           lhs_type->ToString() + " [id: " + std::to_string(lhs_type->id()) + "] vs. "s +

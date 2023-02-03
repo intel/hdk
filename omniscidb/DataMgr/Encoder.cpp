@@ -60,7 +60,7 @@ Encoder* Encoder::Create(Data_Namespace::AbstractBuffer* buffer,
         case 8:
           return new NoneEncoder<int64_t>(buffer);
         default:
-          CHECK("Unhandled primitive type size" && false);
+          CHECK(false) << "Unhandled primitive type size";
       }
     case hdk::ir::Type::kExtDictionary:
       switch (type->size()) {
