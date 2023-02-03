@@ -1000,8 +1000,8 @@ class Executor {
   resetCodeCache();  // ensure code cache is destroyed before tearing down data mgr
 
  private:
-  const unsigned block_size_x_;
-  const unsigned grid_size_x_;
+  const uint32_t block_size_x_;
+  const uint32_t grid_size_x_;
   const size_t max_gpu_slab_size_;
   const std::string debug_dir_;
   const std::string debug_file_;

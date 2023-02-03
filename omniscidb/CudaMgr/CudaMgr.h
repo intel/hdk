@@ -151,7 +151,7 @@ class CudaMgr : public GpuMgr {
   bool isArchMaxwellOrLaterForAll() const;
   bool isArchVoltaOrGreaterForAll() const;
 
-  unsigned getMaxBlockSize() const override {
+  uint32_t getMaxBlockSize() const override {
     return getAllDeviceProperties().front().maxThreadsPerBlock;
   }
 
@@ -159,8 +159,8 @@ class CudaMgr : public GpuMgr {
     return getAllDeviceProperties().front().warpSize;
   }
 
-  unsigned getGridSize() const override { return 2 * getMinNumMPsForAllDevices(); }
-  unsigned getMinEUNumForAllDevices() const override {
+  uint32_t getGridSize() const override { return 2 * getMinNumMPsForAllDevices(); }
+  uint32_t getMinEUNumForAllDevices() const override {
     return getMinNumMPsForAllDevices();
   };
 

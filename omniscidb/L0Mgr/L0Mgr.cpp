@@ -177,10 +177,10 @@ std::unique_ptr<L0CommandList> L0Device::create_command_list() const {
   return std::make_unique<L0CommandList>(res);
 }
 
-unsigned L0Device::maxGroupCount() const {
+uint32_t L0Device::maxGroupCount() const {
   return props_.numSlices * props_.numSubslicesPerSlice;
 }
-unsigned L0Device::maxGroupSize() const {
+uint32_t L0Device::maxGroupSize() const {
   return compute_props_.maxGroupSizeX;
 }
 
@@ -381,7 +381,7 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   return device_properties.maxMemAllocSize;
 }
 
-unsigned L0Manager::getMaxBlockSize() const {
+uint32_t L0Manager::getMaxBlockSize() const {
   unsigned sz = drivers_[0]->devices()[0]->maxGroupSize();
   for (auto d : drivers_[0]->devices()) {
     sz = d->maxGroupSize() < sz ? d->maxGroupSize() : sz;
@@ -394,8 +394,8 @@ int8_t L0Manager::getSubGroupSize() const {
   return 1;
 }
 
-unsigned L0Manager::getGridSize() const {
-  unsigned cnt = drivers_[0]->devices()[0]->maxGroupCount();
+uint32_t L0Manager::getGridSize() const {
+  auto cnt = drivers_[0]->devices()[0]->maxGroupCount();
   for (auto d : drivers_[0]->devices()) {
     cnt = d->maxGroupCount() < cnt ? d->maxGroupCount() : cnt;
   }
@@ -403,7 +403,7 @@ unsigned L0Manager::getGridSize() const {
   return cnt * getMaxBlockSize() /*fixme: refactor on smem enabling*/;
 }
 
-unsigned L0Manager::getMinEUNumForAllDevices() const {
+uint32_t L0Manager::getMinEUNumForAllDevices() const {
   return 1u;
 }
 
