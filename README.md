@@ -1,5 +1,5 @@
-# oneAPI Heterogeneous Data Kernels      [![Conda Version](https://img.shields.io/conda/vn/conda-forge/pyhdk.svg)](https://anaconda.org/conda-forge/pyhdk)
-oneHDK is a low-level execution library for data analytics processing. 
+# HDK - Heterogeneous Data Kernels      [![Conda Version](https://img.shields.io/conda/vn/conda-forge/pyhdk.svg)](https://anaconda.org/conda-forge/pyhdk)
+HDK is a low-level execution library for data analytics processing. 
 
 HDK is used as a fast execution backend in [Modin](https://github.com/intel-ai/modin). The HDK library provides a set of components for federating analytic queries to an execution backend based on [OmniSciDB](https://github.com/intel-ai/omniscidb). Currently, HDK targets OLAP-style queries expressed as relational algebra or SQL.  The APIs required for Modin support have been exposed in a library installed from this repository, `pyhdk`. Major and immediate project priorities include:
 - Introducing a HDK-specific IR and set of optimizations to reduce reliance on RelAlg and improve extensibility of the query API. 
