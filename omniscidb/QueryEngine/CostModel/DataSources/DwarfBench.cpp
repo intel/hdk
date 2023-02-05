@@ -41,9 +41,11 @@ Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
   return dm;
 }
 
-std::vector<Detail::Measurement> DwarfBenchDataSource::measureTemplateOnDevice(ExecutorDeviceType device, AnalyticalTemplate templ) {
+std::vector<Detail::Measurement> DwarfBenchDataSource::measureTemplateOnDevice(
+    ExecutorDeviceType device,
+    AnalyticalTemplate templ) {
   std::vector<Detail::Measurement> ms;
-  for (size_t inputSize: dwarfBenchInputSizes) {
+  for (size_t inputSize : dwarfBenchInputSizes) {
     DwarfBench::RunConfig rc = {
         .device = convertDeviceType(device),
         .inputSize = inputSize,
@@ -51,7 +53,8 @@ std::vector<Detail::Measurement> DwarfBenchDataSource::measureTemplateOnDevice(E
         .dwarf = convertToDwarf(templ),
     };
 
-    std::vector<Detail::Measurement> inputSizeMeasurements = convertMeasurement(db.makeMeasurements(rc));
+    std::vector<Detail::Measurement> inputSizeMeasurements =
+        convertMeasurement(db.makeMeasurements(rc));
 
     ms.insert(ms.end(), inputSizeMeasurements.begin(), inputSizeMeasurements.end());
   }
@@ -72,7 +75,8 @@ DwarfBench::Dwarf DwarfBenchDataSource::convertToDwarf(AnalyticalTemplate templ)
   }
 }
 
-DwarfBench::DeviceType DwarfBenchDataSource::convertDeviceType(ExecutorDeviceType device) {
+DwarfBench::DeviceType DwarfBenchDataSource::convertDeviceType(
+    ExecutorDeviceType device) {
   switch (device) {
     case ExecutorDeviceType::CPU:
       return DwarfBench::DeviceType::CPU;
@@ -81,13 +85,17 @@ DwarfBench::DeviceType DwarfBenchDataSource::convertDeviceType(ExecutorDeviceTyp
   }
 }
 
-std::vector<Detail::Measurement> DwarfBenchDataSource::convertMeasurement(const std::vector<DwarfBench::Measurement> measurements) {
+std::vector<Detail::Measurement> DwarfBenchDataSource::convertMeasurement(
+    const std::vector<DwarfBench::Measurement> measurements) {
   std::vector<Detail::Measurement> ms;
-  std::transform(measurements.begin(), measurements.end(), std::back_inserter(ms),
-                  [](DwarfBench::Measurement m) { return Detail::Measurement { .bytes = m.dataSize, .milliseconds = m.microseconds / 1000 } ; });
+  std::transform(measurements.begin(),
+                 measurements.end(),
+                 std::back_inserter(ms),
+                 [](DwarfBench::Measurement m) {
+                   return Detail::Measurement{.bytes = m.dataSize,
+                                              .milliseconds = m.microseconds / 1000};
+                 });
   return ms;
 }
-
-
 
 }  // namespace costmodel

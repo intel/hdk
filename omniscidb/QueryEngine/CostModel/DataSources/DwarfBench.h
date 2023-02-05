@@ -37,20 +37,16 @@ class DwarfBenchDataSource : public DataSource {
 
  private:
   const size_t dwarfBenchIterations = 10;
-  const std::vector<size_t> dwarfBenchInputSizes = {
-      256,
-      512,
-      1024,
-      2048
-  };
+  const std::vector<size_t> dwarfBenchInputSizes = {256, 512, 1024, 2048};
 
-  std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device, AnalyticalTemplate templ);
-
+  std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device,
+                                                           AnalyticalTemplate templ);
 
   DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
   DwarfBench::DeviceType convertDeviceType(ExecutorDeviceType device);
 
-  std::vector<Detail::Measurement> convertMeasurement(const std::vector<DwarfBench::Measurement> measurements);
+  std::vector<Detail::Measurement> convertMeasurement(
+      const std::vector<DwarfBench::Measurement> measurements);
 
   DwarfBench::DwarfBench db;
 };
