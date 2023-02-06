@@ -79,6 +79,7 @@ class L0Device {
   L0Device(const L0Driver& driver, ze_device_handle_t device);
   unsigned maxGroupCount() const;
   unsigned maxGroupSize() const;
+  unsigned maxSharedLocalMemory() const;
   ze_device_handle_t device() const;
   ze_context_handle_t ctx() const;
   ~L0Device();

@@ -19,6 +19,7 @@
 #include "Logger/Logger.h"
 #include "Utils.h"
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 
@@ -182,6 +183,9 @@ unsigned L0Device::maxGroupCount() const {
 }
 unsigned L0Device::maxGroupSize() const {
   return compute_props_.maxGroupSizeX;
+}
+unsigned L0Device::maxSharedLocalMemory() const {
+  return compute_props_.maxSharedLocalMemory;
 }
 
 L0CommandQueue::L0CommandQueue(ze_command_queue_handle_t handle) : handle_(handle) {}
@@ -408,11 +412,17 @@ unsigned L0Manager::getMinEUNumForAllDevices() const {
 }
 
 bool L0Manager::hasSharedMemoryAtomicsSupport() const {
-  return false;
+  return true;
 }
 
 size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
-  return 0;
+  auto comp = [](const auto& a, const auto& b) {
+    return a->maxSharedLocalMemory() < b->maxSharedLocalMemory();
+  };
+  return std::min_element(
+             drivers_[0]->devices().begin(), drivers_[0]->devices().end(), comp)
+      ->get()
+      ->maxSharedLocalMemory();
 };
 
 }  // namespace l0
