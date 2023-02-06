@@ -1063,7 +1063,6 @@ std::shared_ptr<Backend> getBackend(
       if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::CUDA)
         return std::make_shared<CUDABackend>(exts, is_gpu_smem_used_, gpu_target);
       if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
-        CHECK(!is_gpu_smem_used_);
         return std::make_shared<L0Backend>(exts, gpu_target);
       }
     default:

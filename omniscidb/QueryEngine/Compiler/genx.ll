@@ -9,6 +9,8 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
+@slm.buf = internal global [1024 x i64] undef, align 16
+
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
@@ -212,6 +214,42 @@ define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noun
     %arg0 = phi i32 addrspace(4)* [ %btwi0, %.c0 ], [ %btwi1, %.c1 ], [ %btwi2, %.c2], [ %btwi3, %.c3 ]
     %arg1 = shl nuw i32 1, %res
     tail call void @atomic_or(i32 addrspace(4)* %arg0, i32 noundef %arg1)
+    br label %.exit
+.exit:
+    ret void
+}
+
+define i64* @init_shared_mem(i64* %agg_init_val, i32 noundef %groups_buffer_size) {
+.entry:
+    %buf.units = ashr i32 %groups_buffer_size, 3
+    %buf.units.i64 = sext i32 %buf.units to i64
+    %pos = call i64 @get_thread_index()
+    %wgnum = call i64 @__spirv_BuiltInNumWorkgroups(i32 0)
+    %loop.cond = icmp slt i64 %pos, %buf.units.i64
+    br i1 %loop.cond, label %.for_body, label %.exit
+.for_body:
+    %pos.idx = phi i64 [ %pos, %.entry ], [ %pos.idx.new, %.for_body ]
+    %agg_init_val.idx = getelementptr inbounds i64, i64* %agg_init_val, i64 %pos.idx
+    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64]* @slm.buf, i64 0, i64 %pos.idx
+    %val = load i64, i64* %agg_init_val.idx
+    store i64 %val, i64* %slm.idx
+    %pos.idx.new = add nsw i64 %pos.idx, %wgnum
+    %cond = icmp slt i64 %pos.idx.new, %buf.units.i64
+    br i1 %cond, label %.for_body, label %.exit
+.exit:
+    %res.ptr = bitcast [1024 x i64]* @slm.buf to i64*
+    ret i64* %res.ptr
+}
+
+define void @write_back_non_grouped_agg(i64* %input_buffer, i64* %output_buffer, i32 noundef %agg_idx) {
+    %tid = call i64 @get_thread_index()
+    %agg_idx.i64 = sext i32 %agg_idx to i64
+    %cmp = icmp eq i64 %tid, %agg_idx.i64
+    br i1 %cmp, label %.exit, label %.agg
+.agg:
+    %gep = getelementptr inbounds i64, i64* %input_buffer, i64 %agg_idx.i64
+    %val = load i64, i64* %gep
+    %old = call i64 @agg_sum_shared(i64* %output_buffer, i64 %val)
     br label %.exit
 .exit:
     ret void
