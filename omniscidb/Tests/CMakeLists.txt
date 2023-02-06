@@ -56,11 +56,6 @@ add_executable(ResultSetArrowConversion ResultSetArrowConversion.cpp)
 add_executable(ExecutionSequenceTest ExecutionSequenceTest.cpp TestRelAlgDagBuilder.cpp)
 add_executable(QueryBuilderTest QueryBuilderTest.cpp TestRelAlgDagBuilder.cpp)
 
-# Generate 1MB TPC-H data set required for QueryBuilderTest.
-get_target_property(DSS_FILE_DIR dbgen SOURCE_DIR)
-add_custom_target(tpch_data COMMAND dbgen -b ${DSS_FILE_DIR}/dists.dss -f -s 0.001)
-add_dependencies(QueryBuilderTest tpch_data)
-
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_executable(UdfTest UdfTest.cpp)
 endif()

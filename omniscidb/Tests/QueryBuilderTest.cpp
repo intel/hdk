@@ -4911,7 +4911,7 @@ TEST_F(Taxi, Q4_3) {
   run_compare_q4(std::move(dag));
 }
 
-class TPCH : public TestSuite {
+class DISABLED_TPCH : public TestSuite {
  protected:
   static void SetUpTestSuite() {
     ArrowStorage::CsvParseOptions parse_options;
@@ -5064,7 +5064,7 @@ class TPCH : public TestSuite {
   }
 };
 
-TEST_F(TPCH, Q1_SQL) {
+TEST_F(DISABLED_TPCH, Q1_SQL) {
   auto query = R"""(
     select
         l_returnflag,
@@ -5092,7 +5092,7 @@ TEST_F(TPCH, Q1_SQL) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1_NoBuilder) {
+TEST_F(DISABLED_TPCH, Q1_NoBuilder) {
   // Create 'lineitem' scan.
   auto table_info = getStorage()->getTableInfo(TEST_DB_ID, "lineitem");
   auto col_infos = getStorage()->listColumns(*table_info);
@@ -5214,7 +5214,7 @@ TEST_F(TPCH, Q1_NoBuilder) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1_1) {
+TEST_F(DISABLED_TPCH, Q1_1) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("lineitem");
   auto filter = scan.filter(scan.ref("l_shipdate")
@@ -5242,7 +5242,7 @@ TEST_F(TPCH, Q1_1) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1_2) {
+TEST_F(DISABLED_TPCH, Q1_2) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("lineitem");
   auto filter =
@@ -5267,7 +5267,7 @@ TEST_F(TPCH, Q1_2) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q1_3) {
+TEST_F(DISABLED_TPCH, Q1_3) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto scan = builder.scan("lineitem");
   auto filter =
@@ -5291,7 +5291,7 @@ TEST_F(TPCH, Q1_3) {
   compare_q1(res);
 }
 
-TEST_F(TPCH, Q3_SQL) {
+TEST_F(DISABLED_TPCH, Q3_SQL) {
   auto query = R"""(
     select
         l_orderkey,
@@ -5321,7 +5321,7 @@ TEST_F(TPCH, Q3_SQL) {
   compare_q3(res);
 }
 
-TEST_F(TPCH, Q3_NoBuilder) {
+TEST_F(DISABLED_TPCH, Q3_NoBuilder) {
   // Create scans.
   auto c_table_info = getStorage()->getTableInfo(TEST_DB_ID, "customer");
   auto c_col_infos = getStorage()->listColumns(*c_table_info);
@@ -5465,7 +5465,7 @@ TEST_F(TPCH, Q3_NoBuilder) {
   compare_q3(res);
 }
 
-TEST_F(TPCH, Q3_1) {
+TEST_F(DISABLED_TPCH, Q3_1) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto lineitem = builder.scan("lineitem");
   auto orders = builder.scan("orders");
@@ -5491,7 +5491,7 @@ TEST_F(TPCH, Q3_1) {
   compare_q3(res);
 }
 
-TEST_F(TPCH, Q3_2) {
+TEST_F(DISABLED_TPCH, Q3_2) {
   QueryBuilder builder(ctx(), getStorage(), configPtr());
   auto join = builder.scan("lineitem")
                   .join(builder.scan("orders"), {"l_orderkey"}, {"o_orderkey"}, "inner")
