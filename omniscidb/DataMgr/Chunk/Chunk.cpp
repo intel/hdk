@@ -62,7 +62,8 @@ void Chunk::getChunkBuffer(DataMgr* data_mgr,
                            const int device_id,
                            const size_t num_bytes,
                            const size_t num_elems) {
-  if (data_mgr->useArenaBufferMgr()) {
+  if (!(column_info_->type->isVarLen() || column_info_->type->isArray()) &&
+      data_mgr->useArenaBufferMgr()) {
     buffer_ = data_mgr->getChunkBufferFromArena(key, num_bytes);
   } else {
     if (column_info_->type->isVarLen()) {

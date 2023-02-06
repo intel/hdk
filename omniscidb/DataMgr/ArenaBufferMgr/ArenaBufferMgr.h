@@ -228,7 +228,7 @@ class ArenaBufferMgr {
     CHECK_GT(chunk_metadata.size(), size_t(0));
     size_t num_cols = chunk_metadata.size();
 
-    auto table_arena = std::make_unique<TableArena>(num_cols);
+    auto table_arena = std::make_unique<TableArena>(num_cols + 1);  // add 1 for row_id
     arenas_per_table_.insert(std::make_pair(table_key, std::move(table_arena)));
   }
 
