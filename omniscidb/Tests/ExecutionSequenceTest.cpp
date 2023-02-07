@@ -398,6 +398,42 @@ TEST_F(ExecutionSequenceTest, AggSimpleProject) {
                    std::vector<int32_t>({2, 4, 2, 2}));
 }
 
+TEST_F(ExecutionSequenceTest, AggScan1) {
+  auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
+  auto scan = dag->addScan(TEST_DB_ID, "test2");
+  auto agg1 = dag->addAgg(scan, 2, {{AggType::kMax, ctx().int32(), 2}});
+  auto sort = dag->addSort(
+      agg1,
+      {{0, hdk::ir::SortDirection::Ascending, hdk::ir::NullSortedPosition::Last},
+       {1, hdk::ir::SortDirection::Ascending, hdk::ir::NullSortedPosition::Last}});
+  dag->finalize();
+
+  QueryExecutionSequence new_seq(dag->getRootNode(), configPtr());
+  CHECK_EQ(new_seq.size(), (size_t)1);
+
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int32_t>({1, 1, 2, 2}),
+                   std::vector<int32_t>({1, 2, 1, 2}),
+                   std::vector<int32_t>({15, 17, 13, 19}));
+}
+
+TEST_F(ExecutionSequenceTest, AggScan2) {
+  auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
+  auto scan = dag->addScan(TEST_DB_ID, "test2");
+  auto agg = dag->addAgg(scan, 2, {{AggType::kMax, ctx().int32(), 2}});
+  auto proj = dag->addProject(agg, {getNodeColumnRef(agg.get(), 1)});
+  auto sort = dag->addSort(
+      proj, {{0, hdk::ir::SortDirection::Ascending, hdk::ir::NullSortedPosition::Last}});
+  dag->finalize();
+
+  QueryExecutionSequence new_seq(dag->getRootNode(), configPtr());
+  CHECK_EQ(new_seq.size(), (size_t)1);
+
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int32_t>({1, 1, 2, 2}));
+}
+
 TEST_F(ExecutionSequenceTest, LogicalValues) {
   auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
   std::vector<TargetMetaInfo> tuple_type = {{"id", ctx().int32()},

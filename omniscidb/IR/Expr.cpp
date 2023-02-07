@@ -320,7 +320,6 @@ Constant::~Constant() {
 }
 
 ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
-  CHECK(type->isNumber() || type->isBoolean());
   Datum datum{0};
   switch (type->id()) {
     case Type::kBoolean:
@@ -346,6 +345,12 @@ ExprPtr Constant::make(const Type* type, int64_t val, bool cacheable) {
       break;
     case Type::kDecimal:
       datum.bigintval = val * exp_to_scale(type->as<DecimalType>()->scale());
+      break;
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kInterval:
+      datum.bigintval = val;
       break;
     case Type::kFloatingPoint:
       switch (type->as<FloatingPointType>()->precision()) {

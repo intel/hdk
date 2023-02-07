@@ -99,6 +99,20 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     return this->visit(sort->getInput(0));
   }
 
+  ResultType visitAggregate(const hdk::ir::Aggregate* agg) const override {
+    ResultType result;
+    ExprVisitor visitor;
+    for (auto& expr : agg->getAggs()) {
+      const auto inputs = visitor.visit(expr.get());
+      result.insert(inputs.begin(), inputs.end());
+    }
+    for (unsigned i = 0; i < agg->getGroupByCount(); ++i) {
+      const auto inputs = visitor.visit(getNodeColumnRef(agg->getInput(0), i).get());
+      result.insert(inputs.begin(), inputs.end());
+    }
+    return result;
+  }
+
  protected:
   ResultType aggregateResult(const ResultType& aggregate,
                              const ResultType& next_result) const override {
@@ -177,6 +191,13 @@ class PhysicalInputsVisitor
       if (source->is<hdk::ir::Filter>() || source->is<hdk::ir::Scan>()) {
         auto new_ref = getNodeColumnRef(source->getInput(0), col_ref->index());
         return visit(new_ref.get());
+      }
+      // Aggregate implicitly uses group columns.
+      if (auto agg = source->as<hdk::ir::Aggregate>()) {
+        if (col_ref->index() < agg->getGroupByCount()) {
+          auto new_ref = getNodeColumnRef(agg->getInput(0), col_ref->index());
+          return visit(new_ref.get());
+        }
       }
       return InputColDescriptorSet{};
     }
