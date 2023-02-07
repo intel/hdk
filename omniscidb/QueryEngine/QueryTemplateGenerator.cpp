@@ -16,6 +16,7 @@
  */
 
 #include "QueryTemplateGenerator.h"
+#include "Compiler/HelperFunctions.h"
 #include "IRCodegenUtils.h"
 #include "Logger/Logger.h"
 
@@ -438,6 +439,7 @@ class QueryTemplateGenerator {
     delete pos_inc_pre;
 
     if (llvm::verifyFunction(*query_func_ptr, &llvm::errs())) {
+      DUMP_MODULE(query_func_ptr->getParent(), "invalid.ll");
       LOG(FATAL) << "Generated invalid code. ";
     }
 

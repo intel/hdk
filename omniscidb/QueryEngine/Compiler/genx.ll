@@ -9,7 +9,7 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
-@slm.buf = internal global [1024 x i64] undef, align 16
+@slm.buf = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 4
 
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
@@ -62,8 +62,8 @@ define i64 @agg_count_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_va
     ret i64 0
 }
 
-define i64 @agg_sum_shared(i64* %agg, i64 noundef %val) {
-    %old = atomicrmw add i64* %agg, i64 %val monotonic
+define i64 @agg_sum_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
+    %old = atomicrmw add i64 addrspace(4)* %agg, i64 %val monotonic
     ret i64 %old
 }
 
@@ -81,7 +81,7 @@ define i64 @agg_sum_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val)
     ret i64 0
 }
 
-define i64* @init_shared_mem(i64* %agg_init_val, i32 noundef %groups_buffer_size) {
+define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 noundef %groups_buffer_size) {
 .entry:
     %buf.units = ashr i32 %groups_buffer_size, 3
     %buf.units.i64 = sext i32 %buf.units to i64
@@ -91,27 +91,28 @@ define i64* @init_shared_mem(i64* %agg_init_val, i32 noundef %groups_buffer_size
     br i1 %loop.cond, label %.for_body, label %.exit
 .for_body:
     %pos.idx = phi i64 [ %pos, %.entry ], [ %pos.idx.new, %.for_body ]
-    %agg_init_val.idx = getelementptr inbounds i64, i64* %agg_init_val, i64 %pos.idx
-    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64]* @slm.buf, i64 0, i64 %pos.idx
-    %val = load i64, i64* %agg_init_val.idx
-    store i64 %val, i64* %slm.idx
+    %agg_init_val.idx = getelementptr inbounds i64, i64 addrspace(4)* %agg_init_val, i64 %pos.idx
+    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64] addrspace(3)* @slm.buf, i64 0, i64 %pos.idx
+    %val = load i64, i64 addrspace(4)* %agg_init_val.idx
+    store i64 %val, i64 addrspace(3)* %slm.idx
     %pos.idx.new = add nsw i64 %pos.idx, %wgnum
     %cond = icmp slt i64 %pos.idx.new, %buf.units.i64
     br i1 %cond, label %.for_body, label %.exit
 .exit:
-    %res.ptr = bitcast [1024 x i64]* @slm.buf to i64*
-    ret i64* %res.ptr
+    %res.ptr = bitcast [1024 x i64] addrspace(3)* @slm.buf to i64 addrspace(3)*
+    %res.prt.casted = addrspacecast i64 addrspace(3)* %res.ptr to i64 addrspace(4)*
+    ret i64 addrspace(4)* %res.prt.casted
 }
 
-define void @write_back_non_grouped_agg(i64* %input_buffer, i64* %output_buffer, i32 noundef %agg_idx) {
+define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 addrspace(4)* %output_buffer, i32 noundef %agg_idx) {
     %tid = call i64 @get_thread_index()
     %agg_idx.i64 = sext i32 %agg_idx to i64
     %cmp = icmp eq i64 %tid, %agg_idx.i64
     br i1 %cmp, label %.exit, label %.agg
 .agg:
-    %gep = getelementptr inbounds i64, i64* %input_buffer, i64 %agg_idx.i64
-    %val = load i64, i64* %gep
-    %old = call i64 @agg_sum_shared(i64* %output_buffer, i64 %val)
+    %gep = getelementptr inbounds i64, i64 addrspace(4)* %input_buffer, i64 %agg_idx.i64
+    %val = load i64, i64 addrspace(4)* %gep
+    %old = call i64 @agg_sum_shared(i64 addrspace(4)* %output_buffer, i64 %val)
     br label %.exit
 .exit:
     ret void

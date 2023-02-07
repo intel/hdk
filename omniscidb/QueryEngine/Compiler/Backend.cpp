@@ -847,6 +847,31 @@ void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string&
       fn->getFunctionType(), llvm::GlobalValue::ExternalLinkage, fn->getName(), *to);
 }
 
+void insert_all_globals(llvm::Module* from, llvm::Module* to) {
+  for (const llvm::GlobalVariable& I : from->globals()) {
+    llvm::GlobalVariable* NewGV =
+        new llvm::GlobalVariable(*to,
+                                 I.getValueType(),
+                                 I.isConstant(),
+                                 I.getLinkage(),
+                                 (llvm::Constant*)nullptr,
+                                 I.getName(),
+                                 (llvm::GlobalVariable*)nullptr,
+                                 I.getThreadLocalMode(),
+                                 I.getType()->getAddressSpace());
+    NewGV->copyAttributesFrom(&I);
+  }
+}
+
+void replace_all_global_uses(llvm::Module* from, llvm::Module* to) {
+  for (llvm::GlobalVariable& I : from->globals()) {
+    std::cerr << "Replacing uses of " << I.getName().str() << std::endl;
+    auto NewGV = to->getGlobalVariable(I.getName(), true);
+    CHECK(NewGV);
+    I.replaceAllUsesWith(NewGV);
+  }
+}
+
 void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname) {
   auto target_fn = to->getFunction(fname);
   auto from_fn = from->getFunction(fname);
@@ -906,6 +931,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
 
   CHECK(exts.find(ExtModuleKinds::spirv_helper_funcs_module) != exts.end());
 
+  insert_all_globals(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(), module);
   for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
     insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
                        module,
@@ -919,6 +945,8 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
                        F.getName().str());
     }
   }
+  replace_all_global_uses(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
+                          module);
 
   DUMP_MODULE(module, "after.linking.spirv.ll")
 
