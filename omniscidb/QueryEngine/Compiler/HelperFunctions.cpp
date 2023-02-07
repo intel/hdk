@@ -24,6 +24,10 @@
 #include "QueryEngine/Compiler/Exceptions.h"
 #include "QueryEngine/Optimization/AnnotateInternalFunctionsPass.h"
 
+#ifdef HAVE_L0
+#include "LLVMSPIRVLib/LLVMSPIRVLib.h"
+#endif
+
 namespace compiler {
 #ifdef HAVE_L0
 std::string mangle_spirv_builtin(const llvm::Function& func) {
