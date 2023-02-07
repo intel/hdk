@@ -20,9 +20,6 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_os_ostream.h>
-#ifdef HAVE_L0
-#include "LLVMSPIRVLib/LLVMSPIRVLib.h"
-#endif
 
 #include "QueryEngine/CompilationOptions.h"
 
