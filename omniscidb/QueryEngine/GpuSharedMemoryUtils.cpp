@@ -29,6 +29,7 @@ GpuSharedMemCodeBuilder::GpuSharedMemCodeBuilder(
     const std::vector<TargetInfo>& targets,
     const std::vector<int64_t>& init_agg_values,
     const Config& config,
+    const compiler::CodegenTraits& traits,
     Executor* executor)
     : config_(config)
     , module_(llvm_module)
@@ -38,6 +39,7 @@ GpuSharedMemCodeBuilder::GpuSharedMemCodeBuilder(
     , query_mem_desc_(qmd)
     , targets_(targets)
     , init_agg_values_(init_agg_values)
+    , traits_(traits)
     , executor_(executor) {
   /**
    * This class currently works only with:
@@ -236,19 +238,21 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
                                         llvm::IRBuilder<>& ir_builder,
                                         const size_t slot_idx,
                                         const TargetInfo& target_info,
+                                        const compiler::CodegenTraits& traits,
                                         llvm::Value* dest_byte_stream,
                                         llvm::Value* byte_offset) {
   const auto type = get_compact_type(target_info);
   const auto slot_bytes = query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
-  auto ptr_type = [&context](const size_t slot_bytes, const hdk::ir::Type* type) {
+  auto ptr_type = [&context, &traits](const size_t slot_bytes,
+                                      const hdk::ir::Type* type) {
     if (slot_bytes == sizeof(int32_t)) {
-      return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
+      return traits.smemPointerType(llvm::Type::getInt32Ty(context));
     } else {
       CHECK(slot_bytes == sizeof(int64_t));
-      return llvm::Type::getInt64PtrTy(context, /*address_space=*/3);
+      return traits.smemPointerType(llvm::Type::getInt64Ty(context));
     }
     UNREACHABLE() << "Invalid slot size encountered: " << std::to_string(slot_bytes);
-    return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
+    return traits.smemPointerType(llvm::Type::getInt32Ty(context));
   };
 
   const auto casted_dest_slot_address = ir_builder.CreatePointerCast(
@@ -323,6 +327,7 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
                                                                  ir_builder,
                                                                  slot_idx,
                                                                  target_info,
+                                                                 traits_,
                                                                  dest_byte_stream,
                                                                  byte_offset_ll);
 

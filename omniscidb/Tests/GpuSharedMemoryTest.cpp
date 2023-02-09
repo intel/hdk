@@ -32,6 +32,11 @@ auto double_type = hdk::ir::Context::defaultCtx().fp64();
 
 namespace {
 
+compiler::CodegenTraits get_codegen_traits() {
+  return compiler::CodegenTraits::get(
+      0, 3, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
+}
+
 void init_storage_buffer(int8_t* buffer,
                          const std::vector<TargetInfo>& targets,
                          const QueryMemoryDescriptor& query_mem_desc) {
@@ -385,6 +390,7 @@ void perform_test_and_verify_results(TestInputData input) {
                                      input.target_infos,
                                      init_agg_val_vec(input.target_infos, query_mem_desc),
                                      cuda_mgr.get(),
+                                     get_codegen_traits(),
                                      executor.get());
   gpu_smem_tester.codegen(CompilationOptions::defaults(
       ExecutorDeviceType::GPU,
