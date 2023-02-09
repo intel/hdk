@@ -28,15 +28,18 @@ namespace compiler {
 
 class CodegenTraits {
   explicit CodegenTraits(unsigned local_addr_space,
+                         unsigned smem_addr_space,
                          unsigned global_addr_space,
                          llvm::CallingConv::ID calling_conv,
                          llvm::StringRef triple = "")
       : local_addr_space_(local_addr_space)
+      , smem_addr_space_(smem_addr_space)
       , global_addr_space_(global_addr_space)
       , conv_(calling_conv)
       , triple_(triple) {}
 
   const unsigned local_addr_space_;
+  const unsigned smem_addr_space_;
   const unsigned global_addr_space_;
   const llvm::CallingConv::ID conv_;
   const llvm::StringRef triple_;
@@ -51,10 +54,12 @@ class CodegenTraits {
   CodegenTraits& operator=(const CodegenTraits&) = delete;
 
   static CodegenTraits get(unsigned local_addr_space,
+                           unsigned smem_addr_space,
                            unsigned global_addr_space,
                            llvm::CallingConv::ID calling_conv,
                            llvm::StringRef triple = "") {
-    return CodegenTraits(local_addr_space, global_addr_space, calling_conv, triple);
+    return CodegenTraits(
+        local_addr_space, smem_addr_space, global_addr_space, calling_conv, triple);
   }
 
   static CodegenTraits get(CodegenTraitsDescriptor codegen_traits_desc) {
@@ -80,6 +85,9 @@ class CodegenTraits {
 
   llvm::PointerType* localPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, local_addr_space_);
+  }
+  llvm::PointerType* smemPointerType(llvm::Type* ElementType) const {
+    return llvm::PointerType::get(ElementType, smem_addr_space_);
   }
   llvm::PointerType* globalPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, global_addr_space_);

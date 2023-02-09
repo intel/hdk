@@ -49,6 +49,7 @@ class GpuSharedMemCodeBuilder {
                           const std::vector<TargetInfo>& targets,
                           const std::vector<int64_t>& init_agg_values,
                           const Config& config,
+                          const compiler::CodegenTraits& traits,
                           Executor* executor);
   /**
    * generates code for both the reduction and initialization steps required for shared
@@ -100,5 +101,6 @@ class GpuSharedMemCodeBuilder {
   const QueryMemoryDescriptor query_mem_desc_;
   const std::vector<TargetInfo> targets_;
   const std::vector<int64_t> init_agg_values_;
+  const compiler::CodegenTraits& traits_;
   Executor* executor_;
 };
