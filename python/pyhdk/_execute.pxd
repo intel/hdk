@@ -81,12 +81,16 @@ cdef extern from "omniscidb/QueryEngine/ResultSet.h":
   cdef cppclass CResultSet "ResultSet":
     size_t rowCount()
 
+    string toString() const
+    string contentToString(bool) const
+    string summaryToString() const
+
 ctypedef shared_ptr[CResultSet] CResultSetPtr
 
 cdef extern from "omniscidb/QueryEngine/TargetMetaInfo.h":
   cdef cppclass CTargetMetaInfo "TargetMetaInfo":
     const string& get_resname()
-    const CType& get_type_info()
+    const CType* type()
 
 cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
   cdef cppclass CArrowResultSetConverter "ArrowResultSetConverter":

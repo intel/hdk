@@ -206,7 +206,7 @@ class ResultSet {
 
   std::string getStrScalarVal(const ScalarTargetValue& current_scalar,
                               const hdk::ir::Type* col_type) const;
-  std::string contentToString() const;
+  std::string contentToString(bool header = true) const;
   std::string summaryToString() const;
 
   inline ResultSetRowIterator rowIterator(size_t from_logical_index,
