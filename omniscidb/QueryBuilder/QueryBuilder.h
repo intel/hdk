@@ -25,6 +25,7 @@ class ExprRewriter;
 
 class BuilderExpr {
  public:
+  BuilderExpr();
   BuilderExpr(const BuilderExpr& other) = default;
   BuilderExpr(BuilderExpr&& other) = default;
 
@@ -104,6 +105,9 @@ class BuilderExpr {
   BuilderExpr mod(int val) const;
   BuilderExpr mod(int64_t val) const;
 
+  BuilderExpr ceil() const;
+  BuilderExpr floor() const;
+
   BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
   BuilderExpr logicalOr(const BuilderExpr& rhs) const;
 
@@ -181,6 +185,7 @@ class BuilderExpr {
 
 class BuilderSortField {
  public:
+  BuilderSortField();
   BuilderSortField(int col_idx,
                    SortDirection dir,
                    NullSortedPosition null_pos = NullSortedPosition::Last);
@@ -221,6 +226,8 @@ class BuilderSortField {
 
 class BuilderNode {
  public:
+  BuilderNode();
+
   BuilderExpr ref(int col_idx) const;
   BuilderExpr ref(const std::string& col_name) const;
   std::vector<BuilderExpr> ref(std::initializer_list<int> col_indices) const;
@@ -255,7 +262,7 @@ class BuilderNode {
   BuilderNode proj(const std::vector<BuilderExpr>& exprs,
                    const std::vector<std::string>& fields) const;
 
-  BuilderNode filter(BuilderExpr condition) const;
+  BuilderNode filter(const BuilderExpr& condition) const;
 
   BuilderNode agg(int group_key, const std::string& agg_str) const;
   BuilderNode agg(int group_key, std::initializer_list<std::string> aggs) const;
@@ -330,6 +337,8 @@ class BuilderNode {
   BuilderNode agg(const std::vector<BuilderExpr>& group_keys, BuilderExpr agg_expr) const;
   BuilderNode agg(const std::vector<BuilderExpr>& group_keys,
                   const std::vector<BuilderExpr>& aggs) const;
+
+  BuilderExpr parseAggString(const std::string& agg_str) const;
 
   BuilderNode sort(int col_idx,
                    SortDirection dir = SortDirection::Ascending,
@@ -457,6 +466,9 @@ class BuilderNode {
   std::unique_ptr<QueryDag> finalize() const;
 
   NodePtr node() const { return node_; }
+  int size() const { return node_->size(); }
+  ColumnInfoPtr columnInfo(int col_index) const;
+  ColumnInfoPtr columnInfo(const std::string& col_name) const;
 
  protected:
   friend class QueryBuilder;
@@ -466,7 +478,6 @@ class BuilderNode {
   BuilderNode proj() const;
   BuilderNode proj(const ExprPtrVector& exprs,
                    const std::vector<std::string>& fields) const;
-  BuilderExpr parseAggString(const std::string& agg_str) const;
   std::vector<BuilderExpr> parseAggString(const std::vector<std::string>& aggs) const;
 
   const QueryBuilder* builder_;
@@ -510,6 +521,8 @@ class QueryBuilder {
   BuilderExpr cst(const std::vector<double>& vals, const std::string& type) const;
   BuilderExpr cst(const std::vector<std::string>& vals, const Type* type) const;
   BuilderExpr cst(const std::vector<std::string>& vals, const std::string& type) const;
+  BuilderExpr cst(const std::vector<BuilderExpr>& vals, const Type* type) const;
+  BuilderExpr cst(const std::vector<BuilderExpr>& vals, const std::string& type) const;
   BuilderExpr cstNoScale(int64_t val, const Type* type) const;
   BuilderExpr cstNoScale(int64_t val, const std::string& type) const;
   BuilderExpr trueCst() const;
