@@ -68,6 +68,35 @@ cdef class ExecutionResult:
   def to_explain_str(self):
     return self.c_result.getExplanation()
 
+  @property
+  def schema(self):
+    cdef const vector[CTargetMetaInfo]* meta = &self.c_result.getTargetsMeta()
+    res = dict()
+    for col_idx in range(meta.size()):
+      key = meta.at(col_idx).get_resname()
+      val = meta.at(col_idx).type().toString()
+      res[key] = val
+    return res
+
+  @property
+  def desc(self):
+    return self.c_result.getRows().get().summaryToString()
+
+  @property
+  def memory_desc(self):
+    return self.c_result.getRows().get().toString()
+
+  def __str__(self):
+    res = "Schema:\n"
+    for key, type_str in self.schema.items():
+      res += f"  {key}: {type_str}\n"
+    res += "Data:\n"
+    res += self.c_result.getRows().get().contentToString(False)
+    return res
+
+  def __repr__(self):
+    return self.__str__()
+
 cdef class RelAlgExecutor:
   cdef shared_ptr[CRelAlgExecutor] c_rel_alg_executor
   # DataMgr is used only to pass it to each produced ExecutionResult

@@ -241,20 +241,29 @@ std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar,
   return oss.str();
 }
 
-std::string ResultSet::contentToString() const {
+std::string ResultSet::contentToString(bool header) const {
   std::ostringstream oss;
   constexpr char col_delimiter = '|';
-  oss << "ColTypes:\n";
-  for (size_t col = 0; col < colCount(); col++) {
-    oss << colType(col)->toString() << col_delimiter;
+  if (header) {
+    oss << "Column types:\n";
+    for (size_t col = 0; col < colCount(); col++) {
+      if (col) {
+        oss << col_delimiter;
+      }
+      oss << colType(col)->toString();
+    }
+    oss << "\nData:\n";
   }
-  oss << "\nData:\n";
+  moveToBegin();
   while (true) {
     const auto row = getNextRow(false, false);
     if (row.empty()) {
       break;
     } else {
       for (size_t col_idx = 0; col_idx < row.size(); col_idx++) {
+        if (col_idx) {
+          oss << col_delimiter;
+        }
         if (row[col_idx].type() == typeid(ScalarTargetValue)) {
           const auto scalar_col_val = boost::get<ScalarTargetValue>(row[col_idx]);
           oss << getStrScalarVal(scalar_col_val, colType(col_idx));
@@ -271,7 +280,6 @@ std::string ResultSet::contentToString() const {
             oss << "]";
           }
         }
-        oss << col_delimiter;
       }
       oss << "\n";
     }
