@@ -245,6 +245,16 @@ void checkCst(const BuilderExpr& expr, std::initializer_list<T> vals, const Type
   }
 }
 
+void checkFunctionOper(const BuilderExpr& expr,
+                       const std::string& fn_name,
+                       size_t arity,
+                       const Type* type) {
+  ASSERT_TRUE(expr.expr()->is<FunctionOper>());
+  ASSERT_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_EQ(expr.expr()->as<FunctionOper>()->arity(), arity);
+  ASSERT_EQ(expr.expr()->as<FunctionOper>()->name(), fn_name);
+}
+
 }  // anonymous namespace
 
 class QueryBuilderTest : public TestSuite {
@@ -428,10 +438,11 @@ class QueryBuilderTest : public TestSuite {
     auto table_info = getStorage()->getTableInfo(TEST_DB_ID, "sort");
     auto col_infos = getStorage()->listColumns(*table_info);
     auto scan = std::make_shared<Scan>(table_info, std::move(col_infos));
-    auto proj =
-        std::make_shared<Project>(getNodeColumnRefs(scan.get()),
-                                  std::vector<std::string>({"x", "y", "z", "rowid"}),
-                                  scan);
+    auto proj = std::make_shared<Project>(ExprPtrVector{getNodeColumnRef(scan.get(), 0),
+                                                        getNodeColumnRef(scan.get(), 1),
+                                                        getNodeColumnRef(scan.get(), 2)},
+                                          std::vector<std::string>({"x", "y", "z"}),
+                                          scan);
     auto sort = std::make_shared<hdk::ir::Sort>(fields, limit, offset, proj);
     auto dag = std::make_unique<QueryDag>(configPtr());
     dag->setRootNode(sort);
@@ -3867,6 +3878,40 @@ TEST_F(QueryBuilderTest, ArrayAtExpr) {
   EXPECT_THROW(scan.ref("col_timestamp").at(1), InvalidQueryError);
 }
 
+TEST_F(QueryBuilderTest, Ceil) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkRef(scan.ref("col_bi").ceil(), scan.node(), 0, "col_bi");
+  checkRef(scan.ref("col_i").ceil(), scan.node(), 1, "col_i");
+  checkFunctionOper(scan.ref("col_f").ceil(), "CEIL", 1, ctx().fp32());
+  checkFunctionOper(scan.ref("col_d").ceil(), "CEIL", 1, ctx().fp64());
+  checkFunctionOper(scan.ref("col_dec").ceil(), "CEIL", 1, ctx().decimal64(10, 2));
+  EXPECT_THROW(scan.ref("col_b").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").ceil(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").ceil(), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, Floor) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkRef(scan.ref("col_bi").floor(), scan.node(), 0, "col_bi");
+  checkRef(scan.ref("col_i").floor(), scan.node(), 1, "col_i");
+  checkFunctionOper(scan.ref("col_f").floor(), "FLOOR", 1, ctx().fp32());
+  checkFunctionOper(scan.ref("col_d").floor(), "FLOOR", 1, ctx().fp64());
+  checkFunctionOper(scan.ref("col_dec").floor(), "FLOOR", 1, ctx().decimal64(10, 2));
+  EXPECT_THROW(scan.ref("col_b").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").floor(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").floor(), InvalidQueryError);
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));
@@ -3939,6 +3984,18 @@ TEST_F(QueryBuilderTest, SimpleProjection) {
   EXPECT_THROW(builder.scan("test1").proj({0, 1}, {"c1", "c2", "c3"}), InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj({"col_bi"}, {}), InvalidQueryError);
   EXPECT_THROW(builder.scan("test1").proj(std::vector<int>(), {}), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, ScanFilter) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test1");
+  auto dag = scan.filter(scan.ref("col_bi").gt(3)).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int64_t>({4, 5}),
+                   std::vector<int32_t>({44, 55}),
+                   std::vector<float>({4.4f, 5.5f}),
+                   std::vector<double>({44.44f, 55.55f}));
 }
 
 TEST_F(QueryBuilderTest, ProjFilter) {

@@ -262,6 +262,14 @@ class InputNodesCollector
   }
 };
 
+class InputColIndexesCollector
+    : public ExprCollector<std::unordered_set<int>, InputColIndexesCollector> {
+ protected:
+  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
+    result_.insert(col_ref->index());
+  }
+};
+
 void expandAllowedInput(const Node* node,
                         std::unordered_set<const Node*>& allowed_nodes) {
   allowed_nodes.insert(node);
@@ -482,6 +490,8 @@ JoinType parseJoinType(const std::string& join_type) {
 }
 
 }  // namespace
+
+BuilderExpr::BuilderExpr() : builder_(nullptr) {}
 
 BuilderExpr::BuilderExpr(const QueryBuilder* builder,
                          ExprPtr expr,
@@ -1117,6 +1127,32 @@ BuilderExpr BuilderExpr::mod(int64_t val) const {
   return mod(builder_->cst(val, builder_->ctx_.int64(false)));
 }
 
+BuilderExpr BuilderExpr::ceil() const {
+  if (expr_->type()->isInteger()) {
+    return *this;
+  }
+  if (expr_->type()->isNumber()) {
+    ExprPtr op_expr = makeExpr<FunctionOperWithCustomTypeHandling>(
+        expr_->type(), "CEIL", ExprPtrVector{expr_});
+    return {builder_, op_expr, "", true};
+  }
+  throw InvalidQueryError() << "Cannot apply CEIL operation for operand type "
+                            << expr_->type()->toString();
+}
+
+BuilderExpr BuilderExpr::floor() const {
+  if (expr_->type()->isInteger()) {
+    return *this;
+  }
+  if (expr_->type()->isNumber()) {
+    ExprPtr op_expr = makeExpr<FunctionOperWithCustomTypeHandling>(
+        expr_->type(), "FLOOR", ExprPtrVector{expr_});
+    return {builder_, op_expr, "", true};
+  }
+  throw InvalidQueryError() << "Cannot apply CEIL operation for operand type "
+                            << expr_->type()->toString();
+}
+
 BuilderExpr BuilderExpr::logicalAnd(const BuilderExpr& rhs) const {
   try {
     auto bin_oper = Analyzer::normalizeOperExpr(
@@ -1392,6 +1428,9 @@ Context& BuilderExpr::ctx() const {
   return const_cast<Context&>(builder_->ctx_);
 }
 
+BuilderSortField::BuilderSortField()
+    : field_(0), dir_(SortDirection::Ascending), null_pos_(NullSortedPosition::Last) {}
+
 BuilderSortField::BuilderSortField(int col_idx,
                                    SortDirection dir,
                                    NullSortedPosition null_pos)
@@ -1461,6 +1500,8 @@ NullSortedPosition BuilderSortField::parseNullPosition(const std::string& val) {
   throw InvalidQueryError() << "Cannot parse nulls position (use 'first' or 'last'): '"
                             << val << "'";
 }
+
+BuilderNode::BuilderNode() : builder_(nullptr) {}
 
 BuilderNode::BuilderNode(const QueryBuilder* builder, NodePtr node)
     : builder_(builder), node_(node) {}
@@ -1621,9 +1662,19 @@ BuilderNode BuilderNode::proj(const ExprPtrVector& exprs,
   return {builder_, proj};
 }
 
-BuilderNode BuilderNode::filter(BuilderExpr condition) const {
+BuilderNode BuilderNode::filter(const BuilderExpr& condition) const {
   checkExprInput(condition, {node_.get()}, "filter");
-  auto filter = std::make_shared<Filter>(condition.expr(), node_);
+  // Filter-out virtual column if it is not used on the filter.,
+  auto base = node_;
+  if (node_->is<Scan>()) {
+    auto used_cols = InputColIndexesCollector::collect(condition.expr());
+    int cols_to_proj =
+        used_cols.count((int)(node_->size() - 1)) ? node_->size() : node_->size() - 1;
+    std::vector<int> col_indices(cols_to_proj);
+    std::iota(col_indices.begin(), col_indices.end(), 0);
+    base = proj(col_indices).node();
+  }
+  auto filter = std::make_shared<Filter>(condition.expr(), base);
   return {builder_, filter};
 }
 
@@ -2187,7 +2238,18 @@ BuilderNode BuilderNode::sort(const std::vector<BuilderSortField>& fields,
   // Sort over scan is not supported.
   auto base = node_;
   if (node_->is<Scan>()) {
-    base = proj().node();
+    // Filter out rowid column if it's not used in the sort.
+    bool uses_rowid = false;
+    for (auto& col : collation) {
+      if (col.getField() == node_->size() - 1) {
+        uses_rowid = true;
+        break;
+      }
+    }
+    int cols_to_proj = uses_rowid ? node_->size() : node_->size() - 1;
+    std::vector<int> col_indices(cols_to_proj);
+    std::iota(col_indices.begin(), col_indices.end(), 0);
+    base = proj(col_indices).node();
   }
   auto sort_node = std::make_shared<Sort>(std::move(collation), limit, offset, base);
   return {builder_, sort_node};
@@ -2343,6 +2405,34 @@ std::unique_ptr<QueryDag> BuilderNode::finalize() const {
   }
 
   return std::make_unique<QueryDag>(builder_->config_, node_);
+}
+
+ColumnInfoPtr BuilderNode::columnInfo(int col_index) const {
+  auto ref = getRefByIndex(node_.get(), col_index);
+  int real_idx = ref->as<ir::ColumnRef>()->index();
+  if (node_->is<Scan>()) {
+    return node_->as<Scan>()->getColumnInfo(real_idx);
+  }
+  return std::make_shared<ColumnInfo>(-1,
+                                      -node_->getId(),
+                                      real_idx,
+                                      getFieldName(node_.get(), real_idx),
+                                      ref->type(),
+                                      false);
+}
+
+ColumnInfoPtr BuilderNode::columnInfo(const std::string& col_name) const {
+  auto ref = getRefByName(node_.get(), col_name);
+  int real_idx = ref->as<ir::ColumnRef>()->index();
+  if (node_->is<Scan>()) {
+    return node_->as<Scan>()->getColumnInfo(real_idx);
+  }
+  return std::make_shared<ColumnInfo>(-1,
+                                      -node_->getId(),
+                                      real_idx,
+                                      getFieldName(node_.get(), real_idx),
+                                      ref->type(),
+                                      false);
 }
 
 QueryBuilder::QueryBuilder(Context& ctx,
@@ -2621,6 +2711,24 @@ BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
 }
 
 BuilderExpr QueryBuilder::cst(const std::vector<std::string>& vals,
+                              const std::string& type) const {
+  return cst(vals, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<BuilderExpr>& vals,
+                              const Type* type) const {
+  checkCstArrayType(type, vals.size());
+  auto elem_type = type->as<ArrayBaseType>()->elemType();
+  ExprPtrList exprs;
+  for (auto val : vals) {
+    auto elem_val = val.cast(elem_type).expr();
+    exprs.emplace_back(elem_val);
+  }
+  auto cst_expr = std::make_shared<Constant>(type, false, exprs);
+  return {this, cst_expr};
+}
+
+BuilderExpr QueryBuilder::cst(const std::vector<BuilderExpr>& vals,
                               const std::string& type) const {
   return cst(vals, ctx_.typeFromString(type));
 }
