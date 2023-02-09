@@ -27,15 +27,18 @@ namespace compiler {
 
 class CodegenTraits {
   explicit CodegenTraits(unsigned local_addr_space,
+                         unsigned smem_addr_space,
                          unsigned global_addr_space,
                          llvm::CallingConv::ID calling_conv,
                          llvm::StringRef triple = "")
       : local_addr_space_(local_addr_space)
+      , smem_addr_space_(smem_addr_space)
       , global_addr_space_(global_addr_space)
       , conv_(calling_conv)
       , triple_(triple) {}
 
   const unsigned local_addr_space_;
+  const unsigned smem_addr_space_;
   const unsigned global_addr_space_;
   const llvm::CallingConv::ID conv_;
   const llvm::StringRef triple_;
@@ -45,14 +48,19 @@ class CodegenTraits {
   CodegenTraits& operator=(const CodegenTraits&) = delete;
 
   static CodegenTraits get(unsigned local_addr_space,
+                           unsigned smem_addr_space,
                            unsigned global_addr_space,
                            llvm::CallingConv::ID calling_conv,
                            llvm::StringRef triple = "") {
-    return CodegenTraits(local_addr_space, global_addr_space, calling_conv, triple);
+    return CodegenTraits(
+        local_addr_space, smem_addr_space, global_addr_space, calling_conv, triple);
   }
 
   llvm::PointerType* localPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, local_addr_space_);
+  }
+  llvm::PointerType* smemPointerType(llvm::Type* ElementType) const {
+    return llvm::PointerType::get(ElementType, smem_addr_space_);
   }
   llvm::PointerType* globalPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, global_addr_space_);
@@ -88,7 +96,9 @@ class CPUBackend : public Backend {
       const std::unordered_set<llvm::Function*>& live_funcs,
       const CompilationOptions& co) override;
 
-  CodegenTraits traits() const { return CodegenTraits::get(0, 0, llvm::CallingConv::C); };
+  CodegenTraits traits() const {
+    return CodegenTraits::get(0, 0, 0, llvm::CallingConv::C);
+  };
 
   static std::shared_ptr<CpuCompilationContext> generateNativeCPUCode(
       llvm::Function* func,
@@ -109,7 +119,7 @@ class CUDABackend : public Backend {
       const CompilationOptions& co) override;
 
   CodegenTraits traits() const {
-    return CodegenTraits::get(0, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
+    return CodegenTraits::get(0, 3, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
   };
 
   static std::string generatePTX(const std::string& cuda_llir,
@@ -157,7 +167,7 @@ class L0Backend : public Backend {
 
   CodegenTraits traits() const {
     return CodegenTraits::get(
-        4, 1, llvm::CallingConv::SPIR_FUNC, "spir64-unknown-unknown");
+        4, 3, 1, llvm::CallingConv::SPIR_FUNC, "spir64-unknown-unknown");
   };
 
   static std::shared_ptr<L0CompilationContext> generateNativeGPUCode(

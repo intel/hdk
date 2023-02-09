@@ -29,6 +29,7 @@ GpuSharedMemCodeBuilder::GpuSharedMemCodeBuilder(
     const std::vector<TargetInfo>& targets,
     const std::vector<int64_t>& init_agg_values,
     const Config& config,
+    const compiler::CodegenTraits& traits,
     Executor* executor)
     : config_(config)
     , module_(llvm_module)
@@ -38,6 +39,7 @@ GpuSharedMemCodeBuilder::GpuSharedMemCodeBuilder(
     , query_mem_desc_(qmd)
     , targets_(targets)
     , init_agg_values_(init_agg_values)
+    , traits_(traits)
     , executor_(executor) {
   /**
    * This class currently works only with:
@@ -135,9 +137,13 @@ void GpuSharedMemCodeBuilder::codegenReduction() {
 
   // cast src/dest buffers into byte streams:
   auto src_byte_stream = ir_builder.CreatePointerCast(
-      src_buffer_ptr, llvm::Type::getInt8PtrTy(context_, 0), "src_byte_stream");
+      src_buffer_ptr,
+      traits_.localPointerType(llvm::Type::getInt8Ty(context_)),
+      "src_byte_stream");
   const auto dest_byte_stream = ir_builder.CreatePointerCast(
-      dest_buffer_ptr, llvm::Type::getInt8PtrTy(context_, 0), "dest_byte_stream");
+      dest_buffer_ptr,
+      traits_.localPointerType(llvm::Type::getInt8Ty(context_)),
+      "dest_byte_stream");
 
   // running the result set reduction JIT code to get reduce_one_entry_idx function
   auto fixup_query_mem_desc = ResultSet::fixupQueryMemoryDescriptor(query_mem_desc_);
@@ -202,8 +208,8 @@ void GpuSharedMemCodeBuilder::codegenReduction() {
   // qmd_handles are only used with count distinct and baseline group by
   // serialized varlen buffer is only used with SAMPLE on varlen types, which we will
   // disable for current shared memory support.
-  const auto null_ptr_ll =
-      llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(context_, 0));
+  const auto null_ptr_ll = llvm::ConstantPointerNull::get(
+      traits_.localPointerType(llvm::Type::getInt8Ty(context_)));
   const auto thread_idx_i32 = ir_builder.CreateCast(
       llvm::Instruction::CastOps::Trunc, thread_idx, get_int_type(32, context_));
   ir_builder.CreateCall(reduce_one_entry_idx_func,
@@ -228,19 +234,21 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
                                         llvm::IRBuilder<>& ir_builder,
                                         const size_t slot_idx,
                                         const TargetInfo& target_info,
+                                        const compiler::CodegenTraits& traits,
                                         llvm::Value* dest_byte_stream,
                                         llvm::Value* byte_offset) {
   const auto type = get_compact_type(target_info);
   const auto slot_bytes = query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
-  auto ptr_type = [&context](const size_t slot_bytes, const hdk::ir::Type* type) {
+  auto ptr_type = [&context, &traits](const size_t slot_bytes,
+                                      const hdk::ir::Type* type) {
     if (slot_bytes == sizeof(int32_t)) {
-      return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
+      return traits.smemPointerType(llvm::Type::getInt32Ty(context));
     } else {
       CHECK(slot_bytes == sizeof(int64_t));
-      return llvm::Type::getInt64PtrTy(context, /*address_space=*/3);
+      return traits.smemPointerType(llvm::Type::getInt64Ty(context));
     }
     UNREACHABLE() << "Invalid slot size encountered: " << std::to_string(slot_bytes);
-    return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
+    return traits.smemPointerType(llvm::Type::getInt32Ty(context));
   };
 
   const auto casted_dest_slot_address = ir_builder.CreatePointerCast(
@@ -294,7 +302,9 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
   auto byte_offset_ll = ir_builder.CreateMul(row_size_bytes, thread_idx, "byte_offset");
 
   const auto dest_byte_stream = ir_builder.CreatePointerCast(
-      shared_mem_buffer, llvm::Type::getInt8PtrTy(context_), "dest_byte_stream");
+      shared_mem_buffer,
+      traits_.localPointerType(llvm::Type::getInt8Ty(context_)),
+      "dest_byte_stream");
 
   // each thread will be responsible for one
   const auto& col_slot_context = fixup_query_mem_desc.getColSlotContext();
@@ -312,6 +322,7 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
                                                                  ir_builder,
                                                                  slot_idx,
                                                                  target_info,
+                                                                 traits_,
                                                                  dest_byte_stream,
                                                                  byte_offset_ll);
 
@@ -346,8 +357,8 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
 
 llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction() const {
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(llvm::Type::getInt64PtrTy(context_));
-  input_arguments.push_back(llvm::Type::getInt64PtrTy(context_));
+  input_arguments.push_back(traits_.localPointerType(llvm::Type::getInt64Ty(context_)));
+  input_arguments.push_back(traits_.localPointerType(llvm::Type::getInt64Ty(context_)));
   input_arguments.push_back(llvm::Type::getInt32Ty(context_));
 
   llvm::FunctionType* ft =
@@ -359,12 +370,12 @@ llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction() const {
 
 llvm::Function* GpuSharedMemCodeBuilder::createInitFunction() const {
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(
-      llvm::Type::getInt64PtrTy(context_));                     // a pointer to the buffer
+  input_arguments.push_back(traits_.localPointerType(
+      llvm::Type::getInt64Ty(context_)));                       // a pointer to the buffer
   input_arguments.push_back(llvm::Type::getInt32Ty(context_));  // buffer size in bytes
 
   llvm::FunctionType* ft = llvm::FunctionType::get(
-      llvm::Type::getInt64PtrTy(context_), input_arguments, false);
+      traits_.localPointerType(llvm::Type::getInt64Ty(context_)), input_arguments, false);
   const auto init_function = llvm::Function::Create(
       ft, llvm::Function::ExternalLinkage, "init_smem_func", module_);
   return init_function;
