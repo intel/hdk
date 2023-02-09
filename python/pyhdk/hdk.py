@@ -18,7 +18,7 @@ def not_implemented(func):
 
 class QueryExpr:
     @not_implemented
-    def name(self, name):
+    def rename(self, name):
         """
         Create a copy of the expression with a new assigned name.
 
@@ -39,7 +39,7 @@ class QueryExpr:
         --------
         >>> hdk = pyhdk.init()
         >>> scan = hdk.from_pydict({"x": [1, 4, 7], "y": [9, 3, 1]})
-        >>> proj = scan.proj((scan["x"] + scan["y"]).name("sum"))
+        >>> proj = scan.proj((scan["x"] + scan["y"]).rename("sum"))
         >>> agg = proj.agg([], "max(sum)")
         >>> # Alternative option
         >>> proj = scan.proj(sum=scan["x"] + scan["y"])
@@ -146,7 +146,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def approxQuantile(self, prob):
+    def approx_quantile(self, prob):
         """
         Create APROX QUANTILE aggregate expression with the current expression as
         its argument.
@@ -164,7 +164,7 @@ class QueryExpr:
         --------
         >>> hdk = pyhdk.init()
         >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].approxQuantile(0.5))
+        >>> agg = scan.agg(["id"], scan["x"].approx_quantile(0.5))
         """
         pass
 
@@ -187,7 +187,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def singleValue(self):
+    def single_value(self):
         """
         Create SINGLE VALUE aggregate expression with the current expression as its
         argument.
@@ -200,7 +200,7 @@ class QueryExpr:
         --------
         >>> hdk = pyhdk.init()
         >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].singleValue())
+        >>> agg = scan.agg(["id"], scan["x"].single_value())
         """
         pass
 
@@ -270,7 +270,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def uminus():
+    def uminus(self):
         """
         Create unary minus expression for the current expression.
 
@@ -287,7 +287,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def is_null():
+    def is_null(self):
         """
         Create IS NULL expression for the current expression.
 
@@ -304,7 +304,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def is_not_null():
+    def is_not_null(self):
         """
         Create IS NOT NULL expression for the current expression.
 
@@ -321,7 +321,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def unnest():
+    def unnest(self):
         """
         Create UNNEST expression for the current expression.
 
@@ -341,7 +341,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def add(self, value, interval=None):
+    def add(self, value, field=None):
         """
         Create ADD binary expression.
 
@@ -385,7 +385,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def sub(self, value, interval=None):
+    def sub(self, value, field=None):
         """
         Create SUB binary expression.
 
@@ -450,10 +450,61 @@ class QueryExpr:
         """
         pass
 
+    def truediv(self, value):
+        """
+        Create DIV binary expression with a cast to float when required.
+
+        If both operands have integer type then cast to fp64 is applied to the value
+        and then DIV expression is generated. Otherwise, DIV expression is generated.
+
+        Parameters
+        ----------
+        value : int, float, or QueryExpr
+            Right-hand operand for the binary operation.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15], "y": [2, 3, 7, 4, 5]})
+        >>> node = scan.proj(scan["x"].truediv(scan["y"]))
+        """
+        pass
+
+    def floordiv(self, value):
+        """
+        Create DIV binary expression with an optional fllor operation.
+
+        If both operands have integer type then DIV expression is generated. Otherwise,
+        an additional floor operations is used for the result.
+
+        Parameters
+        ----------
+        value : int, float, or QueryExpr
+            Right-hand operand for the binary operation.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15], "y": [2, 3, 7, 4, 5]})
+        >>> node = scan.proj(scan["x"].truediv(scan["y"]))
+        """
+        pass
+
     @not_implemented
     def div(self, value):
         """
         Create DIV binary expression.
+
+        Operation produces integer result when both operands are integers (floor div is applied).
+        Otherwise, float result is produced (true div is applied).
 
         Parameters
         ----------
@@ -495,7 +546,7 @@ class QueryExpr:
         pass
 
     @not_implemented
-    def logicalNot(self):
+    def logical_not(self):
         """
         Create logical NOT expression.
 
@@ -507,12 +558,12 @@ class QueryExpr:
         --------
         >>> hdk = pyhdk.init()
         >>> scan = hdk.from_pydict({"x": [True, False, True, False]})
-        >>> node = scan.proj(scan["x"].logicalNot())
+        >>> node = scan.proj(scan["x"].logical_not())
         """
         pass
 
     @not_implemented
-    def logicalAnd(self, value):
+    def logical_and(self, value):
         """
         Create logical AND expression.
 
@@ -531,12 +582,12 @@ class QueryExpr:
         >>> scan = hdk.from_pydict(
         >>>     {"x": [True, False, True, False], "y": [True, True, False, False]}
         >>> )
-        >>> node = scan.proj(scan["x"].logicalAnd(scan["y"]))
+        >>> node = scan.proj(scan["x"].logical_and(scan["y"]))
         """
         pass
 
     @not_implemented
-    def logicalOr(self, value):
+    def logical_or(self, value):
         """
         Create logical OR expression.
 
@@ -555,7 +606,7 @@ class QueryExpr:
         >>> scan = hdk.from_pydict(
         >>>     {"x": [True, False, True, False], "y": [True, True, False, False]}
         >>> )
-        >>> node = scan.proj(scan["x"].logicalOr(scan["y"]))
+        >>> node = scan.proj(scan["x"].logical_or(scan["y"]))
         """
         pass
 
@@ -696,6 +747,8 @@ class QueryExpr:
         """
         Create subscript expression to extract array element by index.
 
+        The indexing is 1-based. Out-of-bound access results in NULL.
+
         Parameters
         ----------
         index : int or QueryExpr
@@ -709,7 +762,7 @@ class QueryExpr:
         --------
         >>> hdk = pyhdk.init()
         >>> scan = hdk.from_pydict({"x": [[1, 2], [3, 4]]})
-        >>> node = scan.proj(scan["x"].at(0))
+        >>> node = scan.proj(scan["x"].at(1))
         """
         pass
 
@@ -717,7 +770,8 @@ class QueryExpr:
     __add__ = add
     __sub__ = sub
     __mul__ = mul
-    __truediv__ = div
+    __floordiv__ = floordiv
+    __truediv__ = truediv
     __mod__ = mod
 
     __eq__ = eq
@@ -810,7 +864,7 @@ class QueryNode:
         pass
 
     @not_implemented
-    def sort(self, *args, fields=None, **kwargs):
+    def sort(self, *args, fields=None, limit=0, offset=0, **kwargs):
         """
         Create a sort node with the current node as its input.
 
@@ -824,6 +878,10 @@ class QueryNode:
         fields : dict, default: None
             Column names mapped to a sort order or a tuple holding a sort order and a NULLs
             position.
+        limit : int, default: 0
+            Limit number of output rows. If 0 then unlimited.
+        offset : int, default: 0
+            Number of rows to skip in the result.
         **kwargs : dict
             Used similar to fields.
 
@@ -938,6 +996,59 @@ class QueryNode:
         pass
 
     __getitem__ = ref
+
+    @property
+    def size(self):
+        """
+        Get a number of columns in the node.
+
+        Returns
+        -------
+        int
+        """
+        pass
+
+    def column_info(self, col):
+        """
+        Get column info.
+
+        Parameters
+        ----------
+        col : int, str or QueryExpr
+            Column index, name or reference.
+
+        Returns
+        -------
+        ColumnInfo
+        """
+        pass
+
+    @property
+    def table_name(self):
+        """
+        Return a referenced table name.
+
+        For scan nodes a name of a referenced physical table is returned.
+        For other nodes None is returned.
+
+        Returns
+        -------
+        str or None
+        """
+        pass
+
+    @property
+    def schema(self):
+        """
+        Return a scheme of a table represented by this node.
+
+        Scheme is a dictionary mapping column names to ColumnInfo objects.
+
+        Returns
+        -------
+        dict
+        """
+        pass
 
     @not_implemented
     def run(self):
@@ -1247,16 +1358,16 @@ class HDK:
         pass
 
     @not_implemented
-    def cst(self, value, type=None, scale_decimal=True):
+    def const(self, value, cst_type=None, scale_decimal=True):
         """
-        Create a literal query expression.
+        Create an expression representing a constant value.
 
         Parameters
         ----------
-        value : int, float, bool, str or list
-            Literal value.
-        type : str or TypeInfo, default: None
-            Literal type. If not specified, then inferenced from value.
+        value : None, int, float, bool, str or list
+            Constant value.
+        cst_type : str or TypeInfo, default: None
+            Constant type. If not specified, then inferenced from value.
         scale_decimal : bool, default: True
             If true, then integer value passed for decimal literal will
             be scaled according to the type scale. Otherwise, it will be
@@ -1292,6 +1403,8 @@ class HDK:
         >>> cst = hdk.cst("2001-02-03 15:00:00", "date")
         """
         pass
+
+    cst = const
 
     @not_implemented
     def date(self, value):
@@ -1346,3 +1459,25 @@ class HDK:
         >>> cst = hdk.timestamp("2001-02-03 15:00:00")
         """
         pass
+
+    def count(self):
+        """
+        Create a count agrregation expression.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_csv("test.csv")
+        >>> res = ht.proj(hdk.count())
+        """
+        pass
+
+
+def init(**kwargs):
+    if init._instance is None:
+        init._instance = HDK(**kwargs)
+    return init._instance
+
+
+init._instance = None
