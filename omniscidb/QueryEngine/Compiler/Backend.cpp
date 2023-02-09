@@ -860,15 +860,9 @@ void insert_all_globals(llvm::Module* from, llvm::Module* to) {
                                  I.getThreadLocalMode(),
                                  I.getType()->getAddressSpace());
     NewGV->copyAttributesFrom(&I);
-  }
-}
-
-void replace_all_global_uses(llvm::Module* from, llvm::Module* to) {
-  for (llvm::GlobalVariable& I : from->globals()) {
-    std::cerr << "Replacing uses of " << I.getName().str() << std::endl;
-    auto NewGV = to->getGlobalVariable(I.getName(), true);
-    CHECK(NewGV);
-    I.replaceAllUsesWith(NewGV);
+    NewGV->setName(I.getName());
+    llvm::ConstantAggregateZero* C = llvm::ConstantAggregateZero::get(I.getValueType());
+    NewGV->setInitializer(C);
   }
 }
 
@@ -909,6 +903,24 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
         auto new_call = llvm::CallInst::Create(local_callee, args, call->getName());
 
         llvm::ReplaceInstWithInst(call, new_call);
+        inst = new_call;
+      }
+      for (unsigned op_idx = 0; op_idx < inst->getNumOperands(); ++op_idx) {
+        auto op = inst->getOperand(op_idx);
+        if (auto* global = llvm::dyn_cast<llvm::GlobalVariable>(op)) {
+          auto local_global = to->getGlobalVariable(global->getName(), true);
+          std::cerr << "globals: " << std::endl;
+          for (auto gv_it = to->global_begin(); gv_it != to->global_end(); ++gv_it) {
+            std::cerr << "global: " << gv_it->getName().str() << std::endl;
+          }
+          std::cerr << std::endl;
+          std::cerr << "looking for global: " << global->getName().str() << std::endl;
+          CHECK(local_global);
+          std::cerr << "replacing global " << global->getName().str() << " with "
+                    << local_global->getName().str() << std::endl;
+
+          inst->setOperand(op_idx, local_global);
+        }
       }
     }
   }
@@ -945,8 +957,6 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
                        F.getName().str());
     }
   }
-  replace_all_global_uses(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
-                          module);
 
   DUMP_MODULE(module, "after.linking.spirv.ll")
 
@@ -1005,7 +1015,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
 #if 0
   std::string ss_c = ss.str();
   std::ofstream ospv("gen.spv");
-  ospv << ss_c << std::endl;
+  ospv << ss_c;
 #endif
 
   const auto func_name = wrapper_func->getName().str();

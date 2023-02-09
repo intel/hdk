@@ -9,6 +9,8 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
+declare void @__spirv_ControlBarrier(i32 %execution_scope, i32 %memory_scope, i32 %memory_semantics)
+
 @slm.buf = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 4
 
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
@@ -101,6 +103,7 @@ define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 n
 .exit:
     %res.ptr = bitcast [1024 x i64] addrspace(3)* @slm.buf to i64 addrspace(3)*
     %res.prt.casted = addrspacecast i64 addrspace(3)* %res.ptr to i64 addrspace(4)*
+    call void @sync_threadblock()
     ret i64 addrspace(4)* %res.prt.casted
 }
 
@@ -115,5 +118,10 @@ define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 add
     %old = call i64 @agg_sum_shared(i64 addrspace(4)* %output_buffer, i64 %val)
     br label %.exit
 .exit:
+    ret void
+}
+
+define void @sync_threadblock() {
+    call void @__spirv_ControlBarrier(i32 2, i32 2, i32 u0x100)
     ret void
 }
