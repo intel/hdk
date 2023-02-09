@@ -436,7 +436,7 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
       auto precision = type->as<hdk::ir::DecimalType>()->precision();
       auto scale = type->as<hdk::ir::DecimalType>()->scale();
       double v = (double)d.bigintval / pow(10, scale);
-      int size = snprintf(buf, buf_size, "%*.*f", precision, scale, v);
+      int size = snprintf(buf, buf_size, "%.*f", scale, v);
       CHECK_LE(0, size) << v << ' ' << type->toString();
       CHECK_LT(size_t(size), buf_size) << v << ' ' << type->toString();
       return buf;
@@ -466,7 +466,9 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
       }
       break;
     case hdk::ir::Type::kTime: {
-      size_t const len = shared::formatHMS(buf, buf_size, d.bigintval);
+      auto scaled_val =
+          d.bigintval / hdk::ir::unitsPerSecond(type->as<hdk::ir::TimeType>()->unit());
+      size_t const len = shared::formatHMS(buf, buf_size, scaled_val);
       CHECK_EQ(8u, len);  // 8 == strlen("HH:MM:SS")
       return buf;
     }

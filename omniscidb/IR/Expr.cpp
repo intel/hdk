@@ -1324,11 +1324,19 @@ std::string Constant::toString() const {
   if (is_null_) {
     str += "NULL";
   } else if (type_->isArray()) {
-    str += type_->toString();
+    auto elem_type = type_->as<ArrayBaseType>()->elemType();
+    str += "[";
+    for (auto it = value_list_.begin(); it != value_list_.end(); ++it) {
+      if (it != value_list_.begin()) {
+        str += ", ";
+      }
+      str += DatumToString((*it)->as<Constant>()->value_, elem_type);
+    }
+    str += "]";
   } else {
     str += DatumToString(value_, type_);
   }
-  str += ") ";
+  str += ")";
   return str;
 }
 
