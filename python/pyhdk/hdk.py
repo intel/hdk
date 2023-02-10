@@ -37,13 +37,26 @@ class QueryExpr:
 
         Examples
         --------
+        >>> import pyhdk
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [1, 4, 7], "y": [9, 3, 1]})
-        >>> proj = scan.proj((scan["x"] + scan["y"]).rename("sum"))
-        >>> agg = proj.agg([], "max(sum)")
-        >>> # Alternative option
-        >>> proj = scan.proj(sum=scan["x"] + scan["y"])
-        >>> agg = proj.agg([], "max(sum)")
+        >>> ht = hdk.import_pydict({"a": [1, 1, 2], "b": [1, 2, 3]})
+        >>> ht.proj("a", "b", (ht["a"] + ht["b"]).rename("sum")).run()
+        Schema:
+          a: INT64
+          b: INT64
+          sum: INT64
+        Data:
+        1|1|2
+        1|2|3
+        2|3|5
+
+        >>> ht.agg(["a"], hdk.count().rename("c")).run()
+        Schema:
+          a: INT64
+          c: INT32[NN]
+        Data:
+        1|2
+        2|1
         """
         pass
 
@@ -60,8 +73,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].avg())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.agg(["id"], ht["x"].avg()).run()
+        Schema:
+          id: INT64
+          x_avg: FP64
+        Data:
+        1|6
+        2|9
         """
         pass
 
@@ -78,8 +97,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].min())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.agg(["id"], ht["x"].min()).run()
+        Schema:
+          id: INT64
+          x_min: INT64
+        Data:
+        1|4
+        2|7
         """
         pass
 
@@ -96,8 +121,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].max())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.agg(["id"], ht["x"].max()).run()
+        Schema:
+          id: INT64
+          x_max: INT64
+        Data:
+        1|9
+        2|11
         """
         pass
 
@@ -114,8 +145,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].sum())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.agg(["id"], ht["x"].sum()).run()
+        Schema:
+          id: INT64
+          x_sum: INT64
+        Data:
+        1|18
+        2|18
         """
         pass
 
@@ -140,8 +177,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, None, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].count())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, None, 5]})
+        >>> ht.agg(["id"], ht["x"].count()).run()
+        Schema:
+          id: INT64
+          x_count: INT32[NN]
+        Data:
+        1|3
+        2|1
         """
         pass
 
@@ -163,8 +206,15 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].approx_quantile(0.5))
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1, 2], "x": [4, 7, 9, 11, 5, 13]})
+        >>> ht.agg(["id"], ht["x"].approx_quantile(0.5), ht["x"].approx_quantile(1.0)).run()
+        Schema:
+          id: INT64
+          x_approx_quantile: FP64
+          x_approx_quantile_1: FP64
+        Data:
+        1|5|9
+        2|11|13
         """
         pass
 
@@ -181,8 +231,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], sample["x"].sample())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.agg(["id"], ht["x"].sample()).run()
+        Schema:
+          id: INT64
+          x_sample: INT64
+        Data:
+        1|5
+        2|11
         """
         pass
 
@@ -199,8 +255,14 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> agg = scan.agg(["id"], scan["x"].single_value())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 5, 4, 5, 4]})
+        >>> ht.agg(["id"], ht["x"].single_value()).run()
+        Schema:
+          id: INT64
+          x_single_value: INT64
+        Data:
+        1|4
+        2|5
         """
         pass
 
@@ -240,7 +302,19 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> day = hdk.date("1983-12-01").extract("dayofweek")
+        >>> ht = hdk.import_pydict({"a": pandas.to_datetime(["20230207", "20220308"], format="%Y%m%d")})
+        >>> ht.proj(
+        ...     y=ht["a"].extract("year"),
+        ...     m=ht["a"].extract("month"),
+        ...     d=ht["a"].extract("day"),
+        ... ).run()
+        Schema:
+          y: INT64
+          m: INT64
+          d: INT64
+        Data:
+        2023|2|7
+        2022|3|8
         """
         pass
 
@@ -265,7 +339,23 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> day = hdk.cst("1983-12-01").cast("date")
+        >>> ht = hdk.import_pydict({"a": [1.1, 2.2, 3.3, 4.4, 5.5, 6.6]})
+        >>> ht.proj(ht["a"].cast("int")).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        1
+        2
+        3
+        4
+        6
+        7
+        >>> hdk.cst("1970-01-01 01:00:00").cast("timestamp[ms]")
+        (Const 1970-01-01 01:00:00.000)
+        >>> hdk.cst("1970-01-01 01:00:00").cast("timestamp[s]").cast("int")
+        (Const 3600)
+        >>> hdk.cst("1970-01-01 01:00:00").cast("timestamp[ms]").cast("int")
+        (Const 3600000)
         """
         pass
 
@@ -281,8 +371,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
-        >>> node = scan.proj("id", scan["x"].uminus())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 1, 2, 1], "x": [4, 7, 9, 11, 5]})
+        >>> ht.proj(ht["id"].uminus(), -ht["x"]).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+        Data:
+        -1|-4
+        -2|-7
+        -1|-9
+        -2|-11
+        -1|-5
         """
         pass
 
@@ -298,8 +397,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, None, 9, None, 5]})
-        >>> node = scan.proj("id", scan["x"].is_null())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3, 4, 5], "x": [4, None, 9, None, 5]})
+        >>> ht.proj("id", ht["x"].is_null()).run()
+        Schema:
+          id: INT64
+          expr_1: BOOL[NN]
+        Data:
+        1|0
+        2|1
+        3|0
+        4|1
+        5|0
         """
         pass
 
@@ -315,8 +423,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 1, 2, 1], "x": [4, None, 9, None, 5]})
-        >>> node = scan.proj("id", scan["x"].is_not_null())
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3, 4, 5], "x": [4, None, 9, None, 5]})
+        >>> ht.proj("id", ht["x"].is_not_null()).run()
+        Schema:
+          id: INT64
+          expr_1: BOOL[NN]
+        Data:
+        1|1
+        2|0
+        3|1
+        4|0
+        5|1
         """
         pass
 
@@ -335,8 +452,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"arr": [[1, 2], [3, 4]]})
-        >>> node = scan.proj(scan["arr"].unnest())
+        >>> ht = hdk.create_table("test", [("a", "array(int)")])
+        >>> hdk.import_pydict({"a": [[1, 2], [1, 2, 3, 4]]}, ht)
+        >>> ht.proj(a=ht["a"].unnest()).agg(["a"], "count").run()
+        Schema:
+          a: INT64
+          count: INT32[NN]
+        Data:
+        1|2
+        2|2
+        3|1
+        4|1
         """
         pass
 
@@ -377,10 +503,32 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [1, 2, 1, 2, 1], "y": [4, 7, 9, 11, 5]})
-        >>> node = scan.proj(scan["x"].add(scan["y"]))
-        >>> ...
-        >>> expr = pyhdk.date("1983-12-01").add(5, "weeks")
+        >>> ht = hdk.import_pydict({"x": [1, 1, 1, 2, 2], "y": [5, 6, 7, 8, 9]})
+        >>> ht.proj(ht["x"].add(ht["y"])).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        6
+        7
+        8
+        10
+        11
+        >>> ht.proj(ht["x"] + ht["y"]).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        6
+        7
+        8
+        10
+        11
+        >>> ht = hdk.import_pydict({"a": pandas.to_datetime(["20230207", "20220308"], format="%Y%m%d")})
+        >>> ht.proj(ht["a"].add(1, "month")).run()
+        Schema:
+          expr_1: TIMESTAMP[ns]
+        Data:
+        2023-03-07 00:00:00.000000000
+        2022-04-08 00:00:00.000000000
         """
         pass
 
@@ -421,10 +569,32 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [1, 2, 1, 2, 1], "y": [4, 7, 9, 11, 5]})
-        >>> node = scan.proj(scan["x"].sub(scan["y"]))
-        >>> ...
-        >>> expr = pyhdk.date("1983-12-01").sub(5, "weeks")
+        >>> ht = hdk.import_pydict({"x": [1, 1, 1, 2, 2], "y": [5, 6, 7, 8, 9]})
+        >>> ht.proj(ht["y"].sub(ht["x"])).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        4
+        5
+        6
+        6
+        7
+        >>> ht.proj(ht["y"] - ht["x"]).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        4
+        5
+        6
+        6
+        7
+        >>> ht = hdk.import_pydict({"a": pandas.to_datetime(["20230207", "20220308"], format="%Y%m%d")})
+        >>> ht.proj(ht["a"].sub(1, "hour")).run()
+        Schema:
+          expr_1: TIMESTAMP[ns]
+        Data:
+        2023-02-06 23:00:00.000000000
+        2022-03-07 23:00:00.000000000
         """
         pass
 
@@ -445,8 +615,18 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [1, 2, 1, 2, 1], "y": [4, 7, 9, 11, 5]})
-        >>> node = scan.proj(scan["x"].mul(scan["y"]))
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.proj(ht["a"].mul(ht["b"]), ht["a"] * 2, ht["a"] * 1.5).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+          expr_3: FP64
+        Data:
+        5|2|1.5
+        8|4|3
+        9|6|4.5
+        8|8|6
+        5|10|7.5
         """
         pass
 
@@ -469,8 +649,18 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15], "y": [2, 3, 7, 4, 5]})
-        >>> node = scan.proj(scan["x"].truediv(scan["y"]))
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.proj(ht["a"].truediv(ht["b"]), ht["a"] / 2, ht["a"] / 2.0).run()
+        Schema:
+          expr_1: FP64
+          expr_2: FP64
+          expr_3: FP64
+        Data:
+        0.2|0.5|0.5
+        0.5|1|1
+        1|1.5|1.5
+        2|2|2
+        5|2.5|2.5
         """
         pass
 
@@ -493,8 +683,18 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15], "y": [2, 3, 7, 4, 5]})
-        >>> node = scan.proj(scan["x"].truediv(scan["y"]))
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.proj(ht["a"].floordiv(ht["b"]), ht["a"] // 2, ht["a"] // 2.0).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+          expr_3: FP64
+        Data:
+        0|0|0
+        0|1|1
+        1|1|1
+        2|2|2
+        5|2|2
         """
         pass
 
@@ -518,8 +718,18 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15], "y": [2, 3, 7, 4, 5]})
-        >>> node = scan.proj(scan["x"].div(scan["y"]))
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.proj(ht["a"].div(ht["b"]), ht["a"].div(2), ht["a"].div(2.0)).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+          expr_3: FP64
+        Data:
+        0|0|0.5
+        0|1|1
+        1|1|1.5
+        2|2|2
+        5|2|2.5
         """
         pass
 
@@ -540,8 +750,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].mod(5))
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.proj(ht["a"].mod(ht["b"]), ht["a"] % 2).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+        Data:
+        1|1
+        2|0
+        0|1
+        0|0
+        0|1
         """
         pass
 
@@ -557,8 +776,15 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [True, False, True, False]})
-        >>> node = scan.proj(scan["x"].logical_not())
+        >>> ht = hdk.import_pydict({"x": [True, False, True, False]})
+        >>> ht.proj(ht["x"].logical_not()).run()
+        Schema:
+          expr_1: BOOL
+        Data:
+        0
+        1
+        0
+        1
         """
         pass
 
@@ -579,10 +805,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict(
-        >>>     {"x": [True, False, True, False], "y": [True, True, False, False]}
-        >>> )
-        >>> node = scan.proj(scan["x"].logical_and(scan["y"]))
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [True, False, True, False], "y": [True, True, False, False]}
+        ... )
+        >>> ht.proj(ht["x"].logical_and(ht["y"])).run()
+        Schema:
+          expr_1: BOOL
+        Data:
+        1
+        0
+        0
+        0
         """
         pass
 
@@ -603,10 +836,17 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict(
-        >>>     {"x": [True, False, True, False], "y": [True, True, False, False]}
-        >>> )
-        >>> node = scan.proj(scan["x"].logical_or(scan["y"]))
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [True, False, True, False], "y": [True, True, False, False]}
+        ... )
+        >>> ht.proj(ht["x"].logical_or(ht["y"])).run()
+        Schema:
+          expr_1: BOOL
+        Data:
+        1
+        1
+        1
+        0
         """
         pass
 
@@ -627,8 +867,21 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].eq(14))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter((ht["x"] % 2).eq(1)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        3|3
+        5|1
+        >>> ht.filter(ht["x"] == ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        3|3
         """
         pass
 
@@ -649,8 +902,23 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].ne(14))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter((ht["x"] % 2).ne(1)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        2|4
+        4|2
+        >>> ht.filter(ht["x"] != ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        2|4
+        4|2
+        5|1
         """
         pass
 
@@ -671,8 +939,21 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].lt(15))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter(ht["x"].lt(3)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        2|4
+        >>> ht.filter(ht["x"] < ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        2|4
         """
         pass
 
@@ -693,8 +974,23 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].le(15))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter(ht["x"].le(3)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        2|4
+        3|3
+        >>> ht.filter(ht["x"] <= ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        1|5
+        2|4
+        3|3
         """
         pass
 
@@ -715,8 +1011,20 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].gt(15))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter(ht["x"].gt(4)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        5|1
+        >>> ht.filter(ht["x"] > ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        4|2
+        5|1
         """
         pass
 
@@ -737,8 +1045,22 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [11, 14, 21, 28, 15]})
-        >>> node = scan.proj(scan["x"].ge(15))
+        >>> ht = hdk.import_pydict({"x": [1, 2, 3, 4, 5], "y": [5, 4, 3, 2, 1]})
+        >>> ht.filter(ht["x"].ge(4)).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        4|2
+        5|1
+        >>> ht.filter(ht["x"] >= ht["y"]).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        3|3
+        4|2
+        5|1
         """
         pass
 
@@ -761,8 +1083,16 @@ class QueryExpr:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"x": [[1, 2], [3, 4]]})
-        >>> node = scan.proj(scan["x"].at(1))
+        >>> ht = hdk.create_table("test1", [("a", "array(int)"), ("b", "int")])
+        >>> hdk.import_pydict({"a": [[1, 2], [2, 3, 4]], "b": [2, 3]}, ht)
+        >>> ht.proj(ht["a"].at(1), ht["a"][ht["b"]], ht["a"].at(0)).run()
+        Schema:
+          expr_1: INT64
+          expr_2: INT64
+          expr_3: INT64
+        Data:
+        1|2|null
+        2|4|null
         """
         pass
 
@@ -808,12 +1138,29 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
-        >>> # All following projections select columns 'x' and 'y'.
-        >>> node = scan.proj(1, 2)
-        >>> node = scan.proj("x", "y")
-        >>> node = scan.proj({"x": scan["x"], "y": "y"})
-        >>> node = scan.proj(x="x", y=scan["y"])
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
+        >>> ht.proj("x", -1).run()
+        Schema:
+          x: INT64
+          y: INT64
+        Data:
+        10|0
+        20|-10
+        30|10
+        >>> ht.proj(sum=ht["x"] + ht["y"]).run()
+        Schema:
+          sum: INT64
+        Data:
+        10
+        10
+        40
+        >>> ht.proj(exprs={"neg_x" : -ht["x"]}).run()
+        Schema:
+          neg_x: INT64
+        Data:
+        -10
+        -20
+        -30
         """
         pass
 
@@ -849,22 +1196,51 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict(
-        >>>     {"id1": [1, 2, 1], "id2": [1, 1, 2], "x": [10, 20, 30], "y": [0, -10, 10]}
-        >>> )
-        >>> node = scan.agg([0, 1], "count", "sum(x)", "min(y)")
-        >>> node = scan.agg(
-        >>>     ["id1", "id2"],
-        >>>     aggs={"cnt": "count", "x_sum": "sum(x)", "y_min": scan["y"].min()},
-        >>> )
-        >>> node = scan.agg(
-        >>>     ["id1", "id2"], cnt="count", x_sum=scan["x"].sum(), y_min=scan["y"].min()
-        >>> )
+        >>> ht = hdk.import_pydict(
+        ...     {"id1": [1, 2, 1], "id2": [1, 1, 2], "x": [10, 20, 30], "y": [0, -10, 10]}
+        ... )
+        >>> ht.agg([0, 1], "count", "sum(x)", "min(y)").run()
+        Schema:
+          id1: INT64
+          id2: INT64
+          count: INT32[NN]
+          x_sum: INT64
+          y_min: INT64
+        Data:
+        1|1|1|10|0
+        2|1|1|20|-10
+        1|2|1|30|10
+        >>> ht.agg(
+        ...     ["id1", "id2"],
+        ...     aggs={"cnt": "count", "xs": "sum(x)", "ym": ht["y"].min()},
+        ... ).run()
+        Schema:
+          id1: INT64
+          id2: INT64
+          cnt: INT32[NN]
+          xs: INT64
+          ym: INT64
+        Data:
+        1|1|1|10|0
+        2|1|1|20|-10
+        1|2|1|30|10
+        >>> ht.agg(["id1", "id2"], cnt="count", x_sum=ht["x"].sum(), y_min=ht["y"].min()).run()
+        Schema:
+          id1: INT64
+          id2: INT64
+          cnt: INT32[NN]
+          x_sum: INT64
+          y_min: INT64
+        Data:
+        1|1|1|10|0
+        2|1|1|20|-10
+        1|2|1|30|10
         """
         pass
 
     @not_implemented
     def sort(self, *args, fields=None, limit=0, offset=0, **kwargs):
+        ht.agg(["id1", "id2"], cnt="count", x_sum=ht["x"].sum(), y_min=ht["y"].min())
         """
         Create a sort node with the current node as its input.
 
@@ -893,12 +1269,42 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict(
+        >>> ht = hdk.import_pydict(
         >>>     {"x": [1, 2, 1, 2, 1], "y": [1, 1, 2, None, 3], "z": [10, 20, 30, 40, 50]}
         >>> )
-        >>> node = scan.sort("x", ("y", "asc", "first"))
-        >>> node = scan.sort(fields={"x" : "asc", "y" : ("asc", "first")})
-        >>> node = scan.sort(x="asc", y=("asc", "first"))
+        >>> ht.sort("x", ("y", "asc", "first")).run()
+        Schema:
+          x: INT64
+          y: INT64
+          z: INT64
+        Data:
+        1|1|10
+        1|2|30
+        1|3|50
+        2|null|40
+        2|1|20
+        >>> ht.sort(fields={"x" : "desc", "y" : ("asc", "first")}).run()
+        Schema:
+          x: INT64
+          y: INT64
+          z: INT64
+        Data:
+        2|null|40
+        2|1|20
+        1|1|10
+        1|2|30
+        1|3|50
+        >>> ht.sort(x="desc", y=("desc", "last")).run()
+        Schema:
+          x: INT64
+          y: INT64
+          z: INT64
+        Data:
+        2|1|20
+        2|null|40
+        1|3|50
+        1|2|30
+        1|1|10
         """
         pass
 
@@ -936,15 +1342,55 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> lhs = hdk.from_pydict({"id": [1, 2, 7, 9, 15], "val1": [1, 2, 4, 7, 9]})
-        >>> rhs = hdk.from_pydict({"id": [1, 3, 4, 9, 10], "val2": [1, 2, 4, 7, 9]})
-        >>> # Following join expressions are equal
-        >>> node = lhs.join(rhs)
-        >>> node = lhs.join(rhs, "id")
-        >>> node = lhs.join(rhs, "id", "id")
-        >>> # This join expression would perform the same equi-join but would have
-        >>> # duplicated join key column "x" in the result (as 'x' and "x_1").
-        >>> node = lhs.join(rhs, cond=lhs["id"].eq(rhs["id"]), how="inner")
+        >>> ht1 = hdk.import_pydict(
+        ...             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
+        ...         )
+        >>> ht1 = hdk.import_pydict(
+        ...     {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
+        ... )
+        >>> ht2 = hdk.import_pydict(
+        ...     {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5], "y": [5.5, 4.4, 3.3, 2.2, 1.1]}
+        ... )
+        >>> ht1.join(ht2).run()
+        Schema:
+          a: INT64
+          b: INT64
+          x: FP64
+          y: FP64
+        Data:
+        3|3|3.3|3.3
+        >>> ht1.join(ht2, "a").run()
+        Schema:
+          a: INT64
+          b: INT64
+          x: FP64
+          b_1: INT64
+          y: FP64
+        Data:
+        1|5|1.1|1|5.5
+        2|4|2.2|2|4.4
+        3|3|3.3|3|3.3
+        4|2|4.4|4|2.2
+        5|1|5.5|5|1.1
+        >>> ht1.join(ht2, ["a", "b"], ["b", "a"]).run()
+        Schema:
+          a: INT64
+          b: INT64
+          x: FP64
+          y: FP64
+        Data:
+        3|3|3.3|3.3
+        >>> ht1.join(ht2, cond=ht1["a"] == ht2["b"] + 3).run()
+        Schema:
+          a: INT64
+          b: INT64
+          x: FP64
+          a_1: INT64
+          b_1: INT64
+          y: FP64
+        Data:
+        4|2|4.4|1|1|5.5
+        5|1|5.5|2|2|4.4
         """
         pass
 
@@ -964,10 +1410,21 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
-        >>> # Following filter nodes are equal
-        >>> node = scan.filter((scan["x"] > 10).logicalAnd(scan["y"] < 10))
-        >>> node = scan.filter(scan["x"] > 10, scan["y"] < 10)
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4 ,5], "b": [5, 4, 3, 2, 1]})
+        >>> ht.filter((ht["a"] > 1).logical_and(ht["b"] > 2)).run()
+        Schema:
+          a: INT64
+          b: INT64
+        Data:
+        2|4
+        3|3
+        >>> ht.filter(ht["a"] < 4, ht["b"] < 5).run()
+        Schema:
+          a: INT64
+          b: INT64
+        Data:
+        2|4
+        3|3
         """
         pass
 
@@ -987,11 +1444,25 @@ class QueryNode:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> scan = hdk.from_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
-        >>> # Different ways to get a reference to the "id" column.
-        >>> ref = scan.ref(0)
-        >>> ref = scan.ref(-3)
-        >>> ref = scan.ref("id")
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
+        >>> ht.proj(ht.ref(0), ht.ref("x"), ht.ref(-1)).run()
+        Schema:
+          id: INT64
+          x: INT64
+          y: INT64
+        Data:
+        1|10|0
+        2|20|-10
+        3|30|10
+        >>> ht.proj(ht[0], ht["x"], ht[-1]).run()
+        Schema:
+          id: INT64
+          x: INT64
+          y: INT64
+        Data:
+        1|10|0
+        2|20|-10
+        3|30|10
         """
         pass
 
@@ -1005,6 +1476,15 @@ class QueryNode:
         Returns
         -------
         int
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
+        >>> ht.size
+        3
+        >>> ht.proj(0, 1).size
+        2
         """
         pass
 
@@ -1020,6 +1500,15 @@ class QueryNode:
         Returns
         -------
         ColumnInfo
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"id": [1, 2, 3], "x": [10, 20, 30], "y": [0, -10, 10]})
+        >>> ht.column_info("id")
+        id(db_id=16777217, table_id=1, column_id=1 type=INT64)
+        >>> ht.column_info(-1)
+        y(db_id=16777217, table_id=1, column_id=3 type=INT64)
         """
         pass
 
@@ -1034,6 +1523,16 @@ class QueryNode:
         Returns
         -------
         str or None
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [3, 2, 1]})
+        >>> ht.table_name
+        'tabe_984f9e2346844ab4ae48aba14e1af8d4'
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [3, 2, 1]}, "table1")
+        >>> ht.table_name
+        'table1'
         """
         pass
 
@@ -1047,6 +1546,13 @@ class QueryNode:
         Returns
         -------
         dict
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [3, 2, 1]})
+        >>> ht.schema
+        {'a': a(db_id=16777217, table_id=4, column_id=1 type=INT64), 'b': b(db_id=16777217, table_id=4, column_id=2 type=INT64)}
         """
         pass
 
@@ -1059,6 +1565,19 @@ class QueryNode:
         -------
         ExecutionResult
             The result of query execution.
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [3, 2, 1]})
+        >>> res = ht.proj(sum=ht["a"] + ht["b"]).run()
+        >>> res
+        Schema:
+        sum: INT64
+        Data:
+        4
+        4
+        4
         """
         pass
 
@@ -1100,8 +1619,12 @@ class HDK:
         Examples
         --------
         >>> hdk = pyhdk.init()
-        >>> hdk.create_table("test1", [("id", "int"), ("val1", "int64"), ("val2", "text")])
-        >>> hdk.create_table("test2", {"id": "int", "val1": "int64", "val2": "text"})
+        >>> ht1 = hdk.create_table("test1", [("id", "int"), ("val1", "int64"), ("val2", "text")])
+        >>> ht1
+        hdk::ir::Scan#1(test1, ["id", "val1", "val2", "rowid"])
+        >>> ht2 = hdk.create_table("test2", {"id": "int", "val1": "int64", "val2": "text"})
+        >>> ht2
+        hdk::ir::Scan#2(test2, ["id", "val1", "val2", "rowid"])
         """
         pass
 
@@ -1117,6 +1640,17 @@ class HDK:
 
         Returns
         -------
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.create_table("test1", [("id", "int"), ("val1", "int64"), ("val2", "text")])
+        >>> hdk.scan("test1")
+        hdk::ir::Scan#2(test1, ["id", "val1", "val2", "rowid"])
+        >>> hdk.drop_table(ht)
+        >>> hdk.scan("test1")
+        RuntimeError: Unknown table: test1
+        >>> 
         """
         pass
 
@@ -1247,6 +1781,15 @@ class HDK:
         -------
         QueryExpr
             Scan expression referencing created table.
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [10.1, 20.2, 30.3]}, "t1")
+        >>> ht.table_name
+        't1'
+        >>> ht.schema
+        {'a': a(db_id=16777217, table_id=9, column_id=1 type=INT64), 'b': b(db_id=16777217, table_id=9, column_id=2 type=FP64)}
         """
         pass
 
@@ -1295,6 +1838,13 @@ class HDK:
         Returns
         -------
         QueryNode
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3], "b": [10.1, 20.2, 30.3]}, "t1")
+        >>> hdk.scan("t1")
+        hdk::ir::Scan#2(t1, ["a", "b", "rowid"])
         """
         pass
 
@@ -1354,6 +1904,22 @@ class HDK:
         Returns
         -------
         TypeInfo
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> hdk.type("int")
+        INT64
+        >>> hdk.type("int32")
+        INT32
+        >>> hdk.type("fp")
+        FP64
+        >>> hdk.type("dec(10,2)")
+        DEC64(10,2)
+        >>> hdk.type("text[nn]")
+        TEXT[NN]
+        >>> hdk.type("array(int)")
+        ARRAY32(INT64)
         """
         pass
 
@@ -1383,24 +1949,32 @@ class HDK:
         --------
         >>> hdk = pyhdk.init()
         >>> # int64 constant
-        >>> cst = hdk.cst(10)
+        >>> hdk.cst(10)
+        (Const 10)
         >>> # fp64 constant
-        >>> cst = hdk.cst(10.1)
-        >>> cst = hdk.cst(10, "fp64")
+        >>> hdk.cst(10.1)
+        (Const 10.100000)
+        >>> hdk.cst(10, "fp64")
+        (Const 10.000000)
         >>> # decimal constant
-        >>> cst = hdk.cst(10, "dec(10,2))
-        >>> cst = hdk.cst(1000, "dec(10,2), scale_decimal=False)
-        >>> cst = hdk.cst(10.00, "dec(10,2))
-        >>> cst = hdk.cst("10.00", "dec(10,2)")
+        >>> hdk.cst(1234, "dec(10,2)")
+        (Const 1234.00)
+        >>> hdk.cst(1234, "dec(10,2)", scale_decimal=False)
+        (Const 12.34)
         >>> # bool constant
-        >>> cst = hdk.cst(True)
-        >>> cst = hdk.cst(1, "bool")
+        >>> hdk.cst(True)
+        (Const t)
+        >>> hdk.cst(1, "bool")
+        (Const t)
         >>> # string constant
-        >>> cst = hdk.cst("value")
+        >>> hdk.cst("value")
+        (Const value)
         >>> # date constant
-        >>> cst = hdk.cst("2001-02-03", "date")
+        >>> hdk.cst("2001-02-03", "date")
+        (Const 2001-02-03)
         >>> # timestamp constant
-        >>> cst = hdk.cst("2001-02-03 15:00:00", "date")
+        >>> hdk.cst("2001-02-03 15:00:00", "timestamp")
+        (Const 2001-02-03 15:00:00.000000)
         """
         pass
 
@@ -1420,7 +1994,8 @@ class HDK:
         -------
         QueryExpr
         >>> hdk = pyhdk.init()
-        >>> cst = hdk.date("2001-02-03")
+        >>> hdk.date("2001-02-03")
+        (Const 2001-02-03)
         """
         pass
 
@@ -1438,7 +2013,8 @@ class HDK:
         -------
         QueryExpr
         >>> hdk = pyhdk.init()
-        >>> cst = hdk.time("15:00:00")
+        >>> hdk.time("15:00:00")
+        (Const 15:00:00)
         """
         pass
 
@@ -1456,7 +2032,8 @@ class HDK:
         -------
         QueryExpr
         >>> hdk = pyhdk.init()
-        >>> cst = hdk.timestamp("2001-02-03 15:00:00")
+        >>> hdk.timestamp("2001-02-03 15:00:00")
+        (Const 2001-02-03 15:00:00.000000)
         """
         pass
 
@@ -1468,8 +2045,12 @@ class HDK:
         -------
         QueryExpr
         >>> hdk = pyhdk.init()
-        >>> ht = hdk.import_csv("test.csv")
-        >>> res = ht.proj(hdk.count())
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        >>> ht.agg([], hdk.count()).run()
+        Schema:
+          count: INT32[NN]
+        Data:
+        5
         """
         pass
 
