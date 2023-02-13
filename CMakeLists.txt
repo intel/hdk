@@ -19,7 +19,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Force -O0 optimization level for debug builds.
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+if (WIN32)
+  # Export all symbols from DLLs by default. It is necessary because there are too many of them
+  # to mark explicitly.
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  # 0x0600 means Windows Vista (anything after XP). This setting is needed because without it
+  # boost defines different API levels for different parts of the library and functions appear in
+  # different namespaces.
+  add_definitions("-DBOOST_USE_WINAPI_VERSION=0x0600")
+  # On windows TBB adds tbb12_debug.lib unless the following define is set. This tbb12_debug.lib
+  # is not present in conda-forge tbb build.
+  add_definitions("-D__TBB_NO_IMPLICIT_LINKAGE")
+  # Always use multithreaded DLL runtime (not debug) because using debug requires other dependencies
+  # to be built with debug runtime which we don't have.
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Od")
+else()
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+endif()
 
 # set default build type to "Release w/ Debug Info" 
 set(default_build_type "RelWithDebInfo")

@@ -1,7 +1,7 @@
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set_source_files_properties(sqlite3.c PROPERTIES COMPILE_FLAGS "-O0 -Wno-unused-value -Wno-parentheses-equality")
 elseif(MSVC)
-  set_source_files_properties(sqlite3.c PROPERTIES COMPILE_FLAGS "-O0")
+  set_source_files_properties(sqlite3.c PROPERTIES COMPILE_FLAGS "/Od")
 else()
   set_source_files_properties(sqlite3.c PROPERTIES COMPILE_FLAGS "-O0 -Wno-unused-value")
 endif()
