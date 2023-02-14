@@ -40,8 +40,8 @@ RUN apt-get update && apt-get install -y \
     llvm-12-dev \
     clang-12 \
     libclang-12-dev \
-    gcc-9 \
-    g++-9 \
+    gcc \
+    g++ \
     openjdk-11-jdk \
     -- && \
     update-alternatives \
