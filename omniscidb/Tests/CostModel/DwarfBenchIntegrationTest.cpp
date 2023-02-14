@@ -28,8 +28,8 @@ using namespace costmodel;
                                                                                        \
     std::vector<ExecutorDeviceType> devices = {ExecutorDeviceType::DEVICE};            \
     std::vector<AnalyticalTemplate> templates = {AnalyticalTemplate::TEMPLATE};        \
-    \  
-                                                                                                                                \  
+                                                                                       \  
+                                                                                       \  
         Detail::DeviceMeasurements ms;                                                 \
     ASSERT_NO_FATAL_FAILURE(ms = dbds.getMeasurements(devices, templates));            \
                                                                                        \
