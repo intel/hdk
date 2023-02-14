@@ -116,7 +116,7 @@ add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)
 if(ENABLE_DWARF_BENCH)
   find_package(dbench REQUIRED)
-  message("Dwarf Bench enabled")
+  message(STATUS "Dwarf Bench enabled ${dbench_DIR}")
   add_definitions("-DENABLE_DWARF_BENCH")
 endif()
 
