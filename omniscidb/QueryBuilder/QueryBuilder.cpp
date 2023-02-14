@@ -2239,13 +2239,10 @@ BuilderNode BuilderNode::sort(const std::vector<BuilderSortField>& fields,
   auto base = node_;
   if (node_->is<Scan>()) {
     // Filter out rowid column if it's not used in the sort.
-    bool uses_rowid = false;
-    for (auto& col : collation) {
-      if (col.getField() == node_->size() - 1) {
-        uses_rowid = true;
-        break;
-      }
-    }
+    bool uses_rowid =
+        std::any_of(collation.begin(), collation.end(), [&](const SortField& field) {
+          return field.getField() == node_->size() - 1;
+        });
     int cols_to_proj = uses_rowid ? node_->size() : node_->size() - 1;
     std::vector<int> col_indices(cols_to_proj);
     std::iota(col_indices.begin(), col_indices.end(), 0);
