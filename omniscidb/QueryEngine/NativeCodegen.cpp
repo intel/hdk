@@ -1699,6 +1699,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   auto live_funcs = CodeGenerator::markDeadRuntimeFuncs(
       *cgen_state_->module_, root_funcs, {multifrag_query_func});
 
+  DUMP_MODULE(cgen_state_->module_, "before.inline.ir.ll");
   // Always inline the row function and the filter function.
   // We don't want register spills in the inner loops.
   // LLVM seems to correctly free up alloca instructions
@@ -1707,6 +1708,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   if (cgen_state_->filter_func_) {
     mark_function_always_inline(cgen_state_->filter_func_, cgen_state_->context_);
   }
+
+  DUMP_MODULE(cgen_state_->module_, "before.optimize.ir.ll");
 
 #ifndef NDEBUG
   // Add helpful metadata to the LLVM IR for debugging.
@@ -1756,6 +1759,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   LOG(IR) << serialize_llvm_object(cgen_state_->module_) << "\nEnd of IR";
 #endif
 
+  DUMP_MODULE(cgen_state_->module_, "after.optimize.ir.ll");
   // Run some basic validation checks on the LLVM IR before code is generated below.
   compiler::verify_function_ir(cgen_state_->row_func_);
   if (cgen_state_->filter_func_) {

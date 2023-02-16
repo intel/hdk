@@ -16,7 +16,7 @@
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;
 
-const size_t g_num_rows{10};
+const size_t g_num_rows{20};
 const ExecutorDeviceType g_dt{ExecutorDeviceType::GPU};
 
 // todo: move to a separate file
@@ -31,7 +31,7 @@ struct ExecuteTestBase {
                  {"dt32", ctx().date32(hdk::ir::TimeUnit::kDay)},
                  {"dt16", ctx().date16(hdk::ir::TimeUnit::kDay)},
                  {"ts", ctx().timestamp(hdk::ir::TimeUnit::kSecond)}},
-                {2});
+                {20});
     run_sqlite_query("DROP TABLE IF EXISTS test_inner;");
     run_sqlite_query(
         "CREATE TABLE test_inner(x int not null, y int, xx smallint, str text, dt "

@@ -1005,30 +1005,44 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
 
       for (size_t i = 0; i < aggr_col_count; ++i) {
         auto col_idx = llvm::ConstantInt::get(i32_type, i);
+        std::cerr << "gpu smem context: " << gpu_smem_context.isSharedMemoryUsed()
+                  << std::endl;
         if (gpu_smem_context.isSharedMemoryUsed()) {
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
               smem_output_buffer->getType()->getPointerElementType(),
               smem_output_buffer,
               col_idx,
-              "",
+              "smem_target_gep",
               bb_exit);
+          llvm::Value* casted_gep = target_addr;
+          if (smem_output_buffer->getType()->getPointerElementType() !=
+              codegen_traits.localPointerType(i64_type)) {
+            casted_gep =
+                new llvm::AddrSpaceCastInst(target_addr,
+                                            codegen_traits.localPointerType(i64_type),
+                                            "smem_target_gep.cast",
+                                            bb_exit);
+          }
           // TODO: generalize this once we want to support other types of aggregate
           // functions besides COUNT.
           auto agg_func = mod->getFunction("agg_sum_shared");
           CHECK(agg_func);
           llvm::CallInst::Create(agg_func,
-                                 std::vector<llvm::Value*>{target_addr, result_vec[i]},
-                                 "",
+                                 std::vector<llvm::Value*>{casted_gep, result_vec[i]},
+                                 "smem.call",
                                  bb_exit);
         } else {
           auto out_gep = llvm::GetElementPtrInst::CreateInBounds(
               output_buffers->getType()->getPointerElementType(),
               output_buffers,
               col_idx,
-              "",
+              "non_smem_target_gep",
               bb_exit);
-          auto col_buffer = new llvm::LoadInst(
-              get_pointer_element_type(out_gep), out_gep, "", false, bb_exit);
+          auto col_buffer = new llvm::LoadInst(get_pointer_element_type(out_gep),
+                                               out_gep,
+                                               "non.smem.load",
+                                               false,
+                                               bb_exit);
           col_buffer->setAlignment(LLVM_ALIGN(8));
           auto slot_idx = llvm::BinaryOperator::CreateAdd(
               group_buff_idx,

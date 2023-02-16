@@ -63,10 +63,12 @@
 #ifdef L0_RUNTIME_ENABLED
 #define GENERIC_ADDR_SPACE __attribute__((opencl_generic))
 #define GLOBAL_ADDR_SPACE __attribute__((opencl_global))
+#define SHARED_ADDR_SPACE __attribute__((opencl_local))
 #define NOREMOVE __attribute__((optnone))
 #else
 #define GENERIC_ADDR_SPACE
 #define GLOBAL_ADDR_SPACE
+#define SHARED_ADDR_SPACE
 #define NOREMOVE
 #endif
 

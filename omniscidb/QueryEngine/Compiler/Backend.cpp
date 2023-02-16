@@ -909,15 +909,15 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
         auto op = inst->getOperand(op_idx);
         if (auto* global = llvm::dyn_cast<llvm::GlobalVariable>(op)) {
           auto local_global = to->getGlobalVariable(global->getName(), true);
-          std::cerr << "globals: " << std::endl;
+          // std::cerr << "globals: " << std::endl;
           for (auto gv_it = to->global_begin(); gv_it != to->global_end(); ++gv_it) {
-            std::cerr << "global: " << gv_it->getName().str() << std::endl;
+            // std::cerr << "global: " << gv_it->getName().str() << std::endl;
           }
           std::cerr << std::endl;
-          std::cerr << "looking for global: " << global->getName().str() << std::endl;
+          // std::cerr << "looking for global: " << global->getName().str() << std::endl;
           CHECK(local_global);
-          std::cerr << "replacing global " << global->getName().str() << " with "
-                    << local_global->getName().str() << std::endl;
+          // std::cerr << "replacing global " << global->getName().str() << " with "
+          // << local_global->getName().str() << std::endl;
 
           inst->setOperand(op_idx, local_global);
         }
@@ -1001,7 +1001,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   opts.setDesiredBIsRepresentation(SPIRV::BIsRepresentation::OpenCL12);
   opts.setDebugInfoEIS(SPIRV::DebugInfoEIS::OpenCL_DebugInfo_100);
 
-#if 0
+#if 1
   std::error_code ec;
   llvm::raw_fd_ostream os("gen.ll", ec);
   module->print(os, nullptr);
