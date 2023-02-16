@@ -5,5 +5,5 @@ else()
 endif()
 
 add_library(L0Mgr ${L0_SOURCES})
-target_link_libraries(L0Mgr ${LevelZero_LIBRARIES})
+target_link_libraries(L0Mgr Logger ${LevelZero_LIBRARIES})
 
