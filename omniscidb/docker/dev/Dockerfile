@@ -40,13 +40,10 @@ RUN apt-get update && apt-get install -y \
     llvm-12-dev \
     clang-12 \
     libclang-12-dev \
-    gcc-9 \
-    g++-9 \
+    gcc \
+    g++ \
     openjdk-11-jdk \
-    -- && \
-    update-alternatives \
-        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
-        --slave /usr/bin/g++ g++ /usr/bin/g++-9
+    -- && cc --version
 
 ENV PATH=/usr/lib/llvm-12/bin${PATH:+:${PATH}}
 
