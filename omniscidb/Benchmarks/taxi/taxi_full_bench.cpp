@@ -18,7 +18,6 @@ using namespace TestHelpers::ArrowSQLRunner;
 #define USE_HOT_DATA
 #define PARALLEL_IMPORT_ENABLED
 
-namespace {
 std::istream& operator>>(std::istream& in, ExecutorDeviceType& device_type) {
   std::string token;
   in >> token;
@@ -31,7 +30,6 @@ std::istream& operator>>(std::istream& in, ExecutorDeviceType& device_type) {
   }
   return in;
 }
-}  // namespace
 
 static void createTaxiTableParquet() {
   getStorage()->dropTable("trips");
