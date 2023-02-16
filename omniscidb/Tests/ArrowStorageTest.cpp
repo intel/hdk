@@ -942,6 +942,76 @@ TEST_F(ArrowStorageTest, ImportCsv_DateTime) {
       getFilePath("date_time.csv"), "table1", table_options, parse_options);
 }
 
+TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header1) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  ArrowStorage::CsvParseOptions parse_options;
+  TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_header.csv"),
+                                             "table1",
+                                             {{"col1", ctx.int32()}},
+                                             table_options,
+                                             parse_options);
+  checkData(storage,
+            tinfo->table_id,
+            9,
+            table_options.fragment_size,
+            range(9, (int32_t)1),
+            range(9, 10.0));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header2) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  ArrowStorage::CsvParseOptions parse_options;
+  TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_header.csv"),
+                                             "table1",
+                                             {{"col2", ctx.fp32()}},
+                                             table_options,
+                                             parse_options);
+  checkData(storage,
+            tinfo->table_id,
+            9,
+            table_options.fragment_size,
+            range(9, (int64_t)1),
+            range(9, 10.0f));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader1) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.header = false;
+  TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_noheader.csv"),
+                                             "table1",
+                                             {{"col1", ctx.int32()}, {"col2", nullptr}},
+                                             table_options,
+                                             parse_options);
+  checkData(storage,
+            tinfo->table_id,
+            9,
+            table_options.fragment_size,
+            range(9, (int32_t)1),
+            range(9, 10.0));
+}
+
+TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader2) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage::TableOptions table_options;
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.header = false;
+  TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_noheader.csv"),
+                                             "table1",
+                                             {{"col1", nullptr}, {"col2", ctx.fp32()}},
+                                             table_options,
+                                             parse_options);
+  checkData(storage,
+            tinfo->table_id,
+            9,
+            table_options.fragment_size,
+            range(9, (int64_t)1),
+            range(9, 10.0f));
+}
+
 TEST_F(ArrowStorageTest, AppendCsvData) {
   ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
   TableInfoPtr tinfo =

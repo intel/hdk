@@ -636,8 +636,35 @@ TableInfoPtr ArrowStorage::importCsvFile(const std::string& file_name,
                                          const std::vector<ColumnDescription>& columns,
                                          const TableOptions& options,
                                          const CsvParseOptions parse_options) {
-  auto res = createTable(table_name, columns, options);
-  appendCsvFile(file_name, table_name, parse_options);
+  std::unordered_map<std::string, const hdk::ir::Type*> col_types;
+  ColumnInfoList col_infos;
+  col_infos.reserve(columns.size());
+  for (auto& col : columns) {
+    col_infos.emplace_back(
+        std::make_shared<ColumnInfo>(-1, -1, -1, col.name, col.type, false));
+    if (col.type) {
+      col_types.emplace(col.name, col.type);
+    }
+  }
+  auto at = parseCsvFile(file_name, parse_options, col_infos);
+  // We allow partial schema specification in columns arg which
+  // means missing columns and/or column types. Fill missing
+  // info using parsed table schema.
+  std::vector<ColumnDescription> updated_columns;
+  updated_columns.reserve(at->columns().size());
+  for (size_t i = 0; i < at->columns().size(); ++i) {
+    ColumnDescription col_desc;
+    col_desc.name = at->schema()->field(i)->name();
+    if (col_types.count(col_desc.name)) {
+      col_desc.type = col_types.at(col_desc.name);
+    } else {
+      col_desc.type = getTargetImportType(ctx_, *at->schema()->field(i)->type());
+    }
+    updated_columns.emplace_back(std::move(col_desc));
+  }
+
+  auto res = createTable(table_name, updated_columns, options);
+  appendArrowTable(at, res->table_id);
   return res;
 }
 
@@ -938,9 +965,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
   arrow_read_options.block_size = parse_options.block_size;
   arrow_read_options.autogenerate_column_names =
       !parse_options.header && col_infos.empty();
-  arrow_read_options.skip_rows = parse_options.header && !col_infos.empty()
-                                     ? (parse_options.skip_rows + 1)
-                                     : parse_options.skip_rows;
+  arrow_read_options.skip_rows = parse_options.skip_rows;
 
   auto arrow_convert_options = arrow::csv::ConvertOptions::Defaults();
   arrow_convert_options.check_utf8 = false;
@@ -949,9 +974,13 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
 
   for (auto& col_info : col_infos) {
     if (!col_info->is_rowid) {
-      arrow_read_options.column_names.push_back(col_info->name);
-      arrow_convert_options.column_types.emplace(
-          col_info->name, getArrowImportType(ctx_, col_info->type));
+      if (!parse_options.header) {
+        arrow_read_options.column_names.push_back(col_info->name);
+      }
+      if (col_info->type) {
+        arrow_convert_options.column_types.emplace(
+            col_info->name, getArrowImportType(ctx_, col_info->type));
+      }
     }
   }
 
