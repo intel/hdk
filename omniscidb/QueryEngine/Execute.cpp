@@ -2610,7 +2610,6 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
 
   // BEGIN tbb numa nodes
   std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
-  CHECK_EQ(numa_nodes.size(), size_t(2));
   std::vector<tbb::task_arena> arenas(numa_nodes.size());
   std::vector<tbb::task_group> task_groups(numa_nodes.size());
   for (int i = 0; i < numa_nodes.size(); i++) {
