@@ -1663,7 +1663,7 @@ extern "C" RUNTIME_EXPORT NOREMOVE NEVER_INLINE void query_stub_hoisted_literals
 
 extern "C" RUNTIME_EXPORT void multifrag_query_hoisted_literals(
     const int8_t GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* col_buffers,
-    GLOBAL_ADDR_SPACE const uint64_t* __restrict__ num_fragments,
+    GLOBAL_ADDR_SPACE const uint64_t* RESTRICT num_fragments,
     GLOBAL_ADDR_SPACE const int8_t* literals,
     GLOBAL_ADDR_SPACE const int64_t* num_rows,
     GLOBAL_ADDR_SPACE const uint64_t* frag_row_offsets,
@@ -1672,7 +1672,7 @@ extern "C" RUNTIME_EXPORT void multifrag_query_hoisted_literals(
     GLOBAL_ADDR_SPACE const int64_t* init_agg_value,
     int64_t GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* out,
     GLOBAL_ADDR_SPACE int32_t* error_code,
-    GLOBAL_ADDR_SPACE const uint32_t* __restrict__ num_tables_ptr,
+    GLOBAL_ADDR_SPACE const uint32_t* RESTRICT num_tables_ptr,
     GLOBAL_ADDR_SPACE const int64_t* join_hash_tables) {
   for (uint32_t i = 0; i < *num_fragments; ++i) {
     query_stub_hoisted_literals(
@@ -1712,7 +1712,7 @@ extern "C" RUNTIME_EXPORT NOREMOVE NEVER_INLINE void query_stub(
 
 extern "C" RUNTIME_EXPORT void multifrag_query(
     const int8_t GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* col_buffers,
-    GLOBAL_ADDR_SPACE const uint64_t* __restrict__ num_fragments,
+    GLOBAL_ADDR_SPACE const uint64_t* RESTRICT num_fragments,
     GLOBAL_ADDR_SPACE const int64_t* num_rows,
     GLOBAL_ADDR_SPACE const uint64_t* frag_row_offsets,
     GLOBAL_ADDR_SPACE const int32_t* max_matched,
@@ -1720,7 +1720,7 @@ extern "C" RUNTIME_EXPORT void multifrag_query(
     GLOBAL_ADDR_SPACE const int64_t* init_agg_value,
     int64_t GLOBAL_ADDR_SPACE* GLOBAL_ADDR_SPACE* out,
     GLOBAL_ADDR_SPACE int32_t* error_code,
-    GLOBAL_ADDR_SPACE const uint32_t* __restrict__ num_tables_ptr,
+    GLOBAL_ADDR_SPACE const uint32_t* RESTRICT num_tables_ptr,
     GLOBAL_ADDR_SPACE const int64_t* join_hash_tables) {
   for (uint32_t i = 0; i < *num_fragments; ++i) {
     query_stub(col_buffers ? reinterpret_cast<const int8_t GENERIC_ADDR_SPACE *
