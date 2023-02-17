@@ -59,7 +59,11 @@ jobs:
       - name: ASAN test
         if: inputs.build-name == 'asan'
         run: |
-          echo FIXME docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} curl -o Miniconda3-latest-Linux-x86_64.sh -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} bash Miniconda3-latest-Linux-x86_64.sh -b
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} miniconda3/bin/conda update conda
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} miniconda3/bin/conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} miniconda3/bin/conda run -n omnisci-dev bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
 
       - name: Stop the container
         if: always()
