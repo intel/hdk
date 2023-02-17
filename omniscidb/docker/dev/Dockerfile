@@ -36,19 +36,26 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.24.1/cmake-3.24.1
 
 # Toolchains
 RUN apt-get update && apt-get install -y \
-    llvm-12 \
-    llvm-12-dev \
-    clang-12 \
-    libclang-12-dev \
-    gcc-9 \
-    g++-9 \
+    gcc-10 \
+    g++-10 \
     openjdk-11-jdk \
     -- && \
     update-alternatives \
-        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
-        --slave /usr/bin/g++ g++ /usr/bin/g++-9
+        --install /usr/bin/gcc gcc /usr/bin/gcc-10 10 \
+        --slave /usr/bin/g++ g++ /usr/bin/g++-10
 
-ENV PATH=/usr/lib/llvm-12/bin${PATH:+:${PATH}}
+# LLVM
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    apt-add-repository \
+        'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main' && \
+    apt-get update && apt-get install -y \
+        llvm-14 \
+        llvm-14-dev \
+        clang-14 \
+        libclang-14-dev \
+        --
+
+ENV PATH=/usr/lib/llvm/bin${PATH:+:${PATH}}
 
 # Dependencies
 RUN apt-get update && apt-get install -y \
