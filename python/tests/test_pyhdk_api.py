@@ -6,12 +6,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import json
 import pandas
-import pyarrow
 import pytest
 import pyhdk
-import math
+import numpy as np
 
 
 class BaseTest:
@@ -79,6 +77,57 @@ class TestImport(BaseTest):
         assert ht.table_name == table_name
         assert ht.size == 2
         self.check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
+        hdk.drop_table(table_name)
+
+    @pytest.mark.parametrize("header", [True, False])
+    @pytest.mark.parametrize("create_table", [True, False])
+    @pytest.mark.parametrize("full_schema", [None, True, False])
+    @pytest.mark.parametrize("glob", [True, False])
+    def test_import_csv(self, header, create_table, full_schema, glob):
+        hdk = pyhdk.init()
+        table_name = "table_import_csv"
+
+        if create_table:
+            hdk.create_table(table_name, (("col1", "int32"), ("col2", "fp32")))
+            real_schema = {"col1": "INT32", "col2": "FP32"}
+
+        if glob:
+            file_name = "omniscidb/Tests/ArrowStorageDataFiles/numbers_header*.csv"
+            ref_data = {
+                "col1": [*range(1, 10), *range(10, 19)],
+                "col2": [*np.arange(10.0, 100.0, 10), *np.arange(100.0, 190.0, 10)],
+            }
+        else:
+            file_name = "omniscidb/Tests/ArrowStorageDataFiles/numbers_header.csv"
+            ref_data = {"col1": [*range(1, 10)], "col2": [*np.arange(10.0, 100.0, 10)]}
+
+        if full_schema is None:
+            if header:
+                schema = None
+            else:
+                schema = ["col1", "col2"]
+            if not create_table:
+                real_schema = {"col1": "INT64", "col2": "FP64"}
+        elif full_schema:
+            if not create_table:
+                real_schema = {"col1": "INT32", "col2": "FP64"}
+            schema = real_schema
+        else:
+            if header:
+                schema = {"col2": "fp32"}
+            else:
+                schema = {"col1": None, "col2": "fp32"}
+            if not create_table:
+                real_schema = {"col1": "INT64", "col2": "FP32"}
+
+        skip_rows = 0 if header else 1
+        ht = hdk.import_csv(
+            file_name, table_name, schema=schema, header=header, skip_rows=skip_rows
+        )
+
+        self.check_schema(ht.schema, real_schema)
+        self.check_res(ht.proj(0, 1).run(), ref_data)
+
         hdk.drop_table(table_name)
 
 

@@ -196,37 +196,37 @@ cdef class CsvParseOptions:
 
   @property
   def delimiter(self):
-    return self.delimiter
+    return self.c_options.delimiter
 
   @delimiter.setter
   def delimiter(self, value):
     if not isinstance(value, str) or not (len(value) == 1):
       raise TypeError("Only single-character strings are allowed for delimiter.")
-    self.delimiter = value
+    self.c_options.delimiter = value.encode('utf8')[0]
 
   @property
   def header(self):
-    return self.header
+    return self.c_options.header
 
   @header.setter
   def header(self, value):
-    self.header = value
+    self.c_options.header = value
 
   @property
   def skip_rows(self):
-    return self.skip_rows
+    return self.c_options.skip_rows
 
   @skip_rows.setter
   def skip_rows(self, value):
-    self.skip_rows = value
+    self.c_options.skip_rows = value
 
   @property
   def block_size(self):
-    return self.block_size
+    return self.c_options.block_size
 
   @block_size.setter
   def block_size(self, value):
-    self.block_size = value
+    self.c_options.block_size = value
 
 cdef class ArrowStorage(Storage):
   cdef shared_ptr[CArrowStorage] c_storage
@@ -285,12 +285,57 @@ cdef class ArrowStorage(Storage):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().appendArrowTable(at, name)
 
-  def importCsvFile(self, file_name, table_name, TableOptions table_opts = None, CsvParseOptions csv_opts = None):
+  def importCsvFile(self, file_name, table_name, schema = None, TableOptions table_opts = None, CsvParseOptions csv_opts = None):
     if table_opts is None:
       table_opts = TableOptions()
     if csv_opts is None:
       csv_opts = CsvParseOptions()
-    self.c_storage.get().importCsvFile(file_name, table_name, table_opts.c_options, csv_opts.c_options)
+
+    cdef vector[CColumnDescription] c_schema
+    cdef CColumnDescription col_desc
+
+    def process_col_type(col_name, col_type):
+      if not isinstance(col_name, str):
+        raise TypeError(f"Expected str for a column name. Got: {type(col_name)}.")
+      col_desc.name = col_name
+
+      if col_type is None or col_type == "":
+        col_desc.type = NULL
+      elif isinstance(col_type, str):
+        col_desc.type = CContext.defaultCtx().typeFromString(col_type)
+      elif isinstance(col_type, TypeInfo):
+        col_desc.type = (<TypeInfo>col_type).c_type_info
+      else:
+        raise TypeError(f"Expected None, str or TypeInfo for a column type. Got: {type()}.")
+
+      c_schema.push_back(col_desc)
+
+    if schema is None:
+      self.c_storage.get().importCsvFile(file_name, table_name, table_opts.c_options, csv_opts.c_options)
+    else:
+      if isinstance(schema, dict):
+        for col_name, col_type in schema.items():
+          process_col_type(col_name, col_type)
+      elif isinstance(schema, Iterable):
+        for col_info in schema:
+          if isinstance(col_info, str):
+            process_col_type(col_info, None)
+          elif isinstance(col_info, tuple):
+            if len(col_info) == 1:
+              process_col_type(col_info[0], None)
+            elif len(col_info) == 2:
+              process_col_type(col_info[0], col_info[1])
+            else:
+              raise TypeError(f"Expected tuple length for a column descriptor is 1 or 2. Got: {len(col_info)}.")
+          else:
+            raise TypeError(f"Expected str or tuple for a column descriptor. Got: {type(col_info)}.")
+
+      self.c_storage.get().importCsvFileWithSchema(file_name, table_name, c_schema, table_opts.c_options, csv_opts.c_options)
+
+  def appendCsvFile(self, file_name, table_name, CsvParseOptions csv_opts = None):
+    if csv_opts is None:
+      csv_opts = CsvParseOptions()
+    self.c_storage.get().appendCsvFile(file_name, table_name, csv_opts.c_options)
 
   def dropTable(self, string name, bool throw_if_not_exist = False):
     self.c_storage.get().dropTable(name, throw_if_not_exist)

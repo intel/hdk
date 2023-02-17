@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from pyhdk._common import buildConfig
-from pyhdk._storage import TableOptions, ArrowStorage, DataMgr
+from pyhdk._storage import TableOptions, CsvParseOptions, ArrowStorage, DataMgr
 from pyhdk._sql import Calcite, RelAlgExecutor
 from pyhdk._execute import Executor
 from pyhdk._builder import QueryBuilder, QueryExpr, QueryNode
@@ -12,6 +12,7 @@ from pyhdk._builder import QueryBuilder, QueryExpr, QueryNode
 import pyarrow
 import uuid
 from collections.abc import Iterable
+import glob
 
 
 def not_implemented(func):
@@ -1507,9 +1508,9 @@ class QueryNodeAPI:
     @property
     def schema(self):
         """
-        Return a scheme of a table represented by this node.
+        Return a schema of a table represented by this node.
 
-        Scheme is a dictionary mapping column names to ColumnInfo objects.
+        Schema is a dictionary mapping column names to ColumnInfo objects.
 
         Returns
         -------
@@ -1655,7 +1656,7 @@ class HDK:
         self._executor = Executor(self._data_mgr, self._config)
         self._builder = QueryBuilder(self._storage, self._config, self)
 
-    def create_table(self, table_name, scheme, fragment_size=None):
+    def create_table(self, table_name, schema, fragment_size=None):
         """
         Create an empty table in HDK in-memory storage. Data can be appended to
         existing tables using data import methods.
@@ -1665,7 +1666,7 @@ class HDK:
         table_name : str
             Name of the new table. Shouldn't match name of any previously created
             table.
-        scheme : list of tuples or dict
+        schema : list of tuples or dict
             A list of tuples holding column names and types or a dictionary mapping
             column names to their types.
         fragment_size : int, default: None
@@ -1691,7 +1692,7 @@ class HDK:
         opts = TableOptions()
         if fragment_size is not None:
             opts.fragment_size = fragment_size
-        self._storage.createTable(table_name, scheme, opts)
+        self._storage.createTable(table_name, schema, opts)
         return self.scan(table_name)
 
     def drop_table(self, table):
@@ -1727,12 +1728,11 @@ class HDK:
                 f"Only str and QueryNode scans are allowed for 'table' arg. Provided: {table}"
             )
 
-    @not_implemented
     def import_csv(
         self,
         file_name,
         table_name=None,
-        scheme=None,
+        schema=None,
         delim=",",
         header=True,
         skip_rows=0,
@@ -1751,15 +1751,15 @@ class HDK:
             Destination table name. If not specified, then unique table name is
             generated and used. If table with specified name already exists,
             then imported data is appended to the existing table.
-        scheme : list of str, list of tuples, or dict, default: None
+        schema : list of str, list of tuples, or dict, default: None
             List of strings simply lists column names and can be used for CSV files
             with no headers. In this case, types are auto-detected. Tuple of two
             values can be used to cpecify both column name and type. Alternatively,
             a dictionary can be provided to map column names to their types. When
-            header is not used, then scheme should list all columns. When header is
-            used, scheme can be partial to enforce required data types for specific
+            header is not used, then schema should list all columns. When header is
+            used, schema can be partial to enforce required data types for specific
             columns. If the destination table already exists then mismatch between
-            provided scheme and table's scheme would cause an error.
+            provided schema and table's schema would cause an error.
         delim : str, default: ","
             Delimiter symbol.
         header : bool, default: True
@@ -1779,7 +1779,55 @@ class HDK:
         QueryExpr
             Scan expression referencing created table.
         """
-        pass
+        files = []
+        if isinstance(file_name, str):
+            files.extend(glob.glob(file_name))
+        elif isinstance(file_name, Iterable):
+            for file in file_name:
+                if not isinstance(file, str):
+                    raise TypeError(
+                        f"Expected str values in 'file_name' list. Got: {type(file)}."
+                    )
+                files.extend(glob.glob(file))
+        else:
+            raise TypeError(
+                f"Expected str or list of str for 'file_name' arg. Got: {type(file_name)}."
+            )
+        if len(files) == 0:
+            raise RuntimeError(
+                f"Cannot resolve specified file name to any existing file."
+            )
+
+        table_opts = TableOptions()
+        if fragment_size is not None:
+            table_opts.fragment_size = fragment_size
+        parse_opts = CsvParseOptions()
+        parse_opts.delimiter = delim
+        parse_opts.header = header
+        parse_opts.skip_rows = skip_rows
+        if block_size is not None:
+            parse_opts.block_size = block_size
+
+        real_table_name, append = self._process_import_table_name(table_name)
+        # Create new table by importing the forst file or simply check its schema
+        # matches the specified one.
+        if append:
+            # check schema
+            pass
+        else:
+            self._storage.importCsvFile(
+                files[0], real_table_name, schema, table_opts, parse_opts
+            )
+
+        # Append the rest of files to the exisintg table.
+        for file in files[int(not append) :]:
+            self._storage.appendCsvFile(file, real_table_name, parse_opts)
+
+        return (
+            table_name
+            if isinstance(table_name, QueryNode)
+            else self.scan(real_table_name)
+        )
 
     @not_implemented
     def import_parquet(self, file_name, table_name=None, fragment_size=None):
@@ -1829,26 +1877,7 @@ class HDK:
         QueryExpr
             Scan expression referencing created table.
         """
-        append = False
-        real_name = table_name
-        if isinstance(table_name, QueryNode):
-            if not table_name.is_scan:
-                raise TypeError("Non-scan QueryNode is not allowed as a table name.")
-            real_name = table_name.table_name
-            if self._storage.tableInfo(real_name) is None:
-                raise RuntimeError(
-                    "Table referred by scan QueryNode does not exist anymore: {real_name}."
-                )
-            append = True
-        elif isinstance(table_name, str):
-            append = self._storage.tableInfo(table_name) is not None
-        elif table_name is None:
-            real_name = "tabe_" + uuid.uuid4().hex
-        else:
-            raise TypeError(
-                f"Expected str or QueryNode for 'table_name' arg. Got: {type(table_name)}."
-            )
-
+        real_name, append = self._process_import_table_name(table_name)
         if append:
             self._storage.appendArrowTable(at, real_name)
         else:
@@ -1858,6 +1887,28 @@ class HDK:
             self._storage.importArrowTable(at, real_name, opts)
 
         return table_name if isinstance(table_name, QueryNode) else self.scan(real_name)
+
+    def _process_import_table_name(self, table_name):
+        exists = False
+        res_name = table_name
+        if isinstance(table_name, QueryNode):
+            if not table_name.is_scan:
+                raise TypeError("Non-scan QueryNode is not allowed as a table name.")
+            res_name = table_name.table_name
+            if self._storage.tableInfo(res_name) is None:
+                raise RuntimeError(
+                    "Table referred by scan QueryNode does not exist anymore: {res_name}."
+                )
+            exists = True
+        elif isinstance(table_name, str):
+            exists = self._storage.tableInfo(table_name) is not None
+        elif table_name is None:
+            res_name = "tabe_" + uuid.uuid4().hex
+        else:
+            raise TypeError(
+                f"Expected str or QueryNode for 'table_name' arg. Got: {type(table_name)}."
+            )
+        return (res_name, exists)
 
     def import_pydict(self, values, table_name=None, fragment_size=None):
         """
