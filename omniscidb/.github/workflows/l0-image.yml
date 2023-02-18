@@ -48,25 +48,3 @@ jobs:
       - name: Stop
         if: always()
         run: docker stop build.l0 || true
-  test:
-    runs-on: [self-hosted, linux, intel-ai.hdk.l0]
-    steps:
-      - name: Download a Build Artifact
-        uses: actions/download-artifact@v3.0.2
-        with:
-          name: ${{ env.RUN_STAMP }}-build
-    
-      - name: Unpack build files
-        run: |
-          tar -zxf build.tgz
-
-      - name: Start the container
-        run: |
-          docker run -id --name build.l0 --network host --device --device=/dev/dri:/dev/dri build.l0:latest
-        
-      - name: Test
-        run: docker exec -u ghrunner build.l0 bash /_work/scripts/conda/intel-gpu-enabling-test.sh
-
-      - name: Stop the container
-        if: always()
-        run: docker stop build.l0 || true

@@ -59,3 +59,9 @@ jobs:
     with:
       name: l0
       options: -DENABLE_L0=on -DENABLE_CUDA=off
+
+  test-l0-docker:
+    uses: ./.github/workflows/test-l0.yml
+    with:
+      name: l0
+      reset-cache: ${{ !!inputs.reset-cache }}
