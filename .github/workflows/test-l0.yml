@@ -13,6 +13,10 @@ jobs:
   test:
     runs-on: [self-hosted, linux, intel-ai.hdk.l0]
     steps:
+      - name: Set env context
+        run: |
+          echo RUN_STAMP=docker-${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+
       - name: Download a Build Artifact
         uses: actions/download-artifact@v3.0.2
         with:
