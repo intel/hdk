@@ -115,30 +115,37 @@ void L0Manager::synchronizeDevices() const {
 
 size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   CHECK(false);
+  return 0u;
 }
 
 unsigned L0Manager::getMaxBlockSize() const {
   CHECK(false);
+  return 0u;
 }
 
 int8_t L0Manager::getSubGroupSize() const {
   CHECK(false);
+  return 0;
 }
 
 unsigned L0Manager::getGridSize() const {
   CHECK(false);
+  return 0u;
 }
 
 unsigned L0Manager::getMinEUNumForAllDevices() const {
   CHECK(false);
+  return 0u;
 }
 
 bool L0Manager::hasSharedMemoryAtomicsSupport() const {
   CHECK(false);
+  return false;
 };
 
 size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
   CHECK(false);
+  return 0u;
 };
 
 const std::vector<std::shared_ptr<L0Driver>>& L0Manager::drivers() const {
