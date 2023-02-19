@@ -17,7 +17,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, docker]
+    runs-on: [self-hosted, linux, intel-ai.hdk.l0]
     steps:
       - name: Clean
         run: |
