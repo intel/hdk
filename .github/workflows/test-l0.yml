@@ -28,11 +28,11 @@ jobs:
 
       - name: Start the container
         run: |
-          docker run -id --name build.l0 --network host --device --device=/dev/dri:/dev/dri build.l0:latest
+          docker run -id --name hdk-build.${{ inputs.name }} --network host --device --device=/dev/dri:/dev/dri hdk-build.${{ inputs.name }}:latest
         
       - name: Test
-        run: docker exec -u ghrunner build.l0 bash /_work/scripts/conda/intel-gpu-enabling-test.sh
+        run: docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/scripts/conda/intel-gpu-enabling-test.sh
 
       - name: Stop the container
         if: always()
-        run: docker stop build.l0 || true
+        run: docker stop hdk-build.${{ inputs.name }} || true
