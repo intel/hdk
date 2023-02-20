@@ -53,7 +53,7 @@ class GpuSharedMemCodeBuilder {
    * generates code for both the reduction and initialization steps required for shared
    * memory usage
    */
-  void codegen();
+  void codegen(const CompilationOptions& co);
 
   /**
    * Once the reduction and init functions are generated, this function takes the main
@@ -71,7 +71,7 @@ class GpuSharedMemCodeBuilder {
    * Generates code for the reduction functionality (from shared memory into global
    * memory)
    */
-  void codegenReduction();
+  void codegenReduction(const CompilationOptions& co);
   /**
    * Generates code for the shared memory buffer initialization
    */

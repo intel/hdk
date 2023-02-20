@@ -20,6 +20,9 @@
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 
+#include "Compiler/Backend.h"
+#include "Logger/Logger.h"
+
 #include "Shared/threading.h"
 
 #ifdef HAVE_TBB
@@ -82,6 +85,7 @@ class ExecutionKernel {
   ExecutionKernel(const RelAlgExecutionUnit& ra_exe_unit,
                   const ExecutorDeviceType chosen_device_type,
                   int chosen_device_id,
+                  const CompilationOptions& co,
                   const ExecutionOptions& eo,
                   const ColumnFetcher& column_fetcher,
                   const QueryCompilationDescriptor& query_comp_desc,
@@ -92,6 +96,7 @@ class ExecutionKernel {
       : ra_exe_unit_(ra_exe_unit)
       , chosen_device_type(chosen_device_type)
       , chosen_device_id(chosen_device_id)
+      , co(co)
       , eo(eo)
       , column_fetcher(column_fetcher)
       , query_comp_desc(query_comp_desc)
@@ -109,6 +114,7 @@ class ExecutionKernel {
  private:
   const ExecutorDeviceType chosen_device_type;
   int chosen_device_id;
+  const CompilationOptions& co;
   const ExecutionOptions& eo;
   const ColumnFetcher& column_fetcher;
   const QueryCompilationDescriptor& query_comp_desc;

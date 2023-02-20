@@ -26,6 +26,7 @@
 #include <vector>
 #include "../DataMgr/MemoryLevel.h"
 #include "StringDictionary/StringDictionaryProxy.h"
+#include "Compiler/CodegenTraitsDescriptor.h"
 
 #include <iostream>
 
@@ -42,6 +43,9 @@ namespace llvm {
 class Value;
 }
 
+namespace compiler {
+struct CodegenTraitsDesc;
+}
 namespace StringFunctors {
 enum StringFunctorType : unsigned int;
 }
@@ -60,7 +64,8 @@ class StringDictionaryTranslationMgr {
   void createKernelBuffers();
   llvm::Value* codegenCast(llvm::Value* str_id_input,
                            const hdk::ir::Type* input_type,
-                           const bool add_nullcheck) const;
+                           const bool add_nullcheck,
+                           compiler::CodegenTraitsDescriptor codegen_traits_desc) const;
   bool isMapValid() const;
   const int32_t* data() const;
   int32_t minSourceStringId() const;

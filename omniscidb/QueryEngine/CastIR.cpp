@@ -234,7 +234,7 @@ llvm::Value* CodeGenerator::codegenCastFromString(llvm::Value* operand_lv,
 
     return cgen_state_
         ->moveStringDictionaryTranslationMgr(std::move(string_dictionary_translation_mgr))
-        ->codegenCast(operand_lv, operand_type, true /* add_nullcheck */);
+        ->codegenCast(operand_lv, operand_type, true , co.codegen_traits_desc /* add_nullcheck */);
   }
   // dictionary encode non-constant
   if (operand_type->isString() && !operand_is_const) {

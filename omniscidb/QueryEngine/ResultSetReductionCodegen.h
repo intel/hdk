@@ -18,16 +18,17 @@
 
 #include "ResultSetReductionJIT.h"
 #include "ResultSetReductionOps.h"
+#include "Compiler/Backend.h"
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 
 // Convert an IR type to the corresponding LLVM one.
-llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx);
+llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx, const CompilationOptions& co);
 
 // Translate a function to a LLVM function provided as llvm_function (initially empty).
 // The mapping to LLVM for the reduction functions is also provided as input f.
 void translate_function(const Function* function,
                         llvm::Function* llvm_function,
                         const ReductionCode& reduction_code,
-                        const std::unordered_map<const Function*, llvm::Function*>& f);
+                        const std::unordered_map<const Function*, llvm::Function*>& f, const CompilationOptions& co);

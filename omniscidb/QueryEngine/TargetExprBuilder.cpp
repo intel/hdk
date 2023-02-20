@@ -277,7 +277,7 @@ void TargetExprCodegen::codegenAggregate(
   size_t target_lv_idx = 0;
   const bool lazy_fetched{executor->plan_state_->isLazyFetchColumn(target_expr)};
 
-  CodeGenerator code_generator(executor);
+  CodeGenerator code_generator(executor, co.codegen_traits_desc);
 
   const auto agg_fn_names = agg_fn_base_names(target_info);
   auto arg_expr = agg_arg(target_expr);
@@ -372,7 +372,7 @@ void TargetExprCodegen::codegenAggregate(
     }
     std::vector<llvm::Value*> agg_args{
         executor->castToIntPtrTyIn((is_group_by ? agg_col_ptr : agg_out_vec[slot_index]),
-                                   (agg_chosen_bytes << 3)),
+                                   (agg_chosen_bytes << 3), co.codegen_traits_desc),
         (is_simple_count_target && !arg_expr)
             ? (agg_chosen_bytes == sizeof(int32_t) ? LL_INT(int32_t(0))
                                                    : LL_INT(int64_t(0)))
@@ -733,7 +733,7 @@ void TargetExprCodegenBuilder::codegenMultiSlotSampleExpressions(
   } else {
     CHECK_LT(static_cast<size_t>(first_sample_expr.base_slot_index), agg_out_vec.size());
     agg_col_ptr =
-        executor->castToIntPtrTyIn(agg_out_vec[first_sample_expr.base_slot_index], 64);
+        executor->castToIntPtrTyIn(agg_out_vec[first_sample_expr.base_slot_index], 64, co.codegen_traits_desc);
   }
 
   auto sample_cas_lv =

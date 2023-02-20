@@ -1489,7 +1489,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                                       gpu_smem_context.isSharedMemoryUsed(),
                                       target);
   auto traits = backend->traits();
-
+  CompilationOptions co_codegen_traits = co;
+  co_codegen_traits.codegen_traits_desc = backend->traitsDescriptor();
   if (is_gpu) {
     cgen_state_->module_->setDataLayout(traits.dataLayout());
     cgen_state_->module_->setTargetTriple(traits.triple());
@@ -1516,9 +1517,9 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   auto [query_func, row_func_call] = query_template(cgen_state_->module_,
                                                     agg_slot_count,
                                                     !!ra_exe_unit.estimator,
-                                                    co.hoist_literals,
+                                                    co_codegen_traits.hoist_literals,
                                                     *query_mem_desc,
-                                                    co.device_type,
+                                                    co_codegen_traits.device_type,
                                                     ra_exe_unit.scan_limit,
                                                     gpu_smem_context,
                                                     traits);
@@ -1546,7 +1547,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   const bool is_group_by{query_mem_desc->isGroupBy()};
   cgen_state_->row_func_ = create_row_function(ra_exe_unit.input_col_descs.size(),
                                                is_group_by ? 0 : agg_slot_count,
-                                               co.hoist_literals,
+                                               co_codegen_traits.hoist_literals,
                                                traits,
                                                cgen_state_->module_,
                                                cgen_state_->context_);
@@ -1572,7 +1573,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   preloadFragOffsets(ra_exe_unit.input_descs, query_infos);
   RelAlgExecutionUnit body_execution_unit = ra_exe_unit;
   const auto join_loops = buildJoinLoops(
-      body_execution_unit, co, eo, query_infos, data_provider, column_cache);
+      body_execution_unit, co_codegen_traits, eo, query_infos, data_provider, column_cache);
 
   plan_state_->allocateLocalColumnIds(ra_exe_unit.input_col_descs);
   for (auto& simple_qual : ra_exe_unit.simple_quals) {
@@ -1585,11 +1586,11 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                      query_func,
                      cgen_state_->row_func_bb_,
                      *(query_mem_desc.get()),
-                     co,
+                     co_codegen_traits,
                      eo);
   } else {
     const bool can_return_error =
-        compileBody(ra_exe_unit, row_func_builder, *query_mem_desc, co, gpu_smem_context);
+        compileBody(ra_exe_unit, row_func_builder, *query_mem_desc, co_codegen_traits, gpu_smem_context);
     if (can_return_error || cgen_state_->needs_error_check_ || eo.with_dynamic_watchdog ||
         eo.allow_runtime_query_interrupt) {
       createErrorCheckControlFlow(query_func,
@@ -1667,7 +1668,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
           plan_state_->init_agg_vals_,
           getConfig(),
           this);
-      gpu_smem_code.codegen();
+      gpu_smem_code.codegen(co);
       gpu_smem_code.injectFunctionsInto(query_func);
 
       // helper functions are used for caching purposes later
@@ -1678,16 +1679,16 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   }
 
   auto multifrag_query_func = cgen_state_->module_->getFunction(
-      "multifrag_query" + std::string(co.hoist_literals ? "_hoisted_literals" : ""));
+      "multifrag_query" + std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""));
   CHECK(multifrag_query_func);
 
-  if (co.device_type == ExecutorDeviceType::GPU && eo.allow_multifrag) {
+  if (co_codegen_traits.device_type == ExecutorDeviceType::GPU && eo.allow_multifrag) {
     insertErrorCodeChecker(
-        multifrag_query_func, co.hoist_literals, eo.allow_runtime_query_interrupt);
+        multifrag_query_func, co_codegen_traits.hoist_literals, eo.allow_runtime_query_interrupt);
   }
 
   bind_query(query_func,
-             "query_stub" + std::string(co.hoist_literals ? "_hoisted_literals" : ""),
+             "query_stub" + std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""),
              multifrag_query_func,
              cgen_state_->module_);
 
@@ -1728,7 +1729,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                             pass_manager,
                             live_funcs,
                             gpu_smem_context.isSharedMemoryUsed(),
-                            co);
+                            co_codegen_traits);
 #endif  // WITH_JIT_DEBUG
     }
     llvm_ir =
@@ -1783,9 +1784,9 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
       CompilationResult{
           co.device_type == ExecutorDeviceType::CPU
               ? optimizeAndCodegenCPU(
-                    query_func, multifrag_query_func, backend, live_funcs, co)
+                    query_func, multifrag_query_func, backend, live_funcs, co_codegen_traits)
               : optimizeAndCodegenGPU(
-                    query_func, multifrag_query_func, backend, live_funcs, co),
+                    query_func, multifrag_query_func, backend, live_funcs, co_codegen_traits),
           cgen_state_->getLiterals(),
           output_columnar,
           llvm_ir,
@@ -1917,7 +1918,7 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
             << " quals";
   }
   llvm::Value* filter_lv = cgen_state_->llBool(true);
-  CodeGenerator code_generator(this);
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
   for (auto expr : primary_quals) {
     // Generate the filter for primary quals
     auto cond = code_generator.toBool(code_generator.codegen(expr, true, co).front());

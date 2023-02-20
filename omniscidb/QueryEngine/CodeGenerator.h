@@ -21,24 +21,27 @@
 #include "IR/Expr.h"
 
 #include "Execute.h"
+#include "Compiler/CodegenTraitsDescriptor.h"
 #include "QueryEngine/Target.h"
 
 // Code generation utility to be used for queries and scalar expressions.
 class CodeGenerator {
  public:
-  CodeGenerator(Executor* executor)
+  CodeGenerator(Executor* executor, compiler::CodegenTraitsDescriptor cgen_traits_desc)
       : executor_(executor)
       , config_(executor->getConfig())
       , cgen_state_(executor->cgen_state_.get())
-      , plan_state_(executor->plan_state_.get()) {}
+      , plan_state_(executor->plan_state_.get())
+      , codegen_traits_desc(cgen_traits_desc){}
 
   // Overload which can be used without an executor, for SQL scalar expression code
   // generation.
-  CodeGenerator(const Config& config, CgenState* cgen_state, PlanState* plan_state)
+  CodeGenerator(const Config& config, CgenState* cgen_state, PlanState* plan_state, compiler::CodegenTraitsDescriptor cgen_traits_desc)
       : executor_(nullptr)
       , config_(config)
       , cgen_state_(cgen_state)
-      , plan_state_(plan_state) {}
+      , plan_state_(plan_state)
+      , codegen_traits_desc(cgen_traits_desc) {}
 
   // Generates IR value(s) for the given analyzer expression.
   std::vector<llvm::Value*> codegen(const hdk::ir::Expr*,
@@ -412,7 +415,8 @@ class CodeGenerator {
   llvm::Value* endArgsNullcheck(const ArgNullcheckBBs&,
                                 llvm::Value*,
                                 llvm::Value*,
-                                const hdk::ir::FunctionOper*);
+                                const hdk::ir::FunctionOper*,
+                                const CompilationOptions& co);
 
   llvm::Value* codegenFunctionOperNullArg(const hdk::ir::FunctionOper*,
                                           const std::vector<llvm::Value*>&);
@@ -460,7 +464,7 @@ class CodeGenerator {
   const Config& config_;
   CgenState* cgen_state_;
   PlanState* plan_state_;
-
+  compiler::CodegenTraitsDescriptor codegen_traits_desc;
   friend class RowFuncBuilder;
 };
 
@@ -468,8 +472,8 @@ class CodeGenerator {
 class ScalarCodeGenerator : public CodeGenerator {
  public:
   // Constructor which takes the runtime module.
-  ScalarCodeGenerator(const Config& config, std::unique_ptr<llvm::Module> llvm_module)
-      : CodeGenerator(config, nullptr, nullptr), module_(std::move(llvm_module)) {}
+  ScalarCodeGenerator(const Config& config, std::unique_ptr<llvm::Module> llvm_module, compiler::CodegenTraitsDescriptor cgen_desc)
+      : CodeGenerator(config, nullptr, nullptr, cgen_desc), module_(std::move(llvm_module)) {}
 
   // Function generated for a given analyzer expression. For GPU, a wrapper which meets
   // the kernel signature constraints (returns void, takes all arguments as pointers) is

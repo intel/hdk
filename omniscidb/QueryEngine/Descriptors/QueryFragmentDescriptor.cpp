@@ -68,7 +68,8 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
     const int device_count,
     const bool enable_multifrag_kernels,
     const bool enable_inner_join_fragment_skipping,
-    Executor* executor) {
+    Executor* executor,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   // For joins, only consider the cardinality of the LHS
   // columns in the bytes per row count.
   std::set<int> lhs_table_ids;
@@ -82,7 +83,7 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
 
   if (ra_exe_unit.union_all) {
     buildFragmentPerKernelMapForUnion(
-        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor);
+        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor, cgen_traits_desc);
   } else if (enable_multifrag_kernels) {
     buildMultifragKernelMap(ra_exe_unit,
                             frag_offsets,
@@ -90,10 +91,10 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
                             device_count,
                             num_bytes_for_row,
                             enable_inner_join_fragment_skipping,
-                            executor);
+                            executor, cgen_traits_desc);
   } else {
     buildFragmentPerKernelMap(
-        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor);
+        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor, cgen_traits_desc);
   }
 }
 
@@ -107,7 +108,8 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     const int device_count,
     const size_t num_bytes_for_row,
     const std::optional<size_t> table_desc_offset,
-    Executor* executor) {
+    Executor* executor,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   auto get_fragment_tuple_count =
       [&is_temporary_table](const auto& fragment) -> std::optional<size_t> {
     // returning std::nullopt disables execution dispatch optimizations based on tuple
@@ -133,7 +135,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
 
     const auto& fragment = (*fragments)[i];
     const auto skip_frag = executor->skipFragment(
-        table_desc, fragment, ra_exe_unit.simple_quals, frag_offsets, i);
+        table_desc, fragment, ra_exe_unit.simple_quals, frag_offsets, i, cgen_traits_desc);
     if (skip_frag.first) {
       continue;
     }
@@ -201,7 +203,8 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
     const policy::ExecutionPolicy* policy,
     const int device_count,
     const size_t num_bytes_for_row,
-    Executor* executor) {
+    Executor* executor,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const auto& schema_provider = executor->getSchemaProvider();
 
   for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
@@ -232,7 +235,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
                                    device_count,
                                    num_bytes_for_row,
                                    j,
-                                   executor);
+                                   executor,cgen_traits_desc);
 
     std::vector<int> table_cpu_ids =
         std::accumulate(execution_kernels_per_device_[ExecutorDeviceType::CPU][0].begin(),
@@ -267,7 +270,8 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
     const policy::ExecutionPolicy* policy,
     const int device_count,
     const size_t num_bytes_for_row,
-    Executor* executor) {
+    Executor* executor,
+     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const auto& outer_table_desc = ra_exe_unit.input_descs.front();
   const int db_id = outer_table_desc.getDatabaseId();
   const int outer_table_id = outer_table_desc.getTableId();
@@ -299,7 +303,8 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
                                  device_count,
                                  num_bytes_for_row,
                                  std::nullopt,
-                                 executor);
+                                 executor,
+                                 cgen_traits_desc);
 }
 
 void QueryFragmentDescriptor::buildMultifragKernelMap(
@@ -309,7 +314,8 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
     const int device_count,
     const size_t num_bytes_for_row,
     const bool enable_inner_join_fragment_skipping,
-    Executor* executor) {
+    Executor* executor,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   // Allocate all the fragments of the tables involved in the query to available
   // devices. The basic idea: the device is decided by the outer table in the
   // query (the first table in a join) and we need to broadcast the fragments
@@ -338,11 +344,12 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
                                             fragment,
                                             ra_exe_unit.simple_quals,
                                             frag_offsets,
-                                            outer_frag_id);
+                                            outer_frag_id,
+                                            cgen_traits_desc);
     if (enable_inner_join_fragment_skipping &&
         (skip_frag == std::pair<bool, int64_t>(false, -1))) {
       skip_frag = executor->skipFragmentInnerJoins(
-          outer_table_desc, ra_exe_unit, fragment, frag_offsets, outer_frag_id);
+          outer_table_desc, ra_exe_unit, fragment, frag_offsets, outer_frag_id, cgen_traits_desc);
     }
     if (skip_frag.first) {
       continue;

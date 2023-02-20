@@ -161,10 +161,12 @@ inline const hdk::ir::Type* get_type_from_llvm_type(const llvm::Type* ll_type) {
 }
 
 inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
-                                                 llvm::LLVMContext& ctx) {
+                                                 llvm::LLVMContext& ctx,
+                                                 const compiler::CodegenTraitsDescriptor& codegen_traits_desc) {
   CHECK(type->isBuffer());
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
   if (type->isText()) {
-    return llvm::Type::getInt8PtrTy(ctx);
+    return cgen_traits.localPointerType(get_int_type(8, ctx));
   }
 
   const auto& elem_type = type->isArray() ? type->as<hdk::ir::ArrayBaseType>()->elemType()
@@ -174,26 +176,26 @@ inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
   if (elem_type->isFloatingPoint()) {
     switch (elem_type->size()) {
       case 4:
-        return llvm::Type::getFloatPtrTy(ctx);
+        return cgen_traits.localPointerType(get_fp_type(32, ctx));
       case 8:
-        return llvm::Type::getDoublePtrTy(ctx);
+        return cgen_traits.localPointerType(get_fp_type(64, ctx));
     }
   }
 
   if (elem_type->isBoolean()) {
-    return llvm::Type::getInt8PtrTy(ctx);
+    return cgen_traits.localPointerType(get_int_type(8, ctx));
   }
 
   CHECK(elem_type->isInteger());
   switch (elem_type->size()) {
     case 1:
-      return llvm::Type::getInt8PtrTy(ctx);
+      return cgen_traits.localPointerType(get_int_type(8, ctx));
     case 2:
-      return llvm::Type::getInt16PtrTy(ctx);
+      return cgen_traits.localPointerType(get_int_type(16, ctx));
     case 4:
-      return llvm::Type::getInt32PtrTy(ctx);
+      return cgen_traits.localPointerType(get_int_type(32, ctx));
     case 8:
-      return llvm::Type::getInt64PtrTy(ctx);
+      return cgen_traits.localPointerType(get_int_type(64, ctx));
   }
 
   UNREACHABLE();
@@ -335,7 +337,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         cgen_state_,
         function_oper->name(),
         0,
-        get_llvm_type_from_array_type(ret_type, cgen_state_->context_),
+        get_llvm_type_from_array_type(ret_type, cgen_state_->context_, codegen_traits_desc),
         /* has_is_null = */ ret_type->isArray() || ret_type->isText());
     buffer_ret = cgen_state_->ir_builder_.CreateAlloca(struct_ty);
     args.insert(args.begin(), buffer_ret);
@@ -344,7 +346,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
   const auto ext_call = cgen_state_->emitExternalCall(
       ext_func_sig.getName(), ret_ty, args, {}, ret_type->isBuffer());
   auto ext_call_nullcheck = endArgsNullcheck(
-      bbs, ret_type->isBuffer() ? buffer_ret : ext_call, null_buffer_ptr, function_oper);
+      bbs, ret_type->isBuffer() ? buffer_ret : ext_call, null_buffer_ptr, function_oper, co);
 
   // Cast the return of the extension function to match the FunctionOper
   if (!(ret_type->isBuffer())) {
@@ -388,7 +390,7 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
           cgen_state_,
           function_oper->name(),
           0,
-          get_llvm_type_from_array_type(func_type, cgen_state_->context_),
+          get_llvm_type_from_array_type(func_type, cgen_state_->context_, codegen_traits_desc),
           func_type->isArray() || func_type->isText());
       null_array_alloca = cgen_state_->ir_builder_.CreateAlloca(arr_struct_ty);
     }
@@ -410,8 +412,11 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
 llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
                                              llvm::Value* fn_ret_lv,
                                              llvm::Value* null_array_ptr,
-                                             const hdk::ir::FunctionOper* function_oper) {
+                                             const hdk::ir::FunctionOper* function_oper,
+                                             const CompilationOptions& co) {
+
   AUTOMATIC_IR_METADATA(cgen_state_);
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc); 
   if (bbs.args_null_bb) {
     CHECK(bbs.args_notnull_bb);
     cgen_state_->ir_builder_.CreateBr(bbs.args_null_bb);
@@ -439,10 +444,10 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
           cgen_state_,
           function_oper->name(),
           0,
-          get_llvm_type_from_array_type(func_type, cgen_state_->context_),
+          get_llvm_type_from_array_type(func_type, cgen_state_->context_, codegen_traits_desc),
           true);
       ext_call_phi =
-          cgen_state_->ir_builder_.CreatePHI(llvm::PointerType::get(arr_struct_ty, 0), 2);
+          cgen_state_->ir_builder_.CreatePHI(cgen_traits.localPointerType(arr_struct_ty), 2);
 
       CHECK(null_array_ptr);
       const auto arr_null_bool =
@@ -512,7 +517,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
       CHECK_EQ(0, ret_type->as<hdk::ir::DecimalType>()->scale());
       const auto result_lv = cgen_state_->ir_builder_.CreateSDiv(
           covar_result_lv, cgen_state_->llInt(exp_to_scale(arg_scale)));
-      return endArgsNullcheck(bbs, result_lv, nullptr, function_oper);
+      return endArgsNullcheck(bbs, result_lv, nullptr, function_oper, co);
     } else if (function_oper->name() == "ROUND" &&
                function_oper->arg(0)->type()->isDecimal()) {
       CHECK_EQ(size_t(2), function_oper->arity());
@@ -548,7 +553,7 @@ llvm::Value* CodeGenerator::codegenFunctionOperWithCustomTypeHandling(
           get_int_type(64, cgen_state_->context_),
           {arg0_lv, arg1_lv, cgen_state_->llInt(arg0_scale)});
 
-      return endArgsNullcheck(bbs0, result_lv, nullptr, function_oper);
+      return endArgsNullcheck(bbs0, result_lv, nullptr, function_oper, co);
     }
     throw std::runtime_error("Type combination not supported for function " +
                              function_oper->name());
@@ -654,7 +659,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
       const auto len_lv = orig_arg_lvs[k + 2];
       auto& builder = cgen_state_->ir_builder_;
       auto string_buf_arg = builder.CreatePointerCast(
-          ptr_lv, llvm::Type::getInt8PtrTy(cgen_state_->context_));
+          ptr_lv, llvm::Type::getInt8PtrTy(cgen_state_->context_, ptr_lv->getType()->getPointerAddressSpace()));
       auto string_size_arg =
           builder.CreateZExt(len_lv, get_int_type(64, cgen_state_->context_));
       codegenBufferArgs(ext_func_sig->getName(),
@@ -671,7 +676,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
                               ? orig_arg_lvs[k]
                               : cgen_state_->emitExternalCall(
                                     "array_buff",
-                                    llvm::Type::getInt8PtrTy(cgen_state_->context_),
+                                    llvm::Type::getInt8PtrTy(cgen_state_->context_, orig_arg_lvs[k]->getType()->getPointerAddressSpace()),
                                     {orig_arg_lvs[k], posArg(arg)});
       const auto len_lv =
           (const_arr) ? const_arr_size.at(orig_arg_lvs[k])
@@ -728,26 +733,26 @@ llvm::Value* CodeGenerator::castArrayPointer(llvm::Value* ptr,
   AUTOMATIC_IR_METADATA(cgen_state_);
   if (elem_type->isFp32()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
-        ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_));
+        ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
   }
   if (elem_type->isFp64()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
-        ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_));
+        ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
   }
   CHECK(elem_type->isInteger() || elem_type->isBoolean() || elem_type->isExtDictionary());
   switch (elem_type->size()) {
     case 1:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt8PtrTy(cgen_state_->context_));
+          ptr, llvm::Type::getInt8PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
     case 2:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt16PtrTy(cgen_state_->context_));
+          ptr, llvm::Type::getInt16PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
     case 4:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt32PtrTy(cgen_state_->context_));
+          ptr, llvm::Type::getInt32PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
     case 8:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt64PtrTy(cgen_state_->context_));
+          ptr, llvm::Type::getInt64PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
     default:
       CHECK(false);
   }

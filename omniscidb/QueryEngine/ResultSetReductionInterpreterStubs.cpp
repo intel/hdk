@@ -27,6 +27,7 @@ namespace {
 // Creates an empty stub function, with the fixed signature required by the interpreter.
 llvm::Function* create_stub_function(const std::string& name, CgenState* cgen_state) {
   auto void_type = llvm::Type::getVoidTy(cgen_state->context_);
+  std::cout << "!!create_stub_function!!\n";
   auto int8_ptr_type = llvm::PointerType::get(get_int_type(8, cgen_state->context_), 0);
   std::vector<llvm::Type*> parameter_types(2, int8_ptr_type);
   const auto func_type = llvm::FunctionType::get(void_type, parameter_types, false);
@@ -187,6 +188,9 @@ StubGenerator::Stub StubGenerator::generateStub(const std::string& name,
                                                 const Type ret_type,
                                                 const bool is_external,
                                                 const Executor* executor) {
+  CompilationOptions co{
+      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  std::cout << "generateStub\n";
   // Multiple executors may trigger the generation of the same
   // stub. We'll use get_or_wait/put methods of code cache accessor to
   // let the first executor to generate the stub while other executors
@@ -217,7 +221,7 @@ StubGenerator::Stub StubGenerator::generateStub(const std::string& name,
   for (size_t i = 0; i < arg_types.size(); ++i) {
     const auto arg_type = arg_types[i];
     const auto read_arg_name = get_stub_read_argument_name(arg_type);
-    const auto llvm_arg_type = llvm_type(arg_type, ctx);
+    const auto llvm_arg_type = llvm_type(arg_type, ctx, co);
     auto callee_arg = cgen_state->emitExternalCall(
         read_arg_name, llvm_arg_type, {&*inputs_it, cgen_state->llInt<int32_t>(i)});
     if (is_integer_type(arg_type)) {
@@ -229,7 +233,7 @@ StubGenerator::Stub StubGenerator::generateStub(const std::string& name,
     }
     callee_args.push_back(callee_arg);
   }
-  const auto llvm_ret_type = llvm_type(ret_type, ctx);
+  const auto llvm_ret_type = llvm_type(ret_type, ctx, co);
   auto value = is_external
                    ? cgen_state->emitExternalCall(name, llvm_ret_type, callee_args)
                    : cgen_state->emitCall(name, callee_args);
@@ -262,8 +266,7 @@ StubGenerator::Stub StubGenerator::generateStub(const std::string& name,
   }
   cgen_state->ir_builder_.CreateRetVoid();
   compiler::verify_function_ir(function);
-  CompilationOptions co{
-      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+
   auto cpu_compilation_context =
       compiler::CPUBackend::generateNativeCPUCode(function, {function}, co);
   cpu_compilation_context->setFunctionPointer(function);

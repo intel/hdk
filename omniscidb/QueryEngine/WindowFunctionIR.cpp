@@ -21,7 +21,7 @@
 llvm::Value* Executor::codegenWindowFunction(const size_t target_index,
                                              const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
-  CodeGenerator code_generator(this);
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
   const auto window_func_context =
       WindowProjectNodeContext::get(this)->activateWindowFunctionContext(this,
                                                                          target_index);
@@ -114,16 +114,17 @@ const hdk::ir::Type* get_adjusted_window_type(
 
 }  // namespace
 
-llvm::Value* Executor::aggregateWindowStatePtr() {
+llvm::Value* Executor::aggregateWindowStatePtr(const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
   const auto arg_type = get_adjusted_window_type(window_func);
   llvm::Type* aggregate_state_type =
-      arg_type->isFp32()
-          ? llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0)
-          : llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
+      arg_type->isFp32() 
+          ? cgen_traits.localPointerType(get_int_type(32, cgen_state_->context_))
+          : cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_));
   const auto aggregate_state_i64 = cgen_state_->llInt(
       reinterpret_cast<const int64_t>(window_func_context->aggregateState()));
   return cgen_state_->ir_builder_.CreateIntToPtr(aggregate_state_i64,
@@ -132,8 +133,9 @@ llvm::Value* Executor::aggregateWindowStatePtr() {
 
 llvm::Value* Executor::codegenWindowFunctionAggregate(const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
-  const auto reset_state_false_bb = codegenWindowResetStateControlFlow();
-  auto aggregate_state = aggregateWindowStatePtr();
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  const auto reset_state_false_bb = codegenWindowResetStateControlFlow(co);
+  auto aggregate_state = aggregateWindowStatePtr(co);
   llvm::Value* aggregate_state_count = nullptr;
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
@@ -141,12 +143,11 @@ llvm::Value* Executor::codegenWindowFunctionAggregate(const CompilationOptions& 
   if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto aggregate_state_count_i64 = cgen_state_->llInt(
         reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
-    const auto pi64_type =
-        llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
+    const auto pi64_type = cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_));
     aggregate_state_count =
         cgen_state_->ir_builder_.CreateIntToPtr(aggregate_state_count_i64, pi64_type);
   }
-  codegenWindowFunctionStateInit(aggregate_state);
+  codegenWindowFunctionStateInit(aggregate_state, co);
   if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto count_zero = cgen_state_->llInt(int64_t(0));
     cgen_state_->emitCall("agg_id", {aggregate_state_count, count_zero});
@@ -157,7 +158,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregate(const CompilationOptions& 
   return codegenWindowFunctionAggregateCalls(aggregate_state, co);
 }
 
-llvm::BasicBlock* Executor::codegenWindowResetStateControlFlow() {
+llvm::BasicBlock* Executor::codegenWindowResetStateControlFlow(const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
@@ -167,7 +168,7 @@ llvm::BasicBlock* Executor::codegenWindowResetStateControlFlow() {
   const auto max_val = cgen_state_->llInt(window_func_context->elementCount() - 1);
   const auto null_val = cgen_state_->llInt(inline_int_null_value<int64_t>());
   const auto null_bool_val = cgen_state_->llInt<int8_t>(inline_int_null_value<int8_t>());
-  CodeGenerator code_generator(this);
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
   const auto reset_state =
       code_generator.toBool(cgen_state_->emitCall("bit_is_set",
                                                   {bitset,
@@ -186,8 +187,9 @@ llvm::BasicBlock* Executor::codegenWindowResetStateControlFlow() {
   return reset_state_false_bb;
 }
 
-void Executor::codegenWindowFunctionStateInit(llvm::Value* aggregate_state) {
+void Executor::codegenWindowFunctionStateInit(llvm::Value* aggregate_state, const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
@@ -209,8 +211,7 @@ void Executor::codegenWindowFunctionStateInit(llvm::Value* aggregate_state) {
   } else {
     window_func_init_val = window_func_null_val;
   }
-  const auto pi32_type =
-      llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0);
+  const auto pi32_type = cgen_traits.localPointerType(get_int_type(32, cgen_state_->context_));
   if (window_func_type->isFp64()) {
     cgen_state_->emitCall("agg_id_double", {aggregate_state, window_func_init_val});
   } else if (window_func_type->isFp32()) {
@@ -238,7 +239,7 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
     CHECK(window_func->kind() == hdk::ir::WindowFunctionKind::Count);
     crt_val = cgen_state_->llInt(int64_t(1));
   } else {
-    CodeGenerator code_generator(this);
+    CodeGenerator code_generator(this, co.codegen_traits_desc);
     const auto arg_lvs = code_generator.codegen(args.front().get(), true, co);
     CHECK_EQ(arg_lvs.size(), size_t(1));
     if (window_func->kind() == hdk::ir::WindowFunctionKind::Sum &&
@@ -260,23 +261,23 @@ llvm::Value* Executor::codegenWindowFunctionAggregateCalls(llvm::Value* aggregat
                           {aggregate_state, crt_val, window_func_null_val});
   }
   if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
-    codegenWindowAvgEpilogue(crt_val, window_func_null_val, multiplicity_lv);
+    codegenWindowAvgEpilogue(crt_val, window_func_null_val, multiplicity_lv, co);
   }
-  return codegenAggregateWindowState();
+  return codegenAggregateWindowState(co);
 }
 
 void Executor::codegenWindowAvgEpilogue(llvm::Value* crt_val,
                                         llvm::Value* window_func_null_val,
-                                        llvm::Value* multiplicity_lv) {
+                                        llvm::Value* multiplicity_lv,
+                                        const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const auto window_func = window_func_context->getWindowFunction();
   const auto window_func_type = get_adjusted_window_type(window_func);
-  const auto pi32_type =
-      llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0);
-  const auto pi64_type =
-      llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
+  const auto pi32_type = cgen_traits.localPointerType(get_int_type(32, cgen_state_->context_));
+  const auto pi64_type = cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_));
   const auto aggregate_state_type = window_func_type->isFp32() ? pi32_type : pi64_type;
   const auto aggregate_state_count_i64 = cgen_state_->llInt(
       reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));
@@ -293,18 +294,17 @@ void Executor::codegenWindowAvgEpilogue(llvm::Value* crt_val,
                         {aggregate_state_count, crt_val, window_func_null_val});
 }
 
-llvm::Value* Executor::codegenAggregateWindowState() {
+llvm::Value* Executor::codegenAggregateWindowState(const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
-  const auto pi32_type =
-      llvm::PointerType::get(get_int_type(32, cgen_state_->context_), 0);
-  const auto pi64_type =
-      llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0);
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  const auto pi32_type = cgen_traits.localPointerType(get_int_type(32, cgen_state_->context_));
+  const auto pi64_type = cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_));
   const auto window_func_context =
       WindowProjectNodeContext::getActiveWindowFunctionContext(this);
   const hdk::ir::WindowFunction* window_func = window_func_context->getWindowFunction();
   const auto window_func_type = get_adjusted_window_type(window_func);
   const auto aggregate_state_type = window_func_type->isFp32() ? pi32_type : pi64_type;
-  auto aggregate_state = aggregateWindowStatePtr();
+  auto aggregate_state = aggregateWindowStatePtr(co);
   if (window_func->kind() == hdk::ir::WindowFunctionKind::Avg) {
     const auto aggregate_state_count_i64 = cgen_state_->llInt(
         reinterpret_cast<const int64_t>(window_func_context->aggregateStateCount()));

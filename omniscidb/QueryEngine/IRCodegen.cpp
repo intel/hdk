@@ -549,7 +549,7 @@ std::vector<JoinLoop> Executor::buildJoinLoops(
           FetchCacheAnchor anchor(cgen_state_.get());
           addJoinLoopIterator(prev_iters, level_idx + 1);
           llvm::Value* left_join_cond = cgen_state_->llBool(true);
-          CodeGenerator code_generator(this);
+          CodeGenerator code_generator(this, co.codegen_traits_desc);
           auto it = plan_state_->left_join_non_hashtable_quals_.find(level_idx);
           if (it != plan_state_->left_join_non_hashtable_quals_.end()) {
             for (auto expr : it->second) {
@@ -636,7 +636,7 @@ std::vector<JoinLoop> Executor::buildJoinLoops(
             FetchCacheAnchor anchor(cgen_state_.get());
             addJoinLoopIterator(prev_iters, level_idx + 1);
             llvm::Value* left_join_cond = cgen_state_->llBool(true);
-            CodeGenerator code_generator(this);
+            CodeGenerator code_generator(this, co.codegen_traits_desc);
             for (auto expr : current_level_join_conditions.quals) {
               left_join_cond = cgen_state_->ir_builder_.CreateAnd(
                   left_join_cond,
@@ -769,7 +769,7 @@ JoinLoop::HoistedFiltersCallback Executor::buildHoistLeftHandSideFiltersCb(
             builder.SetInsertPoint(filter_bb);
 
             llvm::Value* filter_lv = cgen_state_->llBool(true);
-            CodeGenerator code_generator(this);
+            CodeGenerator code_generator(this, co.codegen_traits_desc);
             CHECK(plan_state_);
             for (const auto& qual : hoisted_quals) {
               if (plan_state_->hoisted_filters_.insert(qual).second) {
@@ -985,8 +985,7 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
   cgen_state_->ir_builder_.SetInsertPoint(exit_bb);
   cgen_state_->ir_builder_.CreateRet(cgen_state_->llInt<int32_t>(0));
   cgen_state_->ir_builder_.SetInsertPoint(entry_bb);
-  CodeGenerator code_generator(this);
-
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
   llvm::BasicBlock* loops_entry_bb{nullptr};
   auto has_range_join =
       std::any_of(join_loops.begin(), join_loops.end(), [](const auto& join_loop) {
@@ -1159,7 +1158,7 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     const bool thread_mem_shared) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CHECK_GE(col_width, sizeof(int32_t));
-  CodeGenerator code_generator(this);
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
   auto group_key = code_generator.codegen(group_by_col, true, co).front();
   auto key_to_cache = group_key;
   if (group_by_col && group_by_col->is<hdk::ir::UOper>() &&

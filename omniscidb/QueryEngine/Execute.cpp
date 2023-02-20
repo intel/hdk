@@ -1151,7 +1151,8 @@ ResultSetPtr Executor::reduceMultiDeviceResults(
     const RelAlgExecutionUnit& ra_exe_unit,
     std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-    const QueryMemoryDescriptor& query_mem_desc) {
+    const QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
   if (ra_exe_unit.estimator) {
     return reduce_estimator_results(ra_exe_unit, results_per_device);
@@ -1175,7 +1176,8 @@ ResultSetPtr Executor::reduceMultiDeviceResults(
   return reduceMultiDeviceResultSets(
       results_per_device,
       row_set_mem_owner,
-      ResultSet::fixupQueryMemoryDescriptor(query_mem_desc));
+      ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
+      co);
 }
 
 namespace {
@@ -1184,7 +1186,8 @@ ReductionCode get_reduction_code(
     const Config& config,
     std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device,
     int64_t* compilation_queue_time,
-    Executor* executor) {
+    Executor* executor,
+    const CompilationOptions& co) {
   auto clock_begin = timer_start();
   // ResultSetReductionJIT::codegen compilation-locks if new code will be generated
   *compilation_queue_time = timer_stop(clock_begin);
@@ -1215,7 +1218,8 @@ bool couldUseParallelReduce(const QueryMemoryDescriptor& desc) {
 ResultSetPtr Executor::reduceMultiDeviceResultSets(
     std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-    const QueryMemoryDescriptor& query_mem_desc) {
+    const QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
   std::shared_ptr<ResultSet> reduced_results;
 
@@ -1262,7 +1266,7 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
 
   int64_t compilation_queue_time = 0;
   const auto reduction_code =
-      get_reduction_code(getConfig(), results_per_device, &compilation_queue_time, this);
+      get_reduction_code(getConfig(), results_per_device, &compilation_queue_time, this, co);
 
   if (couldUseParallelReduce(query_mem_desc)) {
     std::vector<ResultSetStorage*> storages;
@@ -1766,6 +1770,7 @@ ResultSetPtr Executor::runOnBatch(std::shared_ptr<StreamExecutionContext> ctx,
   auto kernel = std::make_unique<ExecutionKernel>(ctx->ra_exe_unit,
                                                   ctx->co.device_type,
                                                   0,
+                                                  ctx->co,
                                                   ctx->eo,
                                                   *ctx->column_fetcher,
                                                   *ctx->query_comp_desc,
@@ -1785,7 +1790,7 @@ ResultSetPtr Executor::finishStreamExecution(
   for (auto& exec_ctx : ctx->shared_context->getTlsExecutionContext()) {
     if (exec_ctx) {
       CHECK(!ctx->ra_exe_unit.estimator);
-      auto results = exec_ctx->getRowSet(ctx->ra_exe_unit, exec_ctx->query_mem_desc_);
+      auto results = exec_ctx->getRowSet(ctx->ra_exe_unit, exec_ctx->query_mem_desc_, ctx->co);
       ctx->shared_context->addDeviceResults(std::move(results), 0, {});
     }
   }
@@ -1796,7 +1801,8 @@ ResultSetPtr Executor::finishStreamExecution(
                                      ctx->ra_exe_unit,
                                      *ctx->query_mem_desc,
                                      ctx->query_comp_desc->getDeviceType(),
-                                     row_set_mem_owner_);
+                                     row_set_mem_owner_,
+                                     ctx->co);
     } catch (ReductionRanOutOfSlots&) {
       throw QueryExecutionError(ERR_OUT_OF_SLOTS);
     } catch (QueryExecutionError& e) {
@@ -1926,6 +1932,7 @@ TemporaryTable Executor::executeWorkUnitImpl(
                                                column_fetcher,
                                                query_infos,
                                                eo,
+                                               co,
                                                is_agg,
                                                allow_single_frag_table_opt,
                                                query_comp_descs_owned,
@@ -1948,7 +1955,7 @@ TemporaryTable Executor::executeWorkUnitImpl(
                                   available_gpus,
                                   available_cpus);
         }
-        launchKernels(shared_context, std::move(kernels), device_type);
+        launchKernels(shared_context, std::move(kernels), device_type, co);
       } catch (QueryExecutionError& e) {
         if (eo.with_dynamic_watchdog && interrupted_.load() &&
             e.getErrorCode() == ERR_OUT_OF_TIME) {
@@ -1975,7 +1982,8 @@ TemporaryTable Executor::executeWorkUnitImpl(
                                        ra_exe_unit,
                                        *query_mem_descs_owned[reduction_device_type],
                                        reduction_device_type,
-                                       row_set_mem_owner);
+                                       row_set_mem_owner,
+                                       co);
       } catch (ReductionRanOutOfSlots&) {
         throw QueryExecutionError(ERR_OUT_OF_SLOTS);
       } catch (OverflowOrUnderflow&) {
@@ -2065,6 +2073,7 @@ void Executor::executeWorkUnitPerFragment(
       ExecutionKernel kernel(ra_exe_unit,
                              co.device_type,
                              /*device_id=*/0,
+                             co,
                              eo,
                              column_fetcher,
                              *query_comp_desc_owned,
@@ -2316,7 +2325,8 @@ ResultSetPtr Executor::collectAllDeviceResults(
     const RelAlgExecutionUnit& ra_exe_unit,
     const QueryMemoryDescriptor& query_mem_desc,
     const ExecutorDeviceType device_type,
-    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) {
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+    const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
   auto& result_per_device = shared_context.getFragmentResults();
   if (result_per_device.empty() && query_mem_desc.getQueryDescriptionType() ==
@@ -2333,7 +2343,7 @@ ResultSetPtr Executor::collectAllDeviceResults(
     }
   }
   return reduceMultiDeviceResults(
-      ra_exe_unit, result_per_device, row_set_mem_owner, query_mem_desc);
+      ra_exe_unit, result_per_device, row_set_mem_owner, query_mem_desc, co);
 }
 
 std::unordered_map<int, const hdk::ir::BinOper*> Executor::getInnerTabIdToJoinCond()
@@ -2404,7 +2414,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
       device_count,
       use_multifrag_kernel,
       config_->exec.join.inner_join_fragment_skipping,
-      this);
+      this,
+      co.codegen_traits_desc);
   if (eo.with_watchdog && fragment_descriptor.shouldCheckWorkUnitWatchdog()) {
     checkWorkUnitWatchdog(
         ra_exe_unit, table_infos, *schema_provider_, device_type, device_count);
@@ -2422,6 +2433,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     auto multifrag_kernel_dispatch = [&ra_exe_unit,
                                       &execution_kernels,
                                       &column_fetcher,
+                                      &co,
                                       &eo,
                                       &query_comp_desc,
                                       &query_mem_desc](const int device_id,
@@ -2431,6 +2443,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
           std::make_unique<ExecutionKernel>(ra_exe_unit,
                                             ExecutorDeviceType::GPU,
                                             device_id,
+                                            co,
                                             eo,
                                             column_fetcher,
                                             query_comp_desc,
@@ -2461,6 +2474,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     auto fragment_per_kernel_dispatch = [&ra_exe_unit,
                                          &execution_kernels,
                                          &column_fetcher,
+                                         &co,
                                          &eo,
                                          &frag_list_idx,
                                          &query_comp_desc,
@@ -2477,6 +2491,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
           std::make_unique<ExecutionKernel>(ra_exe_unit,
                                             device_type,
                                             device_id,
+                                            co,
                                             eo,
                                             column_fetcher,
                                             query_comp_desc,
@@ -2501,6 +2516,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
     ColumnFetcher& column_fetcher,
     const std::vector<InputTableInfo>& table_infos,
     const ExecutionOptions& eo,
+    const CompilationOptions& co,
     const bool is_agg,
     const bool allow_single_frag_table_opt,
     const std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>&
@@ -2528,7 +2544,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
       available_cpus + available_gpus.size(),
       false, /*multifrag policy unsupported yet*/
       config_->exec.join.inner_join_fragment_skipping,
-      this);
+      this,
+      co.codegen_traits_desc);
 
   if (!ra_exe_unit.use_bump_allocator && allow_single_frag_table_opt &&
       query_mem_descs.count(ExecutorDeviceType::GPU) &&
@@ -2549,6 +2566,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
   auto fragment_per_kernel_dispatch = [&ra_exe_unit,
                                        &execution_kernels,
                                        &column_fetcher,
+                                       &co,
                                        &eo,
                                        &frag_list_idx,
                                        &query_comp_descs,
@@ -2568,6 +2586,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
         std::make_unique<ExecutionKernel>(ra_exe_unit,
                                           device_type,
                                           device_id,
+                                          co,
                                           eo,
                                           column_fetcher,
                                           *query_comp_descs.at(device_type).get(),
@@ -2587,7 +2606,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
 // TODO(Petr): remove device_type from function signature
 void Executor::launchKernels(SharedKernelContext& shared_context,
                              std::vector<std::unique_ptr<ExecutionKernel>>&& kernels,
-                             const ExecutorDeviceType device_type) {
+                             const ExecutorDeviceType device_type, const CompilationOptions& co) {
   auto clock_begin = timer_start();
   std::lock_guard<std::mutex> kernel_lock(kernel_mutex_);
   kernel_queue_time_ms_ += timer_stop(clock_begin);
@@ -2630,7 +2649,7 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
       if (ra_exe_unit->estimator) {
         results = std::shared_ptr<ResultSet>(exec_ctx->estimator_result_set_.release());
       } else {
-        results = exec_ctx->getRowSet(*ra_exe_unit, exec_ctx->query_mem_desc_);
+        results = exec_ctx->getRowSet(*ra_exe_unit, exec_ctx->query_mem_desc_, co);
       }
       shared_context.addDeviceResults(std::move(results), 0, {});
     }
@@ -3165,6 +3184,7 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
                               const bool hoist_literals,
                               ResultSetPtr* results,
                               const ExecutorDeviceType device_type,
+                              const CompilationOptions& co,
                               std::vector<std::vector<const int8_t*>>& col_buffers,
                               const std::vector<size_t> outer_tab_frag_ids,
                               QueryExecutionContext* query_exe_context,
@@ -3455,7 +3475,8 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
   if (results && error_code != Executor::ERR_OVERFLOW_OR_UNDERFLOW &&
       error_code != Executor::ERR_DIV_BY_ZERO) {
     *results = query_exe_context->getRowSet(ra_exe_unit_copy,
-                                            query_exe_context->query_mem_desc_);
+                                            query_exe_context->query_mem_desc_, 
+                                            co);
     CHECK(*results);
     VLOG(2) << "results->rowCount()=" << (*results)->rowCount();
     (*results)->holdLiterals(hoist_buf);
@@ -3633,9 +3654,10 @@ llvm::Value* Executor::castToFP(llvm::Value* value,
   return value;
 }
 
-llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth) {
+llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth, compiler::CodegenTraitsDescriptor codegen_traits_desc) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CHECK(val->getType()->isPointerTy());
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
 
   const auto val_ptr_type = static_cast<llvm::PointerType*>(val->getType());
   const auto val_type = val_ptr_type->getElementType();
@@ -3654,8 +3676,9 @@ llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth)
   if (bitWidth == val_width) {
     return val;
   }
-  return cgen_state_->ir_builder_.CreateBitCast(
-      val, llvm::PointerType::get(get_int_type(bitWidth, cgen_state_->context_), 0));
+  return cgen_state_->ir_builder_.CreateBitCast( 
+      val, cgen_traits.localPointerType(get_int_type(bitWidth, cgen_state_->context_)));
+
 }
 
 #define EXECUTE_INCLUDE
@@ -3772,7 +3795,8 @@ std::pair<bool, int64_t> Executor::skipFragment(
     const FragmentInfo& fragment,
     const std::list<hdk::ir::ExprPtr>& simple_quals,
     const std::vector<uint64_t>& frag_offsets,
-    const size_t frag_idx) {
+    const size_t frag_idx,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const int table_id = table_desc.getTableId();
 
   for (const auto& simple_qual : simple_quals) {
@@ -3891,7 +3915,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     }
     llvm::LLVMContext local_context;
     CgenState local_cgen_state(getConfig(), local_context);
-    CodeGenerator code_generator(getConfig(), &local_cgen_state, nullptr);
+    CodeGenerator code_generator(getConfig(), &local_cgen_state, nullptr, cgen_traits_desc);
 
     const auto rhs_val =
         CodeGenerator::codegenIntConst(rhs_const, &local_cgen_state)->getSExtValue();
@@ -3960,7 +3984,8 @@ std::pair<bool, int64_t> Executor::skipFragmentInnerJoins(
     const RelAlgExecutionUnit& ra_exe_unit,
     const FragmentInfo& fragment,
     const std::vector<uint64_t>& frag_offsets,
-    const size_t frag_idx) {
+    const size_t frag_idx,
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   std::pair<bool, int64_t> skip_frag{false, -1};
   for (auto& inner_join : ra_exe_unit.join_quals) {
     if (inner_join.type != JoinType::INNER) {
@@ -3977,7 +4002,7 @@ std::pair<bool, int64_t> Executor::skipFragmentInnerJoins(
                                      temp_qual.simple_quals.end());
     }
     auto temp_skip_frag = skipFragment(
-        table_desc, fragment, inner_join_simple_quals, frag_offsets, frag_idx);
+        table_desc, fragment, inner_join_simple_quals, frag_offsets, frag_idx, cgen_traits_desc);
     if (temp_skip_frag.second != -1) {
       skip_frag.second = temp_skip_frag.second;
       return skip_frag;

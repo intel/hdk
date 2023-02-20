@@ -111,29 +111,29 @@ inline llvm::Type* get_fp_type(const int width, llvm::LLVMContext& context) {
   return nullptr;
 }
 
-inline llvm::Type* get_fp_ptr_type(const int width, llvm::LLVMContext& context) {
+inline llvm::Type* get_fp_ptr_type(const int width, llvm::LLVMContext& context, const unsigned addrSpace=0) {
   switch (width) {
     case 64:
-      return llvm::Type::getDoublePtrTy(context);
+      return llvm::Type::getDoublePtrTy(context, addrSpace);
     case 32:
-      return llvm::Type::getFloatPtrTy(context);
+      return llvm::Type::getFloatPtrTy(context, addrSpace);
   }
   UNREACHABLE();
   return nullptr;
 }
 
-inline llvm::Type* get_int_ptr_type(const int width, llvm::LLVMContext& context) {
+inline llvm::Type* get_int_ptr_type(const int width, llvm::LLVMContext& context, const unsigned addrSpace=0) {
   switch (width) {
     case 64:
-      return llvm::Type::getInt64PtrTy(context);
+      return llvm::Type::getInt64PtrTy(context, addrSpace);
     case 32:
-      return llvm::Type::getInt32PtrTy(context);
+      return llvm::Type::getInt32PtrTy(context, addrSpace);
     case 16:
-      return llvm::Type::getInt16PtrTy(context);
+      return llvm::Type::getInt16PtrTy(context, addrSpace);
     case 8:
-      return llvm::Type::getInt8PtrTy(context);
+      return llvm::Type::getInt8PtrTy(context, addrSpace);
     case 1:
-      return llvm::Type::getInt1PtrTy(context);
+      return llvm::Type::getInt1PtrTy(context, addrSpace);
   }
   UNREACHABLE();
   return nullptr;

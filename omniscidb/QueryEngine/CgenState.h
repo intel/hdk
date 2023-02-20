@@ -180,7 +180,8 @@ struct CgenState {
 
   const std::unordered_map<int, LiteralValues>& getLiterals() const { return literals_; }
 
-  llvm::Value* addStringConstant(const std::string& str) {
+  llvm::Value* addStringConstant(const std::string& str, const CompilationOptions& co) {\
+    // compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc); 
     llvm::Value* str_lv = ir_builder_.CreateGlobalString(
         str, "str_const_" + std::to_string(std::hash<std::string>()(str)));
     auto i8_ptr = llvm::PointerType::get(get_int_type(8, context_), 0);

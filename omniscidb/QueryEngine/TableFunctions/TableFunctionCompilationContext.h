@@ -39,12 +39,12 @@ class TableFunctionCompilationContext {
                                               const CompilationOptions& co);
 
  private:
-  void generateEntryPoint(const TableFunctionExecutionUnit& exe_unit, bool is_gpu);
+  void generateEntryPoint(const TableFunctionExecutionUnit& exe_unit, bool is_gpu, const CompilationOptions& co);
   void generateTableFunctionCall(const TableFunctionExecutionUnit& exe_unit,
                                  const std::vector<llvm::Value*>& func_args,
                                  llvm::BasicBlock* bb_exit,
                                  llvm::Value* output_row_count_ptr);
-  void generateGpuKernel();
+  void generateGpuKernel(const CompilationOptions& co);
   bool passColumnsByValue(const TableFunctionExecutionUnit& exe_unit, bool is_gpu);
 
   std::shared_ptr<CompilationContext> finalize(const CompilationOptions& co);

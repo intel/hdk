@@ -25,7 +25,8 @@
 
 #include "QueryEngine/Compiler/HelperFunctions.h"
 
-llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx) {
+llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx, const CompilationOptions& co) {
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
   switch (type) {
     case Type::Int1: {
       return get_int_type(1, ctx);
@@ -49,25 +50,25 @@ llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx) {
       return llvm::Type::getVoidTy(ctx);
     }
     case Type::Int8Ptr: {
-      return llvm::PointerType::get(get_int_type(8, ctx), 0);
+      return cgen_traits.localPointerType(get_int_type(8, ctx));
     }
     case Type::Int32Ptr: {
-      return llvm::PointerType::get(get_int_type(32, ctx), 0);
+      return cgen_traits.localPointerType(get_int_type(32, ctx));
     }
     case Type::Int64Ptr: {
-      return llvm::PointerType::get(get_int_type(64, ctx), 0);
+      return cgen_traits.localPointerType(get_int_type(64, ctx));
     }
     case Type::FloatPtr: {
-      return llvm::Type::getFloatPtrTy(ctx);
+      return cgen_traits.localPointerType(get_fp_type(32, ctx));
     }
     case Type::DoublePtr: {
-      return llvm::Type::getDoublePtrTy(ctx);
+      return cgen_traits.localPointerType(get_fp_type(64, ctx));
     }
     case Type::VoidPtr: {
-      return llvm::PointerType::get(get_int_type(8, ctx), 0);
+      return cgen_traits.localPointerType(get_int_type(8, ctx));
     }
     case Type::Int64PtrPtr: {
-      return llvm::PointerType::get(llvm::PointerType::get(get_int_type(64, ctx), 0), 0);
+      return cgen_traits.localPointerType(cgen_traits.localPointerType(get_int_type(64, ctx)));
     }
     default: {
       LOG(FATAL) << "Argument type not supported: " << static_cast<int>(type);
@@ -198,7 +199,8 @@ void translate_for(const For* for_loop,
                    Function* ir_reduce_loop,
                    const ReductionCode& reduction_code,
                    std::unordered_map<const Value*, llvm::Value*>& m,
-                   const std::unordered_map<const Function*, llvm::Function*>& f);
+                   const std::unordered_map<const Function*, llvm::Function*>& f,
+                   const CompilationOptions& co);
 
 // Translate a list of instructions to LLVM IR.
 void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
@@ -206,7 +208,8 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
                     llvm::Function* llvm_function,
                     const ReductionCode& reduction_code,
                     std::unordered_map<const Value*, llvm::Value*>& m,
-                    const std::unordered_map<const Function*, llvm::Function*>& f) {
+                    const std::unordered_map<const Function*, llvm::Function*>& f,
+                    const CompilationOptions& co) {
   auto cgen_state = reduction_code.cgen_state;
   AUTOMATIC_IR_METADATA(cgen_state);
   auto& ctx = cgen_state->context_;
@@ -238,7 +241,7 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
     } else if (auto cast = dynamic_cast<const Cast*>(instr_ptr)) {
       translated = cgen_state->ir_builder_.CreateCast(llvm_cast_op(cast->op()),
                                                       mapped_value(cast->source(), m),
-                                                      llvm_type(cast->type(), ctx),
+                                                      llvm_type(cast->type(), ctx, co),
                                                       cast->label());
     } else if (auto ret = dynamic_cast<const Ret*>(instr_ptr)) {
       if (ret->value()) {
@@ -261,11 +264,11 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
       }
     } else if (auto external_call = dynamic_cast<const ExternalCall*>(instr_ptr)) {
       translated = cgen_state->emitExternalCall(external_call->callee_name(),
-                                                llvm_type(external_call->type(), ctx),
+                                                llvm_type(external_call->type(), ctx, co),
                                                 llvm_args(external_call->arguments(), m));
     } else if (auto alloca = dynamic_cast<const Alloca*>(instr_ptr)) {
       translated = cgen_state->ir_builder_.CreateAlloca(
-          llvm_type(pointee_type(alloca->type()), ctx),
+          llvm_type(pointee_type(alloca->type()), ctx, co),
           mapped_value(alloca->array_size(), m),
           alloca->label());
     } else if (auto memcpy = dynamic_cast<const MemCpy*>(instr_ptr)) {
@@ -280,7 +283,7 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
                    llvm_function,
                    mapped_value(ret_early->error_code(), m));
     } else if (auto for_loop = dynamic_cast<const For*>(instr_ptr)) {
-      translate_for(for_loop, reduction_code.ir_reduce_loop.get(), reduction_code, m, f);
+      translate_for(for_loop, reduction_code.ir_reduce_loop.get(), reduction_code, m, f, co);
     } else {
       LOG(FATAL) << "Instruction not supported yet";
     }
@@ -296,7 +299,8 @@ void translate_for(const For* for_loop,
                    Function* ir_reduce_loop,
                    const ReductionCode& reduction_code,
                    std::unordered_map<const Value*, llvm::Value*>& m,
-                   const std::unordered_map<const Function*, llvm::Function*>& f) {
+                   const std::unordered_map<const Function*, llvm::Function*>& f,
+                   const CompilationOptions& co) {
   auto cgen_state = reduction_code.cgen_state;
   AUTOMATIC_IR_METADATA(cgen_state);
   const auto bb_entry = cgen_state->ir_builder_.GetInsertBlock();
@@ -324,7 +328,7 @@ void translate_for(const For* for_loop,
       "reduction_loop");
   const auto bb_loop_body = JoinLoop::codegen(
       {join_loop},
-      [cgen_state, for_loop, ir_reduce_loop, &f, &m, &reduction_code](
+      [cgen_state, for_loop, ir_reduce_loop, &f, &co, &m, &reduction_code](
           const std::vector<llvm::Value*>& iterators) {
         const auto loop_body_bb = llvm::BasicBlock::Create(
             cgen_state->context_,
@@ -342,7 +346,8 @@ void translate_for(const For* for_loop,
                        mapped_function(ir_reduce_loop, f),
                        reduction_code,
                        m,
-                       f);
+                       f,
+                       co);
         return loop_body_bb;
       },
       nullptr,
@@ -366,7 +371,8 @@ void create_entry_block(llvm::Function* function, CgenState* cgen_state) {
 void translate_function(const Function* function,
                         llvm::Function* llvm_function,
                         const ReductionCode& reduction_code,
-                        const std::unordered_map<const Function*, llvm::Function*>& f) {
+                        const std::unordered_map<const Function*, llvm::Function*>& f,
+                        const CompilationOptions& co) {
   auto cgen_state = reduction_code.cgen_state;
   AUTOMATIC_IR_METADATA(cgen_state);
   create_entry_block(llvm_function, cgen_state);
@@ -417,6 +423,6 @@ void translate_function(const Function* function,
     const auto it_ok = m.emplace(constant.get(), constant_llvm);
     CHECK(it_ok.second);
   }
-  translate_body(function->body(), function, llvm_function, reduction_code, m, f);
+  translate_body(function->body(), function, llvm_function, reduction_code, m, f, co);
   compiler::verify_function_ir(llvm_function);
 }
