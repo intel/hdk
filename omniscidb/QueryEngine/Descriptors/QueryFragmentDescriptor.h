@@ -81,7 +81,8 @@ class QueryFragmentDescriptor {
                               const int device_count,
                               const bool enable_multifrag_kernels,
                               const bool enable_inner_join_fragment_skipping,
-                              Executor* executor);
+                              Executor* executor,
+                              compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   /**
    * Dispatch multi-fragment kernels. Currently GPU only. Each GPU should have only one
@@ -169,14 +170,16 @@ class QueryFragmentDescriptor {
                                          const policy::ExecutionPolicy* policy,
                                          const int device_count,
                                          const size_t num_bytes_for_row,
-                                         Executor* executor);
+                                         Executor* executor,
+                                         compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   void buildFragmentPerKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<uint64_t>& frag_offsets,
                                  const policy::ExecutionPolicy* policy,
                                  const int device_count,
                                  const size_t num_bytes_for_row,
-                                 Executor* executor);
+                                 Executor* executor,
+                               compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   void buildMultifragKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                const std::vector<uint64_t>& frag_offsets,
@@ -184,7 +187,8 @@ class QueryFragmentDescriptor {
                                const int device_count,
                                const size_t num_bytes_for_row,
                                const bool enable_inner_join_fragment_skipping,
-                               Executor* executor);
+                               Executor* executor,
+                               compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   void buildFragmentPerKernelForTable(const TableFragments* fragments,
                                       const RelAlgExecutionUnit& ra_exe_unit,
@@ -195,7 +199,8 @@ class QueryFragmentDescriptor {
                                       const int device_count,
                                       const size_t num_bytes_for_row,
                                       const std::optional<size_t> table_desc_offset,
-                                      Executor* executor);
+                                      Executor* executor,
+                                      compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   bool terminateDispatchMaybe(size_t& tuple_count,
                               const RelAlgExecutionUnit& ra_exe_unit,

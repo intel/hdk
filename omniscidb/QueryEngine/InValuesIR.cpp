@@ -48,7 +48,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InValues* expr,
       }
       CHECK_EQ(size_t(1), lhs_lvs.size());
       return cgen_state_->addInValuesBitmap(in_vals_bitmap)
-          ->codegen(lhs_lvs.front(), executor());
+          ->codegen(lhs_lvs.front(), executor(), co.codegen_traits_desc);
     }
   }
   if (!expr_type->nullable()) {
@@ -113,7 +113,7 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::InIntegerSet* in_integer_set,
   CHECK(result);
   CHECK_EQ(size_t(1), lhs_lvs.size());
   return cgen_state_->addInValuesBitmap(in_vals_bitmap)
-      ->codegen(lhs_lvs.front(), executor());
+      ->codegen(lhs_lvs.front(), executor(), co.codegen_traits_desc);
 }
 
 std::unique_ptr<InValuesBitmap> CodeGenerator::createInValuesBitmap(

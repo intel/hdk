@@ -23,6 +23,7 @@
 #include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/Target.h"
 
+#include "CodegenTraitsDescriptor.h"
 namespace compiler {
 
 class CodegenTraits {
@@ -40,6 +41,8 @@ class CodegenTraits {
   const llvm::CallingConv::ID conv_;
   const llvm::StringRef triple_;
 
+  static const std::unordered_map<CallingConvDesc, llvm::CallingConv::ID> descCallingConvToLLVM;
+  static const std::unordered_map< llvm::CallingConv::ID, CallingConvDesc> llvmCallingConvToDesc;
  public:
   CodegenTraits(const CodegenTraits&) = delete;
   CodegenTraits& operator=(const CodegenTraits&) = delete;
@@ -49,6 +52,27 @@ class CodegenTraits {
                            llvm::CallingConv::ID calling_conv,
                            llvm::StringRef triple = "") {
     return CodegenTraits(local_addr_space, global_addr_space, calling_conv, triple);
+  }
+
+
+
+  static CodegenTraits get(CodegenTraitsDescriptor codegen_traits_desc) {
+    CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) != descCallingConvToLLVM.end());
+    return CodegenTraits(codegen_traits_desc.local_addr_space_, 
+    codegen_traits_desc.global_addr_space_, 
+    descCallingConvToLLVM.at(codegen_traits_desc.conv_), 
+    codegen_traits_desc.triple_);
+  }
+
+  static CodegenTraitsDescriptor getDescriptor(unsigned local_addr_space,
+                           unsigned global_addr_space,
+                           llvm::CallingConv::ID calling_conv,
+                           const std::string triple = "") {
+    return CodegenTraitsDescriptor(local_addr_space, global_addr_space, llvmCallingConvToDesc.at(calling_conv), triple);
+  }
+  
+  CodegenTraitsDescriptor getDescriptor() {
+    return CodegenTraitsDescriptor(local_addr_space_, global_addr_space_, llvmCallingConvToDesc.at(conv_), triple_.str());
   }
 
   llvm::PointerType* localPointerType(llvm::Type* ElementType) const {
@@ -66,6 +90,7 @@ class CodegenTraits {
         "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
   }
   llvm::StringRef triple() const { return triple_; }
+  unsigned getLocalAddrSpace() const { return local_addr_space_; }
 };
 
 class Backend {
@@ -76,7 +101,10 @@ class Backend {
       llvm::Function* wrapper_func,
       const std::unordered_set<llvm::Function*>& live_funcs,
       const CompilationOptions& co) = 0;
-  virtual CodegenTraits traits() const = 0;
+  // virtual CodegenTraits traits() const = 0;
+  virtual CodegenTraitsDescriptor traitsDescriptor() const = 0;
+  CodegenTraits traits(const CodegenTraitsDescriptor& codegenTraitsDesc) const { return CodegenTraits::get(codegenTraitsDesc); };
+   CodegenTraits traits() const { return CodegenTraits::get(traitsDescriptor()); };
 };
 
 class CPUBackend : public Backend {
@@ -88,7 +116,8 @@ class CPUBackend : public Backend {
       const std::unordered_set<llvm::Function*>& live_funcs,
       const CompilationOptions& co) override;
 
-  CodegenTraits traits() const { return CodegenTraits::get(0, 0, llvm::CallingConv::C); };
+  // CodegenTraits traits() const { return CodegenTraits::get(0, 0, llvm::CallingConv::C); };
+  CodegenTraitsDescriptor traitsDescriptor() const { return CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);};
 
   static std::shared_ptr<CpuCompilationContext> generateNativeCPUCode(
       llvm::Function* func,
@@ -108,9 +137,11 @@ class CUDABackend : public Backend {
       const std::unordered_set<llvm::Function*>& live_funcs,
       const CompilationOptions& co) override;
 
-  CodegenTraits traits() const {
-    return CodegenTraits::get(0, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
-  };
+  // CodegenTraits traits() const {
+  //   return CodegenTraits::get(0, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
+  // };
+  CodegenTraitsDescriptor traitsDescriptor() const { return CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");};
+
 
   static std::string generatePTX(const std::string& cuda_llir,
                                  llvm::TargetMachine* nvptx_target_machine,
@@ -155,10 +186,12 @@ class L0Backend : public Backend {
       const std::unordered_set<llvm::Function*>& live_funcs,
       const CompilationOptions& co) override;
 
-  CodegenTraits traits() const {
-    return CodegenTraits::get(
-        4, 1, llvm::CallingConv::SPIR_FUNC, "spir64-unknown-unknown");
-  };
+  // CodegenTraits traits() const {
+  //   return CodegenTraits::get(
+  //       4, 1, llvm::CallingConv::SPIR_FUNC, "spir64-unknown-unknown");
+  // };
+
+  CodegenTraitsDescriptor traitsDescriptor() const { return CodegenTraits::getDescriptor(4, 1, llvm::CallingConv::SPIR_FUNC, "spir64-unknown-unknown");};
 
   static std::shared_ptr<L0CompilationContext> generateNativeGPUCode(
       const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,

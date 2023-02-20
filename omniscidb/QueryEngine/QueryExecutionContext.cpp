@@ -185,7 +185,8 @@ int64_t QueryExecutionContext::getAggInitValForIndex(const size_t index) const {
 
 ResultSetPtr QueryExecutionContext::getRowSet(
     const RelAlgExecutionUnit& ra_exe_unit,
-    const QueryMemoryDescriptor& query_mem_desc) const {
+    const QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co) const {
   auto timer = DEBUG_TIMER(__func__);
   std::vector<std::pair<ResultSetPtr, std::vector<size_t>>> results_per_sm;
   CHECK(query_buffers_);
@@ -203,7 +204,7 @@ ResultSetPtr QueryExecutionContext::getRowSet(
   }
   CHECK(device_type_ == ExecutorDeviceType::GPU);
   return executor_->reduceMultiDeviceResults(
-      ra_exe_unit, results_per_sm, row_set_mem_owner_, query_mem_desc);
+      ra_exe_unit, results_per_sm, row_set_mem_owner_, query_mem_desc, co);
 }
 
 ResultSetPtr QueryExecutionContext::groupBufferToResults(const size_t i) const {

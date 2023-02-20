@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "Shared/Config.h"
+#include "Compiler/CodegenTraitsDescriptor.h"
 #include "Shared/DeviceType.h"
 
 enum class ExecutorOptLevel { Default, ReductionJIT };
@@ -41,6 +42,7 @@ struct CompilationOptions {
   ExecutorExplainType explain_type{ExecutorExplainType::Default};
   bool register_intel_jit_listener{false};
   bool use_groupby_buffer_desc{false};
+  compiler::CodegenTraitsDescriptor codegen_traits_desc{};
 
   static CompilationOptions makeCpuOnly(const CompilationOptions& in) {
     return CompilationOptions{ExecutorDeviceType::CPU,

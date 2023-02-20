@@ -33,7 +33,7 @@ bool Executor::needsUnnestDoublePatch(llvm::Value const* val_ptr,
                                       const CompilationOptions& co) const {
   return (isArchMaxwell(co.device_type) && threads_share_memory &&
           llvm::isa<llvm::AllocaInst>(val_ptr) &&
-          val_ptr->getType() == llvm::Type::getDoublePtrTy(cgen_state_->context_) &&
+          val_ptr->getType() == llvm::Type::getDoublePtrTy(cgen_state_->context_, val_ptr->getType()->getPointerAddressSpace()) &&
           "agg_id" == agg_base_name);
 }
 

@@ -44,6 +44,16 @@ namespace compiler {
 
 static llvm::sys::Mutex g_ee_create_mutex;
 
+const std::unordered_map<CallingConvDesc, llvm::CallingConv::ID> CodegenTraits::descCallingConvToLLVM{
+    {CallingConvDesc::C, llvm::CallingConv::C},
+    {CallingConvDesc::SPIR_FUNC, llvm::CallingConv::SPIR_FUNC},
+};
+
+const std::unordered_map<llvm::CallingConv::ID, CallingConvDesc> CodegenTraits::llvmCallingConvToDesc{
+    {llvm::CallingConv::C, CallingConvDesc::C},
+    {llvm::CallingConv::SPIR_FUNC, CallingConvDesc::SPIR_FUNC},
+};
+
 std::shared_ptr<CompilationContext> CPUBackend::generateNativeCode(
     llvm::Function* func,
     llvm::Function* wrapper_func,

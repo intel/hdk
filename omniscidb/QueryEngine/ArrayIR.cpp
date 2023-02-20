@@ -91,6 +91,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
     hdk::ir::ArrayExpr const* array_expr,
     CompilationOptions const& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
   using ValueVector = std::vector<llvm::Value*>;
   ValueVector argument_list;
   auto& ir_builder(cgen_state_->ir_builder_);
@@ -116,15 +117,14 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
       array_element_size_bytes * 8, array_expr->elementCount(), cgen_state_->context_);
 
   if (array_expr->isNull()) {
-    return {llvm::ConstantPointerNull::get(
-                llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0)),
+    return {llvm::ConstantPointerNull::get(cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_))),
             cgen_state_->llInt(0)};
   }
 
   if (0 == array_expr->elementCount()) {
     llvm::Constant* dead_const = cgen_state_->llInt(0xdead);
     llvm::Value* dead_pointer = llvm::ConstantExpr::getIntToPtr(
-        dead_const, llvm::PointerType::get(get_int_type(64, cgen_state_->context_), 0));
+        dead_const, cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_)));
     return {dead_pointer, cgen_state_->llInt(0)};
   }
 
@@ -138,7 +138,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
 
     allocated_target_buffer =
         cgen_state_->emitExternalCall("allocate_varlen_buffer",
-                                      llvm::Type::getInt8PtrTy(cgen_state_->context_),
+                                      cgen_traits.localPointerType(get_int_type(8, cgen_state_->context_)),
                                       {cgen_state_->llInt(array_expr->elementCount()),
                                        cgen_state_->llInt(array_element_size_bytes)});
     cgen_state_->emitExternalCall(
@@ -165,13 +165,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
       switch (elem_type->size()) {
         case sizeof(double): {
           const auto double_element_ptr = ir_builder.CreatePointerCast(
-              element_ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_));
+              element_ptr, cgen_traits.localPointerType(get_fp_type(64, cgen_state_->context_)));
           ir_builder.CreateStore(element, double_element_ptr);
           break;
         }
         case sizeof(float): {
           const auto float_element_ptr = ir_builder.CreatePointerCast(
-              element_ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_));
+              element_ptr, cgen_traits.localPointerType(get_fp_type(32, cgen_state_->context_)));
           ir_builder.CreateStore(element, float_element_ptr);
           break;
         }

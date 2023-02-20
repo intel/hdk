@@ -778,7 +778,7 @@ std::vector<llvm::Value*> PerfectJoinHashTable::getHashJoinArgs(
     const hdk::ir::Expr* key_col,
     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
-  CodeGenerator code_generator(executor_);
+  CodeGenerator code_generator(executor_, co.codegen_traits_desc);
   const auto key_lvs = code_generator.codegen(key_col, true, co);
   CHECK_EQ(size_t(1), key_lvs.size());
   auto key_col_type = key_col->type();
@@ -850,6 +850,7 @@ HashJoinMatchingSet PerfectJoinHashTable::codegenMatchingSet(const CompilationOp
                                       isBitwiseEq(),
                                       sub_buff_size,
                                       executor_,
+                                      co,
                                       bucketize);
 }
 
@@ -965,7 +966,7 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
   CHECK(key_col);
   auto val_col = cols.first;
   CHECK(val_col);
-  CodeGenerator code_generator(executor_);
+  CodeGenerator code_generator(executor_, co.codegen_traits_desc);
   const auto key_col_var = dynamic_cast<const hdk::ir::ColumnVar*>(key_col);
   const auto val_col_var = dynamic_cast<const hdk::ir::ColumnVar*>(val_col);
   if (key_col_var && val_col_var &&

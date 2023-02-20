@@ -68,7 +68,8 @@ class QueryExecutionContext : boost::noncopyable {
       const size_t thread_idx);
 
   ResultSetPtr getRowSet(const RelAlgExecutionUnit& ra_exe_unit,
-                         const QueryMemoryDescriptor& query_mem_desc) const;
+                         const QueryMemoryDescriptor& query_mem_desc,
+                         const CompilationOptions& co) const;
 
   ResultSetPtr groupBufferToResults(const size_t i) const;
 

@@ -15,7 +15,7 @@
  */
 
 #pragma once
-
+#include "Compiler/Backend.h"
 #include "CgenState.h"
 #include "CodeCache.h"
 #include "ResultSetReductionOps.h"

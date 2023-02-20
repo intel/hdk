@@ -415,10 +415,10 @@ class Executor {
 
   // The aggregate state requires a state reset when starting a new partition. Generate
   // the new partition check and return the continuation basic block.
-  llvm::BasicBlock* codegenWindowResetStateControlFlow();
+  llvm::BasicBlock* codegenWindowResetStateControlFlow(const CompilationOptions& co);
 
   // Generate code for initializing the state of a window aggregate.
-  void codegenWindowFunctionStateInit(llvm::Value* aggregate_state);
+  void codegenWindowFunctionStateInit(llvm::Value* aggregate_state, const CompilationOptions& co);
 
   // Generates the required calls for an aggregate window function and returns the final
   // result.
@@ -429,12 +429,13 @@ class Executor {
   // and the result is stored back for the current row.
   void codegenWindowAvgEpilogue(llvm::Value* crt_val,
                                 llvm::Value* window_func_null_val,
-                                llvm::Value* multiplicity_lv);
+                                llvm::Value* multiplicity_lv,
+                                const CompilationOptions& co);
 
   // Generates code which loads the current aggregate value for the window context.
-  llvm::Value* codegenAggregateWindowState();
+  llvm::Value* codegenAggregateWindowState(const CompilationOptions& co);
 
-  llvm::Value* aggregateWindowStatePtr();
+  llvm::Value* aggregateWindowStatePtr(const CompilationOptions& co);
 
   CudaMgr_Namespace::CudaMgr* cudaMgr() const {
     CHECK(data_mgr_);
@@ -513,7 +514,8 @@ class Executor {
       const RelAlgExecutionUnit& ra_exe_unit,
       const QueryMemoryDescriptor& query_mem_desc,
       const ExecutorDeviceType device_type,
-      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner);
+      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+      const CompilationOptions& co);
 
   std::unordered_map<int, const hdk::ir::BinOper*> getInnerTabIdToJoinCond() const;
 
@@ -546,6 +548,7 @@ class Executor {
       ColumnFetcher& column_fetcher,
       const std::vector<InputTableInfo>& table_infos,
       const ExecutionOptions& eo,
+      const CompilationOptions& co,
       const bool is_agg,
       const bool allow_single_frag_table_opt,
       const std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>&
@@ -562,7 +565,8 @@ class Executor {
    */
   void launchKernels(SharedKernelContext& shared_context,
                      std::vector<std::unique_ptr<ExecutionKernel>>&& kernels,
-                     const ExecutorDeviceType device_type);
+                     const ExecutorDeviceType device_type,
+                     const CompilationOptions& co);
 
   std::vector<size_t> getTableFragmentIndices(
       const RelAlgExecutionUnit& ra_exe_unit,
@@ -636,6 +640,7 @@ class Executor {
                       const bool hoist_literals,
                       ResultSetPtr* results,
                       const ExecutorDeviceType device_type,
+                      const CompilationOptions& co,
                       std::vector<std::vector<const int8_t*>>& col_buffers,
                       const std::vector<size_t> outer_tab_frag_ids,
                       QueryExecutionContext*,
@@ -673,11 +678,13 @@ class Executor {
       const RelAlgExecutionUnit&,
       std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& all_fragment_results,
       std::shared_ptr<RowSetMemoryOwner>,
-      const QueryMemoryDescriptor&);
+      const QueryMemoryDescriptor&,
+      const CompilationOptions& co);
   ResultSetPtr reduceMultiDeviceResultSets(
       std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& all_fragment_results,
       std::shared_ptr<RowSetMemoryOwner>,
-      const QueryMemoryDescriptor&);
+      const QueryMemoryDescriptor&,
+      const CompilationOptions&);
   ResultSetPtr reduceSpeculativeTopN(
       const RelAlgExecutionUnit&,
       std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& all_fragment_results,
@@ -844,7 +851,7 @@ class Executor {
   llvm::Value* castToFP(llvm::Value*,
                         const hdk::ir::Type* from_type,
                         const hdk::ir::Type* to_type);
-  llvm::Value* castToIntPtrTyIn(llvm::Value* val, const size_t bit_width);
+  llvm::Value* castToIntPtrTyIn(llvm::Value* val, const size_t bit_width, compiler::CodegenTraitsDescriptor codegen_traits_desc);
 
   FragmentSkipStatus canSkipFragmentForFpQual(const hdk::ir::BinOper* comp_expr,
                                               const hdk::ir::ColumnVar* lhs_col,
@@ -855,14 +862,16 @@ class Executor {
                                         const FragmentInfo& frag_info,
                                         const std::list<hdk::ir::ExprPtr>& simple_quals,
                                         const std::vector<uint64_t>& frag_offsets,
-                                        const size_t frag_idx);
+                                        const size_t frag_idx,
+                                        compiler::CodegenTraitsDescriptor codegen_traits_desc);
 
   std::pair<bool, int64_t> skipFragmentInnerJoins(
       const InputDescriptor& table_desc,
       const RelAlgExecutionUnit& ra_exe_unit,
       const FragmentInfo& fragment,
       const std::vector<uint64_t>& frag_offsets,
-      const size_t frag_idx);
+      const size_t frag_idx,
+      compiler::CodegenTraitsDescriptor codegen_traits_desc);
 
   AggregatedColRange computeColRangesCache(
       const std::unordered_set<InputColDescriptor>& col_descs);
