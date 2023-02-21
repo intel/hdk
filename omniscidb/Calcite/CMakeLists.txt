@@ -19,16 +19,24 @@ if("${MAPD_VERSION_EXTRA}" STREQUAL "dev")
   set (OMNISCI_JAR_RELEASE_VERSION "${OMNISCI_JAR_RELEASE_VERSION}-SNAPSHOT")
 endif()
 
-set(MVN_PATH_COMMAND "")
-if(NOT MSVC)
-    set(MVN_PATH_COMMAND "MVNPATH=${CMAKE_CURRENT_SOURCE_DIR}/java")
+if (WIN32)
+  # "call" is needed on windows because "mvn" command is a batch script and without
+  # "call" execution is transferred to it and is never returned back to this script.
+  set(MVN_PATH_COMMAND call)
+
+  file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/bin" WIN_BIN_PATH)
+  # The following call to cmd is required to ignore errors if directory already exitst
+  set(MKDIR_COMMAND cmd /c "mkdir ${WIN_BIN_PATH} || (exit 0)")
+else()
+  set(MVN_PATH_COMMAND "MVNPATH=${CMAKE_CURRENT_SOURCE_DIR}/java")
+  set(MKDIR_COMMAND mkdir -p ${CMAKE_BINARY_DIR}/bin)
 endif()
 
 add_custom_command(
   OUTPUT
     ${CMAKE_BINARY_DIR}/bin/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar
     COMMAND ${MVN_PATH_COMMAND} ${MVN_EXECUTABLE} -l ${CMAKE_BINARY_DIR}/mvn_build.log -e clean install -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true -Domnisci.release.version="${OMNISCI_JAR_RELEASE_VERSION}" -Djava.net.preferIPv4Stack=true -Dmaven.wagon.http.retryHandler.count=3 -DMAPD_LOG_DIR="${CMAKE_BINARY_DIR}"
-    COMMAND mkdir -p ${CMAKE_BINARY_DIR}/bin
+    COMMAND ${MKDIR_COMMAND}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/java/calcite/target/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar ${CMAKE_BINARY_DIR}/bin
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/java
   DEPENDS
