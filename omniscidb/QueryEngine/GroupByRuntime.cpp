@@ -284,6 +284,14 @@ bucketized_hash_join_idx(int64_t hash_buff,
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
+rowid_hash_join_idx(const int64_t key, const int64_t min_key, const int64_t max_key) {
+  if (key >= min_key && key <= max_key) {
+    return key;
+  }
+  return -1;
+}
+
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
 hash_join_idx(int64_t hash_buff,
               const int64_t key,
               const int64_t min_key,
@@ -331,6 +339,14 @@ bucketized_hash_join_idx_bitwise(int64_t hash_buff,
                                                     min_key,
                                                     translated_val,
                                                     bucket_normalization);
+}
+
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
+rowid_hash_join_idx_nullable(const int64_t key,
+                             const int64_t min_key,
+                             const int64_t max_key,
+                             const int64_t null_val) {
+  return key != null_val ? rowid_hash_join_idx(key, min_key, max_key) : -1;
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t

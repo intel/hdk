@@ -434,7 +434,19 @@ ColumnsForDevice PerfectJoinHashTable::fetchColumnsForDevice(
   for (const auto& inner_outer_pair : inner_outer_pairs_) {
     const auto inner_col = inner_outer_pair.first;
     if (inner_col->isVirtual()) {
-      throw FailedToJoinOnVirtualColumn();
+      if (inner_outer_pairs_.size() != 1) {
+        throw HashJoinFail("Only single predicate row-id joins are currently supported.");
+      }
+      // push back an empty join column, which will prevent hash table build. the probe
+      // for a row-id hash join simply does null checks and returns the input row-id
+      auto type = inner_col->type();
+      join_columns.emplace_back(
+          JoinColumn{/*ptr=*/nullptr,
+                     /*col_chunks_buff_sz=*/0,
+                     /*num_chunks=*/1,
+                     /*num_elems=*/0,
+                     /*elem_sz=*/static_cast<size_t>(type->size())});
+      continue;
     }
     join_columns.emplace_back(fetchJoinColumn(inner_col,
                                               fragments,
@@ -971,11 +983,44 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
   }
   const auto key_lvs = code_generator.codegen(key_col, true, co);
   CHECK_EQ(size_t(1), key_lvs.size());
+  auto key_col_type = key_col->type();
+
+  if (val_col->isVirtual()) {
+    // short-circuit hash table load. we know the key will be the row number we want to
+    // access, so just return the key
+    CHECK(val_col_var);  // make sure this virtual column is a column
+
+    std::vector<llvm::Value*> hash_join_idx_args{
+        executor_->cgen_state_->castToTypeIn(key_lvs.front(), 64)};
+
+    const auto& query_info = getInnerQueryInfo(val_col_var).info;
+    if (query_info.getPhysicalNumTuples() == 0) {
+      // empty inner table, set range to empty / invalid
+      hash_join_idx_args.push_back(executor_->cgen_state_->llInt(/*min=*/int64_t(0)));
+      hash_join_idx_args.push_back(executor_->cgen_state_->llInt(/*max=*/int64_t(-1)));
+    } else {
+      hash_join_idx_args.push_back(
+          executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMin()));
+      hash_join_idx_args.push_back(
+          executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMax()));
+    }
+
+    auto key_col_logical_type = key_col->type()->canonicalize();
+    if (key_col_logical_type->nullable() || isBitwiseEq()) {
+      hash_join_idx_args.push_back(executor_->cgen_state_->llInt(
+          inline_fixed_encoding_null_value(key_col_logical_type)));
+    }
+
+    std::string fname{"rowid_hash_join_idx"};
+    if (key_col_type->nullable()) {
+      fname += "_nullable";
+    }
+    return executor_->cgen_state_->emitCall(fname, hash_join_idx_args);
+  }
   auto hash_ptr = codegenHashTableLoad(index);
   CHECK(hash_ptr);
   const auto hash_join_idx_args = getHashJoinArgs(hash_ptr, key_col, co);
 
-  auto key_col_type = key_col->type();
   std::string fname(key_col_type->isDate() ? "bucketized_hash_join_idx"s
                                            : "hash_join_idx"s);
 
