@@ -606,6 +606,12 @@ cdef class QueryNode:
     rel_alg_executor = RelAlgExecutor(self._hdk._executor, self._hdk._storage, self._hdk._data_mgr, dag=dag)
     return rel_alg_executor.execute(**kwargs)
 
+  def finalize(self):
+    cdef CQueryDag* c_dag = self.c_node.finalize().release()
+    dag = QueryDag()
+    dag.c_dag.reset(c_dag)
+    return dag
+
   def __repr__(self):
     return self.c_node.node().get().toString()
 

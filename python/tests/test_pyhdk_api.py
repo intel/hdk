@@ -863,7 +863,10 @@ class BaseTaxiTest:
     def check_taxi_q1_res(res):
         df = res.to_arrow().to_pandas()
         assert df["cab_type"].tolist() == ["green"]
-        assert df["cnt"].tolist() == [20]
+        if "cnt" in df.columns:
+            assert df["cnt"].tolist() == [20]
+        else:
+            assert df["count"].tolist() == [20]
 
     @staticmethod
     def check_taxi_q2_res(res):
@@ -876,7 +879,10 @@ class BaseTaxiTest:
         df = res.to_arrow().to_pandas()
         assert df["passenger_count"].tolist() == [1, 2, 5]
         assert df["pickup_year"].tolist() == [2013, 2013, 2013]
-        assert df["cnt"].tolist() == [16, 1, 3]
+        if "cnt" in df.columns:
+            assert df["cnt"].tolist() == [16, 1, 3]
+        else:
+            assert df["count"].tolist() == [16, 1, 3]
 
     @staticmethod
     def check_taxi_q4_res(res):
@@ -884,7 +890,10 @@ class BaseTaxiTest:
         assert df["passenger_count"].tolist() == [1, 5, 2]
         assert df["pickup_year"].tolist() == [2013, 2013, 2013]
         assert df["distance"].tolist() == [0, 0, 0]
-        assert df["cnt"].tolist() == [16, 3, 1]
+        if "cnt" in df.columns:
+            assert df["cnt"].tolist() == [16, 3, 1]
+        else:
+            assert df["count"].tolist() == [16, 3, 1]
 
 
 class TestTaxiSql(BaseTaxiTest):
@@ -899,8 +908,7 @@ class TestTaxiSql(BaseTaxiTest):
 
         # Import data
         storage.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv",
-            "trips",
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv", "trips"
         )
 
         # Run Taxi Q1 SQL query
@@ -948,7 +956,8 @@ class TestTaxiSql(BaseTaxiTest):
         res = rel_alg_executor.execute()
         self.check_taxi_q4_res(res)
 
-    @pytest.mark.skip(reason="unimplemented concept")
+        storage.dropTable("trips")
+
     def test_taxi_over_csv_explicit_instance(self):
         # Initialize HDK components wrapped into a single object
         hdk = pyhdk.init()
@@ -956,9 +965,8 @@ class TestTaxiSql(BaseTaxiTest):
         # Import data
         # import for all cases?
         # globs?
-        hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv",
-            "trips",
+        hdk.import_csv(
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv", "trips"
         )
 
         # Run Taxi Q1 SQL query
@@ -996,7 +1004,8 @@ class TestTaxiSql(BaseTaxiTest):
         )
         self.check_taxi_q4_res(res)
 
-    @pytest.mark.skip(reason="unimplemented concept")
+        hdk.drop_table("trips")
+
     def test_taxi_over_csv_explicit_aliases(self):
         # Initialize HDK components hidden from users
         hdk = pyhdk.init()
@@ -1005,8 +1014,8 @@ class TestTaxiSql(BaseTaxiTest):
         # Tables are referenced through the resulting object
         # Might allow to unify work with imported tables and temporary
         # tables (results of other queries)
-        trips = hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv"
+        trips = hdk.import_csv(
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv"
         )
 
         # Run Taxi Q1 SQL query
@@ -1050,6 +1059,8 @@ class TestTaxiSql(BaseTaxiTest):
         )
         self.check_taxi_q4_res(res)
 
+        hdk.drop_table(trips)
+
     @pytest.mark.skip(reason="unimplemented concept")
     def test_taxi_over_csv_multistep(self):
         # Initialize HDK components hidden from users
@@ -1057,7 +1068,7 @@ class TestTaxiSql(BaseTaxiTest):
 
         # Import data
         trips = hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv"
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv"
         )
 
         # Run Taxi Q3 SQL query in 2 steps
@@ -1093,9 +1104,10 @@ class TestTaxiSql(BaseTaxiTest):
         res = hdk.sql("SELET * FROM trips ORDER BY pickup_year, cnt desc;", trips=tmp)
         self.check_taxi_q4_res(res)
 
+        hdk.drop_table(trips)
+
 
 class TestTaxiIR(BaseTaxiTest):
-    @pytest.mark.skip(reason="QueryBuilder API is not yet available in PyHDK")
     def test_taxi_over_csv_modular(self):
         # Initialize HDK components
         config = pyhdk.buildConfig()
@@ -1106,75 +1118,78 @@ class TestTaxiIR(BaseTaxiTest):
 
         # Import data
         storage.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv",
-            "trips",
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv", "trips"
         )
 
         # Run Taxi Q1 IR query
-        builder = pyhdk.QueryBuilder(config, storage)
+        builder = pyhdk.QueryBuilder(storage, config)
         dag = builder.scan("trips").agg("cab_type", "count").finalize()
-        rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, dag)
+        rel_alg_executor = pyhdk.sql.RelAlgExecutor(
+            executor, storage, data_mgr, dag=dag
+        )
         res = rel_alg_executor.execute()
         self.check_taxi_q1_res(res)
 
         # Run Taxi Q2 IR query
-        builder = pyhdk.QueryBuilder(config, storage)
+        builder = pyhdk.QueryBuilder(storage, config)
         dag = (
             builder.scan("trips")
             .agg("passenger_count", "avg(total_amount)")
             .sort("passenger_count")
             .finalize()
         )
-        rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, dag)
+        rel_alg_executor = pyhdk.sql.RelAlgExecutor(
+            executor, storage, data_mgr, dag=dag
+        )
         res = rel_alg_executor.execute()
         self.check_taxi_q2_res(res)
 
         # Run Taxi Q3 IR query
-        builder = pyhdk.QueryBuilder(config, storage)
+        builder = pyhdk.QueryBuilder(storage, config)
         trips = builder.scan("trips")
         dag = (
             trips.proj(
-                [
-                    trips["passenger_count"],
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                ]
+                trips["passenger_count"],
+                trips["pickup_datetime"].extract("year").rename("pickup_year"),
             )
             .agg(["passenger_count", "pickup_year"], "count")
             .sort("passenger_count")
             .finalize()
         )
-        rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, dag)
+        rel_alg_executor = pyhdk.sql.RelAlgExecutor(
+            executor, storage, data_mgr, dag=dag
+        )
         res = rel_alg_executor.execute()
         self.check_taxi_q3_res(res)
 
         # Run Taxi Q4 IR query
-        builder = pyhdk.QueryBuilder(config, storage)
+        builder = pyhdk.QueryBuilder(storage, config)
         trips = builder.scan("trips")
         dag = (
             trips.proj(
-                [
-                    trips["passenger_count"],
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                    trips["trip_distance"].cast("int32").name("distance"),
-                ]
+                trips["passenger_count"],
+                trips["pickup_datetime"].extract("year").rename("pickup_year"),
+                trips["trip_distance"].cast("int32").rename("distance"),
             )
             .agg(["passenger_count", "pickup_year", "distance"], "count")
             .sort(("pickup_year", "asc"), ("count", "desc"))
             .finalize()
         )
-        rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, dag)
+        rel_alg_executor = pyhdk.sql.RelAlgExecutor(
+            executor, storage, data_mgr, dag=dag
+        )
         res = rel_alg_executor.execute()
         self.check_taxi_q4_res(res)
 
-    @pytest.mark.skip(reason="unimplemented concept")
+        storage.dropTable("trips")
+
     def test_taxi_over_csv_explicit_instance(self):
         # Initialize HDK components wrapped into a single object
         hdk = pyhdk.init()
 
         # Import data
-        hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv",
-            "trips",
+        hdk.import_csv(
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv", "trips"
         )
 
         # Run Taxi Q1 IR query
@@ -1194,10 +1209,7 @@ class TestTaxiIR(BaseTaxiTest):
         trips = hdk.scan("trips")
         res = (
             trips.proj(
-                [
-                    trips["passenger_count"],
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                ]
+                "passenger_count", pickup_year=trips["pickup_datetime"].extract("year")
             )
             .agg(["passenger_count", "pickup_year"], "count")
             .sort("passenger_count")
@@ -1209,11 +1221,9 @@ class TestTaxiIR(BaseTaxiTest):
         trips = hdk.scan("trips")
         res = (
             trips.proj(
-                [
-                    trips["passenger_count"],
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                    trips["trip_distance"].cast("int32").name("distance"),
-                ]
+                "passenger_count",
+                pickup_year=trips["pickup_datetime"].extract("year"),
+                distance=trips["trip_distance"].cast("int32"),
             )
             .agg(["passenger_count", "pickup_year", "distance"], "count")
             .sort(("pickup_year", "asc"), ("count", "desc"))
@@ -1221,7 +1231,8 @@ class TestTaxiIR(BaseTaxiTest):
         )
         self.check_taxi_q4_res(res)
 
-    @pytest.mark.skip(reason="unimplemented concept")
+        hdk.drop_table(trips)
+
     def test_taxi_over_csv_implicit_scan(self):
         # Initialize HDK components hidden from users
         hdk = pyhdk.init()
@@ -1229,8 +1240,8 @@ class TestTaxiIR(BaseTaxiTest):
         # Import data
         # How to reference it in SQL? Use file name as a table name? Use the same approach as in Modin?
         # When is it deleted from the storage? Only exlicit tables drop for simplicity?
-        trips = hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv"
+        trips = hdk.import_csv(
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv"
         )
 
         # Run Taxi Q1 IR query
@@ -1248,10 +1259,7 @@ class TestTaxiIR(BaseTaxiTest):
         # Run Taxi Q3 IR query
         res = (
             trips.proj(
-                [
-                    "passenger_count",
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                ]
+                "passenger_count", pickup_year=trips["pickup_datetime"].extract("year")
             )
             .agg(["passenger_count", "pickup_year"], "count")
             .sort("passenger_count")
@@ -1262,17 +1270,17 @@ class TestTaxiIR(BaseTaxiTest):
         # Run Taxi Q4 IR query
         res = (
             trips.proj(
-                [
-                    "passenger_count",
-                    trips["pickup_datetime"].extract("year").name("pickup_year"),
-                    trips["trip_distance"].cast("int32").name("distance"),
-                ]
+                "passenger_count",
+                pickup_year=trips["pickup_datetime"].extract("year"),
+                distance=trips["trip_distance"].cast("int32"),
             )
             .agg([0, 1, 2], "count")
             .sort(("pickup_year", "asc"), ("count", "desc"))
             .run()
         )
         self.check_taxi_q4_res(res)
+
+        hdk.drop_table(trips)
 
     @pytest.mark.skip(reason="unimplemented concept")
     def test_run_query_on_results(self):
@@ -1281,7 +1289,7 @@ class TestTaxiIR(BaseTaxiTest):
 
         # Import data
         trips = hdk.importCsvFile(
-            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header_no_null.csv"
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv"
         )
 
         # Run a part of Taxi Q2 IR query
@@ -1290,3 +1298,5 @@ class TestTaxiIR(BaseTaxiTest):
         # Can we make it without transforming to Arrow with the following import to ArrowStorage?
         res = res.sort("passenger_count").run()
         self.check_taxi_q2_res(res)
+
+        hdk.drop_table(trips)

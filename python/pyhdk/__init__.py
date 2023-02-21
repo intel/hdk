@@ -19,6 +19,7 @@ from pyhdk._execute import Executor
 import pyhdk.sql as sql
 import pyhdk.storage as storage
 from pyhdk.hdk import init
+from pyhdk._builder import QueryBuilder
 
 if sys.platform == "linux":
     sys.setdlopenflags(prev)
