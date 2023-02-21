@@ -17849,6 +17849,58 @@ TEST_F(Select, ParseIntegerExceptions) {
   }
 }
 
+TEST_F(Select, RowIdJoin) {
+  // make sure select tests pass under trivial join loop threshold default
+  EXPECT_NO_THROW(run_multiple_agg(
+      R"(SELECT t1.x, t2.y FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid AND t1.x = t2.y;)",
+      ExecutorDeviceType::CPU,
+      /*allow_loop_join=*/false));
+
+  // disable loop joins, force hash join path
+  const auto trivial_join_loop_state = config().exec.join.trivial_loop_join_threshold;
+  ScopeGuard reset = [&] {
+    config().exec.join.trivial_loop_join_threshold = trivial_join_loop_state;
+  };
+  config().exec.join.trivial_loop_join_threshold = 1;
+
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+
+    c(R"(SELECT t1.x, t2.y FROM test t1 LEFT JOIN test_inner t2 ON t1.rowid = t2.rowid;)",
+      dt);
+    c(R"(SELECT t1.x, t2.y, COUNT(*) FROM test t1 LEFT JOIN test_inner t2 ON t1.rowid = t2.rowid GROUP BY 1, 2 ORDER BY 1, 2 NULLS LAST;)",
+      dt);
+
+    c(R"(SELECT t1.x, t2.y FROM test t1 LEFT JOIN test_empty t2 ON t1.rowid = t2.rowid;)",
+      dt);
+
+    c(R"(SELECT t1.x, t2.y FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid;)",
+      dt);
+    c(R"(SELECT t1.x, t2.y, COUNT(*) FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid GROUP BY 1, 2 ORDER BY 1, 2;)",
+      dt);
+    c(R"(SELECT t1.x, t2.y FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid WHERE t1.x > 7;)",
+      dt);
+    c(R"(SELECT t1.x, t2.y FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid WHERE t2.x > 0;)",
+      dt);
+
+    EXPECT_EQ(
+        int64_t(1),
+        v<int64_t>(run_simple_agg(
+            R"(SELECT COUNT(*) FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.x;)",
+            dt)));
+    EXPECT_EQ(
+        int64_t(0),
+        v<int64_t>(run_simple_agg(
+            R"(SELECT COUNT(*) FROM test t1 INNER JOIN test_inner t2 ON t1.x = t2.rowid;)",
+            dt)));
+
+    EXPECT_ANY_THROW(run_multiple_agg(
+        R"(SELECT t1.x, t2.y FROM test t1 INNER JOIN test_inner t2 ON t1.rowid = t2.rowid AND t1.x = t2.y;)",
+        dt,
+        /*allow_loop_join=*/false));
+  }
+}
+
 class SubqueryTestEnv : public ExecuteTestBase, public ::testing::Test {
  protected:
   void SetUp() override {
