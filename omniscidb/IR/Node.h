@@ -68,11 +68,7 @@ using NodeInputs = std::vector<std::shared_ptr<const Node>>;
 
 class Node {
  public:
-  Node(NodeInputs inputs = {})
-      : inputs_(std::move(inputs))
-      , id_(crt_id_++)
-      , context_data_(nullptr)
-      , is_nop_(false) {}
+  Node(NodeInputs inputs = {});
 
   virtual ~Node() {}
 

@@ -152,6 +152,12 @@ bool isRenamedInput(const Node* node, const size_t index, const std::string& new
 
 thread_local unsigned Node::crt_id_ = FIRST_NODE_ID;
 
+Node::Node(NodeInputs inputs)
+    : inputs_(std::move(inputs))
+    , id_(crt_id_++)
+    , context_data_(nullptr)
+    , is_nop_(false) {}
+
 void Node::resetRelAlgFirstId() noexcept {
   crt_id_ = FIRST_NODE_ID;
 }
