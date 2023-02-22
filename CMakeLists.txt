@@ -101,6 +101,13 @@ include_directories(${Arrow_INCLUDE_DIRS})
 # Parquet
 find_package(Parquet REQUIRED)
 
+# Folly
+option(ENABLE_FOLLY "Use Folly" ON)
+if(ENABLE_FOLLY)
+  find_package(Folly REQUIRED)
+  add_definitions("-DHAVE_FOLLY")
+endif()
+
 # Boost, required for OmniSciDB
 add_definitions("-DBOOST_LOG_DYN_LINK") # dyn linking only
 find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams REQUIRED)
@@ -111,13 +118,6 @@ find_package(TBB REQUIRED)
 add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
-
-# Folly
-option(ENABLE_FOLLY "Use Folly" ON)
-if(ENABLE_FOLLY)
-  find_package(Folly REQUIRED)
-  add_definitions("-DHAVE_FOLLY")
-endif()
 
 # Dwarf Bench
 option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)

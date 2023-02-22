@@ -34,6 +34,27 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.24.1/cmake-3.24.1
     make -j`nproc` && \
     make install
 
+# Folly
+RUN apt-get install -y autoconf automake cmake libboost-all-dev libdouble-conversion-dev libevent-dev libgflags-dev libgmock-dev libgoogle-glog-dev libgtest-dev liblz4-dev liblzma-dev libsnappy-dev libsodium-dev libtool libzstd-dev ninja-build zip unzip
+RUN wget https://github.com/fmtlib/fmt/releases/download/9.1.0/fmt-9.1.0.zip && \
+    unzip fmt-9.1.0.zip && \
+    cd fmt-9.1.0 && \
+    mkdir _build && \
+    cd _build && \
+    cmake -DCMAKE_CXX_FLAGS="-fPIC" -DFMT_DOC=OFF -DFMT_TEST=OFF .. && \
+    make -j`nproc` && \
+    make install
+
+RUN wget https://github.com/facebook/folly/releases/download/v2022.11.07.00/folly-v2022.11.07.00.tar.gz && \
+    mkdir folly-2022.11.07.00 && \
+    tar xzvf folly-v2022.11.07.00.tar.gz -C folly-2022.11.07.00 && \
+    cd folly-2022.11.07.00 && \
+    mkdir _build && \
+    cd _build && \
+    cmake .. && \
+    make -j`nproc` && \
+    make install
+
 # Toolchains
 RUN apt-get update && apt-get install -y \
     llvm-12 \
@@ -68,6 +89,7 @@ RUN apt-get update && apt-get install -y \
     maven \
     libfmt-dev \
     --
+
 
 # Arrow
 # https://arrow.apache.org/install/
