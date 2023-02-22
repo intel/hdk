@@ -129,6 +129,13 @@ add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
+# Folly
+option(ENABLE_FOLLY "Use Folly" ON)
+if(ENABLE_FOLLY)
+  find_package(Folly REQUIRED)
+  add_definitions("-DHAVE_FOLLY")
+endif()
+
 # Dwarf Bench
 option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)
 if(ENABLE_DWARF_BENCH)
