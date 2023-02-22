@@ -426,7 +426,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     const bool must_use_baseline_sort,
     const bool use_streaming_top_n)
     : executor_(executor)
-    , allow_multifrag_(allow_multifrag)
     , query_desc_type_(col_range_info.hash_type_)
     , keyless_hash_(keyless_hash)
     , interleaved_bins_on_gpu_(interleaved_bins_on_gpu)
@@ -497,7 +496,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
 
 QueryMemoryDescriptor::QueryMemoryDescriptor()
     : executor_(nullptr)
-    , allow_multifrag_(false)
     , query_desc_type_(QueryDescriptionType::Projection)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -520,7 +518,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(const Executor* executor,
                                              const QueryDescriptionType query_desc_type,
                                              const bool is_table_function)
     : executor_(executor)
-    , allow_multifrag_(false)
     , query_desc_type_(query_desc_type)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -544,7 +541,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(const QueryDescriptionType query_de
                                              const bool has_nulls,
                                              const std::vector<int8_t>& group_col_widths)
     : executor_(nullptr)
-    , allow_multifrag_(false)
     , query_desc_type_(query_desc_type)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -1164,7 +1160,6 @@ std::string QueryMemoryDescriptor::queryDescTypeToString() const {
 
 std::string QueryMemoryDescriptor::toString() const {
   auto str = reductionKey();
-  str += "\tAllow Multifrag: " + ::toString(allow_multifrag_) + "\n";
   str += "\tInterleaved Bins on GPU: " + ::toString(interleaved_bins_on_gpu_) + "\n";
   str += "\tBlocks Share Memory: " + ::toString(blocksShareMemory()) + "\n";
   str += "\tThreads Share Memory: " + ::toString(threadsShareMemory()) + "\n";
