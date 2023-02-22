@@ -28,6 +28,8 @@
 #include "MaxwellCodegenPatch.h"
 #include "OutputBufferInitialization.h"
 
+#include <boost/config/pragma_message.hpp>
+
 #define LL_CONTEXT executor->cgen_state_->context_
 #define LL_BUILDER executor->cgen_state_->ir_builder_
 #define LL_BOOL(v) executor->ll_bool(v)
@@ -435,7 +437,7 @@ void TargetExprCodegen::codegenAggregate(
         agg_args.push_back(null_lv);
       }
       if (!target_info.is_distinct) {
-#warning "Shared functions temporarily disabled for L0"
+        BOOST_PRAGMA_MESSAGE("Shared functions temporarily disabled for L0")
 #ifndef HAVE_L0
         if (co.device_type == ExecutorDeviceType::GPU &&
             query_mem_desc.threadsShareMemory()) {
