@@ -344,7 +344,6 @@ class QueryMemoryDescriptor {
 
  private:
   const Executor* executor_;
-  bool allow_multifrag_;
   QueryDescriptionType query_desc_type_;
   bool keyless_hash_;
   bool interleaved_bins_on_gpu_;
