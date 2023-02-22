@@ -1,9 +1,10 @@
-#include "BufferCompaction.h"
 #include "GpuMemUtils.h"
 #include "GpuRtConstants.h"
 #include "ResultSetBufferAccessors.h"
 #include "ResultSetSortImpl.h"
 #include "SortUtils.cuh"
+
+#include "Shared/BufferCompaction.h"
 
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
@@ -136,8 +137,9 @@ std::vector<uint32_t> baseline_sort_fp(const ExecutorDeviceType device_type,
   pos_oe_col_buffer.reserve(slice_entry_count);
   size_t oe_col_buffer_idx = 0;
   const auto& oe_info = layout.oe_target_info;
-  const auto col_type = 
-      oe_info.agg_kind == hdk::ir::AggType::kAvg ? oe_info.type->ctx().fp64() : oe_info.type;
+  const auto col_type = oe_info.agg_kind == hdk::ir::AggType::kAvg
+                            ? oe_info.type->ctx().fp64()
+                            : oe_info.type;
   // Execlude AVG b/c collect_order_entry_column already makes its pair collapse into a
   // double
   const bool float_argument_input =
@@ -346,7 +348,8 @@ std::vector<uint32_t> baseline_sort(const ExecutorDeviceType device_type,
   auto oe_col_buffer = collect_order_entry_column<K>(groupby_buffer, layout, start, step);
   auto entry_type = get_compact_type(layout.oe_target_info);
   CHECK(entry_type->isNumber());
-  if (entry_type->isFloatingPoint() || layout.oe_target_info.agg_kind == hdk::ir::AggType::kAvg) {
+  if (entry_type->isFloatingPoint() ||
+      layout.oe_target_info.agg_kind == hdk::ir::AggType::kAvg) {
     return baseline_sort_fp<K>(device_type,
                                device_id,
                                buffer_provider,

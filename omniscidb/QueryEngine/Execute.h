@@ -40,7 +40,6 @@
 
 #include "BufferProvider/BufferProvider.h"
 #include "QueryEngine/AggregatedColRange.h"
-#include "QueryEngine/BufferCompaction.h"
 #include "QueryEngine/CartesianProduct.h"
 #include "QueryEngine/CgenState.h"
 #include "QueryEngine/CodeCache.h"

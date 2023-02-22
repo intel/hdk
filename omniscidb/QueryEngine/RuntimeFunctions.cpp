@@ -19,10 +19,10 @@
 #endif  // __CUDACC__
 
 #include "RuntimeFunctions.h"
-#include "../Shared/funcannotations.h"
-#include "BufferCompaction.h"
 #include "HyperLogLogRank.h"
 #include "MurmurHash.h"
+#include "Shared/BufferCompaction.h"
+#include "Shared/funcannotations.h"
 #include "Shared/quantile.h"
 #include "TypePunning.h"
 

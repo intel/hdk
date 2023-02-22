@@ -26,7 +26,7 @@
 #define BUFFER_COMPACTION_H
 
 #include <cstdint>
-#include "../Shared/funcannotations.h"
+#include "funcannotations.h"
 
 #ifndef __CUDACC__
 #include <algorithm>

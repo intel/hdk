@@ -24,10 +24,9 @@
 
 #include "ColSlotContext.h"
 
-#include "../BufferCompaction.h"
-
 #include <IR/Expr.h>
 #include <Shared/SqlTypesLayout.h>
+#include "Shared/BufferCompaction.h"
 
 #include <numeric>
 #include <stdexcept>

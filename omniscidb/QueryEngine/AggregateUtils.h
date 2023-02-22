@@ -17,11 +17,11 @@
 #ifndef QUERYENGINE_AGGREGATEUTILS_H
 #define QUERYENGINE_AGGREGATEUTILS_H
 
-#include "../Shared/sqltypes.h"
-#include "BufferCompaction.h"
 #include "TypePunning.h"
 
 #include "Logger/Logger.h"
+#include "Shared/BufferCompaction.h"
+#include "Shared/sqltypes.h"
 
 inline void set_component(int8_t* group_by_buffer,
                           const size_t comp_sz,

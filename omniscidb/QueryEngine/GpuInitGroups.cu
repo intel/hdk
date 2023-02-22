@@ -1,6 +1,7 @@
-#include "BufferCompaction.h"
 #include "GpuInitGroups.h"
 #include "GpuRtConstants.h"
+
+#include "Shared/BufferCompaction.h"
 
 template <typename T>
 __device__ int8_t* init_columnar_buffer(T* buffer_ptr,
