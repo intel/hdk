@@ -16,8 +16,6 @@
 #include "QueryEngine/RelAlgExecutor.h"
 #include "Shared/Config.h"
 
-extern bool g_enable_debug_timer;
-
 // Stores objects needed for various endpoints. Allows us to avoid including all headers
 // in the externally available API header.
 struct Internal {
