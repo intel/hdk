@@ -58,7 +58,7 @@ jobs:
       - name: Install cudatoolkit-dev
         if: env.cuda_compiler_version != 'None'
         run: |
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda
+          conda install -n ${{ env.CONDA_ENV }} -c conda-forge cudatoolkit-dev arrow-cpp-proc=4.0.0=cuda
 
       - name: Restore Maven cache
         uses: actions/cache@v3
