@@ -98,7 +98,9 @@ void c(const std::string& query_string,
        const ExecutorDeviceType device_type);
 
 /* timestamp approximate checking for NOW() */
-void cta(const std::string& query_string, const ExecutorDeviceType device_type);
+void cta(const std::string& query_string,
+         const std::string& sqlite_query_string,
+         const ExecutorDeviceType device_type);
 
 void c_arrow(
     const std::string& query_string,

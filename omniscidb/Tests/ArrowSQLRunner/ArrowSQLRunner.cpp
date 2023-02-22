@@ -182,9 +182,11 @@ class ArrowSQLRunnerImpl {
   }
 
   /* timestamp approximate checking for NOW() */
-  void cta(const std::string& query_string, const ExecutorDeviceType device_type) {
+  void cta(const std::string& query_string,
+           const std::string& sqlite_query_string,
+           const ExecutorDeviceType device_type) {
     sqlite_comparator_.compare_timstamp_approx(
-        run_multiple_agg(query_string, device_type), query_string, device_type);
+        run_multiple_agg(query_string, device_type), sqlite_query_string, device_type);
   }
 
   void check_arrow_dictionaries(
@@ -492,8 +494,10 @@ void c(const std::string& query_string,
   ArrowSQLRunnerImpl::get()->c(query_string, sqlite_query_string, device_type);
 }
 
-void cta(const std::string& query_string, const ExecutorDeviceType device_type) {
-  ArrowSQLRunnerImpl::get()->cta(query_string, device_type);
+void cta(const std::string& query_string,
+         const std::string& sqlite_query_string,
+         const ExecutorDeviceType device_type) {
+  ArrowSQLRunnerImpl::get()->cta(query_string, sqlite_query_string, device_type);
 }
 
 void c_arrow(const std::string& query_string,
