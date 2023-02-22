@@ -22,7 +22,6 @@ import com.mapd.parser.server.ExtensionFunction;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlCallBinding;
@@ -1853,7 +1852,10 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
               null,
               null,
               OperandTypes.family(SqlTypeFamily.NUMERIC),
-              SqlFunctionCategory.SYSTEM);
+              SqlFunctionCategory.SYSTEM,
+              false,
+              false,
+              Optionality.FORBIDDEN);
     }
 
     @Override
@@ -1939,7 +1941,7 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
     @Override
     public SqlReturnTypeInference getRowTypeInference() {
       return opBinding -> {
-        FieldInfoBuilder ret = opBinding.getTypeFactory().builder();
+        RelDataTypeFactory.Builder ret = opBinding.getTypeFactory().builder();
         for (int out_idx = 0; out_idx < outs.size(); ++out_idx) {
           ret = ret.add(out_names.get(out_idx), outs.get(out_idx));
           ret = ret.nullable(true);

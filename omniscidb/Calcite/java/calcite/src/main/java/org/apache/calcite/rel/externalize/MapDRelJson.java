@@ -18,6 +18,7 @@ package org.apache.calcite.rel.externalize;
 
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.mapd.calcite.parser.MapDSqlOperatorTable;
 
 import org.apache.calcite.avatica.AvaticaUtils;
@@ -71,8 +72,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.collect.ImmutableSet;
 
 /**
  * Utilities for converting {@link org.apache.calcite.rel.RelNode} into JSON
@@ -546,12 +545,16 @@ public class MapDRelJson {
     String class_ = (String) map.get("class");
     if (class_ != null) {
       try {
-        return (SqlOperator) Class.forName(class_).newInstance();
+        return (SqlOperator) Class.forName(class_).getDeclaredConstructor().newInstance();
       } catch (InstantiationException e) {
         throw new RuntimeException(e);
       } catch (IllegalAccessException e) {
         throw new RuntimeException(e);
       } catch (ClassNotFoundException e) {
+        throw new RuntimeException(e);
+      } catch (NoSuchMethodException e) {
+        throw new RuntimeException(e);
+      } catch (InvocationTargetException e) {
         throw new RuntimeException(e);
       }
     }
