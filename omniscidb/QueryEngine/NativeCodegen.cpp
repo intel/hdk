@@ -1430,7 +1430,6 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   MemoryLayoutBuilder mem_layout_builder(ra_exe_unit);
 
-  RowFuncBuilder row_func_builder(ra_exe_unit, query_infos, this);
   auto query_mem_desc = mem_layout_builder.build(
       query_infos,
       eo.allow_multifrag,
@@ -1443,7 +1442,6 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
       this,
       co.device_type);
 
-  const bool output_columnar = query_mem_desc->didOutputColumnar();
   const auto shared_memory_size = mem_layout_builder.gpuSharedMemorySize(
       query_mem_desc.get(), gpu_mgr, this, co.device_type);
   if (shared_memory_size > 0) {
@@ -1457,6 +1455,18 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   }
 
   const GpuSharedMemoryContext gpu_smem_context(shared_memory_size);
+  bool row_func_not_inlined = false;
+  GPUTarget target{gpu_mgr, blockSize(), cgen_state_.get(), row_func_not_inlined};
+
+  auto backend = compiler::getBackend(co.device_type,
+                                      getExtensionModuleContext()->getExtensionModules(),
+                                      gpu_smem_context.isSharedMemoryUsed(),
+                                      target);
+  auto traits = backend->traits();
+
+  RowFuncBuilder row_func_builder(ra_exe_unit, query_infos, this);
+
+  const bool output_columnar = query_mem_desc->didOutputColumnar();
 
   if (co.device_type == ExecutorDeviceType::GPU) {
     const size_t num_count_distinct_descs =
@@ -1482,15 +1492,9 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   cgen_state_->set_module_shallow_copy(getExtensionModuleContext()->getRTModule(is_l0),
                                        /*always_clone=*/true);
 
-  bool row_func_not_inlined = false;
-  GPUTarget target{gpu_mgr, blockSize(), cgen_state_.get(), row_func_not_inlined};
-  auto backend = compiler::getBackend(co.device_type,
-                                      getExtensionModuleContext()->getExtensionModules(),
-                                      gpu_smem_context.isSharedMemoryUsed(),
-                                      target);
-  auto traits = backend->traits();
   CompilationOptions co_codegen_traits = co;
   co_codegen_traits.codegen_traits_desc = backend->traitsDesc();
+
   if (is_gpu) {
     cgen_state_->module_->setDataLayout(traits.dataLayout());
     cgen_state_->module_->setTargetTriple(traits.triple());
