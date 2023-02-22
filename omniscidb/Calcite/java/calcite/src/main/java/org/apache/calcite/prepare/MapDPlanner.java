@@ -159,7 +159,7 @@ public class MapDPlanner extends PlannerImpl {
     ready();
 
     SqlValidator.Config validatorConfig = SqlValidator.Config.DEFAULT;
-    validatorConfig = validatorConfig.withSqlConformance(SqlConformanceEnum.LENIENT);
+    validatorConfig = validatorConfig.withConformance(SqlConformanceEnum.LENIENT);
 
     MapDSqlAdvisorValidator advisor_validator = new MapDSqlAdvisorValidator(visibleTables,
             config.getOperatorTable(),

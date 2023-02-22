@@ -121,7 +121,6 @@ public class DynamicFilterJoinRule extends FilterJoinRule.FilterIntoJoinRule {
     boolean filterPushed = false;
     if (RelOptUtil.classifyFilters(join,
                 filtersToBePushedDown,
-                joinType,
                 !(join.analyzeCondition().nonEquiConditions.isEmpty()),
                 !joinType.generatesNullsOnLeft(),
                 !joinType.generatesNullsOnRight(),

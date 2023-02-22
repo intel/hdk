@@ -47,11 +47,10 @@ public class tester {
             Frameworks.newConfigBuilder()
                     .defaultSchema(rootSchema.add("omnisci", mapd))
                     .operatorTable(stdOpTab)
-                    .parserConfig(SqlParser.configBuilder()
-                                          .setConformance(SqlConformanceEnum.LENIENT)
-                                          .setUnquotedCasing(Casing.UNCHANGED)
-                                          .setCaseSensitive(false)
-                                          .build())
+                    .parserConfig(SqlParser.config()
+                                          .withConformance(SqlConformanceEnum.LENIENT)
+                                          .withUnquotedCasing(Casing.UNCHANGED)
+                                          .withCaseSensitive(false))
                     .build();
 
     Planner p = Frameworks.getPlanner(config);

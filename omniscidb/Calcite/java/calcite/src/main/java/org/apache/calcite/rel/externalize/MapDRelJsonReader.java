@@ -303,6 +303,7 @@ public class MapDRelJsonReader {
             false,
             operands,
             filterOperand == null ? -1 : filterOperand,
+            null,
             RelCollations.EMPTY,
             type,
             name);

@@ -99,10 +99,9 @@ public class SqlIdentifierCapturerTest {
                     .defaultSchema(rootSchema.add("omnisci", mapd))
                     .operatorTable(
                             new MapDSqlOperatorTable(SqlStdOperatorTable.instance()))
-                    .parserConfig(SqlParser.configBuilder()
-                                          .setUnquotedCasing(Casing.UNCHANGED)
-                                          .setCaseSensitive(false)
-                                          .build())
+                    .parserConfig(SqlParser.config()
+                                          .withUnquotedCasing(Casing.UNCHANGED)
+                                          .withCaseSensitive(false))
                     .build();
     return new MapDPlanner(config);
   }
