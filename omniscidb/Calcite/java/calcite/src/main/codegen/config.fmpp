@@ -613,6 +613,7 @@ data: {
       ]
 
       includePosixOperators: false
+      includeParsingStringLiteralAsArrayLiteral: false
       includeCompoundIdentifier: true
       includeBraces: true
       includeAdditionalDeclarations: false

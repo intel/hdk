@@ -5295,7 +5295,9 @@ TEST_F(Select, Time) {
     ASSERT_EQ(0,
               v<int64_t>(run_simple_agg(
                   "SELECT COUNT(*) FROM test WHERE CAST('15:13:15' AS TIME) <= n;", dt)));
-    cta("SELECT DATETIME('NOW') FROM test limit 1;", dt);
+    cta("SELECT NOW() FROM test limit 1;",
+        "SELECT DATETIME('NOW') FROM test LIMIT 1;",
+        dt);
     EXPECT_ANY_THROW(run_simple_agg("SELECT DATETIME(NULL) FROM test LIMIT 1;", dt));
     // these next tests work because all dates are before now 2015-12-8 17:00:00
     ASSERT_EQ(
