@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <limits>
-#include "BufferCompaction.h"
 #include "ExtensionFunctions.hpp"
 #include "GpuRtConstants.h"
 #include "HyperLogLogRank.h"
+#include "Shared/BufferCompaction.h"
 #include "gen-cpp/TableFunctionsFactory_init_gpu.hpp"
 
 #if CUDA_VERSION < 10000

@@ -23,7 +23,7 @@
 #ifndef QUERYENGINE_RESULTSETBUFFERACCESSORS_H
 #define QUERYENGINE_RESULTSETBUFFERACCESSORS_H
 
-#include "BufferCompaction.h"
+#include "Shared/BufferCompaction.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/misc.h"
 #include "TypePunning.h"

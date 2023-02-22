@@ -26,7 +26,6 @@
 
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
-#include "QueryEngine/BufferCompaction.h"
 #include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/GpuMemUtils.h"

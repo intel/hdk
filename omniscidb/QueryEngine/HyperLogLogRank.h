@@ -22,6 +22,8 @@
 #include <intrin.h>
 #endif
 
+#include <algorithm>
+
 #ifdef __CUDACC__
 inline __device__ int32_t get_rank(uint64_t x, uint32_t b) {
   return min(b, static_cast<uint32_t>(x ? __clzll(x) : 64)) + 1;

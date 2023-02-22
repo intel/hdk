@@ -26,9 +26,9 @@
 #ifndef QUERYENGINE_COUNTDISTINCTDESCRIPTOR_H
 #define QUERYENGINE_COUNTDISTINCTDESCRIPTOR_H
 
-#include "../BufferCompaction.h"
 #include "../CompilationOptions.h"
 #include "Logger/Logger.h"
+#include "Shared/BufferCompaction.h"
 
 inline size_t bitmap_bits_to_bytes(const size_t bitmap_sz) {
   size_t bitmap_byte_sz = bitmap_sz / 8;
