@@ -435,7 +435,11 @@ void TargetExprCodegen::codegenAggregate(
         agg_args.push_back(null_lv);
       }
       if (!target_info.is_distinct) {
+#ifdef _WIN32
+#pragma message("Shared functions temporarily disabled for L0")
+#else
 #warning "Shared functions temporarily disabled for L0"
+#endif
 #ifndef HAVE_L0
         if (co.device_type == ExecutorDeviceType::GPU &&
             query_mem_desc.threadsShareMemory()) {

@@ -7599,7 +7599,12 @@ TEST_F(Select, CastRound) {
     EXPECT_EQ(-2147483648, v<int64_t>(run("-2147483648.499999999", "INT", dt)));
     EXPECT_ANY_THROW(run("-2147483648.5", "INT", dt));  // overflow
 
+#ifdef _WIN32
+#pragma message( \
+    "This query now results in an empty result set because the literal is the empty key. Do we want to allow these queries, or should this literal be considered out of range?")
+#else
 #warning This query now results in an empty result set because the literal is the empty key. Do we want to allow these queries, or should this literal be considered out of range?
+#endif
     /*EXPECT_EQ(std::numeric_limits<int64_t>::max(),
               v<int64_t>(run("9223372036854775807.", "BIGINT", dt)));*/
     EXPECT_ANY_THROW(run("9223372036854775807.0", "BIGINT", dt));  // out of range
@@ -9567,7 +9572,12 @@ TEST_F(Select, Joins_FilterPushDown) {
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
     for (auto fpd : {std::make_pair(true, 1.0), std::make_pair(false, 0.0)}) {
+#ifdef _WIN32
+#pragma message( \
+    "Enabling filter pushdown fails on a check, re-enable config options when fixed.")
+#else
 #warning "Enabling filter pushdown fails on a check, re-enable config options when fixed."
+#endif
 #if 0
       config().opts.filter_pushdown.enable = fpd.first;
       config().opts.filter_pushdown.low_frac = fpd.second;
