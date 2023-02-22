@@ -24,8 +24,6 @@
 
 #include "Logger/Logger.h"
 
-extern bool g_enable_debug_timer;
-
 template <typename TimeT = std::chrono::milliseconds>
 struct measure {
   template <typename F, typename... Args>
