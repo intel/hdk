@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -19,20 +19,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     lsb-release \
     software-properties-common \
+    cmake \
     --
-
-# cmake
-RUN apt-get update && apt-get install -y \
-    libssl-dev \
-    libcurl4-openssl-dev \
-    --
-
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.24.1/cmake-3.24.1.tar.gz && \
-    tar xzvf cmake-3.24.1.tar.gz && \
-    cd cmake-3.24.1/ && \
-    ./bootstrap && \
-    make -j`nproc` && \
-    make install
 
 # Toolchains
 RUN apt-get update && apt-get install -y \
