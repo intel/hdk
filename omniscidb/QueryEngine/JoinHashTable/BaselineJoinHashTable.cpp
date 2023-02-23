@@ -23,6 +23,7 @@
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ExpressionRewrite.h"
+#include "QueryEngine/HyperLogLog.h"
 #include "QueryEngine/JoinHashTable/BaselineHashTable.h"
 #include "QueryEngine/JoinHashTable/Builders/BaselineHashTableBuilder.h"
 #include "QueryEngine/JoinHashTable/PerfectJoinHashTable.h"

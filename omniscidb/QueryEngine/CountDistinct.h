@@ -30,9 +30,6 @@
 #include "ThirdParty/robin_hood.h"
 
 #include <bitset>
-#include <vector>
-
-using CountDistinctDescriptors = std::vector<CountDistinctDescriptor>;
 
 inline size_t bitmap_set_size(const int8_t* bitmap, const size_t bitmap_byte_sz) {
   const auto bitmap_word_count = bitmap_byte_sz >> 3;
