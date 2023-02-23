@@ -797,6 +797,10 @@ size_t ResultSet::getLimit() const {
   return keep_first_;
 }
 
+size_t ResultSet::getOffset() const {
+  return drop_first_;
+}
+
 const std::vector<std::string> ResultSet::getStringDictionaryPayloadCopy(
     const int dict_id) const {
   const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
@@ -888,17 +892,42 @@ std::vector<std::pair<const int8_t*, size_t>> ResultSet::getChunkedColumnarBuffe
   std::vector<std::pair<const int8_t*, size_t>> retval;
   retval.reserve(1 + appended_storage_.size());
 
-  retval.emplace_back(
-      storage_->getUnderlyingBuffer() + storage_->getColOffInBytes(column_idx),
-      storage_->binSearchRowCount());
+  size_t current_storage_rows = storage_->binSearchRowCount();
+  size_t rows_to_skip = drop_first_;
+  // RowCount value should be cached and take into account size, limit and offset
+  size_t rows_to_fetch = rowCount();
 
-  for (auto& chunk_uptr : appended_storage_) {
-    const int8_t* ptr =
-        chunk_uptr->getUnderlyingBuffer() + chunk_uptr->getColOffInBytes(column_idx);
-    size_t row_count = chunk_uptr->binSearchRowCount();
-    retval.emplace_back(ptr, row_count);
+  if (current_storage_rows <= rows_to_skip) {
+    rows_to_skip -= current_storage_rows;
+  } else {
+    size_t fetch_from_current_storage =
+        std::min(current_storage_rows - rows_to_skip, rows_to_fetch);
+    retval.emplace_back(storage_->getUnderlyingBuffer() +
+                            storage_->getColOffInBytes(column_idx) +
+                            colType(column_idx)->size() * rows_to_skip,
+                        fetch_from_current_storage);
+    rows_to_fetch -= fetch_from_current_storage;
+    rows_to_skip = 0;
   }
 
+  for (auto& storage_uptr : appended_storage_) {
+    if (rows_to_fetch == 0) {
+      break;
+    }
+    const int8_t* ptr =
+        storage_uptr->getUnderlyingBuffer() + storage_uptr->getColOffInBytes(column_idx);
+    current_storage_rows = storage_uptr->binSearchRowCount();
+    if (current_storage_rows <= rows_to_skip) {
+      rows_to_skip -= current_storage_rows;
+    } else {
+      size_t fetch_from_current_storage =
+          std::min(current_storage_rows - rows_to_skip, rows_to_fetch);
+      retval.emplace_back(ptr + colType(column_idx)->size() * rows_to_skip,
+                          fetch_from_current_storage);
+      rows_to_fetch -= fetch_from_current_storage;
+      rows_to_skip = 0;
+    }
+  }
   return retval;
 }
 
