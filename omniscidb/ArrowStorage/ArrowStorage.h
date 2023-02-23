@@ -15,6 +15,7 @@
 #pragma once
 
 #include "DataMgr/AbstractDataProvider.h"
+#include "DataMgr/Allocators/ArenaAllocator.h"
 #include "DataProvider/DictDescriptor.h"
 #include "SchemaMgr/SimpleSchemaProvider.h"
 #include "Shared/mapd_shared_mutex.h"
@@ -25,6 +26,31 @@ namespace hdk::ir {
 class Type;
 }
 
+class ArenaMemoryPool : public arrow::MemoryPool {
+ public:
+  ArenaMemoryPool() : arrow::MemoryPool(), bytes_allocated_(0) {}
+
+  virtual ~ArenaMemoryPool() = default;
+
+  arrow::Status Allocate(int64_t size, uint8_t** out) override;
+
+  // makes a copy
+  arrow::Status Reallocate(int64_t old_size, int64_t new_size, uint8_t** ptr) override;
+
+  // is a noop. for now
+  void Free(uint8_t* buffer, int64_t size) override;
+
+  int64_t bytes_allocated() const { return bytes_allocated_; }
+
+  std::string backend_name() const { return "arena"; }
+
+ private:
+  Arena arena;
+  int64_t bytes_allocated_;
+};
+
+// TODO: should this inherit from arena, or just have an underlying arena? need to build
+// an arrow memory pool override
 class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
  public:
   struct ColumnDescription {
@@ -58,7 +84,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   ArrowStorage(int schema_id, const std::string& schema_name, int db_id)
       : SimpleSchemaProvider(hdk::ir::Context::defaultCtx(), schema_id, schema_name)
       , db_id_(db_id)
-      , schema_id_(getSchemaId(db_id)) {}
+      , schema_id_(getSchemaId(db_id))
+      , arena_memory_pool_(std::make_unique<ArenaMemoryPool>()) {}
 
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
@@ -207,6 +234,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                             Data_Namespace::AbstractBuffer* dest,
                             size_t elem_size,
                             size_t num_bytes) const;
+
+  std::unique_ptr<ArenaMemoryPool> arena_memory_pool_;
 
   int db_id_;
   int schema_id_;

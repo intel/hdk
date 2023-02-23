@@ -65,6 +65,46 @@ size_t computeTotalStringsLength(std::shared_ptr<arrow::ChunkedArray> arr,
 
 }  // anonymous namespace
 
+arrow::Status ArenaMemoryPool::Allocate(int64_t size, uint8_t** out) {
+  if (size < 0) {
+    return arrow::Status::Invalid("negative malloc size");
+  }
+  if (static_cast<uint64_t>(size) >= std::numeric_limits<size_t>::max()) {
+    return arrow::Status::OutOfMemory("malloc size overflows size_t");
+  }
+  *out = reinterpret_cast<uint8_t*>(arena.allocate(size));
+  if (!(*out)) {
+    return arrow::Status::UnknownError("failed to allocate memory in arena");
+  }
+  bytes_allocated_ += size;
+  return arrow::Status::OK();
+}
+
+arrow::Status ArenaMemoryPool::Reallocate(int64_t old_size,
+                                          int64_t new_size,
+                                          uint8_t** ptr) {
+  if (new_size < old_size) {
+    (*ptr)[new_size] = '\0';
+    return arrow::Status::OK();
+  }
+  if (old_size == new_size) {
+    // noop
+    return arrow::Status::OK();
+  }
+  uint8_t* new_ptr{nullptr};
+  RETURN_NOT_OK(Allocate(new_size, &new_ptr));
+  CHECK(new_ptr);
+  std::memcpy(new_ptr, *ptr, static_cast<size_t>(std::min(new_size, old_size)));
+  // we don't free, because the arena doesn't free
+  *ptr = new_ptr;
+  return arrow::Status::OK();
+}
+
+void ArenaMemoryPool::Free(uint8_t* buffer, int64_t size) {
+  // noop
+  return;
+}
+
 void ArrowStorage::fetchBuffer(const ChunkKey& key,
                                Data_Namespace::AbstractBuffer* dest,
                                const size_t num_bytes) {
@@ -914,7 +954,14 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
     std::shared_ptr<arrow::io::InputStream> input,
     const CsvParseOptions parse_options,
     const ColumnInfoList& col_infos) {
-  auto io_context = arrow::io::default_io_context();
+  // by default arrow uses a process-wide memory pool, with jemalloc as the sys allocator
+  // let's explore a per-table scheme with a fragment arena setup similar to
+  // ArenaBufferMgr
+  auto memory_pool = arena_memory_pool_.get();
+  CHECK(memory_pool);
+  // LOG(ERROR) << "Using " << memory_pool->backend_name() << " memory pool for csv
+  // import.";
+  auto io_context = arrow::io::IOContext(memory_pool);
 
   auto arrow_parse_options = arrow::csv::ParseOptions::Defaults();
   arrow_parse_options.quoting = false;
@@ -924,7 +971,8 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
 
   auto arrow_read_options = arrow::csv::ReadOptions::Defaults();
   arrow_read_options.use_threads = true;
-  arrow_read_options.block_size = parse_options.block_size;
+  arrow_read_options.block_size =
+      parse_options.block_size;  // make this match fragment size?
   arrow_read_options.autogenerate_column_names =
       !parse_options.header && col_infos.empty();
   arrow_read_options.skip_rows = parse_options.header && !col_infos.empty()
