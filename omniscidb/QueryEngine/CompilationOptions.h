@@ -21,27 +21,14 @@
 #include <ostream>
 #include <vector>
 
-#ifndef __CUDACC__
-#include <ostream>
-#endif
-
 #include "Shared/Config.h"
-
-enum class ExecutorDeviceType { CPU = 0, GPU };
-#ifndef __CUDACC__
-inline std::ostream& operator<<(std::ostream& os, ExecutorDeviceType const dt) {
-  constexpr char const* strings[]{"CPU", "GPU"};
-  return os << strings[static_cast<int>(dt)];
-}
-#endif
+#include "Shared/DeviceType.h"
 
 enum class ExecutorOptLevel { Default, ReductionJIT };
 
 enum class ExecutorExplainType { Default, Optimized };
 
 enum class ExecutorDispatchMode { KernelPerFragment, MultifragmentKernel };
-
-std::string deviceToString(const ExecutorDeviceType& dt);
 
 struct CompilationOptions {
   ExecutorDeviceType device_type;

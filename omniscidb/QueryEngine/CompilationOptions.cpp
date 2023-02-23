@@ -17,10 +17,6 @@
 #include "QueryEngine/CompilationOptions.h"
 #include <ostream>
 
-std::string deviceToString(const ExecutorDeviceType& dt) {
-  return (dt == ExecutorDeviceType::CPU ? "CPU" : "GPU");
-}
-
 #ifndef __CUDACC__
 std::ostream& operator<<(std::ostream& os, const ExecutionOptions& eo) {
   os << "output_columnar_hint=" << eo.output_columnar_hint << "\n"

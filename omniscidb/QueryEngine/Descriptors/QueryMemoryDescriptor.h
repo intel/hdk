@@ -41,8 +41,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Shared/SqlTypesLayout.h>
-#include <Shared/TargetInfo.h>
+#include "Shared/DeviceType.h"
+#include "Shared/SqlTypesLayout.h"
+#include "Shared/TargetInfo.h"
 
 class Executor;
 class QueryExecutionContext;
