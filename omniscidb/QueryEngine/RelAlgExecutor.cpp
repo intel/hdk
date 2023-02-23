@@ -25,6 +25,7 @@
 #include "QueryEngine/ExtensionFunctionsBinding.h"
 #include "QueryEngine/ExternalExecutor.h"
 #include "QueryEngine/FromTableReordering.h"
+#include "QueryEngine/HyperLogLog.h"
 #include "QueryEngine/MemoryLayoutBuilder.h"
 #include "QueryEngine/QueryPhysicalInputsCollector.h"
 #include "QueryEngine/QueryPlanDagExtractor.h"

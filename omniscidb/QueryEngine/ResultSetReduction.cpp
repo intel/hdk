@@ -22,6 +22,7 @@
  * Copyright (c) 2014 MapD Technologies, Inc.  All rights reserved.
  */
 
+#include "CountDistinct.h"
 #include "DynamicWatchdog.h"
 #include "Execute.h"
 #include "ResultSet.h"

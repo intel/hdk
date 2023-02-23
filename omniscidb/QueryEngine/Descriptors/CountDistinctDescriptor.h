@@ -30,6 +30,8 @@
 #include "Logger/Logger.h"
 #include "Shared/BufferCompaction.h"
 
+#include <vector>
+
 inline size_t bitmap_bits_to_bytes(const size_t bitmap_sz) {
   size_t bitmap_byte_sz = bitmap_sz / 8;
   if (bitmap_sz % 8) {
@@ -65,6 +67,8 @@ struct CountDistinctDescriptor {
     return padded_size * sub_bitmap_count;
   }
 };
+
+using CountDistinctDescriptors = std::vector<CountDistinctDescriptor>;
 
 inline bool operator==(const CountDistinctDescriptor& lhs,
                        const CountDistinctDescriptor& rhs) {

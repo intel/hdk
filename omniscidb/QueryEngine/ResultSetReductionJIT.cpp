@@ -19,6 +19,7 @@
 #include "ResultSetReductionInterpreterStubs.h"
 
 #include "CodeGenerator.h"
+#include "CountDistinct.h"
 #include "DynamicWatchdog.h"
 #include "Execute.h"
 #include "IRCodegenUtils.h"

@@ -21,6 +21,7 @@
  */
 
 #include "ResultSet.h"
+#include "CountDistinct.h"
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "Execute.h"

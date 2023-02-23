@@ -26,8 +26,8 @@
 #define QUERYENGINE_QUERYMEMORYDESCRIPTOR_H
 
 #include "../CompilationOptions.h"
-#include "../CountDistinct.h"
 #include "ColSlotContext.h"
+#include "CountDistinctDescriptor.h"
 #include "Types.h"
 
 #include <boost/optional.hpp>
