@@ -81,8 +81,8 @@ jobs:
           conda run -n ${{ env.CONDA_ENV }} ./ArrowBasedExecuteTest --build-rel-alg-cache=cache.txt
 
           cd ../.. # rebuild with ASAN
-          conda run -n ${{ env.CONDA_ENV }} cmake -B ./build -S . -DENABLE_TESTS=on -DENABLE_CUDA=off -DENABLE_ASAN=on
-          conda run -n ${{ env.CONDA_ENV }} cmake --build ./build/ --parallel 2
+          conda run -n ${{ env.CONDA_ENV }} cmake -B ./build -S . -DCMAKE_BUILD_TYPE=Release -DENABLE_CUDA=off -DENABLE_ASAN=on
+          conda run -n ${{ env.CONDA_ENV }} cmake --build ./build/ --parallel 2 -- -i
 
           cd ..
           tar -zcf /tmp/build.tgz .
