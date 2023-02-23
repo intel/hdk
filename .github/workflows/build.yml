@@ -58,7 +58,11 @@ jobs:
       - name: Install cudatoolkit-dev
         if: env.cuda_compiler_version != 'None'
         run: |
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge cudatoolkit-dev arrow-cpp-proc=4.0.0=cuda
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
+          sudo dpkg -i cuda-keyring_1.0-1_all.deb
+          sudo apt-get update
+          sudo apt-get install cuda-nvcc-${{ env.cuda_compiler_version }}
+          conda install -n ${{ env.CONDA_ENV }} -c conda-forge arrow-cpp-proc=4.0.0=cuda
 
       - name: Restore Maven cache
         uses: actions/cache@v3

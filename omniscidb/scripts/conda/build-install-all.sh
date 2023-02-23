@@ -3,6 +3,7 @@
 set -ex
 [ -z "$PREFIX" ] && PREFIX=${CONDA_PREFIX:-/usr/local}
 export PREFIX=$(cd "$PREFIX"; pwd -P)
+export PATH=$PATH:/usr/local/cuda/bin
 
 this_dir=$(dirname "${BASH_SOURCE[0]}")
 
