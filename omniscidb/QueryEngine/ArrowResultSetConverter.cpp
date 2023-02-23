@@ -342,7 +342,7 @@ void convert_column(ResultSetPtr result,
         reinterpret_cast<const uint8_t*>(chunk_ptr), buf_size, result));
   }
 
-  CHECK_EQ(total_row_count, entry_count);
+  CHECK_LE(total_row_count, entry_count);
 
   std::vector<std::shared_ptr<arrow::Array>> fragments(values.size(), nullptr);
 
@@ -786,18 +786,30 @@ size_t convert_rowwise(
     std::vector<std::shared_ptr<std::vector<bool>>>& null_bitmap_seg,
     const std::vector<bool>& non_lazy_cols,
     const size_t start_entry,
-    const size_t end_entry) {
+    const size_t end_entry,
+    bool is_truncated = false) {
   const auto col_count = results->colCount();
   CHECK_EQ(value_seg.size(), col_count);
   CHECK_EQ(null_bitmap_seg.size(), col_count);
   const auto local_entry_count = end_entry - start_entry;
   size_t seg_row_count = 0;
+  size_t limit = results->getLimit();
+  size_t offset = results->getOffset();
   for (size_t i = start_entry; i < end_entry; ++i) {
+    if (is_truncated && seg_row_count >= offset + limit) {
+      break;
+    }
+
     auto row = results->getRowAtNoTranslations(i, non_lazy_cols);
     if (row.empty()) {
       continue;
     }
     ++seg_row_count;
+
+    if (is_truncated && seg_row_count <= offset) {
+      continue;
+    }
+
     for (size_t j = 0; j < col_count; ++j) {
       if (!non_lazy_cols.empty() && non_lazy_cols[j]) {
         continue;
@@ -1204,7 +1216,21 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
     std::atomic<size_t> row_count = 0;
 
-    {
+    if (results_->isTruncated()) {
+      // TODO(dmitriim) This approach can be optimized for large offsets.
+      // We'll process it without tbb for now, because it's hard to keep track of the
+      // number of rows received across all threads.
+      auto timer = DEBUG_TIMER("fetch data single thread with limit/offset");
+      row_count += convert_rowwise(results_,
+                                   builders,
+                                   device_type_,
+                                   column_value_segs[0],
+                                   null_bitmap_segs[0],
+                                   columnar_conversion_flags,
+                                   0,
+                                   entry_count,
+                                   results_->isTruncated());
+    } else {
       auto timer = DEBUG_TIMER("fetch data in parallel_for");
       threading::parallel_for(
           static_cast<size_t>(0), entry_count, stride, [&](size_t start_entry) {

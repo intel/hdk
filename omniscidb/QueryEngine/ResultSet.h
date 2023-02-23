@@ -437,6 +437,8 @@ class ResultSet {
 
   size_t getLimit() const;
 
+  size_t getOffset() const;
+
   void copyColumnIntoBuffer(const size_t column_idx,
                             int8_t* output_buffer,
                             const size_t output_buffer_size) const;

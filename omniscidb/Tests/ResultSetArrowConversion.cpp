@@ -141,6 +141,8 @@ constexpr TYPE null_builder() {
 template <typename TYPE, size_t len>
 void compare_columns(const std::array<TYPE, len>& expected,
                      const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  ASSERT_EQ(expected.size(), actual->length());
+
   using ArrowColType = arrow::NumericArray<typename arrow::CTypeTraits<TYPE>::ArrowType>;
   const arrow::ArrayVector& chunks = actual->chunks();
 
@@ -383,6 +385,291 @@ TEST(ArrowTable, EmptySelection) {
   ASSERT_NE(table, nullptr);
   ASSERT_EQ(table->num_columns(), 2);
   ASSERT_EQ(table->num_rows(), (int64_t)0);
+}
+
+TEST(ArrowTable, LimitedSelection) {
+  auto res = runSqlQuery("select i, count(bi) from test group by i limit 4 offset 1;",
+                         ExecutorDeviceType::CPU,
+                         true);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)1);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 2);
+  ASSERT_EQ(table->num_rows(), (int64_t)1);
+
+  std::array<int32_t, 1> res_arr_0{1};
+  std::array<int64_t, 1> res_arr_1{3};
+  compare_columns(res_arr_0, table->column(0));
+  compare_columns(res_arr_1, table->column(1));
+}
+
+TEST(ArrowTable, SameLimitedOffsetSelection) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+
+  std::vector<int32_t> values{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6};
+
+  for (size_t i = 0; i < values.size(); i++) {
+    values[i] = (i % 2) == 0 ? i : 0;
+  }
+
+  build_table<int32_t>(values, 3, "LargeTable");
+
+  auto res = runSqlQuery(
+      "SELECT * FROM LargeTable offset 2 limit 2;", ExecutorDeviceType::CPU, true);
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 2);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)2);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(0), true);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 1);
+  ASSERT_EQ(table->num_rows(), (int64_t)2);
+
+  compare_columns(std::vector<int32_t>(values.begin() + 2, values.begin() + 4),
+                  table->column(0));
+  getStorage()->dropTable("LargeTable");
+}
+
+TEST(ArrowTable, OrderedLimitedSelection) {
+  auto res = runSqlQuery("select d, bi from test order by bi desc limit 4 offset 2;",
+                         ExecutorDeviceType::CPU,
+                         true);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)4);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 2);
+  ASSERT_EQ(table->num_rows(), (int64_t)4);
+
+  std::array<double, 6> sorted_arr_0 = table6x4_col_d;
+  std::sort(sorted_arr_0.begin(), sorted_arr_0.end(), std::greater{});
+
+  std::array<double, 4> res_arr_0;
+  std::copy(sorted_arr_0.begin() + 2, sorted_arr_0.begin() + 6, res_arr_0.begin());
+  compare_columns(res_arr_0, table->column(0));
+
+  std::array<int64_t, 6> sorted_arr_1 = table6x4_col_bi;
+  std::sort(sorted_arr_1.begin(), sorted_arr_1.end(), std::greater{});
+
+  std::array<int64_t, 4> res_arr_1;
+  std::copy(sorted_arr_1.begin() + 2, sorted_arr_1.begin() + 6, res_arr_1.begin());
+  compare_columns(res_arr_1, table->column(1));
+}
+
+TEST(ArrowTable, ColumnarLimitedJoin) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+  auto res = runSqlQuery(
+      "SELECT * FROM test_chunked INNER JOIN join_table ON test_chunked.i=join_table.i "
+      "offset 5 limit 2;",
+      ExecutorDeviceType::CPU,
+      true);
+
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 5);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)1);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(4), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(5), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(6), true);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 7);
+  ASSERT_EQ(table->num_rows(), (int64_t)1);
+
+  std::array<int64_t, 1> res_arr_1{1};
+  compare_columns(res_arr_1, table->column(1));
+
+  std::array<int64_t, 1> res_arr_2{6};
+  compare_columns(res_arr_2, table->column(2));
+
+  std::array<double, 1> res_arr_3{60.6};
+  compare_columns(res_arr_3, table->column(3));
+
+  std::array<int64_t, 1> res_arr_4{1};
+  compare_columns(res_arr_4, table->column(4));
+
+  // compare_columns fails on bool
+  // std::array<bool, 1> res_arr_5{true};
+  // compare_columns(res_arr_5, table->column(5));
+
+  std::array<int64_t, 1> res_arr_6{200};
+  compare_columns(res_arr_6, table->column(6));
+}
+
+TEST(ArrowTable, ColumnarEmptyLimitedJoin) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+  auto res = runSqlQuery(
+      "SELECT * FROM test_chunked offset 8 limit 2;", ExecutorDeviceType::CPU, true);
+
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 8);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)0);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 4);
+  ASSERT_EQ(table->num_rows(), (int64_t)0);
+}
+
+TEST(ArrowTable, ColumnarMultiStoragedJoin) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+  auto res = runSqlQuery(
+      "SELECT * FROM test_chunked offset 3 limit 7;", ExecutorDeviceType::CPU, true);
+
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 7);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 3);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)3);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 4);
+  ASSERT_EQ(table->num_rows(), (int64_t)3);
+
+  std::array<int64_t, 3> res_arr_1{1, 1, 1};
+  compare_columns(res_arr_1, table->column(1));
+
+  std::array<int64_t, 3> res_arr_2{4, 5, 6};
+  compare_columns(res_arr_2, table->column(2));
+
+  std::array<double, 3> res_arr_3{40.4, 50.5, 60.6};
+  compare_columns(res_arr_3, table->column(3));
+}
+
+TEST(ArrowTable, ColumnarMultiStoraged) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+  auto res = runSqlQuery(
+      "SELECT * FROM test_chunked offset 5 limit 7;", ExecutorDeviceType::CPU, true);
+
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 7);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 5);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)1);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 4);
+  ASSERT_EQ(table->num_rows(), (int64_t)1);
+
+  std::array<int64_t, 1> res_arr_1{1};
+  compare_columns(res_arr_1, table->column(1));
+
+  std::array<int64_t, 1> res_arr_2{6};
+  compare_columns(res_arr_2, table->column(2));
+
+  std::array<double, 1> res_arr_3{60.6};
+  compare_columns(res_arr_3, table->column(3));
+}
+
+TEST(ArrowTable, ColumnarLargeStoraged) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+  bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+
+  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+    config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+  };
+
+  config().rs.enable_columnar_output = true;
+  config().rs.enable_lazy_fetch = false;
+
+  std::vector<int32_t> values(12000, 0);
+
+  for (size_t i = 0; i < values.size(); i++) {
+    values[i] = (i % 2) == 0 ? 0 : null_builder<int32_t>();
+  }
+
+  build_table<int32_t>(values, 5, "LargeTable");
+
+  auto res = runSqlQuery(
+      "SELECT * FROM LargeTable offset 7000 limit 3000;", ExecutorDeviceType::CPU, true);
+
+  ASSERT_EQ(res.getDataPtr()->getLimit(), 3000);
+  ASSERT_EQ(res.getDataPtr()->getOffset(), 7000);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)3000);
+  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(0), true);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 1);
+  ASSERT_EQ(table->num_rows(), (int64_t)3000);
+
+  compare_columns(std::vector<int32_t>(values.begin() + 7000, values.begin() + 10000),
+                  table->column(0));
+  getStorage()->dropTable("LargeTable");
+}
+
+TEST(ArrowTable, OrderedLimitOverSizeSelection) {
+  auto res = runSqlQuery("select bi from test order by bi desc limit 7 offset 2;",
+                         ExecutorDeviceType::CPU,
+                         true);
+  ASSERT_EQ(res.getRows()->rowCount(), (int64_t)4);
+
+  auto table = getArrowTable(res);
+  ASSERT_NE(table, nullptr);
+  ASSERT_EQ(table->num_columns(), 1);
+  ASSERT_EQ(table->num_rows(), (int64_t)4);
+
+  std::array<int64_t, 6> sorted_arr = table6x4_col_bi;
+  std::sort(sorted_arr.begin(), sorted_arr.end(), std::greater{});
+
+  std::array<int64_t, 4> res_arr;
+  std::copy(sorted_arr.begin() + 2, sorted_arr.begin() + 6, res_arr.begin());
+  compare_columns(res_arr, table->column(0));
 }
 
 //  Chunked Arrow Table Conversion Tests
