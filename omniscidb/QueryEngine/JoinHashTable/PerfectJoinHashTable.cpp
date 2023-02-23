@@ -992,18 +992,10 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
 
     std::vector<llvm::Value*> hash_join_idx_args{
         executor_->cgen_state_->castToTypeIn(key_lvs.front(), 64)};
-
-    const auto& query_info = getInnerQueryInfo(val_col_var).info;
-    if (query_info.getPhysicalNumTuples() == 0) {
-      // empty inner table, set range to empty / invalid
-      hash_join_idx_args.push_back(executor_->cgen_state_->llInt(/*min=*/int64_t(0)));
-      hash_join_idx_args.push_back(executor_->cgen_state_->llInt(/*max=*/int64_t(-1)));
-    } else {
-      hash_join_idx_args.push_back(
-          executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMin()));
-      hash_join_idx_args.push_back(
-          executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMax()));
-    }
+    hash_join_idx_args.push_back(
+        executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMin()));
+    hash_join_idx_args.push_back(
+        executor_->cgen_state_->llInt(rhs_source_col_range_.getIntMax()));
 
     auto key_col_logical_type = key_col->type()->canonicalize();
     if (key_col_logical_type->nullable() || isBitwiseEq()) {

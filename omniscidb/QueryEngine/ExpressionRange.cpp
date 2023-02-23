@@ -544,12 +544,6 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       CHECK(ti_idx);
       const auto& query_info = query_infos[*ti_idx].info;
       const auto& fragments = query_info.fragments;
-      if (col_expr->isVirtual()) {
-        CHECK(col_type->isInt64());
-        const int64_t num_tuples = query_info.getNumTuples();
-        return ExpressionRange::makeIntRange(
-            0, std::max(num_tuples - 1, int64_t(0)), 0, has_nulls);
-      }
       if (query_info.getNumTuples() == 0) {
         // The column doesn't contain any values, synthesize an empty range.
         if (col_type->isFloatingPoint()) {
@@ -557,6 +551,12 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
                                        : ExpressionRange::makeDoubleRange(0, -1, false);
         }
         return ExpressionRange::makeIntRange(0, -1, 0, false);
+      }
+      if (col_expr->isVirtual()) {
+        CHECK(col_type->isInt64());
+        const int64_t num_tuples = query_info.getNumTuples();
+        return ExpressionRange::makeIntRange(
+            0, std::max(num_tuples - 1, int64_t(0)), 0, has_nulls);
       }
       std::vector<size_t> nonempty_fragment_indices;
       for (size_t i = 0; i < fragments.size(); ++i) {
