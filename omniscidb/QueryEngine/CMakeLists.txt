@@ -338,7 +338,16 @@ set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFa
 endif()
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/OmniSciTypes.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/OmniSciTypes.h ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast DESTINATION QueryEngine COMPONENT "QE")
+set(query_engine_install_artefacts
+    ${CMAKE_CURRENT_BINARY_DIR}/OmniSciTypes.h
+    ${CMAKE_CURRENT_BINARY_DIR}/RuntimeFunctions.bc
+    ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast)
+if(ENABLE_L0)
+    list(APPEND query_engine_install_artefacts
+        ${CMAKE_CURRENT_BINARY_DIR}/${intel_gpu_module_name}
+        ${CMAKE_CURRENT_BINARY_DIR}/${spirv_helper_functions_module})
+endif()
+install(FILES ${query_engine_install_artefacts} DESTINATION QueryEngine COMPONENT "QE")
 
 target_precompile_headers(QueryEngine PRIVATE
         [["QueryEngine/Execute.h"]]
