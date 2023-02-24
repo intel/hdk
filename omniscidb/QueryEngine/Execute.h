@@ -977,6 +977,7 @@ class Executor {
 
   std::unique_ptr<PlanState> plan_state_;
   std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner_;
+  StringDictionaryGenerations string_dictionary_generations_;
 
   static const int max_gpu_count{16};
   std::mutex gpu_exec_mutex_[max_gpu_count];

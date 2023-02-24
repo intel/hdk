@@ -448,20 +448,20 @@ StringDictionaryProxy* Executor::getStringDictionaryProxy(
   CHECK(row_set_mem_owner);
   std::lock_guard<std::mutex> lock(
       str_dict_mutex_);  // TODO: can we use RowSetMemOwner state mutex here?
-  return row_set_mem_owner->getOrAddStringDictProxy(dict_id_in, with_generation);
+  const int64_t generation =
+      with_generation ? string_dictionary_generations_.getGeneration(dict_id_in) : -1;
+  return row_set_mem_owner->getOrAddStringDictProxy(dict_id_in, generation);
 }
 
 StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
     const int dict_id_in,
-    const bool with_generation) {
+    const int64_t generation) {
   const int dict_id{dict_id_in < 0 ? REGULAR_DICT(dict_id_in) : dict_id_in};
   CHECK(data_provider_);
   const auto dd = data_provider_->getDictMetadata(dict_id);
   if (dd) {
     CHECK(dd->stringDict);
     CHECK_LE(dd->dictNBits, 32);
-    const int64_t generation =
-        with_generation ? string_dictionary_generations_.getGeneration(dict_id) : -1;
     return addStringDict(dd->stringDict, dict_id, generation);
   }
   CHECK_EQ(dict_id, DictRef::literalsDictId);
@@ -484,8 +484,12 @@ const StringDictionaryProxy::IdMap* Executor::getStringProxyTranslationMap(
   CHECK(row_set_mem_owner);
   std::lock_guard<std::mutex> lock(
       str_dict_mutex_);  // TODO: can we use RowSetMemOwner state mutex here?
+  const int64_t source_generation =
+      with_generation ? string_dictionary_generations_.getGeneration(source_dict_id) : -1;
+  const int64_t dest_generation =
+      with_generation ? string_dictionary_generations_.getGeneration(dest_dict_id) : -1;
   return row_set_mem_owner->getOrAddStringProxyTranslationMap(
-      source_dict_id, dest_dict_id, with_generation, translation_type);
+      source_dict_id, source_generation, dest_dict_id, dest_generation, translation_type);
 }
 
 const StringDictionaryProxy::IdMap* Executor::getIntersectionStringProxyTranslationMap(
@@ -501,11 +505,12 @@ const StringDictionaryProxy::IdMap* Executor::getIntersectionStringProxyTranslat
 
 const StringDictionaryProxy::IdMap* RowSetMemoryOwner::getOrAddStringProxyTranslationMap(
     const int source_dict_id_in,
+    const int64_t source_generation,
     const int dest_dict_id_in,
-    const bool with_generation,
+    const int64_t dest_generation,
     const RowSetMemoryOwner::StringTranslationType translation_type) {
-  const auto source_proxy = getOrAddStringDictProxy(source_dict_id_in, with_generation);
-  auto dest_proxy = getOrAddStringDictProxy(dest_dict_id_in, with_generation);
+  const auto source_proxy = getOrAddStringDictProxy(source_dict_id_in, source_generation);
+  auto dest_proxy = getOrAddStringDictProxy(dest_dict_id_in, dest_generation);
   if (translation_type == RowSetMemoryOwner::StringTranslationType::SOURCE_INTERSECTION) {
     return addStringProxyIntersectionTranslationMap(source_proxy, dest_proxy);
   } else {
@@ -4061,8 +4066,7 @@ void Executor::setupCaching(
     const std::unordered_set<std::pair<int, int>>& phys_table_ids) {
   row_set_mem_owner_ = std::make_shared<RowSetMemoryOwner>(
       data_provider, Executor::getArenaBlockSize(), cpu_threads());
-  row_set_mem_owner_->setDictionaryGenerations(
-      computeStringDictionaryGenerations(col_descs));
+  string_dictionary_generations_ = computeStringDictionaryGenerations(col_descs);
   agg_col_range_cache_ = computeColRangesCache(col_descs);
   table_generations_ = computeTableGenerations(phys_table_ids);
 }
