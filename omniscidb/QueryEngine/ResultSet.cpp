@@ -418,8 +418,7 @@ const hdk::ir::Type* ResultSet::colType(const size_t col_idx) const {
 }
 
 StringDictionaryProxy* ResultSet::getStringDictionaryProxy(int const dict_id) const {
-  constexpr bool with_generation = true;
-  return row_set_mem_owner_->getOrAddStringDictProxy(dict_id, with_generation);
+  return row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
 }
 
 class ResultSet::CellCallback {
@@ -1413,8 +1412,7 @@ size_t ResultSet::getLimit() const {
 
 const std::vector<std::string> ResultSet::getStringDictionaryPayloadCopy(
     const int dict_id) const {
-  const auto sdp =
-      row_set_mem_owner_->getOrAddStringDictProxy(dict_id, /*with_generation=*/true);
+  const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
   CHECK(sdp);
   return sdp->getDictionary()->copyStrings();
 }
@@ -1448,8 +1446,7 @@ ResultSet::getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const {
   }
 
   const int32_t dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-  const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id,
-                                                               /*with_generation=*/true);
+  const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
   CHECK(sdp);
 
   return std::make_pair(unique_string_ids, sdp->getStrings(unique_string_ids));

@@ -808,9 +808,7 @@ TargetValue build_string_array_target_value(
           values.emplace_back(sdp->getString(string_id));
         } else {
           values.emplace_back(NullableString(
-              row_set_mem_owner
-                  ->getOrAddStringDictProxy(dict_id, /*with_generation=*/false)
-                  ->getString(string_id)));
+              row_set_mem_owner->getOrAddStringDictProxy(dict_id)->getString(string_id)));
         }
       }
     }
@@ -1340,11 +1338,9 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
       if (!dict_id) {
         sdp = row_set_mem_owner_->getLiteralStringDictProxy();
       } else {
-        sdp = data_mgr_
-                  ? row_set_mem_owner_->getOrAddStringDictProxy(dict_id,
-                                                                /*with_generation=*/false)
-                  : row_set_mem_owner_->getStringDictProxy(
-                        dict_id);  // unit tests bypass the catalog
+        sdp = data_mgr_ ? row_set_mem_owner_->getOrAddStringDictProxy(dict_id)
+                        : row_set_mem_owner_->getStringDictProxy(
+                              dict_id);  // unit tests bypass the DataMgr
       }
       return NullableString(sdp->getString(ival));
     } else {

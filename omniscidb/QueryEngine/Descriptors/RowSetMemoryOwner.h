@@ -29,7 +29,6 @@
 #include "DataMgr/DataMgr.h"
 #include "DataProvider/DataProvider.h"
 #include "Logger/Logger.h"
-#include "QueryEngine/StringDictionaryGenerations.h"
 #include "Shared/quantile.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 #include "ThirdParty/robin_hood.h"
@@ -174,7 +173,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   }
 
   StringDictionaryProxy* getOrAddStringDictProxy(const int dict_id_in,
-                                                 const bool with_generation);
+                                                 const int64_t generation = -1);
 
   void addLiteralStringDictProxy(
       std::shared_ptr<StringDictionaryProxy> lit_str_dict_proxy) {
@@ -189,8 +188,9 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
 
   const StringDictionaryProxy::IdMap* getOrAddStringProxyTranslationMap(
       const int source_dict_id_in,
+      const int64_t source_generation,
       const int dest_dict_id_in,
-      const bool with_generation,
+      const int64_t dest_generation,
       const StringTranslationType translation_map_type);
 
   void addColBuffer(const void* col_buffer) {
@@ -225,14 +225,6 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     return rtn;
   }
 
-  void setDictionaryGenerations(StringDictionaryGenerations generations) {
-    string_dictionary_generations_ = generations;
-  }
-
-  StringDictionaryGenerations& getStringDictionaryGenerations() {
-    return string_dictionary_generations_;
-  }
-
   quantile::TDigest* nullTDigest(double const q);
 
  private:
@@ -254,7 +246,6 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   std::map<std::pair<int, int>, StringDictionaryProxy::IdMap>
       str_proxy_union_translation_maps_owned_;
   std::shared_ptr<StringDictionaryProxy> lit_str_dict_proxy_;
-  StringDictionaryGenerations string_dictionary_generations_;
   std::vector<void*> col_buffers_;
   std::vector<Data_Namespace::AbstractBuffer*> varlen_input_buffers_;
   std::vector<std::unique_ptr<quantile::TDigest>> t_digests_;
