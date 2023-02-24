@@ -22,8 +22,7 @@
 
 TEST(DataMgrWithL0, SanityTest) {
   ConfigPtr config_ = std::make_shared<Config>();
-  SystemParameters sys_params = {};
-  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_, sys_params);
+  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_);
 
   auto l0_mgr = data_mgr->getL0Mgr();
   ASSERT_EQ(l0_mgr, data_mgr->getGpuMgr());
@@ -33,8 +32,7 @@ TEST(DataMgrWithL0, SanityTest) {
 
 TEST(DataMgrWithL0, SimpleReadWriteTest) {
   ConfigPtr config_ = std::make_shared<Config>();
-  SystemParameters sys_params = {};
-  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_, sys_params);
+  auto data_mgr = std::make_unique<Data_Namespace::DataMgr>(*config_);
 
   std::vector<int8_t> ref_data = {10, 20, 30, 40, 50, 60};
   AbstractBuffer* gpuBuff = data_mgr->alloc(

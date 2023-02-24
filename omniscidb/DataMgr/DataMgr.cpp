@@ -38,16 +38,14 @@
 
 namespace Data_Namespace {
 
-DataMgr::DataMgr(const Config& config,
-                 const SystemParameters& system_parameters,
-                 const size_t numReaderThreads)
+DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
     : gpuMgrContext_(nullptr)
     , hasGpus_(false)
     , reservedGpuMem_(config.mem.gpu.reserved_mem_bytes)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
-  populateDeviceMgrs(config, system_parameters);
-  populateMgrs(config, system_parameters, numReaderThreads);
+  populateDeviceMgrs(config);
+  populateMgrs(config, numReaderThreads);
   createTopLevelMetadata();
 }
 
@@ -169,9 +167,8 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
   }
 }
 
-void DataMgr::populateDeviceMgrs(const Config& config,
-                                 const SystemParameters& system_parameters) {
-  if (system_parameters.cpu_only || config.exec.cpu_only)
+void DataMgr::populateDeviceMgrs(const Config& config) {
+  if (config.exec.cpu_only)
     return;
 
   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
@@ -208,7 +205,6 @@ void DataMgr::populateDeviceMgrs(const Config& config,
 }
 
 void DataMgr::populateMgrs(const Config& config,
-                           const SystemParameters& system_parameters,
                            const size_t userSpecifiedNumReaderThreads) {
   // no need for locking, as this is only called in the constructor
   bufferMgrs_.resize(2);
@@ -216,7 +212,7 @@ void DataMgr::populateMgrs(const Config& config,
 
   levelSizes_.push_back(1);  // levelSizes_[DISK_LEVEL] = 1
   size_t page_size{512};
-  size_t cpuBufferSize = system_parameters.cpu_buffer_mem_bytes;
+  size_t cpuBufferSize = config.mem.cpu.max_size;
   if (cpuBufferSize == 0) {  // if size is not specified
     const auto total_system_memory = getTotalSystemMemory();
     VLOG(1) << "Detected " << (float)total_system_memory / (1024 * 1024)
@@ -224,9 +220,9 @@ void DataMgr::populateMgrs(const Config& config,
     cpuBufferSize = total_system_memory *
                     0.8;  // should get free memory instead of this ugly heuristic
   }
-  size_t minCpuSlabSize = std::min(system_parameters.min_cpu_slab_size, cpuBufferSize);
+  size_t minCpuSlabSize = std::min(config.mem.cpu.min_slab_size, cpuBufferSize);
   minCpuSlabSize = (minCpuSlabSize / page_size) * page_size;
-  size_t maxCpuSlabSize = std::min(system_parameters.max_cpu_slab_size, cpuBufferSize);
+  size_t maxCpuSlabSize = std::min(config.mem.cpu.max_slab_size, cpuBufferSize);
   maxCpuSlabSize = (maxCpuSlabSize / page_size) * page_size;
   LOG(INFO) << "Min CPU Slab Size is " << (float)minCpuSlabSize / (1024 * 1024) << "MB";
   LOG(INFO) << "Max CPU Slab Size is " << (float)maxCpuSlabSize / (1024 * 1024) << "MB";
@@ -283,17 +279,15 @@ void DataMgr::populateMgrs(const Config& config,
           CHECK(false);
       }
 
-      size_t gpuMaxMemSize = system_parameters.gpu_buffer_mem_bytes;
+      size_t gpuMaxMemSize = config.mem.gpu.max_size;
       if (gpuMaxMemSize == 0) {
         CHECK_GT(deviceMemSize, reservedGpuMem_);
         gpuMaxMemSize = deviceMemSize - reservedGpuMem_;
       }
 
-      size_t minGpuSlabSize =
-          std::min(system_parameters.min_gpu_slab_size, gpuMaxMemSize);
+      size_t minGpuSlabSize = std::min(config.mem.gpu.min_slab_size, gpuMaxMemSize);
       minGpuSlabSize = (minGpuSlabSize / page_size) * page_size;
-      size_t maxGpuSlabSize =
-          std::min(system_parameters.max_gpu_slab_size, gpuMaxMemSize);
+      size_t maxGpuSlabSize = std::min(config.mem.gpu.max_slab_size, gpuMaxMemSize);
       maxGpuSlabSize = (maxGpuSlabSize / page_size) * page_size;
       LOG(INFO) << "Min GPU Slab size for GPU " << gpuNum << " is "
                 << (float)minGpuSlabSize / (1024 * 1024) << "MB";

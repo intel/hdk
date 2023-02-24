@@ -137,11 +137,17 @@ struct GpuMemoryConfig {
   double bump_allocator_step_reduction = 0.75;
   double input_mem_limit_percent = 0.9;
   size_t reserved_mem_bytes = 1ULL << 27;
+  size_t max_size = 0;
+  size_t min_slab_size = 256ULL << 20;
+  size_t max_slab_size = 4ULL << 30;
 };
 
 struct CpuMemoryConfig {
   bool enable_tiered_cpu_mem = false;
   size_t pmem_size = 0;
+  size_t max_size = 0;
+  size_t min_slab_size = 256ULL << 20;
+  size_t max_slab_size = 4ULL << 30;
 };
 
 struct MemoryConfig {

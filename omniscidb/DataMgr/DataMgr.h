@@ -35,7 +35,6 @@
 #include "PersistentStorageMgr/PersistentStorageMgr.h"
 #include "SchemaMgr/ColumnInfo.h"
 #include "Shared/Config.h"
-#include "Shared/SystemParameters.h"
 #include "Shared/mapd_shared_mutex.h"
 
 #include <fstream>
@@ -165,9 +164,7 @@ class ProcBuddyinfoParser {
 
 class DataMgr {
  public:
-  explicit DataMgr(const Config& config,
-                   const SystemParameters& system_parameters,
-                   const size_t numReaderThreads = 0);
+  explicit DataMgr(const Config& config, const size_t numReaderThreads = 0);
   ~DataMgr();
   AbstractBuffer* createChunkBuffer(const ChunkKey& key,
                                     const MemoryLevel memoryLevel,
@@ -239,11 +236,8 @@ class DataMgr {
   DataProvider* getDataProvider() const { return data_provider_.get(); }
 
  private:
-  void populateDeviceMgrs(const Config& config,
-                          const SystemParameters& system_parameters);
-  void populateMgrs(const Config& config,
-                    const SystemParameters& system_parameters,
-                    const size_t userSpecifiedNumReaderThreads);
+  void populateDeviceMgrs(const Config& config);
+  void populateMgrs(const Config& config, const size_t userSpecifiedNumReaderThreads);
   void convertDB(const std::string basePath);
   void createTopLevelMetadata() const;
   void allocateCpuBufferMgr(int32_t device_id,

@@ -35,9 +35,7 @@ namespace TestHelpers::ArrowSQLRunner {
 constexpr int TEST_SCHEMA_ID = 1;
 constexpr int TEST_DB_ID = (TEST_SCHEMA_ID << 24) + 1;
 
-void init(ConfigPtr config = nullptr,
-          size_t max_gpu_mem = 0,
-          const std::string& udf_filename = "");
+void init(ConfigPtr config = nullptr, const std::string& udf_filename = "");
 
 void reset();
 

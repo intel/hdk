@@ -437,6 +437,24 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                          po::value<size_t>(&config_->mem.cpu.pmem_size)
                              ->default_value(config_->mem.cpu.pmem_size),
                          "An amount of PMEM memory to use.");
+  opt_desc.add_options()("cpu-buffer-mem-bytes",
+                         po::value<size_t>(&config_->mem.cpu.max_size)
+                             ->default_value(config_->mem.cpu.max_size),
+                         "Size of memory reserved for CPU buffers, in bytes. Use all "
+                         "available memory if 0.");
+  opt_desc.add_options()(
+      "min-cpu-slab-size",
+      po::value<size_t>(&config_->mem.cpu.min_slab_size)
+          ->default_value(config_->mem.cpu.min_slab_size),
+      "Min slab size (size of memory allocations) for CPU buffer pool.");
+  opt_desc.add_options()(
+      "max-cpu-slab-size",
+      po::value<size_t>(&config_->mem.cpu.max_slab_size)
+          ->default_value(config_->mem.cpu.max_slab_size),
+      "Max CPU buffer pool slab size (size of memory allocations). Note if "
+      "there is not enough free memory to accomodate the target slab size, smaller "
+      "slabs will be allocated, down to the minimum size specified by "
+      "min-cpu-slab-size.");
 
   // mem.gpu
   opt_desc.add_options()(
@@ -486,6 +504,24 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       "Reduces GPU memory available to the OmniSci allocator by this amount. Used for "
       "compiled code cache and ancillary GPU functions and other processes that may also "
       "be using the GPU concurrent with OmniSciDB.");
+  opt_desc.add_options()("gpu-buffer-mem-bytes",
+                         po::value<size_t>(&config_->mem.gpu.max_size)
+                             ->default_value(config_->mem.gpu.max_size),
+                         "Size of memory reserved for GPU buffers, in bytes, per GPU. "
+                         "Use all available memory if 0.");
+  opt_desc.add_options()(
+      "min-gpu-slab-size",
+      po::value<size_t>(&config_->mem.gpu.min_slab_size)
+          ->default_value(config_->mem.gpu.min_slab_size),
+      "Min slab size (size of memory allocations) for GPU buffer pools.");
+  opt_desc.add_options()(
+      "max-gpu-slab-size",
+      po::value<size_t>(&config_->mem.gpu.max_slab_size)
+          ->default_value(config_->mem.gpu.max_slab_size),
+      "Max GPU buffer pool slab size (size of memory allocations). Note if "
+      "there is not enough free memory to accomodate the target slab size, smaller "
+      "slabs will be allocated, down to the minimum size speified by "
+      "min-gpu-slab-size.");
 
   // cache
   opt_desc.add_options()("use-estimator-result-cache",

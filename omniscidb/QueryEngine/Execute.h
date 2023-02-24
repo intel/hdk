@@ -72,7 +72,6 @@
 #include "Logger/Logger.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/Config.h"
-#include "Shared/SystemParameters.h"
 #include "Shared/funcannotations.h"
 #include "Shared/mapd_shared_mutex.h"
 #include "Shared/measure.h"
@@ -260,7 +259,6 @@ class Executor {
            Data_Namespace::DataMgr* data_mgr,
            BufferProvider* buffer_provider,
            ConfigPtr config,
-           const size_t max_gpu_slab_size,
            const std::string& debug_dir,
            const std::string& debug_file);
 
@@ -268,13 +266,11 @@ class Executor {
 
   void reset(const bool discard_runtime_modules_only = false);
 
-  static std::shared_ptr<Executor> getExecutor(
-      Data_Namespace::DataMgr* data_mgr,
-      BufferProvider* buffer_provider,
-      ConfigPtr config = nullptr,
-      const std::string& debug_dir = "",
-      const std::string& debug_file = "",
-      const SystemParameters& system_parameters = SystemParameters());
+  static std::shared_ptr<Executor> getExecutor(Data_Namespace::DataMgr* data_mgr,
+                                               BufferProvider* buffer_provider,
+                                               ConfigPtr config = nullptr,
+                                               const std::string& debug_dir = "",
+                                               const std::string& debug_file = "");
 
   // runs clear memory routines under the executor lock to prevent flushing pages in use
   static void clearMemory(const Data_Namespace::MemoryLevel memory_level,
@@ -1002,7 +998,6 @@ class Executor {
  private:
   const uint32_t block_size_x_;
   const uint32_t grid_size_x_;
-  const size_t max_gpu_slab_size_;
   const std::string debug_dir_;
   const std::string debug_file_;
 

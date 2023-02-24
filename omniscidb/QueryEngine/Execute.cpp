@@ -66,7 +66,6 @@
 #include "QueryEngine/TableFunctions/TableFunctionCompilationContext.h"
 #include "QueryEngine/TableFunctions/TableFunctionExecutionContext.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
-#include "Shared/SystemParameters.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
@@ -148,7 +147,6 @@ Executor::Executor(const ExecutorId executor_id,
                    Data_Namespace::DataMgr* data_mgr,
                    BufferProvider* buffer_provider,
                    ConfigPtr config,
-                   const size_t max_gpu_slab_size,
                    const std::string& debug_dir,
                    const std::string& debug_file)
     : executor_id_(executor_id)
@@ -156,7 +154,6 @@ Executor::Executor(const ExecutorId executor_id,
     , config_(config)
     , block_size_x_(config->exec.override_gpu_block_size)
     , grid_size_x_(config->exec.override_gpu_grid_size)
-    , max_gpu_slab_size_(max_gpu_slab_size)
     , debug_dir_(debug_dir)
     , debug_file_(debug_file)
     , data_mgr_(data_mgr)
@@ -388,26 +385,19 @@ Executor::CgenStateManager::~CgenStateManager() {
   executor_.cgen_state_.reset(cgen_state_.release());
 }
 
-std::shared_ptr<Executor> Executor::getExecutor(
-    Data_Namespace::DataMgr* data_mgr,
-    BufferProvider* buffer_provider,
-    ConfigPtr config,
-    const std::string& debug_dir,
-    const std::string& debug_file,
-    const SystemParameters& system_parameters) {
+std::shared_ptr<Executor> Executor::getExecutor(Data_Namespace::DataMgr* data_mgr,
+                                                BufferProvider* buffer_provider,
+                                                ConfigPtr config,
+                                                const std::string& debug_dir,
+                                                const std::string& debug_file) {
   INJECT_TIMER(getExecutor);
 
   if (!config) {
     config = std::make_shared<Config>();
   }
 
-  return std::make_shared<Executor>(executor_id_ctr_++,
-                                    data_mgr,
-                                    buffer_provider,
-                                    config,
-                                    system_parameters.max_gpu_slab_size,
-                                    debug_dir,
-                                    debug_file);
+  return std::make_shared<Executor>(
+      executor_id_ctr_++, data_mgr, buffer_provider, config, debug_dir, debug_file);
 }
 
 void Executor::clearMemory(const Data_Namespace::MemoryLevel memory_level,
@@ -3606,7 +3596,7 @@ unsigned Executor::blockSize() const {
 }
 
 size_t Executor::maxGpuSlabSize() const {
-  return max_gpu_slab_size_;
+  return config_->mem.gpu.max_slab_size;
 }
 
 int64_t Executor::deviceCycles(int milliseconds) const {

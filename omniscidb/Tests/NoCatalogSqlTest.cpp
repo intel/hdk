@@ -146,19 +146,14 @@ class NoCatalogSqlTest : public ::testing::Test {
 
     schema_provider_ = std::make_shared<TestSchemaProvider>();
 
-    SystemParameters system_parameters;
-    data_mgr_ = std::make_shared<DataMgr>(*config_, system_parameters, false);
+    data_mgr_ = std::make_shared<DataMgr>(*config_, false);
 
     auto* ps_mgr = data_mgr_->getPersistentStorageMgr();
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID,
                                  std::make_shared<TestDataProvider>(schema_provider_));
 
-    executor_ = Executor::getExecutor(data_mgr_.get(),
-                                      data_mgr_->getBufferProvider(),
-                                      config_,
-                                      "",
-                                      "",
-                                      system_parameters);
+    executor_ = Executor::getExecutor(
+        data_mgr_.get(), data_mgr_->getBufferProvider(), config_, "", "");
 
     init_calcite("");
   }

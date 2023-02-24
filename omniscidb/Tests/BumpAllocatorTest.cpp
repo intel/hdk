@@ -60,7 +60,8 @@ GpuInfo get_gpu_info() {
 bool setup() {
   auto config = std::make_shared<Config>();
   config->mem.gpu.enable_bump_allocator = true;
-  init(config, /*max_gpu_mem=*/1000000000);
+  config->mem.gpu.max_size = 1000000000;
+  init(config);
 
   if (!gpusPresent()) {
     LOG(WARNING) << "No GPUs detected. Skipping all Bump Allocator tests.";

@@ -30,10 +30,8 @@ namespace {
 
 class ArrowSQLRunnerImpl {
  public:
-  static void init(ConfigPtr config,
-                   size_t max_gpu_mem,
-                   const std::string& udf_filename) {
-    instance_.reset(new ArrowSQLRunnerImpl(config, max_gpu_mem, udf_filename));
+  static void init(ConfigPtr config, const std::string& udf_filename) {
+    instance_.reset(new ArrowSQLRunnerImpl(config, udf_filename));
   }
 
   static void reset() { instance_.reset(); }
@@ -321,9 +319,7 @@ class ArrowSQLRunnerImpl {
   }
 
  protected:
-  ArrowSQLRunnerImpl(ConfigPtr config,
-                     size_t max_gpu_mem,
-                     const std::string& udf_filename)
+  ArrowSQLRunnerImpl(ConfigPtr config, const std::string& udf_filename)
       : config_(std::move(config)) {
     if (!config_) {
       config_ = std::make_shared<Config>();
@@ -331,18 +327,12 @@ class ArrowSQLRunnerImpl {
 
     storage_ = std::make_shared<ArrowStorage>(TEST_SCHEMA_ID, "test", TEST_DB_ID);
 
-    SystemParameters system_parameters;
-    system_parameters.gpu_buffer_mem_bytes = max_gpu_mem;
-    data_mgr_ = std::make_unique<DataMgr>(*config_, system_parameters);
+    data_mgr_ = std::make_unique<DataMgr>(*config_);
     auto* ps_mgr = data_mgr_->getPersistentStorageMgr();
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID, storage_);
 
-    executor_ = Executor::getExecutor(data_mgr_.get(),
-                                      data_mgr_->getBufferProvider(),
-                                      config_,
-                                      "",
-                                      "",
-                                      system_parameters);
+    executor_ = Executor::getExecutor(
+        data_mgr_.get(), data_mgr_->getBufferProvider(), config_, "", "");
     executor_->setSchemaProvider(storage_);
 
     table_functions::TableFunctionsFactory::init();
@@ -389,8 +379,8 @@ std::unique_ptr<ArrowSQLRunnerImpl> ArrowSQLRunnerImpl::instance_;
 
 }  // namespace
 
-void init(ConfigPtr config, size_t max_gpu_mem, const std::string& udf_filename) {
-  ArrowSQLRunnerImpl::init(config, max_gpu_mem, udf_filename);
+void init(ConfigPtr config, const std::string& udf_filename) {
+  ArrowSQLRunnerImpl::init(config, udf_filename);
 }
 
 void reset() {

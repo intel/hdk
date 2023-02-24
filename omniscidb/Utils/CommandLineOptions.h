@@ -28,7 +28,6 @@
 #include "QueryEngine/ExtractFromTime.h"
 #include "QueryEngine/HyperLogLog.h"
 #include "Shared/AuthMetadata.h"
-#include "Shared/SystemParameters.h"
 
 namespace po = boost::program_options;
 
@@ -56,7 +55,6 @@ class CommandLineOptions {
   bool log_user_origin = true;
   AuthMetadata authMetadata;
 
-  SystemParameters system_parameters;
   bool enable_runtime_udf = false;
 
   bool enable_watchdog = true;

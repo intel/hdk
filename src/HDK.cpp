@@ -15,7 +15,6 @@
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/RelAlgExecutor.h"
 #include "Shared/Config.h"
-#include "Shared/SystemParameters.h"
 
 extern bool g_enable_debug_timer;
 
@@ -85,10 +84,8 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
   internal_->storage = std::make_shared<ArrowStorage>(
       internal_->schema_id, internal_->db_name, internal_->db_id);
 
-  SystemParameters sys_params;
-
   internal_->data_mgr =
-      std::make_shared<Data_Namespace::DataMgr>(*internal_->config.get(), sys_params);
+      std::make_shared<Data_Namespace::DataMgr>(*internal_->config.get());
   internal_->data_mgr->getPersistentStorageMgr()->registerDataProvider(
       internal_->schema_id, internal_->storage);
 
@@ -103,8 +100,7 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
                                               internal_->data_mgr->getBufferProvider(),
                                               internal_->config,
                                               "",
-                                              "",
-                                              sys_params);
+                                              "");
   internal_->executor->setSchemaProvider(internal_->storage);
 }
 

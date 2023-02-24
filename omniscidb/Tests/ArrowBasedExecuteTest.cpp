@@ -40,8 +40,6 @@ using namespace TestHelpers::ArrowSQLRunner;
 
 bool g_aggregator{false};
 
-extern bool g_enable_calcite_view_optimize;
-
 extern bool g_is_test_env;
 
 namespace {
