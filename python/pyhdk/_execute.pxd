@@ -11,7 +11,7 @@ from libcpp.utility cimport move
 
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport CType, CSystemParameters, CConfig
+from pyhdk._common cimport CType, CConfig
 from pyhdk._storage cimport CDataMgr, CBufferProvider
 
 cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
@@ -101,7 +101,7 @@ cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
 cdef extern from "omniscidb/QueryEngine/Execute.h":
   cdef cppclass CExecutor "Executor":
     @staticmethod
-    shared_ptr[CExecutor] getExecutor(CDataMgr*, CBufferProvider*, shared_ptr[CConfig], const string&, const string&, const CSystemParameters&)
+    shared_ptr[CExecutor] getExecutor(CDataMgr*, CBufferProvider*, shared_ptr[CConfig], const string&, const string&)
 
     const CConfig &getConfig()
     shared_ptr[CConfig] getConfigPtr()

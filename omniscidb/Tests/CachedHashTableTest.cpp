@@ -27,7 +27,6 @@
 #include "QueryEngine/QueryPlanDagExtractor.h"
 #include "QueryEngine/RelAlgExecutor.h"
 #include "QueryEngine/ResultSet.h"
-#include "Shared/SystemParameters.h"
 
 #include <gtest/gtest.h>
 #include <boost/filesystem/operations.hpp>

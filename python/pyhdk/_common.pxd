@@ -93,10 +93,6 @@ cdef extern from "omniscidb/IR/Context.h":
 cdef class TypeInfo:
   cdef const CType* c_type_info
 
-cdef extern from "omniscidb/Shared/SystemParameters.h":
-  cdef cppclass CSystemParameters "SystemParameters":
-    CSystemParameters()
-
 cdef extern from "omniscidb/Utils/CommandLineOptions.h":
   cdef bool g_enable_debug_timer
 
