@@ -1097,7 +1097,8 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
               },
               prev_iters.back(),
               body_exit_bb,
-              cgen_state_.get());
+              cgen_state_.get(),
+              co);
 
           builder.SetInsertPoint(range_key_body_bb);
           cgen_state_->ir_builder_.CreateBr(body_loops_entry_bb);
@@ -1107,7 +1108,8 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
         },
         code_generator.posArg(nullptr),
         exit_bb,
-        cgen_state_.get());
+        cgen_state_.get(),
+        co);
   } else {
     loops_entry_bb = JoinLoop::codegen(
         join_loops,
@@ -1140,7 +1142,8 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
         },
         /*outer_iter=*/code_generator.posArg(nullptr),
         exit_bb,
-        cgen_state_.get());
+        cgen_state_.get(),
+        co);
   }
   CHECK(loops_entry_bb);
   cgen_state_->ir_builder_.SetInsertPoint(entry_bb);
@@ -1170,7 +1173,12 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
                                                     preheader->getNextNode());
     diamond_codegen.setFalseTarget(array_loop_head);
     const auto ret_ty = get_int_type(32, cgen_state_->context_);
-    auto array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
+    llvm::Value* array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
+    array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+        array_idx_ptr,
+        llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
+                               co.codegen_traits_desc.local_addr_space_),
+        "array.idx.ptrcast");
     CHECK(array_idx_ptr);
     cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
     const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->operand();

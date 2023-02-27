@@ -59,13 +59,13 @@ void GpuSharedMemCodeBuilder::codegen(const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
 
   // codegen the init function
-  init_func_ = createInitFunction();
+  init_func_ = createInitFunction(co);
   CHECK(init_func_);
   codegenInitialization();
   compiler::verify_function_ir(init_func_);
 
   // codegen the reduction function:
-  reduction_func_ = createReductionFunction();
+  reduction_func_ = createReductionFunction(co);
   CHECK(reduction_func_);
   codegenReduction(co);
   compiler::verify_function_ir(reduction_func_);
@@ -345,10 +345,13 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
   ir_builder.CreateRet(shared_mem_buffer);
 }
 
-llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction() const {
+llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction(
+    const CompilationOptions& co) const {
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(llvm::Type::getInt64PtrTy(context_));
-  input_arguments.push_back(llvm::Type::getInt64PtrTy(context_));
+  input_arguments.push_back(
+      llvm::Type::getInt64PtrTy(context_, co.codegen_traits_desc.local_addr_space_));
+  input_arguments.push_back(
+      llvm::Type::getInt64PtrTy(context_, co.codegen_traits_desc.local_addr_space_));
   input_arguments.push_back(llvm::Type::getInt32Ty(context_));
 
   llvm::FunctionType* ft =
@@ -358,14 +361,17 @@ llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction() const {
   return reduction_function;
 }
 
-llvm::Function* GpuSharedMemCodeBuilder::createInitFunction() const {
+llvm::Function* GpuSharedMemCodeBuilder::createInitFunction(
+    const CompilationOptions& co) const {
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(
-      llvm::Type::getInt64PtrTy(context_));                     // a pointer to the buffer
+  input_arguments.push_back(llvm::Type::getInt64PtrTy(
+      context_, co.codegen_traits_desc.local_addr_space_));     // a pointer to the buffer
   input_arguments.push_back(llvm::Type::getInt32Ty(context_));  // buffer size in bytes
 
   llvm::FunctionType* ft = llvm::FunctionType::get(
-      llvm::Type::getInt64PtrTy(context_), input_arguments, false);
+      llvm::Type::getInt64PtrTy(context_, co.codegen_traits_desc.local_addr_space_),
+      input_arguments,
+      false);
   const auto init_function = llvm::Function::Create(
       ft, llvm::Function::ExternalLinkage, "init_smem_func", module_);
   return init_function;

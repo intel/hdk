@@ -271,6 +271,11 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
           llvm_type(pointee_type(alloca->type()), ctx, co),
           mapped_value(alloca->array_size(), m),
           alloca->label());
+      translated = cgen_state->ir_builder_.CreateAddrSpaceCast(
+          translated,
+          llvm::PointerType::get(translated->getType()->getPointerElementType(),
+                                 co.codegen_traits_desc.local_addr_space_),
+          "translated.cast");
     } else if (auto memcpy = dynamic_cast<const MemCpy*>(instr_ptr)) {
       cgen_state->ir_builder_.CreateMemCpy(mapped_value(memcpy->dest(), m),
                                            LLVM_MAYBE_ALIGN(0),
@@ -352,7 +357,8 @@ void translate_for(const For* for_loop,
       },
       nullptr,
       bb_exit,
-      cgen_state);
+      cgen_state,
+      co);
   cgen_state->ir_builder_.SetInsertPoint(bb_entry);
   cgen_state->ir_builder_.CreateBr(bb_loop_body);
   cgen_state->ir_builder_.SetInsertPoint(bb_exit);

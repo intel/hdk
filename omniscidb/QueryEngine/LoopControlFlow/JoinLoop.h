@@ -76,7 +76,8 @@ class JoinLoop {
           body_codegen,
       llvm::Value* outer_iter,
       llvm::BasicBlock* exit_bb,
-      CgenState* cgen_state);
+      CgenState* cgen_state,
+      const CompilationOptions& co);
 
   JoinLoopKind kind() const { return kind_; }
 

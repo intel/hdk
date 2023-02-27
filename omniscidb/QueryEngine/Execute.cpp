@@ -3676,9 +3676,10 @@ llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth,
   if (bitWidth == val_width) {
     return val;
   }
-  return cgen_state_->ir_builder_.CreateBitCast( 
-      val, cgen_traits.localPointerType(get_int_type(bitWidth, cgen_state_->context_)));
-
+  return cgen_state_->ir_builder_.CreateBitCast(
+      val,
+      llvm::PointerType::get(get_int_type(bitWidth, cgen_state_->context_),
+                             val->getType()->getPointerAddressSpace()));
 }
 
 #define EXECUTE_INCLUDE

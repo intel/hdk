@@ -102,7 +102,13 @@ std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
                                 data_ptr_llvm_type,         /* T* ptr */
                                 llvm::Type::getInt64Ty(ctx) /* int64_t sz */
                             });
-  auto col = ir_builder.CreateAlloca(col_struct_type);
+  llvm::Value* col = ir_builder.CreateAlloca(col_struct_type);
+  col = ir_builder.CreateAddrSpaceCast(
+      col,
+      llvm::PointerType::get(col->getType()->getPointerElementType(),
+                             codegen_traits_desc.local_addr_space_),
+      "col.cast");
+
   col->setName(col_name);
   auto col_ptr_ptr = ir_builder.CreateStructGEP(col_struct_type, col, 0);
   auto col_sz_ptr = ir_builder.CreateStructGEP(col_struct_type, col, 1);
@@ -136,7 +142,8 @@ std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
     ir_builder.CreateStore(const_minus1, col_sz_ptr);
   }
   auto col_ptr = ir_builder.CreatePointerCast(
-      col_ptr_ptr, cgen_traits.localPointerType(llvm::Type::getInt8Ty(ctx)));
+      col_ptr_ptr,
+      llvm::Type::getInt8PtrTy(ctx, col_ptr_ptr->getType()->getPointerAddressSpace()));
   col_ptr->setName(col_name + "_ptr");
   return {col, col_ptr};
 }
@@ -165,7 +172,13 @@ llvm::Value* alloc_column_list(std::string col_list_name,
                                 llvm::Type::getInt64Ty(ctx), /* int64_t length */
                                 llvm::Type::getInt64Ty(ctx)  /* int64_t size */
                             });
-  auto col_list = ir_builder.CreateAlloca(col_list_struct_type);
+  llvm::Value* col_list = ir_builder.CreateAlloca(col_list_struct_type);
+  col_list = ir_builder.CreateAddrSpaceCast(
+      col_list,
+      llvm::PointerType::get(col_list->getType()->getPointerElementType(),
+                             codegen_traits_desc.local_addr_space_),
+      "col.list.cast");
+
   col_list->setName(col_list_name);
   auto col_list_ptr_ptr = ir_builder.CreateStructGEP(col_list_struct_type, col_list, 0);
   auto col_list_length_ptr =
@@ -211,7 +224,9 @@ llvm::Value* alloc_column_list(std::string col_list_name,
   }
 
   auto col_list_ptr = ir_builder.CreatePointerCast(
-      col_list_ptr_ptr, cgen_traits.localPointerType(llvm::Type::getInt8Ty(ctx)));
+      col_list_ptr_ptr,
+      llvm::Type::getInt8PtrTy(ctx,
+                               col_list_ptr_ptr->getType()->getPointerAddressSpace()));
   col_list_ptr->setName(col_list_name + "_ptrs");
   return col_list_ptr;
 }
@@ -346,19 +361,26 @@ void TableFunctionCompilationContext::generateEntryPoint(
     }
     if (type->isFloatingPoint()) {
       auto r = cgen_state->ir_builder_.CreateBitCast(
-          col_heads[i], get_fp_ptr_type(get_bit_width(type), ctx, cgen_traits.getLocalAddrSpace()));
+          col_heads[i],
+          get_fp_ptr_type(get_bit_width(type),
+                          ctx,
+                          col_heads[i]->getType()->getPointerAddressSpace()));
       func_args.push_back(
           cgen_state->ir_builder_.CreateLoad(r->getType()->getPointerElementType(), r));
       CHECK_EQ(col_index, -1);
     } else if (type->isInteger() || type->isBoolean()) {
       auto r = cgen_state->ir_builder_.CreateBitCast(
-          col_heads[i], get_int_ptr_type(get_bit_width(type), ctx, cgen_traits.getLocalAddrSpace()));
+          col_heads[i],
+          get_int_ptr_type(get_bit_width(type),
+                           ctx,
+                           col_heads[i]->getType()->getPointerAddressSpace()));
       func_args.push_back(
           cgen_state->ir_builder_.CreateLoad(r->getType()->getPointerElementType(), r));
       CHECK_EQ(col_index, -1);
     } else if (type->isString()) {
-      auto varchar_size =
-          cgen_state->ir_builder_.CreateBitCast(col_heads[i], get_int_ptr_type(64, ctx, cgen_traits.getLocalAddrSpace()));
+      auto varchar_size = cgen_state->ir_builder_.CreateBitCast(
+          col_heads[i],
+          get_int_ptr_type(64, ctx, col_heads[i]->getType()->getPointerAddressSpace()));
       auto varchar_ptr = cgen_state->ir_builder_.CreateGEP(
           col_heads[i]->getType()->getScalarType()->getPointerElementType(),
           col_heads[i],
