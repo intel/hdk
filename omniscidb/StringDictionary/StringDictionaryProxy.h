@@ -18,6 +18,7 @@
 #define STRINGDICTIONARY_STRINGDICTIONARYPROXY_H
 
 #include "Logger/Logger.h"  // For CHECK macros
+#include "Shared/funcannotations.h"
 #include "StringDictionary.h"
 
 #include <map>
@@ -28,6 +29,10 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+#ifndef STRINGDICTIONARY_EXPORT
+#define STRINGDICTIONARY_EXPORT EXTERN
+#endif
 
 // used to access a StringDictionary when transient strings are involved
 class StringDictionaryProxy {
@@ -174,7 +179,7 @@ class StringDictionaryProxy {
    * @return size_t Number of total string entries for this proxy
    *
    */
-  size_t entryCount() const;
+  STRINGDICTIONARY_EXPORT size_t entryCount() const;
 
   void updateGeneration(const int64_t generation) noexcept;
 

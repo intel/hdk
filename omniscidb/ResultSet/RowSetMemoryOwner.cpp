@@ -7,7 +7,7 @@
 
 #include "RowSetMemoryOwner.h"
 
-extern bool g_cache_string_hash;
+EXTERN extern bool g_cache_string_hash;
 
 StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
     const int dict_id_in,

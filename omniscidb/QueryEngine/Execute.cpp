@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#include "QueryEngine/Execute.h"
+#include "Shared/funcannotations.h"
+#define QUERYENGINE_EXPORT RUNTIME_EXPORT
+
 #include "CardinalityEstimator.h"
+#include "QueryEngine/Execute.h"
 
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <boost/filesystem/operations.hpp>

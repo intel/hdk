@@ -16,10 +16,16 @@
 
 #pragma once
 
+#include "Shared/funcannotations.h"
+
 #include <algorithm>
 #include <thread>
 
-extern unsigned g_cpu_threads_override;
+#ifndef SHARED_EXPORT
+#define SHARED_EXPORT EXTERN
+#endif
+
+SHARED_EXPORT extern unsigned g_cpu_threads_override;
 
 inline int cpu_threads() {
   auto ov = g_cpu_threads_override;

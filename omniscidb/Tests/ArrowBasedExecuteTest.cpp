@@ -41,7 +41,7 @@ using namespace TestHelpers::ArrowSQLRunner;
 
 bool g_aggregator{false};
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 namespace {
 

@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include "Shared/funcannotations.h"
+#define QUERYENGINE_EXPORT RUNTIME_EXPORT
+
 #include "QueryEngine/JoinHashTable/PerfectJoinHashTable.h"
 
 #include <atomic>
@@ -31,8 +34,10 @@
 #include "QueryEngine/RuntimeFunctions.h"
 
 // let's only consider CPU hahstable recycler at this moment
-std::unique_ptr<HashtableRecycler> PerfectJoinHashTable::hash_table_cache_;
-std::unique_ptr<HashingSchemeRecycler> PerfectJoinHashTable::hash_table_layout_cache_;
+QUERYENGINE_EXPORT std::unique_ptr<HashtableRecycler>
+    PerfectJoinHashTable::hash_table_cache_;
+QUERYENGINE_EXPORT std::unique_ptr<HashingSchemeRecycler>
+    PerfectJoinHashTable::hash_table_layout_cache_;
 std::once_flag PerfectJoinHashTable::init_caches_flag_;
 
 namespace {

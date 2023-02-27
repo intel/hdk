@@ -86,6 +86,8 @@
 
 #ifdef _WIN32
 #define RUNTIME_EXPORT __declspec(dllexport)
+#define EXTERN __declspec(dllimport)
 #else
 #define RUNTIME_EXPORT
+#define EXTERN
 #endif
