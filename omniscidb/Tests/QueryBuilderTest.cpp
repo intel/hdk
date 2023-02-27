@@ -1956,7 +1956,9 @@ TEST_F(QueryBuilderTest, CstExprScalar) {
   checkCst(builder.cst("00:20:34", "time[ns]"),
            1234000000000,
            ctx().time64(TimeUnit::kNano, false));
-  checkCst(builder.time("01:10:11"), 4211000000, ctx().time64(TimeUnit::kMicro, false));
+  checkCst(builder.time("01:10:11"),
+           static_cast<int64_t>(4211000000),
+           ctx().time64(TimeUnit::kMicro, false));
   EXPECT_THROW(builder.cst(1234, "date[d]"), InvalidQueryError);
   checkCst(builder.cst(1234, "date[s]"), 1234, ctx().date64(TimeUnit::kSecond, false));
   checkCst(builder.cst(1234, "date[ms]"), 1234, ctx().date64(TimeUnit::kMilli, false));
