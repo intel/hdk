@@ -10,6 +10,7 @@
 #include <level_zero/ze_api.h>
 
 #include "L0Mgr/L0Mgr.h"
+#include "OSDependent/omnisci_path.h"
 #include "TestHelpers.h"
 
 template <typename T, size_t N>
@@ -163,7 +164,8 @@ std::string mangle_spirv_builtin(const llvm::Function& func) {
 TEST_F(SPIRVExecuteTest, SPIRVBuiltins) {
   using namespace llvm;
   LLVMContext ctx;
-  auto module = read_gen_module_from_bc("../QueryEngine/genx.bc", ctx);
+  std::string genx_path = omnisci::get_root_abs_path() + "/QueryEngine/genx.bc";
+  auto module = read_gen_module_from_bc(genx_path, ctx);
   IRBuilder<> builder(ctx);
 
   std::vector<Type*> args{Type::getFloatPtrTy(ctx, 1), Type::getFloatPtrTy(ctx, 1)};
