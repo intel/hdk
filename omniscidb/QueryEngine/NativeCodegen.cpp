@@ -1490,7 +1490,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                                       target);
   auto traits = backend->traits();
   CompilationOptions co_codegen_traits = co;
-  co_codegen_traits.codegen_traits_desc = backend->traitsDescriptor();
+  co_codegen_traits.codegen_traits_desc = backend->traitsDesc();
   if (is_gpu) {
     cgen_state_->module_->setDataLayout(traits.dataLayout());
     cgen_state_->module_->setTargetTriple(traits.triple());
@@ -1899,6 +1899,11 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
                                               row_func_entry_bb->begin());
       loop_done = cgen_state_->ir_builder_.CreateAlloca(
           get_int_type(1, cgen_state_->context_), nullptr, "loop_done");
+      loop_done = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+          loop_done,
+          llvm::PointerType::get(loop_done->getType()->getPointerElementType(),
+                                 co.codegen_traits_desc.local_addr_space_),
+          "loop.done.cast");
       cgen_state_->ir_builder_.SetInsertPoint(cgen_state_->row_func_bb_);
       cgen_state_->ir_builder_.CreateStore(cgen_state_->llBool(true), loop_done);
     }

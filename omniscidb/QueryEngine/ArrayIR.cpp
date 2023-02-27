@@ -131,6 +131,12 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
   llvm::Value* allocated_target_buffer;
   if (array_expr->isLocalAlloc()) {
     allocated_target_buffer = ir_builder.CreateAlloca(array_type);
+    allocated_target_buffer = ir_builder.CreateAddrSpaceCast(
+        allocated_target_buffer,
+        llvm::PointerType::get(
+            allocated_target_buffer->getType()->getPointerElementType(),
+            cgen_traits.getLocalAddrSpace()),
+        "allocated.target.buffer.cast");
   } else {
     if (co.device_type == ExecutorDeviceType::GPU) {
       throw QueryMustRunOnCpu();

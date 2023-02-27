@@ -340,6 +340,11 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         get_llvm_type_from_array_type(ret_type, cgen_state_->context_, codegen_traits_desc),
         /* has_is_null = */ ret_type->isArray() || ret_type->isText());
     buffer_ret = cgen_state_->ir_builder_.CreateAlloca(struct_ty);
+    buffer_ret = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+        buffer_ret,
+        llvm::PointerType::get(buffer_ret->getType()->getPointerElementType(),
+                               codegen_traits_desc.local_addr_space_),
+        "buffer.ret.cast");
     args.insert(args.begin(), buffer_ret);
   }
 
@@ -393,6 +398,11 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
           get_llvm_type_from_array_type(func_type, cgen_state_->context_, codegen_traits_desc),
           func_type->isArray() || func_type->isText());
       null_array_alloca = cgen_state_->ir_builder_.CreateAlloca(arr_struct_ty);
+      null_array_alloca = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+          null_array_alloca,
+          llvm::PointerType::get(null_array_alloca->getType()->getPointerElementType(),
+                                 codegen_traits_desc.local_addr_space_),
+          "null.array.alloca.cast");
     }
     const auto args_notnull_lv = cgen_state_->ir_builder_.CreateNot(
         codegenFunctionOperNullArg(function_oper, orig_arg_lvs));
@@ -600,7 +610,12 @@ void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
 
   auto buffer_abstraction = get_buffer_struct_type(
       cgen_state_, ext_func_name, param_num, buffer_buf->getType(), !!(buffer_null));
-  auto alloc_mem = cgen_state_->ir_builder_.CreateAlloca(buffer_abstraction);
+  llvm::Value* alloc_mem = cgen_state_->ir_builder_.CreateAlloca(buffer_abstraction);
+  alloc_mem = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+      alloc_mem,
+      llvm::PointerType::get(alloc_mem->getType()->getPointerElementType(),
+                             codegen_traits_desc.local_addr_space_),
+      "alloc.mem.cast");
 
   auto buffer_buf_ptr =
       cgen_state_->ir_builder_.CreateStructGEP(buffer_abstraction, alloc_mem, 0);
@@ -731,28 +746,29 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
 llvm::Value* CodeGenerator::castArrayPointer(llvm::Value* ptr,
                                              const hdk::ir::Type* elem_type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
+  const unsigned ptr_address_space = ptr->getType()->getPointerAddressSpace();
   if (elem_type->isFp32()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
-        ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+        ptr, llvm::Type::getFloatPtrTy(cgen_state_->context_, ptr_address_space));
   }
   if (elem_type->isFp64()) {
     return cgen_state_->ir_builder_.CreatePointerCast(
-        ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+        ptr, llvm::Type::getDoublePtrTy(cgen_state_->context_, ptr_address_space));
   }
   CHECK(elem_type->isInteger() || elem_type->isBoolean() || elem_type->isExtDictionary());
   switch (elem_type->size()) {
     case 1:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt8PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+          ptr, llvm::Type::getInt8PtrTy(cgen_state_->context_, ptr_address_space));
     case 2:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt16PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+          ptr, llvm::Type::getInt16PtrTy(cgen_state_->context_, ptr_address_space));
     case 4:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt32PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+          ptr, llvm::Type::getInt32PtrTy(cgen_state_->context_, ptr_address_space));
     case 8:
       return cgen_state_->ir_builder_.CreatePointerCast(
-          ptr, llvm::Type::getInt64PtrTy(cgen_state_->context_, ptr->getType()->getPointerAddressSpace()));
+          ptr, llvm::Type::getInt64PtrTy(cgen_state_->context_, ptr_address_space));
     default:
       CHECK(false);
   }

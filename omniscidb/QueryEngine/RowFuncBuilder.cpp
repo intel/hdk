@@ -374,12 +374,22 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
         QueryDescriptionType::GroupByPerfectHash) {
       group_key =
           LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT), key_size_lv);
+      group_key = LL_BUILDER.CreateAddrSpaceCast(
+          group_key,
+          llvm::PointerType::get(group_key->getType()->getPointerElementType(),
+                                 co.codegen_traits_desc.local_addr_space_),
+          "group.key.cast");
     } else if (query_mem_desc.getQueryDescriptionType() ==
                QueryDescriptionType::GroupByBaselineHash) {
       group_key =
           col_width_size == sizeof(int32_t)
               ? LL_BUILDER.CreateAlloca(llvm::Type::getInt32Ty(LL_CONTEXT), key_size_lv)
               : LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT), key_size_lv);
+      group_key = LL_BUILDER.CreateAddrSpaceCast(
+          group_key,
+          llvm::PointerType::get(group_key->getType()->getPointerElementType(),
+                                 co.codegen_traits_desc.local_addr_space_),
+          "group.key.cast");
     }
     CHECK(group_key);
     CHECK(key_size_lv);
@@ -918,11 +928,18 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
                                       const QueryMemoryDescriptor& query_mem_desc,
                                       const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   const auto& estimator_arg = ra_exe_unit_.estimator->getArgument();
   auto estimator_comp_count_lv = LL_INT(static_cast<int32_t>(estimator_arg.size()));
-  auto estimator_key_lv = LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT),
-                                                  estimator_comp_count_lv);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  llvm::Value* estimator_key_lv = LL_BUILDER.CreateAlloca(
+      llvm::Type::getInt64Ty(LL_CONTEXT), estimator_comp_count_lv);
+  estimator_key_lv = LL_BUILDER.CreateAddrSpaceCast(
+      estimator_key_lv,
+      llvm::PointerType::get(estimator_key_lv->getType()->getPointerElementType(),
+                             cgen_traits.getLocalAddrSpace()),
+      "estimator.key.lv.cast");
+
   int32_t subkey_idx = 0;
   for (const auto& estimator_arg_comp : estimator_arg) {
     const auto estimator_arg_comp_lvs =
@@ -944,9 +961,15 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
             estimator_key_lv,
             LL_INT(subkey_idx++)));
   }
-  const auto int8_ptr_ty = cgen_traits.localPointerType(get_int_type(8, LL_CONTEXT));
-  const auto bitmap = LL_BUILDER.CreateBitCast(&*ROW_FUNC->arg_begin(), int8_ptr_ty);
-  const auto key_bytes = LL_BUILDER.CreateBitCast(estimator_key_lv, int8_ptr_ty);
+  const auto bitmap = LL_BUILDER.CreateBitCast(
+      &*ROW_FUNC->arg_begin(),
+      llvm::PointerType::get(
+          get_int_type(8, LL_CONTEXT),
+          (&*ROW_FUNC->arg_begin())->getType()->getPointerAddressSpace()));
+  const auto key_bytes = LL_BUILDER.CreateBitCast(
+      estimator_key_lv,
+      llvm::PointerType::get(get_int_type(8, LL_CONTEXT),
+                             estimator_key_lv->getType()->getPointerAddressSpace()));
   const auto estimator_comp_bytes_lv =
       LL_INT(static_cast<int32_t>(estimator_arg.size() * sizeof(int64_t)));
   const auto bitmap_size_lv =
@@ -1085,7 +1108,9 @@ llvm::Value* RowFuncBuilder::getAdditionalLiteral(const int32_t off) {
   CHECK_LT(off, 0);
   const auto lit_buff_lv = get_arg_by_name(ROW_FUNC, "literals");
   auto* bit_cast = LL_BUILDER.CreateBitCast(
-      lit_buff_lv, llvm::PointerType::get(get_int_type(64, LL_CONTEXT), 0));
+      lit_buff_lv,
+      llvm::PointerType::get(get_int_type(64, LL_CONTEXT),
+                             lit_buff_lv->getType()->getPointerAddressSpace()));
   auto* gep =
       LL_BUILDER.CreateGEP(bit_cast->getType()->getScalarType()->getPointerElementType(),
                            bit_cast,

@@ -1455,7 +1455,7 @@ class ExecuteTestBase {
                  {"y", ctx().int32(false)},
                  {"xx", ctx().int16()}},
                 {2});
-    run_sqlite_query("DROP TABLE IF EXISTS test_inner;");
+    run_sqlite_query("DROP TABLE IF EXISTS test_inner_loop_join;");
     run_sqlite_query("CREATE TABLE test_inner_loop_join(x int not null, y int not null, xx smallint);");
 
     run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(7, 43, 12);");

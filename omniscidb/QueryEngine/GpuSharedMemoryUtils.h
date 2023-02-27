@@ -80,12 +80,12 @@ class GpuSharedMemCodeBuilder {
    * Create the reduction function in the LLVM module, with predefined arguments and
    * return type
    */
-  llvm::Function* createReductionFunction() const;
+  llvm::Function* createReductionFunction(const CompilationOptions& co) const;
   /**
    * Creates the initialization function in the LLVM module, with predefined arguments and
    * return type
    */
-  llvm::Function* createInitFunction() const;
+  llvm::Function* createInitFunction(const CompilationOptions& co) const;
   /**
    * Search for a particular funciton name in the module, and returns it if found
    */
