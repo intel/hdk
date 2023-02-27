@@ -613,7 +613,7 @@ void ResultSetEmulator::rse_fill_storage_buffer(int8_t* buff,
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
-#else
+#elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
@@ -640,7 +640,7 @@ void ResultSetEmulator::print_emulator_diag() {
 
 #ifdef __clang__
 #pragma clang diagnostic pop
-#else
+#elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 

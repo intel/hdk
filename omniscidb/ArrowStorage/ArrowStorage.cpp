@@ -20,8 +20,10 @@
 #include "Shared/measure.h"
 #include "Shared/threading.h"
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 #include <arrow/csv/reader.h>
 #include <arrow/io/api.h>
@@ -31,7 +33,9 @@
 #include <parquet/api/reader.h>
 #include <parquet/arrow/reader.h>
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 
 using namespace std::string_literals;
 

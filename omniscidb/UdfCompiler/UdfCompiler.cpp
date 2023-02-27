@@ -16,8 +16,10 @@
 
 #include "UdfCompiler.h"
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
 
 #include <clang/AST/AST.h>
 #include <clang/AST/ASTConsumer.h>
@@ -35,7 +37,9 @@
 #include <llvm/Support/Program.h>
 #include <llvm/Support/raw_ostream.h>
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 
 #include <boost/process/search_path.hpp>
 #include <iterator>
