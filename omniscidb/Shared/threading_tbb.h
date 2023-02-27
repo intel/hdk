@@ -1,3 +1,4 @@
+#include "Shared/funcannotations.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -5,6 +6,10 @@
 #include <tbb/task_arena.h>
 #include <tbb/task_group.h>
 #include <functional>
+
+#ifndef SHARED_EXPORT
+#define SHARED_EXPORT EXTERN
+#endif
 
 namespace threading_tbb {
 
@@ -14,7 +19,7 @@ using tbb::task_group;
 namespace this_task_arena {
 using namespace tbb::this_task_arena;
 }
-extern tbb::task_arena g_tbb_arena;
+SHARED_EXPORT extern tbb::task_arena g_tbb_arena;
 
 template <typename... X>
 void parallel_for(X&&... x) {

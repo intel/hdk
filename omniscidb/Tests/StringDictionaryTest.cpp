@@ -37,7 +37,7 @@ static const std::string BASE_PATH1 =
 static const std::string BASE_PATH2 =
     BASE_PATH + "/"s + boost::filesystem::unique_path().string();
 
-extern bool g_cache_string_hash;
+EXTERN extern bool g_cache_string_hash;
 
 namespace {
 

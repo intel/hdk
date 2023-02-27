@@ -40,7 +40,7 @@ extern std::unique_ptr<CudaMgr_Namespace::CudaMgr> g_cuda_mgr;
 #include <numeric>
 #include <random>
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 namespace {
 

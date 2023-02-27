@@ -35,7 +35,7 @@
 #include <random>
 #include <stdexcept>
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;

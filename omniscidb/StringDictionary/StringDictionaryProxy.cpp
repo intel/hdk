@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "Shared/funcannotations.h"
+#define STRINGDICTIONARY_EXPORT RUNTIME_EXPORT
 #include "StringDictionary/StringDictionaryProxy.h"
 
 #include "Logger/Logger.h"
