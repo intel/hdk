@@ -483,9 +483,10 @@ bool exprs_share_one_and_same_rte_idx(const hdk::ir::ExprPtr& lhs_expr,
   return collector.result().size() == 1ULL;
 }
 
-const hdk::ir::Type* get_str_dict_cast_type(const hdk::ir::Type* lhs_type,
-                                            const hdk::ir::Type* rhs_type,
-                                            const Executor* executor) {
+const hdk::ir::Type* get_str_dict_cast_type(
+    const hdk::ir::Type* lhs_type,
+    const hdk::ir::Type* rhs_type,
+    const StringDictionaryProxyProvider* executor) {
   CHECK(lhs_type->isExtDictionary());
   CHECK(rhs_type->isExtDictionary());
   const auto lhs_dict_id = lhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
