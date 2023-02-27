@@ -153,9 +153,7 @@ if(ENABLE_DWARF_BENCH)
     list(APPEND query_engine_source_files CostModel/DataSources/DwarfBench.cpp)
 endif()
 
-if(NOT MSVC)
-    list(APPEND query_engine_source_files ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
-endif()
+list(APPEND query_engine_source_files ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
 
 set(query_engine_cuda_source_files
     TopKSort.cu
@@ -208,9 +206,7 @@ endif()
 
 add_library(QueryEngine ${query_engine_source_files} $<$<BOOL:ENABLE_CUDA>:${query_engine_cuda_source_files}>)
 add_dependencies(QueryEngine QueryEngineFunctionsTargets)
-if(NOT MSVC)
-    add_dependencies(QueryEngine QueryEngineTableFunctionsFactory_init)
-endif()
+add_dependencies(QueryEngine QueryEngineTableFunctionsFactory_init)
 
 set(cpu_runtime_function_sources RuntimeFunctions.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
 set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
@@ -323,7 +319,6 @@ if (ENABLE_MLPACK)
     list(APPEND TABLE_FUNCTION_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/TableFunctions/MLFunctions.hpp)
 endif ()
 
-if(NOT MSVC)
 add_custom_command(
         DEPENDS ${TABLE_FUNCTION_HEADERS}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_cpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp
@@ -335,7 +330,6 @@ add_custom_target(QueryEngineTableFunctionsFactory_init
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp GENERATED)
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_cpu.hpp GENERATED)
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp GENERATED)
-endif()
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/OmniSciTypes.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(query_engine_install_artefacts
@@ -377,9 +371,7 @@ endif()
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
 set(TABLE_FUNCTIONS_DEPS "")
-if(NOT MSVC)
-    list(APPEND TABLE_FUNCTIONS_DEPS ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
-endif()
+list(APPEND TABLE_FUNCTIONS_DEPS ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
 
 string(REPLACE " " ";" CUDA_FLAGS_LIST "$ENV{CUDAFLAGS}")
 add_custom_command(
