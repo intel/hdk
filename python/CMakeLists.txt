@@ -15,8 +15,17 @@ set(pydeps
     ${PXD_SOURCES}
     Calcite)
 
-set(SETUP_LDFLAGS "-L$<TARGET_FILE_DIR:Calcite> -L$<TARGET_FILE_DIR:IR> -L$<TARGET_FILE_DIR:ArrowStorage> -L$<TARGET_FILE_DIR:QueryBuilder> -L$<TARGET_FILE_DIR:QueryEngine> -L$<TARGET_FILE_DIR:SchemaMgr> -L$<TARGET_FILE_DIR:ConfigBuilder> -L$<TARGET_FILE_DIR:Logger> -L$<TARGET_FILE_DIR:Shared> -L$<TARGET_FILE_DIR:DataMgr>")
-set(SETUP_FLAGS -g -f -I ${CMAKE_CURRENT_SOURCE_DIR})
+# $<SEMICOLON> is used here as a list separator and it is converted to colon ":" on Linux in $<SHELL_PATH>
+# expression.
+set(SETUP_LDFLAGS $<TARGET_FILE_DIR:Calcite>$<SEMICOLON>$<TARGET_FILE_DIR:IR>$<SEMICOLON>$<TARGET_FILE_DIR:ArrowStorage>$<SEMICOLON>$<TARGET_FILE_DIR:QueryBuilder>$<SEMICOLON>$<TARGET_FILE_DIR:QueryEngine>$<SEMICOLON>$<TARGET_FILE_DIR:SchemaMgr>$<SEMICOLON>$<TARGET_FILE_DIR:ConfigBuilder>$<SEMICOLON>$<TARGET_FILE_DIR:Logger>$<SEMICOLON>$<TARGET_FILE_DIR:Shared>$<SEMICOLON>$<TARGET_FILE_DIR:DataMgr>$<SEMICOLON>$<TARGET_FILE_DIR:${Boost_LOG_LIBRARY}>)
+
+set(SETUP_FLAGS -f -I ${CMAKE_CURRENT_SOURCE_DIR} -L "$<SHELL_PATH:${SETUP_LDFLAGS}>")
+
+if (NOT WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+    # On windows enabling debug in python requires python debug library which is absent in conda
+    # so python with debug info is built only on linux.
+    list(APPEND SETUP_FLAGS -g)
+endif()
 
 if(ENABLE_FOLLY)
    list(APPEND SETUP_FLAGS "-DHAVE_FOLLY") 
@@ -25,15 +34,15 @@ endif()
 set(SETUP_INSTALL_FLAGS "--prefix \${CMAKE_INSTALL_PREFIX}")
 
 add_custom_target(pyhdk ALL
-    COMMAND cd ${CMAKE_CURRENT_BINARY_DIR} && LDFLAGS=${SETUP_LDFLAGS} ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
+    COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
     DEPENDS Calcite ${pydeps}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 add_custom_target(pyhdk-install
-    COMMAND cd ${CMAKE_CURRENT_BINARY_DIR} && LDFLAGS=${SETUP_LDFLAGS} ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${SETUP_INSTALL_FLAGS}
+    COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${SETUP_INSTALL_FLAGS}
     DEPENDS Calcite ${pydeps}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-string(REPLACE ";" " " SETUP_FLAGS_STR "${SETUP_FLAGS}")
-string(REPLACE ";" " " SETUP_INSTALL_FLAGS_STR "${SETUP_INSTALL_FLAGS}")
-install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND bash -c \"LDFLAGS='${SETUP_LDFLAGS}' ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS_STR} install ${SETUP_INSTALL_FLAGS}\")")
+install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${SETUP_INSTALL_FLAGS})")
