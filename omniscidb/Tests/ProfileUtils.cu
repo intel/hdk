@@ -17,14 +17,14 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
-#else
+#elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 #include "../QueryEngine/cuda_mapd_rt.cu"
 #ifdef __clang__
 #pragma clang diagnostic pop
-#else
+#elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
