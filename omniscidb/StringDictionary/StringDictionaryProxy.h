@@ -255,4 +255,12 @@ class StringDictionaryProxy {
   friend class StringLocalCallback;
   friend class StringNetworkCallback;
 };
+
+class StringDictionaryProxyProvider {
+ public:
+  virtual StringDictionaryProxy* getStringDictionaryProxy(
+      const int dict_id,
+      const bool with_generation) const = 0;
+};
+
 #endif  // STRINGDICTIONARY_STRINGDICTIONARYPROXY_H

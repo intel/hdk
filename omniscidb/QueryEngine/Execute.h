@@ -239,7 +239,7 @@ struct StreamExecutionContext {
       : ra_exe_unit(ra_exe_unit), co(co), eo(eo) {}
 };
 
-class Executor {
+class Executor : public StringDictionaryProxyProvider {
   static_assert(sizeof(float) == 4 && sizeof(double) == 8,
                 "Host hardware not supported, unexpected size of float / double.");
   static_assert(sizeof(time_t) == 8,
@@ -301,8 +301,9 @@ class Executor {
   /**
    * Returns a string dictionary proxy using the currently active row set memory owner.
    */
-  StringDictionaryProxy* getStringDictionaryProxy(const int dict_id,
-                                                  const bool with_generation) const {
+  virtual StringDictionaryProxy* getStringDictionaryProxy(
+      const int dict_id,
+      const bool with_generation) const {
     CHECK(row_set_mem_owner_);
     return getStringDictionaryProxy(dict_id, row_set_mem_owner_, with_generation);
   }
