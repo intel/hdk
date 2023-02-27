@@ -37,6 +37,12 @@
 #ifndef SHARED_LOGGER_H
 #define SHARED_LOGGER_H
 
+#include "Shared/funcannotations.h"
+
+#ifndef LOGGER_EXPORT
+#define LOGGER_EXPORT EXTERN
+#endif
+
 #if !(defined(__CUDACC__) || defined(NO_BOOST))
 
 #include <boost/config.hpp>
@@ -68,7 +74,7 @@ class path;
 }
 }  // namespace boost
 
-extern bool g_enable_debug_timer;
+LOGGER_EXPORT extern bool g_enable_debug_timer;
 
 namespace logger {
 
@@ -183,16 +189,16 @@ class Logger {
   ~Logger();
   operator bool() const;
   // Must check operator bool() first before calling stream().
-  boost::log::record_ostream& stream(char const* file, int line);
+  LOGGER_EXPORT boost::log::record_ostream& stream(char const* file, int line);
 };
 
 inline bool fast_logging_check(Channel) {
-  extern bool g_any_active_channels;
+  LOGGER_EXPORT extern bool g_any_active_channels;
   return g_any_active_channels;
 }
 
 inline bool fast_logging_check(Severity severity) {
-  extern Severity g_min_active_severity;
+  LOGGER_EXPORT extern logger::Severity g_min_active_severity;
   return g_min_active_severity <= severity;
 }
 

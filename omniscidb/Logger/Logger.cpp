@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-bool g_enable_debug_timer{false};
+#include "Shared/funcannotations.h"
+#define LOGGER_EXPORT RUNTIME_EXPORT
+
+LOGGER_EXPORT bool g_enable_debug_timer{false};
 
 #ifndef __CUDACC__
 

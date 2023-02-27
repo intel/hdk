@@ -25,7 +25,7 @@
 
 #include <gtest/gtest.h>
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 auto int8_type = hdk::ir::Context::defaultCtx().int8();
 auto int16_type = hdk::ir::Context::defaultCtx().int16();

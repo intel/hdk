@@ -31,7 +31,7 @@ constexpr int TEST_TABLE_ID1 = 1;
 constexpr int TEST_TABLE_ID2 = 2;
 constexpr int TEST_TABLE_ID3 = 3;
 
-extern bool g_enable_table_functions;
+EXTERN extern bool g_enable_table_functions;
 
 namespace {
 

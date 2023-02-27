@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include "Shared/funcannotations.h"
+#define QUERYENGINE_EXPORT RUNTIME_EXPORT
+
 #include "QueryEngine/JoinHashTable/BaselineJoinHashTable.h"
 
 #include <future>
@@ -32,8 +35,10 @@
 
 // let's only consider CPU hashtable recycler at this moment
 // todo (yoonmin): support GPU hashtable cache without regression
-std::unique_ptr<HashtableRecycler> BaselineJoinHashTable::hash_table_cache_;
-std::unique_ptr<HashingSchemeRecycler> BaselineJoinHashTable::hash_table_layout_cache_;
+QUERYENGINE_EXPORT std::unique_ptr<HashtableRecycler>
+    BaselineJoinHashTable::hash_table_cache_;
+QUERYENGINE_EXPORT std::unique_ptr<HashingSchemeRecycler>
+    BaselineJoinHashTable::hash_table_layout_cache_;
 std::once_flag BaselineJoinHashTable::init_caches_flag_;
 
 //! Make hash table from an in-flight SQL query's parse tree etc.

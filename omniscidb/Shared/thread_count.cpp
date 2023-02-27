@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include "Shared/funcannotations.h"
+#define SHARED_EXPORT RUNTIME_EXPORT
+
 #include "thread_count.h"
 
-unsigned g_cpu_threads_override{0};
+SHARED_EXPORT unsigned g_cpu_threads_override{0};

@@ -46,7 +46,7 @@ using namespace TestHelpers::ArrowSQLRunner;
 
 std::shared_ptr<DataMgrDataProvider> g_data_provider;
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 bool skip_tests(const ExecutorDeviceType device_type) {
 #ifdef HAVE_CUDA
