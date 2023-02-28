@@ -525,8 +525,6 @@ class ResultSet {
   class CellCallback;
   void eachCellInColumn(RowIterationState&, CellCallback const&);
 
-  const Executor* getExecutor() const { return query_mem_desc_.getExecutor(); }
-
  private:
   void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
 

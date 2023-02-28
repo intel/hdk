@@ -73,6 +73,42 @@ QueryExecutionContext::QueryExecutionContext(
                                                             executor);
 }
 
+std::unique_ptr<QueryExecutionContext> QueryExecutionContext::create(
+    const RelAlgExecutionUnit& ra_exe_unit,
+    const QueryMemoryDescriptor& query_mem_desc,
+    Executor* executor,
+    const ExecutorDeviceType device_type,
+    const ExecutorDispatchMode dispatch_mode,
+    const bool use_groupby_buffer_desc,
+    const int device_id,
+    const int64_t num_rows,
+    const std::vector<std::vector<const int8_t*>>& col_buffers,
+    const std::vector<std::vector<uint64_t>>& frag_offsets,
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+    const bool output_columnar,
+    const bool sort_on_gpu,
+    const size_t thread_idx) {
+  auto timer = DEBUG_TIMER(__func__);
+  if (frag_offsets.empty()) {
+    return nullptr;
+  }
+  return std::unique_ptr<QueryExecutionContext>(
+      new QueryExecutionContext(ra_exe_unit,
+                                query_mem_desc,
+                                executor,
+                                device_type,
+                                dispatch_mode,
+                                use_groupby_buffer_desc,
+                                device_id,
+                                num_rows,
+                                col_buffers,
+                                frag_offsets,
+                                row_set_mem_owner,
+                                output_columnar,
+                                sort_on_gpu,
+                                thread_idx));
+}
+
 ResultSetPtr QueryExecutionContext::groupBufferToDeinterleavedResults(
     const size_t i) const {
   CHECK(!output_columnar_);

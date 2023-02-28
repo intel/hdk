@@ -51,6 +51,22 @@ class QueryExecutionContext : boost::noncopyable {
                         const bool sort_on_gpu,
                         const size_t thread_idx);
 
+  static std::unique_ptr<QueryExecutionContext> create(
+      const RelAlgExecutionUnit& ra_exe_unit,
+      const QueryMemoryDescriptor& query_mem_desc,
+      Executor* executor,
+      const ExecutorDeviceType device_type,
+      const ExecutorDispatchMode dispatch_mode,
+      const bool use_groupby_buffer_desc,
+      const int device_id,
+      const int64_t num_rows,
+      const std::vector<std::vector<const int8_t*>>& col_buffers,
+      const std::vector<std::vector<uint64_t>>& frag_offsets,
+      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+      const bool output_columnar,
+      const bool sort_on_gpu,
+      const size_t thread_idx);
+
   ResultSetPtr getRowSet(const RelAlgExecutionUnit& ra_exe_unit,
                          const QueryMemoryDescriptor& query_mem_desc) const;
 

@@ -25,7 +25,6 @@
 #ifndef QUERYENGINE_QUERYMEMORYDESCRIPTOR_H
 #define QUERYENGINE_QUERYMEMORYDESCRIPTOR_H
 
-#include "../CompilationOptions.h"
 #include "ColSlotContext.h"
 #include "CountDistinctDescriptor.h"
 #include "Types.h"
@@ -41,11 +40,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Shared/Config.h"
 #include "Shared/DeviceType.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/TargetInfo.h"
 
-class Executor;
+namespace Data_Namespace {
+class DataMgr;
+}
+
+class BufferProvider;
 class QueryExecutionContext;
 class RowSetMemoryOwner;
 struct InputTableInfo;
@@ -71,7 +75,8 @@ class QueryMemoryDescriptor {
   QueryMemoryDescriptor();
 
   // constructor for init call
-  QueryMemoryDescriptor(const Executor* executor,
+  QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
+                        ConfigPtr config,
                         const RelAlgExecutionUnit& ra_exe_unit,
                         const std::vector<InputTableInfo>& query_infos,
                         const bool allow_multifrag,
@@ -90,7 +95,8 @@ class QueryMemoryDescriptor {
                         const bool must_use_baseline_sort,
                         const bool use_streaming_top_n);
 
-  QueryMemoryDescriptor(const Executor* executor,
+  QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
+                        ConfigPtr config,
                         const size_t entry_count,
                         const QueryDescriptionType query_desc_type,
                         const bool is_table_function);
@@ -104,7 +110,8 @@ class QueryMemoryDescriptor {
   bool operator==(const QueryMemoryDescriptor& other) const;
 
   static std::unique_ptr<QueryMemoryDescriptor> init(
-      const Executor* executor,
+      Data_Namespace::DataMgr* data_mgr,
+      ConfigPtr config,
       const RelAlgExecutionUnit& ra_exe_unit,
       const std::vector<InputTableInfo>& query_infos,
       const ColRangeInfo& col_range_info,
@@ -118,21 +125,6 @@ class QueryMemoryDescriptor {
       const bool must_use_baseline_sort,
       const bool output_columnar_hint,
       const bool streaming_top_n_hint);
-
-  std::unique_ptr<QueryExecutionContext> getQueryExecutionContext(
-      const RelAlgExecutionUnit&,
-      Executor* executor,
-      const ExecutorDeviceType device_type,
-      const ExecutorDispatchMode dispatch_mode,
-      const bool use_groupby_buffer_desc,
-      const int device_id,
-      const int64_t num_rows,
-      const std::vector<std::vector<const int8_t*>>& col_buffers,
-      const std::vector<std::vector<uint64_t>>& frag_offsets,
-      std::shared_ptr<RowSetMemoryOwner>,
-      const bool output_columnar,
-      const bool sort_on_gpu,
-      const size_t thread_idx) const;
 
   static bool many_entries(const int64_t max_val,
                            const int64_t min_val,
@@ -153,14 +145,7 @@ class QueryMemoryDescriptor {
     return countDescriptorsLogicallyEmpty(count_distinct_descriptors_);
   }
 
-  static int8_t pick_target_compact_width(const RelAlgExecutionUnit& ra_exe_unit,
-                                          const std::vector<InputTableInfo>& query_infos,
-                                          const int8_t crt_min_byte_width,
-                                          bool bigint_count);
-
   // Getters and Setters
-  const Executor* getExecutor() const { return executor_; }
-
   QueryDescriptionType getQueryDescriptionType() const { return query_desc_type_; }
   void setQueryDescriptionType(const QueryDescriptionType val) { query_desc_type_ = val; }
   bool isSingleColumnGroupByWithPerfectHash() const {
@@ -338,13 +323,21 @@ class QueryMemoryDescriptor {
     return col_slot_context_.slotIsVarlen(slot_idx);
   }
 
+  Data_Namespace::DataMgr* getDataMgr() const;
+  BufferProvider* getBufferProvider() const;
+
  protected:
   void resetGroupColWidths(const std::vector<int8_t>& new_group_col_widths) {
     group_col_widths_ = new_group_col_widths;
   }
 
+  int8_t warpSize() const;
+  unsigned gridSize() const;
+  unsigned blockSize() const;
+
  private:
-  const Executor* executor_;
+  Data_Namespace::DataMgr* data_mgr_;
+  ConfigPtr config_;
   QueryDescriptionType query_desc_type_;
   bool keyless_hash_;
   bool interleaved_bins_on_gpu_;

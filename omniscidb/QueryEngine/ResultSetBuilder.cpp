@@ -170,7 +170,8 @@ ResultSet* ResultSetLogicalValuesBuilder::create(
 
   size_t numRows = logical_values.size();
 
-  QueryMemoryDescriptor query_mem_desc(/*executor=*/nullptr,
+  QueryMemoryDescriptor query_mem_desc(/*data_mgr=*/nullptr,
+                                       /*config=*/nullptr,
                                        /*entry_count=*/numRows,
                                        QueryDescriptionType::Projection,
                                        /*is_table_function=*/false);

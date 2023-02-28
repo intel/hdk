@@ -1898,8 +1898,8 @@ TemporaryTable Executor::executeWorkUnitImpl(
         plan_state_.reset(new PlanState(false, query_infos, this));
         plan_state_->allocateLocalColumnIds(ra_exe_unit.input_col_descs);
         CHECK(!query_mem_desc_owned);
-        query_mem_desc_owned.reset(
-            new QueryMemoryDescriptor(this, 0, QueryDescriptionType::Projection, false));
+        query_mem_desc_owned.reset(new QueryMemoryDescriptor(
+            data_mgr_, config_, 0, QueryDescriptionType::Projection, false));
       }
 
       query_comp_descs_owned.insert(std::make_pair(dt, std::move(query_comp_desc_owned)));
@@ -2093,7 +2093,8 @@ ResultSetPtr Executor::executeTableFunction(
   INJECT_TIMER(Exec_executeTableFunction);
 
   if (eo.just_validate) {
-    QueryMemoryDescriptor query_mem_desc(this,
+    QueryMemoryDescriptor query_mem_desc(data_mgr_,
+                                         config_,
                                          /*entry_count=*/0,
                                          QueryDescriptionType::Projection,
                                          /*is_table_function=*/true);
@@ -2263,6 +2264,7 @@ void fill_entries_for_empty_input(std::vector<TargetInfo>& target_infos,
 }
 
 ResultSetPtr build_row_for_empty_input(
+    const Executor* executor,
     const std::vector<const hdk::ir::Expr*>& target_exprs_in,
     const QueryMemoryDescriptor& query_mem_desc,
     const ExecutorDeviceType device_type) {
@@ -2288,7 +2290,6 @@ ResultSetPtr build_row_for_empty_input(
   }
   std::vector<TargetInfo> target_infos;
   std::vector<int64_t> entry;
-  const auto executor = query_mem_desc.getExecutor();
   fill_entries_for_empty_input(target_infos,
                                entry,
                                target_exprs,
@@ -2322,7 +2323,7 @@ ResultSetPtr Executor::collectAllDeviceResults(
   if (result_per_device.empty() && query_mem_desc.getQueryDescriptionType() ==
                                        QueryDescriptionType::NonGroupedAggregate) {
     return build_row_for_empty_input(
-        ra_exe_unit.target_exprs, query_mem_desc, device_type);
+        this, ra_exe_unit.target_exprs, query_mem_desc, device_type);
   }
   if (use_speculative_top_n(ra_exe_unit, query_mem_desc)) {
     try {

@@ -579,7 +579,7 @@ ReductionCode ResultSetReductionJIT::codegen() const {
   // Always compile for count distinct aggregation
   if (query_mem_desc_.getCountDistinctDescriptorsSize() == 0 &&
       query_mem_desc_.getEntryCount() < INTERP_THRESHOLD &&
-      (!query_mem_desc_.getExecutor() || query_mem_desc_.blocksShareMemory())) {
+      (!query_mem_desc_.getDataMgr() || query_mem_desc_.blocksShareMemory())) {
     return reduction_code;
   }
   CHECK(executor_);

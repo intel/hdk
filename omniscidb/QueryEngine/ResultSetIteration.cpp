@@ -630,8 +630,6 @@ InternalTargetValue ResultSet::getVarlenOrderEntry(const int64_t str_ptr,
   std::vector<int8_t> cpu_buffer;
   if (device_type_ == ExecutorDeviceType::GPU) {
     cpu_buffer.resize(str_len);
-    const auto executor = query_mem_desc_.getExecutor();
-    CHECK(executor);
     getBufferProvider()->copyFromDevice(
         &cpu_buffer[0], reinterpret_cast<const int8_t*>(str_ptr), str_len, device_id_);
     host_str_ptr = reinterpret_cast<char*>(&cpu_buffer[0]);
@@ -1215,9 +1213,7 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
   std::vector<int8_t> cpu_buffer;
   if (varlen_ptr && device_type_ == ExecutorDeviceType::GPU) {
     cpu_buffer.resize(length);
-    const auto executor = query_mem_desc_.getExecutor();
-    CHECK(executor);
-    auto buffer_provider = executor->getBufferProvider();
+    auto buffer_provider = query_mem_desc_.getBufferProvider();
     buffer_provider->copyFromDevice(
         &cpu_buffer[0], reinterpret_cast<const int8_t*>(varlen_ptr), length, device_id_);
     varlen_ptr = reinterpret_cast<int64_t>(&cpu_buffer[0]);

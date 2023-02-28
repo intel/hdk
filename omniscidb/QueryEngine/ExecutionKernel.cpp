@@ -358,19 +358,20 @@ void ExecutionKernel::runImpl(Executor* executor,
   if (eo.executor_type == ExecutorType::Native) {
     try {
       query_exe_context_owned =
-          query_mem_desc.getQueryExecutionContext(ra_exe_unit_,
-                                                  executor,
-                                                  chosen_device_type,
-                                                  kernel_dispatch_mode,
-                                                  query_comp_desc.useGroupByBufferDesc(),
-                                                  chosen_device_id,
-                                                  total_num_input_rows,
-                                                  fetch_result->col_buffers,
-                                                  fetch_result->frag_offsets,
-                                                  executor->getRowSetMemoryOwner(),
-                                                  compilation_result.output_columnar,
-                                                  query_mem_desc.sortOnGpu(),
-                                                  thread_idx);
+          QueryExecutionContext::create(ra_exe_unit_,
+                                        query_mem_desc,
+                                        executor,
+                                        chosen_device_type,
+                                        kernel_dispatch_mode,
+                                        query_comp_desc.useGroupByBufferDesc(),
+                                        chosen_device_id,
+                                        total_num_input_rows,
+                                        fetch_result->col_buffers,
+                                        fetch_result->frag_offsets,
+                                        executor->getRowSetMemoryOwner(),
+                                        compilation_result.output_columnar,
+                                        query_mem_desc.sortOnGpu(),
+                                        thread_idx);
     } catch (const OutOfHostMemory& e) {
       throw QueryExecutionError(Executor::ERR_OUT_OF_CPU_MEM);
     }
@@ -484,21 +485,22 @@ void KernelSubtask::runImpl(Executor* executor) {
       std::vector<std::vector<uint64_t>> frag_offsets(
           fetch_result_->frag_offsets.size(),
           std::vector<uint64_t>(fetch_result_->frag_offsets[0].size()));
-      query_exe_context_owned = kernel_.query_mem_desc.getQueryExecutionContext(
-          kernel_.ra_exe_unit_,
-          executor,
-          kernel_.chosen_device_type,
-          kernel_.kernel_dispatch_mode,
-          kernel_.query_comp_desc.useGroupByBufferDesc(),
-          kernel_.chosen_device_id,
-          total_num_input_rows_,
-          col_buffers,
-          frag_offsets,
-          executor->getRowSetMemoryOwner(),
-          compilation_result.output_columnar,
-          kernel_.query_mem_desc.sortOnGpu(),
-          // TODO: use TBB thread id to choose allocator
-          thread_idx_);
+      query_exe_context_owned =
+          QueryExecutionContext::create(kernel_.ra_exe_unit_,
+                                        kernel_.query_mem_desc,
+                                        executor,
+                                        kernel_.chosen_device_type,
+                                        kernel_.kernel_dispatch_mode,
+                                        kernel_.query_comp_desc.useGroupByBufferDesc(),
+                                        kernel_.chosen_device_id,
+                                        total_num_input_rows_,
+                                        col_buffers,
+                                        frag_offsets,
+                                        executor->getRowSetMemoryOwner(),
+                                        compilation_result.output_columnar,
+                                        kernel_.query_mem_desc.sortOnGpu(),
+                                        // TODO: use TBB thread id to choose allocator
+                                        thread_idx_);
     } catch (const OutOfHostMemory& e) {
       throw QueryExecutionError(Executor::ERR_OUT_OF_CPU_MEM);
     }

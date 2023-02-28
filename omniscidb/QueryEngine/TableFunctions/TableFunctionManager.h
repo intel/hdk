@@ -92,7 +92,8 @@ struct TableFunctionManager {
              size_t(-1));  // re-allocation of output buffers is not supported
     output_num_rows_ = output_num_rows;
     auto num_out_columns = get_ncols();
-    QueryMemoryDescriptor query_mem_desc(executor_,
+    QueryMemoryDescriptor query_mem_desc(executor_->getDataMgr(),
+                                         executor_->getConfigPtr(),
                                          output_num_rows,  // divide by row multiplier???
                                          QueryDescriptionType::Projection,
                                          /*is_table_function=*/true);
