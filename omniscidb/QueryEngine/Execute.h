@@ -902,6 +902,8 @@ class Executor {
   llvm::LLVMContext& getContext() { return *context_.get(); }
   void update_extension_modules(bool update_runtime_modules_only = false);
 
+  bool isLazyFetchAllowed() const { return plan_state_->allow_lazy_fetch_; }
+
  private:
   std::vector<int8_t> serializeLiterals(
       const std::unordered_map<int, CgenState::LiteralValues>& literals,
@@ -1074,7 +1076,6 @@ class Executor {
   friend class HashJoin;  // cgen_state_
   friend class RowFuncBuilder;
   friend class QueryCompilationDescriptor;
-  friend class QueryMemoryDescriptor;
   friend class QueryMemoryInitializer;
   friend class QueryFragmentDescriptor;
   friend class QueryExecutionContext;

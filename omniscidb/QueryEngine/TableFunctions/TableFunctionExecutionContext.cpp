@@ -460,8 +460,11 @@ ResultSetPtr TableFunctionExecutionContext::launchGpuCode(
   kernel_params[ERROR_BUFFER] =
       reinterpret_cast<CUdeviceptr>(gpu_allocator->alloc(sizeof(int32_t)));
   // initialize output memory
-  QueryMemoryDescriptor query_mem_desc(
-      executor, elem_count, QueryDescriptionType::Projection, /*is_table_function=*/true);
+  QueryMemoryDescriptor query_mem_desc(executor->getDataMgr(),
+                                       executor->getConfigPtr(),
+                                       elem_count,
+                                       QueryDescriptionType::Projection,
+                                       /*is_table_function=*/true);
   query_mem_desc.setOutputColumnar(true);
 
   for (size_t i = 0; i < num_out_columns; i++) {

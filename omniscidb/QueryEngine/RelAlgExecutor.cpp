@@ -1859,7 +1859,8 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
     const hdk::ir::LogicalValues* logical_values,
     const ExecutionOptions& eo) {
   auto timer = DEBUG_TIMER(__func__);
-  QueryMemoryDescriptor query_mem_desc(executor_,
+  QueryMemoryDescriptor query_mem_desc(executor_->getDataMgr(),
+                                       executor_->getConfigPtr(),
                                        logical_values->getNumRows(),
                                        QueryDescriptionType::Projection,
                                        /*is_table_function=*/false);

@@ -18,385 +18,12 @@
 
 #include <boost/algorithm/cxx11/any_of.hpp>
 
+#include "DataMgr/DataMgr.h"
 #include "QueryEngine/ColRangeInfo.h"
-#include "QueryEngine/Descriptors/ColSlotContext.h"
-#include "QueryEngine/Execute.h"
-#include "QueryEngine/ExpressionRewrite.h"
-#include "QueryEngine/MemoryLayoutBuilder.h"
 #include "QueryEngine/StreamingTopN.h"
-#include "QueryEngine/UsedColumnsCollector.h"
 
 namespace {
 
-bool is_int_and_no_bigger_than(const hdk::ir::Type* type, const size_t byte_width) {
-  if (!type->isInteger()) {
-    return false;
-  }
-  return get_bit_width(type) <= (byte_width * 8);
-}
-
-bool is_valid_int32_range(const ExpressionRange& range) {
-  return range.getIntMin() > INT32_MIN && range.getIntMax() < EMPTY_KEY_32 - 1;
-}
-
-std::vector<int64_t> target_expr_group_by_indices(
-    const std::list<hdk::ir::ExprPtr>& groupby_exprs,
-    const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  std::vector<int64_t> indices(target_exprs.size(), -1);
-  for (size_t target_idx = 0; target_idx < target_exprs.size(); ++target_idx) {
-    const auto target_expr = target_exprs[target_idx];
-    if (dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
-      continue;
-    }
-    const auto var_expr = dynamic_cast<const hdk::ir::Var*>(target_expr);
-    if (var_expr && var_expr->whichRow() == hdk::ir::Var::kGROUPBY) {
-      indices[target_idx] = var_expr->varNo() - 1;
-      continue;
-    }
-  }
-  return indices;
-}
-
-std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_unit,
-                                              SchemaProviderPtr schema_provider) {
-  if (ra_exe_unit.input_descs.size() > 1 ||
-      !ra_exe_unit.sort_info.order_entries.empty()) {
-    return {};
-  }
-  std::vector<int64_t> target_indices(ra_exe_unit.target_exprs.size(), -1);
-  UsedColumnsCollector columns_collector;
-  for (const auto& simple_qual : ra_exe_unit.simple_quals) {
-    columns_collector.visit(simple_qual.get());
-  }
-  for (const auto& qual : ra_exe_unit.quals) {
-    columns_collector.visit(qual.get());
-  }
-  for (const auto& target : ra_exe_unit.target_exprs) {
-    const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target);
-    if (col_var && !col_var->isVirtual()) {
-      continue;
-    }
-    columns_collector.visit(target);
-  }
-  const auto& used_columns = columns_collector.result();
-  for (size_t target_idx = 0; target_idx < ra_exe_unit.target_exprs.size();
-       ++target_idx) {
-    const auto target_expr = ra_exe_unit.target_exprs[target_idx];
-    CHECK(target_expr);
-    auto type = target_expr->type();
-    // TODO: add proper lazy fetch for varlen types in result set
-    if (type->isString() || type->isArray()) {
-      continue;
-    }
-    const auto col_var = dynamic_cast<const hdk::ir::ColumnVar*>(target_expr);
-    if (!col_var) {
-      continue;
-    }
-    if (used_columns.find(col_var->columnId()) == used_columns.end()) {
-      // setting target index to be zero so that later it can be decoded properly (in lazy
-      // fetch, the zeroth target index indicates the corresponding rowid column for the
-      // projected entry)
-      target_indices[target_idx] = 0;
-    }
-  }
-  return target_indices;
-}
-
-int8_t pick_baseline_key_component_width(const ExpressionRange& range,
-                                         const size_t group_col_width) {
-  if (range.getType() == ExpressionRangeType::Invalid) {
-    return sizeof(int64_t);
-  }
-  switch (range.getType()) {
-    case ExpressionRangeType::Integer:
-      if (group_col_width == sizeof(int64_t) && range.hasNulls()) {
-        return sizeof(int64_t);
-      }
-      return is_valid_int32_range(range) ? sizeof(int32_t) : sizeof(int64_t);
-    case ExpressionRangeType::Float:
-    case ExpressionRangeType::Double:
-      return sizeof(int64_t);  // No compaction for floating point yet.
-    default:
-      UNREACHABLE();
-  }
-  return sizeof(int64_t);
-}
-
-// TODO(miyu): make sure following setting of compact width is correct in all cases.
-int8_t pick_baseline_key_width(const RelAlgExecutionUnit& ra_exe_unit,
-                               const std::vector<InputTableInfo>& query_infos,
-                               const Executor* executor) {
-  int8_t compact_width{4};
-  for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
-    const auto expr_range = getExpressionRange(groupby_expr.get(), query_infos, executor);
-    compact_width = std::max(
-        compact_width,
-        pick_baseline_key_component_width(expr_range, groupby_expr->type()->size()));
-  }
-  return compact_width;
-}
-
-bool use_streaming_top_n(const RelAlgExecutionUnit& ra_exe_unit,
-                         const bool output_columnar,
-                         bool streaming_topn_max) {
-  for (const auto target_expr : ra_exe_unit.target_exprs) {
-    if (dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
-      return false;
-    }
-    if (dynamic_cast<const hdk::ir::WindowFunction*>(target_expr)) {
-      return false;
-    }
-  }
-
-  // TODO: Allow streaming top n for columnar output
-  if (!output_columnar && ra_exe_unit.sort_info.order_entries.size() == 1 &&
-      ra_exe_unit.sort_info.limit &&
-      ra_exe_unit.sort_info.algorithm == SortAlgorithm::StreamingTopN) {
-    const auto only_order_entry = ra_exe_unit.sort_info.order_entries.front();
-    CHECK_GT(only_order_entry.tle_no, int(0));
-    CHECK_LE(static_cast<size_t>(only_order_entry.tle_no),
-             ra_exe_unit.target_exprs.size());
-    const auto order_entry_expr = ra_exe_unit.target_exprs[only_order_entry.tle_no - 1];
-    const auto n = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
-    if ((order_entry_expr->type()->isNumber() ||
-         order_entry_expr->type()->isDateTime()) &&
-        n <= streaming_topn_max) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-template <class T>
-inline std::vector<int8_t> get_col_byte_widths(const T& col_expr_list,
-                                               bool bigint_count) {
-  std::vector<int8_t> col_widths;
-  size_t col_expr_idx = 0;
-  for (const auto& col_expr : col_expr_list) {
-    if (!col_expr) {
-      // row index
-      col_widths.push_back(sizeof(int64_t));
-    } else {
-      const auto agg_info = get_target_info(col_expr, bigint_count);
-      const auto chosen_type = get_compact_type(agg_info);
-      if (chosen_type->isString() || chosen_type->isArray()) {
-        col_widths.push_back(sizeof(int64_t));
-        col_widths.push_back(sizeof(int64_t));
-        ++col_expr_idx;
-        continue;
-      }
-      const auto col_expr_bitwidth = get_bit_width(chosen_type);
-      CHECK_EQ(size_t(0), col_expr_bitwidth % 8);
-      col_widths.push_back(static_cast<int8_t>(col_expr_bitwidth >> 3));
-      // for average, we'll need to keep the count as well
-      if (agg_info.agg_kind == hdk::ir::AggType::kAvg) {
-        CHECK(agg_info.is_agg);
-        col_widths.push_back(sizeof(int64_t));
-      }
-    }
-    ++col_expr_idx;
-  }
-  return col_widths;
-}
-
-}  // namespace
-
-std::unique_ptr<QueryMemoryDescriptor> QueryMemoryDescriptor::init(
-    const Executor* executor,
-    const RelAlgExecutionUnit& ra_exe_unit,
-    const std::vector<InputTableInfo>& query_infos,
-    const ColRangeInfo& col_range_info,
-    const KeylessInfo& keyless_info,
-    const bool allow_multifrag,
-    const ExecutorDeviceType device_type,
-    const int8_t crt_min_byte_width,
-    const bool sort_on_gpu_hint,
-    const size_t max_groups_buffer_entry_count,
-    const CountDistinctDescriptors count_distinct_descriptors,
-    const bool must_use_baseline_sort,
-    const bool output_columnar_hint,
-    const bool streaming_top_n_hint) {
-  auto group_col_widths = get_col_byte_widths(
-      ra_exe_unit.groupby_exprs, executor->getConfig().exec.group_by.bigint_count);
-  const bool is_group_by{!group_col_widths.empty()};
-
-  auto col_slot_context = ColSlotContext(
-      ra_exe_unit.target_exprs, {}, executor->getConfig().exec.group_by.bigint_count);
-
-  const auto min_slot_size = QueryMemoryDescriptor::pick_target_compact_width(
-      ra_exe_unit,
-      query_infos,
-      crt_min_byte_width,
-      executor->getConfig().exec.group_by.bigint_count);
-
-  col_slot_context.setAllSlotsPaddedSize(min_slot_size);
-  col_slot_context.validate();
-
-  if (!is_group_by) {
-    CHECK(!must_use_baseline_sort);
-
-    return std::make_unique<QueryMemoryDescriptor>(
-        executor,
-        ra_exe_unit,
-        query_infos,
-        allow_multifrag,
-        false,
-        false,
-        -1,
-        ColRangeInfo{ra_exe_unit.estimator ? QueryDescriptionType::Estimator
-                                           : QueryDescriptionType::NonGroupedAggregate,
-                     0,
-                     0,
-                     0,
-                     false},
-        col_slot_context,
-        std::vector<int8_t>{},
-        /*group_col_compact_width=*/0,
-        std::vector<int64_t>{},
-        /*entry_count=*/1,
-        count_distinct_descriptors,
-        false,
-        output_columnar_hint,
-        must_use_baseline_sort,
-        /*use_streaming_top_n=*/false);
-  }
-
-  size_t entry_count = 1;
-  auto actual_col_range_info = col_range_info;
-  bool interleaved_bins_on_gpu = false;
-  bool keyless_hash = false;
-  bool streaming_top_n = false;
-  int8_t group_col_compact_width = 0;
-  int32_t idx_target_as_key = -1;
-  auto output_columnar = output_columnar_hint;
-  std::vector<int64_t> target_groupby_indices;
-
-  switch (col_range_info.hash_type_) {
-    case QueryDescriptionType::GroupByPerfectHash: {
-      // keyless hash: whether or not group columns are stored at the beginning of the
-      // output buffer
-      keyless_hash =
-          (!sort_on_gpu_hint ||
-           !QueryMemoryDescriptor::many_entries(
-               col_range_info.max, col_range_info.min, col_range_info.bucket)) &&
-          !col_range_info.bucket && !must_use_baseline_sort && keyless_info.keyless;
-
-      // if keyless, then this target index indicates wheter an entry is empty or not
-      // (acts as a key)
-      idx_target_as_key = keyless_info.target_index;
-
-      if (group_col_widths.size() > 1) {
-        // col range info max contains the expected cardinality of the output
-        entry_count = static_cast<size_t>(actual_col_range_info.max);
-        actual_col_range_info.bucket = 0;
-      } else {
-        // single column perfect hash
-        entry_count = std::max(col_range_info.getBucketedCardinality(), int64_t(1));
-        const size_t interleaved_max_threshold{512};
-
-        if (must_use_baseline_sort) {
-          target_groupby_indices = target_expr_group_by_indices(ra_exe_unit.groupby_exprs,
-                                                                ra_exe_unit.target_exprs);
-          col_slot_context =
-              ColSlotContext(ra_exe_unit.target_exprs,
-                             target_groupby_indices,
-                             executor->getConfig().exec.group_by.bigint_count);
-        }
-
-        bool has_varlen_sample_agg = false;
-        for (const auto& target_expr : ra_exe_unit.target_exprs) {
-          if (target_expr->containsAgg()) {
-            const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-            CHECK(agg_expr);
-            if (agg_expr->aggType() == hdk::ir::AggType::kSample &&
-                (agg_expr->type()->isString() || agg_expr->type()->isArray())) {
-              has_varlen_sample_agg = true;
-              break;
-            }
-          }
-        }
-
-        interleaved_bins_on_gpu = keyless_hash && !has_varlen_sample_agg &&
-                                  (entry_count <= interleaved_max_threshold) &&
-                                  (device_type == ExecutorDeviceType::GPU) &&
-                                  QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
-                                      count_distinct_descriptors) &&
-                                  !output_columnar;
-      }
-      break;
-    }
-    case QueryDescriptionType::GroupByBaselineHash: {
-      entry_count = max_groups_buffer_entry_count;
-      target_groupby_indices = target_expr_group_by_indices(ra_exe_unit.groupby_exprs,
-                                                            ra_exe_unit.target_exprs);
-      col_slot_context = ColSlotContext(ra_exe_unit.target_exprs,
-                                        target_groupby_indices,
-                                        executor->getConfig().exec.group_by.bigint_count);
-
-      group_col_compact_width =
-          output_columnar ? 8
-                          : pick_baseline_key_width(ra_exe_unit, query_infos, executor);
-
-      actual_col_range_info =
-          ColRangeInfo{QueryDescriptionType::GroupByBaselineHash, 0, 0, 0, false};
-      break;
-    }
-    case QueryDescriptionType::Projection: {
-      CHECK(!must_use_baseline_sort);
-
-      if (streaming_top_n_hint &&
-          use_streaming_top_n(ra_exe_unit,
-                              output_columnar,
-                              executor->getConfig().exec.streaming_topn_max)) {
-        streaming_top_n = true;
-        entry_count = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
-      } else {
-        if (ra_exe_unit.use_bump_allocator) {
-          output_columnar = false;
-          entry_count = 0;
-        } else {
-          entry_count = ra_exe_unit.scan_limit
-                            ? static_cast<size_t>(ra_exe_unit.scan_limit)
-                            : max_groups_buffer_entry_count;
-        }
-      }
-
-      target_groupby_indices =
-          executor->plan_state_->allow_lazy_fetch_
-              ? target_expr_proj_indices(ra_exe_unit, executor->getSchemaProvider())
-              : std::vector<int64_t>{};
-
-      col_slot_context = ColSlotContext(ra_exe_unit.target_exprs,
-                                        target_groupby_indices,
-                                        executor->getConfig().exec.group_by.bigint_count);
-      break;
-    }
-    default:
-      UNREACHABLE() << "Unknown query type";
-  }
-
-  return std::make_unique<QueryMemoryDescriptor>(executor,
-                                                 ra_exe_unit,
-                                                 query_infos,
-                                                 allow_multifrag,
-                                                 keyless_hash,
-                                                 interleaved_bins_on_gpu,
-                                                 idx_target_as_key,
-                                                 actual_col_range_info,
-                                                 col_slot_context,
-                                                 group_col_widths,
-                                                 group_col_compact_width,
-                                                 target_groupby_indices,
-                                                 entry_count,
-                                                 count_distinct_descriptors,
-                                                 sort_on_gpu_hint,
-                                                 output_columnar,
-                                                 must_use_baseline_sort,
-                                                 streaming_top_n);
-}
-
-namespace {
 bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs,
            hdk::ir::AggType agg_kind) {
   return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
@@ -404,10 +31,12 @@ bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs,
     return agg && agg->aggType() == agg_kind;
   });
 }
+
 }  // namespace
 
 QueryMemoryDescriptor::QueryMemoryDescriptor(
-    const Executor* executor,
+    Data_Namespace::DataMgr* data_mgr,
+    ConfigPtr config,
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<InputTableInfo>& query_infos,
     const bool allow_multifrag,
@@ -425,7 +54,8 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     const bool output_columnar_hint,
     const bool must_use_baseline_sort,
     const bool use_streaming_top_n)
-    : executor_(executor)
+    : data_mgr_(data_mgr)
+    , config_(config)
     , query_desc_type_(col_range_info.hash_type_)
     , keyless_hash_(keyless_hash)
     , interleaved_bins_on_gpu_(interleaved_bins_on_gpu)
@@ -474,8 +104,8 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   }
 
   if (isLogicalSizedColumnsAllowed()) {
-    // TODO(adb): Ensure fixed size buffer allocations are correct with all logical column
-    // sizes
+    // TODO(adb): Ensure fixed size buffer allocations are correct with all logical
+    // column sizes
     CHECK(!ra_exe_unit.use_bump_allocator);
     col_slot_context_.setAllSlotsPaddedSizeToLogicalSize();
     col_slot_context_.validate();
@@ -483,11 +113,11 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
 
 #ifdef HAVE_CUDA
   // Check Streaming Top N heap usage, bail if > max slab size, CUDA ONLY
-  if (use_streaming_top_n_ && executor->getDataMgr()->gpusPresent()) {
-    const auto thread_count = executor->blockSize() * executor->gridSize();
+  if (use_streaming_top_n_ && data_mgr_->gpusPresent()) {
+    const auto thread_count = blockSize() * gridSize();
     const auto total_buff_size =
         streaming_top_n::get_heap_size(getRowSize(), getEntryCount(), thread_count);
-    if (total_buff_size > executor_->maxGpuSlabSize()) {
+    if (total_buff_size > config_->mem.gpu.max_slab_size) {
       throw StreamingTopNOOM(total_buff_size);
     }
   }
@@ -495,7 +125,8 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
 }
 
 QueryMemoryDescriptor::QueryMemoryDescriptor()
-    : executor_(nullptr)
+    : data_mgr_(nullptr)
+    , config_(nullptr)
     , query_desc_type_(QueryDescriptionType::Projection)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -513,11 +144,13 @@ QueryMemoryDescriptor::QueryMemoryDescriptor()
     , use_streaming_top_n_(false)
     , force_4byte_float_(false) {}
 
-QueryMemoryDescriptor::QueryMemoryDescriptor(const Executor* executor,
+QueryMemoryDescriptor::QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
+                                             ConfigPtr config,
                                              const size_t entry_count,
                                              const QueryDescriptionType query_desc_type,
                                              const bool is_table_function)
-    : executor_(executor)
+    : data_mgr_(data_mgr)
+    , config_(config)
     , query_desc_type_(query_desc_type)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -540,7 +173,8 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(const QueryDescriptionType query_de
                                              const int64_t max_val,
                                              const bool has_nulls,
                                              const std::vector<int8_t>& group_col_widths)
-    : executor_(nullptr)
+    : data_mgr_(nullptr)
+    , config_(nullptr)
     , query_desc_type_(query_desc_type)
     , keyless_hash_(false)
     , interleaved_bins_on_gpu_(false)
@@ -560,7 +194,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(const QueryDescriptionType query_de
     , force_4byte_float_(false) {}
 
 bool QueryMemoryDescriptor::operator==(const QueryMemoryDescriptor& other) const {
-  // Note that this method does not check ptr reference members (e.g. executor_) or
+  // Note that this method does not check ptr reference members (e.g. data_mgr_) or
   // entry_count_
   if (query_desc_type_ != other.query_desc_type_) {
     return false;
@@ -623,136 +257,6 @@ bool QueryMemoryDescriptor::operator==(const QueryMemoryDescriptor& other) const
   return true;
 }
 
-std::unique_ptr<QueryExecutionContext> QueryMemoryDescriptor::getQueryExecutionContext(
-    const RelAlgExecutionUnit& ra_exe_unit,
-    Executor* executor,
-    const ExecutorDeviceType device_type,
-    const ExecutorDispatchMode dispatch_mode,
-    const bool use_groupby_buffer_desc,
-    const int device_id,
-    const int64_t num_rows,
-    const std::vector<std::vector<const int8_t*>>& col_buffers,
-    const std::vector<std::vector<uint64_t>>& frag_offsets,
-    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-    const bool output_columnar,
-    const bool sort_on_gpu,
-    const size_t thread_idx) const {
-  auto timer = DEBUG_TIMER(__func__);
-  if (frag_offsets.empty()) {
-    return nullptr;
-  }
-  return std::unique_ptr<QueryExecutionContext>(
-      new QueryExecutionContext(ra_exe_unit,
-                                *this,
-                                executor,
-                                device_type,
-                                dispatch_mode,
-                                use_groupby_buffer_desc,
-                                device_id,
-                                num_rows,
-                                col_buffers,
-                                frag_offsets,
-                                row_set_mem_owner,
-                                output_columnar,
-                                sort_on_gpu,
-                                thread_idx));
-}
-
-int8_t QueryMemoryDescriptor::pick_target_compact_width(
-    const RelAlgExecutionUnit& ra_exe_unit,
-    const std::vector<InputTableInfo>& query_infos,
-    const int8_t crt_min_byte_width,
-    bool bigint_count) {
-  if (bigint_count) {
-    return sizeof(int64_t);
-  }
-  int8_t compact_width{0};
-  auto col_it = ra_exe_unit.input_col_descs.begin();
-  auto const end = ra_exe_unit.input_col_descs.end();
-  int unnest_array_col_id{std::numeric_limits<int>::min()};
-  for (const auto& groupby_expr : ra_exe_unit.groupby_exprs) {
-    const auto uoper = dynamic_cast<const hdk::ir::UOper*>(groupby_expr.get());
-    if (uoper && uoper->isUnnest()) {
-      auto arg_type = uoper->operand()->type();
-      CHECK(arg_type->isArray());
-      auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
-      if (elem_type->isExtDictionary()) {
-        unnest_array_col_id = (*col_it)->getColId();
-      } else {
-        compact_width = crt_min_byte_width;
-        break;
-      }
-    }
-    if (col_it != end) {
-      ++col_it;
-    }
-  }
-  if (!compact_width &&
-      (ra_exe_unit.groupby_exprs.size() != 1 || !ra_exe_unit.groupby_exprs.front())) {
-    compact_width = crt_min_byte_width;
-  }
-  if (!compact_width) {
-    col_it = ra_exe_unit.input_col_descs.begin();
-    std::advance(col_it, ra_exe_unit.groupby_exprs.size());
-    for (const auto target : ra_exe_unit.target_exprs) {
-      auto type = target->type();
-      const auto agg = target->as<hdk::ir::AggExpr>();
-      if (agg && agg->arg()) {
-        compact_width = crt_min_byte_width;
-        break;
-      }
-
-      if (agg) {
-        CHECK_EQ(hdk::ir::AggType::kCount, agg->aggType());
-        CHECK(!agg->isDistinct());
-        if (col_it != end) {
-          ++col_it;
-        }
-        continue;
-      }
-
-      if (is_int_and_no_bigger_than(type, 4) || (type->isExtDictionary())) {
-        if (col_it != end) {
-          ++col_it;
-        }
-        continue;
-      }
-
-      const auto uoper = target->as<hdk::ir::UOper>();
-      if (uoper && uoper->isUnnest() && (*col_it)->getColId() == unnest_array_col_id) {
-        auto arg_type = uoper->operand()->type();
-        CHECK(arg_type->isArray());
-        auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
-        if (elem_type->isExtDictionary()) {
-          if (col_it != end) {
-            ++col_it;
-          }
-          continue;
-        }
-      }
-
-      compact_width = crt_min_byte_width;
-      break;
-    }
-  }
-  if (!compact_width) {
-    size_t total_tuples{0};
-    for (const auto& qi : query_infos) {
-      total_tuples += qi.info.getNumTuples();
-    }
-    return total_tuples <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()) ||
-                   unnest_array_col_id != std::numeric_limits<int>::min()
-               ? 4
-               : crt_min_byte_width;
-  } else {
-    // TODO(miyu): relax this condition to allow more cases just w/o padding
-    for (auto wid : get_col_byte_widths(ra_exe_unit.target_exprs, bigint_count)) {
-      compact_width = std::max(compact_width, wid);
-    }
-    return compact_width;
-  }
-}
-
 size_t QueryMemoryDescriptor::getColsSize() const {
   return col_slot_context_.getAllSlotsAlignedPaddedSize();
 }
@@ -772,7 +276,7 @@ size_t QueryMemoryDescriptor::getRowSize() const {
 }
 
 size_t QueryMemoryDescriptor::getWarpCount() const {
-  return (interleaved_bins_on_gpu_ ? executor_->warpSize() : 1);
+  return (interleaved_bins_on_gpu_ ? warpSize() : 1);
 }
 
 size_t QueryMemoryDescriptor::getCompactByteWidth() const {
@@ -976,8 +480,7 @@ size_t QueryMemoryDescriptor::getBufferSizeBytes(const ExecutorDeviceType device
     CHECK_GE(group_col_widths_.size(), size_t(1));
     auto row_bytes = align_to_int64(getColsSize());
 
-    return (interleavedBins(device_type) ? executor_->warpSize() : 1) * entry_count *
-           row_bytes;
+    return (interleavedBins(device_type) ? warpSize() : 1) * entry_count * row_bytes;
   }
 
   constexpr size_t row_index_width = sizeof(int64_t);
@@ -1043,7 +546,8 @@ bool QueryMemoryDescriptor::blocksShareMemory() const {
   if (!countDescriptorsLogicallyEmpty(count_distinct_descriptors_)) {
     return true;
   }
-  if (executor_->isCPUOnly() ||
+  CHECK(data_mgr_);
+  if (!data_mgr_->getCudaMgr() ||
       query_desc_type_ == QueryDescriptionType::GroupByBaselineHash ||
       query_desc_type_ == QueryDescriptionType::Projection ||
       (query_desc_type_ == QueryDescriptionType::GroupByPerfectHash &&
@@ -1056,7 +560,8 @@ bool QueryMemoryDescriptor::blocksShareMemory() const {
 
 bool QueryMemoryDescriptor::lazyInitGroups(const ExecutorDeviceType device_type) const {
 #ifdef HAVE_L0
-  return false; /* L0 path currently does not provide lazy group by buffers initialization
+  return false; /* L0 path currently does not provide lazy group by buffers
+                 * initialization
                  */
 #else
   return device_type == ExecutorDeviceType::GPU &&
@@ -1072,8 +577,8 @@ bool QueryMemoryDescriptor::interleavedBins(const ExecutorDeviceType device_type
 bool QueryMemoryDescriptor::isWarpSyncRequired(
     const ExecutorDeviceType device_type) const {
   if (device_type == ExecutorDeviceType::GPU &&
-      executor_->gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA) {
-    return executor_->cudaMgr()->isArchVoltaOrGreaterForAll();
+      data_mgr_->getGpuMgr()->getPlatform() == GpuMgrPlatform::CUDA) {
+    return data_mgr_->getCudaMgr()->isArchVoltaOrGreaterForAll();
   }
   return false;
 }
@@ -1251,4 +756,42 @@ size_t QueryMemoryDescriptor::varlenOutputRowSizeToSlot(const size_t slot_idx) c
     }
   }
   return buffer_element_size;
+}
+
+int8_t QueryMemoryDescriptor::warpSize() const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  if (!gpu_mgr) {
+    return 0;
+  }
+  return gpu_mgr->getSubGroupSize();
+}
+
+unsigned QueryMemoryDescriptor::gridSize() const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  if (!gpu_mgr) {
+    return 0;
+  }
+  return config_->exec.override_gpu_grid_size ? config_->exec.override_gpu_grid_size
+                                              : gpu_mgr->getGridSize();
+}
+
+unsigned QueryMemoryDescriptor::blockSize() const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  if (!gpu_mgr) {
+    return 0;
+  }
+  return config_->exec.override_gpu_block_size ? config_->exec.override_gpu_block_size
+                                               : gpu_mgr->getMaxBlockSize();
+}
+
+Data_Namespace::DataMgr* QueryMemoryDescriptor::getDataMgr() const {
+  return data_mgr_;
+}
+
+BufferProvider* QueryMemoryDescriptor::getBufferProvider() const {
+  CHECK(data_mgr_);
+  return data_mgr_->getBufferProvider();
 }
