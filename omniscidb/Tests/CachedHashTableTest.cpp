@@ -111,7 +111,7 @@ struct QueryPlanDagInfo {
 
 QueryPlanDagInfo getQueryInfoForDataRecyclerTest(const std::string& query_str) {
   const auto query_ra = getSqlQueryRelAlg(query_str);
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   executor->setSchemaProvider(getStorage());
   auto dag = std::make_unique<RelAlgDagBuilder>(
       query_ra, TEST_DB_ID, getStorage(), executor->getConfigPtr());
@@ -129,7 +129,7 @@ QueryPlanDagInfo getQueryInfoForDataRecyclerTest(const std::string& query_str) {
 ExtractedPlanDag extractQueryPlanDag(const std::string& query_str) {
   auto query_dag_info = getQueryInfoForDataRecyclerTest(query_str);
   auto data_mgr = getDataMgr();
-  auto executor = Executor::getExecutor(data_mgr, data_mgr->getBufferProvider()).get();
+  auto executor = Executor::getExecutor(data_mgr).get();
   auto extracted_dag_info =
       QueryPlanDagExtractor::extractQueryPlanDag(query_dag_info.root_node.get(),
                                                  executor->getSchemaProvider(),

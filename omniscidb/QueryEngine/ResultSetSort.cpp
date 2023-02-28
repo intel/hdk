@@ -107,25 +107,25 @@ void ResultSet::doBaselineSort(const ExecutorDeviceType device_type,
             if (device_type == ExecutorDeviceType::GPU) {
               set_cuda_context(data_mgr, start);
             }
-            strided_permutations[start] = (key_bytewidth == 4)
-                                              ? baseline_sort<int32_t>(device_type,
-                                                                       start,
-                                                                       buffer_provider_,
-                                                                       groupby_buffer,
-                                                                       pod_oe,
-                                                                       layout,
-                                                                       top_n,
-                                                                       start,
-                                                                       step)
-                                              : baseline_sort<int64_t>(device_type,
-                                                                       start,
-                                                                       buffer_provider_,
-                                                                       groupby_buffer,
-                                                                       pod_oe,
-                                                                       layout,
-                                                                       top_n,
-                                                                       start,
-                                                                       step);
+            strided_permutations[start] =
+                (key_bytewidth == 4) ? baseline_sort<int32_t>(device_type,
+                                                              start,
+                                                              getBufferProvider(),
+                                                              groupby_buffer,
+                                                              pod_oe,
+                                                              layout,
+                                                              top_n,
+                                                              start,
+                                                              step)
+                                     : baseline_sort<int64_t>(device_type,
+                                                              start,
+                                                              getBufferProvider(),
+                                                              groupby_buffer,
+                                                              pod_oe,
+                                                              layout,
+                                                              top_n,
+                                                              start,
+                                                              step);
           }));
     }
     for (auto& top_future : top_futures) {
@@ -150,7 +150,7 @@ void ResultSet::doBaselineSort(const ExecutorDeviceType device_type,
   } else {
     permutation_ = (key_bytewidth == 4) ? baseline_sort<int32_t>(device_type,
                                                                  0,
-                                                                 buffer_provider_,
+                                                                 getBufferProvider(),
                                                                  groupby_buffer,
                                                                  pod_oe,
                                                                  layout,
@@ -159,7 +159,7 @@ void ResultSet::doBaselineSort(const ExecutorDeviceType device_type,
                                                                  1)
                                         : baseline_sort<int64_t>(device_type,
                                                                  0,
-                                                                 buffer_provider_,
+                                                                 getBufferProvider(),
                                                                  groupby_buffer,
                                                                  pod_oe,
                                                                  layout,

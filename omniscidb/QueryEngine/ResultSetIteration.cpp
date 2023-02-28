@@ -632,7 +632,7 @@ InternalTargetValue ResultSet::getVarlenOrderEntry(const int64_t str_ptr,
     cpu_buffer.resize(str_len);
     const auto executor = query_mem_desc_.getExecutor();
     CHECK(executor);
-    buffer_provider_->copyFromDevice(
+    getBufferProvider()->copyFromDevice(
         &cpu_buffer[0], reinterpret_cast<const int8_t*>(str_ptr), str_len, device_id_);
     host_str_ptr = reinterpret_cast<char*>(&cpu_buffer[0]);
   } else {

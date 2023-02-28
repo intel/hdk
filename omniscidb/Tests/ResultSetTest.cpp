@@ -69,7 +69,6 @@ TEST(Construct, Allocate) {
                        std::make_shared<RowSetMemoryOwner>(g_data_provider.get(),
                                                            Executor::getArenaBlockSize()),
                        nullptr,
-                       nullptr,
                        0,
                        0);
   result_set.allocateStorage();
@@ -891,7 +890,6 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
                        query_mem_desc,
                        row_set_mem_owner,
                        nullptr,
-                       nullptr,
                        0,
                        0);
   for (size_t i = 0; i < query_mem_desc.getEntryCount(); ++i) {
@@ -1020,7 +1018,7 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
   const ResultSetStorage* storage1{nullptr};
   const ResultSetStorage* storage2{nullptr};
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
@@ -1028,7 +1026,6 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -1039,7 +1036,6 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -1060,7 +1056,7 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
   const ResultSetStorage* storage1{nullptr};
   const ResultSetStorage* storage2{nullptr};
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
@@ -1068,7 +1064,6 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -1079,7 +1074,6 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -1165,7 +1159,7 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
   std::unique_ptr<ResultSet> rs1;
   std::unique_ptr<ResultSet> rs2;
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   switch (query_mem_desc.getQueryDescriptionType()) {
@@ -1175,7 +1169,6 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
                               query_mem_desc,
                               row_set_mem_owner,
                               nullptr,
-                              nullptr,
                               0,
                               0));
       storage1 = rs1->allocateStorage();
@@ -1183,7 +1176,6 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
                               ExecutorDeviceType::CPU,
                               query_mem_desc,
                               row_set_mem_owner,
-                              nullptr,
                               nullptr,
                               0,
                               0));
@@ -1196,7 +1188,6 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
                               query_mem_desc,
                               row_set_mem_owner,
                               nullptr,
-                              nullptr,
                               0,
                               0));
       storage1 = rs1->allocateStorage();
@@ -1204,7 +1195,6 @@ void test_reduce_random_groups(const std::vector<TargetInfo>& target_infos,
                               ExecutorDeviceType::CPU,
                               query_mem_desc,
                               row_set_mem_owner,
-                              nullptr,
                               nullptr,
                               0,
                               0));
@@ -1978,14 +1968,13 @@ TEST(MoreReduce, MissingValues) {
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(false);
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   const auto rs1 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -1994,7 +1983,6 @@ TEST(MoreReduce, MissingValues) {
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -2058,14 +2046,13 @@ TEST(MoreReduce, MissingValuesKeyless) {
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(true);
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
   const auto rs1 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -2074,7 +2061,6 @@ TEST(MoreReduce, MissingValuesKeyless) {
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);
@@ -2134,7 +2120,7 @@ TEST(MoreReduce, OffsetRewrite) {
   auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 7, 9);
   query_mem_desc.setHasKeylessHash(false);
   // for codegen only
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
 
@@ -2143,7 +2129,6 @@ TEST(MoreReduce, OffsetRewrite) {
                                                query_mem_desc,
                                                row_set_mem_owner,
                                                nullptr,
-                                               nullptr,
                                                0,
                                                0);
   const auto storage1 = rs1->allocateStorage();
@@ -2151,7 +2136,6 @@ TEST(MoreReduce, OffsetRewrite) {
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
                                                row_set_mem_owner,
-                                               nullptr,
                                                nullptr,
                                                0,
                                                0);

@@ -122,7 +122,7 @@ std::shared_ptr<HashJoin> buildKeyed(std::shared_ptr<const hdk::ir::BinOper> op,
 
 std::pair<std::string, std::shared_ptr<HashJoin>> checkProperQualDetection(
     std::vector<std::shared_ptr<const hdk::ir::BinOper>> quals) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
@@ -145,7 +145,7 @@ std::pair<std::string, std::shared_ptr<HashJoin>> checkProperQualDetection(
 }
 
 TEST(Build, PerfectOneToOne1) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -184,7 +184,7 @@ TEST(Build, PerfectOneToOne1) {
 }
 
 TEST(Build, PerfectOneToOne2) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -221,7 +221,7 @@ TEST(Build, PerfectOneToOne2) {
 }
 
 TEST(Build, PerfectOneToMany1) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -253,7 +253,7 @@ TEST(Build, PerfectOneToMany1) {
 }
 
 TEST(Build, PerfectOneToMany2) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -285,7 +285,7 @@ TEST(Build, PerfectOneToMany2) {
 }
 
 TEST(Build, detectProperJoinQual) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
@@ -372,7 +372,7 @@ TEST(Build, detectProperJoinQual) {
 }
 
 TEST(Build, KeyedOneToOne) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
@@ -417,7 +417,7 @@ TEST(Build, KeyedOneToOne) {
 }
 
 TEST(Build, KeyedOneToMany) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
@@ -463,7 +463,7 @@ TEST(Build, KeyedOneToMany) {
 }
 
 TEST(MultiFragment, PerfectOneToOne) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -502,7 +502,7 @@ TEST(MultiFragment, PerfectOneToOne) {
 }
 
 TEST(MultiFragment, PerfectOneToMany) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
 
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
@@ -542,7 +542,7 @@ TEST(MultiFragment, PerfectOneToMany) {
 }
 
 TEST(MultiFragment, KeyedOneToOne) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
@@ -608,7 +608,7 @@ TEST(MultiFragment, KeyedOneToOne) {
 }
 
 TEST(MultiFragment, KeyedOneToMany) {
-  auto executor = Executor::getExecutor(getDataMgr(), getDataMgr()->getBufferProvider());
+  auto executor = Executor::getExecutor(getDataMgr());
   CHECK(executor);
   auto storage = getStorage();
   executor->setSchemaProvider(storage);

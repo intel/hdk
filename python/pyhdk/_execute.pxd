@@ -101,7 +101,7 @@ cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
 cdef extern from "omniscidb/QueryEngine/Execute.h":
   cdef cppclass CExecutor "Executor":
     @staticmethod
-    shared_ptr[CExecutor] getExecutor(CDataMgr*, CBufferProvider*, shared_ptr[CConfig], const string&, const string&)
+    shared_ptr[CExecutor] getExecutor(CDataMgr*, shared_ptr[CConfig], const string&, const string&)
 
     const CConfig &getConfig()
     shared_ptr[CConfig] getConfigPtr()

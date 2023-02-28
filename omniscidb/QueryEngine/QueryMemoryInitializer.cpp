@@ -396,7 +396,6 @@ QueryMemoryInitializer::QueryMemoryInitializer(
         ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
         row_set_mem_owner_,
         executor->getDataMgr(),
-        executor->getBufferProvider(),
         executor->blockSize(),
         executor->gridSize()));
     result_sets_.back()->allocateStorage(reinterpret_cast<int8_t*>(group_by_buffer),
@@ -491,7 +490,6 @@ QueryMemoryInitializer::QueryMemoryInitializer(
       ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
       row_set_mem_owner_,
       executor->getDataMgr(),
-      executor->getBufferProvider(),
       executor->blockSize(),
       executor->gridSize()));
   result_sets_.back()->allocateStorage(reinterpret_cast<int8_t*>(group_by_buffer),

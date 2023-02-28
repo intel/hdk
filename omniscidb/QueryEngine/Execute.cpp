@@ -145,7 +145,6 @@ void Executor::resetCodeCache() {
 
 Executor::Executor(const ExecutorId executor_id,
                    Data_Namespace::DataMgr* data_mgr,
-                   BufferProvider* buffer_provider,
                    ConfigPtr config,
                    const std::string& debug_dir,
                    const std::string& debug_file)
@@ -157,7 +156,6 @@ Executor::Executor(const ExecutorId executor_id,
     , debug_dir_(debug_dir)
     , debug_file_(debug_file)
     , data_mgr_(data_mgr)
-    , buffer_provider_(buffer_provider)
     , temporary_tables_(nullptr)
     , input_table_info_cache_(this)
     , thread_id_(logger::thread_id()) {
@@ -386,7 +384,6 @@ Executor::CgenStateManager::~CgenStateManager() {
 }
 
 std::shared_ptr<Executor> Executor::getExecutor(Data_Namespace::DataMgr* data_mgr,
-                                                BufferProvider* buffer_provider,
                                                 ConfigPtr config,
                                                 const std::string& debug_dir,
                                                 const std::string& debug_file) {
@@ -397,7 +394,7 @@ std::shared_ptr<Executor> Executor::getExecutor(Data_Namespace::DataMgr* data_mg
   }
 
   return std::make_shared<Executor>(
-      executor_id_ctr_++, data_mgr, buffer_provider, config, debug_dir, debug_file);
+      executor_id_ctr_++, data_mgr, config, debug_dir, debug_file);
 }
 
 void Executor::clearMemory(const Data_Namespace::MemoryLevel memory_level,
@@ -1119,7 +1116,6 @@ TemporaryTable Executor::resultsUnion(SharedKernelContext& shared_context,
                                        QueryMemoryDescriptor(),
                                        row_set_mem_owner_,
                                        data_mgr_,
-                                       buffer_provider_,
                                        blockSize(),
                                        gridSize());
   }
@@ -1167,7 +1163,6 @@ ResultSetPtr Executor::reduceMultiDeviceResults(
                                        QueryMemoryDescriptor(),
                                        nullptr,
                                        data_mgr_,
-                                       buffer_provider_,
                                        blockSize(),
                                        gridSize());
   }
@@ -1240,7 +1235,6 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
                                                   query_mem_desc,
                                                   row_set_mem_owner,
                                                   data_mgr_,
-                                                  buffer_provider_,
                                                   blockSize(),
                                                   gridSize());
     auto result_storage = reduced_results->allocateStorage(plan_state_->init_agg_vals_);
@@ -2003,7 +1997,6 @@ TemporaryTable Executor::executeWorkUnitImpl(
                                      QueryMemoryDescriptor(),
                                      nullptr,
                                      data_mgr_,
-                                     buffer_provider_,
                                      blockSize(),
                                      gridSize());
 }
@@ -2108,7 +2101,6 @@ ResultSetPtr Executor::executeTableFunction(
         ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
         this->getRowSetMemoryOwner(),
         data_mgr_,
-        buffer_provider_,
         this->blockSize(),
         this->gridSize());
   }
@@ -2305,7 +2297,6 @@ ResultSetPtr build_row_for_empty_input(
                                         query_mem_desc,
                                         row_set_mem_owner,
                                         executor->getDataMgr(),
-                                        executor->getBufferProvider(),
                                         executor->blockSize(),
                                         executor->gridSize());
   rs->allocateStorage();

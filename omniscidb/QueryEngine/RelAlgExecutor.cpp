@@ -1649,7 +1649,6 @@ ExecutionResult RelAlgExecutor::executeTableFunction(
                                                      QueryMemoryDescriptor(),
                                                      nullptr,
                                                      executor_->getDataMgr(),
-                                                     executor_->getBufferProvider(),
                                                      executor_->blockSize(),
                                                      executor_->gridSize()),
                          {}};
@@ -2285,7 +2284,6 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
                                                      QueryMemoryDescriptor(),
                                                      nullptr,
                                                      executor_->getDataMgr(),
-                                                     executor_->getBufferProvider(),
                                                      executor_->blockSize(),
                                                      executor_->gridSize()),
                          {}};
@@ -2453,16 +2451,14 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
   auto ra_exe_unit_in = work_unit.exe_unit;
   ra_exe_unit_in.use_bump_allocator = false;
 
-  auto result =
-      ExecutionResult{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
-                                                  co.device_type,
-                                                  QueryMemoryDescriptor(),
-                                                  nullptr,
-                                                  executor_->getDataMgr(),
-                                                  executor_->getBufferProvider(),
-                                                  executor_->blockSize(),
-                                                  executor_->gridSize()),
-                      {}};
+  auto result = ExecutionResult{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
+                                                            co.device_type,
+                                                            QueryMemoryDescriptor(),
+                                                            nullptr,
+                                                            executor_->getDataMgr(),
+                                                            executor_->blockSize(),
+                                                            executor_->gridSize()),
+                                {}};
 
   const auto table_infos = get_table_infos(ra_exe_unit_in, executor_);
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;

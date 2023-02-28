@@ -66,7 +66,6 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
                      const QueryMemoryDescriptor& query_mem_desc,
                      const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                      Data_Namespace::DataMgr* data_mgr,
-                     BufferProvider* buffer_provider,
                      const unsigned block_size,
                      const unsigned grid_size)
     : targets_(targets)
@@ -81,7 +80,6 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
     , block_size_(block_size)
     , grid_size_(grid_size)
     , data_mgr_(data_mgr)
-    , buffer_provider_(buffer_provider)
     , separate_varlen_storage_valid_(false)
     , just_explain_(false)
     , for_validation_only_(false)
@@ -97,7 +95,6 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
                      const QueryMemoryDescriptor& query_mem_desc,
                      const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                      Data_Namespace::DataMgr* data_mgr,
-                     BufferProvider* buffer_provider,
                      const unsigned block_size,
                      const unsigned grid_size)
     : targets_(targets)
@@ -116,7 +113,6 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
     , frag_offsets_{frag_offsets}
     , consistent_frag_sizes_{consistent_frag_sizes}
     , data_mgr_(data_mgr)
-    , buffer_provider_(buffer_provider)
     , separate_varlen_storage_valid_(false)
     , just_explain_(false)
     , for_validation_only_(false)
@@ -125,25 +121,23 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
 ResultSet::ResultSet(const std::shared_ptr<const Analyzer::Estimator> estimator,
                      const ExecutorDeviceType device_type,
                      const int device_id,
-                     Data_Namespace::DataMgr* data_mgr,
-                     BufferProvider* buffer_provider)
+                     Data_Namespace::DataMgr* data_mgr)
     : device_type_(device_type)
     , device_id_(device_id)
     , query_mem_desc_{}
     , crt_row_buff_idx_(0)
     , estimator_(estimator)
     , data_mgr_(data_mgr)
-    , buffer_provider_(buffer_provider)
     , separate_varlen_storage_valid_(false)
     , just_explain_(false)
     , for_validation_only_(false)
     , cached_row_count_(uninitialized_cached_row_count) {
   if (device_type == ExecutorDeviceType::GPU) {
     device_estimator_buffer_ = GpuAllocator::allocGpuAbstractBuffer(
-        buffer_provider_, estimator_->getBufferSize(), device_id_);
-    buffer_provider_->zeroDeviceMem(device_estimator_buffer_->getMemoryPtr(),
-                                    estimator_->getBufferSize(),
-                                    device_id_);
+        getBufferProvider(), estimator_->getBufferSize(), device_id_);
+    getBufferProvider()->zeroDeviceMem(device_estimator_buffer_->getMemoryPtr(),
+                                       estimator_->getBufferSize(),
+                                       device_id_);
   } else {
     host_estimator_buffer_ =
         static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1));
@@ -690,7 +684,7 @@ void ResultSet::syncEstimatorBuffer() const {
       static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1));
   CHECK(device_estimator_buffer_);
   auto device_buffer_ptr = device_estimator_buffer_->getMemoryPtr();
-  buffer_provider_->copyFromDevice(
+  getBufferProvider()->copyFromDevice(
       host_estimator_buffer_, device_buffer_ptr, estimator_->getBufferSize(), device_id_);
 }
 
@@ -1332,7 +1326,7 @@ void ResultSet::radixSortOnGpu(
     const std::list<hdk::ir::OrderEntry>& order_entries) const {
   auto timer = DEBUG_TIMER(__func__);
   const int device_id{0};
-  GpuAllocator cuda_allocator(buffer_provider_, device_id);
+  GpuAllocator cuda_allocator(getBufferProvider(), device_id);
   CHECK_GT(block_size_, 0);
   CHECK_GT(grid_size_, 0);
   std::vector<int64_t*> group_by_buffers(block_size_);
@@ -1352,10 +1346,13 @@ void ResultSet::radixSortOnGpu(
                                   /*use_bump_allocator=*/false,
                                   /*has_varlen_output=*/false,
                                   /*insitu_allocator*=*/nullptr);
-  inplace_sort_gpu(
-      order_entries, query_mem_desc_, dev_group_by_buffers, buffer_provider_, device_id);
+  inplace_sort_gpu(order_entries,
+                   query_mem_desc_,
+                   dev_group_by_buffers,
+                   getBufferProvider(),
+                   device_id);
   copy_group_by_buffers_from_gpu(
-      buffer_provider_,
+      getBufferProvider(),
       group_by_buffers,
       query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU),
       dev_group_by_buffers.data,
@@ -1583,4 +1580,8 @@ bool result_set::can_use_parallel_algorithms(const ResultSet& rows) {
 
 bool result_set::use_parallel_algorithms(const ResultSet& rows) {
   return result_set::can_use_parallel_algorithms(rows) && rows.entryCount() >= 20000;
+}
+
+BufferProvider* ResultSet::getBufferProvider() const {
+  return data_mgr_ ? data_mgr_->getBufferProvider() : nullptr;
 }

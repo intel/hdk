@@ -331,8 +331,7 @@ class ArrowSQLRunnerImpl {
     auto* ps_mgr = data_mgr_->getPersistentStorageMgr();
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID, storage_);
 
-    executor_ = Executor::getExecutor(
-        data_mgr_.get(), data_mgr_->getBufferProvider(), config_, "", "");
+    executor_ = Executor::getExecutor(data_mgr_.get(), config_, "", "");
     executor_->setSchemaProvider(storage_);
 
     table_functions::TableFunctionsFactory::init();

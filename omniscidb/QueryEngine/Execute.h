@@ -256,7 +256,6 @@ class Executor {
   // executors map is populated
   Executor(const ExecutorId id,
            Data_Namespace::DataMgr* data_mgr,
-           BufferProvider* buffer_provider,
            ConfigPtr config,
            const std::string& debug_dir,
            const std::string& debug_file);
@@ -266,7 +265,6 @@ class Executor {
   void reset(const bool discard_runtime_modules_only = false);
 
   static std::shared_ptr<Executor> getExecutor(Data_Namespace::DataMgr* data_mgr,
-                                               BufferProvider* buffer_provider,
                                                ConfigPtr config = nullptr,
                                                const std::string& debug_dir = "",
                                                const std::string& debug_file = "");
@@ -353,8 +351,8 @@ class Executor {
   }
 
   BufferProvider* getBufferProvider() const {
-    CHECK(buffer_provider_);
-    return buffer_provider_;
+    CHECK(data_mgr_);
+    return data_mgr_->getBufferProvider();
   }
 
   const Config& getConfig() const { return *config_; }
@@ -1002,7 +1000,6 @@ class Executor {
 
   SchemaProviderPtr schema_provider_;
   Data_Namespace::DataMgr* data_mgr_;
-  BufferProvider* buffer_provider_;
   const TemporaryTables* temporary_tables_;
   TableIdToNodeMap table_id_to_node_map_;
 

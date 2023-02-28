@@ -93,7 +93,6 @@ ResultSetPtr QueryExecutionContext::groupBufferToDeinterleavedResults(
                                   deinterleaved_query_mem_desc,
                                   row_set_mem_owner_,
                                   executor_->getDataMgr(),
-                                  executor_->getBufferProvider(),
                                   executor_->blockSize(),
                                   executor_->gridSize());
   auto deinterleaved_storage =
@@ -414,11 +413,8 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
         shared_memory_size ? 1 : block_size_x * grid_size_x * num_fragments;
     const auto output_buffer_size_per_agg = num_results_per_agg_col * sizeof(int64_t);
     if (ra_exe_unit.estimator) {
-      estimator_result_set_.reset(new ResultSet(ra_exe_unit.estimator,
-                                                ExecutorDeviceType::GPU,
-                                                device_id,
-                                                data_mgr,
-                                                buffer_provider));
+      estimator_result_set_.reset(new ResultSet(
+          ra_exe_unit.estimator, ExecutorDeviceType::GPU, device_id, data_mgr));
       out_vec_dev_buffers.push_back(
           reinterpret_cast<int8_t*>(estimator_result_set_->getDeviceEstimatorBuffer()));
     } else {
@@ -564,8 +560,8 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
     // Subfragments collect the result from multiple runs in a single
     // result set.
     if (!estimator_result_set_) {
-      estimator_result_set_.reset(new ResultSet(
-          ra_exe_unit.estimator, ExecutorDeviceType::CPU, 0, nullptr, nullptr));
+      estimator_result_set_.reset(
+          new ResultSet(ra_exe_unit.estimator, ExecutorDeviceType::CPU, 0, nullptr));
     }
     out_vec.push_back(
         reinterpret_cast<int64_t*>(estimator_result_set_->getHostEstimatorBuffer()));
