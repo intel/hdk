@@ -1185,6 +1185,13 @@ std::shared_ptr<arrow::ChunkedArray> createDictionaryEncodedColumn(
   return nullptr;
 }
 
+std::shared_ptr<arrow::ChunkedArray> createLazyDictionaryEncodedColumn(
+    StringDictionary* dict,
+    std::shared_ptr<arrow::ChunkedArray> arr,
+    const hdk::ir::Type* type) {
+  return nullptr;
+}
+
 std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
     StringDictionary* dict,
     std::shared_ptr<arrow::ChunkedArray> arr,

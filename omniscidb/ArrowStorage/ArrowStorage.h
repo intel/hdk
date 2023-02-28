@@ -142,6 +142,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     size_t fragment_size = 32'000'000;
     std::shared_ptr<arrow::Schema> schema;
     std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
+    std::vector<std::shared_ptr<arrow::ChunkedArray>> arrow_col_data;  // from arrow table
     std::vector<DataFragment> fragments;
     size_t row_count = 0;
 
@@ -153,8 +154,9 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     // batches for on-the-fly data conversion. for other conversions, delete columns from
     // the record batch after conversion. store a mapping of record batch columns to
     // schema columns
-    std::vector<int> record_batch_col_mapping;
+    std::vector<int> record_batch_col_mapping;  // TODO: unused
     std::shared_ptr<arrow::RecordBatch> record_batch;
+    std::unordered_set<size_t> lazy_fetch_col_ids;
   };
 
   class ArrowChunkDataToken : public Data_Namespace::AbstractDataToken {
