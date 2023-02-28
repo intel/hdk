@@ -1,21 +1,17 @@
 # Intel GPU stack
-# https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-focal.html
-RUN wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | apt-key add - && \
-    apt-add-repository \
-        'deb [arch=amd64] https://repositories.intel.com/graphics/ubuntu focal main' && \
-    apt-get update && \
-        apt-get install -y \
-        intel-igc-cm \
-        intel-level-zero-gpu \
-        intel-media-va-driver-non-free \
-        intel-opencl-icd \
-        level-zero \
-        level-zero-dev \
-        libigc-dev \
-        libigdfcl-dev \
-        libigfxcmrt-dev \
-        libmfx1 \
-        --
+RUN mkdir /intel-gpu-drivers
+RUN cd /intel-gpu-drivers && wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero-devel_1.9.4+u18.04_amd64.deb
+RUN cd /intel-gpu-drivers && wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero_1.9.4+u18.04_amd64.deb
+
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-core_1.0.12812.24_amd64.deb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-opencl_1.0.12812.24_amd64.deb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-level-zero-gpu-dbgsym_1.3.25018.24_amd64.ddeb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-level-zero-gpu_1.3.25018.24_amd64.deb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-opencl-icd-dbgsym_22.49.25018.24_amd64.ddeb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-opencl-icd_22.49.25018.24_amd64.deb
+RUN cd /intel-gpu-drivers && wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/libigdgmm12_22.3.0_amd64.deb
+
+RUN cd /intel-gpu-drivers && dpkg -i *.deb
 
 RUN git clone -b llvm_release_120 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
     mkdir SPIRV-LLVM-Translator/build && cd SPIRV-LLVM-Translator/build && \
