@@ -85,7 +85,6 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
                        query_mem_desc,
                        row_set_mem_owner,
                        nullptr,
-                       nullptr,
                        0,
                        0);
 
@@ -196,7 +195,6 @@ TEST(Construct, Empty) {
                        ExecutorDeviceType::CPU,
                        query_mem_desc,
                        row_set_mem_owner,
-                       nullptr,
                        nullptr,
                        0,
                        0);

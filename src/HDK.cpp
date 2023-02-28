@@ -96,11 +96,8 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
                                                     /*calcite_max_mem_mb=*/1024);
 
   // Executor
-  internal_->executor = Executor::getExecutor(internal_->data_mgr.get(),
-                                              internal_->data_mgr->getBufferProvider(),
-                                              internal_->config,
-                                              "",
-                                              "");
+  internal_->executor =
+      Executor::getExecutor(internal_->data_mgr.get(), internal_->config, "", "");
   internal_->executor->setSchemaProvider(internal_->storage);
 }
 

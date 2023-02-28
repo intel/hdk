@@ -168,7 +168,6 @@ class ResultSet {
             const QueryMemoryDescriptor& query_mem_desc,
             const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
             Data_Namespace::DataMgr* data_mgr,
-            BufferProvider* buffer_provider,
             const unsigned block_size,
             const unsigned grid_size);
 
@@ -182,15 +181,13 @@ class ResultSet {
             const QueryMemoryDescriptor& query_mem_desc,
             const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
             Data_Namespace::DataMgr* data_mgr,
-            BufferProvider* buffer_provider,
             const unsigned block_size,
             const unsigned grid_size);
 
   ResultSet(const std::shared_ptr<const Analyzer::Estimator>,
             const ExecutorDeviceType device_type,
             const int device_id,
-            Data_Namespace::DataMgr* data_mgr,
-            BufferProvider* buffer_provider);
+            Data_Namespace::DataMgr* data_mgr);
 
   ResultSet(const std::string& explanation);
 
@@ -803,6 +800,7 @@ class ResultSet {
   size_t rowCountImpl(const bool force_parallel) const;
 
   Data_Namespace::DataMgr* getDataManager() const;
+  BufferProvider* getBufferProvider() const;
 
   int getGpuCount() const;
 
@@ -855,7 +853,6 @@ class ResultSet {
   Data_Namespace::AbstractBuffer* device_estimator_buffer_{nullptr};
   mutable int8_t* host_estimator_buffer_{nullptr};
   Data_Namespace::DataMgr* data_mgr_{nullptr};
-  BufferProvider* buffer_provider_{nullptr};
 
   // only used by serialization
   using SerializedVarlenBufferStorage = std::vector<std::string>;

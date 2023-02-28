@@ -120,7 +120,6 @@ class RaExecutionDesc {
                                             QueryMemoryDescriptor(),
                                             nullptr,
                                             nullptr,
-                                            nullptr,
                                             0,
                                             0),
                 {}) {}

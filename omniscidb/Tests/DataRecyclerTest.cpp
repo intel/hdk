@@ -1077,7 +1077,7 @@ TEST(DataRecycler, Hashtable_For_Dict_Encoded_Column) {
   createTable("TT1", {{"c1", ctx().extDict(ctx().text(), 0)}, {"id1", ctx().int32()}});
   createTable("TT2", {{"c2", ctx().extDict(ctx().text(), 0)}, {"id2", ctx().int32()}});
   auto data_mgr = getDataMgr();
-  auto executor = Executor::getExecutor(data_mgr, data_mgr->getBufferProvider()).get();
+  auto executor = Executor::getExecutor(data_mgr).get();
   auto clear_caches = [&executor, data_mgr](ExecutorDeviceType dt) {
     auto memory_level =
         dt == ExecutorDeviceType::CPU ? MemoryLevel::CPU_LEVEL : MemoryLevel::GPU_LEVEL;

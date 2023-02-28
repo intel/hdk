@@ -36,7 +36,6 @@ ResultSet* ResultSetBuilder::makeResultSet(
                        query_mem_desc,
                        row_set_mem_owner,
                        executor ? executor->getDataMgr() : nullptr,
-                       executor ? executor->getBufferProvider() : nullptr,
                        executor ? executor->blockSize() : 0,
                        executor ? executor->gridSize() : 0);
 }

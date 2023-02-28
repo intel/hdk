@@ -152,8 +152,7 @@ class NoCatalogSqlTest : public ::testing::Test {
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID,
                                  std::make_shared<TestDataProvider>(schema_provider_));
 
-    executor_ = Executor::getExecutor(
-        data_mgr_.get(), data_mgr_->getBufferProvider(), config_, "", "");
+    executor_ = Executor::getExecutor(data_mgr_.get(), config_, "", "");
 
     init_calcite("");
   }
@@ -327,8 +326,7 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
   threads.resize(TEST_NTHREADS);
   std::vector<std::shared_ptr<Executor>> executors;
   for (size_t i = 0; i < TEST_NTHREADS; ++i) {
-    executors.push_back(
-        Executor::getExecutor(data_mgr_.get(), data_mgr_->getBufferProvider(), config_));
+    executors.push_back(Executor::getExecutor(data_mgr_.get(), config_));
     threads[i] = std::async(std::launch::async, [this, i, &res, &executors]() {
       auto calcite = std::make_unique<CalciteJNI>(schema_provider_, config_);
       auto query_ra = calcite->process(

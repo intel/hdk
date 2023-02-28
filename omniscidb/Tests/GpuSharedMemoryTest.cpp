@@ -217,7 +217,6 @@ std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
                                                       query_mem_desc,
                                                       row_set_mem_owner,
                                                       nullptr,
-                                                      nullptr,
                                                       0,
                                                       0));
     const auto storage = result_sets.back()->allocateStorage();
@@ -240,7 +239,6 @@ create_and_init_output_result_sets(std::shared_ptr<RowSetMemoryOwner> row_set_me
                                                     query_mem_desc,
                                                     row_set_mem_owner,
                                                     nullptr,
-                                                    nullptr,
                                                     0,
                                                     0);
   auto cpu_storage_result = cpu_result_set->allocateStorage();
@@ -252,7 +250,6 @@ create_and_init_output_result_sets(std::shared_ptr<RowSetMemoryOwner> row_set_me
                                                     ExecutorDeviceType::GPU,
                                                     query_mem_desc,
                                                     row_set_mem_owner,
-                                                    nullptr,
                                                     nullptr,
                                                     0,
                                                     0);
@@ -266,7 +263,7 @@ void perform_reduction_on_cpu(std::vector<std::unique_ptr<ResultSet>>& result_se
   CHECK(result_sets.size() > 0);
   Config config;
   // for codegen only
-  auto executor = Executor::getExecutor(nullptr, nullptr);
+  auto executor = Executor::getExecutor(nullptr);
   ResultSetReductionJIT reduction_jit(result_sets.front()->getQueryMemDesc(),
                                       result_sets.front()->getTargetInfos(),
                                       result_sets.front()->getTargetInitVals(),
