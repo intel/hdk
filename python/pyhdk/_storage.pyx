@@ -175,8 +175,10 @@ cdef class SchemaProvider:
 cdef class TableOptions:
   cdef CTableOptions c_options
 
-  def __cinit__(self):
+  def __cinit__(self, int fragment_size = 0):
     self.c_options = CTableOptions()
+    if fragment_size > 0:
+      self.c_options.fragment_size = fragment_size
 
   @property
   def fragment_size(self):
