@@ -76,3 +76,6 @@ jobs:
 
   sanity-test:
     uses: ./.github/workflows/build-docker-hdk.yml
+
+  pytest:
+    uses: ./.github/workflows/pytest.yml
