@@ -45,6 +45,7 @@ jobs:
 
       - name: Start the container
         run:  |
+          set -vx
           docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/dri:/dev/dri hdk-build.${{ inputs.name }}:latest
           docker exec hdk-build.${{ inputs.name }} mkdir -p /_work/
           docker cp build.tgz hdk-build.${{ inputs.name }}:/_work/
