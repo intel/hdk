@@ -1,4 +1,9 @@
 #include "../Shared/funcannotations.h"
+
+#ifdef _MSC_VER
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
+
 #ifndef __CUDACC__
 #include <cstdint>
 

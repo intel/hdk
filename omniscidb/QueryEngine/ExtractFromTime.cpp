@@ -19,6 +19,10 @@
  * http://howardhinnant.github.io/date_algorithms.html
  */
 
+#ifdef _MSC_VER
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
+
 #include "ExtractFromTime.h"
 
 #include <cmath>
