@@ -5,7 +5,9 @@ on:
       reset-cache:
         type: boolean
         default: true
-  push: []
+  push:
+  schedule:
+    - cron: '51 2 * * *'
 
 jobs:
   modin:
