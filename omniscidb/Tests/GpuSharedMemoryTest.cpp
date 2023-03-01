@@ -18,6 +18,7 @@
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
+#include "QueryEngine/ResultSetReduction.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
 
 extern bool g_is_test_env;
@@ -272,8 +273,12 @@ void perform_reduction_on_cpu(std::vector<std::unique_ptr<ResultSet>>& result_se
                                       executor.get());
   const auto reduction_code = reduction_jit.codegen();
   for (auto& result_set : result_sets) {
-    cpu_result_storage->reduce(
-        *(result_set->getStorage()), {}, reduction_code, config, executor.get());
+    ResultSetReduction::reduce(*cpu_result_storage,
+                               *(result_set->getStorage()),
+                               {},
+                               reduction_code,
+                               config,
+                               executor.get());
   }
 }
 

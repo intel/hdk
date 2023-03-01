@@ -25,7 +25,6 @@
 #ifndef QUERYENGINE_RESULTSETSTORAGE_H
 #define QUERYENGINE_RESULTSETSTORAGE_H
 
-#include "CardinalityEstimator.h"
 #include "DataMgr/Chunk/Chunk.h"
 #include "ResultSetBufferAccessors.h"
 #include "Shared/Config.h"
@@ -76,8 +75,6 @@
  * probing is used instead, with a 50% fill rate.
  */
 
-struct ReductionCode;
-
 struct ColumnLazyFetchInfo {
   const bool is_lazily_fetched;
   const int local_col_id;
@@ -104,12 +101,6 @@ class ResultSetStorage {
                    const bool buff_is_provided);
 
  public:
-  void reduce(const ResultSetStorage& that,
-              const std::vector<std::string>& serialized_varlen_buffer,
-              const ReductionCode& reduction_code,
-              const Config& config,
-              const Executor* executor) const;
-
   void rewriteAggregateBufferOffsets(
       const std::vector<std::string>& serialized_varlen_buffer) const;
 
@@ -117,49 +108,23 @@ class ResultSetStorage {
 
   size_t getEntryCount() const { return query_mem_desc_.getEntryCount(); }
 
+  const QueryMemoryDescriptor& getQueryMemDesc() const { return query_mem_desc_; }
+
+  const std::vector<TargetInfo>& getTargets() const { return targets_; }
+  size_t getTargetsCount() const { return targets_.size(); }
+  const TargetInfo& getTarget(size_t idx) const { return targets_[idx]; }
+
+  const std::vector<int64_t>& getInitVals() const { return target_init_vals_; }
+  size_t getInitValsCount() const { return target_init_vals_.size(); }
+  int64_t getInitVal(size_t idx) const { return target_init_vals_[idx]; }
+
   size_t getColOffInBytes(size_t column_idx) const;
-
-  template <class KeyType>
-  void moveEntriesToBuffer(int8_t* new_buff, const size_t new_entry_count) const;
-
-  template <class KeyType>
-  void moveOneEntryToBuffer(const size_t entry_index,
-                            int64_t* new_buff_i64,
-                            const size_t new_entry_count,
-                            const size_t key_count,
-                            const size_t row_qw_count,
-                            const int64_t* src_buff,
-                            const size_t key_byte_width) const;
 
   void updateEntryCount(const size_t new_entry_count) {
     query_mem_desc_.setEntryCount(new_entry_count);
   }
 
-  void reduceOneApproxQuantileSlot(int8_t* this_ptr1,
-                                   const int8_t* that_ptr1,
-                                   const size_t target_logical_idx,
-                                   const ResultSetStorage& that) const;
-
-  // Reduces results for a single row when using interleaved bin layouts
-  static bool reduceSingleRow(const int8_t* row_ptr,
-                              const int8_t warp_count,
-                              const bool is_columnar,
-                              const bool replace_bitmap_ptr_with_bitmap_sz,
-                              std::vector<int64_t>& agg_vals,
-                              const QueryMemoryDescriptor& query_mem_desc,
-                              const std::vector<TargetInfo>& targets,
-                              const std::vector<int64_t>& agg_init_vals);
-
  private:
-  void reduceEntriesNoCollisionsColWise(
-      int8_t* this_buff,
-      const int8_t* that_buff,
-      const ResultSetStorage& that,
-      const size_t start_index,
-      const size_t end_index,
-      const std::vector<std::string>& serialized_varlen_buffer,
-      const Executor* executor) const;
-
   void copyKeyColWise(const size_t entry_idx,
                       int8_t* this_buff,
                       const int8_t* that_buff) const;
@@ -168,56 +133,7 @@ class ResultSetStorage {
   bool isEmptyEntry(const size_t entry_idx) const;
   bool isEmptyEntryColumnar(const size_t entry_idx, const int8_t* buff) const;
 
-  void reduceOneEntryBaseline(int8_t* this_buff,
-                              const int8_t* that_buff,
-                              const size_t i,
-                              const size_t that_entry_count,
-                              const ResultSetStorage& that,
-                              bool enable_dynamic_watchdog) const;
-
-  void reduceOneEntrySlotsBaseline(int64_t* this_entry_slots,
-                                   const int64_t* that_buff,
-                                   const size_t that_entry_idx,
-                                   const size_t that_entry_count,
-                                   const ResultSetStorage& that) const;
-
   void initializeBaselineValueSlots(int64_t* this_entry_slots) const;
-
-  void reduceOneSlotBaseline(int64_t* this_buff,
-                             const size_t this_slot,
-                             const int64_t* that_buff,
-                             const size_t that_entry_count,
-                             const size_t that_slot,
-                             const TargetInfo& target_info,
-                             const size_t target_logical_idx,
-                             const size_t target_slot_idx,
-                             const size_t init_agg_val_idx,
-                             const ResultSetStorage& that) const;
-
-  ALWAYS_INLINE
-  void reduceOneSlotSingleValue(int8_t* this_ptr1,
-                                const TargetInfo& target_info,
-                                const size_t target_slot_idx,
-                                const size_t init_agg_val_idx,
-                                const int8_t* that_ptr1) const;
-
-  ALWAYS_INLINE
-  void reduceOneSlot(int8_t* this_ptr1,
-                     int8_t* this_ptr2,
-                     const int8_t* that_ptr1,
-                     const int8_t* that_ptr2,
-                     const TargetInfo& target_info,
-                     const size_t target_logical_idx,
-                     const size_t target_slot_idx,
-                     const size_t init_agg_val_idx,
-                     const ResultSetStorage& that,
-                     const size_t first_slot_idx_for_target,
-                     const std::vector<std::string>& serialized_varlen_buffer) const;
-
-  void reduceOneCountDistinctSlot(int8_t* this_ptr1,
-                                  const int8_t* that_ptr1,
-                                  const size_t target_logical_idx,
-                                  const ResultSetStorage& that) const;
 
   void fillOneEntryRowWise(const std::vector<int64_t>& entry);
 
@@ -256,6 +172,7 @@ class ResultSetStorage {
 
   friend class ResultSet;
   friend class ResultSetManager;
+  friend class ResultSetReduction;
 };
 
 using GroupValueInfo = std::pair<int64_t*, bool>;
