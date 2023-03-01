@@ -616,21 +616,6 @@ class ExecuteTestBase {
     run_sqlite_query("INSERT INTO join_test VALUES(9, null, 'baz', 'bar');");
   }
 
-  static void createNestedLoopJoinTestTable() {
-    createTable("loop_join_test",
-                {{"x", ctx().int32(false)},
-                 {"y", ctx().int32()},
-                 {"str", ctx().extDict(ctx().text(), 0)},
-                 {"dup_str", ctx().extDict(ctx().text(), 0)}},
-                {2});
-    insertCsvValues("join_test", "7,43,foo,foo\n8,9,bar,foo\n9,8,baz,bar");
-    run_sqlite_query("DROP TABLE IF EXISTS loop_join_test;");
-    run_sqlite_query(
-        "CREATE TABLE loop_join_test(x int not null, y int, str text, dup_str text);");
-    run_sqlite_query("INSERT INTO loop_join_test VALUES(7, 43, 'foo', 'foo');");
-    run_sqlite_query("INSERT INTO loop_join_test VALUES(8, null, 'bar', 'foo');");
-    run_sqlite_query("INSERT INTO loop_join_test VALUES(9, null, 'baz', 'bar');");
-  }
   static void createQueryRewriteTestTable() {
     createTable("query_rewrite_test",
                 {{"x", ctx().int32()}, {"str", ctx().extDict(ctx().text(), 0)}},
