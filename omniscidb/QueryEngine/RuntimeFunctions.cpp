@@ -18,6 +18,10 @@
 #error This code is not intended to be compiled with a CUDA C++ compiler
 #endif  // __CUDACC__
 
+#ifdef _MSC_VER
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
+
 #include "RuntimeFunctions.h"
 #include "HyperLogLogRank.h"
 #include "MurmurHash.h"

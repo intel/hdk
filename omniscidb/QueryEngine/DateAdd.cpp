@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#ifdef _MSC_VER
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
+
 #include "ExtractFromTime.h"
 #include "IR/DateTimeEnums.h"
 #include "Shared/funcannotations.h"
