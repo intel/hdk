@@ -1466,7 +1466,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   const GpuSharedMemoryContext gpu_smem_context(shared_memory_size);
 
-  compiler::setSharedMemory(co.device_type, gpu_smem_context.isSharedMemoryUsed(), target, backend);
+  compiler::setSharedMemory(
+      co.device_type, gpu_smem_context.isSharedMemoryUsed(), target, backend);
 
   RowFuncBuilder row_func_builder(ra_exe_unit, query_infos, this);
 
