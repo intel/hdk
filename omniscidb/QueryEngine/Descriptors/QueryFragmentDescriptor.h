@@ -165,13 +165,14 @@ class QueryFragmentDescriptor {
   std::map<size_t, size_t> tuple_count_per_gpu_device_;
   std::map<size_t, size_t> available_gpu_mem_bytes_;
 
-  void buildFragmentPerKernelMapForUnion(const RelAlgExecutionUnit& ra_exe_unit,
-                                         const std::vector<uint64_t>& frag_offsets,
-                                         const policy::ExecutionPolicy* policy,
-                                         const int device_count,
-                                         const size_t num_bytes_for_row,
-                                         Executor* executor,
-                                         compiler::CodegenTraitsDescriptor cgen_traits_desc);
+  void buildFragmentPerKernelMapForUnion(
+      const RelAlgExecutionUnit& ra_exe_unit,
+      const std::vector<uint64_t>& frag_offsets,
+      const policy::ExecutionPolicy* policy,
+      const int device_count,
+      const size_t num_bytes_for_row,
+      Executor* executor,
+      compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   void buildFragmentPerKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<uint64_t>& frag_offsets,
@@ -179,7 +180,7 @@ class QueryFragmentDescriptor {
                                  const int device_count,
                                  const size_t num_bytes_for_row,
                                  Executor* executor,
-                               compiler::CodegenTraitsDescriptor cgen_traits_desc);
+                                 compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   void buildMultifragKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                const std::vector<uint64_t>& frag_offsets,

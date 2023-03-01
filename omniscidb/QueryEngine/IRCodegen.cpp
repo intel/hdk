@@ -1174,11 +1174,14 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     diamond_codegen.setFalseTarget(array_loop_head);
     const auto ret_ty = get_int_type(32, cgen_state_->context_);
     llvm::Value* array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
-    array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-        array_idx_ptr,
-        llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
-                               co.codegen_traits_desc.local_addr_space_),
-        "array.idx.ptrcast");
+    if (array_idx_ptr->getType()->getPointerAddressSpace() !=
+        co.codegen_traits_desc.local_addr_space_) {
+      array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+          array_idx_ptr,
+          llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
+                                 co.codegen_traits_desc.local_addr_space_),
+          "array.idx.ptrcast");
+    }
     CHECK(array_idx_ptr);
     cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
     const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->operand();

@@ -1572,8 +1572,12 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   preloadFragOffsets(ra_exe_unit.input_descs, query_infos);
   RelAlgExecutionUnit body_execution_unit = ra_exe_unit;
-  const auto join_loops = buildJoinLoops(
-      body_execution_unit, co_codegen_traits, eo, query_infos, data_provider, column_cache);
+  const auto join_loops = buildJoinLoops(body_execution_unit,
+                                         co_codegen_traits,
+                                         eo,
+                                         query_infos,
+                                         data_provider,
+                                         column_cache);
 
   plan_state_->allocateLocalColumnIds(ra_exe_unit.input_col_descs);
   for (auto& simple_qual : ra_exe_unit.simple_quals) {
@@ -1589,8 +1593,11 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
                      co_codegen_traits,
                      eo);
   } else {
-    const bool can_return_error =
-        compileBody(ra_exe_unit, row_func_builder, *query_mem_desc, co_codegen_traits, gpu_smem_context);
+    const bool can_return_error = compileBody(ra_exe_unit,
+                                              row_func_builder,
+                                              *query_mem_desc,
+                                              co_codegen_traits,
+                                              gpu_smem_context);
     if (can_return_error || cgen_state_->needs_error_check_ || eo.with_dynamic_watchdog ||
         eo.allow_runtime_query_interrupt) {
       createErrorCheckControlFlow(query_func,
@@ -1679,16 +1686,19 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   }
 
   auto multifrag_query_func = cgen_state_->module_->getFunction(
-      "multifrag_query" + std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""));
+      "multifrag_query" +
+      std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""));
   CHECK(multifrag_query_func);
 
   if (co_codegen_traits.device_type == ExecutorDeviceType::GPU && eo.allow_multifrag) {
-    insertErrorCodeChecker(
-        multifrag_query_func, co_codegen_traits.hoist_literals, eo.allow_runtime_query_interrupt);
+    insertErrorCodeChecker(multifrag_query_func,
+                           co_codegen_traits.hoist_literals,
+                           eo.allow_runtime_query_interrupt);
   }
 
   bind_query(query_func,
-             "query_stub" + std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""),
+             "query_stub" +
+                 std::string(co_codegen_traits.hoist_literals ? "_hoisted_literals" : ""),
              multifrag_query_func,
              cgen_state_->module_);
 
@@ -1781,16 +1791,21 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   // Generate final native code from the LLVM IR.
   return std::make_tuple(
-      CompilationResult{
-          co.device_type == ExecutorDeviceType::CPU
-              ? optimizeAndCodegenCPU(
-                    query_func, multifrag_query_func, backend, live_funcs, co_codegen_traits)
-              : optimizeAndCodegenGPU(
-                    query_func, multifrag_query_func, backend, live_funcs, co_codegen_traits),
-          cgen_state_->getLiterals(),
-          output_columnar,
-          llvm_ir,
-          std::move(gpu_smem_context)},
+      CompilationResult{co.device_type == ExecutorDeviceType::CPU
+                            ? optimizeAndCodegenCPU(query_func,
+                                                    multifrag_query_func,
+                                                    backend,
+                                                    live_funcs,
+                                                    co_codegen_traits)
+                            : optimizeAndCodegenGPU(query_func,
+                                                    multifrag_query_func,
+                                                    backend,
+                                                    live_funcs,
+                                                    co_codegen_traits),
+                        cgen_state_->getLiterals(),
+                        output_columnar,
+                        llvm_ir,
+                        std::move(gpu_smem_context)},
       std::move(query_mem_desc));
 }
 
@@ -1899,11 +1914,14 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
                                               row_func_entry_bb->begin());
       loop_done = cgen_state_->ir_builder_.CreateAlloca(
           get_int_type(1, cgen_state_->context_), nullptr, "loop_done");
-      loop_done = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-          loop_done,
-          llvm::PointerType::get(loop_done->getType()->getPointerElementType(),
-                                 co.codegen_traits_desc.local_addr_space_),
-          "loop.done.cast");
+      if (loop_done->getType()->getPointerAddressSpace() !=
+          co.codegen_traits_desc.local_addr_space_) {
+        loop_done = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+            loop_done,
+            llvm::PointerType::get(loop_done->getType()->getPointerElementType(),
+                                   co.codegen_traits_desc.local_addr_space_),
+            "loop.done.cast");
+      }
       cgen_state_->ir_builder_.SetInsertPoint(cgen_state_->row_func_bb_);
       cgen_state_->ir_builder_.CreateStore(cgen_state_->llBool(true), loop_done);
     }

@@ -144,8 +144,7 @@ class HashJoin {
       const int64_t sub_buff_size,
       Executor* executor,
       const CompilationOptions& co,
-      const bool is_bucketized = false
-);
+      const bool is_bucketized = false);
 
   static llvm::Value* codegenHashTableLoad(const size_t table_idx, Executor* executor);
 

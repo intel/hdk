@@ -21,8 +21,6 @@
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 
 #include "Compiler/Backend.h"
-#include "Logger/Logger.h"
-
 #include "Shared/threading.h"
 
 #ifdef HAVE_TBB

@@ -154,7 +154,8 @@ HashJoinMatchingSet HashJoin::codegenMatchingSet(
   using namespace std::string_literals;
 
   std::string fname(is_bucketized ? "bucketized_hash_join_idx"s : "hash_join_idx"s);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   if (is_bw_eq) {
     fname += "_bitwise";
@@ -183,7 +184,8 @@ HashJoinMatchingSet HashJoin::codegenMatchingSet(
   auto rowid_base_i32 = executor->cgen_state_->ir_builder_.CreateIntToPtr(
       executor->cgen_state_->ir_builder_.CreateAdd(
           pos_ptr, executor->cgen_state_->llInt(2 * sub_buff_size)),
-      cgen_traits.localPointerType(llvm::Type::getInt32PtrTy(executor->cgen_state_->context_)));
+      cgen_traits.localPointerType(
+          llvm::Type::getInt32PtrTy(executor->cgen_state_->context_)));
 
   auto rowid_ptr_i32 = executor->cgen_state_->ir_builder_.CreateGEP(
       rowid_base_i32->getType()->getScalarType()->getPointerElementType(),

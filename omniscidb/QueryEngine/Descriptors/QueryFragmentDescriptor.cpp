@@ -82,8 +82,13 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
   const auto num_bytes_for_row = executor->getNumBytesForFetchedRow(lhs_table_ids);
 
   if (ra_exe_unit.union_all) {
-    buildFragmentPerKernelMapForUnion(
-        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor, cgen_traits_desc);
+    buildFragmentPerKernelMapForUnion(ra_exe_unit,
+                                      frag_offsets,
+                                      policy,
+                                      device_count,
+                                      num_bytes_for_row,
+                                      executor,
+                                      cgen_traits_desc);
   } else if (enable_multifrag_kernels) {
     buildMultifragKernelMap(ra_exe_unit,
                             frag_offsets,
@@ -91,10 +96,16 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
                             device_count,
                             num_bytes_for_row,
                             enable_inner_join_fragment_skipping,
-                            executor, cgen_traits_desc);
+                            executor,
+                            cgen_traits_desc);
   } else {
-    buildFragmentPerKernelMap(
-        ra_exe_unit, frag_offsets, policy, device_count, num_bytes_for_row, executor, cgen_traits_desc);
+    buildFragmentPerKernelMap(ra_exe_unit,
+                              frag_offsets,
+                              policy,
+                              device_count,
+                              num_bytes_for_row,
+                              executor,
+                              cgen_traits_desc);
   }
 }
 
@@ -134,8 +145,12 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     }
 
     const auto& fragment = (*fragments)[i];
-    const auto skip_frag = executor->skipFragment(
-        table_desc, fragment, ra_exe_unit.simple_quals, frag_offsets, i, cgen_traits_desc);
+    const auto skip_frag = executor->skipFragment(table_desc,
+                                                  fragment,
+                                                  ra_exe_unit.simple_quals,
+                                                  frag_offsets,
+                                                  i,
+                                                  cgen_traits_desc);
     if (skip_frag.first) {
       continue;
     }
@@ -235,7 +250,8 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
                                    device_count,
                                    num_bytes_for_row,
                                    j,
-                                   executor,cgen_traits_desc);
+                                   executor,
+                                   cgen_traits_desc);
 
     std::vector<int> table_cpu_ids =
         std::accumulate(execution_kernels_per_device_[ExecutorDeviceType::CPU][0].begin(),
@@ -271,7 +287,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
     const int device_count,
     const size_t num_bytes_for_row,
     Executor* executor,
-     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
+    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const auto& outer_table_desc = ra_exe_unit.input_descs.front();
   const int db_id = outer_table_desc.getDatabaseId();
   const int outer_table_id = outer_table_desc.getTableId();
@@ -348,8 +364,12 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
                                             cgen_traits_desc);
     if (enable_inner_join_fragment_skipping &&
         (skip_frag == std::pair<bool, int64_t>(false, -1))) {
-      skip_frag = executor->skipFragmentInnerJoins(
-          outer_table_desc, ra_exe_unit, fragment, frag_offsets, outer_frag_id, cgen_traits_desc);
+      skip_frag = executor->skipFragmentInnerJoins(outer_table_desc,
+                                                   ra_exe_unit,
+                                                   fragment,
+                                                   frag_offsets,
+                                                   outer_frag_id,
+                                                   cgen_traits_desc);
     }
     if (skip_frag.first) {
       continue;

@@ -39,7 +39,9 @@ class TableFunctionCompilationContext {
                                               const CompilationOptions& co);
 
  private:
-  void generateEntryPoint(const TableFunctionExecutionUnit& exe_unit, bool is_gpu, const CompilationOptions& co);
+  void generateEntryPoint(const TableFunctionExecutionUnit& exe_unit,
+                          bool is_gpu,
+                          const CompilationOptions& co);
   void generateTableFunctionCall(const TableFunctionExecutionUnit& exe_unit,
                                  const std::vector<llvm::Value*>& func_args,
                                  llvm::BasicBlock* bb_exit,

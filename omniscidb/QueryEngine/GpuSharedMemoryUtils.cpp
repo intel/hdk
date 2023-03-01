@@ -110,7 +110,8 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
   arg_it++;
   auto buffer_size = &*arg_it;
   buffer_size->setName("buffer_size");
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   auto bb_entry = llvm::BasicBlock::Create(context_, ".entry", reduction_func_);
   auto bb_body = llvm::BasicBlock::Create(context_, ".body", reduction_func_);
@@ -136,9 +137,15 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
 
   // cast src/dest buffers into byte streams:
   auto src_byte_stream = ir_builder.CreatePointerCast(
-      src_buffer_ptr, llvm::Type::getInt8PtrTy(context_, src_buffer_ptr->getType()->getPointerAddressSpace()), "src_byte_stream");
+      src_buffer_ptr,
+      llvm::Type::getInt8PtrTy(context_,
+                               src_buffer_ptr->getType()->getPointerAddressSpace()),
+      "src_byte_stream");
   const auto dest_byte_stream = ir_builder.CreatePointerCast(
-      dest_buffer_ptr, llvm::Type::getInt8PtrTy(context_, dest_buffer_ptr->getType()->getPointerAddressSpace()), "dest_byte_stream");
+      dest_buffer_ptr,
+      llvm::Type::getInt8PtrTy(context_,
+                               dest_buffer_ptr->getType()->getPointerAddressSpace()),
+      "dest_byte_stream");
 
   // running the result set reduction JIT code to get reduce_one_entry_idx function
   auto fixup_query_mem_desc = ResultSet::fixupQueryMemoryDescriptor(query_mem_desc_);
@@ -203,8 +210,8 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
   // qmd_handles are only used with count distinct and baseline group by
   // serialized varlen buffer is only used with SAMPLE on varlen types, which we will
   // disable for current shared memory support.
-  const auto null_ptr_ll =
-      llvm::ConstantPointerNull::get(cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(context_)));
+  const auto null_ptr_ll = llvm::ConstantPointerNull::get(
+      cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(context_)));
   const auto thread_idx_i32 = ir_builder.CreateCast(
       llvm::Instruction::CastOps::Trunc, thread_idx, get_int_type(32, context_));
   ir_builder.CreateCall(reduce_one_entry_idx_func,
@@ -295,7 +302,10 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
   auto byte_offset_ll = ir_builder.CreateMul(row_size_bytes, thread_idx, "byte_offset");
 
   const auto dest_byte_stream = ir_builder.CreatePointerCast(
-      shared_mem_buffer, llvm::Type::getInt8PtrTy(context_, shared_mem_buffer->getType()->getPointerAddressSpace()), "dest_byte_stream");
+      shared_mem_buffer,
+      llvm::Type::getInt8PtrTy(context_,
+                               shared_mem_buffer->getType()->getPointerAddressSpace()),
+      "dest_byte_stream");
 
   // each thread will be responsible for one
   const auto& col_slot_context = fixup_query_mem_desc.getColSlotContext();

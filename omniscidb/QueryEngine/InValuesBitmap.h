@@ -48,7 +48,9 @@ class InValuesBitmap {
                  BufferProvider* buffer_provider);
   ~InValuesBitmap();
 
-  llvm::Value* codegen(llvm::Value* needle, Executor* executor, compiler::CodegenTraitsDescriptor codegen_traits_desc) const;
+  llvm::Value* codegen(llvm::Value* needle,
+                       Executor* executor,
+                       compiler::CodegenTraitsDescriptor codegen_traits_desc) const;
 
   bool isEmpty() const;
 

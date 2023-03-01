@@ -25,8 +25,11 @@
 
 #include "QueryEngine/Compiler/HelperFunctions.h"
 
-llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx, const CompilationOptions& co) {
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+llvm::Type* llvm_type(const Type type,
+                      llvm::LLVMContext& ctx,
+                      const CompilationOptions& co) {
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   switch (type) {
     case Type::Int1: {
       return get_int_type(1, ctx);
@@ -68,7 +71,8 @@ llvm::Type* llvm_type(const Type type, llvm::LLVMContext& ctx, const Compilation
       return cgen_traits.localPointerType(get_int_type(8, ctx));
     }
     case Type::Int64PtrPtr: {
-      return cgen_traits.localPointerType(cgen_traits.localPointerType(get_int_type(64, ctx)));
+      return cgen_traits.localPointerType(
+          cgen_traits.localPointerType(get_int_type(64, ctx)));
     }
     default: {
       LOG(FATAL) << "Argument type not supported: " << static_cast<int>(type);
@@ -271,11 +275,14 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
           llvm_type(pointee_type(alloca->type()), ctx, co),
           mapped_value(alloca->array_size(), m),
           alloca->label());
-      translated = cgen_state->ir_builder_.CreateAddrSpaceCast(
-          translated,
-          llvm::PointerType::get(translated->getType()->getPointerElementType(),
-                                 co.codegen_traits_desc.local_addr_space_),
-          "translated.cast");
+      if (translated->getType()->getPointerAddressSpace() !=
+          co.codegen_traits_desc.local_addr_space_) {
+        translated = cgen_state->ir_builder_.CreateAddrSpaceCast(
+            translated,
+            llvm::PointerType::get(translated->getType()->getPointerElementType(),
+                                   co.codegen_traits_desc.local_addr_space_),
+            "translated.cast");
+      }
     } else if (auto memcpy = dynamic_cast<const MemCpy*>(instr_ptr)) {
       cgen_state->ir_builder_.CreateMemCpy(mapped_value(memcpy->dest(), m),
                                            LLVM_MAYBE_ALIGN(0),
@@ -288,7 +295,8 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
                    llvm_function,
                    mapped_value(ret_early->error_code(), m));
     } else if (auto for_loop = dynamic_cast<const For*>(instr_ptr)) {
-      translate_for(for_loop, reduction_code.ir_reduce_loop.get(), reduction_code, m, f, co);
+      translate_for(
+          for_loop, reduction_code.ir_reduce_loop.get(), reduction_code, m, f, co);
     } else {
       LOG(FATAL) << "Instruction not supported yet";
     }
