@@ -23,6 +23,8 @@
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/UsedColumnsCollector.h"
 
+#include <boost/algorithm/cxx11/any_of.hpp>
+
 MemoryLayoutBuilder::MemoryLayoutBuilder(const RelAlgExecutionUnit& ra_exe_unit)
     : ra_exe_unit_(ra_exe_unit) {
   for (const auto& groupby_expr : ra_exe_unit_.groupby_exprs) {
@@ -753,6 +755,14 @@ std::vector<int64_t> target_expr_proj_indices(const RelAlgExecutionUnit& ra_exe_
   return target_indices;
 }
 
+bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs,
+           hdk::ir::AggType agg_kind) {
+  return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
+    auto const* const agg = dynamic_cast<hdk::ir::AggExpr const*>(expr);
+    return agg && agg->aggType() == agg_kind;
+  });
+}
+
 std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
     const Executor* executor,
     const RelAlgExecutionUnit& ra_exe_unit,
@@ -790,8 +800,9 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
     return std::make_unique<QueryMemoryDescriptor>(
         executor->getDataMgr(),
         executor->getConfigPtr(),
-        ra_exe_unit,
         query_infos,
+        false,
+        false,
         allow_multifrag,
         false,
         false,
@@ -928,10 +939,13 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
       UNREACHABLE() << "Unknown query type";
   }
 
+  auto approx_quantile =
+      anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kApproxQuantile);
   return std::make_unique<QueryMemoryDescriptor>(executor->getDataMgr(),
                                                  executor->getConfigPtr(),
-                                                 ra_exe_unit,
                                                  query_infos,
+                                                 ra_exe_unit.use_bump_allocator,
+                                                 approx_quantile,
                                                  allow_multifrag,
                                                  keyless_hash,
                                                  interleaved_bins_on_gpu,

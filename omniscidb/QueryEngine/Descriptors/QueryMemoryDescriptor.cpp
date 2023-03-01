@@ -16,29 +16,18 @@
 
 #include "QueryEngine/Descriptors/QueryMemoryDescriptor.h"
 
-#include <boost/algorithm/cxx11/any_of.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "DataMgr/DataMgr.h"
 #include "QueryEngine/ColRangeInfo.h"
 #include "QueryEngine/StreamingTopN.h"
 
-namespace {
-
-bool anyOf(std::vector<const hdk::ir::Expr*> const& target_exprs,
-           hdk::ir::AggType agg_kind) {
-  return boost::algorithm::any_of(target_exprs, [agg_kind](hdk::ir::Expr const* expr) {
-    auto const* const agg = dynamic_cast<hdk::ir::AggExpr const*>(expr);
-    return agg && agg->aggType() == agg_kind;
-  });
-}
-
-}  // namespace
-
 QueryMemoryDescriptor::QueryMemoryDescriptor(
     Data_Namespace::DataMgr* data_mgr,
     ConfigPtr config,
-    const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<InputTableInfo>& query_infos,
+    const bool use_bump_allocator,
+    const bool approx_quantile,
     const bool allow_multifrag,
     const bool keyless_hash,
     const bool interleaved_bins_on_gpu,
@@ -81,7 +70,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   sort_on_gpu_ = sort_on_gpu_hint && canOutputColumnar() && !keyless_hash_;
 
   if (sort_on_gpu_) {
-    CHECK(!ra_exe_unit.use_bump_allocator);
+    CHECK(!use_bump_allocator);
     output_columnar_ = true;
   } else {
     switch (query_desc_type_) {
@@ -91,11 +80,10 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
       case QueryDescriptionType::GroupByPerfectHash:
       case QueryDescriptionType::GroupByBaselineHash:
       case QueryDescriptionType::NonGroupedAggregate:
-        output_columnar_ =
-            output_columnar_hint &&
-            QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
-                count_distinct_descriptors_) &&
-            !anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kApproxQuantile);
+        output_columnar_ = output_columnar_hint &&
+                           QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
+                               count_distinct_descriptors_) &&
+                           !approx_quantile;
         break;
       default:
         output_columnar_ = false;
@@ -106,7 +94,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   if (isLogicalSizedColumnsAllowed()) {
     // TODO(adb): Ensure fixed size buffer allocations are correct with all logical
     // column sizes
-    CHECK(!ra_exe_unit.use_bump_allocator);
+    CHECK(!use_bump_allocator);
     col_slot_context_.setAllSlotsPaddedSizeToLogicalSize();
     col_slot_context_.validate();
   }
@@ -453,12 +441,12 @@ size_t QueryMemoryDescriptor::getNextColOffInBytesRowOnly(const int8_t* col_ptr,
 }
 
 size_t QueryMemoryDescriptor::getBufferSizeBytes(
-    const RelAlgExecutionUnit& ra_exe_unit,
+    const size_t max_rows,
     const unsigned thread_count,
     const ExecutorDeviceType device_type) const {
   if (use_streaming_top_n_) {
-    const size_t n = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
-    return streaming_top_n::get_heap_size(getRowSize(), n, thread_count);
+    CHECK_GT(max_rows, size_t(0));
+    return streaming_top_n::get_heap_size(getRowSize(), max_rows, thread_count);
   }
   return getBufferSizeBytes(device_type, entry_count_);
 }
