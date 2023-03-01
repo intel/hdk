@@ -21,10 +21,9 @@ using namespace costmodel;
 class DataSourceTest : public DataSource {
  public:
   DataSourceTest()
-      : DataSource(
-            DataSourceConfig{.dataSourceName = "DataSourceTest",
-                             .supportedDevices = {ExecutorDeviceType::CPU},
-                             .supportedTemplates = {AnalyticalTemplate::GroupBy}}) {}
+      : DataSource(DataSourceConfig{"DataSourceTest",
+                                    {ExecutorDeviceType::CPU},
+                                    {AnalyticalTemplate::GroupBy}}) {}
 
   Detail::DeviceMeasurements getMeasurements(
       const std::vector<ExecutorDeviceType>& devices,
@@ -44,9 +43,9 @@ TEST(DataSourceTests, SupportCheckTest) {
 
 TEST(ExtrapolationModelsTests, LinearExtrapolationTest1) {
   LinearExtrapolation le{{
-      {.bytes = 10, .milliseconds = 100},
-      {.bytes = 20, .milliseconds = 200},
-      {.bytes = 30, .milliseconds = 300},
+      {10, 100},
+      {20, 200},
+      {30, 300},
   }};
 
   ASSERT_EQ(le.getExtrapolatedData(15), (size_t)150);
