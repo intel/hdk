@@ -154,6 +154,7 @@ class CUDABackend : public Backend {
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
 
   void setSharedMemory(bool is_gpu_smem_used) { is_gpu_smem_used_ = is_gpu_smem_used; };
+
   static std::string generatePTX(const std::string& cuda_llir,
                                  llvm::TargetMachine* nvptx_target_machine,
                                  llvm::LLVMContext& context);
