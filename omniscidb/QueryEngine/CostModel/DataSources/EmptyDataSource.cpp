@@ -3,13 +3,12 @@
 namespace costmodel {
 
 EmptyDataSource::EmptyDataSource()
-    : DataSource(DataSourceConfig{
-          .dataSourceName = "EmptyDataSource",
-          .supportedDevices = {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU},
-          .supportedTemplates = {AnalyticalTemplate::GroupBy,
-                                 AnalyticalTemplate::Join,
-                                 AnalyticalTemplate::Reduce,
-                                 AnalyticalTemplate::Scan}}) {}
+    : DataSource(DataSourceConfig{"EmptyDataSource",
+                                  {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU},
+                                  {AnalyticalTemplate::GroupBy,
+                                   AnalyticalTemplate::Join,
+                                   AnalyticalTemplate::Reduce,
+                                   AnalyticalTemplate::Scan}}) {}
 
 Detail::DeviceMeasurements EmptyDataSource::getMeasurements(
     const std::vector<ExecutorDeviceType>& devices,
