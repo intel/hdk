@@ -26,11 +26,6 @@
 
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
-#include "Execute.h"
-#include "GpuMemUtils.h"
-#include "InPlaceSort.h"
-#include "OutputBufferInitialization.h"
-#include "RuntimeFunctions.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/likely.h"

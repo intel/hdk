@@ -59,6 +59,7 @@
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/QueryRewrite.h"
 #include "QueryEngine/QueryTemplateGenerator.h"
+#include "QueryEngine/ResultSetReduction.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "QueryEngine/SpeculativeTopN.h"
@@ -1246,12 +1247,18 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
     reduced_results->initializeStorage();
     switch (query_mem_desc.getEffectiveKeyWidth()) {
       case 4:
-        first->getStorage()->moveEntriesToBuffer<int32_t>(
-            result_storage->getUnderlyingBuffer(), query_mem_desc.getEntryCount());
+        ResultSetReduction::moveEntriesToBuffer<int32_t>(
+            first->getStorage()->getQueryMemDesc(),
+            first->getStorage()->getUnderlyingBuffer(),
+            result_storage->getUnderlyingBuffer(),
+            query_mem_desc.getEntryCount());
         break;
       case 8:
-        first->getStorage()->moveEntriesToBuffer<int64_t>(
-            result_storage->getUnderlyingBuffer(), query_mem_desc.getEntryCount());
+        ResultSetReduction::moveEntriesToBuffer<int64_t>(
+            first->getStorage()->getQueryMemDesc(),
+            first->getStorage()->getUnderlyingBuffer(),
+            result_storage->getUnderlyingBuffer(),
+            query_mem_desc.getEntryCount());
         break;
       default:
         CHECK(false);
@@ -1274,10 +1281,12 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
         (ResultSetStorage*)nullptr,
         [&](auto r, ResultSetStorage* res) {
           for (auto i = r.begin() + 1; i != r.end(); ++i) {
-            (*r.begin())->reduce(**i, {}, reduction_code, getConfig(), this);
+            ResultSetReduction::reduce(
+                **r.begin(), **i, {}, reduction_code, getConfig(), this);
           }
           if (res) {
-            res->reduce(*(*r.begin()), {}, reduction_code, getConfig(), this);
+            ResultSetReduction::reduce(
+                *res, *(*r.begin()), {}, reduction_code, getConfig(), this);
             return res;
           }
           return *r.begin();
@@ -1289,16 +1298,17 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
           if (!rhs) {
             return lhs;
           }
-          lhs->reduce(*rhs, {}, reduction_code, getConfig(), this);
+          ResultSetReduction::reduce(*lhs, *rhs, {}, reduction_code, getConfig(), this);
           return lhs;
         });
   } else {
     for (size_t i = 1; i < results_per_device.size(); ++i) {
-      reduced_results->getStorage()->reduce(*(results_per_device[i].first->getStorage()),
-                                            {},
-                                            reduction_code,
-                                            getConfig(),
-                                            this);
+      ResultSetReduction::reduce(*reduced_results->getStorage(),
+                                 *(results_per_device[i].first->getStorage()),
+                                 {},
+                                 reduction_code,
+                                 getConfig(),
+                                 this);
     }
   }
   reduced_results->addCompilationQueueTime(compilation_queue_time);

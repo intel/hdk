@@ -25,6 +25,7 @@
 #include "QueryMemoryInitializer.h"
 #include "RelAlgExecutionUnit.h"
 #include "ResultSet.h"
+#include "ResultSetReduction.h"
 #include "Shared/likely.h"
 #include "SpeculativeTopN.h"
 #include "StreamingTopN.h"
@@ -143,14 +144,14 @@ ResultSetPtr QueryExecutionContext::groupBufferToDeinterleavedResults(
     memcpy(&agg_vals[0],
            &executor_->plan_state_->init_agg_vals_[0],
            agg_col_count * sizeof(agg_vals[0]));
-    ResultSetStorage::reduceSingleRow(rows_ptr + bin_base_off,
-                                      executor_->warpSize(),
-                                      false,
-                                      true,
-                                      agg_vals,
-                                      query_mem_desc_,
-                                      result_set->getTargetInfos(),
-                                      executor_->plan_state_->init_agg_vals_);
+    ResultSetReduction::reduceSingleRow(rows_ptr + bin_base_off,
+                                        executor_->warpSize(),
+                                        false,
+                                        true,
+                                        agg_vals,
+                                        query_mem_desc_,
+                                        result_set->getTargetInfos(),
+                                        executor_->plan_state_->init_agg_vals_);
     for (size_t agg_idx = 0; agg_idx < agg_col_count;
          ++agg_idx, ++deinterleaved_buffer_idx) {
       deinterleaved_buffer[deinterleaved_buffer_idx] = agg_vals[agg_idx];

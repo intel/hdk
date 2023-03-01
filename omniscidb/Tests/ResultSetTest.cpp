@@ -29,6 +29,7 @@
 #include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ResultSet.h"
+#include "QueryEngine/ResultSetReduction.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "StringDictionary/StringDictionary.h"
@@ -2017,7 +2018,8 @@ TEST(MoreReduce, MissingValues) {
                                       config(),
                                       executor.get());
   const auto reduction_code = reduction_jit.codegen();
-  storage1->reduce(*storage2, {}, reduction_code, config(), executor.get());
+  ResultSetReduction::reduce(
+      *storage1, *storage2, {}, reduction_code, config(), executor.get());
   {
     const auto row = rs1->getNextRow(false, false);
     CHECK_EQ(size_t(2), row.size());
@@ -2089,7 +2091,8 @@ TEST(MoreReduce, MissingValuesKeyless) {
                                       config(),
                                       executor.get());
   const auto reduction_code = reduction_jit.codegen();
-  storage1->reduce(*storage2, {}, reduction_code, config(), executor.get());
+  ResultSetReduction::reduce(
+      *storage1, *storage2, {}, reduction_code, config(), executor.get());
   {
     const auto row = rs1->getNextRow(false, false);
     CHECK_EQ(size_t(2), row.size());
@@ -2180,8 +2183,12 @@ TEST(MoreReduce, OffsetRewrite) {
                                       config(),
                                       executor.get());
   const auto reduction_code = reduction_jit.codegen();
-  storage1->reduce(
-      *storage2, serialized_varlen_buffer, reduction_code, config(), executor.get());
+  ResultSetReduction::reduce(*storage1,
+                             *storage2,
+                             serialized_varlen_buffer,
+                             reduction_code,
+                             config(),
+                             executor.get());
   rs1->setSeparateVarlenStorageValid(true);
   {
     const auto row = rs1->getNextRow(false, false);
