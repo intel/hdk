@@ -20,8 +20,8 @@
 
 #include "IR/Expr.h"
 
-#include "Execute.h"
 #include "Compiler/CodegenTraitsDescriptor.h"
+#include "Execute.h"
 #include "QueryEngine/Target.h"
 
 // Code generation utility to be used for queries and scalar expressions.
@@ -32,11 +32,14 @@ class CodeGenerator {
       , config_(executor->getConfig())
       , cgen_state_(executor->cgen_state_.get())
       , plan_state_(executor->plan_state_.get())
-      , codegen_traits_desc(cgen_traits_desc){}
+      , codegen_traits_desc(cgen_traits_desc) {}
 
   // Overload which can be used without an executor, for SQL scalar expression code
   // generation.
-  CodeGenerator(const Config& config, CgenState* cgen_state, PlanState* plan_state, compiler::CodegenTraitsDescriptor cgen_traits_desc)
+  CodeGenerator(const Config& config,
+                CgenState* cgen_state,
+                PlanState* plan_state,
+                compiler::CodegenTraitsDescriptor cgen_traits_desc)
       : executor_(nullptr)
       , config_(config)
       , cgen_state_(cgen_state)
@@ -472,8 +475,11 @@ class CodeGenerator {
 class ScalarCodeGenerator : public CodeGenerator {
  public:
   // Constructor which takes the runtime module.
-  ScalarCodeGenerator(const Config& config, std::unique_ptr<llvm::Module> llvm_module, compiler::CodegenTraitsDescriptor cgen_desc)
-      : CodeGenerator(config, nullptr, nullptr, cgen_desc), module_(std::move(llvm_module)) {}
+  ScalarCodeGenerator(const Config& config,
+                      std::unique_ptr<llvm::Module> llvm_module,
+                      compiler::CodegenTraitsDescriptor cgen_desc)
+      : CodeGenerator(config, nullptr, nullptr, cgen_desc)
+      , module_(std::move(llvm_module)) {}
 
   // Function generated for a given analyzer expression. For GPU, a wrapper which meets
   // the kernel signature constraints (returns void, takes all arguments as pointers) is

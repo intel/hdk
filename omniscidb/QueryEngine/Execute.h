@@ -418,7 +418,8 @@ class Executor {
   llvm::BasicBlock* codegenWindowResetStateControlFlow(const CompilationOptions& co);
 
   // Generate code for initializing the state of a window aggregate.
-  void codegenWindowFunctionStateInit(llvm::Value* aggregate_state, const CompilationOptions& co);
+  void codegenWindowFunctionStateInit(llvm::Value* aggregate_state,
+                                      const CompilationOptions& co);
 
   // Generates the required calls for an aggregate window function and returns the final
   // result.
@@ -851,19 +852,22 @@ class Executor {
   llvm::Value* castToFP(llvm::Value*,
                         const hdk::ir::Type* from_type,
                         const hdk::ir::Type* to_type);
-  llvm::Value* castToIntPtrTyIn(llvm::Value* val, const size_t bit_width, compiler::CodegenTraitsDescriptor codegen_traits_desc);
+  llvm::Value* castToIntPtrTyIn(llvm::Value* val,
+                                const size_t bit_width,
+                                compiler::CodegenTraitsDescriptor codegen_traits_desc);
 
   FragmentSkipStatus canSkipFragmentForFpQual(const hdk::ir::BinOper* comp_expr,
                                               const hdk::ir::ColumnVar* lhs_col,
                                               const FragmentInfo& fragment,
                                               const hdk::ir::Constant* rhs_const) const;
 
-  std::pair<bool, int64_t> skipFragment(const InputDescriptor& table_desc,
-                                        const FragmentInfo& frag_info,
-                                        const std::list<hdk::ir::ExprPtr>& simple_quals,
-                                        const std::vector<uint64_t>& frag_offsets,
-                                        const size_t frag_idx,
-                                        compiler::CodegenTraitsDescriptor codegen_traits_desc);
+  std::pair<bool, int64_t> skipFragment(
+      const InputDescriptor& table_desc,
+      const FragmentInfo& frag_info,
+      const std::list<hdk::ir::ExprPtr>& simple_quals,
+      const std::vector<uint64_t>& frag_offsets,
+      const size_t frag_idx,
+      compiler::CodegenTraitsDescriptor codegen_traits_desc);
 
   std::pair<bool, int64_t> skipFragmentInnerJoins(
       const InputDescriptor& table_desc,

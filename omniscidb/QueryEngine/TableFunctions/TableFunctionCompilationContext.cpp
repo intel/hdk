@@ -27,12 +27,14 @@
 
 namespace {
 
-llvm::Function* generate_entry_point(const CgenState* cgen_state, const CompilationOptions& co) {
+llvm::Function* generate_entry_point(const CgenState* cgen_state,
+                                     const CompilationOptions& co) {
   auto& ctx = cgen_state->context_;
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
-  const auto pi8_type =   cgen_traits.localPointerType(get_int_type(8, ctx));
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
+  const auto pi8_type = cgen_traits.localPointerType(get_int_type(8, ctx));
   const auto ppi8_type = cgen_traits.localPointerType(pi8_type);
-  const auto pi64_type =   cgen_traits.localPointerType(get_int_type(64, ctx));
+  const auto pi64_type = cgen_traits.localPointerType(get_int_type(64, ctx));
   const auto ppi64_type = cgen_traits.localPointerType(pi64_type);
   const auto i32_type = get_int_type(32, ctx);
 
@@ -57,9 +59,10 @@ llvm::Function* generate_entry_point(const CgenState* cgen_state, const Compilat
   return func;
 }
 
-inline llvm::Type* get_llvm_type_from_sql_column_type(const hdk::ir::Type* elem_type,
-                                                      llvm::LLVMContext& ctx,
-                                                      const compiler::CodegenTraits& cgen_traits) {
+inline llvm::Type* get_llvm_type_from_sql_column_type(
+    const hdk::ir::Type* elem_type,
+    llvm::LLVMContext& ctx,
+    const compiler::CodegenTraits& cgen_traits) {
   const unsigned current_addr_space = cgen_traits.getLocalAddrSpace();
   if (elem_type->isFloatingPoint()) {
     return get_fp_ptr_type(elem_type->size() * 8, ctx, current_addr_space);
@@ -75,14 +78,15 @@ inline llvm::Type* get_llvm_type_from_sql_column_type(const hdk::ir::Type* elem_
   return nullptr;
 }
 
-std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
-                                                    const size_t index,
-                                                    const hdk::ir::Type* data_target_type,
-                                                    llvm::Value* data_ptr,
-                                                    llvm::Value* data_size,
-                                                    llvm::LLVMContext& ctx,
-                                                    llvm::IRBuilder<>& ir_builder,
-                                                    compiler::CodegenTraitsDescriptor codegen_traits_desc) {
+std::tuple<llvm::Value*, llvm::Value*> alloc_column(
+    std::string col_name,
+    const size_t index,
+    const hdk::ir::Type* data_target_type,
+    llvm::Value* data_ptr,
+    llvm::Value* data_size,
+    llvm::LLVMContext& ctx,
+    llvm::IRBuilder<>& ir_builder,
+    compiler::CodegenTraitsDescriptor codegen_traits_desc) {
   /*
     Creates a new Column instance of given element type and initialize
     its data ptr and sz members when specified. If data ptr or sz are
@@ -103,12 +107,13 @@ std::tuple<llvm::Value*, llvm::Value*> alloc_column(std::string col_name,
                                 llvm::Type::getInt64Ty(ctx) /* int64_t sz */
                             });
   llvm::Value* col = ir_builder.CreateAlloca(col_struct_type);
-  col = ir_builder.CreateAddrSpaceCast(
-      col,
-      llvm::PointerType::get(col->getType()->getPointerElementType(),
-                             codegen_traits_desc.local_addr_space_),
-      "col.cast");
-
+  if (col->getType()->getPointerAddressSpace() != codegen_traits_desc.local_addr_space_) {
+    col = ir_builder.CreateAddrSpaceCast(
+        col,
+        llvm::PointerType::get(col->getType()->getPointerElementType(),
+                               codegen_traits_desc.local_addr_space_),
+        "col.cast");
+  }
   col->setName(col_name);
   auto col_ptr_ptr = ir_builder.CreateStructGEP(col_struct_type, col, 0);
   auto col_sz_ptr = ir_builder.CreateStructGEP(col_struct_type, col, 1);
@@ -163,7 +168,8 @@ llvm::Value* alloc_column_list(std::string col_list_name,
     and -1, respectively.
    */
   compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
-  llvm::Type* data_ptrs_llvm_type = cgen_traits.localPointerType(llvm::Type::getInt8Ty(ctx));
+  llvm::Type* data_ptrs_llvm_type =
+      cgen_traits.localPointerType(llvm::Type::getInt8Ty(ctx));
 
   llvm::StructType* col_list_struct_type =
       llvm::StructType::get(ctx,
@@ -173,11 +179,14 @@ llvm::Value* alloc_column_list(std::string col_list_name,
                                 llvm::Type::getInt64Ty(ctx)  /* int64_t size */
                             });
   llvm::Value* col_list = ir_builder.CreateAlloca(col_list_struct_type);
-  col_list = ir_builder.CreateAddrSpaceCast(
-      col_list,
-      llvm::PointerType::get(col_list->getType()->getPointerElementType(),
-                             codegen_traits_desc.local_addr_space_),
-      "col.list.cast");
+  if (col_list->getType()->getPointerAddressSpace() !=
+      codegen_traits_desc.local_addr_space_) {
+    col_list = ir_builder.CreateAddrSpaceCast(
+        col_list,
+        llvm::PointerType::get(col_list->getType()->getPointerElementType(),
+                               codegen_traits_desc.local_addr_space_),
+        "col.list.cast");
+  }
 
   col_list->setName(col_list_name);
   auto col_list_ptr_ptr = ir_builder.CreateStructGEP(col_list_struct_type, col_list, 0);
@@ -247,7 +256,8 @@ std::shared_ptr<CompilationContext> TableFunctionCompilationContext::compile(
   entry_point_func_ = generate_entry_point(cgen_state, co);
 
   generateEntryPoint(exe_unit,
-                     /*is_gpu=*/co.device_type == ExecutorDeviceType::GPU, co);
+                     /*is_gpu=*/co.device_type == ExecutorDeviceType::GPU,
+                     co);
 
   if (co.device_type == ExecutorDeviceType::GPU) {
     generateGpuKernel(co);
@@ -323,7 +333,8 @@ void TableFunctionCompilationContext::generateEntryPoint(
   auto cgen_state = executor_->getCgenStatePtr();
   CHECK(cgen_state);
   auto& ctx = cgen_state->context_;
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   llvm::BasicBlock* bb_entry =
       llvm::BasicBlock::Create(ctx, ".entry", entry_point_func_, 0);
@@ -504,7 +515,8 @@ void TableFunctionCompilationContext::generateEntryPoint(
 void TableFunctionCompilationContext::generateGpuKernel(const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
   CHECK(entry_point_func_);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   std::vector<llvm::Type*> arg_types;
   arg_types.reserve(entry_point_func_->arg_size());
   std::for_each(entry_point_func_->arg_begin(),

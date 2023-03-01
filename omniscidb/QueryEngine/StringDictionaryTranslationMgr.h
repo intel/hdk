@@ -25,8 +25,8 @@
 
 #include <vector>
 #include "../DataMgr/MemoryLevel.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 #include "Compiler/CodegenTraitsDescriptor.h"
+#include "StringDictionary/StringDictionaryProxy.h"
 
 #include <iostream>
 

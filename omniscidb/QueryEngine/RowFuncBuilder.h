@@ -62,7 +62,8 @@ class RowFuncBuilder {
       const CompilationOptions& co,
       DiamondCodegen& codegen);
 
-  llvm::Value* codegenVarlenOutputBuffer(const QueryMemoryDescriptor& query_mem_desc, const CompilationOptions& co);
+  llvm::Value* codegenVarlenOutputBuffer(const QueryMemoryDescriptor& query_mem_desc,
+                                         const CompilationOptions& co);
 
   std::tuple<llvm::Value*, llvm::Value*> codegenSingleColumnPerfectHash(
       const QueryMemoryDescriptor& query_mem_desc,
@@ -142,7 +143,8 @@ class RowFuncBuilder {
 
   void checkErrorCode(llvm::Value* retCode);
 
-  std::tuple<llvm::Value*, llvm::Value*> genLoadHashDesc(llvm::Value* groups_buffer, const CompilationOptions& co);
+  std::tuple<llvm::Value*, llvm::Value*> genLoadHashDesc(llvm::Value* groups_buffer,
+                                                         const CompilationOptions& co);
 
   Executor* executor_;
   const Config& config_;

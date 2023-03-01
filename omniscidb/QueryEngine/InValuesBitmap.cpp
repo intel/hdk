@@ -121,7 +121,10 @@ InValuesBitmap::~InValuesBitmap() {
   }
 }
 
-llvm::Value* InValuesBitmap::codegen(llvm::Value* needle, Executor* executor, compiler::CodegenTraitsDescriptor codegen_traits_desc) const {
+llvm::Value* InValuesBitmap::codegen(
+    llvm::Value* needle,
+    Executor* executor,
+    compiler::CodegenTraitsDescriptor codegen_traits_desc) const {
   AUTOMATIC_IR_METADATA(executor->cgen_state_.get());
   std::vector<std::shared_ptr<const hdk::ir::Constant>> constants_owned;
   std::vector<const hdk::ir::Constant*> constants;

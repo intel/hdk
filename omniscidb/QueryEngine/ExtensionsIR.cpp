@@ -160,9 +160,10 @@ inline const hdk::ir::Type* get_type_from_llvm_type(const llvm::Type* ll_type) {
   return nullptr;
 }
 
-inline llvm::Type* get_llvm_type_from_array_type(const hdk::ir::Type* type,
-                                                 llvm::LLVMContext& ctx,
-                                                 const compiler::CodegenTraitsDescriptor& codegen_traits_desc) {
+inline llvm::Type* get_llvm_type_from_array_type(
+    const hdk::ir::Type* type,
+    llvm::LLVMContext& ctx,
+    const compiler::CodegenTraitsDescriptor& codegen_traits_desc) {
   CHECK(type->isBuffer());
   compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
   if (type->isText()) {
@@ -337,21 +338,28 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         cgen_state_,
         function_oper->name(),
         0,
-        get_llvm_type_from_array_type(ret_type, cgen_state_->context_, codegen_traits_desc),
+        get_llvm_type_from_array_type(
+            ret_type, cgen_state_->context_, codegen_traits_desc),
         /* has_is_null = */ ret_type->isArray() || ret_type->isText());
     buffer_ret = cgen_state_->ir_builder_.CreateAlloca(struct_ty);
-    buffer_ret = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-        buffer_ret,
-        llvm::PointerType::get(buffer_ret->getType()->getPointerElementType(),
-                               codegen_traits_desc.local_addr_space_),
-        "buffer.ret.cast");
+    if (buffer_ret->getType()->getPointerAddressSpace() !=
+        codegen_traits_desc.local_addr_space_) {
+      buffer_ret = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+          buffer_ret,
+          llvm::PointerType::get(buffer_ret->getType()->getPointerElementType(),
+                                 codegen_traits_desc.local_addr_space_),
+          "buffer.ret.cast");
+    }
     args.insert(args.begin(), buffer_ret);
   }
 
   const auto ext_call = cgen_state_->emitExternalCall(
       ext_func_sig.getName(), ret_ty, args, {}, ret_type->isBuffer());
-  auto ext_call_nullcheck = endArgsNullcheck(
-      bbs, ret_type->isBuffer() ? buffer_ret : ext_call, null_buffer_ptr, function_oper, co);
+  auto ext_call_nullcheck = endArgsNullcheck(bbs,
+                                             ret_type->isBuffer() ? buffer_ret : ext_call,
+                                             null_buffer_ptr,
+                                             function_oper,
+                                             co);
 
   // Cast the return of the extension function to match the FunctionOper
   if (!(ret_type->isBuffer())) {
@@ -395,14 +403,18 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
           cgen_state_,
           function_oper->name(),
           0,
-          get_llvm_type_from_array_type(func_type, cgen_state_->context_, codegen_traits_desc),
+          get_llvm_type_from_array_type(
+              func_type, cgen_state_->context_, codegen_traits_desc),
           func_type->isArray() || func_type->isText());
       null_array_alloca = cgen_state_->ir_builder_.CreateAlloca(arr_struct_ty);
-      null_array_alloca = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-          null_array_alloca,
-          llvm::PointerType::get(null_array_alloca->getType()->getPointerElementType(),
-                                 codegen_traits_desc.local_addr_space_),
-          "null.array.alloca.cast");
+      if (null_array_alloca->getType()->getPointerAddressSpace() !=
+          codegen_traits_desc.local_addr_space_) {
+        null_array_alloca = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+            null_array_alloca,
+            llvm::PointerType::get(null_array_alloca->getType()->getPointerElementType(),
+                                   codegen_traits_desc.local_addr_space_),
+            "null.array.alloca.cast");
+      }
     }
     const auto args_notnull_lv = cgen_state_->ir_builder_.CreateNot(
         codegenFunctionOperNullArg(function_oper, orig_arg_lvs));
@@ -424,9 +436,8 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
                                              llvm::Value* null_array_ptr,
                                              const hdk::ir::FunctionOper* function_oper,
                                              const CompilationOptions& co) {
-
   AUTOMATIC_IR_METADATA(cgen_state_);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc); 
+  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
   if (bbs.args_null_bb) {
     CHECK(bbs.args_notnull_bb);
     cgen_state_->ir_builder_.CreateBr(bbs.args_null_bb);
@@ -454,10 +465,11 @@ llvm::Value* CodeGenerator::endArgsNullcheck(const ArgNullcheckBBs& bbs,
           cgen_state_,
           function_oper->name(),
           0,
-          get_llvm_type_from_array_type(func_type, cgen_state_->context_, codegen_traits_desc),
+          get_llvm_type_from_array_type(
+              func_type, cgen_state_->context_, codegen_traits_desc),
           true);
-      ext_call_phi =
-          cgen_state_->ir_builder_.CreatePHI(cgen_traits.localPointerType(arr_struct_ty), 2);
+      ext_call_phi = cgen_state_->ir_builder_.CreatePHI(
+          cgen_traits.localPointerType(arr_struct_ty), 2);
 
       CHECK(null_array_ptr);
       const auto arr_null_bool =
@@ -611,12 +623,14 @@ void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
   auto buffer_abstraction = get_buffer_struct_type(
       cgen_state_, ext_func_name, param_num, buffer_buf->getType(), !!(buffer_null));
   llvm::Value* alloc_mem = cgen_state_->ir_builder_.CreateAlloca(buffer_abstraction);
-  alloc_mem = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-      alloc_mem,
-      llvm::PointerType::get(alloc_mem->getType()->getPointerElementType(),
-                             codegen_traits_desc.local_addr_space_),
-      "alloc.mem.cast");
-
+  if (alloc_mem->getType()->getPointerAddressSpace() !=
+      codegen_traits_desc.local_addr_space_) {
+    alloc_mem = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+        alloc_mem,
+        llvm::PointerType::get(alloc_mem->getType()->getPointerElementType(),
+                               codegen_traits_desc.local_addr_space_),
+        "alloc.mem.cast");
+  }
   auto buffer_buf_ptr =
       cgen_state_->ir_builder_.CreateStructGEP(buffer_abstraction, alloc_mem, 0);
   cgen_state_->ir_builder_.CreateStore(buffer_buf, buffer_buf_ptr);
@@ -674,7 +688,9 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
       const auto len_lv = orig_arg_lvs[k + 2];
       auto& builder = cgen_state_->ir_builder_;
       auto string_buf_arg = builder.CreatePointerCast(
-          ptr_lv, llvm::Type::getInt8PtrTy(cgen_state_->context_, ptr_lv->getType()->getPointerAddressSpace()));
+          ptr_lv,
+          llvm::Type::getInt8PtrTy(cgen_state_->context_,
+                                   ptr_lv->getType()->getPointerAddressSpace()));
       auto string_size_arg =
           builder.CreateZExt(len_lv, get_int_type(64, cgen_state_->context_));
       codegenBufferArgs(ext_func_sig->getName(),
@@ -687,12 +703,14 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
       bool const_arr = (const_arr_size.count(orig_arg_lvs[k]) > 0);
       auto elem_type = arg_type->as<hdk::ir::ArrayBaseType>()->elemType();
       // TODO: switch to fast fixlen variants
-      const auto ptr_lv = (const_arr)
-                              ? orig_arg_lvs[k]
-                              : cgen_state_->emitExternalCall(
-                                    "array_buff",
-                                    llvm::Type::getInt8PtrTy(cgen_state_->context_, orig_arg_lvs[k]->getType()->getPointerAddressSpace()),
-                                    {orig_arg_lvs[k], posArg(arg)});
+      const auto ptr_lv =
+          (const_arr) ? orig_arg_lvs[k]
+                      : cgen_state_->emitExternalCall(
+                            "array_buff",
+                            llvm::Type::getInt8PtrTy(
+                                cgen_state_->context_,
+                                orig_arg_lvs[k]->getType()->getPointerAddressSpace()),
+                            {orig_arg_lvs[k], posArg(arg)});
       const auto len_lv =
           (const_arr) ? const_arr_size.at(orig_arg_lvs[k])
                       : cgen_state_->emitExternalCall(

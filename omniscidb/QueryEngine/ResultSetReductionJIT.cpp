@@ -347,7 +347,9 @@ std::unique_ptr<Function> setup_reduce_loop(ReductionCode* reduction_code) {
                          /*always_inline=*/false);
 }
 
-llvm::Function* create_llvm_function(const Function* function, CgenState* cgen_state, const CompilationOptions& co) {
+llvm::Function* create_llvm_function(const Function* function,
+                                     CgenState* cgen_state,
+                                     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state);
   auto& ctx = cgen_state->context_;
   std::vector<llvm::Type*> parameter_types;
@@ -556,7 +558,8 @@ ReductionCode ResultSetReductionJIT::codegen() const {
   CompilationOptions co{
       ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
 
-  co.codegen_traits_desc = compiler::CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);
+  co.codegen_traits_desc =
+      compiler::CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);
   if (query_mem_desc_.didOutputColumnar() || !is_aggregate_query(hash_type)) {
     return {};
   }
@@ -607,7 +610,8 @@ ReductionCode ResultSetReductionJIT::codegen() const {
   reduction_code.module = cgen_state->module_;
 
   AUTOMATIC_IR_METADATA(cgen_state);
-  auto ir_is_empty = create_llvm_function(reduction_code.ir_is_empty.get(), cgen_state, co);
+  auto ir_is_empty =
+      create_llvm_function(reduction_code.ir_is_empty.get(), cgen_state, co);
   auto ir_reduce_one_entry =
       create_llvm_function(reduction_code.ir_reduce_one_entry.get(), cgen_state, co);
   auto ir_reduce_one_entry_idx =
@@ -619,9 +623,13 @@ ReductionCode ResultSetReductionJIT::codegen() const {
   f.emplace(reduction_code.ir_reduce_one_entry.get(), ir_reduce_one_entry);
   f.emplace(reduction_code.ir_reduce_one_entry_idx.get(), ir_reduce_one_entry_idx);
   f.emplace(reduction_code.ir_reduce_loop.get(), ir_reduce_loop);
-  translate_function(reduction_code.ir_is_empty.get(), ir_is_empty, reduction_code, f, co);
   translate_function(
-      reduction_code.ir_reduce_one_entry.get(), ir_reduce_one_entry, reduction_code, f, co);
+      reduction_code.ir_is_empty.get(), ir_is_empty, reduction_code, f, co);
+  translate_function(reduction_code.ir_reduce_one_entry.get(),
+                     ir_reduce_one_entry,
+                     reduction_code,
+                     f,
+                     co);
   translate_function(reduction_code.ir_reduce_one_entry_idx.get(),
                      ir_reduce_one_entry_idx,
                      reduction_code,
@@ -1309,12 +1317,14 @@ std::string ResultSetReductionJIT::cacheKey() const {
 
 ReductionCode GpuReductionHelperJIT::codegen() const {
   CompilationOptions co{
-  ExecutorDeviceType::GPU, false, ExecutorOptLevel::ReductionJIT, false};
-  #ifdef HAVE_L0
-    co.codegen_traits_desc =  compiler::CodegenTraits::getDescriptor(4, 1, llvm::CallingConv::SPIR_FUNC);
-  #else
-    co.codegen_traits_desc = compiler::CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);
-  #endif
+      ExecutorDeviceType::GPU, false, ExecutorOptLevel::ReductionJIT, false};
+#ifdef HAVE_L0
+  co.codegen_traits_desc =
+      compiler::CodegenTraits::getDescriptor(4, 1, llvm::CallingConv::SPIR_FUNC);
+#else
+  co.codegen_traits_desc =
+      compiler::CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);
+#endif
   const auto hash_type = query_mem_desc_.getQueryDescriptionType();
   auto reduction_code = setup_functions_ir(hash_type);
   CHECK(hash_type == QueryDescriptionType::GroupByPerfectHash);
@@ -1336,7 +1346,8 @@ ReductionCode GpuReductionHelperJIT::codegen() const {
   reduction_code.module = cgen_state->module_;
 
   AUTOMATIC_IR_METADATA(cgen_state);
-  auto ir_is_empty = create_llvm_function(reduction_code.ir_is_empty.get(), cgen_state, co);
+  auto ir_is_empty =
+      create_llvm_function(reduction_code.ir_is_empty.get(), cgen_state, co);
   auto ir_reduce_one_entry =
       create_llvm_function(reduction_code.ir_reduce_one_entry.get(), cgen_state, co);
   auto ir_reduce_one_entry_idx =
@@ -1348,13 +1359,18 @@ ReductionCode GpuReductionHelperJIT::codegen() const {
   f.emplace(reduction_code.ir_reduce_one_entry.get(), ir_reduce_one_entry);
   f.emplace(reduction_code.ir_reduce_one_entry_idx.get(), ir_reduce_one_entry_idx);
   f.emplace(reduction_code.ir_reduce_loop.get(), ir_reduce_loop);
-  translate_function(reduction_code.ir_is_empty.get(), ir_is_empty, reduction_code, f, co);
   translate_function(
-      reduction_code.ir_reduce_one_entry.get(), ir_reduce_one_entry, reduction_code, f, co);
+      reduction_code.ir_is_empty.get(), ir_is_empty, reduction_code, f, co);
+  translate_function(reduction_code.ir_reduce_one_entry.get(),
+                     ir_reduce_one_entry,
+                     reduction_code,
+                     f,
+                     co);
   translate_function(reduction_code.ir_reduce_one_entry_idx.get(),
                      ir_reduce_one_entry_idx,
                      reduction_code,
-                     f, co);
+                     f,
+                     co);
   translate_function(
       reduction_code.ir_reduce_loop.get(), ir_reduce_loop, reduction_code, f, co);
   reduction_code.llvm_reduce_loop = ir_reduce_loop;

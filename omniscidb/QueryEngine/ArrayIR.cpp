@@ -91,7 +91,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
     hdk::ir::ArrayExpr const* array_expr,
     CompilationOptions const& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   using ValueVector = std::vector<llvm::Value*>;
   ValueVector argument_list;
   auto& ir_builder(cgen_state_->ir_builder_);
@@ -117,36 +118,41 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
       array_element_size_bytes * 8, array_expr->elementCount(), cgen_state_->context_);
 
   if (array_expr->isNull()) {
-    return {llvm::ConstantPointerNull::get(cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_))),
+    return {llvm::ConstantPointerNull::get(
+                cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_))),
             cgen_state_->llInt(0)};
   }
 
   if (0 == array_expr->elementCount()) {
     llvm::Constant* dead_const = cgen_state_->llInt(0xdead);
     llvm::Value* dead_pointer = llvm::ConstantExpr::getIntToPtr(
-        dead_const, cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_)));
+        dead_const,
+        cgen_traits.localPointerType(get_int_type(64, cgen_state_->context_)));
     return {dead_pointer, cgen_state_->llInt(0)};
   }
 
   llvm::Value* allocated_target_buffer;
   if (array_expr->isLocalAlloc()) {
     allocated_target_buffer = ir_builder.CreateAlloca(array_type);
-    allocated_target_buffer = ir_builder.CreateAddrSpaceCast(
-        allocated_target_buffer,
-        llvm::PointerType::get(
-            allocated_target_buffer->getType()->getPointerElementType(),
-            cgen_traits.getLocalAddrSpace()),
-        "allocated.target.buffer.cast");
+    if (allocated_target_buffer->getType()->getPointerAddressSpace() !=
+        codegen_traits_desc.local_addr_space_) {
+      allocated_target_buffer = ir_builder.CreateAddrSpaceCast(
+          allocated_target_buffer,
+          llvm::PointerType::get(
+              allocated_target_buffer->getType()->getPointerElementType(),
+              cgen_traits.getLocalAddrSpace()),
+          "allocated.target.buffer.cast");
+    }
   } else {
     if (co.device_type == ExecutorDeviceType::GPU) {
       throw QueryMustRunOnCpu();
     }
 
-    allocated_target_buffer =
-        cgen_state_->emitExternalCall("allocate_varlen_buffer",
-                                      cgen_traits.localPointerType(get_int_type(8, cgen_state_->context_)),
-                                      {cgen_state_->llInt(array_expr->elementCount()),
-                                       cgen_state_->llInt(array_element_size_bytes)});
+    allocated_target_buffer = cgen_state_->emitExternalCall(
+        "allocate_varlen_buffer",
+        cgen_traits.localPointerType(get_int_type(8, cgen_state_->context_)),
+        {cgen_state_->llInt(array_expr->elementCount()),
+         cgen_state_->llInt(array_element_size_bytes)});
     cgen_state_->emitExternalCall(
         "register_buffer_with_executor_rsm",
         llvm::Type::getVoidTy(cgen_state_->context_),
@@ -171,13 +177,15 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
       switch (elem_type->size()) {
         case sizeof(double): {
           const auto double_element_ptr = ir_builder.CreatePointerCast(
-              element_ptr, cgen_traits.localPointerType(get_fp_type(64, cgen_state_->context_)));
+              element_ptr,
+              cgen_traits.localPointerType(get_fp_type(64, cgen_state_->context_)));
           ir_builder.CreateStore(element, double_element_ptr);
           break;
         }
         case sizeof(float): {
           const auto float_element_ptr = ir_builder.CreatePointerCast(
-              element_ptr, cgen_traits.localPointerType(get_fp_type(32, cgen_state_->context_)));
+              element_ptr,
+              cgen_traits.localPointerType(get_fp_type(32, cgen_state_->context_)));
           ir_builder.CreateStore(element, float_element_ptr);
           break;
         }

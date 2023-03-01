@@ -105,10 +105,11 @@ void StringDictionaryTranslationMgr::createKernelBuffers() {
   }
 }
 
-llvm::Value* StringDictionaryTranslationMgr::codegenCast(llvm::Value* input_str_id_lv,
-                                                         const hdk::ir::Type* input_type,
-                                                         const bool add_nullcheck,
-                                                         compiler::CodegenTraitsDescriptor codegen_traits_desc) const {
+llvm::Value* StringDictionaryTranslationMgr::codegenCast(
+    llvm::Value* input_str_id_lv,
+    const hdk::ir::Type* input_type,
+    const bool add_nullcheck,
+    compiler::CodegenTraitsDescriptor codegen_traits_desc) const {
   auto cgen_state_ptr = executor_->getCgenStatePtr();
   AUTOMATIC_IR_METADATA(cgen_state_ptr);
   std::vector<std::shared_ptr<const hdk::ir::Constant>> constants_owned;

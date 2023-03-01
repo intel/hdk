@@ -15,15 +15,16 @@
  */
 
 #include "CodeGenerator.h"
-#include "Execute.h"
 #include "Compiler/Backend.h"
+#include "Execute.h"
 
 std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* constant,
                                                  bool use_dict_encoding,
                                                  int dict_id,
                                                  const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   if (co.hoist_literals) {
     std::vector<const hdk::ir::Constant*> constants(
         executor()->deviceCount(co.device_type), constant);
@@ -59,7 +60,8 @@ std::vector<llvm::Value*> CodeGenerator::codegen(const hdk::ir::Constant* consta
               cgen_state_->llInt(static_cast<int32_t>(inline_int_null_value(cst_type)))};
         }
         return {cgen_state_->llInt(int64_t(0)),
-                llvm::Constant::getNullValue(cgen_traits.localPointerType(get_int_type(8, cgen_state_->context_))),
+                llvm::Constant::getNullValue(
+                    cgen_traits.localPointerType(get_int_type(8, cgen_state_->context_))),
                 cgen_state_->llInt(int32_t(0))};
       }
       const auto& str_const = *constant->value().stringval;
@@ -224,7 +226,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     llvm::Value* var_start = literal_loads[0];
     llvm::Value* var_start_address = literal_loads[1];
     llvm::Value* var_length = literal_loads[2];
-    llvm::PointerType* placeholder0_type = cgen_traits.localPointerType(var_start->getType());
+    llvm::PointerType* placeholder0_type =
+        cgen_traits.localPointerType(var_start->getType());
     auto* int_to_ptr0 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder0_type);
     auto placeholder0 = cgen_state_->ir_builder_.CreateLoad(
@@ -261,14 +264,16 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     llvm::Value* var_start_address = literal_loads[0];
     llvm::Value* var_length = literal_loads[1];
 
-    llvm::PointerType* placeholder0_type = cgen_traits.localPointerType(var_start_address->getType());
+    llvm::PointerType* placeholder0_type =
+        cgen_traits.localPointerType(var_start_address->getType());
     auto* int_to_ptr0 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder0_type);
     auto placeholder0 = cgen_state_->ir_builder_.CreateLoad(
         int_to_ptr0->getType()->getPointerElementType(),
         int_to_ptr0,
         "__placeholder__" + literal_name + "_start_address");
-    llvm::PointerType* placeholder1_type = cgen_traits.localPointerType(var_length->getType());
+    llvm::PointerType* placeholder1_type =
+        cgen_traits.localPointerType(var_length->getType());
     auto* int_to_ptr1 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder1_type);
     auto placeholder1 = cgen_state_->ir_builder_.CreateLoad(
@@ -286,7 +291,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
   llvm::Value* to_return_lv = literal_loads[0];
 
   auto* int_to_ptr = cgen_state_->ir_builder_.CreateIntToPtr(
-          cgen_state_->llInt(0), cgen_traits.localPointerType(to_return_lv->getType()));
+      cgen_state_->llInt(0), cgen_traits.localPointerType(to_return_lv->getType()));
   auto placeholder0 =
       cgen_state_->ir_builder_.CreateLoad(int_to_ptr->getType()->getPointerElementType(),
                                           int_to_ptr,

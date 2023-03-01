@@ -111,7 +111,9 @@ inline llvm::Type* get_fp_type(const int width, llvm::LLVMContext& context) {
   return nullptr;
 }
 
-inline llvm::Type* get_fp_ptr_type(const int width, llvm::LLVMContext& context, const unsigned addrSpace=0) {
+inline llvm::Type* get_fp_ptr_type(const int width,
+                                   llvm::LLVMContext& context,
+                                   const unsigned addrSpace = 0) {
   switch (width) {
     case 64:
       return llvm::Type::getDoublePtrTy(context, addrSpace);
@@ -122,7 +124,9 @@ inline llvm::Type* get_fp_ptr_type(const int width, llvm::LLVMContext& context, 
   return nullptr;
 }
 
-inline llvm::Type* get_int_ptr_type(const int width, llvm::LLVMContext& context, const unsigned addrSpace=0) {
+inline llvm::Type* get_int_ptr_type(const int width,
+                                    llvm::LLVMContext& context,
+                                    const unsigned addrSpace = 0) {
   switch (width) {
     case 64:
       return llvm::Type::getInt64PtrTy(context, addrSpace);

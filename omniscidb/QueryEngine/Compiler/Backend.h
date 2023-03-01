@@ -41,8 +41,11 @@ class CodegenTraits {
   const llvm::CallingConv::ID conv_;
   const llvm::StringRef triple_;
 
-  static const std::unordered_map<CallingConvDesc, llvm::CallingConv::ID> descCallingConvToLLVM;
-  static const std::unordered_map< llvm::CallingConv::ID, CallingConvDesc> llvmCallingConvToDesc;
+  static const std::unordered_map<CallingConvDesc, llvm::CallingConv::ID>
+      descCallingConvToLLVM;
+  static const std::unordered_map<llvm::CallingConv::ID, CallingConvDesc>
+      llvmCallingConvToDesc;
+
  public:
   CodegenTraits(const CodegenTraits&) = delete;
   CodegenTraits& operator=(const CodegenTraits&) = delete;
@@ -54,25 +57,30 @@ class CodegenTraits {
     return CodegenTraits(local_addr_space, global_addr_space, calling_conv, triple);
   }
 
-
-
   static CodegenTraits get(CodegenTraitsDescriptor codegen_traits_desc) {
-    CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) != descCallingConvToLLVM.end());
-    return CodegenTraits(codegen_traits_desc.local_addr_space_, 
-    codegen_traits_desc.global_addr_space_, 
-    descCallingConvToLLVM.at(codegen_traits_desc.conv_), 
-    codegen_traits_desc.triple_);
+    CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) !=
+          descCallingConvToLLVM.end());
+    return CodegenTraits(codegen_traits_desc.local_addr_space_,
+                         codegen_traits_desc.global_addr_space_,
+                         descCallingConvToLLVM.at(codegen_traits_desc.conv_),
+                         codegen_traits_desc.triple_);
   }
 
   static CodegenTraitsDescriptor getDescriptor(unsigned local_addr_space,
-                           unsigned global_addr_space,
-                           llvm::CallingConv::ID calling_conv,
-                           const std::string triple = "") {
-    return CodegenTraitsDescriptor(local_addr_space, global_addr_space, llvmCallingConvToDesc.at(calling_conv), triple);
+                                               unsigned global_addr_space,
+                                               llvm::CallingConv::ID calling_conv,
+                                               const std::string triple = "") {
+    return CodegenTraitsDescriptor(local_addr_space,
+                                   global_addr_space,
+                                   llvmCallingConvToDesc.at(calling_conv),
+                                   triple);
   }
-  
+
   CodegenTraitsDescriptor getDescriptor() {
-    return CodegenTraitsDescriptor(local_addr_space_, global_addr_space_, llvmCallingConvToDesc.at(conv_), triple_.str());
+    return CodegenTraitsDescriptor(local_addr_space_,
+                                   global_addr_space_,
+                                   llvmCallingConvToDesc.at(conv_),
+                                   triple_.str());
   }
 
   llvm::PointerType* localPointerType(llvm::Type* ElementType) const {
@@ -125,10 +133,7 @@ class CPUBackend : public Backend {
       const CompilationOptions& co);
 
  private:
-  inline const static CodegenTraitsDescriptor traitsDescriptor{0,
-                                                               0,
-                                                               CallingConvDesc::C,
-                                                               std::string_view{""}};
+  inline const static CodegenTraitsDescriptor traitsDescriptor{cpu_cgen_traits_desc};
 };
 
 class CUDABackend : public Backend {
@@ -173,11 +178,7 @@ class CUDABackend : public Backend {
   GPUTarget& gpu_target_;
 
   mutable std::unique_ptr<llvm::TargetMachine> nvptx_target_machine_;
-  inline const static CodegenTraitsDescriptor traitsDescriptor{
-      4,
-      1,
-      CallingConvDesc::C,
-      std::string_view{"nvptx64-nvidia-cuda"}};
+  inline const static CodegenTraitsDescriptor traitsDescriptor{cuda_cgen_traits_desc};
 };
 
 class L0Backend : public Backend {
@@ -205,11 +206,7 @@ class L0Backend : public Backend {
  private:
   GPUTarget& gpu_target_;
   const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts_;
-  inline const static CodegenTraitsDescriptor traitsDescriptor{
-      4,
-      1,
-      CallingConvDesc::SPIR_FUNC,
-      std::string_view{"spir64-unknown-unknown"}};
+  inline const static CodegenTraitsDescriptor traitsDescriptor{l0_cgen_traits_desc};
 };
 
 std::shared_ptr<Backend> getBackend(

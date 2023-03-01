@@ -21,9 +21,20 @@
 #include <ostream>
 #include <vector>
 
-#include "Shared/Config.h"
+#ifndef __CUDACC__
+#include <ostream>
+#endif
+
 #include "Compiler/CodegenTraitsDescriptor.h"
-#include "Shared/DeviceType.h"
+#include "Shared/Config.h"
+
+enum class ExecutorDeviceType { CPU = 0, GPU };
+#ifndef __CUDACC__
+inline std::ostream& operator<<(std::ostream& os, ExecutorDeviceType const dt) {
+  constexpr char const* strings[]{"CPU", "GPU"};
+  return os << strings[static_cast<int>(dt)];
+}
+#endif
 
 enum class ExecutorOptLevel { Default, ReductionJIT };
 
@@ -53,20 +64,37 @@ struct CompilationOptions {
                               in.filter_on_deleted_column,
                               in.explain_type,
                               in.register_intel_jit_listener,
-                              in.use_groupby_buffer_desc};
+                              in.use_groupby_buffer_desc,
+                              compiler::cpu_cgen_traits_desc};
+  }
+
+  static compiler::CodegenTraitsDescriptor getCgenTraitsDesc(
+      const ExecutorDeviceType device_type,
+      const bool is_l0) {
+    switch (device_type) {
+      case ExecutorDeviceType::CPU:
+        return compiler::cpu_cgen_traits_desc;
+      case ExecutorDeviceType::GPU:
+        return (is_l0 ? compiler::l0_cgen_traits_desc : compiler::cuda_cgen_traits_desc);
+      default:
+        CHECK(false);
+    }
   }
 
   static CompilationOptions defaults(
-      const ExecutorDeviceType device_type = ExecutorDeviceType::GPU) {
-    return CompilationOptions{device_type,
-                              /*hoist_literals=*/true,
-                              /*opt_level=*/ExecutorOptLevel::Default,
-                              /*with_dynamic_watchdog=*/false,
-                              /*allow_lazy_fetch=*/true,
-                              /*filter_on_delted_column=*/true,
-                              /*explain_type=*/ExecutorExplainType::Default,
-                              /*register_intel_jit_listener=*/false,
-                              /*use_groupby_buffer_desc=*/false};
+      const ExecutorDeviceType device_type = ExecutorDeviceType::GPU,
+      const bool is_l0 = false) {
+    return CompilationOptions{
+        device_type,
+        /*hoist_literals=*/true,
+        /*opt_level=*/ExecutorOptLevel::Default,
+        /*with_dynamic_watchdog=*/false,
+        /*allow_lazy_fetch=*/true,
+        /*filter_on_delted_column=*/true,
+        /*explain_type=*/ExecutorExplainType::Default,
+        /*register_intel_jit_listener=*/false,
+        /*use_groupby_buffer_desc=*/false,
+        /*codegen_traits_desc=*/getCgenTraitsDesc(device_type, is_l0)};
   }
 };
 

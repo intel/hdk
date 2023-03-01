@@ -759,8 +759,10 @@ llvm::Value* BaselineJoinHashTable::codegenSlot(const CompilationOptions& co,
   CHECK(key_component_width == 4 || key_component_width == 8);
   auto key_buff_lv = codegenKey(co);
   const auto hash_ptr = hashPtr(index);
-  const auto key_ptr_lv =
-      LL_BUILDER.CreatePointerCast(key_buff_lv, llvm::Type::getInt8PtrTy(LL_CONTEXT, key_buff_lv->getType()->getPointerAddressSpace()));
+  const auto key_ptr_lv = LL_BUILDER.CreatePointerCast(
+      key_buff_lv,
+      llvm::Type::getInt8PtrTy(LL_CONTEXT,
+                               key_buff_lv->getType()->getPointerAddressSpace()));
   const auto key_size_lv = LL_INT(getKeyComponentCount() * key_component_width);
   const auto hash_table = getHashTableForDevice(size_t(0));
   return executor_->cgen_state_->emitExternalCall(
@@ -779,10 +781,11 @@ HashJoinMatchingSet BaselineJoinHashTable::codegenMatchingSet(
   CHECK(key_component_width == 4 || key_component_width == 8);
   auto key_buff_lv = codegenKey(co);
   CHECK(getHashType() == HashType::OneToMany);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   auto hash_ptr = HashJoin::codegenHashTableLoad(index, executor_);
-  const auto composite_dict_ptr_type =
-  cgen_traits.localPointerType(llvm::Type::getIntNPtrTy(LL_CONTEXT, key_component_width * 8));
+  const auto composite_dict_ptr_type = cgen_traits.localPointerType(
+      llvm::Type::getIntNPtrTy(LL_CONTEXT, key_component_width * 8));
   const auto composite_key_dict =
       hash_ptr->getType()->isPointerTy()
           ? LL_BUILDER.CreatePointerCast(hash_ptr, composite_dict_ptr_type)
@@ -870,6 +873,14 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
     default:
       CHECK(false);
   }
+  if (key_buff_lv->getType()->getPointerAddressSpace() !=
+      co.codegen_traits_desc.local_addr_space_) {
+    key_buff_lv = LL_BUILDER.CreateAddrSpaceCast(
+        key_buff_lv,
+        llvm::PointerType::get(key_buff_lv->getType()->getPointerElementType(),
+                               co.codegen_traits_desc.local_addr_space_),
+        "key.buff.lv.cast");
+  }
 
   CodeGenerator code_generator(executor_, co.codegen_traits_desc);
   for (size_t i = 0; i < getKeyComponentCount(); ++i) {
@@ -906,7 +917,8 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
 llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   auto hash_ptr = HashJoin::codegenHashTableLoad(index, executor_);
-  const auto pi8_type = llvm::Type::getInt8PtrTy(LL_CONTEXT, hash_ptr->getType()->getPointerAddressSpace());
+  const auto pi8_type =
+      llvm::Type::getInt8PtrTy(LL_CONTEXT, hash_ptr->getType()->getPointerAddressSpace());
   return hash_ptr->getType()->isPointerTy()
              ? LL_BUILDER.CreatePointerCast(hash_ptr, pi8_type)
              : LL_BUILDER.CreateIntToPtr(hash_ptr, pi8_type);

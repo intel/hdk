@@ -1265,8 +1265,8 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
   }
 
   int64_t compilation_queue_time = 0;
-  const auto reduction_code =
-      get_reduction_code(getConfig(), results_per_device, &compilation_queue_time, this, co);
+  const auto reduction_code = get_reduction_code(
+      getConfig(), results_per_device, &compilation_queue_time, this, co);
 
   if (couldUseParallelReduce(query_mem_desc)) {
     std::vector<ResultSetStorage*> storages;
@@ -1790,7 +1790,8 @@ ResultSetPtr Executor::finishStreamExecution(
   for (auto& exec_ctx : ctx->shared_context->getTlsExecutionContext()) {
     if (exec_ctx) {
       CHECK(!ctx->ra_exe_unit.estimator);
-      auto results = exec_ctx->getRowSet(ctx->ra_exe_unit, exec_ctx->query_mem_desc_, ctx->co);
+      auto results =
+          exec_ctx->getRowSet(ctx->ra_exe_unit, exec_ctx->query_mem_desc_, ctx->co);
       ctx->shared_context->addDeviceResults(std::move(results), 0, {});
     }
   }
@@ -2607,7 +2608,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
 // TODO(Petr): remove device_type from function signature
 void Executor::launchKernels(SharedKernelContext& shared_context,
                              std::vector<std::unique_ptr<ExecutionKernel>>&& kernels,
-                             const ExecutorDeviceType device_type, const CompilationOptions& co) {
+                             const ExecutorDeviceType device_type,
+                             const CompilationOptions& co) {
   auto clock_begin = timer_start();
   std::lock_guard<std::mutex> kernel_lock(kernel_mutex_);
   kernel_queue_time_ms_ += timer_stop(clock_begin);
@@ -3475,9 +3477,8 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
 
   if (results && error_code != Executor::ERR_OVERFLOW_OR_UNDERFLOW &&
       error_code != Executor::ERR_DIV_BY_ZERO) {
-    *results = query_exe_context->getRowSet(ra_exe_unit_copy,
-                                            query_exe_context->query_mem_desc_, 
-                                            co);
+    *results = query_exe_context->getRowSet(
+        ra_exe_unit_copy, query_exe_context->query_mem_desc_, co);
     CHECK(*results);
     VLOG(2) << "results->rowCount()=" << (*results)->rowCount();
     (*results)->holdLiterals(hoist_buf);
@@ -3655,7 +3656,10 @@ llvm::Value* Executor::castToFP(llvm::Value* value,
   return value;
 }
 
-llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth, compiler::CodegenTraitsDescriptor codegen_traits_desc) {
+llvm::Value* Executor::castToIntPtrTyIn(
+    llvm::Value* val,
+    const size_t bitWidth,
+    compiler::CodegenTraitsDescriptor codegen_traits_desc) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CHECK(val->getType()->isPointerTy());
   compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
@@ -3917,7 +3921,8 @@ std::pair<bool, int64_t> Executor::skipFragment(
     }
     llvm::LLVMContext local_context;
     CgenState local_cgen_state(getConfig(), local_context);
-    CodeGenerator code_generator(getConfig(), &local_cgen_state, nullptr, cgen_traits_desc);
+    CodeGenerator code_generator(
+        getConfig(), &local_cgen_state, nullptr, cgen_traits_desc);
 
     const auto rhs_val =
         CodeGenerator::codegenIntConst(rhs_const, &local_cgen_state)->getSExtValue();
@@ -4003,8 +4008,12 @@ std::pair<bool, int64_t> Executor::skipFragmentInnerJoins(
                                      temp_qual.simple_quals.begin(),
                                      temp_qual.simple_quals.end());
     }
-    auto temp_skip_frag = skipFragment(
-        table_desc, fragment, inner_join_simple_quals, frag_offsets, frag_idx, cgen_traits_desc);
+    auto temp_skip_frag = skipFragment(table_desc,
+                                       fragment,
+                                       inner_join_simple_quals,
+                                       frag_offsets,
+                                       frag_idx,
+                                       cgen_traits_desc);
     if (temp_skip_frag.second != -1) {
       skip_frag.second = temp_skip_frag.second;
       return skip_frag;

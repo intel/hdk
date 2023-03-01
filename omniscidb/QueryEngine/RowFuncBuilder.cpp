@@ -117,7 +117,8 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
 
   bool can_return_error = false;
   llvm::BasicBlock* filter_false{nullptr};
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   {
     const bool is_group_by = !ra_exe_unit_.groupby_exprs.empty();
@@ -186,7 +187,8 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
           } else {
             nullcheck_cond = LL_BUILDER.CreateICmpNE(
                 std::get<0>(agg_out_ptr_w_idx),
-                llvm::ConstantPointerNull::get(cgen_traits.localPointerType(get_int_type(64, LL_CONTEXT))));
+                llvm::ConstantPointerNull::get(
+                    cgen_traits.localPointerType(get_int_type(64, LL_CONTEXT))));
           }
           DiamondCodegen nullcheck_cfg(
               nullcheck_cond, executor_, false, "groupby_nullcheck", &filter_cfg, false);
@@ -374,25 +376,23 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
         QueryDescriptionType::GroupByPerfectHash) {
       group_key =
           LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT), key_size_lv);
-      group_key = LL_BUILDER.CreateAddrSpaceCast(
-          group_key,
-          llvm::PointerType::get(group_key->getType()->getPointerElementType(),
-                                 co.codegen_traits_desc.local_addr_space_),
-          "group.key.cast");
     } else if (query_mem_desc.getQueryDescriptionType() ==
                QueryDescriptionType::GroupByBaselineHash) {
       group_key =
           col_width_size == sizeof(int32_t)
               ? LL_BUILDER.CreateAlloca(llvm::Type::getInt32Ty(LL_CONTEXT), key_size_lv)
               : LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT), key_size_lv);
+    }
+    CHECK(group_key);
+    CHECK(key_size_lv);
+    if (group_key->getType()->getPointerAddressSpace() !=
+        co.codegen_traits_desc.local_addr_space_) {
       group_key = LL_BUILDER.CreateAddrSpaceCast(
           group_key,
           llvm::PointerType::get(group_key->getType()->getPointerElementType(),
                                  co.codegen_traits_desc.local_addr_space_),
           "group.key.cast");
     }
-    CHECK(group_key);
-    CHECK(key_size_lv);
   }
 
   int32_t subkey_idx = 0;
@@ -468,13 +468,15 @@ llvm::Value* RowFuncBuilder::codegenVarlenOutputBuffer(
   if (!query_mem_desc.hasVarlenOutput()) {
     return nullptr;
   }
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   auto arg_it = ROW_FUNC->arg_begin();
   arg_it++; /* groups_buffer */
   auto varlen_output_buffer = arg_it++;
-  CHECK(varlen_output_buffer->getType() == cgen_traits.localPointerType(llvm::Type::getInt64PtrTy(LL_CONTEXT)));
+  CHECK(varlen_output_buffer->getType() ==
+        cgen_traits.localPointerType(llvm::Type::getInt64PtrTy(LL_CONTEXT)));
   return varlen_output_buffer;
 }
 
@@ -533,7 +535,7 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenMultiColumnPerfect
     llvm::Value* group_key,
     llvm::Value* key_size_lv,
     const QueryMemoryDescriptor& query_mem_desc,
-    const int32_t row_size_quad, 
+    const int32_t row_size_quad,
     const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   CHECK(query_mem_desc.getQueryDescriptionType() ==
@@ -581,14 +583,19 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenMultiColumnBaselin
     const size_t key_width,
     const int32_t row_size_quad) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
-  
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
+
   std::vector<llvm::Value*> func_args;
 
-  if (group_key->getType() != cgen_traits.localPointerType(llvm::Type::getInt64PtrTy(LL_CONTEXT))) {
+  if (group_key->getType() !=
+      llvm::Type::getInt64PtrTy(LL_CONTEXT,
+                                group_key->getType()->getPointerAddressSpace())) {
     CHECK(key_width == sizeof(int32_t));
-    group_key =
-        LL_BUILDER.CreatePointerCast(group_key, llvm::Type::getInt64PtrTy(LL_CONTEXT, group_key->getType()->getPointerAddressSpace()));
+    group_key = LL_BUILDER.CreatePointerCast(
+        group_key,
+        llvm::Type::getInt64PtrTy(LL_CONTEXT,
+                                  group_key->getType()->getPointerAddressSpace()));
   }
 
   if (query_mem_desc.getQueryDescriptionType() ==
@@ -630,11 +637,12 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction(const CompilationOpti
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
 
   CHECK_GT(ra_exe_unit_.groupby_exprs.size(), size_t(1));
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
-  auto ft = llvm::FunctionType::get(
-      get_int_type(32, LL_CONTEXT),
-      std::vector<llvm::Type*>{cgen_traits.localPointerType(get_int_type(64, LL_CONTEXT))},
-      false);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
+  auto ft = llvm::FunctionType::get(get_int_type(32, LL_CONTEXT),
+                                    std::vector<llvm::Type*>{cgen_traits.localPointerType(
+                                        get_int_type(64, LL_CONTEXT))},
+                                    false);
   auto key_hash_func = llvm::Function::Create(ft,
                                               llvm::Function::ExternalLinkage,
                                               "perfect_key_hash",
@@ -934,11 +942,14 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
   auto estimator_comp_count_lv = LL_INT(static_cast<int32_t>(estimator_arg.size()));
   llvm::Value* estimator_key_lv = LL_BUILDER.CreateAlloca(
       llvm::Type::getInt64Ty(LL_CONTEXT), estimator_comp_count_lv);
-  estimator_key_lv = LL_BUILDER.CreateAddrSpaceCast(
-      estimator_key_lv,
-      llvm::PointerType::get(estimator_key_lv->getType()->getPointerElementType(),
-                             cgen_traits.getLocalAddrSpace()),
-      "estimator.key.lv.cast");
+  if (estimator_key_lv->getType()->getPointerAddressSpace() !=
+      co.codegen_traits_desc.local_addr_space_) {
+    estimator_key_lv = LL_BUILDER.CreateAddrSpaceCast(
+        estimator_key_lv,
+        llvm::PointerType::get(estimator_key_lv->getType()->getPointerElementType(),
+                               cgen_traits.getLocalAddrSpace()),
+        "estimator.key.lv.cast");
+  }
 
   int32_t subkey_idx = 0;
   for (const auto& estimator_arg_comp : estimator_arg) {
@@ -1124,7 +1135,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
   const auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr);
   const auto func_expr = dynamic_cast<const hdk::ir::FunctionOper*>(target_expr);
   const auto arr_expr = dynamic_cast<const hdk::ir::ArrayExpr*>(target_expr);
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
   // TODO(alex): handle arrays uniformly?
   CodeGenerator code_generator(executor_, co.codegen_traits_desc);
   if (target_expr) {
@@ -1146,7 +1158,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         CHECK_EQ(size_t(1), target_lvs.size());
         CHECK(!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample);
         const auto i32_ty = get_int_type(32, executor_->cgen_state_->context_);
-        const auto i8p_ty = cgen_traits.localPointerType(get_int_type(8, executor_->cgen_state_->context_));
+        const auto i8p_ty = cgen_traits.localPointerType(
+            get_int_type(8, executor_->cgen_state_->context_));
 
         auto elem_type = target_type->as<hdk::ir::ArrayBaseType>()->elemType();
         return {
@@ -1176,7 +1189,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
           // const auto target_lv_type = target_lvs[0]->getType();
           // CHECK(target_lv_type->isStructTy());
           // CHECK_EQ(target_lv_type->getNumContainedTypes(), 3u);
-          const auto i8p_ty = cgen_traits.localPointerType(get_int_type(8, executor_->cgen_state_->context_));
+          const auto i8p_ty = cgen_traits.localPointerType(
+              get_int_type(8, executor_->cgen_state_->context_));
           const auto ptr = LL_BUILDER.CreatePointerCast(
               LL_BUILDER.CreateExtractValue(target_lv, 0), i8p_ty);
           const auto size = LL_BUILDER.CreateExtractValue(target_lv, 1);
@@ -1239,8 +1253,10 @@ void RowFuncBuilder::checkErrorCode(llvm::Value* retCode) {
 std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::genLoadHashDesc(
     llvm::Value* groups_buffer,
     const CompilationOptions& co) {
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(co.codegen_traits_desc);
-  const auto int8_ptr_ty = cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(LL_CONTEXT));
+  compiler::CodegenTraits cgen_traits =
+      compiler::CodegenTraits::get(co.codegen_traits_desc);
+  const auto int8_ptr_ty =
+      cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(LL_CONTEXT));
   const auto int32_ptr_ty = LL_BUILDER.getInt32Ty();
   auto* desc_type = llvm::StructType::get(int8_ptr_ty, int32_ptr_ty);
   auto* desc_ptr_type = llvm::PointerType::getUnqual(desc_type);
@@ -1253,8 +1269,10 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::genLoadHashDesc(
   llvm::Value* hash_ptr =
       LL_BUILDER.CreateLoad(llvm::Type::getInt8Ty(LL_CONTEXT), hash_ptr_ptr);
   CHECK(hash_ptr->getType() == int8_ptr_ty);
-  hash_ptr =
-      LL_BUILDER.CreatePointerCast(hash_ptr, llvm::Type::getInt64PtrTy(LL_CONTEXT, hash_ptr->getType()->getPointerAddressSpace()));
+  hash_ptr = LL_BUILDER.CreatePointerCast(
+      hash_ptr,
+      llvm::Type::getInt64PtrTy(LL_CONTEXT,
+                                hash_ptr->getType()->getPointerAddressSpace()));
   auto hash_size_ptr = LL_BUILDER.CreateStructGEP(int32_ptr_ty, hash_table_desc_ptr, 1);
   llvm::Value* hash_size =
       LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT), hash_size_ptr);
