@@ -35,11 +35,11 @@
 #include "Descriptors/InputDescriptors.h"
 #include "IR/Node.h"
 #include "QueryEngine/QueryHint.h"
-#include "QueryEngine/TypePunning.h"
 #include "SchemaMgr/ColumnInfo.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "SchemaMgr/TableInfo.h"
 #include "Shared/Config.h"
+#include "Shared/TypePunning.h"
 #include "Shared/toString.h"
 
 /**

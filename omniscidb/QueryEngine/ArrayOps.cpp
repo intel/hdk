@@ -23,11 +23,11 @@
  **/
 
 #include <cstdint>
-#include "../Shared/funcannotations.h"
-#include "../ThirdParty/robin_hood.h"
 
-#include "../Utils/ChunkIter.h"
-#include "TypePunning.h"
+#include "Shared/TypePunning.h"
+#include "Shared/funcannotations.h"
+#include "ThirdParty/robin_hood.h"
+#include "Utils/ChunkIter.h"
 
 #ifdef EXECUTE_INCLUDE
 

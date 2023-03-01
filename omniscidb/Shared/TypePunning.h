@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef QUERYENGINE_TYPEPUNNING_H
-#define QUERYENGINE_TYPEPUNNING_H
+#pragma once
 
-#include "../Shared/funcannotations.h"
+#include "funcannotations.h"
 
 // Mark ptr as safe for type-punning operations. We need it whenever we want to
 // interpret a sequence of bytes as float / double through a reinterpret_cast.
@@ -33,5 +32,3 @@ template <class T>
   return ptr;
 }
 #endif
-
-#endif  // QUERYENGINE_TYPEPUNNING_H
