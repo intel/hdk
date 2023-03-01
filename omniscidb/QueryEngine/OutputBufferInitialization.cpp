@@ -16,10 +16,10 @@
 
 #include "OutputBufferInitialization.h"
 #include "Descriptors/QueryMemoryDescriptor.h"
-#include "TypePunning.h"
 
-#include "../Analyzer/Analyzer.h"
+#include "Analyzer/Analyzer.h"
 #include "Shared/BufferCompaction.h"
+#include "Shared/TypePunning.h"
 
 std::vector<int64_t> init_agg_val_vec(const std::vector<TargetInfo>& targets,
                                       const QueryMemoryDescriptor& query_mem_desc) {

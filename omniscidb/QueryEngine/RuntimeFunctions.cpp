@@ -22,9 +22,9 @@
 #include "HyperLogLogRank.h"
 #include "MurmurHash.h"
 #include "Shared/BufferCompaction.h"
+#include "Shared/TypePunning.h"
 #include "Shared/funcannotations.h"
 #include "Shared/quantile.h"
-#include "TypePunning.h"
 
 #include <algorithm>
 #include <atomic>

@@ -25,8 +25,8 @@
 
 #include "Shared/BufferCompaction.h"
 #include "Shared/SqlTypesLayout.h"
+#include "Shared/TypePunning.h"
 #include "Shared/misc.h"
-#include "TypePunning.h"
 
 #ifndef __CUDACC__
 

@@ -28,9 +28,9 @@
 #include "ResultSet.h"
 #include "RuntimeFunctions.h"
 #include "Shared/SqlTypesLayout.h"
+#include "Shared/TypePunning.h"
 #include "Shared/likely.h"
 #include "Shared/sqltypes.h"
-#include "TypePunning.h"
 
 #include <boost/math/special_functions/fpclassify.hpp>
 
