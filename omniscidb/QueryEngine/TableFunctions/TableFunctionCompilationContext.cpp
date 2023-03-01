@@ -333,8 +333,6 @@ void TableFunctionCompilationContext::generateEntryPoint(
   auto cgen_state = executor_->getCgenStatePtr();
   CHECK(cgen_state);
   auto& ctx = cgen_state->context_;
-  compiler::CodegenTraits cgen_traits =
-      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   llvm::BasicBlock* bb_entry =
       llvm::BasicBlock::Create(ctx, ".entry", entry_point_func_, 0);

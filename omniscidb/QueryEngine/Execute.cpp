@@ -3656,13 +3656,9 @@ llvm::Value* Executor::castToFP(llvm::Value* value,
   return value;
 }
 
-llvm::Value* Executor::castToIntPtrTyIn(
-    llvm::Value* val,
-    const size_t bitWidth,
-    compiler::CodegenTraitsDescriptor codegen_traits_desc) {
+llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CHECK(val->getType()->isPointerTy());
-  compiler::CodegenTraits cgen_traits = compiler::CodegenTraits::get(codegen_traits_desc);
 
   const auto val_ptr_type = static_cast<llvm::PointerType*>(val->getType());
   const auto val_type = val_ptr_type->getElementType();

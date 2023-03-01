@@ -76,9 +76,8 @@ struct CompilationOptions {
         return compiler::cpu_cgen_traits_desc;
       case ExecutorDeviceType::GPU:
         return (is_l0 ? compiler::l0_cgen_traits_desc : compiler::cuda_cgen_traits_desc);
-      default:
-        CHECK(false);
     }
+    return {};
   }
 
   static CompilationOptions defaults(

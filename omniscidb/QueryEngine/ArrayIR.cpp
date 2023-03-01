@@ -140,7 +140,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
           allocated_target_buffer,
           llvm::PointerType::get(
               allocated_target_buffer->getType()->getPointerElementType(),
-              cgen_traits.getLocalAddrSpace()),
+              co.codegen_traits_desc.local_addr_space_),
           "allocated.target.buffer.cast");
     }
   } else {

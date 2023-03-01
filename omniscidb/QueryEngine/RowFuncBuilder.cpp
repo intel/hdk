@@ -583,8 +583,6 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenMultiColumnBaselin
     const size_t key_width,
     const int32_t row_size_quad) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
-  compiler::CodegenTraits cgen_traits =
-      compiler::CodegenTraits::get(co.codegen_traits_desc);
 
   std::vector<llvm::Value*> func_args;
 
