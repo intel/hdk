@@ -297,8 +297,9 @@ QueryMemoryInitializer::QueryMemoryInitializer(
                           query_mem_desc.getRowSize();
     }
   } else {
+    size_t max_rows = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
     group_buffer_size =
-        query_mem_desc.getBufferSizeBytes(ra_exe_unit, thread_count, device_type);
+        query_mem_desc.getBufferSizeBytes(max_rows, thread_count, device_type);
   }
   CHECK_GE(group_buffer_size, size_t(0));
 
@@ -1288,10 +1289,11 @@ void QueryMemoryInitializer::applyStreamingTopNOffsetCpu(
   const size_t buffer_start_idx = query_mem_desc.hasVarlenOutput() ? 1 : 0;
   CHECK_EQ(group_by_buffers_.size(), buffer_start_idx + 1);
 
+  size_t max_rows = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
   const auto rows_copy = streaming_top_n::get_rows_copy_from_heaps(
       group_by_buffers_[buffer_start_idx],
-      query_mem_desc.getBufferSizeBytes(ra_exe_unit, 1, ExecutorDeviceType::CPU),
-      ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit,
+      query_mem_desc.getBufferSizeBytes(max_rows, 1, ExecutorDeviceType::CPU),
+      max_rows,
       1);
   CHECK_EQ(rows_copy.size(),
            query_mem_desc.getEntryCount() * query_mem_desc.getRowSize());

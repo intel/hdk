@@ -53,7 +53,6 @@ class BufferProvider;
 class QueryExecutionContext;
 class RowSetMemoryOwner;
 struct InputTableInfo;
-struct RelAlgExecutionUnit;
 class TResultSetBufferDescriptor;
 struct ColRangeInfo;
 
@@ -77,8 +76,9 @@ class QueryMemoryDescriptor {
   // constructor for init call
   QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
                         ConfigPtr config,
-                        const RelAlgExecutionUnit& ra_exe_unit,
                         const std::vector<InputTableInfo>& query_infos,
+                        const bool use_bump_allocator,
+                        const bool approx_quantile,
                         const bool allow_multifrag,
                         const bool keyless_hash,
                         const bool interleaved_bins_on_gpu,
@@ -108,23 +108,6 @@ class QueryMemoryDescriptor {
                         const std::vector<int8_t>& group_col_widths);
 
   bool operator==(const QueryMemoryDescriptor& other) const;
-
-  static std::unique_ptr<QueryMemoryDescriptor> init(
-      Data_Namespace::DataMgr* data_mgr,
-      ConfigPtr config,
-      const RelAlgExecutionUnit& ra_exe_unit,
-      const std::vector<InputTableInfo>& query_infos,
-      const ColRangeInfo& col_range_info,
-      const KeylessInfo& keyless_info,
-      const bool allow_multifrag,
-      const ExecutorDeviceType device_type,
-      const int8_t crt_min_byte_width,
-      const bool sort_on_gpu_hint,
-      const size_t max_groups_buffer_entry_count,
-      const CountDistinctDescriptors count_distinct_descriptors,
-      const bool must_use_baseline_sort,
-      const bool output_columnar_hint,
-      const bool streaming_top_n_hint);
 
   static bool many_entries(const int64_t max_val,
                            const int64_t min_val,
@@ -263,7 +246,7 @@ class QueryMemoryDescriptor {
   size_t getKeyCount() const { return keyless_hash_ ? 0 : getGroupbyColCount(); }
   size_t getBufferColSlotCount() const;
 
-  size_t getBufferSizeBytes(const RelAlgExecutionUnit& ra_exe_unit,
+  size_t getBufferSizeBytes(const size_t max_rows,
                             const unsigned thread_count,
                             const ExecutorDeviceType device_type) const;
   size_t getBufferSizeBytes(const ExecutorDeviceType device_type) const;
