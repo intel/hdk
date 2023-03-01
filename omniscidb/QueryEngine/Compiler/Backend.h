@@ -111,6 +111,7 @@ class Backend {
       const CompilationOptions& co) = 0;
   CodegenTraits traits() const { return CodegenTraits::get(traitsDesc()); };
   virtual CodegenTraitsDescriptor traitsDesc() const = 0;
+  virtual void setSharedMemory(bool is_gpu_smem_used) = 0;
   CodegenTraits traits(const CodegenTraitsDescriptor& codegenTraitsDesc) const {
     return CodegenTraits::get(codegenTraitsDesc);
   };
@@ -126,6 +127,8 @@ class CPUBackend : public Backend {
       const CompilationOptions& co) override;
 
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
+
+  void setSharedMemory(bool is_gpu_smem_used){};
 
   static std::shared_ptr<CpuCompilationContext> generateNativeCPUCode(
       llvm::Function* func,
@@ -149,6 +152,8 @@ class CUDABackend : public Backend {
       const CompilationOptions& co) override;
 
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
+
+  void setSharedMemory(bool is_gpu_smem_used) { is_gpu_smem_used_ = is_gpu_smem_used; };
   static std::string generatePTX(const std::string& cuda_llir,
                                  llvm::TargetMachine* nvptx_target_machine,
                                  llvm::LLVMContext& context);
@@ -195,6 +200,8 @@ class L0Backend : public Backend {
 
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
 
+  void setSharedMemory(bool is_gpu_smem_used){};
+
   static std::shared_ptr<L0CompilationContext> generateNativeGPUCode(
       const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
       llvm::Function* func,
@@ -214,5 +221,10 @@ std::shared_ptr<Backend> getBackend(
     const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
     bool is_gpu_smem_used_,
     GPUTarget& gpu_target);
+
+void setSharedMemory(ExecutorDeviceType dt,
+                     bool is_gpu_smem_used_,
+                     GPUTarget& gpu_target,
+                     const std::shared_ptr<compiler::Backend>& backend);
 
 }  // namespace compiler

@@ -1428,6 +1428,16 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   addTransientStringLiterals(ra_exe_unit, row_set_mem_owner);
 
+  bool row_func_not_inlined = false;
+  bool is_gpu_smem_used = false;
+
+  GPUTarget target{gpu_mgr, blockSize(), cgen_state_.get(), row_func_not_inlined};
+  auto backend = compiler::getBackend(co.device_type,
+                                      getExtensionModuleContext()->getExtensionModules(),
+                                      is_gpu_smem_used,
+                                      target);
+  auto traits = backend->traits();
+
   MemoryLayoutBuilder mem_layout_builder(ra_exe_unit);
 
   auto query_mem_desc = mem_layout_builder.build(
@@ -1455,14 +1465,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
   }
 
   const GpuSharedMemoryContext gpu_smem_context(shared_memory_size);
-  bool row_func_not_inlined = false;
-  GPUTarget target{gpu_mgr, blockSize(), cgen_state_.get(), row_func_not_inlined};
 
-  auto backend = compiler::getBackend(co.device_type,
-                                      getExtensionModuleContext()->getExtensionModules(),
-                                      gpu_smem_context.isSharedMemoryUsed(),
-                                      target);
-  auto traits = backend->traits();
+  compiler::setSharedMemory(co.device_type, gpu_smem_context.isSharedMemoryUsed(), target, backend);
 
   RowFuncBuilder row_func_builder(ra_exe_unit, query_infos, this);
 
