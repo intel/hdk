@@ -1015,6 +1015,9 @@ std::shared_ptr<Backend> getBackend(
     const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
     bool is_gpu_smem_used_,
     GPUTarget& gpu_target) {
+
+  is_gpu_smem_used_=false;
+
   switch (dt) {
     case ExecutorDeviceType::CPU:
       return std::make_shared<CPUBackend>();
@@ -1030,4 +1033,26 @@ std::shared_ptr<Backend> getBackend(
       return {};
   };
 }
+
+
+void setSharedMemory(
+    ExecutorDeviceType dt,
+    bool is_gpu_smem_used_,
+    GPUTarget& gpu_target,
+    const std::shared_ptr<compiler::Backend>& backend){
+  switch (dt) {
+    case ExecutorDeviceType::CPU:
+      return;
+    case ExecutorDeviceType::GPU:
+      if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::CUDA)
+        backend->setSharedMemory(is_gpu_smem_used_);
+      if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
+         CHECK(!is_gpu_smem_used_);
+      }
+    default:
+      //CHECK(false);
+      return;
+  };
+}
+
 }  // namespace compiler
