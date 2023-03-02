@@ -133,8 +133,6 @@ class ResultSetStorage {
   bool isEmptyEntry(const size_t entry_idx) const;
   bool isEmptyEntryColumnar(const size_t entry_idx, const int8_t* buff) const;
 
-  void initializeBaselineValueSlots(int64_t* this_entry_slots) const;
-
   void fillOneEntryRowWise(const std::vector<int64_t>& entry);
 
   void fillOneEntryColWise(const std::vector<int64_t>& entry);

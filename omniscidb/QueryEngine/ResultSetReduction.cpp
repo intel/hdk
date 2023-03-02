@@ -89,20 +89,6 @@ void fill_slots(int64_t* dst_entry,
   }
 }
 
-ALWAYS_INLINE
-void fill_empty_key_32(int32_t* key_ptr_i32, const size_t key_count) {
-  for (size_t i = 0; i < key_count; ++i) {
-    key_ptr_i32[i] = EMPTY_KEY_32;
-  }
-}
-
-ALWAYS_INLINE
-void fill_empty_key_64(int64_t* key_ptr_i64, const size_t key_count) {
-  for (size_t i = 0; i < key_count; ++i) {
-    key_ptr_i64[i] = EMPTY_KEY_64;
-  }
-}
-
 inline int64_t get_component(const int8_t* group_by_buffer,
                              const size_t comp_sz,
                              const size_t index = 0) {
@@ -182,25 +168,6 @@ void run_reduction_code(const ReductionCode& reduction_code,
 }
 
 }  // namespace
-
-void result_set::fill_empty_key(void* key_ptr,
-                                const size_t key_count,
-                                const size_t key_width) {
-  switch (key_width) {
-    case 4: {
-      auto key_ptr_i32 = reinterpret_cast<int32_t*>(key_ptr);
-      fill_empty_key_32(key_ptr_i32, key_count);
-      break;
-    }
-    case 8: {
-      auto key_ptr_i64 = reinterpret_cast<int64_t*>(key_ptr);
-      fill_empty_key_64(key_ptr_i64, key_count);
-      break;
-    }
-    default:
-      CHECK(false);
-  }
-}
 
 // Driver method for various buffer layouts, actual work is done by reduceOne* methods.
 // Reduces the entries of `this_` into the buffer of `that` ResultSetStorage object.
@@ -479,102 +446,6 @@ void ResultSetReduction::reduceEntriesNoCollisionsColWise(
       }
     }
   }
-}
-
-/*
- * copy all keys from the columnar prepended group buffer of "that_buff" into
- * "this_buff"
- */
-void ResultSetStorage::copyKeyColWise(const size_t entry_idx,
-                                      int8_t* this_buff,
-                                      const int8_t* that_buff) const {
-  CHECK(query_mem_desc_.didOutputColumnar());
-  for (size_t group_idx = 0; group_idx < query_mem_desc_.getGroupbyColCount();
-       group_idx++) {
-    // if the column corresponds to a group key
-    const auto column_offset_bytes =
-        query_mem_desc_.getPrependedGroupColOffInBytes(group_idx);
-    auto lhs_key_ptr = this_buff + column_offset_bytes;
-    auto rhs_key_ptr = that_buff + column_offset_bytes;
-    switch (query_mem_desc_.groupColWidth(group_idx)) {
-      case 8:
-        *(reinterpret_cast<int64_t*>(lhs_key_ptr) + entry_idx) =
-            *(reinterpret_cast<const int64_t*>(rhs_key_ptr) + entry_idx);
-        break;
-      case 4:
-        *(reinterpret_cast<int32_t*>(lhs_key_ptr) + entry_idx) =
-            *(reinterpret_cast<const int32_t*>(rhs_key_ptr) + entry_idx);
-        break;
-      case 2:
-        *(reinterpret_cast<int16_t*>(lhs_key_ptr) + entry_idx) =
-            *(reinterpret_cast<const int16_t*>(rhs_key_ptr) + entry_idx);
-        break;
-      case 1:
-        *(reinterpret_cast<int8_t*>(lhs_key_ptr) + entry_idx) =
-            *(reinterpret_cast<const int8_t*>(rhs_key_ptr) + entry_idx);
-        break;
-      default:
-        CHECK(false);
-        break;
-    }
-  }
-}
-
-// Rewrites the entries of this ResultSetStorage object to point directly into the
-// serialized_varlen_buffer rather than using offsets.
-void ResultSetStorage::rewriteAggregateBufferOffsets(
-    const std::vector<std::string>& serialized_varlen_buffer) const {
-  if (serialized_varlen_buffer.empty()) {
-    return;
-  }
-
-  CHECK(!query_mem_desc_.didOutputColumnar());
-  auto entry_count = query_mem_desc_.getEntryCount();
-  CHECK_GT(entry_count, size_t(0));
-  CHECK(buff_);
-
-  // Row-wise iteration, consider moving to separate function
-  for (size_t i = 0; i < entry_count; ++i) {
-    if (isEmptyEntry(i, buff_)) {
-      continue;
-    }
-    const auto key_bytes = get_key_bytes_rowwise(query_mem_desc_);
-    const auto key_bytes_with_padding = align_to_int64(key_bytes);
-    auto rowwise_targets_ptr =
-        row_ptr_rowwise(buff_, query_mem_desc_, i) + key_bytes_with_padding;
-    size_t target_slot_idx = 0;
-    for (size_t target_logical_idx = 0; target_logical_idx < targets_.size();
-         ++target_logical_idx) {
-      const auto& target_info = targets_[target_logical_idx];
-      if ((target_info.type->isString() || target_info.type->isArray()) &&
-          target_info.is_agg) {
-        CHECK(target_info.agg_kind == hdk::ir::AggType::kSample);
-        auto ptr1 = rowwise_targets_ptr;
-        auto slot_idx = target_slot_idx;
-        auto ptr2 = ptr1 + query_mem_desc_.getPaddedSlotWidthBytes(slot_idx);
-        auto offset = *reinterpret_cast<const int64_t*>(ptr1);
-
-        size_t length_to_elems =
-            target_info.type->isString()
-                ? 1
-                : target_info.type->as<hdk::ir::ArrayBaseType>()->elemType()->size();
-        CHECK_LT(static_cast<size_t>(offset), serialized_varlen_buffer.size());
-        const auto& varlen_bytes_str = serialized_varlen_buffer[offset];
-        const auto str_ptr = reinterpret_cast<const int8_t*>(varlen_bytes_str.c_str());
-        CHECK(ptr1);
-        *reinterpret_cast<int64_t*>(ptr1) = reinterpret_cast<const int64_t>(str_ptr);
-        CHECK(ptr2);
-        *reinterpret_cast<int64_t*>(ptr2) =
-            static_cast<int64_t>(varlen_bytes_str.size() / length_to_elems);
-      }
-
-      rowwise_targets_ptr = advance_target_ptr_row_wise(
-          rowwise_targets_ptr, target_info, target_slot_idx, query_mem_desc_, false);
-      target_slot_idx = advance_slot(target_slot_idx, target_info, false);
-    }
-  }
-
-  return;
 }
 
 namespace {
@@ -1128,113 +999,6 @@ void ResultSetManager::rewriteVarlenAggregates(ResultSet* result_rs) {
   auto& result_storage = result_rs->storage_;
   result_storage->rewriteAggregateBufferOffsets(
       result_rs->serialized_varlen_buffer_.front());
-}
-
-void ResultSetStorage::fillOneEntryRowWise(const std::vector<int64_t>& entry) {
-  const auto slot_count = query_mem_desc_.getBufferColSlotCount();
-  const auto key_count = query_mem_desc_.getGroupbyColCount();
-  CHECK_EQ(slot_count + key_count, entry.size());
-  auto this_buff = reinterpret_cast<int64_t*>(buff_);
-  CHECK(!query_mem_desc_.didOutputColumnar());
-  CHECK_EQ(size_t(1), query_mem_desc_.getEntryCount());
-  const auto key_off = key_offset_rowwise(0, key_count, slot_count);
-  CHECK_EQ(query_mem_desc_.getEffectiveKeyWidth(), sizeof(int64_t));
-  for (size_t i = 0; i < key_count; ++i) {
-    this_buff[key_off + i] = entry[i];
-  }
-  const auto first_slot_off = slot_offset_rowwise(0, 0, key_count, slot_count);
-  for (size_t i = 0; i < target_init_vals_.size(); ++i) {
-    this_buff[first_slot_off + i] = entry[key_count + i];
-  }
-}
-
-void ResultSetStorage::initializeRowWise() const {
-  const auto key_count = query_mem_desc_.getGroupbyColCount();
-  const auto row_size = get_row_bytes(query_mem_desc_);
-  CHECK_EQ(row_size % 8, 0u);
-  const auto key_bytes_with_padding =
-      align_to_int64(get_key_bytes_rowwise(query_mem_desc_));
-  CHECK(!query_mem_desc_.hasKeylessHash());
-  switch (query_mem_desc_.getEffectiveKeyWidth()) {
-    case 4: {
-      for (size_t i = 0; i < query_mem_desc_.getEntryCount(); ++i) {
-        auto row_ptr = buff_ + i * row_size;
-        fill_empty_key_32(reinterpret_cast<int32_t*>(row_ptr), key_count);
-        auto slot_ptr = reinterpret_cast<int64_t*>(row_ptr + key_bytes_with_padding);
-        for (size_t j = 0; j < target_init_vals_.size(); ++j) {
-          slot_ptr[j] = target_init_vals_[j];
-        }
-      }
-      break;
-    }
-    case 8: {
-      for (size_t i = 0; i < query_mem_desc_.getEntryCount(); ++i) {
-        auto row_ptr = buff_ + i * row_size;
-        fill_empty_key_64(reinterpret_cast<int64_t*>(row_ptr), key_count);
-        auto slot_ptr = reinterpret_cast<int64_t*>(row_ptr + key_bytes_with_padding);
-        for (size_t j = 0; j < target_init_vals_.size(); ++j) {
-          slot_ptr[j] = target_init_vals_[j];
-        }
-      }
-      break;
-    }
-    default:
-      CHECK(false);
-  }
-}
-
-void ResultSetStorage::fillOneEntryColWise(const std::vector<int64_t>& entry) {
-  CHECK(query_mem_desc_.didOutputColumnar());
-  CHECK_EQ(size_t(1), query_mem_desc_.getEntryCount());
-  const auto slot_count = query_mem_desc_.getBufferColSlotCount();
-  const auto key_count = query_mem_desc_.getGroupbyColCount();
-  CHECK_EQ(slot_count + key_count, entry.size());
-  auto this_buff = reinterpret_cast<int64_t*>(buff_);
-
-  for (size_t i = 0; i < key_count; i++) {
-    const auto key_offset = key_offset_colwise(0, i, 1);
-    this_buff[key_offset] = entry[i];
-  }
-
-  for (size_t i = 0; i < target_init_vals_.size(); i++) {
-    const auto slot_offset = slot_offset_colwise(0, i, key_count, 1);
-    this_buff[slot_offset] = entry[key_count + i];
-  }
-}
-
-void ResultSetStorage::initializeColWise() const {
-  const auto key_count = query_mem_desc_.getGroupbyColCount();
-  auto this_buff = reinterpret_cast<int64_t*>(buff_);
-  CHECK(!query_mem_desc_.hasKeylessHash());
-  for (size_t key_idx = 0; key_idx < key_count; ++key_idx) {
-    const auto first_key_off =
-        key_offset_colwise(0, key_idx, query_mem_desc_.getEntryCount());
-    for (size_t i = 0; i < query_mem_desc_.getEntryCount(); ++i) {
-      this_buff[first_key_off + i] = EMPTY_KEY_64;
-    }
-  }
-  for (size_t target_idx = 0; target_idx < target_init_vals_.size(); ++target_idx) {
-    const auto first_val_off =
-        slot_offset_colwise(0, target_idx, key_count, query_mem_desc_.getEntryCount());
-    for (size_t i = 0; i < query_mem_desc_.getEntryCount(); ++i) {
-      this_buff[first_val_off + i] = target_init_vals_[target_idx];
-    }
-  }
-}
-
-void ResultSetStorage::initializeBaselineValueSlots(int64_t* entry_slots) const {
-  CHECK(entry_slots);
-  if (query_mem_desc_.didOutputColumnar()) {
-    size_t slot_off = 0;
-    for (size_t j = 0; j < target_init_vals_.size(); ++j) {
-      entry_slots[slot_off] = target_init_vals_[j];
-      slot_off += query_mem_desc_.getEntryCount();
-    }
-  } else {
-    for (size_t j = 0; j < target_init_vals_.size(); ++j) {
-      entry_slots[j] = target_init_vals_[j];
-    }
-  }
 }
 
 #define AGGREGATE_ONE_VALUE(                                                      \
