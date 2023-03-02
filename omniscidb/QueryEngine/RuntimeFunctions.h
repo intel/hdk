@@ -17,6 +17,7 @@
 #ifndef QUERYENGINE_RUNTIMEFUNCTIONS_H
 #define QUERYENGINE_RUNTIMEFUNCTIONS_H
 
+#include "Shared/EmptyKeyValues.h"
 #include "Shared/funcannotations.h"
 
 #include <cstdint>
@@ -143,11 +144,6 @@ extern "C" RUNTIME_EXPORT void agg_min_float_skip_val(GENERIC_ADDR_SPACE int32_t
 extern "C" RUNTIME_EXPORT void agg_count_distinct_bitmap(GENERIC_ADDR_SPACE int64_t* agg,
                                                          const int64_t val,
                                                          const int64_t min_val);
-
-#define EMPTY_KEY_64 std::numeric_limits<int64_t>::max()
-#define EMPTY_KEY_32 std::numeric_limits<int32_t>::max()
-#define EMPTY_KEY_16 std::numeric_limits<int16_t>::max()
-#define EMPTY_KEY_8 std::numeric_limits<int8_t>::max()
 
 extern "C" RUNTIME_EXPORT uint32_t key_hash(GENERIC_ADDR_SPACE const int64_t* key,
                                             const uint32_t key_qw_count,
@@ -277,17 +273,5 @@ extern "C" RUNTIME_EXPORT GENERIC_ADDR_SPACE int8_t* extract_str_ptr_noinline(
     const uint64_t str_and_len);
 
 extern "C" RUNTIME_EXPORT int32_t extract_str_len_noinline(const uint64_t str_and_len);
-
-template <typename T = int64_t>
-inline T get_empty_key() {
-  static_assert(std::is_same<T, int64_t>::value,
-                "Unsupported template parameter other than int64_t for now");
-  return EMPTY_KEY_64;
-}
-
-template <>
-inline int32_t get_empty_key() {
-  return EMPTY_KEY_32;
-}
 
 #endif  // QUERYENGINE_RUNTIMEFUNCTIONS_H

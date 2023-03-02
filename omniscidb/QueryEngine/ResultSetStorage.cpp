@@ -26,6 +26,8 @@
 
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
+#include "DataMgr/StreamDecode.h"
+#include "Shared/EmptyKeyValues.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/likely.h"
@@ -198,10 +200,10 @@ int64_t result_set::lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
   auto type = col_lazy_fetch.type;
   if (type->isFloatingPoint()) {
     if (type->isFp32()) {
-      double fval = fixed_width_float_decode_noinline(byte_stream, pos);
+      double fval = decodeFp<float>(byte_stream, pos);
       return *reinterpret_cast<const int64_t*>(may_alias_ptr(&fval));
     } else {
-      double fval = fixed_width_double_decode_noinline(byte_stream, pos);
+      double fval = decodeFp<double>(byte_stream, pos);
       return *reinterpret_cast<const int64_t*>(may_alias_ptr(&fval));
     }
   }
@@ -218,15 +220,14 @@ int64_t result_set::lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
   bool date_in_days =
       type->isDate() && type->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay;
   if (date_in_days) {
-    val = type->size() == 2 ? fixed_width_small_date_decode_noinline(
-                                  byte_stream, 2, NULL_SMALLINT, NULL_BIGINT, pos)
-                            : fixed_width_small_date_decode_noinline(
-                                  byte_stream, 4, NULL_INT, NULL_BIGINT, pos);
+    val = type->size() == 2
+              ? decodeSmallDate(byte_stream, 2, NULL_SMALLINT, NULL_BIGINT, pos)
+              : decodeSmallDate(byte_stream, 4, NULL_INT, NULL_BIGINT, pos);
   } else {
     val = (type->isExtDictionary() && type->size() < type->canonicalSize() &&
            type->as<hdk::ir::ExtDictionaryType>()->dictId())
-              ? fixed_width_unsigned_decode_noinline(byte_stream, type_bitwidth / 8, pos)
-              : fixed_width_int_decode_noinline(byte_stream, type_bitwidth / 8, pos);
+              ? decodeUnsignedInt(byte_stream, type_bitwidth / 8, pos)
+              : decodeInt(byte_stream, type_bitwidth / 8, pos);
   }
   if (!date_in_days &&
       ((type->size() < type->canonicalSize()) || type->isExtDictionary())) {
