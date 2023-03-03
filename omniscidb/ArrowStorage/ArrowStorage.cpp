@@ -449,6 +449,62 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
   data_lock.unlock();
 
+  auto batch_reader = arrow::TableBatchReader(*at);
+  bool have_record_batch{true};
+  while (have_record_batch) {
+    std::shared_ptr<arrow::RecordBatch> crt_record_batch{nullptr};
+    ARROW_THROW_NOT_OK(batch_reader.ReadNext(&crt_record_batch));
+    if (crt_record_batch) {
+      if (table.record_batch) {
+        // NOTE: this will break as soon as we remove cols, so for now let's just leave
+        // all data in the RecordBatch
+        compareSchemas(table.record_batch->schema(), crt_record_batch->schema());
+
+        // make a new record batch which merges both the existing record batch and
+        // incoming record batch. Is this 0-copy?
+        std::vector<std::shared_ptr<arrow::ArrayData>> ext_array_data(
+            table.record_batch->num_columns());
+        std::vector<std::shared_ptr<arrow::ArrayData>> new_array_data(
+            crt_record_batch->num_columns());
+        for (int i = 0; i < table.record_batch->num_columns(); i++) {
+          ext_array_data[i] = table.record_batch->column_data(i);
+          new_array_data[i] = crt_record_batch->column_data(i);
+        }
+        // merge columns
+        CHECK_EQ(ext_array_data.size(), new_array_data.size());
+        std::vector<std::shared_ptr<arrow::ArrayData>> new_cols(new_array_data.size());
+
+        for (size_t i = 0; i < ext_array_data.size(); i++) {
+          CHECK(ext_array_data[i]);
+
+          auto builder = arrow::MakeBuilder(ext_array_data[i]->type).ValueOrDie();
+
+          arrow::ArraySpan ext_array_span = arrow::ArraySpan(*ext_array_data[i]);
+          ARROW_THROW_NOT_OK(builder->AppendArraySlice(
+              ext_array_span, /*offset=*/0, /*length=*/ext_array_data[i]->length));
+
+          arrow::ArraySpan new_array_span = arrow::ArraySpan(*new_array_data[i]);
+          ARROW_THROW_NOT_OK(builder->AppendArraySlice(
+              new_array_span, /*offset=*/0, /*length=*/new_array_data[i]->length));
+
+          ARROW_THROW_NOT_OK(builder->FinishInternal(&new_cols[i]));
+        }
+
+        table.record_batch = arrow::RecordBatch::Make(
+            table.record_batch->schema(),
+            table.record_batch->num_rows() + crt_record_batch->num_rows(),
+            new_cols);
+
+      } else {
+        table.record_batch = std::move(crt_record_batch);
+      }
+    } else {
+      have_record_batch = false;
+    }
+  }
+
+  LOG(ERROR) << "Table record batch has " << table.record_batch->num_rows() << " rows.";
+
   std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
   col_data.resize(at->columns().size());
 

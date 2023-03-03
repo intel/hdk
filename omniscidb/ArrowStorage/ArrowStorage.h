@@ -144,6 +144,17 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
     std::vector<DataFragment> fragments;
     size_t row_count = 0;
+
+    // TODO: eventually we should set a record batch size and split into sizes. For right
+    // now, where we expect the record batch to be relatively small (as most columns are
+    // not lazy converted), we will store only one and concat
+
+    // store all incoming record batches in concatenated record batch. access record
+    // batches for on-the-fly data conversion. for other conversions, delete columns from
+    // the record batch after conversion. store a mapping of record batch columns to
+    // schema columns
+    std::vector<int> record_batch_col_mapping;
+    std::shared_ptr<arrow::RecordBatch> record_batch;
   };
 
   class ArrowChunkDataToken : public Data_Namespace::AbstractDataToken {
