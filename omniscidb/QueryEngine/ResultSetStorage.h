@@ -124,7 +124,6 @@ class ResultSetStorage {
     query_mem_desc_.setEntryCount(new_entry_count);
   }
 
- private:
   void copyKeyColWise(const size_t entry_idx,
                       int8_t* this_buff,
                       const int8_t* that_buff) const;
@@ -133,6 +132,7 @@ class ResultSetStorage {
   bool isEmptyEntry(const size_t entry_idx) const;
   bool isEmptyEntryColumnar(const size_t entry_idx, const int8_t* buff) const;
 
+ private:
   void fillOneEntryRowWise(const std::vector<int64_t>& entry);
 
   void fillOneEntryColWise(const std::vector<int64_t>& entry);
@@ -169,8 +169,6 @@ class ResultSetStorage {
   std::shared_ptr<VarlenOutputInfo> varlen_output_info_;
 
   friend class ResultSet;
-  friend class ResultSetManager;
-  friend class ResultSetReduction;
 };
 
 using GroupValueInfo = std::pair<int64_t*, bool>;
