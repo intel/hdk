@@ -201,7 +201,7 @@ class L0Backend : public Backend {
 
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
 
-  void setSharedMemory(bool is_gpu_smem_used){};
+  void setSharedMemory(bool is_gpu_smem_used) { is_gpu_smem_used_ = is_gpu_smem_used; };
 
   static std::shared_ptr<L0CompilationContext> generateNativeGPUCode(
       const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,

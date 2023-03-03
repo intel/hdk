@@ -1046,9 +1046,9 @@ void setSharedMemory(ExecutorDeviceType dt,
       if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
         CHECK(!is_gpu_smem_used_);
       }
-    default:
-      // CHECK(false);
       return;
+    default:
+      CHECK(false);
   };
 }
 
