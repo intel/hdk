@@ -17976,18 +17976,12 @@ TEST_F(SubqueryTestEnv, SubqueryTest) {
 }
 
 TEST_F(Select, L0JoinTest) {
-  /*
-    createTable("test_inner_loop_join",
-                {{"x", ctx().int32(false)},
-                 {"y", ctx().int32(false)},
-                 {"xx", ctx().int16()}},
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(7, 43, 12);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(8, 2, 11);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(9, 7, 10);");
-  */
-  c("SELECT a.x FROM test_inner_loop_join as a, test_inner_loop_join as b WHERE a.x < "
-    "b.y ",
-    ExecutorDeviceType::GPU);
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+
+    c("SELECT a.x FROM test_inner_loop_join as a, test_inner_loop_join as b WHERE a.x > "
+      "b.y ", ExecutorDeviceType::GPU);
+  }
 }
 
 class ManyRowsTest : public ExecuteTestBase, public ::testing::Test {
@@ -18044,8 +18038,6 @@ int main(int argc, char** argv) {
   namespace po = boost::program_options;
 
   po::options_description desc("Options");
-  config->exec.heterogeneous.allow_query_step_cpu_retry = false;
-  config->exec.heterogeneous.allow_cpu_retry = false;
 
   // these two are here to allow passing correctly google testing parameters
   desc.add_options()("gtest_list_tests", "list all test");
