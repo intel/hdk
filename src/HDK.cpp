@@ -55,7 +55,7 @@ ExecutionResult HDK::query(const std::string& sql, const bool is_explain) {
                              internal_->data_mgr->getDataProvider(),
                              std::move(dag));
 
-  auto co = CompilationOptions::defaults();
+  auto co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
   auto eo = ExecutionOptions::fromConfig(*internal_->config.get());
   return ra_executor.executeRelAlgQuery(co, eo, /*just_explain_plan=*/false);
 }

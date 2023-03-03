@@ -374,7 +374,7 @@ TEST_F(NoCatalogRelAlgTest, StreamingAggregate) {
       executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
 
   ra_executor.prepareStreamingExecution(
-      CompilationOptions::defaults(),
+      CompilationOptions::defaults(ExecutorDeviceType::CPU),
       ExecutionOptions::fromConfig(executor_->getConfig()));
 
   TestDataProvider& data_provider = getDataProvider();
@@ -471,7 +471,7 @@ TEST_F(NoCatalogRelAlgTest, StreamingFilter) {
       executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
 
   ra_executor.prepareStreamingExecution(
-      CompilationOptions::defaults(),
+      CompilationOptions::defaults(ExecutorDeviceType::CPU),
       ExecutionOptions::fromConfig(executor_->getConfig()));
 
   std::vector<std::string> col_names;
