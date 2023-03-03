@@ -69,6 +69,9 @@ struct ExecuteTestBase {
     run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(7, 43, 12);");
     run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(8, 2, 11);");
     run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(9, 7, 10);");
+    insertCsvValues("test_inner_loop_join", "7,43,2");
+    insertCsvValues("test_inner_loop_join", "8,2,11");
+    insertCsvValues("test_inner_loop_join", "9,7,10");
   }
 
   static void createSmallTestsTable() {
@@ -238,7 +241,7 @@ struct ExecuteTestBase {
 
 class JoinTest : public ExecuteTestBase, public ::testing::Test {};
 
-TEST_F(JoinTest, DISABLED_SimpleJoin) {
+TEST_F(JoinTest, SimpleJoin) {
   c("SELECT a.x FROM test_inner_loop_join as a, test_inner_loop_join as b WHERE a.x > "
     "b.y ",
     g_dt);
