@@ -15,6 +15,7 @@
  */
 
 #include "GpuSharedMemoryTest.h"
+#include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
@@ -380,7 +381,9 @@ void perform_test_and_verify_results(TestInputData input) {
                                      init_agg_val_vec(input.target_infos, query_mem_desc),
                                      cuda_mgr.get(),
                                      executor.get());
-  gpu_smem_tester.codegen();  // generate code for gpu reduciton and initialization
+  gpu_smem_tester.codegen(CompilationOptions::defaults(
+      ExecutorDeviceType::GPU,
+      false));  // generate code for gpu reduciton and initialization
   gpu_smem_tester.codegenWrapperKernel();
   gpu_smem_tester.performReductionTest(
       input_result_sets, gpu_result_set->getStorage(), input.device_id);
