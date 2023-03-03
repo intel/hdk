@@ -213,6 +213,7 @@ class L0Backend : public Backend {
 
  private:
   GPUTarget& gpu_target_;
+  bool is_gpu_smem_used_;
   const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts_;
   inline const static CodegenTraitsDescriptor traitsDescriptor{l0_cgen_traits_desc};
 };
