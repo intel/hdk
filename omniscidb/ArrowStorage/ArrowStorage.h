@@ -58,7 +58,12 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   ArrowStorage(int schema_id, const std::string& schema_name, int db_id)
       : SimpleSchemaProvider(hdk::ir::Context::defaultCtx(), schema_id, schema_name)
       , db_id_(db_id)
-      , schema_id_(getSchemaId(db_id)) {}
+      , schema_id_(getSchemaId(db_id)) {
+    LOG(INFO) << "ArrowStorage: " << schema_name << " (" << schema_id_
+              << "), tables_.size(): " << tables_.size();
+    tables_.clear();
+    LOG(INFO) << "tables_.size() after clear(): " << tables_.size();
+  }
 
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
@@ -129,6 +134,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   void dropTable(int table_id, bool throw_if_not_exist = false);
 
   int dbId() const { return db_id_; }
+  size_t tableCount() const { return tables_.size(); }
+  void* getTablePtr();
 
  private:
   struct DataFragment {

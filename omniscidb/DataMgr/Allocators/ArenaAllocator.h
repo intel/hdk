@@ -42,7 +42,7 @@ class SysAllocator {
   friend bool operator!=(Self const&, Self const&) noexcept { return false; }
 };
 
-#ifdef HAVE_FOLLY
+#ifdef HDK_HAVE_FOLLY
 
 #include <folly/Memory.h>
 #include <folly/memory/Arena.h>

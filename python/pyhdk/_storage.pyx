@@ -237,10 +237,13 @@ cdef class ArrowStorage(Storage):
     cdef string schema_name = f"schema_#{schema_id}"
     cdef int db_id = (schema_id << 24) + 1
     self.c_storage = make_shared[CArrowStorage](schema_id, schema_name, db_id)
+    print("table count = " + str(self.c_storage.get().tableCount()))
     self.c_schema_provider = static_pointer_cast[CSchemaProvider, CArrowStorage](self.c_storage)
     self.c_abstract_buffer_mgr = static_pointer_cast[CAbstractBufferMgr, CArrowStorage](self.c_storage)
+    print("table count = " + str(self.c_storage.get().tableCount()))
 
   def createTable(self, table_name, scheme, TableOptions table_opts):
+    print("table count = " + str(self.c_storage.get().tableCount()))
     if not isinstance(table_name, str):
       raise TypeError(f"Expected str for 'table_name' arg. Got: {type(table_name)}.")
 
@@ -262,6 +265,9 @@ cdef class ArrowStorage(Storage):
     else:
       raise TypeError(f"Expected dict or list of tuples for 'scheme' arg. Got: {type(scheme)}.")
 
+    print("table count = " + str(self.c_storage.get().tableCount()))
+    print("pointer: " + str(<long>self.c_storage.get()))
+    print("map pointer: " + str(<long>self.c_storage.get().getTablePtr()))
     self.c_storage.get().createTable(table_name, col_descs, table_opts.c_options)
 
   def _process_col_name(self, val):

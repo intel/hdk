@@ -112,6 +112,8 @@ cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h" namespace "ArrowStorage
     size_t skip_rows;
     size_t block_size;
 
+    CCsvParseOptions()
+
   struct CJsonParseOptions "ArrowStorage::JsonParseOptions":
     size_t skip_rows;
     size_t block_size;
@@ -133,6 +135,8 @@ cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
     void dropTable(const string&, bool) except +;
 
     int dbId() const
+    size_t tableCount() const
+    void* getTablePtr()
 
 cdef extern from "omniscidb/BufferProvider/BufferProvider.h" namespace "Data_Namespace":
   cdef cppclass CBufferProvider "BufferProvider":

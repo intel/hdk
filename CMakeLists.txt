@@ -105,7 +105,7 @@ find_package(Parquet REQUIRED)
 option(ENABLE_FOLLY "Use Folly" ON)
 if(ENABLE_FOLLY)
   find_package(Folly REQUIRED)
-  add_definitions("-DHAVE_FOLLY")
+  add_definitions("-DHDK_HAVE_FOLLY")
 endif()
 
 # Boost, required for OmniSciDB

@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from pyhdk._common import buildConfig
+from pyhdk._common import buildConfig, initLogger
 from pyhdk._storage import TableOptions, CsvParseOptions, ArrowStorage, DataMgr
 from pyhdk._sql import Calcite, RelAlgExecutor
 from pyhdk._execute import Executor
@@ -1648,6 +1648,7 @@ class QueryOptions:
 
 class HDK:
     def __init__(self, **kwargs):
+        initLogger(debug_logs=True, **kwargs)
         self._config = buildConfig(**kwargs)
         self._storage = ArrowStorage(1)
         self._data_mgr = DataMgr(self._config)

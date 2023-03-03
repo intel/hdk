@@ -321,9 +321,16 @@ const DictDescriptor* ArrowStorage::getDictMetadata(int dict_id, bool /*load_dic
   return nullptr;
 }
 
+void* ArrowStorage::getTablePtr() {
+  return reinterpret_cast<void*>(&tables_);
+}
+
 TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
                                        const std::vector<ColumnDescription>& columns,
                                        const TableOptions& options) {
+  LOG(INFO) << "this: " << this;
+  LOG(INFO) << "this.map: " << &tables_;
+  LOG(INFO) << "createTable: " << table_name << " tables_.size(): " << tables_.size();
   TableInfoPtr res;
   int table_id;
   mapd_unique_lock<mapd_shared_mutex> data_lock(data_mutex_);
@@ -395,6 +402,9 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
   auto schema = arrow::schema(fields);
 
   {
+    LOG(ERROR) << "Creating table " << table_name
+               << " with schema: " << schema->ToString() << std::endl
+               << "Table id: " << table_id << " tables_:" << tables_.size() << std::endl;
     auto [iter, inserted] = tables_.emplace(table_id, std::make_unique<TableData>());
     CHECK(inserted);
     auto& table = *iter->second;
