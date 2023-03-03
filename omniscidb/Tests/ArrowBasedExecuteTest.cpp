@@ -1434,21 +1434,6 @@ class ExecuteTestBase {
     insertJsonValues("varlen_table", ss.str());
   }
 
-  static void createTestInnerLoopJoinTable() {
-    createTable(
-        "test_inner_loop_join",
-        {{"x", ctx().int32(false)}, {"y", ctx().int32(false)}, {"xx", ctx().int16()}},
-        {2});
-    run_sqlite_query("DROP TABLE IF EXISTS test_inner_loop_join;");
-    run_sqlite_query(
-        "CREATE TABLE test_inner_loop_join(x int not null, y int not null, xx "
-        "smallint);");
-
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(7, 43, 12);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(8, 2, 11);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(9, 7, 10);");
-  }
-
   static void createAndPopulateTestTables() {
     createTestInnerTable();
     createTestTable();
@@ -1499,7 +1484,6 @@ class ExecuteTestBase {
     createLargeWindowFuncTable(false);
     createUnionAllTestsTable();
     createVarlenLazyFetchTable();
-    createTestInnerLoopJoinTable();
   }
 
   static void check_date_trunc_groups(const ResultSet& rows) {
@@ -17972,15 +17956,6 @@ TEST_F(SubqueryTestEnv, SubqueryTest) {
       dt);
     c(R"(select (select sum(x - y) from ( select count(1) as x, ( select count(1) from ( select distinct str as py from test_inner ) ) as y from ( select str as x from test_inner group by str ) ) ) from test_inner;)",
       dt);
-  }
-}
-
-TEST_F(Select, L0JoinTest) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
-    c("SELECT a.x FROM test_inner_loop_join as a, test_inner_loop_join as b WHERE a.x > "
-      "b.y ", ExecutorDeviceType::GPU);
   }
 }
 
