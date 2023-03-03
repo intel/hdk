@@ -189,7 +189,7 @@ class NoCatalogRelAlgTest : public ::testing::Test {
     auto ra_executor = RelAlgExecutor(
         executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
     return ra_executor.executeRelAlgQuery(
-        CompilationOptions(),
+        CompilationOptions::defaults(ExecutorDeviceType::CPU),
         ExecutionOptions::fromConfig(executor_->getConfig()),
         false);
   }
@@ -374,7 +374,8 @@ TEST_F(NoCatalogRelAlgTest, StreamingAggregate) {
       executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
 
   ra_executor.prepareStreamingExecution(
-      CompilationOptions(), ExecutionOptions::fromConfig(executor_->getConfig()));
+      CompilationOptions::defaults(),
+      ExecutionOptions::fromConfig(executor_->getConfig()));
 
   TestDataProvider& data_provider = getDataProvider();
 
@@ -470,7 +471,8 @@ TEST_F(NoCatalogRelAlgTest, StreamingFilter) {
       executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
 
   ra_executor.prepareStreamingExecution(
-      CompilationOptions(), ExecutionOptions::fromConfig(executor_->getConfig()));
+      CompilationOptions::defaults(),
+      ExecutionOptions::fromConfig(executor_->getConfig()));
 
   std::vector<std::string> col_names;
   col_names.push_back("res");

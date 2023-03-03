@@ -1251,10 +1251,8 @@ void RowFuncBuilder::checkErrorCode(llvm::Value* retCode) {
 std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::genLoadHashDesc(
     llvm::Value* groups_buffer,
     const CompilationOptions& co) {
-  compiler::CodegenTraits cgen_traits =
-      compiler::CodegenTraits::get(co.codegen_traits_desc);
   const auto int8_ptr_ty =
-      cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(LL_CONTEXT));
+      llvm::Type::getInt8PtrTy(LL_CONTEXT, co.codegen_traits_desc.local_addr_space_);
   const auto int32_ptr_ty = LL_BUILDER.getInt32Ty();
   auto* desc_type = llvm::StructType::get(int8_ptr_ty, int32_ptr_ty);
   auto* desc_ptr_type = llvm::PointerType::getUnqual(desc_type);
