@@ -145,6 +145,49 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
 
   if (col_type->isExtDictionary() &&
       (table.lazy_fetch_col_ids.find(col_idx) != table.lazy_fetch_col_ids.end())) {
+#if 1
+    auto& frag = table.fragments[frag_idx];
+    size_t elem_size = col_type->size();
+    size_t rows_to_fetch = num_bytes ? num_bytes / elem_size : frag.row_count;
+
+    CHECK(table.record_batch);
+    auto arrow_col_data = table.record_batch->column(col_idx);
+    CHECK(arrow_col_data);
+    CHECK_EQ(arrow_col_data->type(), arrow::utf8()) << arrow_col_data->type()->ToString();
+
+    // get the slice of strings corresponding to this fragment
+    auto crt_frag_strings = std::static_pointer_cast<arrow::StringArray>(
+        arrow_col_data->Slice(frag.offset, frag.row_count));
+    CHECK(crt_frag_strings);
+    CHECK_LE(crt_frag_strings->length(), static_cast<int64_t>(frag.row_count));
+
+    const auto bulk_size = crt_frag_strings->length();
+
+    auto dict =
+        dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
+            ->stringDict.get();
+
+    // dictionary conversion
+    std::vector<std::string_view> bulk(bulk_size);
+    for (int j = 0; j < crt_frag_strings->length(); j++) {
+      auto view = crt_frag_strings->GetView(j);
+      bulk[j] = std::string_view(view.data(), view.length());
+    }
+
+    std::shared_ptr<arrow::Buffer> indices_buf;
+    auto res = arrow::AllocateBuffer(bulk_size * sizeof(int32_t));
+    CHECK(res.ok());
+    indices_buf = std::move(res).ValueOrDie();
+    auto raw_data = reinterpret_cast<int*>(indices_buf->mutable_data());
+    dict->getOrAddBulk(bulk, raw_data);
+
+    const int64_t arrow_elem_size = 4;  // 32-bit integer
+    auto chunk = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
+    const int8_t* ptr =
+        chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * arrow_elem_size);
+    size_t chunk_size = chunk->length() * arrow_elem_size;
+    return std::make_unique<ArrowChunkDataToken>(std::move(chunk), ptr, chunk_size);
+#else
     // raw data
     auto& frag = table.fragments[frag_idx];
     size_t elem_size = col_type->size();
@@ -185,7 +228,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
     auto array = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
 
     CHECK(false);
-    // return std::make_shared<arrow::ChunkedArray>(array);
+// return std::make_shared<arrow::ChunkedArray>(array);
+#endif
   }
 
   if (!col_type->isVarLen()) {
@@ -497,10 +541,6 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   }
 
   auto& table = *tables_.at(table_id);
-
-  table.base_table_refs.push_back(at);  // keep ownership of orig data
-  // TODO: this could get quite expensive, but we also want to avoid copy
-
   compareSchemas(table.schema, at->schema());
 
   mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
@@ -565,9 +605,6 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
   col_data.resize(at->columns().size());
 
-  std::vector<std::shared_ptr<arrow::ChunkedArray>> arrow_col_data;
-  arrow_col_data.resize(at->columns().size());
-
   std::vector<DataFragment> fragments;
   // Compute size of the fragment. If the last existing fragment is not full, then it will
   // be merged with the first new fragment.
@@ -628,26 +665,12 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                              // 1. note that this column is lazy
                              // 2. store the raw strings for this column
                   table.lazy_fetch_col_ids.insert(col_idx);
-                  // createLazyDictionaryEncodedColumn(dict, col_arr, col_type);
-                  arrow_col_data[col_idx] = col_arr;
-                  // need to make col_data empty chunked array
-                  std::vector<std::shared_ptr<arrow::Array>> empty_chunks(frag_count);
-                  for (size_t x = 0; x < frag_count; x++) {
-                    auto col_arr_builder = arrow::Int32Builder();
-                    col_arr_builder.AppendEmptyValues(table.fragment_size);
-                    ARROW_THROW_NOT_OK(col_arr_builder.Finish(&empty_chunks[x]));
-                  }
-                  col_data[col_idx] =
-                      arrow::ChunkedArray::Make(empty_chunks).ValueOrDie();
-
-                  // TODO: this probably isn't right
-                  auto meta = std::make_shared<ChunkMetadata>();
-                  meta->type = col_type;
-                  meta->numElements = col_arr->length();
-                  auto& frag = fragments[frag_idx];
-                  frag.metadata[col_idx] = meta;
-
-                  continue;
+                  // grab col_arr from record batch
+                  CHECK(table.record_batch);
+                  auto array = table.record_batch->column(col_idx);
+                  CHECK(array);
+                  CHECK_EQ(array->type()->id(), col_arr->type()->id());
+                  col_arr = std::make_shared<arrow::ChunkedArray>(array);
                 } else {
                   col_arr = createDictionaryEncodedColumn(dict, col_arr, col_type);
                 }
@@ -733,22 +756,11 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   if (table.row_count) {
     // If table is not empty then we have to merge chunked arrays.
     CHECK_EQ(table.col_data.size(), col_data.size());
-    CHECK_EQ(table.arrow_col_data.size(), arrow_col_data.size());
     for (size_t i = 0; i < table.col_data.size(); ++i) {
       arrow::ArrayVector lhs = table.col_data[i]->chunks();
       arrow::ArrayVector rhs = col_data[i]->chunks();
       lhs.insert(lhs.end(), rhs.begin(), rhs.end());
       table.col_data[i] = arrow::ChunkedArray::Make(std::move(lhs)).ValueOrDie();
-    }
-
-    for (size_t i = 0; i < table.arrow_col_data.size(); ++i) {
-      if (table.arrow_col_data[i]) {
-        CHECK(arrow_col_data[i]);
-        arrow::ArrayVector lhs = table.arrow_col_data[i]->chunks();
-        arrow::ArrayVector rhs = arrow_col_data[i]->chunks();
-        lhs.insert(lhs.end(), rhs.begin(), rhs.end());
-        table.arrow_col_data[i] = arrow::ChunkedArray::Make(std::move(lhs)).ValueOrDie();
-      }
     }
 
     // Probably need to merge the last existing fragment with the first new one.
@@ -782,7 +794,6 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   } else {
     CHECK_EQ(table.row_count, (size_t)0);
     table.col_data = std::move(col_data);
-    table.arrow_col_data = std::move(arrow_col_data);
     table.fragments = std::move(fragments);
     table.row_count = at->num_rows();
   }

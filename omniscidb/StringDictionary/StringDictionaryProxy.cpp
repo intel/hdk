@@ -465,10 +465,14 @@ std::pair<const char*, size_t> StringDictionaryProxy::getStringBytes(
 }
 
 size_t StringDictionaryProxy::storageEntryCount() const {
+#if 1
+  return string_dict_->storageEntryCount();
+#else
   const size_t num_storage_entries{generation_ == -1 ? string_dict_->storageEntryCount()
                                                      : generation_};
   CHECK_LE(num_storage_entries, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
   return num_storage_entries;
+#endif
 }
 
 size_t StringDictionaryProxy::transientEntryCountUnlocked() const {
