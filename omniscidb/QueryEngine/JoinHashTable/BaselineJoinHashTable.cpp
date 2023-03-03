@@ -784,8 +784,8 @@ HashJoinMatchingSet BaselineJoinHashTable::codegenMatchingSet(
   compiler::CodegenTraits cgen_traits =
       compiler::CodegenTraits::get(co.codegen_traits_desc);
   auto hash_ptr = HashJoin::codegenHashTableLoad(index, executor_);
-  const auto composite_dict_ptr_type = cgen_traits.localPointerType(
-      llvm::Type::getIntNPtrTy(LL_CONTEXT, key_component_width * 8));
+  const auto composite_dict_ptr_type = llvm::Type::getIntNPtrTy(
+      LL_CONTEXT, key_component_width * 8, cgen_traits.getLocalAddrSpace());
   const auto composite_key_dict =
       hash_ptr->getType()->isPointerTy()
           ? LL_BUILDER.CreatePointerCast(hash_ptr, composite_dict_ptr_type)

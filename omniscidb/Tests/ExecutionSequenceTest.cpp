@@ -92,7 +92,8 @@ class ExecutionSequenceTest : public ::testing::Test {
     auto eo = ExecutionOptions::fromConfig(config());
     eo.just_explain = just_explain;
     eo.allow_loop_joins = true;
-    return ra_executor.executeRelAlgQuery(CompilationOptions(), eo, false);
+    return ra_executor.executeRelAlgQuery(
+        CompilationOptions::defaults(ExecutorDeviceType::CPU), eo, false);
   }
 };
 

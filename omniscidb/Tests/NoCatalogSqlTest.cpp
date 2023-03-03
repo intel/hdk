@@ -261,8 +261,9 @@ TEST_F(NoCatalogSqlTest, StreamingAggregate) {
   });
 
   auto ra_executor = getExecutor("SELECT SUM(val) FROM test_streaming;");
-  ra_executor.prepareStreamingExecution(CompilationOptions(),
-                                        ExecutionOptions::fromConfig(config()));
+  ra_executor.prepareStreamingExecution(
+      CompilationOptions::defaults(ExecutorDeviceType::CPU),
+      ExecutionOptions::fromConfig(config()));
   TestDataProvider& data_provider = getDataProvider();
 
   data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {1, 2, 3});
@@ -290,7 +291,7 @@ TEST_F(NoCatalogSqlTest, StreamingAggregate) {
 TEST_F(NoCatalogSqlTest, StreamingFilter) {
   GTEST_SKIP();
   auto ra_executor = getExecutor("SELECT val FROM test_streaming WHERE val > 20;");
-  ra_executor.prepareStreamingExecution(CompilationOptions(),
+  ra_executor.prepareStreamingExecution(CompilationOptions::defaults(),
                                         ExecutionOptions::fromConfig(config()));
 
   std::vector<std::string> col_names;

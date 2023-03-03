@@ -27,7 +27,6 @@ namespace {
 // Creates an empty stub function, with the fixed signature required by the interpreter.
 llvm::Function* create_stub_function(const std::string& name, CgenState* cgen_state) {
   auto void_type = llvm::Type::getVoidTy(cgen_state->context_);
-  std::cout << "!!create_stub_function!!\n";
   auto int8_ptr_type = llvm::PointerType::get(get_int_type(8, cgen_state->context_), 0);
   std::vector<llvm::Type*> parameter_types(2, int8_ptr_type);
   const auto func_type = llvm::FunctionType::get(void_type, parameter_types, false);
@@ -190,7 +189,7 @@ StubGenerator::Stub StubGenerator::generateStub(const std::string& name,
                                                 const Executor* executor) {
   CompilationOptions co{
       ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
-  std::cout << "generateStub\n";
+  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
   // Multiple executors may trigger the generation of the same
   // stub. We'll use get_or_wait/put methods of code cache accessor to
   // let the first executor to generate the stub while other executors

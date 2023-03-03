@@ -70,7 +70,7 @@ struct CompilationOptions {
 
   static compiler::CodegenTraitsDescriptor getCgenTraitsDesc(
       const ExecutorDeviceType device_type,
-      const bool is_l0) {
+      const bool is_l0 = false) {
     switch (device_type) {
       case ExecutorDeviceType::CPU:
         return compiler::cpu_cgen_traits_desc;
