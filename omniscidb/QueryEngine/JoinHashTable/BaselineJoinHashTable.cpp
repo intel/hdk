@@ -758,7 +758,7 @@ llvm::Value* BaselineJoinHashTable::codegenSlot(const CompilationOptions& co,
   const auto key_component_width = getKeyComponentWidth();
   CHECK(key_component_width == 4 || key_component_width == 8);
   auto key_buff_lv = codegenKey(co);
-  const auto hash_ptr = hashPtr(index);
+  const auto hash_ptr = hashPtr(index, co.codegen_traits_desc.local_addr_space_);
   const auto key_ptr_lv = LL_BUILDER.CreatePointerCast(
       key_buff_lv,
       llvm::Type::getInt8PtrTy(LL_CONTEXT,
@@ -914,11 +914,10 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
   return key_buff_lv;
 }
 
-llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index) {
+llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index, const size_t addr_space) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   auto hash_ptr = HashJoin::codegenHashTableLoad(index, executor_);
-  const auto pi8_type =
-      llvm::Type::getInt8PtrTy(LL_CONTEXT, hash_ptr->getType()->getPointerAddressSpace());
+  const auto pi8_type = llvm::Type::getInt8PtrTy(LL_CONTEXT, addr_space);
   return hash_ptr->getType()->isPointerTy()
              ? LL_BUILDER.CreatePointerCast(hash_ptr, pi8_type)
              : LL_BUILDER.CreateIntToPtr(hash_ptr, pi8_type);
