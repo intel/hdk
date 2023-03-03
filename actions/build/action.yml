@@ -1,0 +1,47 @@
+name: Build
+inputs:
+  prefix: 
+    default: ""
+  env-type:
+    required: true
+    default: None
+
+#   hw-type:
+    # required: true
+    # default: None
+
+outputs:
+  random-number:
+    value: 13
+runs:
+  using: "composite"
+  steps:
+    # if ${{ inputs.env-type  == 'docker'}}; then
+    #   source /usr/share/miniconda/etc/profile.d/conda.sh
+    #   conda activate omnisci-dev
+    # fi;
+
+    - name: Build
+      env:
+        CPU_COUNT: 2
+      run: |
+        echo ${PWD}
+        echo "prefix: " ${{ inputs.prefix }}
+        if ${{ inputs.env-type  == 'conda'}}; then
+          source /usr/share/miniconda/etc/profile.d/conda.sh
+          conda activate omnisci-dev
+          export CMAKE_OPTS=${{ env.CMAKE_OPTS }}
+        fi;
+        if ${{ inputs.env-type  == 'docker'}}; then
+          echo "=========================container ls========================="
+          export CMAKE_OPTS="${{ env.CMAKE_OPTS }} -DENABLE_PYTHON=off"
+          docker inspect -f "{{ .Mounts }}" verify
+        fi;
+        echo "cmake ${CMAKE_OPTS} .."
+        echo 'cmake ${CMAKE_OPTS} ..'
+        ${{ inputs.prefix }} -c " mkdir build && cd build && \
+          cmake ${CMAKE_OPTS} .. && \
+          make -j ${{ env.CPU_COUNT }} && \
+          cd .. && \
+          tar -zcf /tmp/build.tgz ."
+      shell: bash

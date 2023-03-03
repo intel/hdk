@@ -1,0 +1,58 @@
+name: Build
+on:
+  workflow_call:
+    inputs:
+      env-type: 
+        required: true
+        type: string
+        default: None
+      hw-type:
+        required: true
+        type: string
+        default: None
+env:
+  PRE: "/usr/bin/bash"
+
+jobs:
+  build-common:
+    name: Build for ${{ inputs.hw-type }} in ${{ inputs.env-type }} env
+    runs-on: ubuntu-latest
+    outputs:
+      prefix: ${{ env.PRE }}
+    
+    env:
+      CONDA_ENV: omnisci-dev
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Checking cached
+        uses: ./actions/cache
+        with:
+          env-type: ${{ inputs.env-type }}
+          hw-type: ${{ inputs.hw-type }}
+
+      - name: Build
+        uses: ./actions/build
+        with:
+          prefix: ${{ env.PRE }}
+          env-type: ${{ inputs.env-type }}
+
+      - name: Upload build and src files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.env-type }}-build-${{ github.run_id }}
+          path: /tmp/build.tgz
+
+  test:
+    needs: [build-common]
+    strategy:
+      matrix:
+        test-type: [Unit, Integration] # Perf]
+    uses: ./.github/workflows/parametrized_test_draft.yml
+    with:
+      test-type: ${{ matrix.test-type }}
+      env-type: ${{ inputs.env-type }}
+      hw-type: ${{ inputs.hw-type }}
+      prefix: ${{ needs.build-common.outputs.prefix }}
+      conda-env: omnisci-dev

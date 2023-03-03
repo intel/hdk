@@ -1,0 +1,80 @@
+name: Test
+on:
+  workflow_call:
+    inputs:
+      test-type:
+        required: true
+        type: string
+        default: None
+      env-type: 
+        required: true
+        type: string
+        default: None
+      hw-type:
+        required: true
+        type: string
+        default: None
+      conda-env:
+        type: string
+        default: omnisci-dev
+      prefix: 
+        type: string
+        default: None
+
+jobs:
+  test:
+    name: ${{ inputs.test-type }} test
+    runs-on: ubuntu-latest
+    #container: devjiu/cpu-hdk:check
+
+    env:
+      CONDA_ENV: ${{ inputs.conda-env }}
+
+    steps:
+      - name: Test
+        run: |
+          echo "test: " ${{ inputs.test-type }}
+          ls -la
+      - uses: actions/checkout@v3
+
+      - name: Checking cached
+        uses: ./actions/cache
+        with:
+          env-type: ${{ inputs.env-type }}
+          hw-type: ${{ inputs.hw-type }}
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.env-type }}-build-${{ github.run_id }}
+
+      - name: Unpack build files
+        run: |
+          tar -zxf build.tgz
+
+      # don't works here
+      # - if: ${{ inputs.env-type == 'conda' }}
+      #   run: |
+      #     source /usr/share/miniconda/etc/profile.d/conda.sh
+      #     conda activate omnisci-dev
+      
+      - name: Test
+        if: ${{ inputs.test-type == 'Integration' &&  inputs.env-type == 'conda'}}
+        uses: ./actions/Integration-test
+      
+      - name: Test
+        if: ${{ inputs.test-type == 'Unit'}}
+        uses: ./actions/Unit-test
+        with:
+          env-type: ${{ inputs.env-type }}
+          prefix: ${{ inputs.prefix }}
+      
+      # - name: Test
+      #   if: ${{ inputs.test-type == 'Perf'}}
+      #   uses: ./actions/Integration-test
+
+      # - name: Upload build and src files
+      #   if: inputs.test == 'asan'
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: docker-${{ env.RUN_STAMP }}-asan
+      #     path: /tmp/cache.tgz

@@ -1,0 +1,59 @@
+name: Test
+# inputs:
+#   env-type: 
+#     required: true
+#     default: None
+#   hw-type:
+#     required: true
+#     default: None
+
+# outputs:
+#   random-number:
+#     value: 13
+
+runs:
+  using: composite
+  steps:
+      
+    # The following tests need more memory than a standard instance has:
+    #   ArrowBasedExecuteTest
+    #   ArrowBasedExecuteTestColumnarOutput
+    #   ArrowBasedExecuteTestSizeAgnostic
+    #   ArrayTest
+    #   CorrelatedSubqueryTest
+    #   NoCatalogSqlTest
+    # that's not possible to manage instance memory with standard actions
+    - name: Set Swap Space
+      # if: inputs.test == 'smoke' || inputs.test == 'asan'
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 12
+
+    - name: Checkout Modin
+      uses: actions/checkout@v3
+      with:
+        path: modin
+        repository: modin-project/modin
+        ref: master
+
+    - name: Install python dependencies
+      run: |
+        conda info --envs
+        source /usr/share/miniconda/etc/profile.d/conda.sh
+        conda activate omnisci-dev
+        cd modin
+        conda info --envs
+        pip install -e .
+      shell: bash
+
+    - name: Run tests
+      run: |
+        conda info --envs
+        source /usr/share/miniconda/etc/profile.d/conda.sh
+        conda activate omnisci-dev
+        conda info --envs
+        python -c 'import pyhdk'
+        python python/tests/modin/modin_smoke_test.py
+        python python/tests/test_pyhdk_bindings.py
+        python python/tests/test_pyhdk_sql.py
+      shell: bash

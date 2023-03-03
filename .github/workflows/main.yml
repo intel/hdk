@@ -1,4 +1,4 @@
-name: Build
+name: Main workflow
 on:
   workflow_dispatch:
     inputs:
@@ -13,41 +13,58 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  #group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
   cancel-in-progress: true
 
 jobs:
-  modin:
-    uses: ./.github/workflows/modin.yml
-
-  build:
-    uses: ./.github/workflows/build.yml
-
-  build-cuda:
-    uses: ./.github/workflows/build.yml
+  configuration:
+    strategy:
+      fail-fast: true
+      matrix:
+        environment-type: [conda, docker] # Windows
+        hardware-type: [CPU] #, GPU] # L0
+    uses: ./.github/workflows/parametrized_build_draft.yml
     with:
-      name: cuda
-      cuda_compiler_version: 12-0
+      env-type: ${{ matrix.environment-type }}
+      hw-type: ${{ matrix.hardware-type }}
 
-  style:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: style
+  style-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Style
+        run: |
+          ls -la
+          find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \)
+          find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file
+        # with:
+        #   cancelMode: self
+        #   token: ${{ secrets.GITHUB_TOKEN }}
+      # - if: failure()
+      #   uses: andymckay/cancel-action@0.2
+      - if: failure()
+        run: |
+          gh run cancel ${{ github.run_id }}
+    # uses: ./.github/workflows/test.yml
+    # with:
+    #   cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+    #   test: style
 
-  sanity:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: sanity
+  # sanity:
+  #   needs: build
+  #   uses: ./.github/workflows/test.yml
+  #   with:
+  #     cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+  #     test: sanity
 
-  asan:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: asan
+#   build:
+#     uses: ./.github/workflows/build.yml
+
+#   build-cuda:
+#     uses: ./.github/workflows/build.yml
+#     with:
+#       name: cuda
+#       cuda_compiler_version: 12-0
 
 #  test-asan-docker:
 #    needs: [build-asan, asan]
@@ -56,37 +73,37 @@ jobs:
 #      build-name: asan
 #      reset-cache: ${{ !!inputs.reset-cache }}
 
+  # build-cuda-docker:
+  #   uses: ./.github/workflows/build-docker.yml
+  #   with:
+  #     name: cuda
+  #     options: -DENABLE_PYTHON=off 
 
-  build-cuda-docker:
-    uses: ./.github/workflows/build-docker.yml
-    with:
-      name: cuda
-      options: -DENABLE_PYTHON=off 
+#   perf:
+#     needs: build
+#     uses: ./.github/workflows/test.yml
+#     with:
+#       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+#       test: perf
 
-  test-cuda-docker:
-    needs: build-cuda-docker
-    uses: ./.github/workflows/test-docker.yml
-    with:
-      name: cuda
-      # input for a push event is an empty string, convert it to boolean
-      reset-cache: ${{ !!inputs.reset-cache }}
+  # build-l0-docker:
+  #   uses: ./.github/workflows/build-docker.yml
+  #   with:
+  #     name: l0
+  #     options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
 
-  build-l0-docker:
-    uses: ./.github/workflows/build-docker.yml
-    with:
-      name: l0
-      options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
+  # test-l0-docker:
+  #   needs: build-l0-docker
+  #   uses: ./.github/workflows/test-l0-docker.yml
+  #   with:
+  #     name: l0
+  #     reset-cache: ${{ !!inputs.reset-cache }}
 
-  test-l0-docker:
-    needs: build-l0-docker
-    uses: ./.github/workflows/test-l0-docker.yml
-    with:
-      name: l0
-      reset-cache: ${{ !!inputs.reset-cache }}
+#   build-l0-docker:
+#     uses: ./.github/workflows/build-docker.yml
+#     with:
+#       name: l0
+#       options: -DENABLE_L0=on -DENABLE_CUDA=off
 
-#
-#  sanity-test:
-#    uses: ./.github/workflows/build-docker-hdk.yml
-
-  pytest:
-    uses: ./.github/workflows/pytest.yml
+#   sanity-test:
+#     uses: ./.github/workflows/build-docker-hdk.yml

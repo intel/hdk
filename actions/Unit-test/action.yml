@@ -1,0 +1,52 @@
+name: Test
+inputs:
+  prefix: 
+    default: ""
+  env-type: 
+    required: true
+    default: None
+#   hw-type:
+#     required: true
+#     default: None
+
+# outputs:
+#   random-number:
+#     value: 13
+
+runs:
+  using: composite
+  steps:
+      
+    # The following tests need more memory than a standard instance has:
+    #   ArrowBasedExecuteTest
+    #   ArrowBasedExecuteTestColumnarOutput
+    #   ArrowBasedExecuteTestSizeAgnostic
+    #   ArrayTest
+    #   CorrelatedSubqueryTest
+    #   NoCatalogSqlTest
+    # that's not possible to manage instance memory with standard actions
+    - name: Set Swap Space
+      # if: inputs.test == 'smoke' || inputs.test == 'asan'
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 12
+
+    - name: Run smoke tests
+      #if: inputs.test == 'smoke'
+      run: |
+        ${{ inputs.prefix }} -c " \
+          sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory' \
+          ./omniscidb/scripts/conda/test.sh \
+        "
+      shell: bash
+
+    - name: Run ASAN test
+      #if: inputs.test == 'asan'
+      run: |
+        ${{ inputs.prefix }} -c " \
+          sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory' \ 
+          # cd build/omniscidb/Tests # build cache \
+          ./build/omniscidb/Tests/ArrowBasedExecuteTest --build-rel-alg-cache=cache.txt \
+          # tar -zcf /tmp/cache.tgz cache.txt \
+        "
+      shell: bash

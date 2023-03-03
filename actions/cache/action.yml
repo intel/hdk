@@ -1,0 +1,92 @@
+name: Cache
+inputs:
+  env-type: 
+    required: true
+    default: None
+  hw-type:
+    required: true
+    default: None
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Maven cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.m2
+        key: maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: maven-
+
+    - if: ${{ inputs.env-type == 'docker' }}
+      uses: actions/cache@v3
+      id: docker-cache
+      with:
+        path: /tmp/docker-registry
+        key: image-cached-1
+        restore-keys: image-cached-
+
+    - if: ${{ inputs.env-type == 'docker' }}
+      run: |
+        DOCKER_OPTS=" -g  /tmp/docker-registry" && sudo systemctl restart docker
+        docker image ls -a 
+      shell: bash
+        
+    - if: ${{ (inputs.env-type == 'docker') && (steps.docker-cacheoutputs.cache-hit != 'true') }}
+      run: |
+        docker pull devjiu/cpu-hdk:latest
+      shell: bash
+
+    - if: ${{ inputs.env-type == 'docker' }}
+      run: |
+        echo ${PWD}
+        echo ${whoami}
+        ls -la 
+        docker run -i --name verify\
+          -u root \
+          -v ${PWD}:/home/hdk \
+          -v /tmp:/tmp \
+          -w /home/hdk \
+          devjiu/cpu-hdk:latest \
+          /usr/bin/bash -c \
+          "chown ghrunner:ghrunner /home/ && su ghrunner -s /usr/bin/bash"
+        docker image ls -a
+        docker container ls -a
+        docker start verify
+        docker cp ~/.m2/. verify:/home/ghrunner/.m2
+        docker exec -u ghrunner -i verify chown -R ghrunner:ghrunner /home/ghrunner
+        echo "PRE=docker exec -u ghrunner -i verify /usr/bin/bash" >> $GITHUB_ENV
+      shell: bash
+
+    - if: ${{ inputs.env-type == 'conda' }}
+      name: Env
+      run: |  
+        echo CONDA_ENV=${{ env.CONDA_ENV }} >>$GITHUB_ENV
+        echo CONDA_PATH=$CONDA >>$GITHUB_ENV
+        echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
+        echo "PRE=/usr/bin/bash" >> $GITHUB_ENV
+      shell: bash
+
+    - if: ${{ inputs.env-type == 'conda' }}
+      name: Restore Conda env cache
+      id: conda-cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ env.CONDA_ENV_PATH }}
+        key: conda-nightlyid-1
+        restore-keys: |
+          conda-nightlyid-
+    
+    - if: ${{ inputs.env-type == 'conda' }}
+      name: Init Conda
+      run: |
+        conda init bash
+      shell: bash
+    
+    - if: ${{ (inputs.env-type  == 'conda') && (steps.conda-cache.outputs.cache-hit != 'true') }}
+      name: Update Conda env
+      run: |
+        conda update conda
+        conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+      shell: bash

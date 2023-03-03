@@ -50,7 +50,7 @@ jobs:
           rm -rf build
           mkdir -p build
           cd build
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DENABLE_CONDA=on -DENABLE_PYTHON=on -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off  -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
 
       - name: Run pytest
         run: |
