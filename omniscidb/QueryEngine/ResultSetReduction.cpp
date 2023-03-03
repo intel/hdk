@@ -912,7 +912,7 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
   for (const auto result_set : result_sets) {
     CHECK_EQ(row_set_mem_owner, result_set->row_set_mem_owner_);
   }
-  if (first_result.query_mem_desc_.getQueryDescriptionType() ==
+  if (first_result.getQueryMemDesc().getQueryDescriptionType() ==
       QueryDescriptionType::GroupByBaselineHash) {
     const auto total_entry_count =
         std::accumulate(result_sets.begin(),
@@ -922,16 +922,16 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
                           return init + rs->query_mem_desc_.getEntryCount();
                         });
     CHECK(total_entry_count);
-    auto query_mem_desc = first_result.query_mem_desc_;
+    auto query_mem_desc = first_result.getQueryMemDesc();
     query_mem_desc.setEntryCount(total_entry_count);
-    rs_.reset(new ResultSet(first_result.targets_,
+    rs_.reset(new ResultSet(first_result.getTargets(),
                             ExecutorDeviceType::CPU,
                             query_mem_desc,
                             row_set_mem_owner,
                             result_rs->data_mgr_,
                             0,
                             0));
-    auto result_storage = rs_->allocateStorage(first_result.target_init_vals_);
+    auto result_storage = rs_->allocateStorage(first_result.getInitVals());
     rs_->initializeStorage();
     switch (query_mem_desc.getEffectiveKeyWidth()) {
       case 4:
