@@ -200,6 +200,8 @@ llvm::Value* HashJoin::codegenHashTableLoad(const size_t table_idx, Executor* ex
   const auto total_table_count =
       executor->plan_state_->join_info_.join_hash_tables_.size();
   CHECK_LT(table_idx, total_table_count);
+
+  // TODO: ambiguous hash_ptr, needs further investigation
   if (total_table_count > 1) {
     auto hash_tables_ptr =
         get_arg_by_name(executor->cgen_state_->row_func_, "join_hash_tables");
