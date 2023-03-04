@@ -113,7 +113,7 @@ ResultSet::ResultSet(const std::vector<TargetInfo>& targets,
     , for_validation_only_(false)
     , cached_row_count_(uninitialized_cached_row_count) {}
 
-ResultSet::ResultSet(const std::shared_ptr<const Analyzer::Estimator> estimator,
+ResultSet::ResultSet(const std::shared_ptr<const hdk::ir::Estimator> estimator,
                      const ExecutorDeviceType device_type,
                      const int device_id,
                      Data_Namespace::DataMgr* data_mgr)
@@ -989,7 +989,7 @@ std::vector<size_t> ResultSet::getSlotIndicesForTargetIndices() const {
 }
 
 size_t ResultSet::getNDVEstimator() const {
-  CHECK(dynamic_cast<const Analyzer::NDVEstimator*>(estimator_.get()));
+  CHECK(dynamic_cast<const hdk::ir::NDVEstimator*>(estimator_.get()));
   CHECK(host_estimator_buffer_);
   auto bits_set = bitmap_set_size(host_estimator_buffer_, estimator_->getBufferSize());
   if (bits_set == 0) {

@@ -166,6 +166,15 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       po::value<size_t>(&config_->exec.group_by.baseline_threshold)
           ->default_value(config_->exec.group_by.baseline_threshold),
       "Prefer baseline hash if number of entries exceeds this threshold.");
+  opt_desc.add_options()("large-ndv-threshold",
+                         po::value<int64_t>(&config_->exec.group_by.large_ndv_threshold)
+                             ->default_value(config_->exec.group_by.large_ndv_threshold),
+                         "Value range threshold at which large NDV estimator is used.");
+  opt_desc.add_options()(
+      "large-ndv-multiplier",
+      po::value<size_t>(&config_->exec.group_by.large_ndv_multiplier)
+          ->default_value(config_->exec.group_by.large_ndv_multiplier),
+      "A multiplier applied to NDV estimator buffer size for large ranges.");
 
   // exec.window
   opt_desc.add_options()("enable-window-functions",

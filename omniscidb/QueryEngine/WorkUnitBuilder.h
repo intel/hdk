@@ -126,7 +126,7 @@ class WorkUnitBuilder {
   JoinQualsPerNestingLevel join_quals_;
   std::list<hdk::ir::ExprPtr> groupby_exprs_;
   std::vector<ir::ExprPtrVector> target_exprs_;
-  std::shared_ptr<Analyzer::Estimator> estimator_;
+  std::shared_ptr<hdk::ir::Estimator> estimator_;
   SortInfo sort_info_ = {{}, SortAlgorithm::Default, 0, 0};
   size_t scan_limit_ = 0;
   QueryPlan query_plan_dag_ = EMPTY_QUERY_PLAN;

@@ -27,8 +27,8 @@
 
 #include <boost/optional/optional_io.hpp>
 #include "BufferProvider/BufferProvider.h"
-#include "CardinalityEstimator.h"
 #include "DataMgr/Chunk/Chunk.h"
+#include "IR/CardinalityEstimator.h"
 #include "ResultSetBufferAccessors.h"
 #include "ResultSetStorage.h"
 #include "Shared/quantile.h"
@@ -183,7 +183,7 @@ class ResultSet {
             const unsigned block_size,
             const unsigned grid_size);
 
-  ResultSet(const std::shared_ptr<const Analyzer::Estimator>,
+  ResultSet(const std::shared_ptr<const hdk::ir::Estimator>,
             const ExecutorDeviceType device_type,
             const int device_id,
             Data_Namespace::DataMgr* data_mgr);
@@ -770,7 +770,7 @@ class ResultSet {
   std::vector<std::vector<std::vector<int64_t>>> frag_offsets_;
   std::vector<std::vector<int64_t>> consistent_frag_sizes_;
 
-  const std::shared_ptr<const Analyzer::Estimator> estimator_;
+  const std::shared_ptr<const hdk::ir::Estimator> estimator_;
   Data_Namespace::AbstractBuffer* device_estimator_buffer_{nullptr};
   mutable int8_t* host_estimator_buffer_{nullptr};
   Data_Namespace::DataMgr* data_mgr_{nullptr};

@@ -48,6 +48,8 @@ struct GroupByConfig {
   size_t gpu_smem_threshold = 4096;
   unsigned hll_precision_bits = 11;
   size_t baseline_threshold = 1'000'000;
+  int64_t large_ndv_threshold = 10'000'000;
+  size_t large_ndv_multiplier = 256;
 };
 
 struct WindowFunctionsConfig {
