@@ -23,12 +23,12 @@
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ExpressionRewrite.h"
-#include "QueryEngine/HyperLogLog.h"
 #include "QueryEngine/JoinHashTable/BaselineHashTable.h"
 #include "QueryEngine/JoinHashTable/Builders/BaselineHashTableBuilder.h"
 #include "QueryEngine/JoinHashTable/PerfectJoinHashTable.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinKeyHandlers.h"
 #include "QueryEngine/JoinHashTable/Runtime/JoinHashTableGpuUtils.h"
+#include "ResultSet/HyperLogLog.h"
 
 // let's only consider CPU hashtable recycler at this moment
 // todo (yoonmin): support GPU hashtable cache without regression

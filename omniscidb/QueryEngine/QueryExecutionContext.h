@@ -18,11 +18,11 @@
 #define QUERYENGINE_QUERYEXECUTIONCONTEXT_H
 
 #include "CompilationOptions.h"
-#include "DataMgr/Allocators/GpuAllocator.h"
 #include "GpuMemUtils.h"
-#include "ResultSet.h"
-
 #include "QueryMemoryInitializer.h"
+
+#include "DataMgr/Allocators/GpuAllocator.h"
+#include "ResultSet/ResultSet.h"
 
 #include <boost/core/noncopyable.hpp>
 #include <vector>

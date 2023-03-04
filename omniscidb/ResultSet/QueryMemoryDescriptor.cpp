@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#include "QueryEngine/Descriptors/QueryMemoryDescriptor.h"
-
-#include <boost/algorithm/string.hpp>
+#include "QueryMemoryDescriptor.h"
+#include "ColRangeInfo.h"
+#include "StreamingTopN.h"
 
 #include "DataMgr/DataMgr.h"
-#include "QueryEngine/ColRangeInfo.h"
-#include "QueryEngine/StreamingTopN.h"
+
+#include <boost/algorithm/string.hpp>
 
 QueryMemoryDescriptor::QueryMemoryDescriptor(
     Data_Namespace::DataMgr* data_mgr,

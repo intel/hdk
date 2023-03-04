@@ -21,7 +21,7 @@
 #include "Logger/Logger.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
-#include "QueryEngine/ResultSet.h"
+#include "ResultSet/ResultSet.h"
 #include "UdfCompiler/UdfCompiler.h"
 
 #include <gtest/gtest.h>

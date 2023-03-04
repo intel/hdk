@@ -15,9 +15,9 @@
  */
 
 #include "OutputBufferInitialization.h"
-#include "Descriptors/QueryMemoryDescriptor.h"
 
 #include "Analyzer/Analyzer.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
 #include "Shared/BufferCompaction.h"
 #include "Shared/TypePunning.h"
 

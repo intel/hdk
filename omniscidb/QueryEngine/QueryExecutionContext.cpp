@@ -17,18 +17,19 @@
 #include "QueryExecutionContext.h"
 #include "AggregateUtils.h"
 #include "CompilationOptions.h"
-#include "Descriptors/QueryMemoryDescriptor.h"
 #include "DeviceKernel.h"
 #include "Execute.h"
 #include "GpuInitGroups.h"
 #include "InPlaceSort.h"
 #include "QueryMemoryInitializer.h"
 #include "RelAlgExecutionUnit.h"
-#include "ResultSet.h"
 #include "ResultSetReduction.h"
-#include "Shared/likely.h"
 #include "SpeculativeTopN.h"
 #include "StreamingTopN.h"
+
+#include "ResultSet/QueryMemoryDescriptor.h"
+#include "ResultSet/ResultSet.h"
+#include "Shared/likely.h"
 
 QueryExecutionContext::QueryExecutionContext(
     const RelAlgExecutionUnit& ra_exe_unit,

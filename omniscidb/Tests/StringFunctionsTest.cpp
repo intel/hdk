@@ -22,7 +22,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
 
-#include <QueryEngine/ResultSet.h>
+#include "ResultSet/ResultSet.h"
 
 #include <gtest/gtest.h>
 #include <boost/format.hpp>

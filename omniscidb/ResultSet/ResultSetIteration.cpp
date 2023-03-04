@@ -23,16 +23,13 @@
  */
 
 #include "CountDistinct.h"
-#include "Execute.h"
-#include "QueryEngine/TargetValue.h"
 #include "ResultSet.h"
-#include "RuntimeFunctions.h"
+#include "RowSetMemoryOwner.h"
+
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/TypePunning.h"
 #include "Shared/likely.h"
 #include "Shared/sqltypes.h"
-
-#include <boost/math/special_functions/fpclassify.hpp>
 
 #include <memory>
 #include <utility>

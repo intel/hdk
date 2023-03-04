@@ -17,11 +17,11 @@
 #pragma once
 
 #include "CompilationOptions.h"
-#include "DataMgr/DataMgr.h"
 #include "Descriptors/RelAlgExecutionDescriptor.h"
-#include "ResultSet.h"
 #include "TargetMetaInfo.h"
-#include "TargetValue.h"
+
+#include "DataMgr/DataMgr.h"
+#include "ResultSet/ResultSet.h"
 
 #include <type_traits>
 

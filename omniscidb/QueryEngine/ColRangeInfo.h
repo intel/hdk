@@ -19,25 +19,14 @@
 
 #include <vector>
 
-#include "QueryEngine/Descriptors/Types.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
+#include "ResultSet/ColRangeInfo.h"
 
 namespace hdk::ir {
 class Expr;
 }
 class Executor;
-
-struct ColRangeInfo {
-  QueryDescriptionType hash_type_;
-  int64_t min;
-  int64_t max;
-  int64_t bucket;
-  bool has_nulls;
-  bool isEmpty() { return min == 0 && max == -1; }
-
-  int64_t getBucketedCardinality() const;
-};
 
 ColRangeInfo get_expr_range_info(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<InputTableInfo>& query_infos,

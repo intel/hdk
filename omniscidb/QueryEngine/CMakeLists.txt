@@ -34,10 +34,8 @@ set(query_engine_source_files
     DateTimePlusRewrite.cpp
     DateTimeTranslator.cpp
     DateTruncate.cpp
-    Descriptors/ColSlotContext.cpp
     Descriptors/QueryCompilationDescriptor.cpp
     Descriptors/QueryFragmentDescriptor.cpp
-    Descriptors/QueryMemoryDescriptor.cpp
     Descriptors/RelAlgExecutionDescriptor.cpp
     DeviceKernel.cpp
     Dispatchers/DefaultExecutionPolicy.cpp
@@ -91,15 +89,12 @@ set(query_engine_source_files
     RelAlgTranslator.cpp
     RelAlgOptimizer.cpp
     RelAlgSchemaProvider.cpp
-    ResultSet.cpp
     ResultSetBuilder.cpp
-    ResultSetIteration.cpp
     ResultSetReduction.cpp
     ResultSetReductionCodegen.cpp
     ResultSetReductionInterpreter.cpp
     ResultSetReductionInterpreterStubs.cpp
     ResultSetReductionJIT.cpp
-    ResultSetStorage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LoopControlFlow/JoinLoop.cpp
     ResultSetSort.cpp
     RuntimeFunctions.cpp
@@ -330,6 +325,7 @@ set(QUERY_ENGINE_LIBS
         StringDictionary
         Utils
         Logger
+        ResultSet
         Shared
         SchemaMgr
         SqliteConnector

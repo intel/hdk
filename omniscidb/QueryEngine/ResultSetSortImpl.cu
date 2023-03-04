@@ -1,9 +1,9 @@
 #include "GpuMemUtils.h"
 #include "GpuRtConstants.h"
-#include "ResultSetBufferAccessors.h"
 #include "ResultSetSortImpl.h"
 #include "SortUtils.cuh"
 
+#include "ResultSet/ResultSetBufferAccessors.h"
 #include "Shared/BufferCompaction.h"
 
 #include <thrust/copy.h>

@@ -22,10 +22,10 @@
 
 #pragma once
 
-#include <IR/Expr.h>
-#include <Shared/TargetInfo.h>
+#include "IR/Expr.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
+#include "Shared/TargetInfo.h"
 
-#include "Descriptors/QueryMemoryDescriptor.h"
 #include "RowFuncBuilder.h"
 
 #include <vector>

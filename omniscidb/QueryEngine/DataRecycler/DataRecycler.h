@@ -22,7 +22,7 @@
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 #include "QueryEngine/JoinHashTable/HashTable.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
-#include "QueryEngine/ResultSet.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/mapd_shared_mutex.h"
 #include "Shared/misc.h"
 

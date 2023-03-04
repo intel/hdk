@@ -21,11 +21,11 @@
  *
  */
 
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/Execute.h"
-#include "QueryEngine/ResultSet.h"
 #include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/RuntimeFunctions.h"
+#include "ResultSet/ResultSet.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 #include "Tests/ResultSetTestUtils.h"
 #include "Tests/TestHelpers.h"
 

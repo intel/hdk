@@ -18,11 +18,11 @@
 
 #include <numeric>
 
-#include "QueryEngine/Descriptors/CountDistinctDescriptor.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/OutputBufferInitialization.h"
-#include "QueryEngine/ResultSetBufferAccessors.h"
 #include "QueryEngine/RuntimeFunctions.h"
+#include "ResultSet/CountDistinctDescriptor.h"
+#include "ResultSet/ResultSetBufferAccessors.h"
 #include "Shared/Intervals.h"
 #include "Shared/TypePunning.h"
 #include "Shared/checked_alloc.h"

@@ -23,14 +23,14 @@
  */
 
 #include "ResultSetReduction.h"
-#include "CountDistinct.h"
 #include "DynamicWatchdog.h"
 #include "Execute.h"
-#include "ResultSet.h"
 #include "ResultSetReductionInterpreter.h"
 #include "ResultSetReductionJIT.h"
 #include "RuntimeFunctions.h"
 
+#include "ResultSet/CountDistinct.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/likely.h"
 #include "Shared/thread_count.h"

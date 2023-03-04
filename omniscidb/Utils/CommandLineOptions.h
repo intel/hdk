@@ -25,7 +25,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/program_options.hpp>
 
-#include "QueryEngine/HyperLogLog.h"
+#include "ResultSet/HyperLogLog.h"
 #include "Shared/AuthMetadata.h"
 #include "Utils/ExtractFromTime.h"
 

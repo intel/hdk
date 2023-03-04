@@ -24,12 +24,12 @@
 
 #include "ResultSetSort.h"
 
-#include "CountDistinct.h"
 #include "Execute.h"
 #include "InPlaceSort.h"
-#include "ResultSet.h"
 #include "ResultSetSortImpl.h"
 
+#include "ResultSet/CountDistinct.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/Intervals.h"
 #include "Shared/likely.h"
 #include "Shared/parallel_sort.h"

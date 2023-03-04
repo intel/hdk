@@ -19,9 +19,9 @@
 
 #include "QueryEngine/CardinalityEstimator.h"
 #include "QueryEngine/ColRangeInfo.h"
-#include "QueryEngine/HyperLogLog.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/UsedColumnsCollector.h"
+#include "ResultSet/HyperLogLog.h"
 
 #include <boost/algorithm/cxx11/any_of.hpp>
 

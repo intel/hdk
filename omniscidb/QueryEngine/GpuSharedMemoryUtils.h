@@ -27,11 +27,12 @@
 #include <llvm/Linker/Linker.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
-#include "Descriptors/QueryMemoryDescriptor.h"
-#include "IRCodegenUtils.h"
 #include "Logger/Logger.h"
-#include "ResultSet.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/TargetInfo.h"
+
+#include "IRCodegenUtils.h"
 
 /**
  * This is a builder class for extra functions that are required to

@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "QueryEngine/Descriptors/QueryMemoryDescriptor.h"
 #include "QueryEngine/JoinFilterPushDown.h"
-#include "QueryEngine/ResultSet.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/TargetInfo.h"
 #include "Shared/toString.h"
 

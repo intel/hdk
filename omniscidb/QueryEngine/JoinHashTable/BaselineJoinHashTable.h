@@ -31,11 +31,11 @@
 #include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/DataRecycler/HashingSchemeRecycler.h"
 #include "QueryEngine/DataRecycler/HashtableRecycler.h"
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/JoinHashTable/BaselineHashTable.h"
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinRuntime.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 
 class Executor;
 

@@ -16,10 +16,9 @@
 
 #include "Logger/Logger.h"
 #include "QueryEngine/ColumnarResults.h"
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/Execute.h"
-#include "QueryEngine/ResultSet.h"
-#include "QueryEngine/TargetValue.h"
+#include "ResultSet/ResultSet.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 #include "Shared/TargetInfo.h"
 #include "Tests/ResultSetTestUtils.h"
 #include "Tests/TestHelpers.h"

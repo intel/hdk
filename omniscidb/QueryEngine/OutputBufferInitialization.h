@@ -57,6 +57,4 @@ const hdk::ir::Expr* agg_arg(const hdk::ir::Expr* expr);
 bool constrained_not_null(const hdk::ir::Expr* expr,
                           const std::list<hdk::ir::ExprPtr>& quals);
 
-void set_notnull(TargetInfo& target, const bool not_null);
-
 #endif  // QUERYENGINE_OUTPUTBUFFERINITIALIZATION_H

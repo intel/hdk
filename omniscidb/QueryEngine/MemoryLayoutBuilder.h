@@ -22,9 +22,9 @@
 #include <vector>
 
 #include "DataMgr/GpuMgr.h"
-#include "QueryEngine/Descriptors/QueryMemoryDescriptor.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
 
 class Executor;
 

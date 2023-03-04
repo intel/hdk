@@ -16,13 +16,15 @@
 
 #ifndef COLUMNAR_RESULTS_H
 #define COLUMNAR_RESULTS_H
-#include "ResultSet.h"
-#include "Shared/SqlTypesLayout.h"
 
-#include "../Shared/checked_alloc.h"
+#include "ResultSet/ResultSet.h"
+#include "Shared/SqlTypesLayout.h"
+#include "Shared/checked_alloc.h"
 
 #include <memory>
 #include <unordered_map>
+
+class Executor;
 
 class ColumnarConversionNotSupported : public std::runtime_error {
  public:

@@ -15,7 +15,7 @@
  */
 
 /**
- * @file    Types.h
+ * @file    ResultType.h
  * @author  Alex Baden <alex.baden@omnisci.com>
  * @brief   Catch-all for publicly accessible types utilized in various Query Engine
  * Descriptors

@@ -412,6 +412,7 @@ add_subdirectory(omniscidb/IR)
 add_subdirectory(omniscidb/SqliteConnector)
 add_subdirectory(omniscidb/QueryBuilder)
 add_subdirectory(omniscidb/QueryEngine)
+add_subdirectory(omniscidb/ResultSet)
 
 # Source
 add_subdirectory(src)

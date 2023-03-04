@@ -15,7 +15,6 @@
  */
 
 #include "CardinalityEstimator.h"
-#include "CountDistinct.h"
 #include "ErrorHandling.h"
 #include "ExpressionRewrite.h"
 #include "RelAlgExecutor.h"

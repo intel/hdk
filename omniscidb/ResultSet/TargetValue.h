@@ -22,8 +22,7 @@
  * Copyright (c) 2014 MapD Technologies, Inc.  All rights reserved.
  */
 
-#ifndef QUERYENGINE_TARGETVALUE_H
-#define QUERYENGINE_TARGETVALUE_H
+#pragma once
 
 #include <boost/optional.hpp>
 #include <boost/variant.hpp>
@@ -100,5 +99,3 @@ using NullableString = boost::variant<std::string, void*>;
 using ScalarTargetValue = boost::variant<int64_t, double, float, NullableString>;
 using ArrayTargetValue = boost::optional<std::vector<ScalarTargetValue>>;
 using TargetValue = boost::variant<ScalarTargetValue, ArrayTargetValue>;
-
-#endif  // QUERYENGINE_TARGETVALUE_H
