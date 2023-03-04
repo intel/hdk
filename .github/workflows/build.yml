@@ -2,9 +2,15 @@ name: Reusable build action
 on:
   workflow_call:
     inputs:
+      name:
+        type: string
+        default: cpu
+      options:
+        type: string
+        default:
       cuda_compiler_version:
         type: string
-        default: None
+
 
     outputs:
       cache-suffix:
@@ -13,11 +19,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    env:
-      cuda_compiler_version: ${{ inputs.cuda_compiler_version }}
-      PREFIX: distr
-      CONDA_ENV: omnisci-dev
 
     outputs:
       cache-suffix: ${{ env.DATE }}
@@ -28,16 +29,18 @@ jobs:
       - name: Free space
         run: |
           sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
-          sudo apt-get purge -y gcc
+          sudo apt-get purge -y gcc llvm-12 llvm-13 llvm-14
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
 
       - name: Set env context
         run: |
-          echo CONDA_PATH=$CONDA >>$GITHUB_ENV
-          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
-          echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/omnisci-dev >>$GITHUB_ENV
           echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-          echo ${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}
-          echo ${{ hashFiles('CMakeLists.txt') }}
 
       - name: Restore Conda env cache
         id: conda-cache
@@ -55,14 +58,14 @@ jobs:
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
 
-      - name: Install cudatoolkit-dev
-        if: env.cuda_compiler_version != 'None'
+      - name: Install cuda
+        if: inputs.name == 'cuda'
         run: |
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update
-          sudo apt-get install cuda-nvcc-${{ env.cuda_compiler_version }}
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge arrow-cpp-proc=4.0.0=cuda
+          sudo apt-get install cuda-nvcc-${{ inputs.cuda_compiler_version }}
+          conda install -n omnisci-dev -c conda-forge arrow-cpp-proc=4.0.0=cuda
 
       - name: Restore Maven cache
         uses: actions/cache@v3
@@ -73,18 +76,12 @@ jobs:
           restore-keys: ${{ env.RUN_STAMP }}-maven-
 
       - name: Build
-        env:
-          CPU_COUNT: 2
-          RUN_TESTS: 1
         run: |
-          sh -vx
-          cd omniscidb
-          mkdir -p ${{ env.PREFIX }}
-          rm -rf build
+          set -vx
           conda info
-          conda list -n ${{ env.CONDA_ENV }}
-          conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/build-install-all.sh
-          cd ..
+          conda list -n omnisci-dev
+          conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/build.sh ${{ inputs.options }}
+          conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/install.sh
           tar -zcf /tmp/build.tgz .
 
       - name: Upload build and src files
@@ -99,7 +96,7 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-logs
           path: |
-            omniscidb/build/*.log
-            omniscidb/build/CMakeCache.txt 
-            omniscidb/build/CMakeFiles/*.log
+            build/*.log
+            build/CMakeCache.txt
+            build/CMakeFiles/*.log
 

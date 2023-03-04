@@ -17,12 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: true
 
       - name: Free space
         run: |
           sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
+          sudo apt-get purge -y gcc llvm-12 llvm-13 llvm-14
 
       - name: Set env context
         run: |
@@ -61,18 +60,13 @@ jobs:
 
       - name: Start the container
         run:  |
-          mkdir -p omniscidb/build
+          mkdir -p build
           docker run -id --name build.${{ inputs.name }} --network host -v $(pwd):/_work build.${{ inputs.name }}:latest
 
-      - name: Configure the project
+      - name: Configure and build the project
         run: |
-          docker exec -u ghrunner build.${{ inputs.name }} python3 /_work/omniscidb/scripts/conda/make-m2-proxy.py
           docker exec -u ghrunner build.${{ inputs.name }} dpkg -l
-          docker exec -u ghrunner build.${{ inputs.name }} cmake -B/_work/omniscidb/build -S/_work/omniscidb -DENABLE_TESTS=on ${{ inputs.options }}
- 
-      - name: Build the project
-        run: |
-          docker exec -u ghrunner build.${{ inputs.name }} cmake --build /_work/omniscidb/build/ --parallel 2
+          docker exec -u ghrunner build.${{ inputs.name }} sh /_work/omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           docker exec -u ghrunner build.${{ inputs.name }} tar -zcf /tmp/build.tgz -C /_work .
           docker cp build.${{ inputs.name }}:/tmp/build.tgz .
      

@@ -11,7 +11,6 @@ export CXX=g++
 . ./get_cxx_include_path.sh
 export CPLUS_INCLUDE_PATH=$(get_cxx_include_path)
 
-mkdir -p ../../build
-cd ../../build
+cd ../../../build
 
 make enabling_tests

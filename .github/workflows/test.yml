@@ -2,9 +2,9 @@ name: Reusable test action
 on:
   workflow_call: 
     inputs:
-      cuda_compiler_version:
+      name:
         type: string
-        default: None
+        default: cpu
       cache-suffix:
         type: string
         required: true
@@ -14,17 +14,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      cuda_compiler_version: ${{ inputs.cuda_compiler_version }}
-      PREFIX: distr
-      CONDA_ENV: omnisci-dev
 
     steps:
       - name: Set env context
         run: |
-          echo CONDA_PATH=$CONDA >>$GITHUB_ENV
-          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
-          echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/omnisci-dev >>$GITHUB_ENV
 
       - uses: actions/download-artifact@v3
         with:
@@ -44,8 +39,7 @@ jobs:
       - name: Check style
         if: inputs.test == 'style'
         run: |
-          cd omniscidb
-          conda run -n ${{ env.CONDA_ENV }} bash -c "find . -name build -prune -or -name ThirdParty -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file"
+          conda run --no-capture-output -n omnisci-dev bash -c "find . -name python -prune -or -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file"
 
       #	The following tests need more memory than a standard instance has:
       #	  ArrowBasedExecuteTest
@@ -65,64 +59,23 @@ jobs:
         if: inputs.test == 'smoke'
         run: |
           sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory'
-          cd omniscidb
-          conda run -n ${{ env.CONDA_ENV }} bash scripts/conda/test.sh
+          conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh
 
       - name: Run ASAN test
         if: inputs.test == 'asan'
-        env:
-          ASAN_OPTIONS: verbosity=1
 
         run: |
           sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory'
-          cd omniscidb
 
-          cd build/Tests # build cache
-          conda run -n ${{ env.CONDA_ENV }} ./ArrowBasedExecuteTest --build-rel-alg-cache=cache.txt
+          cd build/omniscidb/Tests # build cache
+          conda run --no-capture-output -n omnisci-dev ./ArrowBasedExecuteTest --build-rel-alg-cache=cache.txt
 
-          cd ../.. # rebuild with ASAN
-          conda run -n ${{ env.CONDA_ENV }} cmake -B ./build -S . -DCMAKE_BUILD_TYPE=Release -DENABLE_CUDA=off -DENABLE_ASAN=on
-          conda run -n ${{ env.CONDA_ENV }} cmake --build ./build/ --parallel 2 -- -i
-
-          cd ..
-          tar -zcf /tmp/build.tgz .
+          tar -zcf /tmp/cache.tgz cache.txt
 
       - name: Upload build and src files
         if: inputs.test == 'asan'
         uses: actions/upload-artifact@v3
         with:
           name: docker-${{ env.RUN_STAMP }}-asan
-          path: /tmp/build.tgz
-
-      - name: Download perf results
-        # there is no way to access other workflow artifacts without dawidd6/action-download-artifact@v2
-        uses: dawidd6/action-download-artifact@v2
-        if: inputs.test == 'perf' && github.ref_name == 'main'
-        with:
-          workflow: main.yml
-          branch: ${{ github.ref_name }}
-          workflow_conclusion: success
-          name: ${{ env.RUN_STAMP }}-taxi
-          search_artifacts: true
-        continue-on-error: true
-
-      - name: Run tests and process results
-        if: inputs.test == 'perf'
-        run: |
-          cd omniscidb
-          git clone --branch trips-reduced https://github.com/intel-ai/datasets.git data
-          rm -rf data/.git
-
-          conda run -n ${{ env.CONDA_ENV }} pip install matplotlib
-          conda run -n ${{ env.CONDA_ENV }} python .github/workflows/scripts/run-perf.py 3x build/bin/taxi_reduced --data data
-
-      - name: Upload perf results
-        uses: actions/upload-artifact@v3
-        if: inputs.test == 'perf'
-        with:
-          name: ${{ env.RUN_STAMP }}-taxi
-          path: |
-            omniscidb/*.pdf
-            omniscidb/perf.json
-
+          path: /tmp/cache.tgz
 

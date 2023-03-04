@@ -10,6 +10,7 @@
 
 #include <string>
 
-static const std::string MAPD_RELEASE{"@HDK_VERSION_RAW@-@HDK_BUILD_DATE@-@HDK_GIT_HASH@"};
+static const std::string MAPD_RELEASE{
+    "@HDK_VERSION_RAW@-@HDK_BUILD_DATE@-@HDK_GIT_HASH@"};
 
 #endif

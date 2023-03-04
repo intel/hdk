@@ -12,7 +12,7 @@ RUN mkdir /intel-gpu-drivers && cd /intel-gpu-drivers && \
 
 RUN cd /intel-gpu-drivers && dpkg -i *.deb
 
-RUN git clone -b llvm_release_120 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
+RUN git clone -b llvm_release_140 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
     mkdir SPIRV-LLVM-Translator/build && cd SPIRV-LLVM-Translator/build && \
     cmake -Wno-dev .. && make llvm-spirv -j`nproc` && make install
 

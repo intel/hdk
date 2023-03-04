@@ -19,7 +19,8 @@ jobs:
   build-cuda:
     uses: ./.github/workflows/build.yml
     with:
-      cuda_compiler_version: "12-0"
+      name: cuda
+      cuda_compiler_version: 12-0
 
   style:
     needs: build
@@ -42,25 +43,19 @@ jobs:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: asan
 
-  test-asan-docker:
-    needs: asan
-    uses: ./.github/workflows/test-docker.yml
-    with:
-      build-name: asan
-      reset-cache: ${{ !!inputs.reset-cache }}
+#  test-asan-docker:
+#    needs: [build-asan, asan]
+#    uses: ./.github/workflows/test-docker.yml
+#    with:
+#      build-name: asan
+#      reset-cache: ${{ !!inputs.reset-cache }}
 
-  perf:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: perf
 
   build-cuda-docker:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: cuda
-      options:
+      options: -DENABLE_PYTHON=off 
 
   test-cuda-docker:
     needs: build-cuda-docker
@@ -74,7 +69,7 @@ jobs:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: l0
-      options: -DENABLE_L0=on -DENABLE_CUDA=off
+      options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
 
   test-l0-docker:
     needs: build-l0-docker
