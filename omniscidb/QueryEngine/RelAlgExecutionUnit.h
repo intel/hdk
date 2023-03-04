@@ -107,12 +107,9 @@ namespace hdk::ir {
 class Expr;
 class ColumnVar;
 struct OrderEntry;
+class Estimator;
 
 }  // namespace hdk::ir
-
-namespace Analyzer {
-class Estimator;
-}
 
 struct SortInfo {
   std::list<hdk::ir::OrderEntry> order_entries;
@@ -136,7 +133,7 @@ struct RelAlgExecutionUnit {
   const JoinQualsPerNestingLevel join_quals;
   const std::list<hdk::ir::ExprPtr> groupby_exprs;
   std::vector<const hdk::ir::Expr*> target_exprs;
-  const std::shared_ptr<Analyzer::Estimator> estimator;
+  const std::shared_ptr<hdk::ir::Estimator> estimator;
   const SortInfo sort_info;
   size_t scan_limit;
   QueryPlan query_plan_dag{EMPTY_QUERY_PLAN};

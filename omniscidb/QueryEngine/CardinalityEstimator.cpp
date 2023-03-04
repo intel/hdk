@@ -20,23 +20,13 @@
 #include "ExpressionRewrite.h"
 #include "RelAlgExecutor.h"
 
-int64_t g_large_ndv_threshold = 10000000;
-size_t g_large_ndv_multiplier = 256;
-
-namespace Analyzer {
-
-size_t LargeNDVEstimator::getBufferSize() const {
-  return 1024 * 1024 * g_large_ndv_multiplier;
-}
-
-}  // namespace Analyzer
-
 size_t RelAlgExecutor::getNDVEstimation(const WorkUnit& work_unit,
                                         const int64_t range,
                                         const bool is_agg,
                                         const CompilationOptions& co,
                                         const ExecutionOptions& eo) {
-  const auto estimator_exe_unit = create_ndv_execution_unit(work_unit.exe_unit, range);
+  const auto estimator_exe_unit =
+      create_ndv_execution_unit(work_unit.exe_unit, config_, range);
   size_t one{1};
   ColumnCacheMap column_cache;
   try {
@@ -70,24 +60,26 @@ size_t RelAlgExecutor::getNDVEstimation(const WorkUnit& work_unit,
 }
 
 RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_unit,
+                                              const Config& config,
                                               const int64_t range) {
-  const bool use_large_estimator = range > g_large_ndv_threshold;
-  return {ra_exe_unit.input_descs,
-          ra_exe_unit.input_col_descs,
-          ra_exe_unit.simple_quals,
-          ra_exe_unit.quals,
-          ra_exe_unit.join_quals,
-          {},
-          {},
-          use_large_estimator
-              ? hdk::ir::makeExpr<Analyzer::LargeNDVEstimator>(ra_exe_unit.groupby_exprs)
-              : hdk::ir::makeExpr<Analyzer::NDVEstimator>(ra_exe_unit.groupby_exprs),
-          SortInfo{{}, SortAlgorithm::Default, 0, 0},
-          0,
-          ra_exe_unit.query_plan_dag,
-          ra_exe_unit.hash_table_build_plan_dag,
-          ra_exe_unit.table_id_to_node_map,
-          ra_exe_unit.union_all};
+  const bool use_large_estimator = range > config.exec.group_by.large_ndv_threshold;
+  size_t ndv_multiplier =
+      use_large_estimator ? config.exec.group_by.large_ndv_multiplier : 1;
+  return {
+      ra_exe_unit.input_descs,
+      ra_exe_unit.input_col_descs,
+      ra_exe_unit.simple_quals,
+      ra_exe_unit.quals,
+      ra_exe_unit.join_quals,
+      {},
+      {},
+      hdk::ir::makeExpr<hdk::ir::NDVEstimator>(ra_exe_unit.groupby_exprs, ndv_multiplier),
+      SortInfo{{}, SortAlgorithm::Default, 0, 0},
+      0,
+      ra_exe_unit.query_plan_dag,
+      ra_exe_unit.hash_table_build_plan_dag,
+      ra_exe_unit.table_id_to_node_map,
+      ra_exe_unit.union_all};
 }
 
 RelAlgExecutionUnit create_count_all_execution_unit(
@@ -115,7 +107,7 @@ ResultSetPtr reduce_estimator_results(
   if (results_per_device.empty()) {
     return nullptr;
   }
-  CHECK(dynamic_cast<const Analyzer::NDVEstimator*>(ra_exe_unit.estimator.get()));
+  CHECK(dynamic_cast<const hdk::ir::NDVEstimator*>(ra_exe_unit.estimator.get()));
   const auto& result_set = results_per_device.front().first;
   CHECK(result_set);
   auto estimator_buffer = result_set->getHostEstimatorBuffer();

@@ -27,7 +27,8 @@
 
 #include "RelAlgExecutionUnit.h"
 
-#include "../Analyzer/Analyzer.h"
+#include "Analyzer/Analyzer.h"
+#include "IR/CardinalityEstimator.h"
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
 
@@ -42,79 +43,8 @@ class CardinalityEstimationRequired : public std::runtime_error {
   const int64_t range_;
 };
 
-namespace Analyzer {
-
-/*
- * @type  Estimator
- * @brief Infrastructure to define estimators which take an expression tuple, are called
- * for every row and need a buffer to track state.
- */
-class Estimator : public hdk::ir::Expr {
- public:
-  Estimator() : Expr(hdk::ir::Context::defaultCtx().int32(false)){};
-
-  // The tuple argument received by the estimator for every row.
-  virtual const hdk::ir::ExprPtrList& getArgument() const = 0;
-
-  // The size of the working buffer used by the estimator.
-  virtual size_t getBufferSize() const = 0;
-
-  // The name for the estimator runtime function which is called for every row.
-  // The runtime function will receive four arguments:
-  //   uint8_t* the pointer to the beginning of the estimator buffer
-  //   uint32_t the size of the estimator buffer, in bytes
-  //   uint8_t* the concatenated bytes for the argument tuple
-  //   uint32_t the size of the argument tuple, in bytes
-  virtual std::string getRuntimeFunctionName() const = 0;
-
-  hdk::ir::ExprPtr withType(const hdk::ir::Type* new_type) const override {
-    CHECK(false);
-    return nullptr;
-  }
-
-  bool operator==(const Expr& rhs) const override {
-    CHECK(false);
-    return false;
-  }
-
-  std::string toString() const override {
-    CHECK(false);
-    return "";
-  }
-};
-
-/*
- * @type  NDVEstimator
- * @brief Provides an estimate for the number of distinct tuples. Not a real
- *        Analyzer expression, it's only used in RelAlgExecutionUnit synthesized
- *        for the cardinality estimation before running an user-provided query.
- */
-class NDVEstimator : public Analyzer::Estimator {
- public:
-  NDVEstimator(const hdk::ir::ExprPtrList& expr_tuple) : expr_tuple_(expr_tuple) {}
-
-  const hdk::ir::ExprPtrList& getArgument() const override { return expr_tuple_; }
-
-  size_t getBufferSize() const override { return 1024 * 1024; }
-
-  std::string getRuntimeFunctionName() const override {
-    return "linear_probabilistic_count";
-  }
-
- private:
-  const hdk::ir::ExprPtrList expr_tuple_;
-};
-
-class LargeNDVEstimator : public NDVEstimator {
- public:
-  LargeNDVEstimator(const hdk::ir::ExprPtrList& expr_tuple) : NDVEstimator(expr_tuple) {}
-
-  size_t getBufferSize() const final;
-};
-
-}  // namespace Analyzer
-
 RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_unit,
+                                              const Config& config,
                                               const int64_t range);
 
 RelAlgExecutionUnit create_count_all_execution_unit(

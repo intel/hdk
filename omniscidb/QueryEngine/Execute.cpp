@@ -15,6 +15,7 @@
  */
 
 #include "QueryEngine/Execute.h"
+#include "CardinalityEstimator.h"
 
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <boost/filesystem/operations.hpp>

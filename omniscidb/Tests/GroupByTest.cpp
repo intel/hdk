@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-#include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
+
+#include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "DataMgr/DataMgrBufferProvider.h"
+#include "DataMgr/DataMgrDataProvider.h"
+#include "QueryEngine/CardinalityEstimator.h"
+#include "QueryEngine/Execute.h"
+#include "QueryEngine/InputMetadata.h"
 
 #include <boost/filesystem.hpp>
 #include <fstream>
-
-#include "../QueryEngine/Execute.h"
-#include "../QueryEngine/InputMetadata.h"
-
-#include "DataMgr/DataMgrBufferProvider.h"
-#include "DataMgr/DataMgrDataProvider.h"
 
 extern bool g_is_test_env;
 

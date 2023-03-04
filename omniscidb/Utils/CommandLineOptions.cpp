@@ -32,8 +32,6 @@
 
 bool g_use_table_device_offset;  // TODO(adb): where did this go?
 extern bool g_cache_string_hash;
-extern int64_t g_large_ndv_threshold;
-extern size_t g_large_ndv_multiplier;
 extern int64_t g_bitmap_memory_limit;
 extern size_t g_approx_quantile_buffer;
 extern size_t g_approx_quantile_centroids;
@@ -235,12 +233,6 @@ void CommandLineOptions::fillAdvancedOptions() {
                                po::value<std::vector<std::string>>(&udf_compiler_options),
                                "Specify compiler options to tailor udf compilation.");
 
-  developer_desc.add_options()(
-      "large-ndv-threshold",
-      po::value<int64_t>(&g_large_ndv_threshold)->default_value(g_large_ndv_threshold));
-  developer_desc.add_options()(
-      "large-ndv-multiplier",
-      po::value<size_t>(&g_large_ndv_multiplier)->default_value(g_large_ndv_multiplier));
   developer_desc.add_options()("approx_quantile_buffer",
                                po::value<size_t>(&g_approx_quantile_buffer)
                                    ->default_value(g_approx_quantile_buffer));
