@@ -321,6 +321,37 @@ if(ENABLE_L0)
   list(PREPEND llvm_libs PkgConfig::LLVMSPIRVLib)
 endif()
 
+# address and thread sanitizer
+option(ENABLE_STANDALONE_CALCITE "Require standalone Calcite server" OFF)
+option(ENABLE_ASAN "Enable address sanitizer" OFF)
+option(ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
+if(ENABLE_ASAN)
+  set(SAN_FLAGS "-fsanitize=address -O1 -fno-omit-frame-pointer")
+  add_definitions("-DWITH_DECODERS_BOUNDS_CHECKING")
+elseif(ENABLE_TSAN)
+  add_definitions("-DHAVE_TSAN")
+  # Copy the config directory to the build dir for TSAN suppressions
+  file(COPY config DESTINATION ${CMAKE_BINARY_DIR})
+
+  set(SAN_FLAGS "-fsanitize=thread -fPIC -O1 -fno-omit-frame-pointer")
+  # required for older GCC, see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64354
+  add_definitions("-D__SANITIZE_THREAD__")
+elseif(ENABLE_UBSAN)
+  set(SAN_FLAGS "-fsanitize=undefined -fPIC -O1 -fno-omit-frame-pointer")
+endif()
+if(ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SAN_FLAGS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAN_FLAGS}")
+  set(ENABLE_STANDALONE_CALCITE ON)
+endif()
+
+option(ENABLE_DECODERS_BOUNDS_CHECKING "Enable bounds checking for column decoding" OFF)
+
+if(ENABLE_STANDALONE_CALCITE)
+  add_definitions("-DSTANDALONE_CALCITE")
+endif()
+
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 
@@ -392,36 +423,6 @@ add_custom_target(hdk_python_clean
 add_dependencies(clean-all hdk_python_clean)
 add_dependencies(clean-all calcite_java_clean)
 
-# address and thread sanitizer
-option(ENABLE_STANDALONE_CALCITE "Require standalone Calcite server" OFF)
-option(ENABLE_ASAN "Enable address sanitizer" OFF)
-option(ENABLE_TSAN "Enable thread sanitizer" OFF)
-option(ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
-if(ENABLE_ASAN)
-  set(SAN_FLAGS "-fsanitize=address -O1 -fno-omit-frame-pointer")
-  add_definitions("-DWITH_DECODERS_BOUNDS_CHECKING")
-elseif(ENABLE_TSAN)
-  add_definitions("-DHAVE_TSAN")
-  # Copy the config directory to the build dir for TSAN suppressions
-  file(COPY config DESTINATION ${CMAKE_BINARY_DIR})
-
-  set(SAN_FLAGS "-fsanitize=thread -fPIC -O1 -fno-omit-frame-pointer")
-  # required for older GCC, see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64354
-  add_definitions("-D__SANITIZE_THREAD__")
-elseif(ENABLE_UBSAN)
-  set(SAN_FLAGS "-fsanitize=undefined -fPIC -O1 -fno-omit-frame-pointer")
-endif()
-if(ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SAN_FLAGS}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAN_FLAGS}")
-  set(ENABLE_STANDALONE_CALCITE ON)
-endif()
-
-option(ENABLE_DECODERS_BOUNDS_CHECKING "Enable bounds checking for column decoding" OFF)
-
-if(ENABLE_STANDALONE_CALCITE)
-  add_definitions("-DSTANDALONE_CALCITE")
-endif()
 
 option(ENABLE_TESTS "Build unit tests" ON)
 if (ENABLE_TESTS)
