@@ -24,6 +24,7 @@
 #include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ResultSet.h"
+#include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "Tests/ResultSetTestUtils.h"
 #include "Tests/TestHelpers.h"
@@ -247,7 +248,7 @@ void SortBaselineIntegersTestImpl(const bool desc) {
   std::list<hdk::ir::OrderEntry> order_entries;
   order_entries.emplace_back(3, desc, false);
   const size_t top_n = 5;
-  rs->sort(order_entries, top_n, nullptr);
+  sortResultSet(rs.get(), order_entries, top_n, nullptr);
   check_sorted<int64_t>(*rs, desc ? upper_bound : lower_bound, top_n, desc);
 }
 
@@ -289,7 +290,7 @@ TEST(SortBaseline, Floats) {
       std::list<hdk::ir::OrderEntry> order_entries;
       order_entries.emplace_back(tle_no, desc, false);
       const size_t top_n = 5;
-      rs->sort(order_entries, top_n, nullptr);
+      sortResultSet(rs.get(), order_entries, top_n, nullptr);
       check_sorted<float>(*rs, desc ? upper_bound : 1, top_n, desc);
     }
   }
@@ -319,7 +320,7 @@ TEST(SortBaseline, FloatsNotNull) {
       std::list<hdk::ir::OrderEntry> order_entries;
       order_entries.emplace_back(tle_no, desc, false);
       const size_t top_n = 5;
-      rs->sort(order_entries, top_n, nullptr);
+      sortResultSet(rs.get(), order_entries, top_n, nullptr);
       check_sorted<float>(*rs, desc ? upper_bound : 1, top_n, desc);
     }
   }

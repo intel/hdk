@@ -34,6 +34,7 @@
 #include "QueryEngine/RelAlgTranslator.h"
 #include "QueryEngine/RelAlgVisitor.h"
 #include "QueryEngine/ResultSetBuilder.h"
+#include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/WindowContext.h"
 #include "QueryEngine/WorkUnitBuilder.h"
 #include "SessionInfo.h"
@@ -1538,7 +1539,10 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
     if (sort->collationCount() != 0 && !rows_to_sort->definitelyHasNoRows() &&
         !use_speculative_top_n(work_unit.exe_unit, rows_to_sort->getQueryMemDesc())) {
       const size_t top_n = limit == 0 ? 0 : limit + offset;
-      rows_to_sort->sort(work_unit.exe_unit.sort_info.order_entries, top_n, executor_);
+      sortResultSet(rows_to_sort.get(),
+                    work_unit.exe_unit.sort_info.order_entries,
+                    top_n,
+                    executor_);
     }
     if (limit || offset) {
       rows_to_sort->dropFirstN(offset);
@@ -1982,8 +1986,10 @@ ExecutionResult RelAlgExecutor::executeSort(const hdk::ir::Sort* sort,
         !use_speculative_top_n(source_work_unit.exe_unit,
                                rows_to_sort->getQueryMemDesc())) {
       const size_t top_n = limit == 0 ? 0 : limit + offset;
-      rows_to_sort->sort(
-          source_work_unit.exe_unit.sort_info.order_entries, top_n, executor_);
+      sortResultSet(rows_to_sort.get(),
+                    source_work_unit.exe_unit.sort_info.order_entries,
+                    top_n,
+                    executor_);
     }
     if (limit || offset) {
       rows_to_sort->dropFirstN(offset);
