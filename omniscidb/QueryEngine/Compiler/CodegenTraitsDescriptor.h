@@ -32,8 +32,8 @@ const CodegenTraitsDescriptor cpu_cgen_traits_desc = {0,
                                                       std::string_view{""}};
 
 const CodegenTraitsDescriptor cuda_cgen_traits_desc = {
-    4,
-    1,
+    0,
+    0,
     CallingConvDesc::C,
     std::string_view{"nvptx64-nvidia-cuda"}};
 
