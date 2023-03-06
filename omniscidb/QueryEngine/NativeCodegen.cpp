@@ -1675,7 +1675,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
           plan_state_->init_agg_vals_,
           getConfig(),
           this);
-      gpu_smem_code.codegen(co);
+      gpu_smem_code.codegen(co_codegen_traits);
       gpu_smem_code.injectFunctionsInto(query_func);
 
       // helper functions are used for caching purposes later
