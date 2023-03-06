@@ -128,7 +128,7 @@ class CPUBackend : public Backend {
 
   CodegenTraitsDescriptor traitsDesc() const { return traitsDescriptor; };
 
-  void setSharedMemory(bool is_gpu_smem_used){
+  void setSharedMemory(bool is_gpu_smem_used) {
     CHECK(false) << "Unsupported Shared Memory on CPU";
   };
 
