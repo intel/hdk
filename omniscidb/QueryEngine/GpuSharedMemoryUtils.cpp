@@ -155,7 +155,7 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
       result_set::initialize_target_values_for_storage(targets_),
       config_,
       executor_);
-  auto reduction_code = rs_reduction_jit->codegen();
+  auto reduction_code = rs_reduction_jit->codegen(co);
   CHECK(reduction_code.module);
   reduction_code.module->setDataLayout(
       "e-p:64:64:64-i1:8:8-i8:8:8-"

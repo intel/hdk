@@ -1,7 +1,14 @@
+/**
+ * Copyright 2022 OmniSci, Inc.
+ * Copyright (C) 2023 Intel Corporation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #pragma once
 #include <string>
 namespace compiler {
-enum class CallingConvDesc { NONE = 0, C, SPIR_FUNC };
+enum class CallingConvDesc { C, SPIR_FUNC };
 struct CodegenTraitsDescriptor {
   CodegenTraitsDescriptor(unsigned local_addr_space,
                           unsigned global_addr_space,
@@ -15,7 +22,7 @@ struct CodegenTraitsDescriptor {
 
   unsigned local_addr_space_{0};
   unsigned global_addr_space_{0};
-  CallingConvDesc conv_{CallingConvDesc::NONE};
+  CallingConvDesc conv_;
   std::string_view triple_{"DUMMY"};
 };
 

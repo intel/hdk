@@ -116,9 +116,9 @@ cdef class RelAlgExecutor:
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
     cdef CCompilationOptions c_co
     if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
-      c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU)
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU, False)
     else:
-      c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU)
+      c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU, False)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))

@@ -1315,14 +1315,7 @@ std::string ResultSetReductionJIT::cacheKey() const {
          targets_key;
 }
 
-ReductionCode GpuReductionHelperJIT::codegen() const {
-  CompilationOptions co{
-      ExecutorDeviceType::GPU, false, ExecutorOptLevel::ReductionJIT, false};
-#ifdef HAVE_L0
-  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::GPU, true);
-#else
-  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::GPU);
-#endif
+ReductionCode GpuReductionHelperJIT::codegen(const CompilationOptions& co) const {
   const auto hash_type = query_mem_desc_.getQueryDescriptionType();
   auto reduction_code = setup_functions_ir(hash_type);
   CHECK(hash_type == QueryDescriptionType::GroupByPerfectHash);

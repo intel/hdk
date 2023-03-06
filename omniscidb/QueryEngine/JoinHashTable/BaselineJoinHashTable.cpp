@@ -914,7 +914,8 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
   return key_buff_lv;
 }
 
-llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index, const size_t addr_space) {
+llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index,
+                                            const unsigned addr_space) {
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
   auto hash_ptr = HashJoin::codegenHashTableLoad(index, executor_);
   const auto pi8_type = llvm::Type::getInt8PtrTy(LL_CONTEXT, addr_space);
