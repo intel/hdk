@@ -211,7 +211,7 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
   // serialized varlen buffer is only used with SAMPLE on varlen types, which we will
   // disable for current shared memory support.
   const auto null_ptr_ll = llvm::ConstantPointerNull::get(
-      cgen_traits.localPointerType(llvm::Type::getInt8PtrTy(context_)));
+      cgen_traits.localPointerType(llvm::Type::getInt8Ty(context_)));
   const auto thread_idx_i32 = ir_builder.CreateCast(
       llvm::Instruction::CastOps::Trunc, thread_idx, get_int_type(32, context_));
   ir_builder.CreateCall(reduce_one_entry_idx_func,
