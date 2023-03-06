@@ -116,7 +116,7 @@ To verify check `python -c 'import pyhdk'` executed without an error.
 Install extra dependencies into existing environment or into a new one.
 
 ```bash
-conda install -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda arrow-cpp=8.0=*cuda
+conda install -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda arrow-cpp=11.0=*cuda
 ```
 
 ##### Compilation
