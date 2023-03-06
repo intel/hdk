@@ -31,6 +31,7 @@
 #include "QueryEngine/ResultSet.h"
 #include "QueryEngine/ResultSetReduction.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
+#include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "StringDictionary/StringDictionary.h"
 
@@ -998,7 +999,7 @@ std::vector<TargetInfo> generate_random_groups_nullable_target_infos() {
 std::vector<OneRow> get_rows_sorted_by_col(ResultSet& rs, const size_t col_idx) {
   std::list<hdk::ir::OrderEntry> order_entries;
   order_entries.emplace_back(1, false, false);
-  rs.sort(order_entries, 0, nullptr);
+  sortResultSet(&rs, order_entries, 0, nullptr);
   std::vector<OneRow> result;
 
   while (true) {
@@ -1088,7 +1089,7 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
   if (sort) {
     std::list<hdk::ir::OrderEntry> order_entries;
     order_entries.emplace_back(1, false, false);
-    result_rs->sort(order_entries, 0, nullptr);
+    sortResultSet(result_rs, order_entries, 0, nullptr);
   }
   const size_t thread_count = cpu_threads();
   const auto row_count = result_rs->rowCount();

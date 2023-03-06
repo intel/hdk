@@ -156,7 +156,6 @@ using AppendedStorage = std::vector<std::unique_ptr<ResultSetStorage>>;
 using PermutationIdx = uint32_t;
 using Permutation = std::vector<PermutationIdx>;
 using PermutationView = VectorView<PermutationIdx>;
-using Comparator = std::function<bool(const PermutationIdx, const PermutationIdx)>;
 
 class ResultSet {
  public:
@@ -266,10 +265,6 @@ class ResultSet {
       const std::vector<bool>& targets_to_skip = {}) const;
 
   bool isRowAtEmpty(const size_t index) const;
-
-  void sort(const std::list<hdk::ir::OrderEntry>& order_entries,
-            size_t top_n,
-            const Executor* executor);
 
   void keepFirstN(const size_t n);
 
@@ -436,6 +431,7 @@ class ResultSet {
 
   const Permutation& getPermutationBuffer() const;
   const bool isPermutationBufferEmpty() const { return permutation_.empty(); };
+  void setPermutationBuffer(Permutation perm) { permutation_ = std::move(perm); }
 
   void serialize(TSerializedRows& serialized_rows) const;
 
@@ -491,6 +487,7 @@ class ResultSet {
     return std::count_if(lazy_fetch_info_.begin(), lazy_fetch_info_.end(), is_lazy);
   }
 
+  bool getSeparateVarlenStorageValid() const { return separate_varlen_storage_valid_; }
   void setSeparateVarlenStorageValid(const bool val) {
     separate_varlen_storage_valid_ = val;
   }
@@ -512,6 +509,11 @@ class ResultSet {
   void translateDictEncodedColumns(std::vector<TargetInfo> const&,
                                    size_t const start_idx);
 
+  unsigned getBlockSize() const { return block_size_; }
+  unsigned getGridSize() const { return grid_size_; }
+
+  BufferProvider* getBufferProvider() const;
+
   struct RowIterationState {
     size_t prev_target_idx_{0};
     size_t cur_target_idx_;
@@ -525,137 +527,21 @@ class ResultSet {
   class CellCallback;
   void eachCellInColumn(RowIterationState&, CellCallback const&);
 
- private:
-  void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
-
-  std::vector<TargetValue> getNextRowImpl(const bool translate_strings,
-                                          const bool decimal_to_double) const;
-
-  std::vector<TargetValue> getNextRowUnlocked(const bool translate_strings,
-                                              const bool decimal_to_double) const;
-
-  std::vector<TargetValue> getRowAt(const size_t index,
-                                    const bool translate_strings,
-                                    const bool decimal_to_double,
-                                    const bool fixup_count_distinct_pointers,
-                                    const std::vector<bool>& targets_to_skip = {}) const;
-
-  // NOTE: just for direct columnarization use at the moment
-  template <typename ENTRY_TYPE>
-  ENTRY_TYPE getColumnarPerfectHashEntryAt(const size_t row_idx,
-                                           const size_t target_idx,
-                                           const size_t slot_idx) const;
-
-  template <typename ENTRY_TYPE>
-  ENTRY_TYPE getRowWisePerfectHashEntryAt(const size_t row_idx,
-                                          const size_t target_idx,
-                                          const size_t slot_idx) const;
-
-  template <typename ENTRY_TYPE>
-  ENTRY_TYPE getRowWiseBaselineEntryAt(const size_t row_idx,
-                                       const size_t target_idx,
-                                       const size_t slot_idx) const;
-
-  template <typename ENTRY_TYPE>
-  ENTRY_TYPE getColumnarBaselineEntryAt(const size_t row_idx,
-                                        const size_t target_idx,
-                                        const size_t slot_idx) const;
-
-  size_t binSearchRowCount() const;
-
-  size_t parallelRowCount() const;
-
-  size_t advanceCursorToNextEntry() const;
-
-  void radixSortOnGpu(const Config& config,
-                      const std::list<hdk::ir::OrderEntry>& order_entries) const;
-
-  void radixSortOnCpu(const std::list<hdk::ir::OrderEntry>& order_entries) const;
-
   static bool isNull(const hdk::ir::Type* type,
                      const InternalTargetValue& val,
                      const bool float_argument_input);
-
-  TargetValue getTargetValueFromBufferRowwise(
-      int8_t* rowwise_target_ptr,
-      int8_t* keys_ptr,
-      const size_t entry_buff_idx,
-      const TargetInfo& target_info,
-      const size_t target_logical_idx,
-      const size_t slot_idx,
-      const bool translate_strings,
-      const bool decimal_to_double,
-      const bool fixup_count_distinct_pointers) const;
-
-  TargetValue getTargetValueFromBufferColwise(const int8_t* col_ptr,
-                                              const int8_t* keys_ptr,
-                                              const QueryMemoryDescriptor& query_mem_desc,
-                                              const size_t local_entry_idx,
-                                              const size_t global_entry_idx,
-                                              const TargetInfo& target_info,
-                                              const size_t target_logical_idx,
-                                              const size_t slot_idx,
-                                              const bool translate_strings,
-                                              const bool decimal_to_double) const;
-
-  TargetValue makeTargetValue(const int8_t* ptr,
-                              const int8_t compact_sz,
-                              const TargetInfo& target_info,
-                              const size_t target_logical_idx,
-                              const bool translate_strings,
-                              const bool decimal_to_double,
-                              const size_t entry_buff_idx) const;
-
-  TargetValue makeVarlenTargetValue(const int8_t* ptr1,
-                                    const int8_t compact_sz1,
-                                    const int8_t* ptr2,
-                                    const int8_t compact_sz2,
-                                    const TargetInfo& target_info,
-                                    const size_t target_logical_idx,
-                                    const bool translate_strings,
-                                    const size_t entry_buff_idx) const;
-
-  struct VarlenTargetPtrPair {
-    int8_t* ptr1;
-    int8_t compact_sz1;
-    int8_t* ptr2;
-    int8_t compact_sz2;
-
-    VarlenTargetPtrPair()
-        : ptr1(nullptr), compact_sz1(0), ptr2(nullptr), compact_sz2(0) {}
-  };
-
-  struct StorageLookupResult {
-    const ResultSetStorage* storage_ptr;
-    const size_t fixedup_entry_idx;
-    const size_t storage_idx;
-  };
-
-  InternalTargetValue getVarlenOrderEntry(const int64_t str_ptr,
-                                          const size_t str_len) const;
-
-  int64_t lazyReadInt(const int64_t ival,
-                      const size_t target_logical_idx,
-                      const StorageLookupResult& storage_lookup_result) const;
-
-  /// Returns (storageIdx, entryIdx) pair, where:
-  /// storageIdx : 0 is storage_, storageIdx-1 is index into appended_storage_.
-  /// entryIdx   : local index into the storage object.
-  std::pair<size_t, size_t> getStorageIndex(const size_t entry_idx) const;
-
-  const std::vector<const int8_t*>& getColumnFrag(const size_t storge_idx,
-                                                  const size_t col_logical_idx,
-                                                  int64_t& global_idx) const;
-
-  const VarlenOutputInfo* getVarlenOutputInfo(const size_t entry_idx) const;
-
-  StorageLookupResult findStorage(const size_t entry_idx) const;
 
   struct TargetOffsets {
     const int8_t* ptr1;
     const size_t compact_sz1;
     const int8_t* ptr2;
     const size_t compact_sz2;
+  };
+
+  struct StorageLookupResult {
+    const ResultSetStorage* storage_ptr;
+    const size_t fixedup_entry_idx;
+    const size_t storage_idx;
   };
 
   struct RowWiseTargetAccessor {
@@ -709,98 +595,131 @@ class ResultSet {
     const ResultSet* result_set_;
   };
 
-  using ApproxQuantileBuffers = std::vector<std::vector<double>>;
-
-  template <typename BUFFER_ITERATOR_TYPE>
-  struct ResultSetComparator {
-    using BufferIteratorType = BUFFER_ITERATOR_TYPE;
-
-    ResultSetComparator(const std::list<hdk::ir::OrderEntry>& order_entries,
-                        const ResultSet* result_set,
-                        const PermutationView permutation,
-                        const Executor* executor,
-                        const bool single_threaded)
-        : order_entries_(order_entries)
-        , result_set_(result_set)
-        , permutation_(permutation)
-        , buffer_itr_(result_set)
-        , executor_(executor)
-        , single_threaded_(single_threaded)
-        , approx_quantile_materialized_buffers_(materializeApproxQuantileColumns()) {
-      materializeCountDistinctColumns();
-    }
-
-    void materializeCountDistinctColumns();
-    ApproxQuantileBuffers materializeApproxQuantileColumns() const;
-
-    std::vector<int64_t> materializeCountDistinctColumn(
-        const hdk::ir::OrderEntry& order_entry) const;
-    ApproxQuantileBuffers::value_type materializeApproxQuantileColumn(
-        const hdk::ir::OrderEntry& order_entry) const;
-
-    bool operator()(const PermutationIdx lhs, const PermutationIdx rhs) const;
-
-    const std::list<hdk::ir::OrderEntry>& order_entries_;
-    const ResultSet* result_set_;
-    const PermutationView permutation_;
-    const BufferIteratorType buffer_itr_;
-    const Executor* executor_;
-    const bool single_threaded_;
-    std::vector<std::vector<int64_t>> count_distinct_materialized_buffers_;
-    const ApproxQuantileBuffers approx_quantile_materialized_buffers_;
-  };
-
-  Comparator createComparator(const std::list<hdk::ir::OrderEntry>& order_entries,
-                              const PermutationView permutation,
-                              const Executor* executor,
-                              const bool single_threaded) {
-    auto timer = DEBUG_TIMER(__func__);
-    if (query_mem_desc_.didOutputColumnar()) {
-      return [rsc = ResultSetComparator<ColumnWiseTargetAccessor>(
-                  order_entries, this, permutation, executor, single_threaded)](
-                 const PermutationIdx lhs, const PermutationIdx rhs) {
-        return rsc(lhs, rhs);
-      };
-    } else {
-      return [rsc = ResultSetComparator<RowWiseTargetAccessor>(
-                  order_entries, this, permutation, executor, single_threaded)](
-                 const PermutationIdx lhs, const PermutationIdx rhs) {
-        return rsc(lhs, rhs);
-      };
-    }
-  }
-
-  static PermutationView topPermutation(PermutationView,
-                                        const size_t n,
-                                        const Comparator&,
-                                        const bool single_threaded);
-
   PermutationView initPermutationBuffer(PermutationView permutation,
                                         PermutationIdx const begin,
                                         PermutationIdx const end) const;
 
-  void parallelTop(const std::list<hdk::ir::OrderEntry>& order_entries,
-                   const size_t top_n,
-                   const Executor* executor);
-
-  void baselineSort(const std::list<hdk::ir::OrderEntry>& order_entries,
-                    const size_t top_n,
-                    const Executor* executor);
-
-  void doBaselineSort(const ExecutorDeviceType device_type,
-                      const std::list<hdk::ir::OrderEntry>& order_entries,
-                      const size_t top_n,
-                      const Executor* executor);
-
-  bool canUseFastBaselineSort(const std::list<hdk::ir::OrderEntry>& order_entries,
-                              const size_t top_n);
-
-  size_t rowCountImpl(const bool force_parallel) const;
+  StorageLookupResult findStorage(const size_t entry_idx) const;
 
   Data_Namespace::DataMgr* getDataManager() const;
-  BufferProvider* getBufferProvider() const;
 
   int getGpuCount() const;
+
+ private:
+  void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
+
+  std::vector<TargetValue> getNextRowImpl(const bool translate_strings,
+                                          const bool decimal_to_double) const;
+
+  std::vector<TargetValue> getNextRowUnlocked(const bool translate_strings,
+                                              const bool decimal_to_double) const;
+
+  std::vector<TargetValue> getRowAt(const size_t index,
+                                    const bool translate_strings,
+                                    const bool decimal_to_double,
+                                    const bool fixup_count_distinct_pointers,
+                                    const std::vector<bool>& targets_to_skip = {}) const;
+
+  // NOTE: just for direct columnarization use at the moment
+  template <typename ENTRY_TYPE>
+  ENTRY_TYPE getColumnarPerfectHashEntryAt(const size_t row_idx,
+                                           const size_t target_idx,
+                                           const size_t slot_idx) const;
+
+  template <typename ENTRY_TYPE>
+  ENTRY_TYPE getRowWisePerfectHashEntryAt(const size_t row_idx,
+                                          const size_t target_idx,
+                                          const size_t slot_idx) const;
+
+  template <typename ENTRY_TYPE>
+  ENTRY_TYPE getRowWiseBaselineEntryAt(const size_t row_idx,
+                                       const size_t target_idx,
+                                       const size_t slot_idx) const;
+
+  template <typename ENTRY_TYPE>
+  ENTRY_TYPE getColumnarBaselineEntryAt(const size_t row_idx,
+                                        const size_t target_idx,
+                                        const size_t slot_idx) const;
+
+  size_t binSearchRowCount() const;
+
+  size_t parallelRowCount() const;
+
+  size_t advanceCursorToNextEntry() const;
+
+  void radixSortOnGpu(const Config& config,
+                      const std::list<hdk::ir::OrderEntry>& order_entries) const;
+
+  void radixSortOnCpu(const std::list<hdk::ir::OrderEntry>& order_entries) const;
+
+  TargetValue getTargetValueFromBufferRowwise(
+      int8_t* rowwise_target_ptr,
+      int8_t* keys_ptr,
+      const size_t entry_buff_idx,
+      const TargetInfo& target_info,
+      const size_t target_logical_idx,
+      const size_t slot_idx,
+      const bool translate_strings,
+      const bool decimal_to_double,
+      const bool fixup_count_distinct_pointers) const;
+
+  TargetValue getTargetValueFromBufferColwise(const int8_t* col_ptr,
+                                              const int8_t* keys_ptr,
+                                              const QueryMemoryDescriptor& query_mem_desc,
+                                              const size_t local_entry_idx,
+                                              const size_t global_entry_idx,
+                                              const TargetInfo& target_info,
+                                              const size_t target_logical_idx,
+                                              const size_t slot_idx,
+                                              const bool translate_strings,
+                                              const bool decimal_to_double) const;
+
+  TargetValue makeTargetValue(const int8_t* ptr,
+                              const int8_t compact_sz,
+                              const TargetInfo& target_info,
+                              const size_t target_logical_idx,
+                              const bool translate_strings,
+                              const bool decimal_to_double,
+                              const size_t entry_buff_idx) const;
+
+  TargetValue makeVarlenTargetValue(const int8_t* ptr1,
+                                    const int8_t compact_sz1,
+                                    const int8_t* ptr2,
+                                    const int8_t compact_sz2,
+                                    const TargetInfo& target_info,
+                                    const size_t target_logical_idx,
+                                    const bool translate_strings,
+                                    const size_t entry_buff_idx) const;
+
+  struct VarlenTargetPtrPair {
+    int8_t* ptr1;
+    int8_t compact_sz1;
+    int8_t* ptr2;
+    int8_t compact_sz2;
+
+    VarlenTargetPtrPair()
+        : ptr1(nullptr), compact_sz1(0), ptr2(nullptr), compact_sz2(0) {}
+  };
+
+  InternalTargetValue getVarlenOrderEntry(const int64_t str_ptr,
+                                          const size_t str_len) const;
+
+  int64_t lazyReadInt(const int64_t ival,
+                      const size_t target_logical_idx,
+                      const StorageLookupResult& storage_lookup_result) const;
+
+  /// Returns (storageIdx, entryIdx) pair, where:
+  /// storageIdx : 0 is storage_, storageIdx-1 is index into appended_storage_.
+  /// entryIdx   : local index into the storage object.
+  std::pair<size_t, size_t> getStorageIndex(const size_t entry_idx) const;
+
+  const std::vector<const int8_t*>& getColumnFrag(const size_t storge_idx,
+                                                  const size_t col_logical_idx,
+                                                  int64_t& global_idx) const;
+
+  const VarlenOutputInfo* getVarlenOutputInfo(const size_t entry_idx) const;
+
+  size_t rowCountImpl(const bool force_parallel) const;
 
   void serializeProjection(TSerializedRows& serialized_rows) const;
   void serializeVarlenAggColumn(int8_t* buf,
