@@ -17,7 +17,6 @@
 #pragma once
 #include "CgenState.h"
 #include "CodeCache.h"
-#include "Compiler/Backend.h"
 #include "ResultSetReductionOps.h"
 
 #include "Descriptors/QueryMemoryDescriptor.h"
@@ -165,7 +164,7 @@ class GpuReductionHelperJIT : public ResultSetReductionJIT {
    * reduceOneEntryNoCollissionsIdx(reduce one slot for perfect hash), and reduceLoop (the
    * outer loop).
    */
-  ReductionCode codegen() const override;
+  ReductionCode codegen(const CompilationOptions& co) const;
 
  private:
   const QueryMemoryDescriptor& query_mem_desc_;

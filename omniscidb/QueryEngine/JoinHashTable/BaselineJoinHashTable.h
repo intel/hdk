@@ -179,7 +179,7 @@ class BaselineJoinHashTable : public HashJoin {
       const size_t emitted_keys_count,
       const int device_id);
 
-  llvm::Value* hashPtr(const size_t index, const size_t addr_space);
+  llvm::Value* hashPtr(const size_t index, const unsigned addr_space);
 
   std::shared_ptr<HashTable> initHashTableOnCpuFromCache(
       QueryPlanHash key,

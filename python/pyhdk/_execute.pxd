@@ -14,6 +14,17 @@ from pyarrow.lib cimport CTable as CArrowTable
 from pyhdk._common cimport CType, CConfig
 from pyhdk._storage cimport CDataMgr, CBufferProvider
 
+cdef extern from "omniscidb/QueryEngine/Compiler/CodegenTraitsDescriptor.h" namespace "compiler":
+  enum CCallingConvDesc "CallingConvDesc":
+    C "CallingConvDesc::C", 
+    SPIR "CallingConvDesc::SPIR_FUNC",
+
+  cdef cppclass CCodegenTraitsDescriptor "CodegenTraitsDescriptor":
+    unsigned local_addr_space_
+    unsigned global_addr_space_
+    CCallingConvDesc conv_
+    string triple_
+
 cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
   enum CExecutorDeviceType "ExecutorDeviceType":
     CPU "ExecutorDeviceType::CPU",
@@ -41,12 +52,16 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     CExecutorExplainType explain_type
     bool register_intel_jit_listener
     bool use_groupby_buffer_desc
+    CCodegenTraitsDescriptor codegen_traits_desc
 
     @staticmethod
     CCompilationOptions makeCpuOnly(const CCompilationOptions&)
 
     @staticmethod
-    CCompilationOptions defaults(const CExecutorDeviceType)
+    CCodegenTraitsDescriptor getCgenTraitsDesc(const CExecutorDeviceType, const bool)
+
+    @staticmethod
+    CCompilationOptions defaults(const CExecutorDeviceType, const bool)
 
   enum CExecutorType "ExecutorType":
     Native "ExecutorType::Native",

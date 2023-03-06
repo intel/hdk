@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "Compiler/Backend.h"
+#include "QueryEngine/CompilationOptions.h"
 #include "ResultSetReductionJIT.h"
 #include "ResultSetReductionOps.h"
 
