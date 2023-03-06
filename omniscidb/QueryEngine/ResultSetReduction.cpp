@@ -889,14 +889,6 @@ void ResultSetReduction::moveOneEntryToBuffer(const QueryMemoryDescriptor& query
              query_mem_desc);
 }
 
-void ResultSet::initializeStorage() const {
-  if (query_mem_desc_.didOutputColumnar()) {
-    storage_->initializeColWise();
-  } else {
-    storage_->initializeRowWise();
-  }
-}
-
 // Driver for reductions. Needed because the result of a reduction on the baseline
 // layout, which can have collisions, cannot be done in place and something needs
 // to take the ownership of the new result set with the bigger underlying buffer.

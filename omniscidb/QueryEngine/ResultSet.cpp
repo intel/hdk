@@ -959,6 +959,35 @@ std::vector<size_t> ResultSet::getSlotIndicesForTargetIndices() const {
   return slot_indices;
 }
 
+size_t ResultSet::getNDVEstimator() const {
+  CHECK(dynamic_cast<const Analyzer::NDVEstimator*>(estimator_.get()));
+  CHECK(host_estimator_buffer_);
+  auto bits_set = bitmap_set_size(host_estimator_buffer_, estimator_->getBufferSize());
+  if (bits_set == 0) {
+    // empty result set, return 1 for a groups buffer size of 1
+    return 1;
+  }
+  const auto total_bits = estimator_->getBufferSize() * 8;
+  CHECK_LE(bits_set, total_bits);
+  const auto unset_bits = total_bits - bits_set;
+  const auto ratio = static_cast<double>(unset_bits) / total_bits;
+  if (ratio == 0.) {
+    LOG(WARNING)
+        << "Failed to get a high quality cardinality estimation, falling back to "
+           "approximate group by buffer size guess.";
+    return 0;
+  }
+  return -static_cast<double>(total_bits) * log(ratio);
+}
+
+void ResultSet::initializeStorage() const {
+  if (query_mem_desc_.didOutputColumnar()) {
+    storage_->initializeColWise();
+  } else {
+    storage_->initializeRowWise();
+  }
+}
+
 // namespace result_set
 
 bool result_set::can_use_parallel_algorithms(const ResultSet& rows) {

@@ -435,9 +435,6 @@ class ResultSet {
 
   void serialize(TSerializedRows& serialized_rows) const;
 
-  static std::unique_ptr<ResultSet> unserialize(const TSerializedRows& serialized_rows,
-                                                const Executor*);
-
   size_t getLimit() const;
 
   void copyColumnIntoBuffer(const size_t column_idx,
