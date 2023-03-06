@@ -371,7 +371,7 @@ void L0Manager::synchronizeDevices() const {
 }
 
 size_t L0Manager::getMaxAllocationSize(const int device_num) const {
-  CHECK_EQ(device_num, 0);
+  CHECK_LE(device_num, drivers_[0]->devices().size());
   ze_device_properties_t device_properties;
   L0_SAFE_CALL(zeDeviceGetProperties(drivers_[0]->devices()[device_num]->device(),
                                      &device_properties));
