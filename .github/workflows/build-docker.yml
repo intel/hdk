@@ -82,7 +82,7 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-logs
           path: |
-            omniscidb/build/*.log
-            omniscidb/build/CMakeCache.txt 
-            omniscidb/build/CMakeFiles/*.log
+            build/*.log
+            build/CMakeCache.txt 
+            build/CMakeFiles/*.log
 
