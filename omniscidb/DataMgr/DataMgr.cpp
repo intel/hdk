@@ -179,7 +179,8 @@ void DataMgr::populateDeviceMgrs(const Config& config) {
     LOG(ERROR) << "Failed to initialize CUDA GPU: " << e.what();
     gpu_mgrs.erase(GpuMgrPlatform::CUDA);
   }
-#elif HAVE_L0
+#endif
+#ifdef HAVE_L0
   try {
     gpu_mgrs[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
   } catch (const std::exception& e) {
