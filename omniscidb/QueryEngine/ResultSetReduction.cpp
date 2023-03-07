@@ -897,12 +897,12 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
                                     Executor* executor) {
   CHECK(!result_sets.empty());
   auto result_rs = result_sets.front();
-  CHECK(result_rs->storage_);
-  auto& first_result = *result_rs->storage_;
+  CHECK(result_rs->getStorage());
+  auto& first_result = *result_rs->getStorage();
   auto result = &first_result;
-  const auto row_set_mem_owner = result_rs->row_set_mem_owner_;
+  const auto row_set_mem_owner = result_rs->getRowSetMemOwner();
   for (const auto result_set : result_sets) {
-    CHECK_EQ(row_set_mem_owner, result_set->row_set_mem_owner_);
+    CHECK_EQ(row_set_mem_owner, result_set->getRowSetMemOwner());
   }
   if (first_result.getQueryMemDesc().getQueryDescriptionType() ==
       QueryDescriptionType::GroupByBaselineHash) {
@@ -911,7 +911,7 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
                         result_sets.end(),
                         size_t(0),
                         [](const size_t init, const ResultSet* rs) {
-                          return init + rs->query_mem_desc_.getEntryCount();
+                          return init + rs->getQueryMemDesc().getEntryCount();
                         });
     CHECK(total_entry_count);
     auto query_mem_desc = first_result.getQueryMemDesc();
@@ -920,7 +920,7 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
                             ExecutorDeviceType::CPU,
                             query_mem_desc,
                             row_set_mem_owner,
-                            result_rs->data_mgr_,
+                            result_rs->getDataManager(),
                             0,
                             0));
     auto result_storage = rs_->allocateStorage(first_result.getInitVals());
@@ -943,19 +943,18 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
       default:
         CHECK(false);
     }
-    result = rs_->storage_.get();
+    result = rs_->getStorage();
     result_rs = rs_.get();
   }
 
-  auto& serialized_varlen_buffer = result_sets.front()->serialized_varlen_buffer_;
+  auto serialized_varlen_buffer = result_sets.front()->getSerializedVarlenBuffer();
   if (!serialized_varlen_buffer.empty()) {
     result->rewriteAggregateBufferOffsets(serialized_varlen_buffer.front());
     for (auto result_it = result_sets.begin() + 1; result_it != result_sets.end();
          ++result_it) {
-      auto& result_serialized_varlen_buffer = (*result_it)->serialized_varlen_buffer_;
+      auto& result_serialized_varlen_buffer = (*result_it)->getSerializedVarlenBuffer();
       CHECK_EQ(result_serialized_varlen_buffer.size(), size_t(1));
-      serialized_varlen_buffer.emplace_back(
-          std::move(result_serialized_varlen_buffer.front()));
+      serialized_varlen_buffer.emplace_back(result_serialized_varlen_buffer.front());
     }
   }
 
@@ -970,14 +969,14 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
        ++result_it) {
     if (!serialized_varlen_buffer.empty()) {
       ResultSetReduction::reduce(*result,
-                                 *((*result_it)->storage_),
+                                 *((*result_it)->getStorage()),
                                  serialized_varlen_buffer[ctr++],
                                  reduction_code,
                                  config,
                                  executor);
     } else {
       ResultSetReduction::reduce(
-          *result, *((*result_it)->storage_), {}, reduction_code, config, executor);
+          *result, *((*result_it)->getStorage()), {}, reduction_code, config, executor);
     }
   }
   return result_rs;
@@ -988,9 +987,9 @@ std::shared_ptr<ResultSet> ResultSetManager::getOwnResultSet() {
 }
 
 void ResultSetManager::rewriteVarlenAggregates(ResultSet* result_rs) {
-  auto& result_storage = result_rs->storage_;
+  auto result_storage = result_rs->getStorage();
   result_storage->rewriteAggregateBufferOffsets(
-      result_rs->serialized_varlen_buffer_.front());
+      result_rs->getSerializedVarlenBuffer().front());
 }
 
 #define AGGREGATE_ONE_VALUE(                                                      \

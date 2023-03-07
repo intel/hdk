@@ -600,6 +600,13 @@ class ResultSet {
 
   Data_Namespace::DataMgr* getDataManager() const { return data_mgr_; }
 
+  // only used by serialization
+  using SerializedVarlenBufferStorage = std::vector<std::string>;
+
+  const std::vector<SerializedVarlenBufferStorage>& getSerializedVarlenBuffer() const {
+    return serialized_varlen_buffer_;
+  }
+
  private:
   void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
 
@@ -766,9 +773,6 @@ class ResultSet {
   mutable int8_t* host_estimator_buffer_{nullptr};
   Data_Namespace::DataMgr* data_mgr_{nullptr};
 
-  // only used by serialization
-  using SerializedVarlenBufferStorage = std::vector<std::string>;
-
   std::vector<SerializedVarlenBufferStorage> serialized_varlen_buffer_;
   bool separate_varlen_storage_valid_;
   std::string explanation_;
@@ -777,7 +781,6 @@ class ResultSet {
   mutable std::atomic<int64_t> cached_row_count_;
   mutable std::mutex row_iteration_mutex_;
 
-  friend class ResultSetManager;
   friend class ResultSetRowIterator;
   friend class ColumnarResults;
 };
@@ -806,18 +809,6 @@ inline ResultSetRowIterator& ResultSetRowIterator::operator++(void) {
   }
   return *this;
 }
-
-class ResultSetManager {
- public:
-  ResultSet* reduce(std::vector<ResultSet*>&, const Config& config, Executor* executor);
-
-  std::shared_ptr<ResultSet> getOwnResultSet();
-
-  void rewriteVarlenAggregates(ResultSet*);
-
- private:
-  std::shared_ptr<ResultSet> rs_;
-};
 
 class RowSortException : public std::runtime_error {
  public:
