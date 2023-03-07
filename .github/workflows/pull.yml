@@ -1,0 +1,82 @@
+name: Build
+on:
+  workflow_dispatch:
+    inputs:
+      reset-cache:
+        type: boolean
+        default: true
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Free space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
+          sudo apt-get purge -y gcc llvm-12 llvm-13 llvm-14
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
+      - name: Set env context
+        run: |
+          echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/omnisci-dev >>$GITHUB_ENV
+          echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Restore Conda env cache
+        id: conda-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          restore-keys: |
+            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
+
+      - name: Update Conda env
+        if: steps.conda-cache.cache-hit != 'true'
+        run: |
+          conda update conda
+          conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+          conda install -n omnisci-dev -c conda-forge python=3.8
+
+      - name: Restore Maven cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2
+          key: ${{ env.RUN_STAMP }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ env.RUN_STAMP }}-maven
+
+      - name: Build
+        run: |
+          set -vx
+          conda info
+          conda list -n omnisci-dev
+          conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/build.sh
+          conda run --no-capture-output -n omnisci-dev cmake --install build
+
+      - uses: actions/checkout@v3
+        with:
+          path: modin
+          repository: modin-project/modin
+          ref: master
+
+      - name: Install python dependencies
+        run: |
+          $CONDA/bin/conda run -n omnisci-dev sh -c "cd modin && pip install -e ."
+
+      - name: Run tests
+        run: |
+          conda run -n omnisci-dev python -c 'import pyhdk'
+          conda run -n omnisci-dev python python/tests/modin/modin_smoke_test.py
+          conda run -n omnisci-dev python python/tests/test_pyhdk_bindings.py
+          conda run -n omnisci-dev python python/tests/test_pyhdk_sql.py
+
