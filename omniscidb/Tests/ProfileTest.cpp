@@ -33,6 +33,7 @@
 #include "DataMgr/Allocators/ArenaAllocator.h"
 #include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/ResultSet.h"
+#include "QueryEngine/ResultSetReduction.h"
 #include "Shared/measure.h"
 #include "Shared/thread_count.h"
 #include "Tests/TestHelpers.h"

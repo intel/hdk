@@ -106,3 +106,15 @@ class ResultSetReduction {
                                          const int8_t* that_ptr1,
                                          const size_t target_logical_idx);
 };
+
+class ResultSetManager {
+ public:
+  ResultSet* reduce(std::vector<ResultSet*>&, const Config& config, Executor* executor);
+
+  std::shared_ptr<ResultSet> getOwnResultSet();
+
+  void rewriteVarlenAggregates(ResultSet*);
+
+ private:
+  std::shared_ptr<ResultSet> rs_;
+};
