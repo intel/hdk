@@ -56,6 +56,13 @@ void set_cuda_context(Data_Namespace::DataMgr* data_mgr, const int device_id) {
   g_cuda_mgr->setContext(device_id);
 }
 
+int getGpuCount(const Data_Namespace::DataMgr* data_mgr) {
+  if (!data_mgr) {
+    return g_cuda_mgr ? g_cuda_mgr->getDeviceCount() : 0;
+  }
+  return data_mgr->gpusPresent() ? data_mgr->getCudaMgr()->getDeviceCount() : 0;
+}
+
 void doBaselineSort(ResultSet* rs,
                     const ExecutorDeviceType device_type,
                     const std::list<hdk::ir::OrderEntry>& order_entries,
@@ -96,7 +103,7 @@ void doBaselineSort(ResultSet* rs,
   auto groupby_buffer = rs->getStorage()->getUnderlyingBuffer();
   auto data_mgr = rs->getDataManager();
   const auto step = static_cast<size_t>(
-      device_type == ExecutorDeviceType::GPU ? rs->getGpuCount() : cpu_threads());
+      device_type == ExecutorDeviceType::GPU ? getGpuCount(data_mgr) : cpu_threads());
   CHECK_GE(step, size_t(1));
   const auto key_bytewidth = query_mem_desc.getEffectiveKeyWidth();
   Permutation permutation;
@@ -209,7 +216,7 @@ void baselineSort(ResultSet* rs,
                   const Executor* executor) {
   auto timer = DEBUG_TIMER(__func__);
   // If we only have on GPU, it's usually faster to do multi-threaded radix sort on CPU
-  if (rs->getGpuCount() > 1) {
+  if (getGpuCount(rs->getDataManager()) > 1) {
     try {
       doBaselineSort(rs, ExecutorDeviceType::GPU, order_entries, top_n, executor);
     } catch (...) {
@@ -221,18 +228,6 @@ void baselineSort(ResultSet* rs,
 }
 
 }  // namespace
-
-Data_Namespace::DataMgr* ResultSet::getDataManager() const {
-  return data_mgr_;
-}
-
-int ResultSet::getGpuCount() const {
-  const auto data_mgr = getDataManager();
-  if (!data_mgr) {
-    return g_cuda_mgr ? g_cuda_mgr->getDeviceCount() : 0;
-  }
-  return data_mgr->gpusPresent() ? data_mgr->getCudaMgr()->getDeviceCount() : 0;
-}
 #endif  // HAVE_CUDA
 
 template <typename BUFFER_ITERATOR_TYPE>
