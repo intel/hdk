@@ -344,7 +344,19 @@ target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
 string(REPLACE " " ";" CUDA_FLAGS_LIST "$ENV{CUDAFLAGS}")
 add_custom_command(
-        DEPENDS cuda_mapd_rt.cu JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp GpuInitGroups.cu GroupByRuntime.cpp TopKRuntime.cpp StringFunctions.cpp RegexpFunctions.cpp ../Utils/ChunkIter.cpp ../Utils/StringLike.cpp ../Utils/Regexp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp
+        DEPENDS cuda_mapd_rt.cu 
+            JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp 
+            GpuInitGroupsImpl.cpp 
+            GpuInitGroups.cu 
+            GroupByRuntime.cpp 
+            TopKRuntime.cpp 
+            StringFunctions.cpp
+            RegexpFunctions.cpp
+            ../Utils/ChunkIter.cpp
+            ../Utils/StringLike.cpp
+            ../Utils/Regexp.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cuda_mapd_rt.fatbin
         COMMAND nvcc
         ${CUDA_FLAGS_LIST}

@@ -187,16 +187,16 @@ __global__ void init_columnar_group_by_buffer_gpu_wrapper(
                                          key_size);
 }
 
-void init_group_by_buffer_on_device(int64_t* groups_buffer,
-                                    const int64_t* init_vals,
-                                    const uint32_t groups_buffer_entry_count,
-                                    const uint32_t key_count,
-                                    const uint32_t key_width,
-                                    const uint32_t row_size_quad,
-                                    const bool keyless,
-                                    const int8_t warp_size,
-                                    const size_t block_size_x,
-                                    const size_t grid_size_x) {
+void init_group_by_buffer_on_device_cuda(int64_t* groups_buffer,
+                                         const int64_t* init_vals,
+                                         const uint32_t groups_buffer_entry_count,
+                                         const uint32_t key_count,
+                                         const uint32_t key_width,
+                                         const uint32_t row_size_quad,
+                                         const bool keyless,
+                                         const int8_t warp_size,
+                                         const size_t block_size_x,
+                                         const size_t grid_size_x) {
   init_group_by_buffer_gpu<<<grid_size_x, block_size_x>>>(groups_buffer,
                                                           init_vals,
                                                           groups_buffer_entry_count,
@@ -207,17 +207,18 @@ void init_group_by_buffer_on_device(int64_t* groups_buffer,
                                                           warp_size);
 }
 
-void init_columnar_group_by_buffer_on_device(int64_t* groups_buffer,
-                                             const int64_t* init_vals,
-                                             const uint32_t groups_buffer_entry_count,
-                                             const uint32_t key_count,
-                                             const uint32_t agg_col_count,
-                                             const int8_t* col_sizes,
-                                             const bool need_padding,
-                                             const bool keyless,
-                                             const int8_t key_size,
-                                             const size_t block_size_x,
-                                             const size_t grid_size_x) {
+void init_columnar_group_by_buffer_on_device_cuda(
+    int64_t* groups_buffer,
+    const int64_t* init_vals,
+    const uint32_t groups_buffer_entry_count,
+    const uint32_t key_count,
+    const uint32_t agg_col_count,
+    const int8_t* col_sizes,
+    const bool need_padding,
+    const bool keyless,
+    const int8_t key_size,
+    const size_t block_size_x,
+    const size_t grid_size_x) {
   init_columnar_group_by_buffer_gpu_wrapper<<<grid_size_x, block_size_x>>>(
       groups_buffer,
       init_vals,
