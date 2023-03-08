@@ -18,7 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 
-enum GpuMgrPlatform { CUDA, L0 };
+#include "Shared/GpuPlatform.h"
 
 class DeviceException : public std::runtime_error {
  public:
