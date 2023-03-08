@@ -171,7 +171,7 @@ class QueryExecutionSequenceImpl {
   void mergeExecutionPointsWithSimpleProject() {
     std::vector<const ir::Node*> simple_projects;
     for (auto input : execution_points_) {
-      if (boost::in_degree(node_to_vertex_[input], graph_) > 1) {
+      if (boost::in_degree(node_to_vertex_[input], graph_) != 1) {
         continue;
       }
 
@@ -184,6 +184,7 @@ class QueryExecutionSequenceImpl {
       }
 
       auto [start, end] = boost::in_edges(node_to_vertex_[input], graph_);
+      CHECK(start != end);
       auto node = graph_[start->m_source];
 
       if (node->is<ir::Project>() && !hasWindowFunctionExpr(node->as<ir::Project>())) {
