@@ -20,9 +20,10 @@
 #include "DateTruncate.h"
 #include "Descriptors/InputDescriptors.h"
 #include "Execute.h"
-#include "ExtractFromTime.h"
-#include "IR/TypeUtils.h"
 #include "QueryPhysicalInputsCollector.h"
+
+#include "IR/TypeUtils.h"
+#include "Utils/ExtractFromTime.h"
 
 #include <algorithm>
 #include <cfenv>

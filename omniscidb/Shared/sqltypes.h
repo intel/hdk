@@ -150,7 +150,7 @@ int64_t convert_decimal_value_to_scale(const int64_t decimal_value,
                                        const hdk::ir::Type* new_type);
 size_t hash(Datum datum, const hdk::ir::Type* type);
 
-#include "../QueryEngine/ExtractFromTime.h"
+#include "../Utils/ExtractFromTime.h"
 
 using StringOffsetT = int32_t;
 using ArrayOffsetT = int32_t;

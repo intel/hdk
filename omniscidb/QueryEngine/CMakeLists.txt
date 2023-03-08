@@ -53,8 +53,6 @@ set(query_engine_source_files
     ExtensionFunctions.ast
     ExtensionsIR.cpp
     ExternalExecutor.cpp
-    ExtractStringFromTime.cpp
-    ExtractFromTime.cpp
     FromTableReordering.cpp
     GpuInterrupt.cpp
     GpuMemUtils.cpp
@@ -208,13 +206,18 @@ add_library(QueryEngine ${query_engine_source_files} $<$<BOOL:ENABLE_CUDA>:${que
 add_dependencies(QueryEngine QueryEngineFunctionsTargets)
 add_dependencies(QueryEngine QueryEngineTableFunctionsFactory_init)
 
-set(cpu_runtime_function_sources RuntimeFunctions.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
-set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp ExtractFromTime.cpp DateAdd.cpp DateTruncate.cpp)
+set(cpu_runtime_function_sources RuntimeFunctions.cpp DateAdd.cpp DateTruncate.cpp)
+set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp DateAdd.cpp DateTruncate.cpp)
 
 
 set(hdk_default_runtime_functions_module_dependencies
     ${cpu_runtime_function_sources}
-    RuntimeFunctions.h DecodersImpl.h ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp GroupByRuntime.cpp TopKRuntime.cpp)
+    RuntimeFunctions.h
+    DecodersImpl.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/ExtractFromTime.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp
+    GroupByRuntime.cpp
+    TopKRuntime.cpp)
 
 # Adds a custom command for producing llvm bitcode modules out of a .cpp source.
 # Any additional arguments are treated as clang args and bypassed as-is.

@@ -16,8 +16,9 @@
 
 #pragma once
 
+#include "Utils/ExtractFromTime.h"
+
 #include <cstdint>
-#include "../QueryEngine/ExtractFromTime.h"
 
 namespace DateConverters {
 

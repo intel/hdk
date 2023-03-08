@@ -23,9 +23,9 @@
 #endif
 
 #include "DateTruncate.h"
-#include "ExtractFromTime.h"
 
 #include "Shared/funcannotations.h"
+#include "Utils/ExtractFromTime.h"
 
 #ifdef __CUDACC__
 #error This code is not intended to be compiled with a CUDA C++ compiler

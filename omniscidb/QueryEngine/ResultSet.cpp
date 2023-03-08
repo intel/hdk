@@ -25,7 +25,6 @@
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "Execute.h"
-#include "ExtractFromTime.h"
 #include "GpuMemUtils.h"
 #include "InPlaceSort.h"
 #include "OutputBufferInitialization.h"
@@ -37,6 +36,7 @@
 #include "Shared/likely.h"
 #include "Shared/thread_count.h"
 #include "Shared/threading.h"
+#include "Utils/ExtractFromTime.h"
 
 #include <algorithm>
 #include <atomic>

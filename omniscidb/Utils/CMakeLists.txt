@@ -1,5 +1,7 @@
 set(utils_source_files
     ChunkIter.cpp
+    ExtractFromTime.cpp
+    ExtractStringFromTime.cpp
     Regexp.cpp
     StringLike.cpp
 )
