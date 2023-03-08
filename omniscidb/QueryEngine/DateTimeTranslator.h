@@ -17,7 +17,7 @@
 #pragma once
 
 #include "IR/Expr.h"
-#include "QueryEngine/ExtractFromTime.h"
+#include "Utils/ExtractFromTime.h"
 
 #include "DateTimeUtils.h"
 

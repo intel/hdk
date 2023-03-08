@@ -1408,6 +1408,10 @@ string_pack(GENERIC_ADDR_SPACE const int8_t* ptr, const int32_t len) {
 #include "../Utils/StringLike.cpp"
 #endif
 
+#if defined(__clang__) && !defined(__CUDACC__)
+#include "../Utils/ExtractFromTime.cpp"
+#endif
+
 #if !defined(__CUDACC__) && !defined(L0_RUNTIME_ENABLED)
 #include "TopKRuntime.cpp"
 #endif

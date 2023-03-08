@@ -25,7 +25,6 @@
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "Execute.h"
-#include "ExtractFromTime.h"
 #include "GpuMemUtils.h"
 #include "InPlaceSort.h"
 #include "OutputBufferInitialization.h"
@@ -38,6 +37,7 @@
 #include "Shared/parallel_sort.h"
 #include "Shared/thread_count.h"
 #include "Shared/threading.h"
+#include "Utils/ExtractFromTime.h"
 
 #ifdef HAVE_TBB
 #include "tbb/parallel_sort.h"
