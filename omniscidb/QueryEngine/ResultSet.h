@@ -601,9 +601,7 @@ class ResultSet {
 
   StorageLookupResult findStorage(const size_t entry_idx) const;
 
-  Data_Namespace::DataMgr* getDataManager() const;
-
-  int getGpuCount() const;
+  Data_Namespace::DataMgr* getDataManager() const { return data_mgr_; }
 
  private:
   void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
