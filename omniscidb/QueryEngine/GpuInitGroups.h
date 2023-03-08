@@ -24,6 +24,7 @@
 #ifndef GPUINITGROUPS_H
 #define GPUINITGROUPS_H
 #include <cstdint>
+#include "Shared/GpuPlatform.h"
 
 void init_group_by_buffer_on_device(int64_t* groups_buffer,
                                     const int64_t* init_vals,
@@ -34,7 +35,8 @@ void init_group_by_buffer_on_device(int64_t* groups_buffer,
                                     const bool keyless,
                                     const int8_t warp_size,
                                     const size_t block_size_x,
-                                    const size_t grid_size_x);
+                                    const size_t grid_size_x,
+                                    const GpuMgrPlatform gpu_mgr_platform);
 
 void init_columnar_group_by_buffer_on_device(int64_t* groups_buffer,
                                              const int64_t* init_vals,
@@ -46,6 +48,7 @@ void init_columnar_group_by_buffer_on_device(int64_t* groups_buffer,
                                              const bool keyless,
                                              const int8_t key_size,
                                              const size_t block_size_x,
-                                             const size_t grid_size_x);
+                                             const size_t grid_size_x,
+                                             const GpuMgrPlatform gpu_mgr_platform);
 
 #endif  // GPUINITGROUPS_H

@@ -257,7 +257,8 @@ QueryMemoryInitializer::QueryMemoryInitializer(
     , count_distinct_bitmap_host_mem_(nullptr)
     , device_allocator_(device_allocator)
     , use_hash_table_desc_(use_hash_table_desc)
-    , thread_idx_(thread_idx) {
+    , thread_idx_(thread_idx)
+    , gpu_mgr_platform_(executor->getDataMgr()->getGpuMgr()->getPlatform()) {
   CHECK(!sort_on_gpu || output_columnar);
 
   const auto& consistent_frag_sizes = get_consistent_frags_sizes(frag_offsets);
@@ -391,6 +392,96 @@ QueryMemoryInitializer::QueryMemoryInitializer(
       result_sets_.emplace_back(nullptr);
     }
   }
+}
+
+// Table functions execution constructor
+QueryMemoryInitializer::QueryMemoryInitializer(
+    const TableFunctionExecutionUnit& exe_unit,
+    const QueryMemoryDescriptor& query_mem_desc,
+    const int device_id,
+    const ExecutorDeviceType device_type,
+    const bool use_hash_table_desc,
+    const int64_t num_rows,
+    const std::vector<std::vector<const int8_t*>>& col_buffers,
+    const std::vector<std::vector<uint64_t>>& frag_offsets,
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+    DeviceAllocator* device_allocator,
+    const Executor* executor)
+    : num_rows_(num_rows)
+    , row_set_mem_owner_(row_set_mem_owner)
+    , init_agg_vals_(init_agg_val_vec(exe_unit.target_exprs,
+                                      {},
+                                      query_mem_desc,
+                                      executor->getConfig().exec.group_by.bigint_count))
+    , num_buffers_(1)
+    , varlen_output_buffer_(0)
+    , varlen_output_buffer_host_ptr_(nullptr)
+    , count_distinct_bitmap_mem_(0)
+    , count_distinct_bitmap_mem_bytes_(0)
+    , count_distinct_bitmap_crt_ptr_(nullptr)
+    , count_distinct_bitmap_host_mem_(nullptr)
+    , device_allocator_(device_allocator)
+    , use_hash_table_desc_(use_hash_table_desc)
+    , thread_idx_(0)
+    , gpu_mgr_platform_(executor->getDataMgr()->getGpuMgr()->getPlatform()) {
+  // Table functions output columnar, basically treat this as a projection
+  const auto& consistent_frag_sizes = get_consistent_frags_sizes(frag_offsets);
+  if (consistent_frag_sizes.empty()) {
+    // No fragments in the input, no underlying buffers will be needed.
+    return;
+  }
+
+  size_t group_buffer_size{0};
+  const size_t num_columns = query_mem_desc.getBufferColSlotCount();
+  group_buffer_size = num_rows_ * num_columns * sizeof(int64_t);
+  CHECK_GE(group_buffer_size, size_t(0));
+
+  const auto index_buffer_qw =
+      device_type == ExecutorDeviceType::GPU && query_mem_desc.hasKeylessHash()
+          ? query_mem_desc.getEntryCount()
+          : size_t(0);
+  const auto actual_group_buffer_size =
+      group_buffer_size + index_buffer_qw * sizeof(int64_t);
+  CHECK_GE(actual_group_buffer_size, group_buffer_size);
+
+  CHECK_EQ(num_buffers_, size_t(1));
+  auto group_by_buffer = alloc_group_by_buffer(
+      actual_group_buffer_size, thread_idx_, row_set_mem_owner.get());
+  if (!query_mem_desc.lazyInitGroups(device_type)) {
+    initColumnarGroups(
+        query_mem_desc, group_by_buffer + index_buffer_qw, init_agg_vals_, executor);
+  }
+
+  if (use_hash_table_desc_) {
+    auto* desc = new HashTableDesc(reinterpret_cast<int8_t*>(group_by_buffer),
+                                   query_mem_desc.getEntryCount());
+    group_by_buffers_.push_back(reinterpret_cast<int64_t*>(desc));
+    hash_table_desc_holders_.emplace_back(desc);
+  } else {
+    group_by_buffers_.push_back(group_by_buffer);
+  }
+
+  const auto column_frag_offsets =
+      get_col_frag_offsets(exe_unit.target_exprs, frag_offsets);
+  const auto column_frag_sizes =
+      get_consistent_frags_sizes(exe_unit.target_exprs, consistent_frag_sizes);
+  result_sets_.emplace_back(new ResultSet(
+      target_exprs_to_infos(exe_unit.target_exprs,
+                            query_mem_desc,
+                            executor->getConfig().exec.group_by.bigint_count),
+      /*col_lazy_fetch_info=*/{},
+      col_buffers,
+      column_frag_offsets,
+      column_frag_sizes,
+      device_type,
+      device_id,
+      ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
+      row_set_mem_owner_,
+      executor->getDataMgr(),
+      executor->blockSize(),
+      executor->gridSize()));
+  result_sets_.back()->allocateStorage(reinterpret_cast<int8_t*>(group_by_buffer),
+                                       init_agg_vals_);
 }
 
 void QueryMemoryInitializer::initGroupByBuffer(
@@ -534,7 +625,6 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
 }
 
 namespace {
-
 template <typename T>
 int8_t* initColumnarBuffer(T* buffer_ptr, const T init_val, const uint32_t entry_count) {
   static_assert(sizeof(T) <= sizeof(int64_t), "Unsupported template type");
@@ -839,7 +929,8 @@ GpuGroupByBuffers QueryMemoryInitializer::prepareTopNHeapsDevBuffer(
       query_mem_desc.hasKeylessHash(),
       1,
       block_size_x,
-      grid_size_x);
+      grid_size_x,
+      gpu_mgr_platform_);
 
   return {reinterpret_cast<int8_t*>(dev_ptr), dev_buffer};
 #else
@@ -847,32 +938,6 @@ GpuGroupByBuffers QueryMemoryInitializer::prepareTopNHeapsDevBuffer(
   return {};
 #endif
 }
-
-#ifdef HAVE_L0
-void init_group_by_buffer_on_device(int64_t* groups_buffer,
-                                    const int64_t* init_vals,
-                                    const uint32_t groups_buffer_entry_count,
-                                    const uint32_t key_count,
-                                    const uint32_t key_width,
-                                    const uint32_t row_size_quad,
-                                    const bool keyless,
-                                    const int8_t warp_size,
-                                    const size_t block_size_x,
-                                    const size_t grid_size_x) {
-  /*todo*/
-}
-void init_columnar_group_by_buffer_on_device(int64_t* groups_buffer,
-                                             const int64_t* init_vals,
-                                             const uint32_t groups_buffer_entry_count,
-                                             const uint32_t key_count,
-                                             const uint32_t agg_col_count,
-                                             const int8_t* col_sizes,
-                                             const bool need_padding,
-                                             const bool keyless,
-                                             const int8_t key_size,
-                                             const size_t block_size_x,
-                                             const size_t grid_size_x) {}
-#endif
 
 GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
     const RelAlgExecutionUnit& ra_exe_unit,
@@ -956,7 +1021,8 @@ GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
             query_mem_desc.hasKeylessHash(),
             sizeof(int64_t),
             block_size_x,
-            grid_size_x);
+            grid_size_x,
+            gpu_mgr_platform_);
       } else {
         init_group_by_buffer_on_device(
             reinterpret_cast<int64_t*>(group_by_dev_buffer),
@@ -968,7 +1034,8 @@ GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
             query_mem_desc.hasKeylessHash(),
             warp_count,
             block_size_x,
-            grid_size_x);
+            grid_size_x,
+            gpu_mgr_platform_);
       }
       group_by_dev_buffer += groups_buffer_size;
     }
@@ -991,7 +1058,6 @@ size_t QueryMemoryInitializer::computeNumberOfBuffers(
 }
 
 namespace {
-
 // in-place compaction of output buffer
 void compact_projection_buffer_for_cpu_columnar(
     const QueryMemoryDescriptor& query_mem_desc,

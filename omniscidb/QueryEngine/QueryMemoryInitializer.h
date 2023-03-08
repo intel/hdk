@@ -217,6 +217,7 @@ class QueryMemoryInitializer {
 
   bool use_hash_table_desc_;
   const size_t thread_idx_;
+  const GpuMgrPlatform gpu_mgr_platform_;
 
   friend class Executor;  // Accesses result_sets_
   friend class QueryExecutionContext;
