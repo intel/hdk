@@ -531,6 +531,262 @@ TEST_F(BasicTest, SimpleFilterWithLiteral) {
   c("SELECT * FROM test WHERE x > 0;", g_dt);
 }
 
+TEST_F(BasicTest, Time) {
+  ASSERT_EQ(
+      static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE CAST('1999-09-10' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(
+      static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE CAST('10/09/1999' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('10/09/99' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('10-Sep-99' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('9/10/99' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(
+      static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE CAST('31/Oct/2013' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('10/31/13' AS DATE) > o;", g_dt)));
+  // check TIME FORMATS
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('15:13:15' AS TIME) > n;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('151315' AS TIME) > n;", g_dt)));
+}
+
+TEST_F(BasicTest, Time2) {
+  GTEST_SKIP();
+  ASSERT_EQ(
+      static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE CAST('1999-09-10' AS DATE) > o;", g_dt)));
+  ASSERT_EQ(
+      0,
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE CAST('1999-09-10' AS DATE) <= o;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('15:13:15' AS TIME) > n;", g_dt)));
+  ASSERT_EQ(0,
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE CAST('15:13:15' AS TIME) <= n;", g_dt)));
+  cta("SELECT NOW() FROM test limit 1;",
+      "SELECT DATETIME('NOW') FROM test LIMIT 1;",
+      g_dt);
+  EXPECT_ANY_THROW(run_simple_agg("SELECT DATETIME(NULL) FROM test LIMIT 1;", g_dt));
+  // these next tests work because all dates are before now 2015-12-8 17:00:00
+  ASSERT_EQ(
+      static_cast<int64_t>(2 * g_num_rows),
+      v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE m < NOW();", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE o IS NULL OR o < CURRENT_DATE;", g_dt)));
+  ASSERT_EQ(
+      static_cast<int64_t>(2 * g_num_rows),
+      v<int64_t>(run_simple_agg(
+          "SELECT COUNT(*) FROM test WHERE o IS NULL OR o < CURRENT_DATE();", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE m < CURRENT_TIMESTAMP;", g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE m < CURRENT_TIMESTAMP();", g_dt)));
+  ASSERT_TRUE(v<int64_t>(
+      run_simple_agg("SELECT CURRENT_DATE = CAST(CURRENT_TIMESTAMP AS DATE);", g_dt)));
+  ASSERT_TRUE(
+      v<int64_t>(run_simple_agg("SELECT DATEADD('day', -1, CURRENT_TIMESTAMP) < "
+                                "CURRENT_DATE AND CURRENT_DATE <= CURRENT_TIMESTAMP;",
+                                g_dt)));
+  ASSERT_TRUE(v<int64_t>(run_simple_agg(
+      "SELECT CAST(CURRENT_DATE AS TIMESTAMP) <= CURRENT_TIMESTAMP;", g_dt)));
+  ASSERT_TRUE(v<int64_t>(run_simple_agg(
+      "SELECT EXTRACT(YEAR FROM CURRENT_DATE) = EXTRACT(YEAR FROM CURRENT_TIMESTAMP)"
+      " AND EXTRACT(MONTH FROM CURRENT_DATE) = EXTRACT(MONTH FROM CURRENT_TIMESTAMP)"
+      " AND EXTRACT(DAY FROM CURRENT_DATE) = EXTRACT(DAY FROM CURRENT_TIMESTAMP)"
+      " AND EXTRACT(HOUR FROM CURRENT_DATE) = 0"
+      " AND EXTRACT(MINUTE FROM CURRENT_DATE) = 0"
+      " AND EXTRACT(SECOND FROM CURRENT_DATE) = 0;",
+      g_dt)));
+  ASSERT_TRUE(v<int64_t>(run_simple_agg(
+      "SELECT EXTRACT(HOUR FROM CURRENT_TIME()) = EXTRACT(HOUR FROM CURRENT_TIMESTAMP)"
+      " AND EXTRACT(MINUTE FROM CURRENT_TIME) = EXTRACT(MINUTE FROM CURRENT_TIMESTAMP)"
+      " AND EXTRACT(SECOND FROM CURRENT_TIME) = EXTRACT(SECOND FROM CURRENT_TIMESTAMP)"
+      ";",
+      g_dt)));
+}
+
+TEST_F(BasicTest, Timestamp) {
+  ASSERT_EQ(static_cast<int64_t>(2 * g_num_rows),
+            v<int64_t>(run_simple_agg(
+                "SELECT COUNT(*) FROM test WHERE m > timestamp(0) '2014-12-13T000000';",
+                g_dt)));
+  ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
+            v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE CAST(o AS "
+                                      "TIMESTAMP) > timestamp(0) '1999-09-08T160000';",
+                                      g_dt)));
+  ASSERT_EQ(0,
+            v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE CAST(o AS "
+                                      "TIMESTAMP) > timestamp(0) '1999-09-10T160000';",
+                                      g_dt)));
+}
+
+TEST_F(BasicTest, TimeExtract) {
+  ASSERT_EQ(14185957950LL,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(EPOCH FROM m) * 10) FROM test;",
+                                      g_dt)));
+  ASSERT_EQ(14185152000LL,
+            v<int64_t>(run_simple_agg(
+                "SELECT MAX(EXTRACT(DATEEPOCH FROM m) * 10) FROM test;", g_dt)));
+  ASSERT_EQ(20140,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(YEAR FROM m) * 10) FROM test;",
+                                      g_dt)));
+  ASSERT_EQ(120,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(MONTH FROM m) * 10) FROM test;",
+                                      g_dt)));
+  ASSERT_EQ(140,
+            v<int64_t>(
+                run_simple_agg("SELECT MAX(EXTRACT(DAY FROM m) * 10) FROM test;", g_dt)));
+  ASSERT_EQ(
+      22,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(HOUR FROM m)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      23,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(MINUTE FROM m)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      15,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(SECOND FROM m)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      6, v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(DOW FROM m)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      348,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(DOY FROM m)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      15,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(HOUR FROM n)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      13,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(MINUTE FROM n)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      14,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(SECOND FROM n)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      1999,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(YEAR FROM o)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      9,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(MONTH FROM o)) FROM test;", g_dt)));
+  ASSERT_EQ(
+      9, v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(DAY FROM o)) FROM test;", g_dt)));
+  ASSERT_EQ(4,
+            v<int64_t>(run_simple_agg(
+                "SELECT EXTRACT(DOW FROM o) FROM test WHERE o IS NOT NULL;", g_dt)));
+  ASSERT_EQ(252,
+            v<int64_t>(run_simple_agg(
+                "SELECT EXTRACT(DOY FROM o) FROM test WHERE o IS NOT NULL;", g_dt)));
+  ASSERT_EQ(
+      936835200LL,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(EPOCH FROM o)) FROM test;", g_dt)));
+  ASSERT_EQ(936835200LL,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(DATEEPOCH FROM o)) FROM test;",
+                                      g_dt)));
+  ASSERT_EQ(52LL,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK FROM CAST('2012-01-01 "
+                                      "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(
+      1LL,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK_SUNDAY FROM CAST('2012-01-01 "
+                                "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                g_dt)));
+  ASSERT_EQ(
+      1LL,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK_SATURDAY FROM CAST('2012-01-01 "
+                                "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                g_dt)));
+  ASSERT_EQ(10LL,
+            v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK FROM CAST('2008-03-03 "
+                                      "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(
+      10LL,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK_SUNDAY FROM CAST('2008-03-03 "
+                                "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                g_dt)));
+  ASSERT_EQ(
+      10LL,
+      v<int64_t>(run_simple_agg("SELECT MAX(EXTRACT(WEEK_SATURDAY FROM CAST('2008-03-03 "
+                                "20:15:12' AS TIMESTAMP))) FROM test limit 1;",
+                                g_dt)));
+  // Monday
+  ASSERT_EQ(1LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(DOW FROM CAST('2008-03-03 "
+                                      "20:15:12' AS TIMESTAMP)) FROM test limit 1;",
+                                      g_dt)));
+  // Monday
+  ASSERT_EQ(1LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(ISODOW FROM CAST('2008-03-03 "
+                                      "20:15:12' AS TIMESTAMP)) FROM test limit 1;",
+                                      g_dt)));
+  // Sunday
+  ASSERT_EQ(0LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(DOW FROM CAST('2008-03-02 "
+                                      "20:15:12' AS TIMESTAMP)) FROM test limit 1;",
+                                      g_dt)));
+  // Sunday
+  ASSERT_EQ(7LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(ISODOW FROM CAST('2008-03-02 "
+                                      "20:15:12' AS TIMESTAMP)) FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(15000000000LL,
+            v<int64_t>(run_simple_agg(
+                "SELECT EXTRACT(nanosecond from m) FROM test limit 1;", g_dt)));
+  ASSERT_EQ(15000000LL,
+            v<int64_t>(run_simple_agg(
+                "SELECT EXTRACT(microsecond from m) FROM test limit 1;", g_dt)));
+  ASSERT_EQ(15000LL,
+            v<int64_t>(run_simple_agg(
+                "SELECT EXTRACT(millisecond from m) FROM test limit 1;", g_dt)));
+  ASSERT_EQ(56000000000LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(nanosecond from TIMESTAMP(0) "
+                                      "'1999-03-14 23:34:56') FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(56000000LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(microsecond from TIMESTAMP(0) "
+                                      "'1999-03-14 23:34:56') FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(56000LL,
+            v<int64_t>(run_simple_agg("SELECT EXTRACT(millisecond from TIMESTAMP(0) "
+                                      "'1999-03-14 23:34:56') FROM test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(2005,
+            v<int64_t>(run_simple_agg("select EXTRACT(year from TIMESTAMP '2005-12-31 "
+                                      "23:59:59') from test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(1997,
+            v<int64_t>(run_simple_agg("select EXTRACT(year from TIMESTAMP '1997-01-01 "
+                                      "23:59:59') from test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(2006,
+            v<int64_t>(run_simple_agg("select EXTRACT(year from TIMESTAMP '2006-01-01 "
+                                      "00:0:00') from test limit 1;",
+                                      g_dt)));
+  ASSERT_EQ(2014,
+            v<int64_t>(run_simple_agg("select EXTRACT(year from TIMESTAMP '2014-01-01 "
+                                      "00:00:00') from test limit 1;",
+                                      g_dt)));
+}
+
 int main(int argc, char* argv[]) {
   auto config = std::make_shared<Config>();
   testing::InitGoogleTest(&argc, argv);
