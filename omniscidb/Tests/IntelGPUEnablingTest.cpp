@@ -282,17 +282,168 @@ TEST_F(AggregationTest, CountWithProjectionAfterCountStar) {
   c("SELECT COUNT(x) FROM test;", g_dt);
 }
 
+TEST_F(AggregationTest, StandaloneSum) {
+  c("SELECT SUM(x) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, SimpleAggregations) {
+  c("SELECT COUNT(*) FROM test;", g_dt);
+  c("SELECT COUNT(f) FROM test;", g_dt);
+  c("SELECT COUNT(smallint_nulls), COUNT(*), COUNT(fn) FROM test;", g_dt);
+  c("SELECT MIN(x) FROM test;", g_dt);
+  c("SELECT MAX(x) FROM test;", g_dt);
+  c("SELECT MIN(z) FROM test;", g_dt);
+  c("SELECT MAX(z) FROM test;", g_dt);
+  c("SELECT MIN(t) FROM test;", g_dt);
+  c("SELECT MAX(t) FROM test;", g_dt);
+  c("SELECT MIN(ff) FROM test;", g_dt);
+  c("SELECT MIN(fn) FROM test;", g_dt);
+  c("SELECT SUM(ff) FROM test;", g_dt);
+  c("SELECT SUM(fn) FROM test;", g_dt);
+  c("SELECT SUM(x + y) FROM test;", g_dt);
+  c("SELECT SUM(x + y + z) FROM test;", g_dt);
+  c("SELECT SUM(x + y + z + t) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, FilterAndCount) {
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 AND z > 100 AND z < 102;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 OR (z > 100 AND z < 103);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 AND z > 100 AND z < 102 AND t > "
+    "1000 AND t < 1002;",
+    g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 OR (z > 100 AND z < 103);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 OR (z > 100 AND z < 102) OR (t > "
+    "1000 AND t < 1003);",
+    g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x <> 7;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE z <> 102;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE t <> 1002;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x + y = 49;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x + y + z = 150;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x + y + z + t = 1151;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE CAST(x as TINYINT) + CAST(y as TINYINT) < CAST(z "
+    "as TINYINT);",
+    g_dt);
+  c("SELECT COUNT(*) FROM test WHERE CAST(y as TINYINT) / CAST(x as TINYINT) = 6", g_dt);
+  c("SELECT SUM(x + y) FROM test WHERE x + y = 49;", g_dt);
+  c("SELECT SUM(x + y + z) FROM test WHERE x + y = 49;", g_dt);
+  c("SELECT SUM(x + y + z + t) FROM test WHERE x + y = 49;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x - y = -35;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x - y + z = 66;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x - y + z + t = 1067;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE y - x = 35;", g_dt);
+  c("SELECT 'Hello', 'World', 7 FROM test WHERE x <> 7;", g_dt);
+  c("SELECT 'Total', COUNT(*) FROM test WHERE x <> 7;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 100;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 200;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 300;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 111.0;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 111.1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > 222.2;", g_dt);
+}
+
+TEST_F(AggregationTest, ComplexFilterAndCount) {
+  c("SELECT COUNT(*) FROM test WHERE dd > CAST(111.0 AS decimal(10, 2));", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > CAST(222.0 AS decimal(10, 2));", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE dd > CAST(333.0 AS decimal(10, 2));", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE 1<>2;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE 1=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE 22 > 33;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE ff < 23.0/4.0 AND 22 < 33;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x + 3*8/2 < 35 + y - 20/5;", g_dt);
+  c("SELECT x + 2 * 10/4 + 3 AS expr FROM test WHERE x + 3*8/2 < 35 + y - 20/5 ORDER "
+    "BY expr ASC;",
+    g_dt);
+  c("SELECT COUNT(*) FROM test WHERE ff + 3.0*8 < 20.0/5;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < y AND 0=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < y AND 1=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < y OR 1<1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < y OR 1=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < 35 AND x < y AND 1=1 AND 0=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE 1>2 AND x < 35 AND x < y AND y < 10;", g_dt);
+  c("SELECT COUNT(*) AS val FROM test WHERE (test.dd = 0.5 OR test.dd = 3);", g_dt);
+}
+
 TEST_F(AggregationTest, Sum) {
   c("SELECT SUM(x) FROM test;", g_dt);
-}
-
-TEST_F(AggregationTest, Sum2) {
-  c("SELECT SUM(x + y) FROM test;", g_dt);
-}
-
-TEST_F(AggregationTest, ConsequentSum) {
-  c("SELECT SUM(x) FROM test;", g_dt);
   c("SELECT SUM(y) FROM test;", g_dt);
+  c("SELECT SUM(x + y) FROM test;", g_dt);
+  c("SELECT SUM(dd * x) FROM test;", g_dt);
+  c("SELECT SUM(dd * y) FROM test;", g_dt);
+  c("SELECT SUM(dd * w) FROM test;", g_dt);
+  c("SELECT SUM(dd * z) FROM test;", g_dt);
+  c("SELECT SUM(dd * t) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, FilterAndSum) {
+  GTEST_SKIP();
+  c("SELECT SUM(x * dd) FROM test;", g_dt);
+  c("SELECT SUM(y * dd) FROM test;", g_dt);
+  c("SELECT SUM(w * dd) FROM test;", g_dt);
+  c("SELECT SUM(z * dd) FROM test;", g_dt);
+  c("SELECT SUM(t * dd) FROM test;", g_dt);
+  c("SELECT SUM(dd * ufd) FROM test;", g_dt);
+  c("SELECT SUM(dd * d) FROM test;", g_dt);
+  c("SELECT SUM(dd * dn) FROM test;", g_dt);
+  c("SELECT SUM(x * dd_notnull) FROM test;", g_dt);
+  c("SELECT SUM(2 * x) FROM test WHERE x = 7;", g_dt);
+  c("SELECT SUM(2 * x + z) FROM test WHERE x = 7;", g_dt);
+  c("SELECT SUM(x + y) FROM test WHERE x - y = -35;", g_dt);
+  c("SELECT SUM(x + y) FROM test WHERE y - x = 35;", g_dt);
+  c("SELECT SUM(x + y - z) FROM test WHERE y - x = 35;", g_dt);
+  c("SELECT SUM(x * y + 15) FROM test WHERE x + y + 1 = 50;", g_dt);
+  c("SELECT SUM(x * y + 15) FROM test WHERE x + y + z + 1 = 151;", g_dt);
+  c("SELECT SUM(x * y + 15) FROM test WHERE x + y + z + t + 1 = 1152;", g_dt);
+  c("SELECT SUM(z) FROM test WHERE z IS NOT NULL;", g_dt);
+  c("SELECT SUM(dd) FROM test;", g_dt);
+  c("SELECT SUM(dd * 0.99) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, MinMax) {
+  c("SELECT MIN(x * y + 15) FROM test WHERE x + y + 1 = 50;", g_dt);
+  c("SELECT MIN(x * y + 15) FROM test WHERE x + y + z + 1 = 151;", g_dt);
+  c("SELECT MIN(x * y + 15) FROM test WHERE x + y + z + t + 1 = 1152;", g_dt);
+  c("SELECT MAX(x * y + 15) FROM test WHERE x + y + 1 = 50;", g_dt);
+  c("SELECT MAX(x * y + 15) FROM test WHERE x + y + z + 1 = 151;", g_dt);
+  c("SELECT MAX(x * y + 15) FROM test WHERE x + y + z + t + 1 = 1152;", g_dt);
+  c("SELECT MIN(x) FROM test WHERE x = 7;", g_dt);
+  c("SELECT MIN(z) FROM test WHERE z = 101;", g_dt);
+  c("SELECT MIN(t) FROM test WHERE t = 1001;", g_dt);
+  c("SELECT MIN(dd) FROM test;", g_dt);
+  c("SELECT MAX(dd) FROM test;", g_dt);
+  c("SELECT MAX(x + dd) FROM test;", g_dt);
+  c("SELECT MAX(x + 2 * dd), MIN(x + 2 * dd) FROM test;", g_dt);
+  c("SELECT MIN(dd * dd) FROM test;", g_dt);
+  c("SELECT MAX(dd * dd) FROM test;", g_dt);
+  c("SELECT MAX(dd_notnull * 1) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, Average) {
+  c("SELECT AVG(x + y) FROM test;", g_dt);
+  c("SELECT AVG(x + y + z) FROM test;", g_dt);
+  c("SELECT AVG(x + y + z + t) FROM test;", g_dt);
+  c("SELECT AVG(y) FROM test WHERE x > 6 AND x < 8;", g_dt);
+  c("SELECT AVG(y) FROM test WHERE z > 100 AND z < 102;", g_dt);
+  c("SELECT AVG(y) FROM test WHERE t > 1000 AND t < 1002;", g_dt);
+  c("SELECT AVG(dd) FROM test;", g_dt);
+  c("SELECT AVG(dd) FROM test WHERE x > 6 AND x < 8;", g_dt);
+  c("SELECT AVG(u * f) FROM test;", g_dt);
+  c("SELECT AVG(u * d) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, NegateSum) {
+  c("SELECT SUM(-y) FROM test;", g_dt);
+  c("SELECT SUM(-z) FROM test;", g_dt);
+  c("SELECT SUM(-t) FROM test;", g_dt);
+  c("SELECT SUM(-dd) FROM test;", g_dt);
+  c("SELECT SUM(-f) FROM test;", g_dt);
+  c("SELECT SUM(-d) FROM test;", g_dt);
+}
+
+TEST_F(AggregationTest, NullHandling) {
+  c("SELECT COUNT(*) FROM test WHERE u IS NOT NULL;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE ofq >= 0 OR ofq IS NULL;", g_dt);
 }
 
 class GroupByAggTest : public ExecuteTestBase, public ::testing::Test {};
@@ -308,10 +459,25 @@ TEST_F(GroupByAggTest, GroupBySum) {
   c("SELECT SUM(x + y) FROM small_tests GROUP BY z;", g_dt);
 }
 
+TEST_F(GroupByAggTest, AggHaving) {
+  GTEST_SKIP();
+  c("SELECT COUNT(*) FROM test WHERE x < y GROUP BY x HAVING 0=1;", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x < y GROUP BY x HAVING 1=1;", g_dt);
+  c("SELECT x, COUNT(*) AS n FROM test GROUP BY x, ufd ORDER BY x, n;", g_dt);
+  c("SELECT MIN(x), MAX(x) FROM test WHERE real_str LIKE '%nope%';", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE (x > 7 AND y / (x - 7) < 44);", g_dt);
+  c("SELECT x, AVG(ff) AS val FROM test GROUP BY x ORDER BY val;", g_dt);
+  c("SELECT x, MAX(fn) as val FROM test WHERE fn IS NOT NULL GROUP BY x ORDER BY val;",
+    g_dt);
+  c("SELECT MAX(dn) FROM test WHERE dn IS NOT NULL;", g_dt);
+  c("SELECT x, MAX(dn) as val FROM test WHERE dn IS NOT NULL GROUP BY x ORDER BY val;",
+    g_dt);
+  c("SELECT COUNT(*) as val FROM test GROUP BY x, y, ufd ORDER BY val;", g_dt);
+}
+
 class BasicTest : public ExecuteTestBase, public ::testing::Test {};
 
-TEST_F(BasicTest, SimpleFilter) {
-  GTEST_SKIP();
+TEST_F(BasicTest, SimpleFilterWithLiteral) {
   c("SELECT * FROM test WHERE x > 0;", g_dt);
 }
 
