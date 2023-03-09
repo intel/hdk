@@ -475,6 +475,56 @@ TEST_F(GroupByAggTest, AggHaving) {
   c("SELECT COUNT(*) as val FROM test GROUP BY x, y, ufd ORDER BY val;", g_dt);
 }
 
+class GroupByTest : public ExecuteTestBase, public ::testing::Test {};
+
+TEST_F(GroupByTest, Basic) {
+  c("SELECT x, y, COUNT(*) FROM test GROUP BY x, y;", g_dt);
+}
+
+TEST_F(GroupByTest, WithFilter) {
+  c("SELECT MIN(x + y) FROM test WHERE x + y > 47 AND x + y < 53 GROUP BY x, y;", g_dt);
+  c("SELECT MIN(x + y) FROM test WHERE x + y > 47 AND x + y < 53 GROUP BY x + 1, x + "
+    "y;",
+    g_dt);
+  c("SELECT x, y, COUNT(*) FROM test GROUP BY x, y;", g_dt);
+}
+
+TEST_F(GroupByTest, WithOrdering) {
+  GTEST_SKIP();
+  c("SELECT x, dd, COUNT(*) FROM test GROUP BY x, dd ORDER BY x, dd;", g_dt);
+  c("SELECT 'literal_string' AS key0 FROM test GROUP BY key0;", g_dt);
+  c("SELECT str, MIN(y) FROM test WHERE y IS NOT NULL GROUP BY str ORDER BY str DESC;",
+    g_dt);
+  c("SELECT x, AVG(u), COUNT(*) AS n FROM test GROUP BY x ORDER BY n DESC;", g_dt);
+  c("SELECT f, ss FROM test GROUP BY f, ss ORDER BY f DESC;", g_dt);
+  c("SELECT fx, COUNT(*) n FROM test GROUP BY fx ORDER BY n DESC, fx IS NULL DESC;",
+    g_dt);
+}
+
+TEST_F(GroupByTest, WithFilterHaving) {
+  c("SELECT dd AS key1, COUNT(*) AS value1 FROM test GROUP BY key1 HAVING key1 IS NOT "
+    "NULL ORDER BY key1, value1 "
+    "DESC "
+    "LIMIT 12;",
+    g_dt);
+  c("SELECT x, MAX(z) FROM test WHERE z IS NOT NULL GROUP BY x HAVING x > 7;", g_dt);
+  c("SELECT CAST((dd - 0.5) * 2.0 AS int) AS key0, COUNT(*) AS val FROM test WHERE (dd "
+    ">= 100.0 AND dd < 400.0) "
+    "GROUP "
+    "BY key0 HAVING key0 >= 0 AND key0 < 400 ORDER BY val DESC LIMIT 50 OFFSET 0;",
+    g_dt);
+  c("SELECT fx, COUNT(*) FROM test GROUP BY fx HAVING COUNT(*) > 5;", g_dt);
+}
+
+TEST_F(GroupByTest, WithCase) {
+  c("SELECT y, AVG(CASE WHEN x BETWEEN 6 AND 7 THEN x END) FROM test GROUP BY y ORDER "
+    "BY y;",
+    g_dt);
+  c("SELECT CASE WHEN x > 8 THEN 100000000 ELSE 42 END AS c, COUNT(*) FROM test GROUP "
+    "BY c;",
+    g_dt);
+}
+
 class BasicTest : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(BasicTest, SimpleFilterWithLiteral) {
