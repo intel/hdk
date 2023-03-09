@@ -787,6 +787,22 @@ TEST_F(BasicTest, TimeExtract) {
                                       g_dt)));
 }
 
+TEST_F(BasicTest, In) {
+  GTEST_SKIP();
+  c("SELECT COUNT(*) FROM test WHERE x IN (7, 8);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x IN (9, 10);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE z IN (101, 102);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE z IN (201, 202);", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE real_str IN ('real_foo', 'real_bar');", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE real_str IN ('real_foo', 'real_bar', 'real_baz', "
+    "'foo');",
+    g_dt);
+  c("SELECT COUNT(*) FROM test WHERE str IN ('foo', 'bar', 'real_foo');", g_dt);
+  c("SELECT COUNT(*) FROM test WHERE x IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, "
+    "14, 15, 16, 17, 18, 19, 20);",
+    g_dt);
+}
+
 int main(int argc, char* argv[]) {
   auto config = std::make_shared<Config>();
   testing::InitGoogleTest(&argc, argv);
