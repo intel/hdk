@@ -1781,14 +1781,14 @@ class HDK:
         """
         files = []
         if isinstance(file_name, str):
-            files.extend(glob.glob(file_name))
+            files.extend(sorted(glob.glob(file_name)))
         elif isinstance(file_name, Iterable):
             for file in file_name:
                 if not isinstance(file, str):
                     raise TypeError(
                         f"Expected str values in 'file_name' list. Got: {type(file)}."
                     )
-                files.extend(glob.glob(file))
+                files.extend(sorted(glob.glob(file)))
         else:
             raise TypeError(
                 f"Expected str or list of str for 'file_name' arg. Got: {type(file_name)}."
