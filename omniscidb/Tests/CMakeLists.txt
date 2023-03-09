@@ -303,6 +303,7 @@ if(ENABLE_L0)
     ArrowStorageSqlTest # taxi queries
     SpirvBuildTest
     L0MgrExecuteTest
+    IntelGPUEnablingTest
   )
   set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
 
