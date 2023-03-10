@@ -661,9 +661,6 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
             switch (col_arr->type()->id()) {
               case arrow::Type::STRING:
                 if (true) {  // enable lazy dictionary
-                             // TODO:
-                             // 1. note that this column is lazy
-                             // 2. store the raw strings for this column
                   table.lazy_fetch_col_ids.insert(col_idx);
                   // grab col_arr from record batch
                   CHECK(table.record_batch);
@@ -723,9 +720,22 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                     auto meta = std::make_shared<ChunkMetadata>(
                         col_info->type, num_bytes, frag.row_count);
 
-                    meta->fillChunkStats(computeStats(
-                        col_arr->Slice(frag.offset, frag.row_count * elems_count),
-                        col_type));
+                    if (table.lazy_fetch_col_ids.find(col_idx) !=
+                        table.lazy_fetch_col_ids.end()) {
+                      CHECK(table.record_batch);
+                      Datum min_datum;
+                      min_datum.intval = int32_t(0);
+                      meta->chunkStats.min = min_datum;
+                      Datum max_datum;
+                      max_datum.intval =
+                          int32_t(table.record_batch->column(col_idx)->length());
+                      meta->chunkStats.max = max_datum;
+                    } else {
+                      computeStats(
+                          col_arr->Slice(frag.offset, frag.row_count * elems_count),
+                          col_type,
+                          meta->chunkStats);
+                    }
                     frag.metadata[col_idx] = meta;
                   }
                 });  // each fragment
@@ -743,9 +753,20 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                   col_info->type,
                   computeTotalStringsLength(col_arr, frag.offset, frag.row_count),
                   frag.row_count);
-              meta->fillStringChunkStats(
-                  col_arr->Slice(frag.offset, frag.row_count)->null_count());
-
+              if (table.lazy_fetch_col_ids.find(col_idx) !=
+                  table.lazy_fetch_col_ids.end()) {
+                // it would be better to count the number of unique strings, but start
+                // with a count of all strings (in the record batch?)
+                CHECK(table.record_batch);
+                Datum min_datum;
+                min_datum.intval = int32_t(0);
+                meta->chunkStats.min = min_datum;
+                Datum max_datum;
+                max_datum.intval = int32_t(table.record_batch->column(col_idx)->length());
+                meta->chunkStats.max = max_datum;
+                CHECK(false) << "TODO: remove this and make sure we don't hit this path "
+                                "for lazy dictionary encoding";
+              }
               frag.metadata[col_idx] = meta;
             }
           }
@@ -770,6 +791,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       auto& first_frag = fragments.front();
       last_frag.row_count += first_frag.row_count;
       for (size_t col_idx = 0; col_idx < last_frag.metadata.size(); ++col_idx) {
+        CHECK(last_frag.metadata[col_idx]) << col_idx;
+        CHECK(first_frag.metadata[col_idx]) << col_idx;
         auto col_type = getColumnInfo(db_id_, table_id, col_idx + 1)->type;
         size_t num_elems = last_frag.metadata[col_idx]->numElements() +
                            first_frag.metadata[col_idx]->numElements();
