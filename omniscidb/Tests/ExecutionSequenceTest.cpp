@@ -61,6 +61,14 @@ class ExecutionSequenceTest : public ::testing::Test {
     createTable("test4", {{"col_bi", ctx().int64()}, {"col_i", ctx().int32()}}, {2});
     insertCsvValues("test4", "2,122\n3,133\n4,144");
 
+    createTable("test5",
+                {{"col_bi", ctx().int64()},
+                 {"col_i", ctx().int32()},
+                 {"col_f", ctx().fp32()},
+                 {"col_d", ctx().fp64()}},
+                {2});
+    insertCsvValues("test5", "1,11,1.1,11.11\n2,22,2.2,22.22\n3,33,3.3,33.33");
+
     createTable("array_test", {{"arr_float", ctx().arrayVarLen(ctx().fp32())}});
     insertJsonValues("array_test",
                      R"___({"arr_float": [0.0, 1.0]}
@@ -778,7 +786,7 @@ TEST_F(ExecutionSequenceTest, JoinThreeScansFilterAggregate) {
                             makeExpr<BinOper>(ctx().boolean(),
                                               OpType::kNe,
                                               Qualifier::kOne,
-                                              getNodeColumnRef(scan1.get(), 1),
+                                              getNodeColumnRef(join1.get(), 1),
                                               getNodeColumnRef(scan3.get(), 1)));
   auto proj = dag->addProject(join2, {4, 8});
   auto agg = dag->addAgg(proj, 2, {{AggType::kCount}});
@@ -812,6 +820,42 @@ TEST_F(ExecutionSequenceTest, Limit0) {
 
   auto res = runQuery(std::move(dag));
   compare_res_data(res, std::vector<int64_t>());
+}
+
+TEST_F(ExecutionSequenceTest, JoinOfJoins) {
+  auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
+  auto scan1 = dag->addScan(TEST_DB_ID, "test1");
+  auto scan2 = dag->addScan(TEST_DB_ID, "test3");
+  auto scan3 = dag->addScan(TEST_DB_ID, "test5");
+  auto join1 = dag->addEquiJoin(scan1, scan2, JoinType::INNER, 1, 1);
+  auto join2 = dag->addEquiJoin(scan1, scan3, JoinType::INNER, 1, 1);
+  auto join3 = dag->addJoin(
+      join1,
+      join2,
+      JoinType::INNER,
+      makeExpr<BinOper>(ctx().boolean(),
+                        OpType::kAnd,
+                        Qualifier::kOne,
+                        makeExpr<BinOper>(ctx().boolean(),
+                                          OpType::kEq,
+                                          Qualifier::kOne,
+                                          getNodeColumnRef(join1.get(), 1),
+                                          getNodeColumnRef(join2.get(), 1)),
+                        makeExpr<BinOper>(ctx().boolean(),
+                                          OpType::kEq,
+                                          Qualifier::kOne,
+                                          getNodeColumnRef(join1.get(), 5),
+                                          getNodeColumnRef(join2.get(), 5))));
+
+  auto proj3 = dag->addProject(join3, std::vector<int>{1, 5});
+  dag->finalize();
+
+  QueryExecutionSequence new_seq(dag->getRootNode(), configPtr());
+  CHECK_EQ(new_seq.size(), (size_t)2);
+
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res, std::vector<int32_t>({11, 22, 33}), std::vector<int64_t>({1, 2, 3}));
 }
 
 int main(int argc, char* argv[]) {

@@ -108,3 +108,5 @@ inline InputColDescriptor column_var_to_descriptor(const hdk::ir::ColumnVar* var
 hdk::ir::ExprPtrVector getInputExprsForAgg(const hdk::ir::Node* node);
 
 bool hasWindowFunctionExpr(const hdk::ir::Project* node);
+
+void insert_join_projections(std::vector<hdk::ir::NodePtr>& nodes);
