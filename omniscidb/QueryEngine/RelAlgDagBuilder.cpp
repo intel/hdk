@@ -2358,6 +2358,68 @@ bool hasWindowFunctionExpr(const hdk::ir::Project* node) {
   return false;
 }
 
+/**
+ * Join can become an execution point in a query. This is inconvenient because
+ * Join node doesn't allow to filter-out unused columns. Here we insert projections
+ * that would help to avoid Joins as execution points and enable dead columns
+ * elimination.
+ */
+void insert_join_projections(std::vector<hdk::ir::NodePtr>& nodes) {
+  std::list<hdk::ir::NodePtr> node_list(nodes.begin(), nodes.end());
+  auto du_web = build_du_web(nodes);
+  for (auto node_it = node_list.begin(); node_it != node_list.end(); ++node_it) {
+    auto& node = *node_it;
+    auto join = node->as<hdk::ir::Join>();
+    if (!join) {
+      continue;
+    }
+
+    CHECK(du_web.count(join));
+    auto join_users = du_web.at(join);
+    if (join_users.empty()) {
+      continue;
+    }
+
+    bool insert_projection = false;
+    if (join_users.size() > 1) {
+      insert_projection = true;
+    } else {
+      auto join_user = *join_users.begin();
+      if (join_user->is<hdk::ir::Join>() && join == join_user->getInput(0)) {
+        insert_projection = false;
+      } else {
+        insert_projection = !join_user->is<hdk::ir::Project>();
+      }
+    }
+
+    // Here we insert a projection for all join columns. We assume that dead column
+    // elimination will be used to remove unused ones.
+    if (insert_projection) {
+      hdk::ir::ExprPtrVector exprs;
+      std::vector<std::string> fields;
+      exprs.reserve(join->size());
+      fields.reserve(join->size());
+      for (unsigned i = 0; i < (unsigned)join->size(); ++i) {
+        exprs.emplace_back(getNodeColumnRef(join, i));
+        fields.emplace_back("expr_" + std::to_string(i));
+      }
+      auto new_project =
+          std::make_shared<hdk::ir::Project>(std::move(exprs), std::move(fields), node);
+      auto next_it = node_it;
+      ++next_it;
+      node_list.insert(next_it, new_project);
+
+      for (auto join_user : join_users) {
+        const_cast<hdk::ir::Node*>(join_user)->replaceInput(node, new_project);
+      }
+    }
+  }
+
+  if (node_list.size() != nodes.size()) {
+    nodes.assign(node_list.begin(), node_list.end());
+  }
+}
+
 namespace details {
 
 class RelAlgDispatcher {
@@ -2894,6 +2956,9 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   simplify_sort(nodes_);
   sink_projected_boolean_expr_to_join(nodes_);
   eliminate_identical_copy(nodes_);
+  if (!coalesce_) {
+    insert_join_projections(nodes_);
+  }
   fold_filters(nodes_);
   std::vector<const hdk::ir::Node*> filtered_left_deep_joins;
   std::vector<const hdk::ir::Node*> left_deep_joins;
