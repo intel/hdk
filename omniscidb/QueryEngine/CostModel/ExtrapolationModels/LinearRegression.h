@@ -26,7 +26,7 @@ class LinearRegression : public ExtrapolationModel {
       : ExtrapolationModel(std::move(measurement)) { buildRegressionCoefficients(); }
 
   size_t getExtrapolatedData(size_t bytes) override;
-private:
+protected:
     void buildRegressionCoefficients();
     arma::mat buildFeaturesMatrix();
     arma::vec buildTargets();

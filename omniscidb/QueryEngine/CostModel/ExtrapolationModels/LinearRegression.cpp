@@ -34,7 +34,7 @@ arma::mat LinearRegression::buildFeaturesMatrix() {
   arma::mat X(measurement.size(), featuresSize, arma::fill::ones);
     
   for (size_t row = 0; row < measurement.size(); row++) {
-    X(row, 0) = (double) measurement[row].bytes;
+    X(row, 1) = (double) measurement[row].bytes;
   }
 
   return X;
