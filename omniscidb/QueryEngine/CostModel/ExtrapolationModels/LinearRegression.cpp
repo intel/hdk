@@ -16,25 +16,25 @@
 namespace costmodel {
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
-  arma::vec x = { 1.0, (double) bytes };
-  return (size_t) arma::dot(x, w);
+  arma::vec x = {1.0, (double)bytes};
+  return (size_t)arma::dot(x, w);
 }
 
-void LinearRegression::buildRegressionCoefficients() { 
-    // y(x) = w0 + \sum xj * wj = x^T * w
-    arma::mat X = buildFeaturesMatrix();
-    arma::vec y = buildTargets();
+void LinearRegression::buildRegressionCoefficients() {
+  // y(x) = w0 + \sum xj * wj = x^T * w
+  arma::mat X = buildFeaturesMatrix();
+  arma::vec y = buildTargets();
 
-    w = arma::inv(X.t() * X) * X.t() * y;
+  w = arma::inv(X.t() * X) * X.t() * y;
 }
 
 arma::mat LinearRegression::buildFeaturesMatrix() {
-  // x = (1, bytes) 
+  // x = (1, bytes)
   const size_t featuresSize = 2;
   arma::mat X(measurement.size(), featuresSize, arma::fill::ones);
-    
+
   for (size_t row = 0; row < measurement.size(); row++) {
-    X(row, 1) = (double) measurement[row].bytes;
+    X(row, 1) = (double)measurement[row].bytes;
   }
 
   return X;
@@ -49,4 +49,4 @@ arma::vec LinearRegression::buildTargets() {
   return y;
 }
 
-} // namespace costmodel
+}  // namespace costmodel
