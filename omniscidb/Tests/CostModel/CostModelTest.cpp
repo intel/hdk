@@ -40,14 +40,15 @@ bool doubleEquals(double x, double y) {
 }
 
 class LinearRegressionTest : public LinearRegression {
-public:
-  LinearRegressionTest(std::vector<Detail::Measurement> &measurement) : LinearRegression(measurement) {}
+ public:
+  LinearRegressionTest(std::vector<Detail::Measurement>& measurement)
+      : LinearRegression(measurement) {}
 
   void equalsWs(arma::vec wExpected) {
-     ASSERT_EQ(w.size(), wExpected.size());
-    
+    ASSERT_EQ(w.size(), wExpected.size());
+
     for (size_t i = 0; i < w.size(); i++) {
-      ASSERT_TRUE(doubleEquals(w(i), wExpected(i))); 
+      ASSERT_TRUE(doubleEquals(w(i), wExpected(i)));
     }
   }
 };
@@ -75,9 +76,9 @@ TEST(ExtrapolationModelsTests, LinearExtrapolationTest1) {
 
 TEST(ExtrapolationModelsTests, LinearRegressionTest1) {
   std::vector<Detail::Measurement> ms = {
-    { .bytes = 10, .milliseconds = 10 },
-    { .bytes = 20, .milliseconds = 20 },
-    { .bytes = 30, .milliseconds = 30 },
+      {.bytes = 10, .milliseconds = 10},
+      {.bytes = 20, .milliseconds = 20},
+      {.bytes = 30, .milliseconds = 30},
   };
 
   LinearRegressionTest lrt(ms);
