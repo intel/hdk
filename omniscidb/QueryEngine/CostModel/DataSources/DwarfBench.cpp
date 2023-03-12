@@ -20,7 +20,7 @@ namespace costmodel {
 
 DwarfBenchDataSource::DwarfBenchDataSource()
     : DataSource(DataSourceConfig{.dataSourceName = "DwarfBench",
-                                  .supportedDevices = {ExecutorDeviceType::CPU},
+                                  .supportedDevices = {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU},
                                   .supportedTemplates = {AnalyticalTemplate::GroupBy,
                                                          AnalyticalTemplate::Join,
                                                          AnalyticalTemplate::Scan}}) {}
@@ -67,7 +67,7 @@ DwarfBench::Dwarf DwarfBenchDataSource::convertToDwarf(AnalyticalTemplate templ)
     case AnalyticalTemplate::GroupBy:
       return DwarfBench::Dwarf::GroupBy;
     case AnalyticalTemplate::Scan:
-      return DwarfBench::Dwarf::DPLScan;
+      return DwarfBench::Dwarf::Scan;
     case AnalyticalTemplate::Join:
       return DwarfBench::Dwarf::Join;
     case AnalyticalTemplate::Reduce:
