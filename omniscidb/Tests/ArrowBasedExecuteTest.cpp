@@ -7278,6 +7278,23 @@ TEST_F(Select, ReturnNullFromDivByZero) {
   }
 }
 
+TEST_F(Select, ReturnNullFromModByZero) {
+  auto old_null_mod_by_zero = config().exec.codegen.null_mod_by_zero;
+  config().exec.codegen.null_mod_by_zero = true;
+  ScopeGuard sg = [old_null_mod_by_zero] {
+    config().exec.codegen.null_mod_by_zero = old_null_mod_by_zero;
+  };
+  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+    SKIP_NO_GPU();
+    c("SELECT x % 0 FROM test;", dt);
+    c("SELECT w % 0 FROM test;", dt);
+    c("SELECT y % 0 FROM test;", dt);
+    c("SELECT z % 0 FROM test;", dt);
+    c("SELECT t % 0 FROM test;", dt);
+    c("SELECT 1 % 0 FROM test;", dt);
+  }
+}
+
 TEST_F(Select, ReturnInfFromDivByZero) {
   config().exec.codegen.inf_div_by_zero = true;
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {

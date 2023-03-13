@@ -78,6 +78,7 @@ struct InterruptConfig {
 struct CodegenConfig {
   bool inf_div_by_zero = false;
   bool null_div_by_zero = false;
+  bool null_mod_by_zero = false;
   bool hoist_literals = true;
   bool enable_filter_function = true;
 };

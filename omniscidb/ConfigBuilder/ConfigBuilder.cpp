@@ -285,6 +285,12 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->default_value(config_->exec.codegen.inf_div_by_zero)
           ->implicit_value(true),
       "Return INF on fp division by zero instead of throwing an exception.");
+  opt_desc.add_options()(
+      "null-mod-by-zero",
+      po::value<bool>(&config_->exec.codegen.null_mod_by_zero)
+          ->default_value(config_->exec.codegen.null_mod_by_zero)
+          ->implicit_value(true),
+      "Return NULL on modulo by zero instead of throwing an exception.");
   opt_desc.add_options()("enable-hoist-literals",
                          po::value<bool>(&config_->exec.codegen.hoist_literals)
                              ->default_value(config_->exec.codegen.hoist_literals)
