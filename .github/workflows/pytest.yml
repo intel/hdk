@@ -18,11 +18,21 @@ jobs:
           echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
           echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
 
-      - name: Update Conda
+      - name: Restore Conda env cache
+        id: conda-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          restore-keys: |
+            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
+
+      - name: Update Conda env
+        if: steps.conda-cache.cache-hit != 'true'
         run: |
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.8
 
       - name: Restore Maven cache
         uses: actions/cache@v3
@@ -37,7 +47,8 @@ jobs:
           CPU_COUNT: 4
           RUN_TESTS: 1
         run: |
-          mkdir -p ${{ env.PREFIX }} build
+          rm -rf build
+          mkdir -p build
           cd build
           $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} sh -c "cmake  .. -DENABLE_CUDA=off -DENABLE_CONDA=on -DENABLE_PYTHON=on -DCMAKE_BUILD_TYPE=release && make -j2 && make install"
 
