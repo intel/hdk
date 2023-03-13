@@ -26,7 +26,11 @@ using namespace TestHelpers;
 namespace {
 
 const size_t g_num_rows{10};
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
 bool g_cpu_only{false};
+#else
+bool g_cpu_only{true};
+#endif
 
 }  // namespace
 
@@ -152,42 +156,15 @@ int main(int argc, char** argv) {
           ArrowSQLRunner::getExecutionOptions(/*allow_loop_joins=*/false, just_explain);
       auto co = ArrowSQLRunner::getCompilationOptions(dt);
       auto res = ArrowSQLRunner::runSqlQuery(
-          R"(SELECT COUNT(*), AVG(x), SUM(y), SUM(w), AVG(t) FROM test;)", co, eo);
+          R"(SELECT str, count(*) FROM test GROUP BY str;)", co, eo);
       if (just_explain) {
         std::cout << "Explanation for " << device_type_str << res.getExplanation()
                   << std::endl;
       } else {
         auto rows = res.getRows();
-        CHECK_EQ(rows->rowCount(), size_t(1));
-        auto row =
-            rows->getNextRow(/*translate_strings=*/true, /*decimal_to_double=*/true);
-        CHECK_EQ(row.size(), size_t(5));
-        std::cout << "Result for " << device_type_str << v<int64_t>(row[0]) << " : "
-                  << v<double>(row[1]) << " : " << v<int64_t>(row[2]) << " : "
-                  << v<int64_t>(row[3]) << " : " << v<double>(row[4]) << std::endl;
-      }
-    }
-    {
-      const ExecutorDeviceType dt =
-          g_cpu_only ? ExecutorDeviceType::CPU : ExecutorDeviceType::GPU;
-      const auto device_type_str = dt == ExecutorDeviceType::CPU ? " CPU: " : " GPU: ";
-      auto eo =
-          ArrowSQLRunner::getExecutionOptions(/*allow_loop_joins=*/false, just_explain);
-      auto co = ArrowSQLRunner::getCompilationOptions(dt);
-      auto res = ArrowSQLRunner::runSqlQuery(
-          R"(SELECT COUNT(*), AVG(x), SUM(y), t FROM test GROUP BY t;)", co, eo);
-      if (just_explain) {
-        std::cout << "Explanation for " << device_type_str << res.getExplanation()
-                  << std::endl;
-      } else {
-        auto rows = res.getRows();
-        CHECK_GE(rows->rowCount(), size_t(1));
-        auto row =
-            rows->getNextRow(/*translate_strings=*/true, /*decimal_to_double=*/true);
-        CHECK_EQ(row.size(), size_t(4));
-        std::cout << "Result for " << device_type_str << v<int64_t>(row[0]) << " : "
-                  << v<double>(row[1]) << " : " << v<int64_t>(row[2]) << " : "
-                  << v<int64_t>(row[3]) << std::endl;
+        CHECK(rows);
+        std::cout << "Result for " << device_type_str << "\n"
+                  << rows->contentToString() << std::endl;
       }
     }
   } catch (const std::exception& e) {
