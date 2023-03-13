@@ -622,9 +622,23 @@ llvm::Value* CodeGenerator::codegenMod(llvm::Value* lhs_lv,
                  : cgen_state_->emitCall(
                        "mod_" + null_typename + null_check_suffix,
                        {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(type))});
-  cgen_state_->ir_builder_.SetInsertPoint(mod_zero);
-  cgen_state_->ir_builder_.CreateRet(cgen_state_->llInt(Executor::ERR_DIV_BY_ZERO));
-  cgen_state_->ir_builder_.SetInsertPoint(mod_ok);
+  if (config_.exec.codegen.null_mod_by_zero) {
+    auto mod_res = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mod_res", cgen_state_->current_func_);
+    cgen_state_->ir_builder_.CreateBr(mod_res);
+    cgen_state_->ir_builder_.SetInsertPoint(mod_zero);
+    cgen_state_->ir_builder_.CreateBr(mod_res);
+    cgen_state_->ir_builder_.SetInsertPoint(mod_res);
+    auto phi = cgen_state_->ir_builder_.CreatePHI(ret->getType(), 2);
+    phi->addIncoming(ret, mod_ok);
+    phi->addIncoming(llvm::ConstantInt::get(ret->getType(), inline_int_null_value(type)),
+                     mod_zero);
+    ret = phi;
+  } else {
+    cgen_state_->ir_builder_.SetInsertPoint(mod_zero);
+    cgen_state_->ir_builder_.CreateRet(cgen_state_->llInt(Executor::ERR_DIV_BY_ZERO));
+    cgen_state_->ir_builder_.SetInsertPoint(mod_ok);
+  }
   return ret;
 }
 
