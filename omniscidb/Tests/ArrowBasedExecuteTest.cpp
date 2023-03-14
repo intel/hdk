@@ -1626,25 +1626,6 @@ bool skip_tests(const ExecutorDeviceType device_type) {
     continue;                                                \
   }
 
-class Distributed50 : public ExecuteTestBase, public ::testing::Test {};
-
-TEST_F(Distributed50, FailOver) {
-  createTable("dist5", {{"col1", ctx().extDict(ctx().text(), 0)}});
-
-  auto dt = ExecutorDeviceType::CPU;
-
-  EXPECT_NO_THROW(insertCsvValues("dist5", "t1"));
-  ASSERT_EQ(1, v<int64_t>(run_simple_agg("SELECT count(*) FROM dist5;", dt)));
-
-  EXPECT_NO_THROW(insertCsvValues("dist5", "t2"));
-  ASSERT_EQ(2, v<int64_t>(run_simple_agg("SELECT count(*) FROM dist5;", dt)));
-
-  EXPECT_NO_THROW(insertCsvValues("dist5", "t3"));
-  ASSERT_EQ(3, v<int64_t>(run_simple_agg("SELECT count(*) FROM dist5;", dt)));
-
-  dropTable("dist5");
-}
-
 class Errors : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(Errors, InvalidQueries) {
@@ -3075,22 +3056,13 @@ TEST_F(Select, Arrays) {
                   "t1.arr_str[1] = t2.arr_str[1];",
                   dt)));
 
-    // New behavior introduced by [QE-261] allows translation to none-encoded strings for
-    // comparison if watchdog is off for non-distributed deployments
-
-    // The following tests throw "Cast from dictionary-encoded string to
-    // none-encoded not supported for distributed queries" in distributed mode.
-    // We will unlock these with planned work for sort permutations of dictionary
-    // translation maps, as well as much faster support for this class of queries
-    // with watchdog off (distributed and single-node).
-
     config().exec.watchdog.enable = false;
 
     EXPECT_EQ(int64_t(190),
               v<int64_t>(run_simple_agg(
                   "SELECT COUNT(1) FROM array_test t1, array_test t2 WHERE "
                   "t1.arr_str[1] > t2.arr_str[1];",
-                  dt)));  //
+                  dt)));
 
     EXPECT_EQ(int64_t(210),
               v<int64_t>(run_simple_agg(
@@ -3109,9 +3081,6 @@ TEST_F(Select, Arrays) {
                   "SELECT COUNT(1) FROM array_test t1, array_test t2 WHERE "
                   "t1.arr_str[1] <= t2.arr_str[1];",
                   dt)));
-
-    // This query can run on distributed as it can leverage distributed
-    // string translation
 
     EXPECT_EQ(int64_t(20),
               v<int64_t>(run_simple_agg(
@@ -4486,9 +4455,6 @@ TEST_F(Select, Case) {
     c(R"(SELECT CASE WHEN x = 8 THEN 'b' WHEN x = 7 THEN str END AS case_group, COUNT(*) AS n FROM test WHERE CASE WHEN x = 7 THEN str WHEN x = 8 THEN fixed_str ELSE 'bar' END = str GROUP BY case_group ORDER BY case_group ASC NULLS FIRST, n ASC NULLS FIRST;)",
       dt);
 
-    // Ensure that transients added during case-statement string dictionary column casts
-    // are propogated to aggregator in distributed mode
-
     c(R"(SELECT CASE WHEN x = 8 THEN str WHEN x = 7 THEN ss END AS case_expr FROM test ORDER BY case_expr ASC NULLS FIRST;)",
       dt);
     c(R"(SELECT CASE WHEN x = 8 THEN str WHEN x = 7 THEN ss END AS case_group, COUNT(*) AS n FROM test GROUP BY case_group ORDER BY case_group ASC NULLS FIRST;)",
@@ -4514,7 +4480,6 @@ TEST_F(Select, Case) {
         config().exec.watchdog.enable = watchdog_state;
       };
 
-      // casts not yet supported in distributed mode
       config().exec.watchdog.enable = false;
       c(R"(SELECT CASE WHEN x = 7 THEN 'a' WHEN x = 8 then str ELSE fixed_str END FROM test ORDER BY 1;)",
         dt);
@@ -4744,8 +4709,6 @@ TEST_F(Select, Strings) {
     c("SELECT COUNT(*) FROM test WHERE str <> 'bar';", dt);
     c("SELECT COUNT(*) FROM test WHERE 'bar' <> str;", dt);
     c("SELECT COUNT(*) FROM test WHERE str = 'foo' OR str = 'bar';", dt);
-    // The following tests throw Cast from dictionary-encoded string to none-encoded not
-    // supported for distributed queries in distributed mode
     c("SELECT COUNT(*) FROM test WHERE str = real_str;", dt);
     c("SELECT COUNT(*) FROM test WHERE str <> str;", dt);
     c("SELECT COUNT(*) FROM test WHERE ss <> str;", dt);
