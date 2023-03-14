@@ -98,14 +98,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       po::value<unsigned>(&config_->exec.join.trivial_loop_join_threshold)
           ->default_value(config_->exec.join.trivial_loop_join_threshold),
       "Maximum number of rows in an inner table allowed for loop join.");
-  opt_desc.add_options()(
-      "inner-join-fragment-skipping",
-      po::value<bool>(&config_->exec.join.inner_join_fragment_skipping)
-          ->default_value(config_->exec.join.inner_join_fragment_skipping)
-          ->implicit_value(true),
-      "Enable/disable inner join fragment skipping. This feature is "
-      "considered stable and is enabled by default. This "
-      "parameter will be removed in a future release.");
   opt_desc.add_options()("huge-join-hash-threshold",
                          po::value<size_t>(&config_->exec.join.huge_join_hash_threshold)
                              ->default_value(config_->exec.join.huge_join_hash_threshold),

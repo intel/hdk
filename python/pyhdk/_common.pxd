@@ -129,7 +129,6 @@ cdef extern from "omniscidb/Shared/Config.h":
   cdef cppclass CJoinConfig "JoinConfig":
     bool allow_loop_joins
     unsigned trivial_loop_join_threshold
-    bool inner_join_fragment_skipping
     size_t huge_join_hash_threshold
     size_t huge_join_hash_min_load
 

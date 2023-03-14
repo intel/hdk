@@ -80,7 +80,6 @@ class QueryFragmentDescriptor {
                               const policy::ExecutionPolicy* policy,
                               const int device_count,
                               const bool enable_multifrag_kernels,
-                              const bool enable_inner_join_fragment_skipping,
                               Executor* executor,
                               compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
@@ -187,7 +186,6 @@ class QueryFragmentDescriptor {
                                const policy::ExecutionPolicy* policy,
                                const int device_count,
                                const size_t num_bytes_for_row,
-                               const bool enable_inner_join_fragment_skipping,
                                Executor* executor,
                                compiler::CodegenTraitsDescriptor cgen_traits_desc);
 

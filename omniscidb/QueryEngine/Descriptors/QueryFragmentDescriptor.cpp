@@ -67,7 +67,6 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
     const policy::ExecutionPolicy* policy,
     const int device_count,
     const bool enable_multifrag_kernels,
-    const bool enable_inner_join_fragment_skipping,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   // For joins, only consider the cardinality of the LHS
@@ -95,7 +94,6 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
                             policy,
                             device_count,
                             num_bytes_for_row,
-                            enable_inner_join_fragment_skipping,
                             executor,
                             cgen_traits_desc);
   } else {
@@ -329,7 +327,6 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
     const policy::ExecutionPolicy* policy,
     const int device_count,
     const size_t num_bytes_for_row,
-    const bool enable_inner_join_fragment_skipping,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   // Allocate all the fragments of the tables involved in the query to available
@@ -362,8 +359,7 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
                                             frag_offsets,
                                             outer_frag_id,
                                             cgen_traits_desc);
-    if (enable_inner_join_fragment_skipping &&
-        (skip_frag == std::pair<bool, int64_t>(false, -1))) {
+    if (skip_frag == std::pair<bool, int64_t>(false, -1)) {
       skip_frag = executor->skipFragmentInnerJoins(outer_table_desc,
                                                    ra_exe_unit,
                                                    fragment,
