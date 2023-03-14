@@ -384,12 +384,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->opts.constrained_by_in_threshold),
                          "Threshold for constrained-by-in reqrite optimiation.");
   opt_desc.add_options()(
-      "skip-intermediate-count",
-      po::value<bool>(&config_->opts.skip_intermediate_count)
-          ->default_value(config_->opts.skip_intermediate_count)
-          ->implicit_value(true),
-      "Skip pre-flight counts for intermediate projections with no filters.");
-  opt_desc.add_options()(
       "enable-left-join-filter-hoisting",
       po::value<bool>(&config_->opts.enable_left_join_filter_hoisting)
           ->default_value(config_->opts.enable_left_join_filter_hoisting)

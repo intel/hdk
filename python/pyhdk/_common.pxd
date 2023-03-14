@@ -200,7 +200,6 @@ cdef extern from "omniscidb/Shared/Config.h":
     CFilterPushdownConfig filter_pushdown
     bool from_table_reordering
     size_t constrained_by_in_threshold
-    bool skip_intermediate_count
     bool enable_left_join_filter_hoisting
 
   cdef cppclass CResultSetConfig "ResultSetConfig":

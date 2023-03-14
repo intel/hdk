@@ -845,9 +845,7 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
   const auto project = dynamic_cast<const hdk::ir::Project*>(body);
   if (project) {
     std::optional<size_t> prev_count;
-    // Disabling the intermediate count optimization in distributed, as the previous
-    // execution descriptor will likely not hold the aggregated result.
-    if (config_.opts.skip_intermediate_count && step_idx > 0) {
+    if (step_idx > 0) {
       // If the previous node produced a reliable count, skip the pre-flight count.
       hdk::ir::Node const* const prev_body = project->getInput(0);
       if (shared::dynamic_castable_to_any<hdk::ir::Compound, hdk::ir::LogicalValues>(
