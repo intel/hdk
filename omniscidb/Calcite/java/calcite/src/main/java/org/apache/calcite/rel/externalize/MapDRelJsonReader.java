@@ -269,8 +269,9 @@ public class MapDRelJsonReader {
         Objects.requireNonNull(relOptSchema);
         Objects.requireNonNull(jsonRel);
         Objects.requireNonNull(jsonRel.get("table"));
-        Objects.requireNonNull(
-                relOptSchema.getTableForMember((List<String>) jsonRel.get("table")));
+        if (relOptSchema.getTableForMember((List<String>) jsonRel.get("table")) == null) {
+          throw new RuntimeException("unknown table: " + jsonRel.get("table"));
+        }
         rel = EnumerableTableScan.create(cluster,
                 relOptSchema.getTableForMember((List<String>) jsonRel.get("table")));
       }
