@@ -2358,15 +2358,13 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
   const auto device_count = deviceCount(device_type);
   CHECK_GT(device_count, 0);
 
-  fragment_descriptor.buildFragmentKernelMap(
-      ra_exe_unit,
-      shared_context.getFragOffsets(),
-      policy,
-      device_count,
-      use_multifrag_kernel,
-      config_->exec.join.inner_join_fragment_skipping,
-      this,
-      co.codegen_traits_desc);
+  fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
+                                             shared_context.getFragOffsets(),
+                                             policy,
+                                             device_count,
+                                             use_multifrag_kernel,
+                                             this,
+                                             co.codegen_traits_desc);
   if (eo.with_watchdog && fragment_descriptor.shouldCheckWorkUnitWatchdog()) {
     checkWorkUnitWatchdog(
         ra_exe_unit, table_infos, *schema_provider_, device_type, device_count);
@@ -2488,15 +2486,13 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
 
   CHECK(!ra_exe_unit.input_descs.empty());
 
-  fragment_descriptor.buildFragmentKernelMap(
-      ra_exe_unit,
-      shared_context.getFragOffsets(),
-      policy,
-      available_cpus + available_gpus.size(),
-      false, /*multifrag policy unsupported yet*/
-      config_->exec.join.inner_join_fragment_skipping,
-      this,
-      co.codegen_traits_desc);
+  fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
+                                             shared_context.getFragOffsets(),
+                                             policy,
+                                             available_cpus + available_gpus.size(),
+                                             false, /*multifrag policy unsupported yet*/
+                                             this,
+                                             co.codegen_traits_desc);
 
   if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
       (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
