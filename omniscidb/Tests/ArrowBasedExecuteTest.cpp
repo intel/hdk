@@ -4289,11 +4289,6 @@ TEST_F(Select, MultiStepQueries) {
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
 
-    const auto skip_intermediate_count = config().opts.skip_intermediate_count;
-    ScopeGuard reset_skip_intermediate_count = [&skip_intermediate_count] {
-      config().opts.skip_intermediate_count = skip_intermediate_count;
-    };
-
     c("SELECT z, (z * SUM(x)) / SUM(y) + 1 FROM test GROUP BY z ORDER BY z;", dt);
     c("SELECT z,COUNT(*), AVG(x) / SUM(y) + 1 FROM test GROUP BY z ORDER BY z;", dt);
   }
