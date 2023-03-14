@@ -315,9 +315,9 @@ void build_table(const std::vector<TYPE>& values,
   {
     std::shared_ptr<arrow::Array> array;
     arrow::NumericBuilder<typename ConversionTraits<TYPE>::arrow_type> builder;
-    builder.Resize(values.size());
-    builder.AppendValues(values);
-    builder.Finish(&array);
+    ARROW_THROW_NOT_OK(builder.Resize(values.size()));
+    ARROW_THROW_NOT_OK(builder.AppendValues(values));
+    ARROW_THROW_NOT_OK(builder.Finish(&array));
 
     auto schema =
         arrow::schema({arrow::field("value", ConversionTraits<TYPE>::getSchemaValue())});
