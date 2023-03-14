@@ -21,7 +21,6 @@
 #include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
-#include "QueryEngine/QueryHint.h"
 #include "Shared/Config.h"
 
 #include "BufferPoolStats.h"
@@ -121,11 +120,6 @@ DataMgr* getDataMgr();
 Executor* getExecutor();
 
 std::shared_ptr<CalciteJNI> getCalcite();
-
-RegisteredQueryHint getParsedQueryHint(const std::string& query_str);
-
-std::optional<std::unordered_map<size_t, RegisteredQueryHint>> getParsedQueryHints(
-    const std::string& query_str);
 
 std::unique_ptr<RelAlgExecutor> makeRelAlgExecutor(const std::string& query_str);
 

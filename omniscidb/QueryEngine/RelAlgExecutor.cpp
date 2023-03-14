@@ -243,38 +243,6 @@ ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
   return run_query(co_cpu);
 }
 
-std::pair<CompilationOptions, ExecutionOptions> RelAlgExecutor::handle_hint(
-    const CompilationOptions& co,
-    const ExecutionOptions& eo,
-    const hdk::ir::Node* body) {
-  ExecutionOptions eo_hint_applied = eo;
-  CompilationOptions co_hint_applied = co;
-  auto target_node = body;
-  if (auto sort_body = dynamic_cast<const hdk::ir::Sort*>(body)) {
-    target_node = sort_body->getInput(0);
-  }
-  auto query_hints = getParsedQueryHint(target_node);
-  auto columnar_output_hint_enabled = false;
-  auto rowwise_output_hint_enabled = false;
-  if (query_hints) {
-    if (query_hints->isHintRegistered(QueryHint::kCpuMode)) {
-      VLOG(1) << "A user forces to run the query on the CPU execution mode";
-      co_hint_applied.device_type = ExecutorDeviceType::CPU;
-    }
-    if (query_hints->isHintRegistered(QueryHint::kColumnarOutput)) {
-      VLOG(1) << "A user forces the query to run with columnar output";
-      columnar_output_hint_enabled = true;
-    } else if (query_hints->isHintRegistered(QueryHint::kRowwiseOutput)) {
-      VLOG(1) << "A user forces the query to run with rowwise output";
-      rowwise_output_hint_enabled = true;
-    }
-  }
-  auto columnar_output_enabled = eo.output_columnar_hint ? !rowwise_output_hint_enabled
-                                                         : columnar_output_hint_enabled;
-  eo_hint_applied.output_columnar_hint = columnar_output_enabled;
-  return std::make_pair(co_hint_applied, eo_hint_applied);
-}
-
 void RelAlgExecutor::prepareStreamingExecution(const CompilationOptions& co,
                                                const ExecutionOptions& eo) {
   query_dag_->resetQueryExecutionState();
@@ -313,26 +281,15 @@ void RelAlgExecutor::prepareStreamingExecution(const CompilationOptions& co,
 
   const ExecutionOptions eo_work_unit{eo};
 
-  auto [co_hint_applied, eo_hint_applied] = handle_hint(co, eo_work_unit, body);
-
   auto work_unit = createWorkUnitForStreaming(body, co, eo);
 
   auto ra_exe_unit = work_unit.exe_unit;
-  ra_exe_unit.query_hint = RegisteredQueryHint::fromConfig(config_);
-  auto candidate = query_dag_->getQueryHint(body);
-  if (candidate) {
-    ra_exe_unit.query_hint = *candidate;
-  }
   auto column_cache = std::make_unique<ColumnCacheMap>();
 
   auto table_infos = get_table_infos(work_unit.exe_unit, executor_);
 
-  stream_execution_context_ = executor_->prepareStreamingExecution(ra_exe_unit,
-                                                                   co_hint_applied,
-                                                                   eo_hint_applied,
-                                                                   table_infos,
-                                                                   data_provider_,
-                                                                   *column_cache);
+  stream_execution_context_ = executor_->prepareStreamingExecution(
+      ra_exe_unit, co, eo_work_unit, table_infos, data_provider_, *column_cache);
 
   stream_execution_context_->column_cache = std::move(column_cache);
   stream_execution_context_->is_agg = node_is_aggregate(body);
@@ -814,11 +771,9 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     return new_eo;
   }();
 
-  auto hint_applied = handle_hint(co, eo_work_unit, body);
   const auto compound = dynamic_cast<const hdk::ir::Compound*>(body);
   if (compound) {
-    exec_desc.setResult(executeCompound(
-        compound, hint_applied.first, hint_applied.second, queue_time_ms));
+    exec_desc.setResult(executeCompound(compound, co, eo_work_unit, queue_time_ms));
     VLOG(3) << "Returned from executeCompound(), addTemporaryTable("
             << static_cast<int>(-compound->getId()) << ", ...)"
             << " exec_desc.getResult().getDataPtr()->rowCount()="
@@ -869,22 +824,19 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
   }
   const auto aggregate = dynamic_cast<const hdk::ir::Aggregate*>(body);
   if (aggregate) {
-    exec_desc.setResult(executeAggregate(
-        aggregate, hint_applied.first, hint_applied.second, queue_time_ms));
+    exec_desc.setResult(executeAggregate(aggregate, co, eo_work_unit, queue_time_ms));
     addTemporaryTable(-aggregate->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
   const auto filter = dynamic_cast<const hdk::ir::Filter*>(body);
   if (filter) {
-    exec_desc.setResult(
-        executeFilter(filter, hint_applied.first, hint_applied.second, queue_time_ms));
+    exec_desc.setResult(executeFilter(filter, co, eo_work_unit, queue_time_ms));
     addTemporaryTable(-filter->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
   const auto sort = dynamic_cast<const hdk::ir::Sort*>(body);
   if (sort) {
-    exec_desc.setResult(
-        executeSort(sort, hint_applied.first, hint_applied.second, queue_time_ms));
+    exec_desc.setResult(executeSort(sort, co, eo_work_unit, queue_time_ms));
     if (exec_desc.getResult().isFilterPushDownEnabled()) {
       return;
     }
@@ -893,7 +845,7 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
   }
   const auto logical_values = dynamic_cast<const hdk::ir::LogicalValues*>(body);
   if (logical_values) {
-    exec_desc.setResult(executeLogicalValues(logical_values, hint_applied.second));
+    exec_desc.setResult(executeLogicalValues(logical_values, eo_work_unit));
     addTemporaryTable(-logical_values->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
@@ -1688,7 +1640,6 @@ std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionConte
                                               data_provider_,
                                               column_cache_map,
                                               ra_exe_unit.hash_table_build_plan_dag,
-                                              ra_exe_unit.query_hint,
                                               ra_exe_unit.table_id_to_node_map);
     if (!join_table_or_err.fail_reason.empty()) {
       throw std::runtime_error(join_table_or_err.fail_reason);
@@ -1978,7 +1929,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createSortInputWorkUnit(
                               nullptr,
                               {sort_info.order_entries, sort_algorithm, limit, offset},
                               scan_total_limit,
-                              source_exe_unit.query_hint,
                               source_exe_unit.query_plan_dag,
                               source_exe_unit.hash_table_build_plan_dag,
                               source_exe_unit.table_id_to_node_map,
@@ -2145,14 +2095,6 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
   auto ra_exe_unit = decide_approx_count_distinct_implementation(
       work_unit.exe_unit, table_infos, executor_, co.device_type, target_exprs_owned_);
 
-  // register query hint if query_dag_ is valid
-  ra_exe_unit.query_hint = RegisteredQueryHint::fromConfig(config_);
-  if (query_dag_) {
-    auto candidate = query_dag_->getQueryHint(body);
-    if (candidate) {
-      ra_exe_unit.query_hint = *candidate;
-    }
-  }
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;
   if (is_window_execution_unit(ra_exe_unit)) {
     CHECK_EQ(table_infos.size(), size_t(1));
@@ -2828,13 +2770,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
                                               translator,
                                               eo.executor_type,
                                               config_.exec.group_by.bigint_count);
-  auto query_hint = RegisteredQueryHint::fromConfig(config_);
-  if (query_dag_) {
-    auto candidate = query_dag_->getQueryHint(compound);
-    if (candidate) {
-      query_hint = *candidate;
-    }
-  }
   CHECK_EQ(compound->size(), target_exprs.size());
   const RelAlgExecutionUnit exe_unit = {input_descs,
                                         input_col_descs,
@@ -2846,7 +2781,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
                                         nullptr,
                                         sort_info,
                                         0,
-                                        query_hint,
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
@@ -3104,13 +3038,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createAggregateWorkUnit(
                                                              temporary_tables_,
                                                              executor_,
                                                              translator);
-  auto query_hint = RegisteredQueryHint::fromConfig(config_);
-  if (query_dag_) {
-    auto candidate = query_dag_->getQueryHint(aggregate);
-    if (candidate) {
-      query_hint = *candidate;
-    }
-  }
   return {RelAlgExecutionUnit{input_descs,
                               input_col_descs,
                               {},
@@ -3121,7 +3048,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createAggregateWorkUnit(
                               nullptr,
                               sort_info,
                               0,
-                              query_hint,
                               dag_info.extracted_dag,
                               dag_info.hash_table_plan_dag,
                               dag_info.table_id_to_node_map,
@@ -3180,13 +3106,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
     target_exprs.push_back(target_expr.get());
     target_exprs_owned_.emplace_back(std::move(target_expr));
   }
-  auto query_hint = RegisteredQueryHint::fromConfig(config_);
-  if (query_dag_) {
-    auto candidate = query_dag_->getQueryHint(project);
-    if (candidate) {
-      query_hint = *candidate;
-    }
-  }
   const RelAlgExecutionUnit exe_unit = {input_descs,
                                         input_col_descs,
                                         {},
@@ -3197,7 +3116,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
                                         nullptr,
                                         sort_info,
                                         0,
-                                        query_hint,
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
@@ -3300,7 +3218,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
                                         nullptr,
                                         sort_info,
                                         max_num_tuples,
-                                        RegisteredQueryHint::fromConfig(config_),
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
@@ -3419,13 +3336,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createFilterWorkUnit(
                                                              temporary_tables_,
                                                              executor_,
                                                              translator);
-  auto query_hint = RegisteredQueryHint::fromConfig(config_);
-  if (query_dag_) {
-    auto candidate = query_dag_->getQueryHint(filter);
-    if (candidate) {
-      query_hint = *candidate;
-    }
-  }
   return {{input_descs,
            input_col_descs,
            {},
@@ -3436,7 +3346,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createFilterWorkUnit(
            nullptr,
            sort_info,
            0,
-           query_hint,
            dag_info.extracted_dag,
            dag_info.hash_table_plan_dag,
            dag_info.table_id_to_node_map},

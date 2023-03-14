@@ -1628,7 +1628,6 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
           ra_exe_unit_in.estimator,
           ra_exe_unit_in.sort_info,
           new_scan_limit,
-          ra_exe_unit_in.query_hint,
           ra_exe_unit_in.query_plan_dag,
           ra_exe_unit_in.hash_table_build_plan_dag,
           ra_exe_unit_in.table_id_to_node_map,
@@ -3500,7 +3499,6 @@ Executor::JoinHashTableOrError Executor::buildHashTableForQualifier(
     DataProvider* data_provider,
     ColumnCacheMap& column_cache,
     const HashTableBuildDagMap& hashtable_build_dag_map,
-    const RegisteredQueryHint& query_hint,
     const TableIdToNodeMap& table_id_to_node_map) {
   if (config_->exec.watchdog.enable_dynamic && interrupted_.load()) {
     throw QueryExecutionError(ERR_INTERRUPTED);
@@ -3516,7 +3514,6 @@ Executor::JoinHashTableOrError Executor::buildHashTableForQualifier(
                                      column_cache,
                                      this,
                                      hashtable_build_dag_map,
-                                     query_hint,
                                      table_id_to_node_map);
     return {tbl, ""};
   } catch (const HashJoinFail& e) {

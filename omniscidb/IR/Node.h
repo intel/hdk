@@ -9,9 +9,9 @@
 
 #include "Expr.h"
 
-#include "QueryEngine/QueryHint.h"
 #include "QueryEngine/TargetMetaInfo.h"
 #include "SchemaMgr/TableInfo.h"
+#include "Shared/Config.h"
 
 class RaExecutionDesc;
 class ExecutionResult;
@@ -207,10 +207,7 @@ using NodePtr = std::shared_ptr<Node>;
 class Scan : public Node {
  public:
   Scan(TableInfoPtr tinfo, std::vector<ColumnInfoPtr> column_infos)
-      : table_info_(std::move(tinfo))
-      , column_infos_(std::move(column_infos))
-      , hint_applied_(false)
-      , hints_(std::make_unique<Hints>()) {}
+      : table_info_(std::move(tinfo)), column_infos_(std::move(column_infos)) {}
 
   size_t size() const override { return column_infos_.size(); }
 
@@ -274,36 +271,9 @@ class Scan : public Node {
     return nullptr;
   };
 
-  void addHint(const ExplainedQueryHint& hint_explained) {
-    if (!hint_applied_) {
-      hint_applied_ = true;
-    }
-    hints_->emplace(hint_explained.getHint(), hint_explained);
-  }
-
-  const bool hasHintEnabled(const QueryHint candidate_hint) const {
-    if (hint_applied_ && !hints_->empty()) {
-      return hints_->find(candidate_hint) != hints_->end();
-    }
-    return false;
-  }
-
-  const ExplainedQueryHint& getHintInfo(QueryHint hint) const {
-    CHECK(hint_applied_);
-    CHECK(!hints_->empty());
-    CHECK(hasHintEnabled(hint));
-    return hints_->at(hint);
-  }
-
-  bool hasDeliveredHint() { return !hints_->empty(); }
-
-  Hints* getDeliveredHints() { return hints_.get(); }
-
  private:
   TableInfoPtr table_info_;
   const std::vector<ColumnInfoPtr> column_infos_;
-  bool hint_applied_;
-  std::unique_ptr<Hints> hints_;
 };
 
 class Project : public Node {
@@ -312,10 +282,7 @@ class Project : public Node {
   Project(ExprPtrVector exprs,
           std::vector<std::string> fields,
           std::shared_ptr<const Node> input)
-      : exprs_(std::move(exprs))
-      , fields_(std::move(fields))
-      , hint_applied_(false)
-      , hints_(std::make_unique<Hints>()) {
+      : exprs_(std::move(exprs)), fields_(std::move(fields)) {
     inputs_.push_back(input);
   }
 
@@ -393,36 +360,9 @@ class Project : public Node {
     return std::make_shared<Project>(*this);
   }
 
-  void addHint(const ExplainedQueryHint& hint_explained) {
-    if (!hint_applied_) {
-      hint_applied_ = true;
-    }
-    hints_->emplace(hint_explained.getHint(), hint_explained);
-  }
-
-  const bool hasHintEnabled(QueryHint candidate_hint) const {
-    if (hint_applied_ && !hints_->empty()) {
-      return hints_->find(candidate_hint) != hints_->end();
-    }
-    return false;
-  }
-
-  const ExplainedQueryHint& getHintInfo(QueryHint hint) const {
-    CHECK(hint_applied_);
-    CHECK(!hints_->empty());
-    CHECK(hasHintEnabled(hint));
-    return hints_->at(hint);
-  }
-
-  bool hasDeliveredHint() { return !hints_->empty(); }
-
-  Hints* getDeliveredHints() { return hints_.get(); }
-
  private:
   mutable ExprPtrVector exprs_;
   mutable std::vector<std::string> fields_;
-  bool hint_applied_;
-  std::unique_ptr<Hints> hints_;
 };
 
 class Aggregate : public Node {
@@ -434,9 +374,7 @@ class Aggregate : public Node {
             std::shared_ptr<const Node> input)
       : groupby_count_(groupby_count)
       , aggs_(std::move(aggs))
-      , fields_(std::move(fields))
-      , hint_applied_(false)
-      , hints_(std::make_unique<Hints>()) {
+      , fields_(std::move(fields)) {
     inputs_.emplace_back(std::move(input));
   }
 
@@ -501,37 +439,10 @@ class Aggregate : public Node {
     return std::make_shared<Aggregate>(*this);
   }
 
-  void addHint(const ExplainedQueryHint& hint_explained) {
-    if (!hint_applied_) {
-      hint_applied_ = true;
-    }
-    hints_->emplace(hint_explained.getHint(), hint_explained);
-  }
-
-  const bool hasHintEnabled(QueryHint candidate_hint) const {
-    if (hint_applied_ && !hints_->empty()) {
-      return hints_->find(candidate_hint) != hints_->end();
-    }
-    return false;
-  }
-
-  const ExplainedQueryHint& getHintInfo(QueryHint hint) const {
-    CHECK(hint_applied_);
-    CHECK(!hints_->empty());
-    CHECK(hasHintEnabled(hint));
-    return hints_->at(hint);
-  }
-
-  bool hasDeliveredHint() { return !hints_->empty(); }
-
-  Hints* getDeliveredHints() { return hints_.get(); }
-
  private:
   const size_t groupby_count_;
   ExprPtrVector aggs_;
   std::vector<std::string> fields_;
-  bool hint_applied_;
-  std::unique_ptr<Hints> hints_;
 };
 
 class Join : public Node {
@@ -540,10 +451,7 @@ class Join : public Node {
        std::shared_ptr<const Node> rhs,
        ExprPtr condition,
        const JoinType join_type)
-      : condition_(std::move(condition))
-      , join_type_(join_type)
-      , hint_applied_(false)
-      , hints_(std::make_unique<Hints>()) {
+      : condition_(std::move(condition)), join_type_(join_type) {
     inputs_.emplace_back(std::move(lhs));
     inputs_.emplace_back(std::move(rhs));
   }
@@ -590,36 +498,9 @@ class Join : public Node {
     return std::make_shared<Join>(*this);
   }
 
-  void addHint(const ExplainedQueryHint& hint_explained) {
-    if (!hint_applied_) {
-      hint_applied_ = true;
-    }
-    hints_->emplace(hint_explained.getHint(), hint_explained);
-  }
-
-  const bool hasHintEnabled(QueryHint candidate_hint) const {
-    if (hint_applied_ && !hints_->empty()) {
-      return hints_->find(candidate_hint) != hints_->end();
-    }
-    return false;
-  }
-
-  const ExplainedQueryHint& getHintInfo(QueryHint hint) const {
-    CHECK(hint_applied_);
-    CHECK(!hints_->empty());
-    CHECK(hasHintEnabled(hint));
-    return hints_->at(hint);
-  }
-
-  bool hasDeliveredHint() { return !hints_->empty(); }
-
-  Hints* getDeliveredHints() { return hints_.get(); }
-
  private:
   ExprPtr condition_;
   const JoinType join_type_;
-  bool hint_applied_;
-  std::unique_ptr<Hints> hints_;
 };
 
 // a helper node that contains detailed information of each level of join qual
@@ -843,9 +724,7 @@ class Compound : public Node {
       , fields_(fields)
       , is_agg_(is_agg)
       , groupby_exprs_(std::move(groupby_exprs))
-      , exprs_(std::move(exprs))
-      , hint_applied_(false)
-      , hints_(std::make_unique<Hints>()) {
+      , exprs_(std::move(exprs)) {
     CHECK_EQ(fields.size(), exprs_.size());
   }
 
@@ -895,31 +774,6 @@ class Compound : public Node {
     return std::make_shared<Compound>(*this);
   }
 
-  void addHint(const ExplainedQueryHint& hint_explained) {
-    if (!hint_applied_) {
-      hint_applied_ = true;
-    }
-    hints_->emplace(hint_explained.getHint(), hint_explained);
-  }
-
-  const bool hasHintEnabled(QueryHint candidate_hint) const {
-    if (hint_applied_ && !hints_->empty()) {
-      return hints_->find(candidate_hint) != hints_->end();
-    }
-    return false;
-  }
-
-  const ExplainedQueryHint& getHintInfo(QueryHint hint) const {
-    CHECK(hint_applied_);
-    CHECK(!hints_->empty());
-    CHECK(hasHintEnabled(hint));
-    return hints_->at(hint);
-  }
-
-  bool hasDeliveredHint() { return !hints_->empty(); }
-
-  Hints* getDeliveredHints() { return hints_.get(); }
-
  private:
   ExprPtr filter_;
   const size_t groupby_count_;
@@ -927,8 +781,6 @@ class Compound : public Node {
   const bool is_agg_;
   ExprPtrVector groupby_exprs_;
   ExprPtrVector exprs_;
-  bool hint_applied_;
-  std::unique_ptr<Hints> hints_;
 };
 
 class Sort : public Node {
@@ -1133,22 +985,11 @@ class QueryDag {
     subqueries_.emplace_back(std::move(subquery_expr));
   }
 
-  void registerQueryHints(NodePtr node, Hints* hints_delivered);
-
   /**
    * Gets all registered subqueries. Only the root DAG can contain subqueries.
    */
   const std::vector<std::shared_ptr<const ScalarSubquery>>& getSubqueries() const {
     return subqueries_;
-  }
-
-  std::optional<RegisteredQueryHint> getQueryHint(const Node* node) const {
-    auto it = query_hint_.find(node->toHash());
-    return it != query_hint_.end() ? std::make_optional(it->second) : std::nullopt;
-  }
-
-  const std::unordered_map<size_t, RegisteredQueryHint>& getQueryHints() const {
-    return query_hint_;
   }
 
   /**
@@ -1166,7 +1007,6 @@ class QueryDag {
   // All nodes including the root one.
   std::vector<NodePtr> nodes_;
   std::vector<std::shared_ptr<const ScalarSubquery>> subqueries_;
-  std::unordered_map<size_t, RegisteredQueryHint> query_hint_;
 };
 
 const Type* getColumnType(const Node* node, size_t col_idx);

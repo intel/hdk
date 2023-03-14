@@ -27,7 +27,6 @@
 #define QUERYENGINE_RELALGEXECUTIONUNIT_H
 
 #include "Descriptors/InputDescriptors.h"
-#include "QueryHint.h"
 #include "RelAlgDagBuilder.h"
 #include "Shared/sqldefs.h"
 #include "Shared/toString.h"
@@ -140,7 +139,6 @@ struct RelAlgExecutionUnit {
   const std::shared_ptr<Analyzer::Estimator> estimator;
   const SortInfo sort_info;
   size_t scan_limit;
-  RegisteredQueryHint query_hint;
   QueryPlan query_plan_dag{EMPTY_QUERY_PLAN};
   HashTableBuildDagMap hash_table_build_plan_dag{};
   TableIdToNodeMap table_id_to_node_map{};

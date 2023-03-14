@@ -1471,37 +1471,6 @@ JoinType to_join_type(const std::string& join_type_name) {
   throw hdk::ir::QueryNotSupported("Join type (" + join_type_name + ") not supported");
 }
 
-void handleQueryHint(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-                     RelAlgDagBuilder* dag_builder) noexcept {
-  // query hint is delivered by the above three nodes
-  // when a query block has top-sort node, a hint is registered to
-  // one of the node which locates at the nearest from the sort node
-  for (auto node : nodes) {
-    Hints* hint_delivered = nullptr;
-    const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
-    if (agg_node) {
-      if (agg_node->hasDeliveredHint()) {
-        hint_delivered = agg_node->getDeliveredHints();
-      }
-    }
-    const auto project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
-    if (project_node) {
-      if (project_node->hasDeliveredHint()) {
-        hint_delivered = project_node->getDeliveredHints();
-      }
-    }
-    const auto compound_node = std::dynamic_pointer_cast<hdk::ir::Compound>(node);
-    if (compound_node) {
-      if (compound_node->hasDeliveredHint()) {
-        hint_delivered = compound_node->getDeliveredHints();
-      }
-    }
-    if (hint_delivered && !hint_delivered->empty()) {
-      dag_builder->registerQueryHints(node, hint_delivered);
-    }
-  }
-}
-
 void mark_nops(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
   for (auto node : nodes) {
     const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
@@ -1564,10 +1533,8 @@ class InputReplacementVisitor : public hdk::ir::ExprRewriter {
   const hdk::ir::ExprPtrVector* groupby_exprs_;
 };
 
-void create_compound(
-    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-    const std::vector<size_t>& pattern,
-    std::unordered_map<size_t, RegisteredQueryHint>& query_hints) noexcept {
+void create_compound(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
+                     const std::vector<size_t>& pattern) noexcept {
   CHECK_GE(pattern.size(), size_t(2));
   CHECK_LE(pattern.size(), size_t(4));
 
@@ -1580,15 +1547,8 @@ void create_compound(
   bool is_agg{false};
   hdk::ir::Node* last_node{nullptr};
 
-  size_t node_hash{0};
-  std::optional<RegisteredQueryHint> registered_query_hint;
   for (const auto node_idx : pattern) {
     const auto ra_node = nodes[node_idx];
-    auto registered_query_hint_it = query_hints.find(ra_node->toHash());
-    if (registered_query_hint_it != query_hints.end()) {
-      node_hash = registered_query_hint_it->first;
-      registered_query_hint = registered_query_hint_it->second;
-    }
     const auto ra_filter = std::dynamic_pointer_cast<hdk::ir::Filter>(ra_node);
     if (ra_filter) {
       CHECK(!filter_expr);
@@ -1673,12 +1633,6 @@ void create_compound(
   auto first_node = nodes[pattern.front()];
   CHECK_EQ(size_t(1), first_node->inputCount());
   compound_node->addManagedInput(first_node->getAndOwnInput(0));
-  if (registered_query_hint) {
-    // pass the registered hint from the origin node to newly created compound node
-    // where it is coalesced
-    query_hints.erase(node_hash);
-    query_hints.emplace(compound_node->toHash(), *registered_query_hint);
-  }
   for (size_t i = 0; i < pattern.size() - 1; ++i) {
     nodes[pattern[i]].reset();
   }
@@ -1871,8 +1825,7 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
 }
 
 void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-                    const std::vector<const hdk::ir::Node*>& left_deep_joins,
-                    std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
+                    const std::vector<const hdk::ir::Node*>& left_deep_joins) {
   enum class CoalesceState { Initial, Filter, FirstProject, Aggregate };
   std::vector<size_t> crt_pattern;
   CoalesceState crt_state{CoalesceState::Initial};
@@ -1927,7 +1880,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
           nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
         } else {
           if (crt_pattern.size() >= 2) {
-            create_compound(nodes, crt_pattern, query_hints);
+            create_compound(nodes, crt_pattern);
           }
           reset_state();
         }
@@ -1961,7 +1914,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
           }
         }
         CHECK_GE(crt_pattern.size(), size_t(2));
-        create_compound(nodes, crt_pattern, query_hints);
+        create_compound(nodes, crt_pattern);
         reset_state();
         break;
       }
@@ -1971,7 +1924,7 @@ void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
   }
   if (crt_state == CoalesceState::FirstProject || crt_state == CoalesceState::Aggregate) {
     if (crt_pattern.size() >= 2) {
-      create_compound(nodes, crt_pattern, query_hints);
+      create_compound(nodes, crt_pattern);
     }
     CHECK(!crt_pattern.empty());
   }
@@ -2048,23 +2001,6 @@ class InputBackpropagationVisitor : public hdk::ir::ExprRewriter {
   mutable InputReplacements replacements_;
 };
 
-void propagate_hints_to_new_project(
-    std::shared_ptr<hdk::ir::Project> prev_node,
-    std::shared_ptr<hdk::ir::Project> new_node,
-    std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
-  auto delivered_hints = prev_node->getDeliveredHints();
-  bool needs_propagate_hints = !delivered_hints->empty();
-  if (needs_propagate_hints) {
-    for (auto& kv : *delivered_hints) {
-      new_node->addHint(kv.second);
-    }
-    auto prev_it = query_hints.find(prev_node->toHash());
-    // query hint for the prev projection node should be registered
-    CHECK(prev_it != query_hints.end());
-    query_hints.emplace(new_node->toHash(), prev_it->second);
-  }
-}
-
 /**
  * Detect the presence of window function operators nested inside expressions. Separate
  * the window function operator from the expression, computing the expression as a
@@ -2081,8 +2017,7 @@ void propagate_hints_to_new_project(
  expression copy
  */
 void separate_window_function_expressions(
-    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-    std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
+    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) {
   std::list<std::shared_ptr<hdk::ir::Node>> node_list(nodes.begin(), nodes.end());
 
   for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
@@ -2175,7 +2110,6 @@ void separate_window_function_expressions(
           std::make_shared<hdk::ir::Project>(std::move(new_exprs),
                                              window_func_project_node->getFields(),
                                              window_func_project_node);
-      propagate_hints_to_new_project(window_func_project_node, new_project, query_hints);
       node_list.insert(std::next(node_itr), new_project);
 
       // Rebind all the following inputs
@@ -2213,8 +2147,7 @@ class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
  */
 void add_window_function_pre_project(
     std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-    const bool always_add_project_if_first_project_is_window_expr,
-    std::unordered_map<size_t, RegisteredQueryHint>& query_hints) {
+    const bool always_add_project_if_first_project_is_window_expr) {
   std::list<std::shared_ptr<hdk::ir::Node>> node_list(nodes.begin(), nodes.end());
   size_t project_node_counter{0};
   for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
@@ -2295,7 +2228,6 @@ void add_window_function_pre_project(
 
     auto new_project =
         std::make_shared<hdk::ir::Project>(std::move(exprs), fields, prev_node);
-    propagate_hints_to_new_project(window_func_project_node, new_project, query_hints);
     node_list.insert(node_itr, new_project);
     window_func_project_node->replaceInput(
         prev_node, new_project, old_index_to_new_index);
@@ -2475,11 +2407,7 @@ class RelAlgDispatcher {
       infos.emplace_back(schema_provider_->getColumnInfo(*tinfo, col_name));
       CHECK(infos.back());
     }
-    auto scan_node = std::make_shared<hdk::ir::Scan>(tinfo, std::move(infos));
-    if (scan_ra.HasMember("hints")) {
-      getRelAlgHints(scan_ra, scan_node);
-    }
-    return scan_node;
+    return std::make_shared<hdk::ir::Scan>(tinfo, std::move(infos));
   }
 
   std::shared_ptr<hdk::ir::Project> dispatchProject(const rapidjson::Value& proj_ra,
@@ -2498,12 +2426,6 @@ class RelAlgDispatcher {
                                     getNodeColumnRefs(inputs[0].get())));
     }
     const auto& fields = field(proj_ra, "fields");
-    if (proj_ra.HasMember("hints")) {
-      auto project_node = std::make_shared<hdk::ir::Project>(
-          std::move(exprs), strings_from_json_array(fields), inputs.front());
-      getRelAlgHints(proj_ra, project_node);
-      return project_node;
-    }
     return std::make_shared<hdk::ir::Project>(
         std::move(exprs), strings_from_json_array(fields), inputs.front());
   }
@@ -2547,9 +2469,6 @@ class RelAlgDispatcher {
     }
     auto agg_node = std::make_shared<hdk::ir::Aggregate>(
         group.size(), std::move(aggs), fields, inputs.front());
-    if (agg_ra.HasMember("hints")) {
-      getRelAlgHints(agg_ra, agg_node);
-    }
     return agg_node;
   }
 
@@ -2568,9 +2487,6 @@ class RelAlgDispatcher {
                                 ra_outputs);
     auto join_node = std::make_shared<hdk::ir::Join>(
         inputs[0], inputs[1], std::move(condition), join_type);
-    if (join_ra.HasMember("hints")) {
-      getRelAlgHints(join_ra, join_node);
-    }
     return join_node;
   }
 
@@ -2673,106 +2589,6 @@ class RelAlgDispatcher {
     return {key, val};
   }
 
-  ExplainedQueryHint parseHintString(std::string& hint_string) {
-    std::string white_space_delim = " ";
-    int l = hint_string.length();
-    hint_string = hint_string.erase(0, 1).substr(0, l - 2);
-    size_t pos = 0;
-    if ((pos = hint_string.find("options:")) != std::string::npos) {
-      // need to parse hint options
-      std::vector<std::string> tokens;
-      std::string hint_name = hint_string.substr(0, hint_string.find(white_space_delim));
-      auto hint_type = RegisteredQueryHint::translateQueryHint(hint_name);
-      bool kv_list_op = false;
-      std::string raw_options = hint_string.substr(pos + 8, hint_string.length() - 2);
-      if (raw_options.find('{') != std::string::npos) {
-        kv_list_op = true;
-      } else {
-        CHECK(raw_options.find('[') != std::string::npos);
-      }
-      auto t1 = raw_options.erase(0, 1);
-      raw_options = t1.substr(0, t1.length() - 1);
-      std::string op_delim = ", ";
-      if (kv_list_op) {
-        // kv options
-        std::unordered_map<std::string, std::string> kv_options;
-        while ((pos = raw_options.find(op_delim)) != std::string::npos) {
-          auto kv_pair = getKVOptionPair(raw_options, pos);
-          kv_options.emplace(kv_pair.first, kv_pair.second);
-        }
-        // handle the last kv pair
-        auto kv_pair = getKVOptionPair(raw_options, pos);
-        kv_options.emplace(kv_pair.first, kv_pair.second);
-        return {hint_type, true, false, true, kv_options};
-      } else {
-        std::vector<std::string> list_options;
-        while ((pos = raw_options.find(op_delim)) != std::string::npos) {
-          list_options.emplace_back(raw_options.substr(0, pos));
-          raw_options.erase(0, pos + white_space_delim.length() + 1);
-        }
-        // handle the last option
-        list_options.emplace_back(raw_options.substr(0, pos));
-        return {hint_type, true, false, false, list_options};
-      }
-    } else {
-      // marker hint: no extra option for this hint
-      std::string hint_name = hint_string.substr(0, hint_string.find(white_space_delim));
-      auto hint_type = RegisteredQueryHint::translateQueryHint(hint_name);
-      return {hint_type, true, true, false};
-    }
-  }
-
-  void getRelAlgHints(const rapidjson::Value& json_node,
-                      std::shared_ptr<hdk::ir::Node> node) {
-    std::string hint_explained = json_str(field(json_node, "hints"));
-    size_t pos = 0;
-    std::string delim = "|";
-    std::vector<std::string> hint_list;
-    while ((pos = hint_explained.find(delim)) != std::string::npos) {
-      hint_list.emplace_back(hint_explained.substr(0, pos));
-      hint_explained.erase(0, pos + delim.length());
-    }
-    // handling the last one
-    hint_list.emplace_back(hint_explained.substr(0, pos));
-
-    const auto agg_node = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
-    if (agg_node) {
-      for (std::string& hint : hint_list) {
-        auto parsed_hint = parseHintString(hint);
-        agg_node->addHint(parsed_hint);
-      }
-    }
-    const auto project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
-    if (project_node) {
-      for (std::string& hint : hint_list) {
-        auto parsed_hint = parseHintString(hint);
-        project_node->addHint(parsed_hint);
-      }
-    }
-    const auto scan_node = std::dynamic_pointer_cast<hdk::ir::Scan>(node);
-    if (scan_node) {
-      for (std::string& hint : hint_list) {
-        auto parsed_hint = parseHintString(hint);
-        scan_node->addHint(parsed_hint);
-      }
-    }
-    const auto join_node = std::dynamic_pointer_cast<hdk::ir::Join>(node);
-    if (join_node) {
-      for (std::string& hint : hint_list) {
-        auto parsed_hint = parseHintString(hint);
-        join_node->addHint(parsed_hint);
-      }
-    }
-
-    const auto compound_node = std::dynamic_pointer_cast<hdk::ir::Compound>(node);
-    if (compound_node) {
-      for (std::string& hint : hint_list) {
-        auto parsed_hint = parseHintString(hint);
-        compound_node->addHint(parsed_hint);
-      }
-    }
-  }
-
   std::shared_ptr<const hdk::ir::Node> prev(const rapidjson::Value& crt_node) {
     const auto id = node_id(crt_node);
     CHECK(id);
@@ -2848,7 +2664,6 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   }
   CHECK(!nodes_.empty());
 
-  handleQueryHint(nodes_, this);
   mark_nops(nodes_);
   simplify_sort(nodes_);
   sink_projected_boolean_expr_to_join(nodes_);
@@ -2875,13 +2690,11 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   }
   eliminate_dead_columns(nodes_);
   eliminate_dead_subqueries(subqueries_, nodes_.back().get());
-  separate_window_function_expressions(nodes_, query_hint_);
+  separate_window_function_expressions(nodes_);
   add_window_function_pre_project(
-      nodes_,
-      false /* always_add_project_if_first_project_is_window_expr */,
-      query_hint_);
+      nodes_, false /* always_add_project_if_first_project_is_window_expr */);
   if (coalesce_) {
-    coalesce_nodes(nodes_, left_deep_joins, query_hint_);
+    coalesce_nodes(nodes_, left_deep_joins);
     if (config_->debug.check_query_exec_seq) {
       // Don't create non coalesced versions for subqueries, they will be
       // parsed in the root non coalesced builder.

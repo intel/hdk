@@ -163,17 +163,7 @@ void Node::print() const {
 }
 
 Project::Project(Project const& rhs)
-    : Node(rhs)
-    , exprs_(rhs.exprs_)
-    , fields_(rhs.fields_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
+    : Node(rhs), exprs_(rhs.exprs_), fields_(rhs.fields_) {}
 
 void Project::replaceInput(
     std::shared_ptr<const Node> old_input,
@@ -238,15 +228,7 @@ Aggregate::Aggregate(Aggregate const& rhs)
     : Node(rhs)
     , groupby_count_(rhs.groupby_count_)
     , aggs_(rhs.aggs_)
-    , fields_(rhs.fields_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
+    , fields_(rhs.fields_) {}
 
 void Aggregate::replaceInput(std::shared_ptr<const Node> old_input,
                              std::shared_ptr<const Node> input) {
@@ -258,17 +240,7 @@ void Aggregate::replaceInput(std::shared_ptr<const Node> old_input,
 }
 
 Join::Join(Join const& rhs)
-    : Node(rhs)
-    , condition_(rhs.condition_)
-    , join_type_(rhs.join_type_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
+    : Node(rhs), condition_(rhs.condition_), join_type_(rhs.join_type_) {}
 
 void Join::replaceInput(std::shared_ptr<const Node> old_input,
                         std::shared_ptr<const Node> input) {
@@ -295,15 +267,7 @@ Compound::Compound(Compound const& rhs)
     , fields_(rhs.fields_)
     , is_agg_(rhs.is_agg_)
     , groupby_exprs_(rhs.groupby_exprs_)
-    , exprs_(rhs.exprs_)
-    , hint_applied_(false)
-    , hints_(std::make_unique<Hints>()) {
-  if (rhs.hint_applied_) {
-    for (auto const& kv : *rhs.hints_) {
-      addHint(kv.second);
-    }
-  }
-}
+    , exprs_(rhs.exprs_) {}
 
 void Compound::replaceInput(std::shared_ptr<const Node> old_input,
                             std::shared_ptr<const Node> input) {
@@ -480,67 +444,6 @@ void QueryDag::eachNode(std::function<void(Node const*)> const& callback) const 
       callback(node.get());
     }
   }
-}
-
-void QueryDag::registerQueryHints(std::shared_ptr<Node> node, Hints* hints_delivered) {
-  bool detect_columnar_output_hint = false;
-  bool detect_rowwise_output_hint = false;
-  RegisteredQueryHint query_hint = RegisteredQueryHint::fromConfig(*config_);
-  for (auto it = hints_delivered->begin(); it != hints_delivered->end(); it++) {
-    auto target = it->second;
-    auto hint_type = it->first;
-    switch (hint_type) {
-      case QueryHint::kCpuMode: {
-        query_hint.registerHint(QueryHint::kCpuMode);
-        query_hint.cpu_mode = true;
-        break;
-      }
-      case QueryHint::kColumnarOutput: {
-        detect_columnar_output_hint = true;
-        break;
-      }
-      case QueryHint::kRowwiseOutput: {
-        detect_rowwise_output_hint = true;
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  // we have four cases depending on 1) enable_columnar_output flag
-  // and 2) query hint status: columnar_output and rowwise_output
-  // case 1. enable_columnar_output = true
-  // case 1.a) columnar_output = true (so rowwise_output = false);
-  // case 1.b) rowwise_output = true (so columnar_output = false);
-  // case 2. enable_columnar_output = false
-  // case 2.a) columnar_output = true (so rowwise_output = false);
-  // case 2.b) rowwise_output = true (so columnar_output = false);
-  // case 1.a --> use columnar output
-  // case 1.b --> use rowwise output
-  // case 2.a --> use columnar output
-  // case 2.b --> use rowwise output
-  if (detect_columnar_output_hint && detect_rowwise_output_hint) {
-    VLOG(1) << "Two hints 1) columnar output and 2) rowwise output are enabled together, "
-            << "so skip them and use the runtime configuration "
-               "\"enable_columnar_output\"";
-  } else if (detect_columnar_output_hint && !detect_rowwise_output_hint) {
-    if (config_->rs.enable_columnar_output) {
-      VLOG(1) << "We already enable columnar output by default "
-                 "(g_enable_columnar_output = true), so skip this columnar output hint";
-    } else {
-      query_hint.registerHint(QueryHint::kColumnarOutput);
-      query_hint.columnar_output = true;
-    }
-  } else if (!detect_columnar_output_hint && detect_rowwise_output_hint) {
-    if (!config_->rs.enable_columnar_output) {
-      VLOG(1) << "We already use the default rowwise output (g_enable_columnar_output "
-                 "= false), so skip this rowwise output hint";
-    } else {
-      query_hint.registerHint(QueryHint::kRowwiseOutput);
-      query_hint.rowwise_output = true;
-    }
-  }
-  query_hint_.emplace(node->toHash(), query_hint);
 }
 
 void QueryDag::resetQueryExecutionState() {

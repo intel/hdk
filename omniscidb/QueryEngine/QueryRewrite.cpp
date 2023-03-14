@@ -123,7 +123,6 @@ RelAlgExecutionUnit QueryRewriter::rewriteConstrainedByInImpl(
           nullptr,
           ra_exe_unit_in.sort_info,
           ra_exe_unit_in.scan_limit,
-          ra_exe_unit_in.query_hint,
           ra_exe_unit_in.query_plan_dag,
           ra_exe_unit_in.hash_table_build_plan_dag,
           ra_exe_unit_in.table_id_to_node_map};
@@ -271,7 +270,6 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
                                          ra_exe_unit_in.estimator,
                                          ra_exe_unit_in.sort_info,
                                          ra_exe_unit_in.scan_limit,
-                                         ra_exe_unit_in.query_hint,
                                          ra_exe_unit_in.query_plan_dag,
                                          ra_exe_unit_in.hash_table_build_plan_dag,
                                          ra_exe_unit_in.table_id_to_node_map,
