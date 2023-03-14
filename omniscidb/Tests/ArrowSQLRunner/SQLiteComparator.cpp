@@ -23,6 +23,7 @@
 #include <gtest/gtest.h>
 #include <boost/filesystem.hpp>
 
+#include <boost/algorithm/string.hpp>
 #include <filesystem>
 
 #ifdef _WIN32

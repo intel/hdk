@@ -14,9 +14,6 @@ add_executable(StringDictionaryTest StringDictionaryTest.cpp)
 add_executable(StringTransformTest StringTransformTest.cpp)
 add_executable(StringFunctionsTest StringFunctionsTest.cpp)
 add_executable(EncoderTest EncoderTest.cpp)
-if(NOT MSVC)
-  add_executable(JSONTest JSONTest.cpp)
-endif()
 add_executable(DataRecyclerTest DataRecyclerTest.cpp)
 add_executable(ParallelSortTest ParallelSortTest.cpp)
 
@@ -120,9 +117,6 @@ if(NOT MSVC)
 	target_link_libraries(QuantileCpuTest gtest Logger TBB::tbb)
 endif()
 target_link_libraries(DataRecyclerTest gtest QueryEngine ArrowQueryRunner)
-if(NOT MSVC)
-	target_link_libraries(JSONTest gtest Logger Shared)
-endif()
 target_link_libraries(NoCatalogRelAlgTest gtest QueryEngine)
 target_link_libraries(NoCatalogSqlTest gtest QueryEngine Calcite)
 target_link_libraries(ArrowStorageTest gtest QueryEngine ArrowStorage)
@@ -172,7 +166,6 @@ add_test(ThreadingTestSTD ThreadingTestSTD ${TEST_ARGS})
 add_test(JoinHashTableTest JoinHashTableTest ${TEST_ARGS})
 add_test(EncoderTest EncoderTest ${TEST_ARGS})
 add_test(DataRecyclerTest DataRecyclerTest ${TEST_ARGS})
-add_test(JSONTest JSONTest ${TEST_ARGS})
 add_test(NoCatalogRelAlgTest NoCatalogRelAlgTest ${TEST_ARGS})
 add_test(NoCatalogSqlTest NoCatalogSqlTest ${TEST_ARGS})
 add_test(ArrowStorageTest ArrowStorageTest ${TEST_ARGS})
@@ -223,7 +216,6 @@ set(TEST_PROGRAMS
   StringDictionaryTest
   EncoderTest
   DataRecyclerTest
-  JSONTest
   NoCatalogRelAlgTest
   NoCatalogSqlTest
   ArrowStorageTest
