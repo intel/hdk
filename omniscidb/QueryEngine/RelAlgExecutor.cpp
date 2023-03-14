@@ -2067,7 +2067,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createSortInputWorkUnit(
                               source_exe_unit.query_plan_dag,
                               source_exe_unit.hash_table_build_plan_dag,
                               source_exe_unit.table_id_to_node_map,
-                              source_exe_unit.use_bump_allocator,
                               source_exe_unit.union_all},
           source,
           max_groups_buffer_entry_guess,
@@ -2196,15 +2195,6 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
   return ra_exe_unit;
 }
 
-inline bool can_use_bump_allocator(const RelAlgExecutionUnit& ra_exe_unit,
-                                   const Config& config,
-                                   const CompilationOptions& co,
-                                   const ExecutionOptions& eo) {
-  return config.mem.gpu.enable_bump_allocator &&
-         (co.device_type == ExecutorDeviceType::GPU) && !eo.output_columnar_hint &&
-         ra_exe_unit.sort_info.order_entries.empty();
-}
-
 }  // namespace
 
 ExecutionResult RelAlgExecutor::executeWorkUnit(
@@ -2262,10 +2252,7 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
     if (previous_count && !exe_unit_has_quals(ra_exe_unit)) {
       ra_exe_unit.scan_limit = *previous_count;
     } else {
-      if (can_use_bump_allocator(ra_exe_unit, config_, co, eo)) {
-        ra_exe_unit.scan_limit = 0;
-        ra_exe_unit.use_bump_allocator = true;
-      } else if (eo.executor_type == ::ExecutorType::Extern) {
+      if (eo.executor_type == ::ExecutorType::Extern) {
         ra_exe_unit.scan_limit = 0;
       } else if (!eo.just_explain) {
         const auto filter_count_all = getFilteredCountAll(work_unit, true, co, eo);
@@ -2456,7 +2443,6 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
   // for the kernel per fragment path. Need to unify the max_groups_buffer_entry_guess
   // = 0 path and the bump allocator path for kernel per fragment execution.
   auto ra_exe_unit_in = work_unit.exe_unit;
-  ra_exe_unit_in.use_bump_allocator = false;
 
   auto result = ExecutionResult{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
                                                             co.device_type,
@@ -2952,7 +2938,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createCompoundWorkUnit(
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
-                                        false,
                                         std::nullopt};
   auto query_rewriter = std::make_unique<QueryRewriter>(query_infos, executor_);
   auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);
@@ -3228,7 +3213,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createAggregateWorkUnit(
                               dag_info.extracted_dag,
                               dag_info.hash_table_plan_dag,
                               dag_info.table_id_to_node_map,
-                              false,
                               std::nullopt},
           aggregate,
           config_.exec.group_by.default_max_groups_buffer_entry_guess,
@@ -3305,7 +3289,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createProjectWorkUnit(
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
-                                        false,
                                         std::nullopt};
   auto query_rewriter = std::make_unique<QueryRewriter>(query_infos, executor_);
   auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);
@@ -3409,7 +3392,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
                                         EMPTY_QUERY_PLAN,
                                         {},
                                         {},
-                                        false,
                                         logical_union->isAll()};
   auto query_rewriter = std::make_unique<QueryRewriter>(query_infos, executor_);
   const auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);

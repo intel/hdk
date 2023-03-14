@@ -275,7 +275,6 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
                                          ra_exe_unit_in.query_plan_dag,
                                          ra_exe_unit_in.hash_table_build_plan_dag,
                                          ra_exe_unit_in.table_id_to_node_map,
-                                         ra_exe_unit_in.use_bump_allocator,
                                          ra_exe_unit_in.union_all};
   return rewritten_exe_unit;
 }

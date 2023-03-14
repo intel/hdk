@@ -464,16 +464,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
 
   // mem.gpu
   opt_desc.add_options()(
-      "enable-bump-allocator",
-      po::value<bool>(&config_->mem.gpu.enable_bump_allocator)
-          ->default_value(config_->mem.gpu.enable_bump_allocator)
-          ->implicit_value(true),
-      "Enable the bump allocator for projection queries on GPU. The bump allocator will "
-      "allocate a fixed size buffer for each query, track the number of rows passing the "
-      "kernel during query execution, and copy back only the rows that passed the kernel "
-      "to CPU after execution. When disabled, pre-flight count queries are used to size "
-      "the output buffer for projection queries.");
-  opt_desc.add_options()(
       "min-output-projection-allocation-bytes",
       po::value<size_t>(&config_->mem.gpu.min_memory_allocation_size)
           ->default_value(config_->mem.gpu.min_memory_allocation_size),
@@ -488,14 +478,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       "Maximum allocation size for a fixed output buffer allocation for projection "
       "queries with no pre-flight count. Default is the maximum slab size (sizes "
       "greater than the maximum slab size have no affect). Requires bump allocator.");
-  opt_desc.add_options()(
-      "max-output-projection-allocation-bytes",
-      po::value<double>(&config_->mem.gpu.bump_allocator_step_reduction)
-          ->default_value(config_->mem.gpu.bump_allocator_step_reduction)
-          ->notifier(
-              get_range_checker(0.01, 0.99, "max-output-projection-allocation-bytes")),
-      "Step for re-trying memory allocation of a fixed output buffer allocation for "
-      "projection queries with no pre-flight count. Must be in range [0.01, 0.99].");
   opt_desc.add_options()(
       "gpu-input-mem-limit",
       po::value<double>(&config_->mem.gpu.input_mem_limit_percent)

@@ -72,7 +72,6 @@ GpuGroupByBuffers create_dev_group_by_buffers(
     const int64_t num_input_rows,
     const bool prepend_index_buffer,
     const bool always_init_group_by_on_host,
-    const bool use_bump_allocator,
     const bool has_varlen_output,
     Allocator* insitu_allocator) {
   if (group_by_buffers.empty() && !insitu_allocator) {
@@ -80,92 +79,28 @@ GpuGroupByBuffers create_dev_group_by_buffers(
   }
   CHECK(device_allocator);
 
-  size_t groups_buffer_size{0};
-  DevicePtr group_by_dev_buffers_mem{0};
-  size_t mem_size{0};
-  size_t entry_count{0};
+  size_t entry_count = query_mem_desc.getEntryCount();
+  CHECK_GT(entry_count, size_t(0));
+  size_t groups_buffer_size =
+      query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU, entry_count);
+  size_t mem_size = coalesced_size(query_mem_desc,
+                                   groups_buffer_size,
+                                   query_mem_desc.blocksShareMemory() ? 1 : grid_size_x);
+  const size_t prepended_buff_size{
+      prepend_index_buffer ? align_to_int64(entry_count * sizeof(int32_t)) : 0};
 
-  if (use_bump_allocator) {
-    CHECK(!prepend_index_buffer);
-    CHECK(!insitu_allocator);
-
-    if (dispatch_mode == ExecutorDispatchMode::KernelPerFragment) {
-      // Allocate an output buffer equal to the size of the number of rows in the
-      // fragment. The kernel per fragment path is only used for projections with lazy
-      // fetched outputs. Therefore, the resulting output buffer should be relatively
-      // narrow compared to the width of an input row, offsetting the larger allocation.
-
-      CHECK_GT(num_input_rows, int64_t(0));
-      entry_count = num_input_rows;
-      groups_buffer_size =
-          query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU, entry_count);
-      mem_size = coalesced_size(query_mem_desc,
-                                groups_buffer_size,
-                                query_mem_desc.blocksShareMemory() ? 1 : grid_size_x);
-      group_by_dev_buffers_mem =
-          reinterpret_cast<DevicePtr>(device_allocator->alloc(mem_size));
-    } else {
-      // Attempt to allocate increasingly small buffers until we have less than 256B of
-      // memory remaining on the device. This may have the side effect of evicting
-      // memory allocated for previous queries. However, at current maximum slab sizes
-      // (2GB) we expect these effects to be minimal.
-      size_t max_memory_size{config.mem.gpu.max_memory_allocation_size};
-      while (true) {
-        entry_count = max_memory_size / query_mem_desc.getRowSize();
-        groups_buffer_size =
-            query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU, entry_count);
-
-        try {
-          mem_size = coalesced_size(query_mem_desc,
-                                    groups_buffer_size,
-                                    query_mem_desc.blocksShareMemory() ? 1 : grid_size_x);
-          CHECK_LE(entry_count, std::numeric_limits<uint32_t>::max());
-
-          group_by_dev_buffers_mem =
-              reinterpret_cast<DevicePtr>(device_allocator->alloc(mem_size));
-        } catch (const OutOfMemory& e) {
-          LOG(WARNING) << e.what();
-          max_memory_size =
-              max_memory_size * config.mem.gpu.bump_allocator_step_reduction;
-          if (max_memory_size < config.mem.gpu.min_memory_allocation_size) {
-            throw;
-          }
-
-          LOG(WARNING) << "Ran out of memory for projection query output. Retrying with "
-                       << std::to_string(max_memory_size) << " bytes";
-
-          continue;
-        }
-        break;
-      }
-    }
-    LOG(INFO) << "Projection query allocation succeeded with " << groups_buffer_size
-              << " bytes allocated (max entry count " << entry_count << ")";
+  int8_t* group_by_dev_buffers_allocation{nullptr};
+  if (insitu_allocator) {
+    group_by_dev_buffers_allocation =
+        insitu_allocator->alloc(mem_size + prepended_buff_size);
   } else {
-    entry_count = query_mem_desc.getEntryCount();
-    CHECK_GT(entry_count, size_t(0));
-    groups_buffer_size =
-        query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU, entry_count);
-    mem_size = coalesced_size(query_mem_desc,
-                              groups_buffer_size,
-                              query_mem_desc.blocksShareMemory() ? 1 : grid_size_x);
-    const size_t prepended_buff_size{
-        prepend_index_buffer ? align_to_int64(entry_count * sizeof(int32_t)) : 0};
-
-    int8_t* group_by_dev_buffers_allocation{nullptr};
-    if (insitu_allocator) {
-      group_by_dev_buffers_allocation =
-          insitu_allocator->alloc(mem_size + prepended_buff_size);
-    } else {
-      group_by_dev_buffers_allocation =
-          device_allocator->alloc(mem_size + prepended_buff_size);
-    }
-    CHECK(group_by_dev_buffers_allocation);
-
-    group_by_dev_buffers_mem =
-        reinterpret_cast<DevicePtr>(group_by_dev_buffers_allocation) +
-        prepended_buff_size;
+    group_by_dev_buffers_allocation =
+        device_allocator->alloc(mem_size + prepended_buff_size);
   }
+  CHECK(group_by_dev_buffers_allocation);
+
+  DevicePtr group_by_dev_buffers_mem =
+      reinterpret_cast<DevicePtr>(group_by_dev_buffers_allocation) + prepended_buff_size;
   CHECK_GT(groups_buffer_size, size_t(0));
   CHECK(group_by_dev_buffers_mem);
 

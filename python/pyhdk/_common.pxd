@@ -212,10 +212,8 @@ cdef extern from "omniscidb/Shared/Config.h":
     bool enable_lazy_fetch
 
   cdef cppclass CGpuMemoryConfig "GpuMemoryConfig":
-    bool enable_bump_allocator
     size_t min_memory_allocation_size
     size_t max_memory_allocation_size
-    double bump_allocator_step_reduction
     double input_mem_limit_percent
     size_t reserved_mem_bytes
 

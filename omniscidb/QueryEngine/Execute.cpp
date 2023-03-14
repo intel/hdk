@@ -1430,11 +1430,6 @@ void checkWorkUnitWatchdog(const RelAlgExecutionUnit& ra_exe_unit,
     // Allow a query with no scan limit to run on small tables
     return;
   }
-  if (ra_exe_unit.use_bump_allocator) {
-    // Bump allocator removes the scan limit (and any knowledge of the size of the output
-    // relative to the size of the input), so we bypass this check for now
-    return;
-  }
   if (ra_exe_unit.sort_info.algorithm != SortAlgorithm::StreamingTopN &&
       ra_exe_unit.groupby_exprs.size() == 1 && !ra_exe_unit.groupby_exprs.front() &&
       (!ra_exe_unit.scan_limit ||
@@ -1615,7 +1610,6 @@ std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_uni
   os << "\n\t  Limit: " << std::to_string(sort_info.limit);
   os << "\n\t  Offset: " << std::to_string(sort_info.offset);
   os << "\n\tScan Limit: " << std::to_string(ra_exe_unit.scan_limit);
-  os << "\n\tBump Allocator: " << ::toString(ra_exe_unit.use_bump_allocator);
   if (ra_exe_unit.union_all) {
     os << "\n\tUnion: " << std::string(*ra_exe_unit.union_all ? "UNION ALL" : "UNION");
   }
@@ -1640,7 +1634,6 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
           ra_exe_unit_in.query_plan_dag,
           ra_exe_unit_in.hash_table_build_plan_dag,
           ra_exe_unit_in.table_id_to_node_map,
-          ra_exe_unit_in.use_bump_allocator,
           ra_exe_unit_in.union_all};
 }
 
@@ -2469,7 +2462,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     VLOG(1) << "Creating one execution kernel per fragment";
     VLOG(1) << query_mem_desc.toString();
 
-    if (!ra_exe_unit.use_bump_allocator && allow_single_frag_table_opt &&
+    if (allow_single_frag_table_opt &&
         (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) &&
         table_infos.size() == 1 && table_infos.front().table_id > 0) {
       const auto max_frag_size =
@@ -2559,8 +2552,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
       this,
       co.codegen_traits_desc);
 
-  if (!ra_exe_unit.use_bump_allocator && allow_single_frag_table_opt &&
-      query_mem_descs.count(ExecutorDeviceType::GPU) &&
+  if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
       (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
        QueryDescriptionType::Projection) &&
       table_infos.size() == 1 && table_infos.front().table_id > 0) {

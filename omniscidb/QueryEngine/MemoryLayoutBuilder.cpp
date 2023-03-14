@@ -802,7 +802,6 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
         executor->getConfigPtr(),
         query_infos,
         false,
-        false,
         allow_multifrag,
         false,
         false,
@@ -915,14 +914,8 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
         streaming_top_n = true;
         entry_count = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
       } else {
-        if (ra_exe_unit.use_bump_allocator) {
-          output_columnar = false;
-          entry_count = 0;
-        } else {
-          entry_count = ra_exe_unit.scan_limit
-                            ? static_cast<size_t>(ra_exe_unit.scan_limit)
-                            : max_groups_buffer_entry_count;
-        }
+        entry_count = ra_exe_unit.scan_limit ? static_cast<size_t>(ra_exe_unit.scan_limit)
+                                             : max_groups_buffer_entry_count;
       }
 
       target_groupby_indices =
@@ -944,7 +937,6 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
   return std::make_unique<QueryMemoryDescriptor>(executor->getDataMgr(),
                                                  executor->getConfigPtr(),
                                                  query_infos,
-                                                 ra_exe_unit.use_bump_allocator,
                                                  approx_quantile,
                                                  allow_multifrag,
                                                  keyless_hash,

@@ -547,7 +547,6 @@ void radixSortOnGpu(ResultSet* rs,
                                   /*num_input_rows=*/-1,
                                   /*prepend_index_buffer=*/true,
                                   /*always_init_group_by_on_host=*/true,
-                                  /*use_bump_allocator=*/false,
                                   /*has_varlen_output=*/false,
                                   /*insitu_allocator*=*/nullptr);
   inplace_sort_gpu(order_entries,
@@ -564,7 +563,7 @@ void radixSortOnGpu(ResultSet* rs,
       rs->getBlockSize(),
       rs->getGridSize(),
       device_id,
-      /*use_bump_allocator=*/false,
+      /*prepend_index_buffer=*/false,
       /*has_varlen_output=*/false);
 }
 

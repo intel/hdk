@@ -114,7 +114,6 @@ RelAlgExecutionUnit WorkUnitBuilder::exeUnit() const {
           query_plan_dag_,
           hash_table_build_plan_dag_,
           table_id_to_node_map_,
-          use_bump_allocator_,
           union_all_};
 }
 
