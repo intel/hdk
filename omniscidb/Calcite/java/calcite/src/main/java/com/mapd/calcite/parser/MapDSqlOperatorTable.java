@@ -33,7 +33,6 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.SqlTableFunction;
 import org.apache.calcite.sql.fun.SqlArrayValueConstructor;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.OperandTypes;
@@ -260,10 +259,8 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
         continue;
       }
       demangledNames.add(demangledNameArity);
-      if (extSig.getValue().isRowUdf()) {
+      if (extSig.getValue().isRowUdf()) { // TODO 
         opTab.addOperator(new ExtFunction(demangledName, extSig.getValue()));
-      } else {
-        opTab.addOperator(new ExtTableFunction(demangledName, extSig.getValue()));
       }
     }
   }
@@ -1924,34 +1921,6 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
     }
 
     private final SqlTypeName ret;
-  }
-
-  static class ExtTableFunction extends SqlFunction implements SqlTableFunction {
-    ExtTableFunction(final String name, final ExtensionFunction sig) {
-      super(name,
-              SqlKind.OTHER_FUNCTION,
-              ReturnTypes.CURSOR,
-              null,
-              OperandTypes.family(sig.toSqlSignature()),
-              SqlFunctionCategory.USER_DEFINED_TABLE_FUNCTION);
-      outs = sig.getSqlOuts();
-      out_names = sig.getOutNames();
-    }
-
-    @Override
-    public SqlReturnTypeInference getRowTypeInference() {
-      return opBinding -> {
-        RelDataTypeFactory.Builder ret = opBinding.getTypeFactory().builder();
-        for (int out_idx = 0; out_idx < outs.size(); ++out_idx) {
-          ret = ret.add(out_names.get(out_idx), outs.get(out_idx));
-          ret = ret.nullable(true);
-        }
-        return ret.build();
-      };
-    }
-
-    private final List<SqlTypeName> outs;
-    private final List<String> out_names;
   }
 
   //

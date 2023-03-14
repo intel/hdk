@@ -83,19 +83,16 @@ public class ExtensionFunction {
     this.name = name;
     this.args = args;
     this.ret = ret;
-    this.outs = null;
     this.names = null;
     this.isRowUdf = true;
   }
 
   ExtensionFunction(String name,
           final List<ExtArgumentType> args,
-          final List<ExtArgumentType> outs,
           final List<String> names) {
     this.name = name;
     this.args = args;
     this.ret = null;
-    this.outs = outs;
     this.names = names;
     this.isRowUdf = false;
   }
@@ -106,10 +103,6 @@ public class ExtensionFunction {
 
   public List<ExtArgumentType> getArgs() {
     return this.args;
-  }
-
-  public List<ExtArgumentType> getOuts() {
-    return this.outs;
   }
 
   public List<String> getArgNames() {
@@ -135,15 +128,6 @@ public class ExtensionFunction {
     return toSqlTypeName(this.ret);
   }
 
-  public List<SqlTypeName> getSqlOuts() {
-    assert this.isTableUdf();
-    List<SqlTypeName> sql_outs = new ArrayList<SqlTypeName>();
-    for (final ExtArgumentType otype : this.getOuts()) {
-      sql_outs.add(toSqlTypeName(getValueType(otype)));
-    }
-    return sql_outs;
-  }
-
   public boolean isRowUdf() {
     return this.isRowUdf;
   }
@@ -157,18 +141,7 @@ public class ExtensionFunction {
     StringBuilder json_cons = new StringBuilder();
     json_cons.append("{");
     json_cons.append("\"name\":").append(dq(name)).append(",");
-    if (isRowUdf) {
       json_cons.append("\"ret\":").append(dq(typeName(ret))).append(",");
-    } else {
-      json_cons.append("\"outs\":");
-      json_cons.append("[");
-      List<String> param_list = new ArrayList<String>();
-      for (final ExtArgumentType out : outs) {
-        param_list.add(dq(typeName(out)));
-      }
-      json_cons.append(ExtensionFunctionSignatureParser.join(param_list, ","));
-      json_cons.append("],");
-    }
     json_cons.append("\"args\":");
     json_cons.append("[");
     List<String> param_list = new ArrayList<String>();
@@ -276,7 +249,6 @@ public class ExtensionFunction {
   }
 
   private final List<ExtArgumentType> args;
-  private final List<ExtArgumentType> outs; // only used by UDTFs
   private final List<String> names;
   private final ExtArgumentType ret; // only used by UDFs
   private final boolean isRowUdf;

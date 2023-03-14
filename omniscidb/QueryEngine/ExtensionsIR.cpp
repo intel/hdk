@@ -650,6 +650,26 @@ void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
   output_args.push_back(alloc_mem);
 }
 
+namespace {
+
+inline bool is_ext_arg_type_pointer(const ExtArgumentType ext_arg_type) {
+  switch (ext_arg_type) {
+    case ExtArgumentType::PInt8:
+    case ExtArgumentType::PInt16:
+    case ExtArgumentType::PInt32:
+    case ExtArgumentType::PInt64:
+    case ExtArgumentType::PFloat:
+    case ExtArgumentType::PDouble:
+    case ExtArgumentType::PBool:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+}  // namespace
+
 // Generate CAST operations for arguments in `orig_arg_lvs` to the types required by
 // `ext_func_sig`.
 std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
@@ -744,7 +764,6 @@ std::vector<llvm::Value*> CodeGenerator::codegenFunctionOperCastArgs(
         UNREACHABLE();
       }
     } else {
-      CHECK(is_ext_arg_type_scalar(ext_func_arg));
       const auto arg_target_type = ext_arg_type_to_type(arg_type->ctx(), ext_func_arg);
       if ((arg_type->id() != arg_target_type->id()) ||
           (arg_type->size() != arg_target_type->size())) {

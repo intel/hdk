@@ -63,8 +63,6 @@ public class CalciteServerHandler {
   private String udfRTSigsJson = "";
   Map<String, ExtensionFunction> udfRTSigs = null;
 
-  Map<String, ExtensionFunction> udtfSigs = null;
-
   private Map<String, ExtensionFunction> extSigs = null;
 
   // TODO MAT we need to merge this into common code base for these functions with
@@ -212,7 +210,6 @@ public class CalciteServerHandler {
   }
 
   public void setRuntimeExtensionFunctions(List<ExtensionFunction> udfs,
-          List<ExtensionFunction> udtfs,
           boolean isruntime) {
     if (isruntime) {
       // Clean up previously defined Runtime UDFs
@@ -228,10 +225,6 @@ public class CalciteServerHandler {
         udfRTSigs.put(udf.getName(), udf);
       }
 
-      for (ExtensionFunction udtf : udtfs) {
-        udfRTSigs.put(udtf.getName(), udtf);
-      }
-
       // Avoid overwritting compiled and Loadtime UDFs:
       for (String name : udfRTSigs.keySet()) {
         if (extSigs.containsKey(name)) {
@@ -244,17 +237,6 @@ public class CalciteServerHandler {
       udfRTSigsJson = ExtensionFunctionSignatureParser.signaturesToJson(udfRTSigs);
       // Expose RT UDFs to Calcite server:
       extSigs.putAll(udfRTSigs);
-    } else {
-      // currently only LoadTime UDTFs can be registered via calcite thrift interface
-      if (udtfSigs == null) {
-        udtfSigs = new HashMap<String, ExtensionFunction>();
-      }
-
-      for (ExtensionFunction udtf : udtfs) {
-        udtfSigs.put(udtf.getName(), udtf);
-      }
-
-      extSigs.putAll(udtfSigs);
     }
 
     calciteParserFactory.updateOperatorTable();

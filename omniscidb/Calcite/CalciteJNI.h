@@ -17,7 +17,6 @@
 #pragma once
 
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
-#include "QueryEngine/TableFunctions/TableFunctionsFactory.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/Config.h"
 
@@ -45,10 +44,8 @@ class CalciteJNI {
   std::string getExtensionFunctionWhitelist();
   std::string getUserDefinedFunctionWhitelist();
   std::string getRuntimeExtensionFunctionWhitelist();
-  void setRuntimeExtensionFunctions(
-      const std::vector<ExtensionFunction>& udfs,
-      const std::vector<table_functions::TableFunction>& udtfs,
-      bool is_runtime = true);
+  void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
+                                    bool is_runtime = true);
 
  private:
   class Impl;

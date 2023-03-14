@@ -194,20 +194,17 @@ DAG build_dag(const hdk::ir::Node* sink) {
     const auto input_num = node->inputCount();
     switch (input_num) {
       case 0:
-        CHECK(dynamic_cast<const hdk::ir::LogicalValues*>(node) ||
-              dynamic_cast<const hdk::ir::TableFunction*>(node));
+        CHECK(dynamic_cast<const hdk::ir::LogicalValues*>(node));
       case 1:
         break;
       case 2:
         CHECK(dynamic_cast<const hdk::ir::Join*>(node) ||
               dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node) ||
-              dynamic_cast<const hdk::ir::LogicalUnion*>(node) ||
-              dynamic_cast<const hdk::ir::TableFunction*>(node));
+              dynamic_cast<const hdk::ir::LogicalUnion*>(node));
         break;
       default:
         CHECK(dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node) ||
-              dynamic_cast<const hdk::ir::LogicalUnion*>(node) ||
-              dynamic_cast<const hdk::ir::TableFunction*>(node));
+              dynamic_cast<const hdk::ir::LogicalUnion*>(node));
     }
     for (size_t i = 0; i < input_num; ++i) {
       const auto input = node->getInput(i);

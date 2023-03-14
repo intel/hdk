@@ -811,7 +811,7 @@ set_dpkg_arch(${CMAKE_SYSTEM_PROCESSOR} CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/licenses" DESTINATION "ThirdParty" COMPONENT "doc")
 
-# OmniSciTypes.h local includes (for UDF/UDTF)
+# OmniSciTypes.h local includes (for UDF)
 install(FILES Shared/funcannotations.h DESTINATION "Shared/" COMPONENT "include")
 install(FILES Shared/InlineNullValues.h DESTINATION "Shared/" COMPONENT "include")
 install(FILES Logger/Logger.h DESTINATION "Logger/" COMPONENT "include")

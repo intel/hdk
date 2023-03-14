@@ -133,10 +133,6 @@ bool isRenamedInput(const Node* node, const size_t index, const std::string& new
     return new_name != project->getFieldName(index);
   }
 
-  if (auto table_func = dynamic_cast<const TableFunction*>(node)) {
-    return new_name != table_func->getFieldName(index);
-  }
-
   if (auto logical_values = dynamic_cast<const LogicalValues*>(node)) {
     const auto& tuple_type = logical_values->getTupleType();
     CHECK_LT(index, tuple_type.size());
@@ -390,32 +386,6 @@ bool Sort::hasEquivCollationOf(const Sort& that) const {
   return true;
 }
 
-TableFunction::TableFunction(TableFunction const& rhs)
-    : Node(rhs)
-    , function_name_(rhs.function_name_)
-    , fields_(rhs.fields_)
-    , col_input_exprs_(rhs.col_input_exprs_)
-    , table_func_input_exprs_(rhs.table_func_input_exprs_) {}
-
-void TableFunction::replaceInput(std::shared_ptr<const Node> old_input,
-                                 std::shared_ptr<const Node> input) {
-  Node::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  for (size_t i = 0; i < table_func_input_exprs_.size(); ++i) {
-    table_func_input_exprs_[i] = visitor.visit(table_func_input_exprs_[i].get());
-  }
-}
-
-int32_t TableFunction::countConstantArgs() const {
-  int32_t literal_args = 0;
-  for (const auto& arg : table_func_input_exprs_) {
-    if (arg->is<Constant>()) {
-      literal_args += 1;
-    }
-  }
-  return literal_args;
-}
-
 LogicalValues::LogicalValues(LogicalValues const& rhs)
     : Node(rhs), tuple_type_(rhs.tuple_type_), values_(rhs.values_) {}
 
@@ -453,8 +423,6 @@ std::string LogicalUnion::getFieldName(const size_t i) const {
   } else if (auto const* input = dynamic_cast<Aggregate const*>(inputs_[0].get())) {
     return input->getFieldName(i);
   } else if (auto const* input = dynamic_cast<Scan const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<TableFunction const*>(inputs_[0].get())) {
     return input->getFieldName(i);
   }
   UNREACHABLE() << "Unhandled input type: " << ::toString(inputs_.front());
@@ -590,7 +558,6 @@ size_t getNodeColumnCount(const Node* node) {
                 Project,
                 Aggregate,
                 Compound,
-                TableFunction,
                 LogicalUnion,
                 LogicalValues,
                 LeftDeepInnerJoin>(node)) {
@@ -628,7 +595,6 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
                 Project,
                 Aggregate,
                 Compound,
-                TableFunction,
                 LogicalUnion,
                 LogicalValues,
                 Filter,
@@ -657,7 +623,6 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
                 Project,
                 Aggregate,
                 Compound,
-                TableFunction,
                 LogicalUnion,
                 LogicalValues,
                 Filter,
@@ -732,13 +697,6 @@ const Type* getColumnType(const Node* node, size_t col_idx) {
       return type->ctx().int64();
     }
     return values->getTupleType()[col_idx].type();
-  }
-
-  // For table functions we can use its tuple type.
-  const auto table_fn = dynamic_cast<const TableFunction*>(node);
-  if (table_fn) {
-    CHECK_GT(table_fn->size(), col_idx);
-    return table_fn->getTupleType()[col_idx].type();
   }
 
   // For projections type can be extracted from Exprs.

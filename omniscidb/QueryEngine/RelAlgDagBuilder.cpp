@@ -2451,8 +2451,6 @@ class RelAlgDispatcher {
         ra_node = dispatchSort(crt_node);
       } else if (rel_op == std::string("LogicalValues")) {
         ra_node = dispatchLogicalValues(crt_node);
-      } else if (rel_op == std::string("LogicalTableFunctionScan")) {
-        ra_node = dispatchTableFunction(crt_node, root_dag_builder);
       } else if (rel_op == std::string("LogicalUnion")) {
         ra_node = dispatchUnion(crt_node);
       } else {
@@ -2609,107 +2607,6 @@ class RelAlgDispatcher {
       tuple_type.emplace_back(component_name, component_type);
     }
     return tuple_type;
-  }
-
-  std::shared_ptr<hdk::ir::TableFunction> dispatchTableFunction(
-      const rapidjson::Value& table_func_ra,
-      RelAlgDagBuilder& root_dag_builder) {
-    const auto inputs = getRelAlgInputs(table_func_ra);
-    const auto& invocation = field(table_func_ra, "invocation");
-    CHECK(invocation.IsObject());
-
-    const auto& operands = field(invocation, "operands");
-    CHECK(operands.IsArray());
-    CHECK_GE(operands.Size(), unsigned(0));
-
-    hdk::ir::ExprPtrVector col_input_exprs;
-    hdk::ir::ExprPtrVector table_func_input_exprs;
-    std::vector<std::string> fields;
-
-    for (auto exprs_json_it = operands.Begin(); exprs_json_it != operands.End();
-         ++exprs_json_it) {
-      const auto& expr_json = *exprs_json_it;
-      CHECK(expr_json.IsObject());
-      if (expr_json.HasMember("op")) {
-        const auto op_str = json_str(field(expr_json, "op"));
-        if (op_str == "CAST" && expr_json.HasMember("type")) {
-          const auto& expr_type = field(expr_json, "type");
-          CHECK(expr_type.IsObject());
-          CHECK(expr_type.HasMember("type"));
-          const auto& expr_type_name = json_str(field(expr_type, "type"));
-          if (expr_type_name == "CURSOR") {
-            CHECK(expr_json.HasMember("operands"));
-            const auto& expr_operands = field(expr_json, "operands");
-            CHECK(expr_operands.IsArray());
-            if (expr_operands.Size() != 1) {
-              throw std::runtime_error(
-                  "Table functions currently only support one ResultSet input");
-            }
-            auto pos = field(expr_operands[0], "input").GetInt();
-            CHECK_LT(pos, inputs.size());
-            for (size_t i = inputs[pos]->size(); i > 0; i--) {
-              unsigned col_idx = static_cast<unsigned>(inputs[pos]->size() - i);
-              table_func_input_exprs.emplace_back(hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-                  getColumnType(inputs[pos].get(), col_idx), inputs[pos].get(), col_idx));
-              col_input_exprs.push_back(table_func_input_exprs.back());
-            }
-            continue;
-          }
-        }
-      }
-      hdk::ir::ExprPtrVector ra_output;
-      for (auto& node : inputs) {
-        auto node_output = getNodeColumnRefs(node.get());
-        ra_output.insert(ra_output.end(), node_output.begin(), node_output.end());
-      }
-      table_func_input_exprs.emplace_back(parse_expr(
-          *exprs_json_it, db_id_, schema_provider_, root_dag_builder, ra_output));
-    }
-
-    const auto& op_name = field(invocation, "op");
-    CHECK(op_name.IsString());
-
-    const auto& row_types = field(table_func_ra, "rowType");
-    std::vector<TargetMetaInfo> tuple_type = parseTupleType(row_types);
-    // Calcite doesn't always put proper type for the table function result.
-    if (op_name.GetString() == "sort_column_limit"s ||
-        op_name.GetString() == "ct_binding_scalar_multiply"s ||
-        op_name.GetString() == "column_list_safe_row_sum"s ||
-        op_name.GetString() == "ct_named_rowmul_output"s) {
-      CHECK_EQ(tuple_type.size(), 1);
-      tuple_type[0] =
-          TargetMetaInfo(tuple_type[0].get_resname(), col_input_exprs[0]->type());
-    } else if (op_name.GetString() == "ct_scalar_1_arg_runtime_sizing"s) {
-      CHECK_EQ(tuple_type.size(), 1);
-      if (table_func_input_exprs[0]->type()->isInteger()) {
-        tuple_type[0] = TargetMetaInfo(tuple_type[0].get_resname(),
-                                       hdk::ir::Context::defaultCtx().int64());
-      } else {
-        CHECK(table_func_input_exprs[0]->type()->isFloatingPoint());
-        tuple_type[0] = TargetMetaInfo(tuple_type[0].get_resname(),
-                                       hdk::ir::Context::defaultCtx().fp64());
-      }
-    } else if (op_name.GetString() == "ct_templated_no_cursor_user_constant_sizer"s) {
-      CHECK_EQ(tuple_type.size(), 1);
-      tuple_type[0] =
-          TargetMetaInfo(tuple_type[0].get_resname(), table_func_input_exprs[0]->type());
-    } else if (op_name.GetString() == "ct_binding_column2"s) {
-      CHECK_EQ(tuple_type.size(), 1);
-      if (col_input_exprs[0]->type()->isString() ||
-          col_input_exprs[0]->type()->isExtDictionary()) {
-        tuple_type[0] =
-            TargetMetaInfo(tuple_type[0].get_resname(), col_input_exprs[0]->type());
-      }
-    }
-    for (size_t i = 0; i < tuple_type.size(); i++) {
-      fields.emplace_back("");
-    }
-    return std::make_shared<hdk::ir::TableFunction>(op_name.GetString(),
-                                                    inputs,
-                                                    fields,
-                                                    std::move(col_input_exprs),
-                                                    std::move(table_func_input_exprs),
-                                                    std::move(tuple_type));
   }
 
   std::shared_ptr<hdk::ir::LogicalValues> dispatchLogicalValues(
@@ -3028,7 +2925,7 @@ hdk::ir::ExprPtrVector getInputExprsForAgg(const hdk::ir::Node* node) {
       }
     }
   } else if (node->is<hdk::ir::LogicalValues>() || node->is<hdk::ir::Aggregate>() ||
-             node->is<hdk::ir::LogicalUnion>() || node->is<hdk::ir::TableFunction>()) {
+             node->is<hdk::ir::LogicalUnion>()) {
     res = getNodeColumnRefs(node);
   } else {
     CHECK(false) << "Unexpected node: " << node->toString();

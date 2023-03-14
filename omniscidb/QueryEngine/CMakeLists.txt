@@ -111,10 +111,6 @@ set(query_engine_source_files
     SpeculativeTopN.cpp
     StreamingTopN.cpp
     StringDictionaryGenerations.cpp
-    TableFunctions/TableFunctionCompilationContext.cpp
-    TableFunctions/TableFunctionExecutionContext.cpp
-    TableFunctions/TableFunctionsFactory.cpp
-    TableFunctions/TableFunctionOps.cpp
     TableGenerations.cpp
     TargetExprBuilder.cpp
     Utils/DiamondCodegen.cpp
@@ -136,8 +132,7 @@ set(query_engine_source_files
     Codec.h
     Execute.h
     NvidiaKernel.h
-    QueryTemplateGenerator.h
-    TableFunctions/TableFunctionManager.h)
+    QueryTemplateGenerator.h)
 
 list(APPEND query_engine_source_files
         CostModel/CostModel.cpp
@@ -150,8 +145,6 @@ list(APPEND query_engine_source_files
 if(ENABLE_DWARF_BENCH)
     list(APPEND query_engine_source_files CostModel/DataSources/DwarfBench.cpp)
 endif()
-
-list(APPEND query_engine_source_files ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
 
 set(query_engine_cuda_source_files
     TopKSort.cu
@@ -204,7 +197,6 @@ endif()
 
 add_library(QueryEngine ${query_engine_source_files} $<$<BOOL:ENABLE_CUDA>:${query_engine_cuda_source_files}>)
 add_dependencies(QueryEngine QueryEngineFunctionsTargets)
-add_dependencies(QueryEngine QueryEngineTableFunctionsFactory_init)
 
 set(cpu_runtime_function_sources RuntimeFunctions.cpp DateAdd.cpp DateTruncate.cpp)
 set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp DateAdd.cpp DateTruncate.cpp)
@@ -315,25 +307,6 @@ add_custom_target(QueryEngineFunctionsTargets
         ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast
         )
 
-set(TABLE_FUNCTION_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/TableFunctions/TableFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/TableFunctions/TableFunctionsTesting.hpp)
-list(APPEND TABLE_FUNCTION_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/TableFunctions/SystemFunctions/ExampleFunctions.hpp)
-
-if (ENABLE_MLPACK)
-    list(APPEND TABLE_FUNCTION_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/TableFunctions/MLFunctions.hpp)
-endif ()
-
-add_custom_command(
-        DEPENDS ${TABLE_FUNCTION_HEADERS}
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_cpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp
-        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_TableFunctionsFactory_init.py ${TABLE_FUNCTION_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
-
-add_custom_target(QueryEngineTableFunctionsFactory_init
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_cpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp)
-
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp GENERATED)
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_cpu.hpp GENERATED)
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp GENERATED)
-
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/OmniSciTypes.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(query_engine_install_artefacts
     ${CMAKE_CURRENT_BINARY_DIR}/OmniSciTypes.h
@@ -373,12 +346,9 @@ endif()
 
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
-set(TABLE_FUNCTIONS_DEPS "")
-list(APPEND TABLE_FUNCTIONS_DEPS ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init_gpu.hpp ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp/TableFunctionsFactory_init.cpp)
-
 string(REPLACE " " ";" CUDA_FLAGS_LIST "$ENV{CUDAFLAGS}")
 add_custom_command(
-        DEPENDS cuda_mapd_rt.cu JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp GpuInitGroups.cu GroupByRuntime.cpp TopKRuntime.cpp StringFunctions.cpp RegexpFunctions.cpp ../Utils/ChunkIter.cpp ../Utils/StringLike.cpp ../Utils/Regexp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp ${TABLE_FUNCTIONS_DEPS}
+        DEPENDS cuda_mapd_rt.cu JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp GpuInitGroups.cu GroupByRuntime.cpp TopKRuntime.cpp StringFunctions.cpp RegexpFunctions.cpp ../Utils/ChunkIter.cpp ../Utils/StringLike.cpp ../Utils/Regexp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cuda_mapd_rt.fatbin
         COMMAND nvcc
         ${CUDA_FLAGS_LIST}

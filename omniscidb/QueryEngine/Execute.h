@@ -495,17 +495,6 @@ class Executor {
 
   ResultSetPtr executeExplain(const QueryCompilationDescriptor&);
 
-  /**
-   * @brief Compiles and dispatches a table function; that is, a function that takes as
-   * input one or more columns and returns a ResultSet, which can be parsed by subsequent
-   * execution steps
-   */
-  ResultSetPtr executeTableFunction(const TableFunctionExecutionUnit exe_unit,
-                                    const std::vector<InputTableInfo>& table_infos,
-                                    const CompilationOptions& co,
-                                    const ExecutionOptions& eo,
-                                    DataProvider* data_provider);
-
   ExecutorDeviceType getDeviceTypeForTargets(
       const RelAlgExecutionUnit& ra_exe_unit,
       const ExecutorDeviceType requested_device_type);
@@ -1099,8 +1088,6 @@ class Executor {
   friend class PendingExecutionClosure;
   friend class RelAlgExecutor;
   friend class GpuReductionHelperJIT;  // ExtensionModuleContext
-  friend class TableFunctionCompilationContext;
-  friend class TableFunctionExecutionContext;
   friend struct TargetExprCodegenBuilder;
   friend struct TargetExprCodegen;
   friend class WindowProjectNodeContext;

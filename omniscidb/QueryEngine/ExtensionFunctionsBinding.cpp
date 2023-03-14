@@ -33,77 +33,6 @@
 
 namespace {
 
-ExtArgumentType get_column_arg_elem_type(const ExtArgumentType ext_arg_column_type) {
-  switch (ext_arg_column_type) {
-    case ExtArgumentType::ColumnInt8:
-      return ExtArgumentType::Int8;
-    case ExtArgumentType::ColumnInt16:
-      return ExtArgumentType::Int16;
-    case ExtArgumentType::ColumnInt32:
-      return ExtArgumentType::Int32;
-    case ExtArgumentType::ColumnInt64:
-      return ExtArgumentType::Int64;
-    case ExtArgumentType::ColumnFloat:
-      return ExtArgumentType::Float;
-    case ExtArgumentType::ColumnDouble:
-      return ExtArgumentType::Double;
-    case ExtArgumentType::ColumnBool:
-      return ExtArgumentType::Bool;
-    case ExtArgumentType::ColumnTextEncodingDict:
-      return ExtArgumentType::TextEncodingDict;
-    default:
-      UNREACHABLE();
-  }
-  return ExtArgumentType{};
-}
-
-ExtArgumentType get_column_list_arg_elem_type(
-    const ExtArgumentType ext_arg_column_list_type) {
-  switch (ext_arg_column_list_type) {
-    case ExtArgumentType::ColumnListInt8:
-      return ExtArgumentType::Int8;
-    case ExtArgumentType::ColumnListInt16:
-      return ExtArgumentType::Int16;
-    case ExtArgumentType::ColumnListInt32:
-      return ExtArgumentType::Int32;
-    case ExtArgumentType::ColumnListInt64:
-      return ExtArgumentType::Int64;
-    case ExtArgumentType::ColumnListFloat:
-      return ExtArgumentType::Float;
-    case ExtArgumentType::ColumnListDouble:
-      return ExtArgumentType::Double;
-    case ExtArgumentType::ColumnListBool:
-      return ExtArgumentType::Bool;
-    case ExtArgumentType::ColumnListTextEncodingDict:
-      return ExtArgumentType::TextEncodingDict;
-    default:
-      UNREACHABLE();
-  }
-  return ExtArgumentType{};
-}
-
-ExtArgumentType get_array_arg_elem_type(const ExtArgumentType ext_arg_array_type) {
-  switch (ext_arg_array_type) {
-    case ExtArgumentType::ArrayInt8:
-      return ExtArgumentType::Int8;
-    case ExtArgumentType::ArrayInt16:
-      return ExtArgumentType::Int16;
-    case ExtArgumentType::ArrayInt32:
-      return ExtArgumentType::Int32;
-    case ExtArgumentType::ArrayInt64:
-      return ExtArgumentType::Int64;
-    case ExtArgumentType::ArrayFloat:
-      return ExtArgumentType::Float;
-    case ExtArgumentType::ArrayDouble:
-      return ExtArgumentType::Double;
-    case ExtArgumentType::ArrayBool:
-      return ExtArgumentType::Bool;
-    default:
-      UNREACHABLE();
-  }
-  return ExtArgumentType{};
-}
-
 static int get_numeric_scalar_scale(const hdk::ir::Type* arg_type) {
   switch (arg_type->id()) {
     case hdk::ir::Type::kBoolean:
@@ -254,6 +183,32 @@ static int match_numeric_argument(const hdk::ir::Type* arg_type,
   return 1;
 }
 
+namespace {
+
+ExtArgumentType get_array_arg_elem_type(const ExtArgumentType ext_arg_array_type) {
+  switch (ext_arg_array_type) {
+    case ExtArgumentType::ArrayInt8:
+      return ExtArgumentType::Int8;
+    case ExtArgumentType::ArrayInt16:
+      return ExtArgumentType::Int16;
+    case ExtArgumentType::ArrayInt32:
+      return ExtArgumentType::Int32;
+    case ExtArgumentType::ArrayInt64:
+      return ExtArgumentType::Int64;
+    case ExtArgumentType::ArrayFloat:
+      return ExtArgumentType::Float;
+    case ExtArgumentType::ArrayDouble:
+      return ExtArgumentType::Double;
+    case ExtArgumentType::ArrayBool:
+      return ExtArgumentType::Bool;
+    default:
+      UNREACHABLE();
+  }
+  return ExtArgumentType{};
+}
+
+}  // namespace
+
 static int match_arguments(const hdk::ir::Type* arg_type,
                            const bool is_arg_literal,
                            int sig_pos,
@@ -328,44 +283,6 @@ static int match_arguments(const hdk::ir::Type* arg_type,
           sig_pos < max_pos && sig_types[sig_pos + 1] == ExtArgumentType::Int64) {
         penalty_score += 1000;
         return 2;
-      }
-      break;
-    case hdk::ir::Type::kColumn:
-      if (is_ext_arg_type_column(sig_type)) {
-        // column arguments must match exactly
-        const auto sig_type_type =
-            ext_arg_type_to_type(arg_type->ctx(), get_column_arg_elem_type(sig_type));
-        auto elem_type = arg_type->as<hdk::ir::ColumnType>()->columnType();
-        if (elem_type->isBoolean() && sig_type_type->isInt8()) {
-          /* Boolean column has the same low-level structure as Int8 column. */
-          penalty_score += 1000;
-          return 1;
-        } else if (elem_type->id() == sig_type_type->id() &&
-                   elem_type->size() == sig_type_type->size()) {
-          penalty_score += 1000;
-          return 1;
-        } else {
-          return -1;
-        }
-      }
-      break;
-    case hdk::ir::Type::kColumnList:
-      if (is_ext_arg_type_column_list(sig_type)) {
-        // column_list arguments must match exactly
-        const auto sig_type_type = ext_arg_type_to_type(
-            arg_type->ctx(), get_column_list_arg_elem_type(sig_type));
-        auto elem_type = arg_type->as<hdk::ir::ColumnListType>()->columnType();
-        if (elem_type->isBoolean() && sig_type_type->isInt8()) {
-          /* Boolean column_list has the same low-level structure as Int8 column_list. */
-          penalty_score += 10000;
-          return 1;
-        } else if (elem_type->id() == sig_type_type->id() &&
-                   elem_type->size() == sig_type_type->size()) {
-          penalty_score += 10000;
-          return 1;
-        } else {
-          return -1;
-        }
       }
       break;
     case hdk::ir::Type::kVarChar:
@@ -453,8 +370,8 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
     ext_funcs have the same name.
    */
   if (!is_valid_identifier(name)) {
-    throw NativeExecutionError(
-        "Cannot bind function with invalid UDF/UDTF function name: " + name);
+    throw NativeExecutionError("Cannot bind function with invalid UDF function name: " +
+                               name);
   }
 
   int minimal_score = std::numeric_limits<int>::max();
@@ -465,19 +382,6 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
   std::vector<const hdk::ir::Type*> types_input;
   std::vector<bool> args_are_constants;
   for (auto atype : func_args) {
-    if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-      if (dynamic_cast<const hdk::ir::ColumnVar*>(atype.get())) {
-        auto type = atype->type();
-        if (type->isText() || type->isExtDictionary()) {
-          types_input.push_back(type->ctx().column(type));
-          args_are_constants.push_back(false);
-        } else {
-          types_input.push_back(type->ctx().column(type));
-          args_are_constants.push_back(true);
-        }
-        continue;
-      }
-    }
     types_input.push_back(atype->type());
     if (dynamic_cast<const hdk::ir::Constant*>(atype.get())) {
       args_are_constants.push_back(true);
@@ -490,90 +394,18 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
   if (types_input.size() == 0 && ext_funcs.size() > 0) {
     CHECK_EQ(ext_funcs.size(), static_cast<size_t>(1));
     CHECK_EQ(ext_funcs[0].getInputArgs().size(), static_cast<size_t>(0));
-    if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-      CHECK(ext_funcs[0].hasNonUserSpecifiedOutputSize());
-    }
     std::vector<const hdk::ir::Type*> empty_type_info_variant(0);
     return {ext_funcs[0], empty_type_info_variant};
   }
 
-  // clang-format off
-  /*
-    Table functions may have arguments such as ColumnList that collect
-    neighboring columns with the same data type into a single object.
-    Here we compute all possible combinations of mapping a subset of
-    columns into columns sets. For example, if the types of function
-    arguments are (as given in func_args argument)
-
-      (Column<int>, Column<int>, Column<int>, int)
-
-    then the computed variants will be
-
-      (Column<int>, Column<int>, Column<int>, int)
-      (Column<int>, Column<int>, ColumnList[1]<int>, int)
-      (Column<int>, ColumnList[1]<int>, Column<int>, int)
-      (Column<int>, ColumnList[2]<int>, int)
-      (ColumnList[1]<int>, Column<int>, Column<int>, int)
-      (ColumnList[1]<int>, Column<int>, ColumnList[1]<int>, int)
-      (ColumnList[2]<int>, Column<int>, int)
-      (ColumnList[3]<int>, int)
-
-    where the integers in [..] indicate the number of collected
-    columns. In the ColumnListType instance, this number is stored in the
-    length attribute.
-
-    As an example, let us consider a SQL query containing the
-    following expression calling a UDTF foo:
-
-      table(foo(cursor(select a, b, c from tableofints), 1))
-
-    Here follows a list of table functions and the corresponding
-    optimal argument type variants that are computed for the given
-    query expression:
-
-    UDTF:  foo(ColumnList<int>, RowMultiplier) -> Column<int>
-           (ColumnList[3]<int>, int)               # a, b, c are all collected to column_list
-
-    UDTF:  foo(Column<int>, ColumnList<int>, RowMultiplier) -> Column<int>
-           (Column<int>, ColumnList[2]<int>, int)  # b and c are collected to column_list
-
-    UDTF:  foo(Column<int>, Column<int>, Column<int>, RowMultiplier) -> Column<int>
-           (Column<int>, Column<int>, Column<int>, int)
-   */
-  // clang-format on
   std::vector<std::vector<const hdk::ir::Type*>> types_variants;
   for (auto type : types_input) {
     if (types_variants.begin() == types_variants.end()) {
       types_variants.push_back({type});
-      if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-        if (type->isColumn()) {
-          auto mt =
-              type->ctx().columnList(type->as<hdk::ir::ColumnType>()->columnType(), 1);
-          types_variants.push_back({mt});
-        }
-      }
       continue;
     }
     std::vector<std::vector<const hdk::ir::Type*>> new_types_variants;
     for (auto& types : types_variants) {
-      if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-        if (type->isColumn()) {
-          auto col_type = type->as<hdk::ir::ColumnType>()->columnType();
-          auto new_types = types;  // makes a copy
-          const auto& last = types.back();
-          if (last->isColumnList() &&
-              last->as<hdk::ir::ColumnListType>()->columnType()->equal(col_type)) {
-            // last column_list consumes column argument if types match
-            new_types.back() = type->ctx().columnList(
-                col_type, last->as<hdk::ir::ColumnListType>()->length() + 1);
-          } else {
-            // add column as column_list argument
-            auto mt = type->ctx().columnList(col_type, 1);
-            new_types.push_back(mt);
-          }
-          new_types_variants.push_back(new_types);
-        }
-      }
       types.push_back(type);
     }
     types_variants.insert(
@@ -638,10 +470,7 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
       message = "Function " + name + "(" + sarg_types + ") not supported.";
       throw ExtensionFunctionBindingError(message);
     } else {
-      if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-        message = "Could not bind " + name + "(" + sarg_types + ") to any " + processor +
-                  " UDTF implementation.";
-      } else if constexpr (std::is_same_v<T, ExtensionFunction>) {
+      if constexpr (std::is_same_v<T, ExtensionFunction>) {
         message = "Could not bind " + name + "(" + sarg_types + ") to any " + processor +
                   " UDF implementation.";
       } else {
@@ -649,49 +478,11 @@ std::tuple<T, std::vector<const hdk::ir::Type*>> bind_function(
                    << typeid(T).name();
       }
       message += "\n  Existing extension function implementations:";
-      for (const auto& ext_func : ext_funcs) {
-        // Do not show functions missing the sizer argument
-        if constexpr (std::is_same_v<T, table_functions::TableFunction>)
-          if (ext_func.useDefaultSizer())
-            continue;
-        message += "\n    " + ext_func.toStringSQL();
-      }
     }
     throw ExtensionFunctionBindingError(message);
   }
 
-  // Functions with "_default_" suffix only exist for calcite
-  if constexpr (std::is_same_v<T, table_functions::TableFunction>) {
-    if (ext_funcs[optimal].hasUserSpecifiedOutputSizeMultiplier() &&
-        ext_funcs[optimal].useDefaultSizer()) {
-      std::string name = ext_funcs[optimal].getName();
-      name.erase(name.find(DEFAULT_ROW_MULTIPLIER_SUFFIX),
-                 sizeof(DEFAULT_ROW_MULTIPLIER_SUFFIX));
-      for (size_t i = 0; i < ext_funcs.size(); i++) {
-        if (ext_funcs[i].getName() == name) {
-          optimal = i;
-          std::vector<const hdk::ir::Type*> types = types_variants[optimal_variant];
-          size_t sizer = ext_funcs[optimal].getOutputRowSizeParameter();
-          types.insert(types.begin() + sizer - 1,
-                       hdk::ir::Context::defaultCtx().int32(false));
-          return {ext_funcs[optimal], types};
-        }
-      }
-      UNREACHABLE();
-    }
-  }
-
   return {ext_funcs[optimal], types_variants[optimal_variant]};
-}
-
-const std::tuple<table_functions::TableFunction, std::vector<const hdk::ir::Type*>>
-bind_table_function(std::string name,
-                    hdk::ir::ExprPtrVector input_args,
-                    const std::vector<table_functions::TableFunction>& table_funcs,
-                    const bool is_gpu) {
-  std::string processor = (is_gpu ? "GPU" : "CPU");
-  return bind_function<table_functions::TableFunction>(
-      name, input_args, table_funcs, processor);
 }
 
 ExtensionFunction bind_function(std::string name, hdk::ir::ExprPtrVector func_args) {
@@ -741,14 +532,4 @@ ExtensionFunction bind_function(const hdk::ir::FunctionOper* function_oper,
     func_args.push_back(function_oper->argShared(i));
   }
   return bind_function(name, func_args, is_gpu);
-}
-
-const std::tuple<table_functions::TableFunction, std::vector<const hdk::ir::Type*>>
-bind_table_function(std::string name,
-                    hdk::ir::ExprPtrVector input_args,
-                    const bool is_gpu) {
-  // used in RelAlgExecutor.cpp
-  std::vector<table_functions::TableFunction> table_funcs =
-      table_functions::TableFunctionsFactory::get_table_funcs(name, is_gpu);
-  return bind_table_function(name, input_args, table_funcs, is_gpu);
 }

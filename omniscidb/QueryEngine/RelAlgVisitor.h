@@ -64,10 +64,6 @@ class RelAlgVisitor {
     if (logical_values) {
       return aggregateResult(result, visitLogicalValues(logical_values));
     }
-    const auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(rel_alg);
-    if (table_func) {
-      return aggregateResult(result, visitTableFunction(table_func));
-    }
     const auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(rel_alg);
     if (logical_union) {
       return aggregateResult(result, visitLogicalUnion(logical_union));
@@ -95,10 +91,6 @@ class RelAlgVisitor {
   virtual T visitSort(const hdk::ir::Sort*) const { return defaultResult(); }
 
   virtual T visitLogicalValues(const hdk::ir::LogicalValues*) const {
-    return defaultResult();
-  }
-
-  virtual T visitTableFunction(const hdk::ir::TableFunction*) const {
     return defaultResult();
   }
 
