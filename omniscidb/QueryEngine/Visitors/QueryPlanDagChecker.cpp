@@ -42,11 +42,6 @@ void QueryPlanDagChecker::visitLogicalValues(const hdk::ir::LogicalValues* rel_a
   return;
 }
 
-void QueryPlanDagChecker::visitTableFunction(const hdk::ir::TableFunction* rel_alg_node) {
-  detectNonSupportedNode("Detect TableFunction node");
-  return;
-}
-
 void QueryPlanDagChecker::visitCompound(const hdk::ir::Compound* rel_alg_node) {
   // SINGLE_VALUE / SAMPLE query
   if (rel_alg_node->isAggregate() && rel_alg_node->size() > 0) {

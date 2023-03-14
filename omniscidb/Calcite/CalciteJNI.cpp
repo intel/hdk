@@ -277,10 +277,8 @@ class CalciteJNI::Impl {
     return convertJavaString(env.get(), java_res);
   }
 
-  void setRuntimeExtensionFunctions(
-      const std::vector<ExtensionFunction>& udfs,
-      const std::vector<table_functions::TableFunction>& udtfs,
-      bool is_runtime) {
+  void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
+                                    bool is_runtime) {
     auto env = jvm_->getEnv();
     jobject udfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
     for (auto& udf : udfs) {
@@ -288,14 +286,8 @@ class CalciteJNI::Impl {
           udfs_list, array_list_add_, convertExtensionFunction(env.get(), udf));
     }
 
-    jobject udtfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
-    for (auto& udtf : udtfs) {
-      env->CallVoidMethod(
-          udtfs_list, array_list_add_, convertTableFunction(env.get(), udtf));
-    }
-
     env->CallVoidMethod(
-        handler_obj_, handler_set_rt_fns_, udfs_list, udtfs_list, (jboolean)is_runtime);
+        handler_obj_, handler_set_rt_fns_, udfs_list, (jboolean)is_runtime);
     if (env->ExceptionCheck() != JNI_FALSE) {
       env->ExceptionDescribe();
       throw std::runtime_error("Failed Java call to setRuntimeExtensionFunctions");
@@ -373,9 +365,8 @@ class CalciteJNI::Impl {
     }
 
     // Find 'CalciteServerHandler::setRuntimeExtensionFunctions' method.
-    handler_set_rt_fns_ = env->GetMethodID(handler_cls,
-                                           "setRuntimeExtensionFunctions",
-                                           "(Ljava/util/List;Ljava/util/List;Z)V");
+    handler_set_rt_fns_ = env->GetMethodID(
+        handler_cls, "setRuntimeExtensionFunctions", "(Ljava/util/List;Z)V");
     if (!handler_set_rt_fns_) {
       throw std::runtime_error(
           "cannot find CalciteServerHandler::setRuntimeExtensionFunctions "
@@ -434,13 +425,6 @@ class CalciteJNI::Impl {
                          "ExtensionFunction$ExtArgumentType;)V");
     if (!extension_fn_udf_ctor_) {
       throw std::runtime_error("cannot find ExtensionFunction (UDF) ctor");
-    }
-    extension_fn_udtf_ctor_ = env->GetMethodID(
-        extension_fn_cls_,
-        "<init>",
-        "(Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V");
-    if (!extension_fn_udtf_ctor_) {
-      throw std::runtime_error("cannot find ExtensionFunction (UDTF) ctor");
     }
   }
 
@@ -532,28 +516,6 @@ class CalciteJNI::Impl {
         extension_fn_cls_, extension_fn_udf_ctor_, name_arg, args_arg, ret_arg);
   }
 
-  jobject convertTableFunction(JNIEnv* env, const table_functions::TableFunction& udtf) {
-    jstring name_arg = env->NewStringUTF(udtf.getName().c_str());
-    jobject args_arg = env->NewObject(array_list_cls_, array_list_ctor_);
-    jobject outs_arg = env->NewObject(array_list_cls_, array_list_ctor_);
-    jobject names_arg = env->NewObject(array_list_cls_, array_list_ctor_);
-    addArgTypesAndNames(
-        env, args_arg, names_arg, udtf.getSqlArgs(), udtf.getAnnotations(), "inp", 0);
-    addArgTypesAndNames(env,
-                        outs_arg,
-                        names_arg,
-                        udtf.getOutputArgs(),
-                        udtf.getAnnotations(),
-                        "out",
-                        udtf.getSqlArgs().size());
-    return env->NewObject(extension_fn_cls_,
-                          extension_fn_udtf_ctor_,
-                          name_arg,
-                          args_arg,
-                          outs_arg,
-                          names_arg);
-  }
-
   SchemaProviderPtr schema_provider_;
   ConfigPtr config_;
 
@@ -583,7 +545,6 @@ class CalciteJNI::Impl {
   // com.mapd.parser.server.ExtensionFunction class and methods
   jclass extension_fn_cls_;
   jmethodID extension_fn_udf_ctor_;
-  jmethodID extension_fn_udtf_ctor_;
 
   // com.mapd.parser.server.InvalidParseRequest class and fields
   jclass invalid_parse_req_cls_;
@@ -637,9 +598,7 @@ std::string CalciteJNI::getUserDefinedFunctionWhitelist() {
 std::string CalciteJNI::getRuntimeExtensionFunctionWhitelist() {
   return impl_->getRuntimeExtensionFunctionWhitelist();
 }
-void CalciteJNI::setRuntimeExtensionFunctions(
-    const std::vector<ExtensionFunction>& udfs,
-    const std::vector<table_functions::TableFunction>& udtfs,
-    bool is_runtime) {
-  return impl_->setRuntimeExtensionFunctions(udfs, udtfs, is_runtime);
+void CalciteJNI::setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
+                                              bool is_runtime) {
+  return impl_->setRuntimeExtensionFunctions(udfs, is_runtime);
 }

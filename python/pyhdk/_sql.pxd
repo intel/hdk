@@ -23,17 +23,6 @@ cdef extern from "omniscidb/QueryEngine/ExtensionFunctionsWhitelist.h":
     @staticmethod
     void addUdfs(const string)
 
-cdef extern from "omniscidb/QueryEngine/TableFunctions/TableFunctionsFactory.h" namespace "table_functions":
-  cdef cppclass CTableFunction "table_functions::TableFunction":
-    pass
-
-  cdef cppclass CTableFunctionsFactory "table_functions::TableFunctionsFactory":
-    @staticmethod
-    void init()
-
-    @staticmethod
-    vector[CTableFunction] get_table_funcs(bool)
-
 cdef extern from "omniscidb/Calcite/CalciteJNI.h":
   cdef cppclass FilterPushDownInfo:
     int input_prev;
@@ -46,7 +35,7 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
 
     string getExtensionFunctionWhitelist()
     string getUserDefinedFunctionWhitelist()
-    void setRuntimeExtensionFunctions(const vector[CExtensionFunction]&, const vector[CTableFunction]&, bool)
+    void setRuntimeExtensionFunctions(const vector[CExtensionFunction]&, bool)
 
 cdef extern from "omniscidb/IR/Node.h":
   cdef cppclass CQueryDag "hdk::ir::QueryDag":

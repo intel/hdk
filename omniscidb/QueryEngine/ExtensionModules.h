@@ -23,8 +23,8 @@ enum class ExtModuleKinds {
   l0_template_module,   // RuntimeFunctionsL0.bc
   udf_cpu_module,       // Load-time UDFs for CPU execution
   udf_gpu_module,       // Load-time UDFs for GPU execution
-  rt_udf_cpu_module,    // Run-time UDF/UDTFs for CPU execution
-  rt_udf_gpu_module,    // Run-time UDF/UDTFs for GPU execution
+  rt_udf_cpu_module,    // Run-time UDF for CPU execution
+  rt_udf_gpu_module,    // Run-time UDF for GPU execution
   rt_libdevice_module,  // math library functions for GPU execution
   spirv_helper_funcs_module
 };

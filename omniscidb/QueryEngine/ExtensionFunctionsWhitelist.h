@@ -174,4 +174,20 @@ class ExtensionFunctionsWhitelist {
 
 std::string toString(const ExtArgumentType& sig_type);
 
+inline bool is_ext_arg_type_array(const ExtArgumentType ext_arg_type) {
+  switch (ext_arg_type) {
+    case ExtArgumentType::ArrayInt8:
+    case ExtArgumentType::ArrayInt16:
+    case ExtArgumentType::ArrayInt32:
+    case ExtArgumentType::ArrayInt64:
+    case ExtArgumentType::ArrayFloat:
+    case ExtArgumentType::ArrayDouble:
+    case ExtArgumentType::ArrayBool:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
 #endif  // QUERYENGINE_EXTENSIONFUNCTIONSWHITELIST_H

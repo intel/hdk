@@ -66,7 +66,6 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
   enum CExecutorType "ExecutorType":
     Native "ExecutorType::Native",
     Extern "ExecutorType::Extern",
-    TableFunctions "ExecutorType::TableFunctions",
 
   cdef cppclass CExecutionOptions "ExecutionOptions":
     bool output_columnar_hint

@@ -21,7 +21,6 @@
 
 #include "QueryEngine/ExtensionFunctionsBinding.h"
 #include "QueryEngine/JsonAccessors.h"
-#include "QueryEngine/TableFunctions/TableFunctionsFactory.h"
 #include "Shared/StringTransform.h"
 
 // Get the list of all type specializations for the given function name.
@@ -463,7 +462,6 @@ std::vector<std::string> ExtensionFunctionsWhitelist::getLLVMDeclarations(
 
       std::string decl_prefix;
       std::vector<std::string> arg_strs;
-
       if (is_ext_arg_type_array(signature.getRet())) {
         decl_prefix = "declare void @" + signature.getName();
         arg_strs.emplace_back(serialize_type(signature.getRet()));
@@ -479,25 +477,6 @@ std::vector<std::string> ExtensionFunctionsWhitelist::getLLVMDeclarations(
     }
   }
 
-  for (const auto& kv : table_functions::TableFunctionsFactory::functions_) {
-    if (kv.second.isRuntime() || kv.second.useDefaultSizer()) {
-      // Runtime UDTFs are defined in LLVM/NVVM IR module
-      // UDTFs using default sizer share LLVM IR
-      continue;
-    }
-    if (!((is_gpu && kv.second.isGPU()) || (!is_gpu && kv.second.isCPU()))) {
-      continue;
-    }
-    std::string decl_prefix{"declare " + serialize_type(ExtArgumentType::Int32) + " @" +
-                            kv.first};
-    std::vector<std::string> arg_strs;
-    for (const auto arg : kv.second.getArgs(/* ensure_column = */ true)) {
-      arg_strs.push_back(
-          serialize_type(arg, /* byval= */ kv.second.isRuntime(), /* declare= */ true));
-    }
-    declarations.push_back(decl_prefix + "(" + boost::algorithm::join(arg_strs, ", ") +
-                           ");");
-  }
   return declarations;
 }
 

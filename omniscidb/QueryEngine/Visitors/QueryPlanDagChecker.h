@@ -38,7 +38,6 @@ class QueryPlanDagChecker final : public ExprDagVisitor {
 
  private:
   void visitLogicalValues(const hdk::ir::LogicalValues*) override;
-  void visitTableFunction(const hdk::ir::TableFunction*) override;
   void visitCompound(const hdk::ir::Compound*) override;
   void visitLogicalUnion(const hdk::ir::LogicalUnion*) override;
 

@@ -31,8 +31,6 @@
 #include "RelAlgDagBuilder.h"
 #include "Shared/sqldefs.h"
 #include "Shared/toString.h"
-#include "TableFunctions/TableFunctionOutputBufferSizeType.h"
-#include "TableFunctions/TableFunctionsFactory.h"
 
 #include <boost/graph/adjacency_list.hpp>
 
@@ -152,25 +150,6 @@ struct RelAlgExecutionUnit {
 
 std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_unit);
 std::string ra_exec_unit_desc_for_caching(const RelAlgExecutionUnit& ra_exe_unit);
-
-struct TableFunctionExecutionUnit {
-  const std::vector<InputDescriptor> input_descs;
-  std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
-  std::vector<const hdk::ir::Expr*> input_exprs;
-  std::vector<const hdk::ir::ColumnVar*> table_func_inputs;
-  std::vector<const hdk::ir::Expr*> target_exprs;
-  const size_t output_buffer_size_param;
-  const table_functions::TableFunction table_func;
-
- public:
-  std::string toString() const {
-    return typeName(this) + "(" + "input_exprs=" + ::toString(input_exprs) +
-           ", table_func_inputs=" + ::toString(table_func_inputs) +
-           ", target_exprs=" + ::toString(target_exprs) +
-           ", output_buffer_size_param=" + ::toString(output_buffer_size_param) +
-           ", table_func=" + ::toString(table_func) + ")";
-  }
-};
 
 class ResultSet;
 using ResultSetPtr = std::shared_ptr<ResultSet>;

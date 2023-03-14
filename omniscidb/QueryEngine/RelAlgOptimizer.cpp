@@ -185,7 +185,6 @@ bool is_identical_copy(
       if (dynamic_cast<const hdk::ir::Aggregate*>(only_usr) ||
           dynamic_cast<const hdk::ir::Sort*>(only_usr) ||
           dynamic_cast<const hdk::ir::Join*>(only_usr) ||
-          dynamic_cast<const hdk::ir::TableFunction*>(only_usr) ||
           dynamic_cast<const hdk::ir::LogicalUnion*>(only_usr)) {
         return false;
       }
@@ -352,9 +351,6 @@ void redirect_inputs_of(
       return;
     }
   }
-  if (std::dynamic_pointer_cast<hdk::ir::TableFunction>(node)) {
-    return;
-  }
   CHECK(std::dynamic_pointer_cast<hdk::ir::Aggregate>(node) ||
         std::dynamic_pointer_cast<hdk::ir::Sort>(node));
   node->replaceInput(src_project, src_project->getAndOwnInput(0));
@@ -479,7 +475,6 @@ build_du_web(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept 
             dynamic_cast<const hdk::ir::Sort*>(walker) ||
             dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(walker) ||
             dynamic_cast<const hdk::ir::LogicalValues*>(walker) ||
-            dynamic_cast<const hdk::ir::TableFunction*>(walker) ||
             dynamic_cast<const hdk::ir::LogicalUnion*>(walker));
       for (size_t i = 0; i < walker->inputCount(); ++i) {
         auto src = walker->getInput(i);
@@ -766,21 +761,6 @@ std::vector<std::unordered_set<size_t>> get_live_ins(
     }
     return {live_in};
   }
-  if (auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(node)) {
-    const auto input_count = table_func->size();
-    std::unordered_set<size_t> live_in;
-    for (size_t i = 0; i < input_count; i++) {
-      live_in.insert(i);
-    }
-
-    std::vector<std::unordered_set<size_t>> result;
-    // Is the computed result correct in general?
-    for (size_t i = table_func->inputCount(); i > 0; i--) {
-      result.push_back(live_in);
-    }
-
-    return result;
-  }
   if (auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(node)) {
     return std::vector<std::unordered_set<size_t>>(logical_union->inputCount(), live_out);
   }
@@ -936,8 +916,7 @@ std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>> mark_live_c
   std::vector<const hdk::ir::Node*> work_set;
   for (auto node_it = nodes.rbegin(); node_it != nodes.rend(); ++node_it) {
     auto node = node_it->get();
-    if (dynamic_cast<const hdk::ir::Scan*>(node) || live_outs.count(node) ||
-        dynamic_cast<const hdk::ir::TableFunction*>(node)) {
+    if (dynamic_cast<const hdk::ir::Scan*>(node) || live_outs.count(node)) {
       continue;
     }
     std::vector<size_t> all_live(node->size());
@@ -955,8 +934,7 @@ std::unordered_map<const hdk::ir::Node*, std::unordered_set<size_t>> mark_live_c
       CHECK_EQ(live_ins.size(), walker->inputCount());
       for (size_t i = 0; i < walker->inputCount(); ++i) {
         auto src = walker->getInput(i);
-        if (dynamic_cast<const hdk::ir::Scan*>(src) ||
-            dynamic_cast<const hdk::ir::TableFunction*>(src) || live_ins[i].empty()) {
+        if (dynamic_cast<const hdk::ir::Scan*>(src) || live_ins[i].empty()) {
           continue;
         }
         if (!live_outs.count(src)) {
@@ -1751,9 +1729,6 @@ void sync_field_names_if_necessary(std::shared_ptr<const hdk::ir::Project> from_
     } else if (auto compound_to = dynamic_cast<hdk::ir::Compound*>(to_node);
                compound_to && compound_to->getFields().size() == from_fields.size()) {
       compound_to->setFields(std::move(from_fields));
-    } else if (auto tf_to = dynamic_cast<hdk::ir::TableFunction*>(to_node);
-               tf_to && tf_to->getFields().size() == from_fields.size()) {
-      tf_to->setFields(std::move(from_fields));
     }
   }
 }

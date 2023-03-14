@@ -34,8 +34,6 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
       visitScan(scan);
     } else if (auto sort = dynamic_cast<const hdk::ir::Sort*>(node)) {
       visitSort(sort);
-    } else if (auto table_fn = dynamic_cast<const hdk::ir::TableFunction*>(node)) {
-      visitTableFunction(table_fn);
     } else if (auto translated_join =
                    dynamic_cast<const hdk::ir::TranslatedJoin*>(node)) {
       visitTranslatedJoin(translated_join);
@@ -99,12 +97,6 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
 
   virtual void visitScan(const hdk::ir::Scan*) {}
   virtual void visitSort(const hdk::ir::Sort*) {}
-
-  virtual void visitTableFunction(const hdk::ir::TableFunction* table_function) {
-    for (size_t i = 0; i < table_function->getTableFuncInputsSize(); ++i) {
-      visit(table_function->getTableFuncInputExprAt(i));
-    }
-  }
 
   virtual void visitTranslatedJoin(const hdk::ir::TranslatedJoin* translated_join) {
     visit(translated_join->getLHS());

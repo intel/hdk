@@ -50,19 +50,6 @@ class QueryMemoryInitializer {
                          const size_t thread_idx,
                          const Executor* executor);
 
-  // Table functions execution constructor
-  QueryMemoryInitializer(const TableFunctionExecutionUnit& exe_unit,
-                         const QueryMemoryDescriptor& query_mem_desc,
-                         const int device_id,
-                         const ExecutorDeviceType device_type,
-                         const bool use_hash_table_desc,
-                         const int64_t num_rows,
-                         const std::vector<std::vector<const int8_t*>>& col_buffers,
-                         const std::vector<std::vector<uint64_t>>& frag_offsets,
-                         std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-                         DeviceAllocator* device_allocator,
-                         const Executor* executor);
-
   const auto getCountDistinctBitmapPtr() const { return count_distinct_bitmap_mem_; }
 
   const auto getCountDistinctHostPtr() const { return count_distinct_bitmap_host_mem_; }
@@ -106,21 +93,6 @@ class QueryMemoryInitializer {
     CHECK_EQ(num_buffers_, group_by_buffers_.size());
     return num_buffers_;
   }
-
-#if defined(HAVE_CUDA) || defined(HAVE_L0)
-  GpuGroupByBuffers setupTableFunctionGpuBuffers(
-      const QueryMemoryDescriptor& query_mem_desc,
-      const int device_id,
-      const unsigned block_size_x,
-      const unsigned grid_size_x);
-  void copyFromTableFunctionGpuBuffers(BufferProvider* buffer_provider,
-                                       const QueryMemoryDescriptor& query_mem_desc,
-                                       const size_t entry_count,
-                                       const GpuGroupByBuffers& gpu_group_by_buffers,
-                                       const int device_id,
-                                       const unsigned block_size_x,
-                                       const unsigned grid_size_x);
-#endif
 
   void copyGroupByBuffersFromGpu(BufferProvider* buffer_provider,
                                  const QueryMemoryDescriptor& query_mem_desc,

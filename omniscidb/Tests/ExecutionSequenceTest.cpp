@@ -486,30 +486,6 @@ TEST_F(ExecutionSequenceTest, LogicalUnion) {
       std::vector<double>({11.11, 22.22, 33.33, 44.44, 55.55, 11.11, 22.22, 33.33}));
 }
 
-TEST_F(ExecutionSequenceTest, TableFunction) {
-  auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
-  auto scan1 = dag->addScan(TEST_DB_ID, "test1");
-  auto proj1 = dag->addProject(scan1, {3, 3});
-  std::vector<TargetMetaInfo> tuple_type = {{"val", ctx().fp64()}};
-  auto table_fn = std::shared_ptr<TableFunction>(new TableFunction(
-      "row_adder",
-      NodeInputs{proj1},
-      {""},
-      {getNodeColumnRef(proj1.get(), 0), getNodeColumnRef(proj1.get(), 1)},
-      {Constant::make(ctx().int32(), 1),
-       getNodeColumnRef(proj1.get(), 0),
-       getNodeColumnRef(proj1.get(), 1)},
-      tuple_type));
-  dag->addNode(table_fn);
-  dag->finalize();
-
-  QueryExecutionSequence new_seq(dag->getRootNode(), configPtr());
-  CHECK_EQ(new_seq.size(), (size_t)2);
-
-  auto res = runQuery(std::move(dag));
-  compare_res_data(res, std::vector<double>({22.22, 44.44, 66.66, 88.88, 111.1}));
-}
-
 TEST_F(ExecutionSequenceTest, InnerJoin) {
   auto dag = std::make_unique<TestRelAlgDagBuilder>(getStorage(), configPtr());
   auto scan1 = dag->addScan(TEST_DB_ID, "test1");

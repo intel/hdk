@@ -484,8 +484,8 @@ std::unique_ptr<llvm::Module> read_llvm_module_from_ir_string(
     bool is_gpu = false) {
   llvm::SMDiagnostic parse_error;
 
-  auto buf = std::make_unique<llvm::MemoryBufferRef>(udf_ir_string,
-                                                     "Runtime UDF/UDTF LLVM/NVVM IR");
+  auto buf =
+      std::make_unique<llvm::MemoryBufferRef>(udf_ir_string, "Runtime UDF LLVM/NVVM IR");
 
   auto owner = llvm::parseIR(*buf, parse_error, ctx);
   if (!owner) {
@@ -501,7 +501,7 @@ std::unique_ptr<llvm::Module> read_llvm_module_from_ir_string(
               << udf_ir_string << "\nEnd of NNVM IR";
       LOG(WARNING) << "Expected triple nvptx64-nvidia-cuda for NVVM IR but got "
                    << gpu_triple.str()
-                   << ". Executing runtime UDF/UDTFs on GPU will be disabled.";
+                   << ". Executing runtime UDF on GPU will be disabled.";
       return std::unique_ptr<llvm::Module>();
       ;
     }

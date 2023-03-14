@@ -27,10 +27,8 @@ cdef class Calcite:
     if not udf_filename.empty():
       CExtensionFunctionsWhitelist.addUdfs(self.calcite.get().getUserDefinedFunctionWhitelist())
 
-    CTableFunctionsFactory.init();
-    cdef vector[CTableFunction] udtfs = move(CTableFunctionsFactory.get_table_funcs(False))
     cdef vector[CExtensionFunction] udfs = move(vector[CExtensionFunction]())
-    self.calcite.get().setRuntimeExtensionFunctions(udfs, udtfs, False)
+    self.calcite.get().setRuntimeExtensionFunctions(udfs, False)
 
   def process(self, string sql, **kwargs):
     cdef string db_name = kwargs.get("db_name", "test-db")

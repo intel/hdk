@@ -334,8 +334,6 @@ class ArrowSQLRunnerImpl {
     executor_ = Executor::getExecutor(data_mgr_.get(), config_, "", "");
     executor_->setSchemaProvider(storage_);
 
-    table_functions::TableFunctionsFactory::init();
-
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
       calcite_ = std::make_shared<CalciteJNI>(storage_, config_, udf_filename, 1024);
 
@@ -347,14 +345,7 @@ class ArrowSQLRunnerImpl {
         }
       }
 
-#ifdef _WIN32
-      calcite_->setRuntimeExtensionFunctions({}, {}, /*is_runtime=*/false);
-#else
-      auto udtfs =
-          table_functions::TableFunctionsFactory::get_table_funcs(/*is_runtime=*/false);
-      std::vector<ExtensionFunction> udfs = {};
-      calcite_->setRuntimeExtensionFunctions(udfs, udtfs, /*is_runtime=*/false);
-#endif
+      calcite_->setRuntimeExtensionFunctions({}, /*is_runtime=*/false);
     }
 
     rel_alg_cache_ = std::make_shared<RelAlgCache>(calcite_, storage_, config_);

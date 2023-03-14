@@ -64,8 +64,6 @@
 #include "QueryEngine/RuntimeFunctions.h"
 #include "QueryEngine/SpeculativeTopN.h"
 #include "QueryEngine/StringDictionaryGenerations.h"
-#include "QueryEngine/TableFunctions/TableFunctionCompilationContext.h"
-#include "QueryEngine/TableFunctions/TableFunctionExecutionContext.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/measure.h"
@@ -210,7 +208,7 @@ void Executor::initialize_extension_module_sources() {
 }
 
 void Executor::reset(const bool discard_runtime_modules_only) {
-  // TODO: keep cached results that do not depend on runtime UDF/UDTFs
+  // TODO: keep cached results that do not depend on runtime UDF
   s_code_accessor->clear();
   s_stubs_accessor->clear();
   cpu_code_accessor->clear();
@@ -2097,58 +2095,6 @@ void Executor::executeWorkUnitPerFragment(
   }
 }
 
-ResultSetPtr Executor::executeTableFunction(
-    const TableFunctionExecutionUnit exe_unit,
-    const std::vector<InputTableInfo>& table_infos,
-    const CompilationOptions& co,
-    const ExecutionOptions& eo,
-    DataProvider* data_provider) {
-  INJECT_TIMER(Exec_executeTableFunction);
-
-  if (eo.just_validate) {
-    QueryMemoryDescriptor query_mem_desc(data_mgr_,
-                                         config_,
-                                         /*entry_count=*/0,
-                                         QueryDescriptionType::Projection,
-                                         /*is_table_function=*/true);
-    query_mem_desc.setOutputColumnar(true);
-    return std::make_shared<ResultSet>(
-        target_exprs_to_infos(exe_unit.target_exprs,
-                              query_mem_desc,
-                              getConfig().exec.group_by.bigint_count),
-        co.device_type,
-        ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
-        this->getRowSetMemoryOwner(),
-        data_mgr_,
-        this->blockSize(),
-        this->gridSize());
-  }
-
-  ColumnCacheMap column_cache;  // Note: if we add retries to the table function
-                                // framework, we may want to move this up a level
-
-  ColumnFetcher column_fetcher(this, data_provider, column_cache);
-  TableFunctionExecutionContext exe_context(getRowSetMemoryOwner());
-
-  std::shared_ptr<CompilationContext> compilation_context;
-  {
-    Executor::CgenStateManager cgenstate_manager(*this,
-                                                 false,
-                                                 table_infos,
-                                                 nullptr);  // locks compilation_mutex
-    TableFunctionCompilationContext tf_compilation_context(this);
-    compilation_context = tf_compilation_context.compile(exe_unit, co);
-  }
-
-  return exe_context.execute(exe_unit,
-                             table_infos,
-                             compilation_context,
-                             data_provider,
-                             column_fetcher,
-                             co.device_type,
-                             this);
-}
-
 ResultSetPtr Executor::executeExplain(const QueryCompilationDescriptor& query_comp_desc) {
   return std::make_shared<ResultSet>(query_comp_desc.getIR());
 }
@@ -3689,7 +3635,6 @@ llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth)
 #include "ArrayOps.cpp"
 #include "DateAdd.cpp"
 #include "StringFunctions.cpp"
-#include "TableFunctions/TableFunctionOps.cpp"
 #undef EXECUTE_INCLUDE
 
 namespace {

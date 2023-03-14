@@ -919,13 +919,6 @@ void RelAlgExecutor::executeRelAlgStep(const RaExecutionSequence& seq,
     addTemporaryTable(-logical_union->getId(), exec_desc.getResult().getDataPtr());
     return;
   }
-  const auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(body);
-  if (table_func) {
-    exec_desc.setResult(executeTableFunction(
-        table_func, hint_applied.first, hint_applied.second, queue_time_ms));
-    addTemporaryTable(-table_func->getId(), exec_desc.getResult().getDataPtr());
-    return;
-  }
   LOG(FATAL) << "Unhandled body type: " << body->toString();
 }
 
@@ -963,9 +956,6 @@ class UsedInputsCollector
 };
 
 const hdk::ir::Node* get_data_sink(const hdk::ir::Node* ra_node) {
-  if (auto table_func = dynamic_cast<const hdk::ir::TableFunction*>(ra_node)) {
-    return table_func;
-  }
   if (auto join = dynamic_cast<const hdk::ir::Join*>(ra_node)) {
     CHECK_EQ(size_t(2), join->inputCount());
     return join;
@@ -1018,14 +1008,6 @@ ColumnRefSet get_used_inputs(const hdk::ir::Aggregate* aggregate) {
 ColumnRefSet get_used_inputs(const hdk::ir::Project* project) {
   UsedInputsCollector collector;
   for (auto& expr : project->getExprs()) {
-    collector.visit(expr.get());
-  }
-  return std::move(collector.result());
-}
-
-ColumnRefSet get_used_inputs(const hdk::ir::TableFunction* table_func) {
-  UsedInputsCollector collector;
-  for (auto& expr : table_func->getTableFuncInputExprs()) {
     collector.visit(expr.get());
   }
   return std::move(collector.result());
@@ -1122,9 +1104,6 @@ ColumnRefSet get_join_source_used_inputs(const hdk::ir::Node* ra_node) {
 
   if (dynamic_cast<const hdk::ir::LogicalUnion*>(ra_node)) {
     CHECK_GT(ra_node->inputCount(), 1u) << ra_node->toString();
-  } else if (dynamic_cast<const hdk::ir::TableFunction*>(ra_node)) {
-    // no-op
-    CHECK_GE(ra_node->inputCount(), 0u) << ra_node->toString();
   } else {
     CHECK_EQ(ra_node->inputCount(), 1u) << ra_node->toString();
   }
@@ -1451,8 +1430,6 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     } else {
       res = set_transient_dict_maybe(res);
     }
-  } else if (executor_type == ExecutorType::TableFunctions) {
-    res = fold_expr(res.get());
   } else {
     res = cast_dict_to_none(fold_expr(res.get()));
   }
@@ -1487,8 +1464,6 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
   // with other nodes. We don't use WorkUnitBuilder for them.
   if (auto logical_values = step_root->as<hdk::ir::LogicalValues>()) {
     return executeLogicalValues(logical_values, eo);
-  } else if (auto table_function = step_root->as<hdk::ir::TableFunction>()) {
-    return executeTableFunction(table_function, co, eo, queue_time_ms);
   }
 
   WorkUnit work_unit = createWorkUnit(step_root, co, eo, allow_speculative_sort);
@@ -1623,51 +1598,6 @@ ExecutionResult RelAlgExecutor::executeProject(
                          eo,
                          queue_time_ms,
                          previous_count);
-}
-
-ExecutionResult RelAlgExecutor::executeTableFunction(
-    const hdk::ir::TableFunction* table_func,
-    const CompilationOptions& co_in,
-    const ExecutionOptions& eo,
-    const int64_t queue_time_ms) {
-  INJECT_TIMER(executeTableFunction);
-  auto timer = DEBUG_TIMER(__func__);
-
-  auto co = co_in;
-
-  if (!g_enable_table_functions) {
-    throw std::runtime_error("Table function support is disabled");
-  }
-  auto table_func_work_unit = createTableFunctionWorkUnit(
-      table_func,
-      eo.just_explain,
-      /*is_gpu = */ co.device_type == ExecutorDeviceType::GPU);
-  const auto body = table_func_work_unit.body;
-  CHECK(body);
-
-  const auto table_infos =
-      get_table_infos(table_func_work_unit.exe_unit.input_descs, executor_);
-
-  ExecutionResult result{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
-                                                     co.device_type,
-                                                     QueryMemoryDescriptor(),
-                                                     nullptr,
-                                                     executor_->getDataMgr(),
-                                                     executor_->blockSize(),
-                                                     executor_->gridSize()),
-                         {}};
-
-  try {
-    result = {executor_->executeTableFunction(
-                  table_func_work_unit.exe_unit, table_infos, co, eo, data_provider_),
-              body->getOutputMetainfo()};
-  } catch (const QueryExecutionError& e) {
-    handlePersistentError(e.getErrorCode());
-    CHECK(e.getErrorCode() == Executor::ERR_OUT_OF_GPU_MEM);
-    throw std::runtime_error("Table function ran out of memory during execution");
-  }
-  result.setQueueTime(queue_time_ms);
-  return result;
 }
 
 namespace {
@@ -3430,179 +3360,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createUnionWorkUnit(
           logical_union,
           config_.exec.group_by.default_max_groups_buffer_entry_guess,
           std::move(query_rewriter)};
-}
-
-RelAlgExecutor::TableFunctionWorkUnit RelAlgExecutor::createTableFunctionWorkUnit(
-    const hdk::ir::TableFunction* rel_table_func,
-    const bool just_explain,
-    const bool is_gpu) {
-  std::vector<InputDescriptor> input_descs;
-  std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
-  auto input_to_nest_level = get_input_nest_levels(rel_table_func, {});
-  std::tie(input_descs, input_col_descs) =
-      get_input_desc(rel_table_func, input_to_nest_level, {});
-  const auto query_infos = get_table_infos(input_descs, executor_);
-  RelAlgTranslator translator(executor_, input_to_nest_level, {}, now_, just_explain);
-
-  hdk::ir::ExprPtrVector input_exprs_owned;
-  for (auto& expr : rel_table_func->getTableFuncInputExprs()) {
-    input_exprs_owned.push_back(
-        translate(expr.get(), translator, ::ExecutorType::TableFunctions));
-  }
-
-  target_exprs_owned_.insert(
-      target_exprs_owned_.end(), input_exprs_owned.begin(), input_exprs_owned.end());
-  auto input_exprs = get_exprs_not_owned(input_exprs_owned);
-
-  const auto table_function_impl_and_types = [=]() {
-    if (is_gpu) {
-      try {
-        return bind_table_function(
-            rel_table_func->getFunctionName(), input_exprs_owned, is_gpu);
-      } catch (ExtensionFunctionBindingError& e) {
-        LOG(WARNING) << "createTableFunctionWorkUnit[GPU]: " << e.what()
-                     << " Redirecting " << rel_table_func->getFunctionName()
-                     << " step to run on CPU.";
-        throw QueryMustRunOnCpu();
-      }
-    } else {
-      try {
-        return bind_table_function(
-            rel_table_func->getFunctionName(), input_exprs_owned, is_gpu);
-      } catch (ExtensionFunctionBindingError& e) {
-        LOG(WARNING) << "createTableFunctionWorkUnit[CPU]: " << e.what();
-        throw;
-      }
-    }
-  }();
-  const auto& table_function_impl = std::get<0>(table_function_impl_and_types);
-  const auto& table_function_types = std::get<1>(table_function_impl_and_types);
-
-  size_t output_row_sizing_param = 0;
-  if (table_function_impl
-          .hasUserSpecifiedOutputSizeParameter()) {  // constant and row multiplier
-    const auto parameter_index =
-        table_function_impl.getOutputRowSizeParameter(table_function_types);
-    CHECK_GT(parameter_index, size_t(0));
-    if (rel_table_func->countConstantArgs() == table_function_impl.countScalarArgs()) {
-      auto param_expr = rel_table_func->getTableFuncInputExprAt(parameter_index - 1);
-      auto param_const = dynamic_cast<const hdk::ir::Constant*>(param_expr);
-      if (!param_const) {
-        throw std::runtime_error(
-            "Provided output buffer sizing parameter is not a literal. Only literal "
-            "values are supported with output buffer sizing configured table "
-            "functions.");
-      }
-      if (!param_const->type()->isInteger()) {
-        throw std::runtime_error(
-            "Output buffer sizing parameter should have integer type.");
-      }
-      int64_t literal_val = param_const->intVal();
-      if (literal_val < 0) {
-        throw std::runtime_error("Provided output sizing parameter " +
-                                 std::to_string(literal_val) +
-                                 " must be positive integer.");
-      }
-      output_row_sizing_param = static_cast<size_t>(literal_val);
-    } else {
-      // RowMultiplier not specified in the SQL query. Set it to 1
-      output_row_sizing_param = 1;  // default value for RowMultiplier
-      static Datum d = {DEFAULT_ROW_MULTIPLIER_VALUE};
-      static auto DEFAULT_ROW_MULTIPLIER_EXPR = hdk::ir::makeExpr<hdk::ir::Constant>(
-          hdk::ir::Context::defaultCtx().int32(false), false, d);
-      // Push the constant 1 to input_exprs
-      input_exprs.insert(input_exprs.begin() + parameter_index - 1,
-                         DEFAULT_ROW_MULTIPLIER_EXPR.get());
-    }
-  } else if (table_function_impl.hasNonUserSpecifiedOutputSize()) {
-    output_row_sizing_param = table_function_impl.getOutputRowSizeParameter();
-  } else {
-    UNREACHABLE();
-  }
-
-  std::vector<const hdk::ir::ColumnVar*> input_col_exprs;
-  size_t input_index = 0;
-  size_t arg_index = 0;
-  const auto table_func_args = table_function_impl.getInputArgs();
-  CHECK_EQ(table_func_args.size(), table_function_types.size());
-  for (auto type : table_function_types) {
-    if (type->isColumnList()) {
-      for (int i = 0; i < type->as<hdk::ir::ColumnListType>()->length(); i++) {
-        auto& input_expr = input_exprs[input_index];
-        auto input_type = type->ctx().columnList(
-            input_expr->type(), type->as<hdk::ir::ColumnListType>()->length());
-        auto col_var = input_expr->withType(input_type);
-        CHECK(col_var->is<hdk::ir::ColumnVar>());
-
-        target_exprs_owned_.push_back(col_var);
-        input_exprs[input_index] = col_var.get();
-        input_col_exprs.push_back(col_var->as<hdk::ir::ColumnVar>());
-        input_index++;
-      }
-    } else if (type->isColumn()) {
-      auto& input_expr = input_exprs[input_index];
-      auto input_type = type->ctx().column(input_expr->type());
-      auto col_var = input_expr->withType(input_type);
-      CHECK(col_var->is<hdk::ir::ColumnVar>());
-
-      target_exprs_owned_.push_back(col_var);
-      input_exprs[input_index] = col_var.get();
-      input_col_exprs.push_back(col_var->as<hdk::ir::ColumnVar>());
-      input_index++;
-    } else {
-      auto input_expr = input_exprs[input_index];
-      auto ext_func_arg_type =
-          ext_arg_type_to_type(input_expr->ctx(), table_func_args[arg_index]);
-      if (!ext_func_arg_type->equal(input_expr->type())) {
-        target_exprs_owned_.push_back(input_expr->cast(ext_func_arg_type));
-        input_exprs[input_index] = target_exprs_owned_.back().get();
-      }
-      input_index++;
-    }
-    arg_index++;
-  }
-  CHECK_EQ(input_col_exprs.size(), rel_table_func->getColInputsSize());
-  std::vector<const hdk::ir::Expr*> table_func_outputs;
-  for (size_t i = 0; i < table_function_impl.getOutputsSize(); i++) {
-    auto type = table_function_impl.getOutputType(i);
-    if (type->isExtDictionary()) {
-      auto p = table_function_impl.getInputID(i);
-
-      int32_t input_pos = p.first;
-      // Iterate over the list of arguments to compute the offset. Use this offset to
-      // get the corresponding input
-      int32_t offset = 0;
-      for (int j = 0; j < input_pos; j++) {
-        auto type = table_function_types[j];
-        offset +=
-            type->isColumnList() ? type->as<hdk::ir::ColumnListType>()->length() : 1;
-      }
-      input_pos = offset + p.second;
-
-      CHECK_LT(input_pos, input_exprs.size());
-      auto input_type = input_exprs[input_pos]->type();
-      CHECK(input_type->isColumn()) << input_type->toString();
-      int32_t comp_param = input_type->as<hdk::ir::ColumnType>()
-                               ->columnType()
-                               ->as<hdk::ir::ExtDictionaryType>()
-                               ->dictId();
-      type = type->ctx().extDict(type->as<hdk::ir::ExtDictionaryType>()->elemType(),
-                                 comp_param);
-    }
-    target_exprs_owned_.push_back(std::make_shared<hdk::ir::ColumnVar>(type, 0, i, -1));
-    table_func_outputs.push_back(target_exprs_owned_.back().get());
-  }
-  const TableFunctionExecutionUnit exe_unit = {
-      input_descs,
-      input_col_descs,
-      input_exprs,              // table function inputs
-      input_col_exprs,          // table function column inputs (duplicates w/ above)
-      table_func_outputs,       // table function projected exprs
-      output_row_sizing_param,  // output buffer sizing param
-      table_function_impl};
-  const auto targets_meta = get_targets_meta(rel_table_func, exe_unit.target_exprs);
-  rel_table_func->setOutputMetainfo(targets_meta);
-  return {exe_unit, rel_table_func};
 }
 
 namespace {

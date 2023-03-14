@@ -185,11 +185,6 @@ class RelAlgExecutor {
                                  const int64_t queue_time_ms,
                                  const std::optional<size_t> previous_count);
 
-  ExecutionResult executeTableFunction(const hdk::ir::TableFunction*,
-                                       const CompilationOptions&,
-                                       const ExecutionOptions&,
-                                       const int64_t queue_time_ms);
-
   // Computes the window function results to be used by the query.
   void computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
                      const CompilationOptions& co,
@@ -245,11 +240,6 @@ class RelAlgExecutor {
       const CompilationOptions& co,
       const ExecutionOptions& eo,
       const hdk::ir::Node* body);
-
-  struct TableFunctionWorkUnit {
-    TableFunctionExecutionUnit exe_unit;
-    const hdk::ir::Node* body;
-  };
 
   WorkUnit createSortInputWorkUnit(const hdk::ir::Sort*, const ExecutionOptions& eo);
 
@@ -324,11 +314,6 @@ class RelAlgExecutor {
   WorkUnit createUnionWorkUnit(const hdk::ir::LogicalUnion*,
                                const SortInfo&,
                                const ExecutionOptions& eo);
-
-  TableFunctionWorkUnit createTableFunctionWorkUnit(
-      const hdk::ir::TableFunction* table_func,
-      const bool just_explain,
-      const bool is_gpu);
 
   void addTemporaryTable(const int table_id, const ResultSetPtr& result) {
     CHECK_LT(size_t(0), result->colCount());

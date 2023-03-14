@@ -191,5 +191,4 @@ class ColumnFetcher {
       linearized_idx_buf_cache_;
 
   friend class QueryCompilationDescriptor;
-  friend class TableFunctionExecutionContext;  // TODO(adb)
 };

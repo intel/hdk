@@ -126,14 +126,6 @@ class QueryExecutionSequenceImpl {
       }
     }
 
-    // Currently, we do not merge TableFunction with anything.
-    if (node->is<ir::TableFunction>()) {
-      execution_points_.insert(node);
-      for (size_t i = 0; i < node->inputCount(); ++i) {
-        execution_points_.insert(node->getInput(i));
-      }
-    }
-
     // LogicalValues are processed separately.
     if (node->is<ir::LogicalValues>()) {
       execution_points_.insert(node);
