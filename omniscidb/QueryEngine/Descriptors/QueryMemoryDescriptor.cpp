@@ -26,7 +26,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     Data_Namespace::DataMgr* data_mgr,
     ConfigPtr config,
     const std::vector<InputTableInfo>& query_infos,
-    const bool use_bump_allocator,
     const bool approx_quantile,
     const bool allow_multifrag,
     const bool keyless_hash,
@@ -70,7 +69,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   sort_on_gpu_ = sort_on_gpu_hint && canOutputColumnar() && !keyless_hash_;
 
   if (sort_on_gpu_) {
-    CHECK(!use_bump_allocator);
     output_columnar_ = true;
   } else {
     switch (query_desc_type_) {
@@ -94,7 +92,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   if (isLogicalSizedColumnsAllowed()) {
     // TODO(adb): Ensure fixed size buffer allocations are correct with all logical
     // column sizes
-    CHECK(!use_bump_allocator);
     col_slot_context_.setAllSlotsPaddedSizeToLogicalSize();
     col_slot_context_.validate();
   }

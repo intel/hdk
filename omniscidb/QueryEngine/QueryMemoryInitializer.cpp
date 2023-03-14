@@ -265,9 +265,7 @@ QueryMemoryInitializer::QueryMemoryInitializer(
     // No fragments in the input, no underlying buffers will be needed.
     return;
   }
-  if (!ra_exe_unit.use_bump_allocator) {
-    check_total_bitmap_memory(query_mem_desc);
-  }
+  check_total_bitmap_memory(query_mem_desc);
   if (device_type == ExecutorDeviceType::GPU) {
     allocateCountDistinctGpuMem(query_mem_desc);
   }
@@ -285,22 +283,9 @@ QueryMemoryInitializer::QueryMemoryInitializer(
                                 ? executor->blockSize() * executor->gridSize()
                                 : 1;
 
-  size_t group_buffer_size{0};
-  if (ra_exe_unit.use_bump_allocator) {
-    // For kernel per fragment execution, just allocate a buffer equivalent to the size of
-    // the fragment
-    if (dispatch_mode == ExecutorDispatchMode::KernelPerFragment) {
-      group_buffer_size = num_rows * query_mem_desc.getRowSize();
-    } else {
-      // otherwise, allocate a GPU buffer equivalent to the maximum GPU allocation size
-      group_buffer_size = executor->getConfig().mem.gpu.max_memory_allocation_size /
-                          query_mem_desc.getRowSize();
-    }
-  } else {
-    size_t max_rows = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
-    group_buffer_size =
-        query_mem_desc.getBufferSizeBytes(max_rows, thread_count, device_type);
-  }
+  size_t max_rows = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
+  size_t group_buffer_size =
+      query_mem_desc.getBufferSizeBytes(max_rows, thread_count, device_type);
   CHECK_GE(group_buffer_size, size_t(0));
 
   const auto group_buffers_count = !query_mem_desc.isGroupBy() ? 1 : num_buffers_;
@@ -1011,7 +996,6 @@ GpuGroupByBuffers QueryMemoryInitializer::createAndInitializeGroupByBufferGpu(
                                   num_rows_,
                                   can_sort_on_gpu,
                                   false,
-                                  ra_exe_unit.use_bump_allocator,
                                   query_mem_desc.hasVarlenOutput(),
                                   nullptr);
   if (query_mem_desc.hasVarlenOutput()) {

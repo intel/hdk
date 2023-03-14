@@ -88,7 +88,6 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
           ra_exe_unit.query_plan_dag,
           ra_exe_unit.hash_table_build_plan_dag,
           ra_exe_unit.table_id_to_node_map,
-          false,
           ra_exe_unit.union_all};
 }
 
@@ -112,7 +111,6 @@ RelAlgExecutionUnit create_count_all_execution_unit(
           ra_exe_unit.query_plan_dag,
           ra_exe_unit.hash_table_build_plan_dag,
           ra_exe_unit.table_id_to_node_map,
-          false,
           ra_exe_unit.union_all};
 }
 

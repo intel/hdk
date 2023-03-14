@@ -77,7 +77,6 @@ class QueryMemoryDescriptor {
   QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
                         ConfigPtr config,
                         const std::vector<InputTableInfo>& query_infos,
-                        const bool use_bump_allocator,
                         const bool approx_quantile,
                         const bool allow_multifrag,
                         const bool keyless_hash,

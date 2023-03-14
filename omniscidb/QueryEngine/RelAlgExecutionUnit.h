@@ -146,7 +146,6 @@ struct RelAlgExecutionUnit {
   QueryPlan query_plan_dag{EMPTY_QUERY_PLAN};
   HashTableBuildDagMap hash_table_build_plan_dag{};
   TableIdToNodeMap table_id_to_node_map{};
-  bool use_bump_allocator{false};
   // empty if not a UNION, true if UNION ALL, false if regular UNION
   const std::optional<bool> union_all;
 };

@@ -398,33 +398,16 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
                   buffer_provider, kernel_params[TOTAL_MATCHED], device_id),
               device_id);
         } else {
-          size_t num_allocated_rows{0};
-          if (ra_exe_unit.use_bump_allocator) {
-            num_allocated_rows = get_num_allocated_rows_from_gpu(
-                buffer_provider, kernel_params[TOTAL_MATCHED], device_id);
-            // First, check the error code. If we ran out of slots, don't copy data back
-            // into the ResultSet or update ResultSet entry count
-            if (*error_code < 0) {
-              return {};
-            }
-          }
           query_buffers_->copyGroupByBuffersFromGpu(
               buffer_provider,
               query_mem_desc_,
-              ra_exe_unit.use_bump_allocator ? num_allocated_rows
-                                             : query_mem_desc_.getEntryCount(),
+              query_mem_desc_.getEntryCount(),
               gpu_group_by_buffers,
               &ra_exe_unit,
               block_size_x,
               grid_size_x,
               device_id,
               can_sort_on_gpu && query_mem_desc_.hasKeylessHash());
-          if (num_allocated_rows) {
-            CHECK(ra_exe_unit.use_bump_allocator);
-            CHECK(!query_buffers_->result_sets_.empty());
-            query_buffers_->result_sets_.front()->updateStorageEntryCount(
-                num_allocated_rows);
-          }
         }
       } else {
         query_buffers_->copyGroupByBuffersFromGpu(

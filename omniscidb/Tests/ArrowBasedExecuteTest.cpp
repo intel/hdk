@@ -18056,11 +18056,6 @@ int main(int argc, char** argv) {
                          ->default_value(config->rs.enable_columnar_output)
                          ->implicit_value(true),
                      "Enable/disable using columnar output format.");
-  desc.add_options()("enable-bump-allocator",
-                     po::value<bool>(&config->mem.gpu.enable_bump_allocator)
-                         ->default_value(config->mem.gpu.enable_bump_allocator)
-                         ->implicit_value(true),
-                     "Enable the bump allocator for projection queries on GPU.");
   desc.add_options()(
       "enable-heterogeneous",
       po::value<bool>(&config->exec.heterogeneous.enable_heterogeneous_execution)

@@ -67,7 +67,6 @@ GpuGroupByBuffers create_dev_group_by_buffers(
     const int64_t num_input_rows,
     const bool prepend_index_buffer,
     const bool always_init_group_by_on_host,
-    const bool use_bump_allocator,
     const bool has_varlen_output,
     Allocator* insitu_allocator);
 

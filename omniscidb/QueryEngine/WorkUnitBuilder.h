@@ -140,7 +140,6 @@ class WorkUnitBuilder {
   QueryPlan query_plan_dag_ = EMPTY_QUERY_PLAN;
   HashTableBuildDagMap hash_table_build_plan_dag_;
   TableIdToNodeMap table_id_to_node_map_;
-  bool use_bump_allocator_ = false;
   std::optional<bool> union_all_;
 
   std::optional<unsigned> left_deep_tree_id_;

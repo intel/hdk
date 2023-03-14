@@ -32,7 +32,6 @@ add_executable(ResultSetTest ResultSetTest.cpp ResultSetTestUtils.cpp)
 add_executable(FromTableReorderingTest FromTableReorderingTest.cpp)
 add_executable(ResultSetBaselineRadixSortTest ResultSetBaselineRadixSortTest.cpp ResultSetTestUtils.cpp)
 add_executable(UtilTest UtilTest.cpp)
-add_executable(BumpAllocatorTest BumpAllocatorTest.cpp)
 add_executable(TableFunctionsTest TableFunctionsTest.cpp)
 add_executable(ArrayTest ArrayTest.cpp)
 add_executable(GroupByTest GroupByTest.cpp)
@@ -104,7 +103,6 @@ target_link_libraries(StandaloneQueryRunner gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(TableFunctionsTest gtest QueryEngine ArrowQueryRunner ConfigBuilder)
 target_link_libraries(ArrayTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(GroupByTest gtest QueryEngine ArrowQueryRunner)
-target_link_libraries(BumpAllocatorTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(TopKTest gtest ArrowQueryRunner ArrowStorage Logger)
 
 if(ENABLE_FOLLY) 
@@ -168,7 +166,6 @@ add_test(StringDictionaryTest StringDictionaryTest ${TEST_ARGS})
 add_test(NAME StringDictionaryHashTest COMMAND StringDictionaryTest ${TEST_ARGS} "--enable-string-dict-hash-cache")
 add_test(StringTransformTest StringTransformTest ${TEST_ARGS})
 add_test(StringFunctionsTest StringFunctionsTest ${TEST_ARGS})
-add_test(BumpAllocatorTest BumpAllocatorTest ${TEST_ARGS})
 add_test(TableFunctionsTest TableFunctionsTest ${TEST_ARGS})
 add_test(ArrayTest ArrayTest ${TEST_ARGS})
 add_test(GroupByTest GroupByTest ${TEST_ARGS})
@@ -220,7 +217,6 @@ set(TEST_PROGRAMS
   ColumnarResultsTest
   FromTableReorderingTest
   ResultSetBaselineRadixSortTest
-  BumpAllocatorTest
   TableFunctionsTest
   ArrayTest
   GroupByTest
