@@ -199,7 +199,6 @@ cdef extern from "omniscidb/Shared/Config.h":
   cdef cppclass COptimizationsConfig "OptimizationsConfig":
     CFilterPushdownConfig filter_pushdown
     bool from_table_reordering
-    bool strip_join_covered_quals
     size_t constrained_by_in_threshold
     bool skip_intermediate_count
     bool enable_left_join_filter_hoisting

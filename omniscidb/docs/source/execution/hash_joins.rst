@@ -92,7 +92,6 @@ C++ Class Name               Layouts                       Selected For
 ============================ ============================= ========================
 JoinHashTable                One-To-One or One-To-Many     Perfect hashing
 BaselineJoinHashTable        One-To-One or One-To-Many     Keyed hashing
-OverlapsJoinHashTable        only One-To-Many              Geospatial hashing
 ============================ ============================= ========================
 
 =============================
@@ -199,10 +198,6 @@ Adding a duplicate record to the previous example turns the hash join into a one
     C++ toString():
       | keys * (1,1) (3,3) (0,0) * * | offsets * 0 1 3 * * | counts * 1 2 1 * * | payloads 1 2 3 0 |
 
-One-To-Many OverlapsJoinHashTable Example
------------------------------------------
-
-TODO
 
 ===========================
 Comparing Hash Join Buffers
