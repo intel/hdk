@@ -190,9 +190,6 @@ inline std::vector<const hdk::ir::Expr*> get_exprs_not_owned(
 // whatever reason we still run out of memory. In those cases we go down the
 // handleOutOfMemoryRetry path, which will first try per-fragment execution on GPU,
 // and if that fails, CPU execution.
-// Note that for distributed execution failures on leaves, we do not retry queries
-// TODO(todd): See if CPU retry of individual steps can be turned on safely for
-// distributed
 
 class QueryMustRunOnCpu : public std::runtime_error {
  public:

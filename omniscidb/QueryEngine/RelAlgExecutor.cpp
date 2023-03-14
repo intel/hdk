@@ -271,10 +271,6 @@ std::pair<CompilationOptions, ExecutionOptions> RelAlgExecutor::handle_hint(
   }
   auto columnar_output_enabled = eo.output_columnar_hint ? !rowwise_output_hint_enabled
                                                          : columnar_output_hint_enabled;
-  if (columnar_output_hint_enabled || rowwise_output_hint_enabled) {
-    LOG(INFO) << "Currently, we do not support applying query hint to change query "
-                 "output layout in distributed mode.";
-  }
   eo_hint_applied.output_columnar_hint = columnar_output_enabled;
   return std::make_pair(co_hint_applied, eo_hint_applied);
 }
@@ -670,9 +666,6 @@ ExecutionResult RelAlgExecutor::executeRelAlgSeq(const RaExecutionSequence& seq,
     try {
       executeRelAlgStep(seq, i, co, eo, queue_time_ms);
     } catch (const QueryMustRunOnCpu&) {
-      // Do not allow per-step retry if flag is off or in distributed mode
-      // TODO(todd): Determine if and when we can relax this restriction
-      // for distributed
       CHECK(co.device_type == ExecutorDeviceType::GPU);
       if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
         throw;
@@ -741,9 +734,6 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
     try {
       executeStep(seq.step(i), co, eo, queue_time_ms);
     } catch (const QueryMustRunOnCpu&) {
-      // Do not allow per-step retry if flag is off or in distributed mode
-      // TODO(todd): Determine if and when we can relax this restriction
-      // for distributed
       CHECK(co.device_type == ExecutorDeviceType::GPU);
       if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
         throw;
@@ -785,9 +775,6 @@ ExecutionResult RelAlgExecutor::executeRelAlgSubSeq(
     try {
       executeRelAlgStep(seq, i, co, eo, queue_time_ms);
     } catch (const QueryMustRunOnCpu&) {
-      // Do not allow per-step retry if flag is off or in distributed mode
-      // TODO(todd): Determine if and when we can relax this restriction
-      // for distributed
       CHECK(co.device_type == ExecutorDeviceType::GPU);
       if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
         throw;
@@ -2078,9 +2065,6 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     if (arg_range.getType() != ExpressionRangeType::Integer) {
       continue;
     }
-    // When running distributed, the threshold for using the precise implementation
-    // must be consistent across all leaves, otherwise we could have a mix of precise
-    // and approximate bitmaps and we cannot aggregate them.
     const auto device_type = device_type_in;
     const auto bitmap_sz_bits = arg_range.getIntMax() - arg_range.getIntMin() + 1;
     const auto sub_bitmap_count =
