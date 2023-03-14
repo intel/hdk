@@ -103,9 +103,6 @@ std::vector<llvm::Value*> CodeGenerator::codegenColVar(const hdk::ir::ColumnVar*
     }
   }
   const auto hash_join_lhs = hashJoinLhs(col_var);
-  // Note(jclay): This has been prone to cause failures in some overlaps joins.
-  // I believe most of the issues are worked out now, but a good place to check if
-  // failures are happening.
 
   // Use the already fetched left-hand side of an equi-join if the types are identical.
   // Currently, types can only be different because of different underlying dictionaries.

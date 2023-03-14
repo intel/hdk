@@ -379,12 +379,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->opts.from_table_reordering)
                              ->implicit_value(true),
                          "Enable automatic table reordering in FROM clause.");
-  opt_desc.add_options()("strip-join-covered-quals",
-                         po::value<bool>(&config_->opts.strip_join_covered_quals)
-                             ->default_value(config_->opts.strip_join_covered_quals)
-                             ->implicit_value(true),
-                         "Remove quals from the filtered count if they are covered by a "
-                         "join condition (currently only ST_Contains).");
   opt_desc.add_options()("constrained-by-in-threshold",
                          po::value<size_t>(&config_->opts.constrained_by_in_threshold)
                              ->default_value(config_->opts.constrained_by_in_threshold),

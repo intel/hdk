@@ -42,20 +42,6 @@ hdk::ir::ExprPtr rewrite_expr(const hdk::ir::Expr*);
 // Rewrites array elements that are strings to be dict encoded transient literals
 hdk::ir::ExprPtr rewrite_array_elements(const hdk::ir::Expr*);
 
-// Rewrite a FunctionOper to an AND between a BinOper and the FunctionOper if the
-// FunctionOper is supported for overlaps joins
-struct OverlapsJoinConjunction {
-  std::list<hdk::ir::ExprPtr> quals;
-  std::list<hdk::ir::ExprPtr> join_quals;
-};
-
-boost::optional<OverlapsJoinConjunction> rewrite_overlaps_conjunction(
-    const hdk::ir::ExprPtr expr);
-
-std::list<hdk::ir::ExprPtr> strip_join_covered_filter_quals(
-    const std::list<hdk::ir::ExprPtr>& quals,
-    const JoinQualsPerNestingLevel& join_quals);
-
 hdk::ir::ExprPtr fold_expr(const hdk::ir::Expr*);
 
 bool self_join_not_covered_by_left_deep_tree(const hdk::ir::ColumnVar* lhs,

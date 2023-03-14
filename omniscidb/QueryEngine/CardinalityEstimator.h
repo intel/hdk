@@ -119,8 +119,7 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
 
 RelAlgExecutionUnit create_count_all_execution_unit(
     const RelAlgExecutionUnit& ra_exe_unit,
-    hdk::ir::ExprPtr replacement_target,
-    bool strip_join_covered_quals);
+    hdk::ir::ExprPtr replacement_target);
 
 ResultSetPtr reduce_estimator_results(
     const RelAlgExecutionUnit& ra_exe_unit,

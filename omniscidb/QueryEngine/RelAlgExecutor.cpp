@@ -2295,8 +2295,8 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
       nullptr,
       false,
       nullptr);
-  const auto count_all_exe_unit = create_count_all_execution_unit(
-      work_unit.exe_unit, count, config_.opts.strip_join_covered_quals);
+  const auto count_all_exe_unit =
+      create_count_all_execution_unit(work_unit.exe_unit, count);
   size_t one{1};
   TemporaryTable count_all_result;
   try {
