@@ -125,14 +125,6 @@ class RelAlgExecutor {
     return query_dag_->getSubqueries();
   };
 
-  std::optional<RegisteredQueryHint> getParsedQueryHint(const hdk::ir::Node* node) {
-    return query_dag_ ? query_dag_->getQueryHint(node) : std::nullopt;
-  }
-
-  std::optional<std::unordered_map<size_t, RegisteredQueryHint>> getParsedQueryHints() {
-    return query_dag_ ? std::make_optional(query_dag_->getQueryHints()) : std::nullopt;
-  }
-
   AggregatedColRange computeColRangesCache();
   StringDictionaryGenerations computeStringDictionaryGenerations();
   TableGenerations computeTableGenerations();
@@ -235,11 +227,6 @@ class RelAlgExecutor {
   WorkUnit createWorkUnitForStreaming(const hdk::ir::Node* body,
                                       const CompilationOptions& co,
                                       const ExecutionOptions& eo);
-
-  std::pair<CompilationOptions, ExecutionOptions> handle_hint(
-      const CompilationOptions& co,
-      const ExecutionOptions& eo,
-      const hdk::ir::Node* body);
 
   WorkUnit createSortInputWorkUnit(const hdk::ir::Sort*, const ExecutionOptions& eo);
 

@@ -638,17 +638,6 @@ if(DISABLE_CONCURRENCY)
   add_definitions("-DDISABLE_CONCURRENCY")
 endif()
 
-set(gen_cpp_files
-    ${CMAKE_BINARY_DIR}/gen-cpp/OmniSci.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/OmniSci.h
-    ${CMAKE_BINARY_DIR}/gen-cpp/omnisci_types.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/common_types.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/completion_hints_types.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/serialized_result_set_types.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/extension_functions_types.cpp
-    ${CMAKE_BINARY_DIR}/gen-cpp/extension_functions_types.h
-)
-
 list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_BINARY_DIR}/gen-cpp/)
 
 set(TIME_LIMITED_NUMBER_OF_DAYS "30" CACHE STRING "Number of days this build is valid for if build is time limited")

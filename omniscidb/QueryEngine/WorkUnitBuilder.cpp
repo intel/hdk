@@ -89,8 +89,7 @@ WorkUnitBuilder::WorkUnitBuilder(const ir::Node* root,
     , co_(co)
     , now_(now)
     , just_explain_(just_explain)
-    , allow_speculative_sort_(allow_speculative_sort)
-    , query_hint_(RegisteredQueryHint::fromConfig(executor_->getConfig())) {
+    , allow_speculative_sort_(allow_speculative_sort) {
   build();
 }
 
@@ -110,7 +109,6 @@ RelAlgExecutionUnit WorkUnitBuilder::exeUnit() const {
           estimator_,
           sort_info_,
           scan_limit_,
-          query_hint_,
           query_plan_dag_,
           hash_table_build_plan_dag_,
           table_id_to_node_map_,
@@ -218,13 +216,6 @@ void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
     new_target_exprs.emplace_back(target_expr);
   }
 
-  if (dag_) {
-    auto candidate_hint = dag_->getQueryHint(agg);
-    if (candidate_hint) {
-      query_hint_ = *candidate_hint;
-    }
-  }
-
   for (size_t i = 0; i < agg->size(); ++i) {
     input_rewriter_.addReplacement(agg, i, new_target_exprs[i]);
   }
@@ -241,12 +232,6 @@ void WorkUnitBuilder::processProject(const ir::Project* proj) {
     auto rewritten_expr = input_rewriter_.visit(expr.get());
     auto target_expr = translate(rewritten_expr.get(), translator, eo_.executor_type);
     new_target_exprs.emplace_back(std::move(target_expr));
-  }
-  if (dag_) {
-    auto candidate_hint = dag_->getQueryHint(proj);
-    if (candidate_hint) {
-      query_hint_ = *candidate_hint;
-    }
   }
 
   for (size_t i = 0; i < proj->size(); ++i) {

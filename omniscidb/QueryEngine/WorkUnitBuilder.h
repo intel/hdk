@@ -136,7 +136,6 @@ class WorkUnitBuilder {
   std::shared_ptr<Analyzer::Estimator> estimator_;
   SortInfo sort_info_ = {{}, SortAlgorithm::Default, 0, 0};
   size_t scan_limit_ = 0;
-  RegisteredQueryHint query_hint_;
   QueryPlan query_plan_dag_ = EMPTY_QUERY_PLAN;
   HashTableBuildDagMap hash_table_build_plan_dag_;
   TableIdToNodeMap table_id_to_node_map_;

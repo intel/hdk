@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import com.mapd.metadata.MetaConnect;
 import com.mapd.parser.extension.ddl.ExtendedSqlParser;
 import com.mapd.parser.extension.ddl.JsonSerializableDdl;
-import com.mapd.parser.hint.OmniSciHintStrategyTable;
 
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.config.CalciteConnectionConfig;
@@ -167,8 +166,6 @@ public final class MapDParser {
                                     .withDecorrelationEnabled(true) // this is default
                                     // allow as many as possible IN operator values
                                     .withInSubQueryThreshold(Integer.MAX_VALUE)
-                                    .withHintStrategyTable(
-                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
                                     .addRelBuilderConfigTransform(c
                                             -> c.withPruneInputOfAggregate(false)
                                                        .withSimplify(false)))
@@ -246,11 +243,6 @@ public final class MapDParser {
     String res = MapDSerializer.toString(project);
 
     return res;
-  }
-
-  public MapDPlanner.CompletionResult getCompletionHints(
-          String sql, int cursor, List<String> visible_tables) {
-    return getPlanner().getCompletionHints(sql, cursor, visible_tables);
   }
 
   public HashSet<ImmutableList<String>> resolveSelectIdentifiers(

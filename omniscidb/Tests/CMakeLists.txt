@@ -42,7 +42,6 @@ add_executable(ThreadingTestSTD Shared/ThreadingTestStd.cpp)
 add_executable(JoinHashTableTest JoinHashTableTest.cpp)
 add_executable(CachedHashTableTest CachedHashTableTest.cpp)
 add_executable(ColumnarResultsTest ColumnarResultsTest.cpp ResultSetTestUtils.cpp)
-add_executable(SQLHintTest SQLHintTest.cpp)
 if(NOT MSVC)
   add_executable(QuantileCpuTest Quantile/QuantileCpuTest.cpp)
 endif()
@@ -117,7 +116,6 @@ target_link_libraries(JoinHashTableTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(CachedHashTableTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(UtilTest OSDependent)
 target_link_libraries(EncoderTest gtest ${Arrow_LIBRARIES} DataMgr Logger)
-target_link_libraries(SQLHintTest gtest QueryEngine ArrowQueryRunner)
 if(NOT MSVC)
 	target_link_libraries(QuantileCpuTest gtest Logger TBB::tbb)
 endif()
@@ -173,7 +171,6 @@ add_test(ThreadingTest ThreadingTest ${TEST_ARGS})
 add_test(ThreadingTestSTD ThreadingTestSTD ${TEST_ARGS})
 add_test(JoinHashTableTest JoinHashTableTest ${TEST_ARGS})
 add_test(EncoderTest EncoderTest ${TEST_ARGS})
-add_test(SQLHintTest SQLHintTest ${TEST_ARGS})
 add_test(DataRecyclerTest DataRecyclerTest ${TEST_ARGS})
 add_test(JSONTest JSONTest ${TEST_ARGS})
 add_test(NoCatalogRelAlgTest NoCatalogRelAlgTest ${TEST_ARGS})
@@ -225,7 +222,6 @@ set(TEST_PROGRAMS
   StringFunctionsTest
   StringDictionaryTest
   EncoderTest
-  SQLHintTest
   DataRecyclerTest
   JSONTest
   NoCatalogRelAlgTest

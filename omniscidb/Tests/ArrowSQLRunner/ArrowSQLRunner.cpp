@@ -105,19 +105,6 @@ class ArrowSQLRunnerImpl {
     return res;
   }
 
-  RegisteredQueryHint getParsedQueryHint(const std::string& query_str) {
-    auto ra_executor = makeRelAlgExecutor(query_str);
-    auto query_hints = ra_executor->getParsedQueryHint(ra_executor->getRootNode());
-    return query_hints ? *query_hints : RegisteredQueryHint::fromConfig(*config_);
-  }
-
-  std::optional<std::unordered_map<size_t, RegisteredQueryHint>> getParsedQueryHints(
-      const std::string& query_str) {
-    auto ra_executor = makeRelAlgExecutor(query_str);
-    auto query_hints = ra_executor->getParsedQueryHints();
-    return query_hints ? query_hints : std::nullopt;
-  }
-
   ExecutionResult runSqlQuery(const std::string& sql,
                               ExecutorDeviceType device_type,
                               const ExecutionOptions& eo) {
@@ -513,15 +500,6 @@ Executor* getExecutor() {
 
 std::shared_ptr<CalciteJNI> getCalcite() {
   return ArrowSQLRunnerImpl::get()->getCalcite();
-}
-
-RegisteredQueryHint getParsedQueryHint(const std::string& query_str) {
-  return ArrowSQLRunnerImpl::get()->getParsedQueryHint(query_str);
-}
-
-std::optional<std::unordered_map<size_t, RegisteredQueryHint>> getParsedQueryHints(
-    const std::string& query_str) {
-  return ArrowSQLRunnerImpl::get()->getParsedQueryHints(query_str);
 }
 
 std::unique_ptr<RelAlgExecutor> makeRelAlgExecutor(const std::string& query_str) {

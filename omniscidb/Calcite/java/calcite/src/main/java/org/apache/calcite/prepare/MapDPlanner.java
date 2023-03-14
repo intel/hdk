@@ -97,16 +97,6 @@ public class MapDPlanner extends PlannerImpl {
     }
   }
 
-  public static class CompletionResult {
-    public List<SqlMoniker> hints;
-    public String replaced;
-
-    CompletionResult(final List<SqlMoniker> hints, final String replaced) {
-      this.hints = hints;
-      this.replaced = replaced;
-    }
-  }
-
   private CalciteCatalogReader createCatalogReader() {
     final SchemaPlus rootSchema = rootSchema(config.getDefaultSchema());
     final Context context = config.getContext();
@@ -152,26 +142,6 @@ public class MapDPlanner extends PlannerImpl {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  public CompletionResult getCompletionHints(
-          final String sql, final int cursor, final List<String> visibleTables) {
-    ready();
-
-    SqlValidator.Config validatorConfig = SqlValidator.Config.DEFAULT;
-    validatorConfig = validatorConfig.withConformance(SqlConformanceEnum.LENIENT);
-
-    MapDSqlAdvisorValidator advisor_validator = new MapDSqlAdvisorValidator(visibleTables,
-            config.getOperatorTable(),
-            createCatalogReader(),
-            getTypeFactory(),
-            validatorConfig);
-    SqlAdvisor advisor = new MapDSqlAdvisor(advisor_validator, config.getParserConfig());
-    String[] replaced = new String[1];
-    int adjusted_cursor = cursor < 0 ? sql.length() : cursor;
-    java.util.List<SqlMoniker> hints =
-            advisor.getCompletionHints(sql, adjusted_cursor, replaced);
-    return new CompletionResult(hints, replaced[0]);
   }
 
   public static HepPlanner getHepPlanner(HepProgram hepProgram, boolean noDag) {

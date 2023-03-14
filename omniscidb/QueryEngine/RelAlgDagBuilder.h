@@ -34,7 +34,6 @@
 #include "Analyzer/Analyzer.h"
 #include "Descriptors/InputDescriptors.h"
 #include "IR/Node.h"
-#include "QueryEngine/QueryHint.h"
 #include "SchemaMgr/ColumnInfo.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "SchemaMgr/TableInfo.h"
