@@ -5,5 +5,5 @@ cd $(dirname "$0")/../../..
 
 test -z "$CC" || export CUDAFLAGS="--compiler-bindir $CC"
 cmake -B build -S . $@
-cmake --build build --parallel 2
+cmake --build build --parallel $(nproc)
 
