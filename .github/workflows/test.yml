@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
+          sudo apt-get purge -y gcc llvm-12 llvm-13 llvm-14
+
       - name: Set env context
         run: |
           echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
