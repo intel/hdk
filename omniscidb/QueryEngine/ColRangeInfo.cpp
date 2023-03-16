@@ -16,6 +16,7 @@
  */
 
 #include "QueryEngine/ColRangeInfo.h"
+#include "QueryEngine/ExpressionRange.h"
 
 int64_t ColRangeInfo::getBucketedCardinality() const {
   checked_int64_t crt_col_cardinality = checked_int64_t(max) - checked_int64_t(min);

@@ -338,7 +338,7 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
                         block_size_x,
                         block_size_y,
                         block_size_z,
-                        shared_memory_size,
+                        static_cast<unsigned int>(shared_memory_size),
                         LITERALS,
                         hoist_literals};
 
@@ -468,7 +468,7 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
                         block_size_x,
                         block_size_y,
                         block_size_z,
-                        shared_memory_size,
+                        static_cast<unsigned int>(shared_memory_size),
                         LITERALS,
                         hoist_literals};
 

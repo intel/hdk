@@ -19,10 +19,7 @@
 #include <list>
 #include <memory>
 
-namespace hdk::ir {
-class BinOper;
-class Expr;
-}  // namespace hdk::ir
+#include "IR/Expr.h"
 
 // Go through the qualifiers and group consecutive equality operators to create
 // a list of composite join conditions.
