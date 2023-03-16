@@ -14,6 +14,7 @@
 
 #include "HelperFunctions.h"
 
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/AlwaysInliner.h>

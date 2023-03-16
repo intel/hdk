@@ -19,6 +19,7 @@
 
 #include "ExtractFromTime.h"
 
+#include <cassert>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -84,6 +85,10 @@ std::string getStrTStamp(const int64_t tstamp, hdk::ir::TimeUnit unit) {
     case hdk::ir::TimeUnit::kDay:
       return getStrDayFromSeconds(tstamp);
   }
+#if !defined(_WIN32) && !defined(L0_RUNTIME_ENABLED)
+  assert(false);
+#endif
+  return "";
 }
 
 #endif  // QUERYENGINE_EXTRACTSTRINGFROMTIME_H

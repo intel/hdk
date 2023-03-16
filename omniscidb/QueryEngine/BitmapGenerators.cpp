@@ -1,6 +1,8 @@
 #include "BitmapGenerators.h"
 #include <immintrin.h>
 
+#include <cstring>
+
 #ifdef __AVX512F__
 size_t __attribute__((target("avx512bw", "avx512f"), optimize("no-tree-vectorize")))
 gen_null_bitmap_8(uint8_t* dst, const uint8_t* src, size_t size, const uint8_t null_val) {
