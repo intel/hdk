@@ -885,7 +885,9 @@ void ArrowStorage::compareSchemas(std::shared_ptr<arrow::Schema> lhs,
   auto& lhs_fields = lhs->fields();
   auto& rhs_fields = rhs->fields();
   if (lhs_fields.size() != rhs_fields.size()) {
-    throw std::runtime_error("Mismatched clumns count");
+    throw std::runtime_error("Mismatched clumns count: "s +
+                             std::to_string(lhs_fields.size()) + " != "s +
+                             std::to_string(rhs_fields.size()));
   }
 
   for (size_t i = 0; i < lhs_fields.size(); ++i) {
