@@ -130,6 +130,40 @@ class TestImport(BaseTest):
 
         hdk.drop_table(table_name)
 
+    # TODO(dmitiim) Support more types. Decimal(128/256), Time32 (ms/us),
+    # Timestamp, Text have several conversion issues in arrow, pandas,
+    # parquet, hdk processing conversions.
+    # e.g. parquet replacing [s] with [ms] on save of Time32.
+    @pytest.mark.parametrize("create_table", [True, False])
+    @pytest.mark.parametrize("glob", [True, False])
+    def test_import_parquet(self, create_table, glob):
+        hdk = pyhdk.init()
+        table_name = "table_parquet"
+
+        if glob:
+            if create_table:
+                hdk.create_table(table_name, {"fpD": "fp64", "intD": "int32"})
+            real_schema = {"fpD": "FP64", "intD": "INT32"}
+            file_name = "omniscidb/Tests/ArrowStorageDataFiles/fp_int*.parquet"
+            ref_data = {
+                "fpD": [1.00001, 2.00002, 3.00003, 4.00004, 5.00005, 6.00006, 7.00007],
+                "intD": [43, 45, 47, 48, 49, 51, 53],
+            }
+        else:
+            if create_table:
+                hdk.create_table(table_name, (("a", "int64"), ("b", "fp64")))
+                real_schema = {"a": "INT64", "b": "FP64"}
+            else:
+                real_schema = {"a": "INT64", "b": "FP64"}
+            file_name = "omniscidb/Tests/ArrowStorageDataFiles/int_float.parquet"
+            ref_data = {"a": [*range(1, 6)], "b": [1.1, 2.2, 3.3, 4.4, 5.5]}
+
+        ht = hdk.import_parquet(file_name, table_name)
+        self.check_schema(ht.schema, real_schema)
+        self.check_res(ht.proj(0, 1).run(), ref_data)
+
+        hdk.drop_table(table_name)
+
 
 class TestBuilder(BaseTest):
     def test_scan(self):

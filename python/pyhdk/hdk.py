@@ -1716,7 +1716,7 @@ class HDK:
         >>> hdk.drop_table(ht)
         >>> hdk.scan("test1")
         RuntimeError: Unknown table: test1
-        >>> 
+        >>>
         """
         if isinstance(table, QueryNode) and table.is_scan:
             table = table.table_name
@@ -1727,6 +1727,33 @@ class HDK:
             raise TypeError(
                 f"Only str and QueryNode scans are allowed for 'table' arg. Provided: {table}"
             )
+
+    def __verify_files_param(self, file_name):
+        files = []
+        if isinstance(file_name, str):
+            found_file = glob.glob(file_name)
+            if not found_file:
+                raise RuntimeError(f"No files found by pattern: {file_name}.")
+            files.extend(sorted(found_file))
+        elif isinstance(file_name, Iterable):
+            for file in file_name:
+                if not isinstance(file, str):
+                    raise TypeError(
+                        f"Expected str values in 'file_name' list. Got: {type(file)}."
+                    )
+                found_file = glob.glob(file)
+                if not found_file:
+                    raise RuntimeError(f"No files found by pattern: {file}.")
+                files.extend(sorted(found_file))
+        else:
+            raise TypeError(
+                f"Expected str or list of str for 'file_name' arg. Got: {type(file_name)}."
+            )
+        if len(files) == 0:
+            raise RuntimeError(
+                f"Cannot resolve specified file name to any existing file."
+            )
+        return files
 
     def import_csv(
         self,
@@ -1779,24 +1806,7 @@ class HDK:
         QueryExpr
             Scan expression referencing created table.
         """
-        files = []
-        if isinstance(file_name, str):
-            files.extend(sorted(glob.glob(file_name)))
-        elif isinstance(file_name, Iterable):
-            for file in file_name:
-                if not isinstance(file, str):
-                    raise TypeError(
-                        f"Expected str values in 'file_name' list. Got: {type(file)}."
-                    )
-                files.extend(sorted(glob.glob(file)))
-        else:
-            raise TypeError(
-                f"Expected str or list of str for 'file_name' arg. Got: {type(file_name)}."
-            )
-        if len(files) == 0:
-            raise RuntimeError(
-                f"Cannot resolve specified file name to any existing file."
-            )
+        files = self.__verify_files_param(file_name)
 
         table_opts = TableOptions()
         if fragment_size is not None:
@@ -1809,7 +1819,7 @@ class HDK:
             parse_opts.block_size = block_size
 
         real_table_name, append = self._process_import_table_name(table_name)
-        # Create new table by importing the forst file or simply check its schema
+        # Create new table by importing the first file or simply check its schema
         # matches the specified one.
         if append:
             # check schema
@@ -1829,7 +1839,6 @@ class HDK:
             else self.scan(real_table_name)
         )
 
-    @not_implemented
     def import_parquet(self, file_name, table_name=None, fragment_size=None):
         """
         Import Parquet file(s) into HDK in-memory storage.
@@ -1853,7 +1862,30 @@ class HDK:
         QueryExpr
             Scan expression referencing created table.
         """
-        pass
+        files = self.__verify_files_param(file_name)
+
+        table_opts = TableOptions()
+        if fragment_size is not None:
+            table_opts.fragment_size = fragment_size
+
+        real_table_name, append = self._process_import_table_name(table_name)
+        # Create new table by importing the first file or simply check its schema
+        # matches the specified one.
+        if append:
+            # check schema
+            pass
+        else:
+            self._storage.importParquetFile(files[0], real_table_name, table_opts)
+
+        # Append the rest of files to the exisintg table.
+        for file in files[int(not append) :]:
+            self._storage.appendParquetFile(file, real_table_name)
+
+        return (
+            table_name
+            if isinstance(table_name, QueryNode)
+            else self.scan(real_table_name)
+        )
 
     def import_arrow(self, at, table_name=None, fragment_size=None):
         """

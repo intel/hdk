@@ -339,6 +339,15 @@ cdef class ArrowStorage(Storage):
       csv_opts = CsvParseOptions()
     self.c_storage.get().appendCsvFile(file_name, table_name, csv_opts.c_options)
 
+  def importParquetFile(self, file_name, table_name, TableOptions table_opts = None):
+    if table_opts is None:
+      table_opts = TableOptions()
+
+    self.c_storage.get().importParquetFile(file_name, table_name, table_opts.c_options)
+
+  def appendParquetFile(self, file_name, table_name):
+    self.c_storage.get().appendParquetFile(file_name, table_name)
+
   def dropTable(self, string name, bool throw_if_not_exist = False):
     self.c_storage.get().dropTable(name, throw_if_not_exist)
 
