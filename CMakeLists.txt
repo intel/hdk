@@ -83,6 +83,25 @@ configure_file(
     )
 include_directories(${CMAKE_BINARY_DIR})
 
+# Folly
+option(ENABLE_FOLLY "Use Folly" ON)
+if(ENABLE_FOLLY)
+  find_package(Folly)
+  if(NOT Folly_FOUND)
+    set(ENABLE_FOLLY OFF CACHE BOOL "Use Folly" FORCE)
+  else()
+    include_directories(${Folly_INCLUDE_DIRS})
+    add_definitions("-DHAVE_FOLLY")
+    list(APPEND Folly_LIBRARIES ${Glog_LIBRARIES})
+    # TODO: use Folly::folly_deps?
+    if(MSVC)
+      find_package(Libevent COMPONENTS core REQUIRED)
+      list(APPEND Folly_LIBRARIES libevent::core)
+    endif()
+  endif()
+endif()
+
+
 # SQLite
 include_directories(omniscidb/ThirdParty/sqlite3)
 add_subdirectory(omniscidb/ThirdParty/sqlite3)
@@ -128,13 +147,6 @@ find_package(TBB REQUIRED)
 add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
-
-# Folly
-option(ENABLE_FOLLY "Use Folly" ON)
-if(ENABLE_FOLLY)
-  find_package(Folly REQUIRED)
-  add_definitions("-DHAVE_FOLLY")
-endif()
 
 # Dwarf Bench
 option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)

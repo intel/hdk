@@ -119,5 +119,6 @@ setup(
             "language_level": "3",
         },
         include_path=["@CMAKE_CURRENT_SOURCE_DIR@"],
+        gdb_debug=False, # TODO: drive this via cmake build type 
     ),
 )
