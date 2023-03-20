@@ -37,6 +37,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <queue>
 #include <random>
@@ -1901,9 +1902,16 @@ TEST(Reduce, BaselineHashColumnar) {
   test_reduce(target_infos, query_mem_desc, generator1, generator2, 1, true);
 }
 
+#define SKIP_LARGE_BUFFERS()               \
+  if (std::getenv("SKIP_LARGE_BUFFERS")) { \
+    GTEST_SKIP();                          \
+  }
+
 #ifndef HAVE_TSAN
 // The large buffers tests allocate too much memory to instrument under TSAN
-TEST(DISABLED_ReduceLargeBuffers, PerfectHashOne_Overflow32) {
+TEST(ReduceLargeBuffers, PerfectHashOne_Overflow32) {
+  SKIP_LARGE_BUFFERS();
+
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 0, 222208903, {8});
@@ -1916,7 +1924,9 @@ TEST(DISABLED_ReduceLargeBuffers, PerfectHashOne_Overflow32) {
   }
 }
 
-TEST(DISABLED_ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
+TEST(ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
+  SKIP_LARGE_BUFFERS();
+
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 0, 222208903, {8});
@@ -1931,7 +1941,9 @@ TEST(DISABLED_ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
   }
 }
 
-TEST(DISABLED_ReduceLargeBuffers, BaselineHash_Overflow32) {
+TEST(ReduceLargeBuffers, BaselineHash_Overflow32) {
+  SKIP_LARGE_BUFFERS();
+
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = baseline_hash_two_col_desc_overflow32(target_infos, 8);
@@ -1944,7 +1956,9 @@ TEST(DISABLED_ReduceLargeBuffers, BaselineHash_Overflow32) {
   }
 }
 
-TEST(DISABLED_ReduceLargeBuffers, BaselineHashColumnar_Overflow32) {
+TEST(ReduceLargeBuffers, BaselineHashColumnar_Overflow32) {
+  SKIP_LARGE_BUFFERS();
+
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = baseline_hash_two_col_desc_overflow32(target_infos, 8);
