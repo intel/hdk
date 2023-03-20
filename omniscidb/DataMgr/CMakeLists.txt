@@ -45,7 +45,7 @@ add_library(DataMgr ${datamgr_source_files})
 
 set(DataMgrLibs CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS})
 if(ENABLE_FOLLY)
-  list(APPEND DataMgrLibs Folly::folly)
+  list(APPEND DataMgrLibs ${Folly_LIBRARIES})
 endif()
 target_link_libraries(DataMgr ${DataMgrLibs})
 
