@@ -59,6 +59,10 @@ class ORCJITExecutionEngineWrapper {
             *object_layer_,
             std::make_unique<llvm::orc::ConcurrentIRCompiler>(
                 std::move(target_machine_builder)))) {
+#ifdef _WIN32
+    object_layer_->setOverrideObjectFlagsWithResponsibilityFlags(true);
+    object_layer_->setAutoClaimResponsibilityForObjectSymbols(true);
+#endif
     auto dylib_or_error = execution_session_->createJITDylib("<main>");
     if (!dylib_or_error) {
       LOG(FATAL) << "Failed to initialize JITTargetMachineBuilder: "
