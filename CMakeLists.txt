@@ -332,7 +332,7 @@ if(ENABLE_ASAN)
 elseif(ENABLE_TSAN)
   add_definitions("-DHAVE_TSAN")
   # Copy the config directory to the build dir for TSAN suppressions
-  file(COPY config DESTINATION ${CMAKE_BINARY_DIR})
+  file(COPY omniscidb/config DESTINATION ${CMAKE_BINARY_DIR})
 
   set(SAN_FLAGS "-fsanitize=thread -fPIC -O1 -fno-omit-frame-pointer")
   # required for older GCC, see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64354
