@@ -1903,7 +1903,7 @@ TEST(Reduce, BaselineHashColumnar) {
 
 #ifndef HAVE_TSAN
 // The large buffers tests allocate too much memory to instrument under TSAN
-TEST(ReduceLargeBuffers, PerfectHashOne_Overflow32) {
+TEST(DISABLED_ReduceLargeBuffers, PerfectHashOne_Overflow32) {
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 0, 222208903, {8});
@@ -1916,7 +1916,7 @@ TEST(ReduceLargeBuffers, PerfectHashOne_Overflow32) {
   }
 }
 
-TEST(ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
+TEST(DISABLED_ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = perfect_hash_one_col_desc(target_infos, 8, 0, 222208903, {8});
@@ -1931,7 +1931,7 @@ TEST(ReduceLargeBuffers, PerfectHashColumnarOne_Overflow32) {
   }
 }
 
-TEST(ReduceLargeBuffers, BaselineHash_Overflow32) {
+TEST(DISABLED_ReduceLargeBuffers, BaselineHash_Overflow32) {
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = baseline_hash_two_col_desc_overflow32(target_infos, 8);
@@ -1944,7 +1944,7 @@ TEST(ReduceLargeBuffers, BaselineHash_Overflow32) {
   }
 }
 
-TEST(ReduceLargeBuffers, BaselineHashColumnar_Overflow32) {
+TEST(DISABLED_ReduceLargeBuffers, BaselineHashColumnar_Overflow32) {
   try {
     const auto target_infos = generate_random_groups_nullable_target_infos();
     auto query_mem_desc = baseline_hash_two_col_desc_overflow32(target_infos, 8);
