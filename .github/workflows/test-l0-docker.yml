@@ -52,7 +52,7 @@ jobs:
           docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
           docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
 
-      - name: Smoke test
+      - name: sanity test
         if: inputs.name == 'l0'
         run: |
           docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l

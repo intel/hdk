@@ -55,8 +55,8 @@ jobs:
         with:
           swap-size-gb: 12
 
-      - name: Run smoke tests
-        if: inputs.test == 'smoke'
+      - name: Run sanity tests
+        if: inputs.test == 'sanity'
         run: |
           conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh
 
