@@ -74,7 +74,9 @@ class ORCJITExecutionEngineWrapper {
             data_layout_->getGlobalPrefix())));
   }
 
-  ~ORCJITExecutionEngineWrapper() { llvm::cantFail(execution_session_->endSession()); }
+  ~ORCJITExecutionEngineWrapper() {
+    llvm::cantFail(execution_session_->endSession());
+  }
 
   ORCJITExecutionEngineWrapper(const ORCJITExecutionEngineWrapper& other) = delete;
   ORCJITExecutionEngineWrapper(ORCJITExecutionEngineWrapper&& other) = delete;
@@ -100,7 +102,9 @@ class ORCJITExecutionEngineWrapper {
     return reinterpret_cast<void*>(symbol->getAddress());
   }
 
-  bool exists() const { return !(execution_session_ == nullptr); }
+  bool exists() const {
+    return !(execution_session_ == nullptr);
+  }
 
   void removeModule(llvm::Module* module) {
     // Do nothing here. Module is deleted by ORC after materialization.
