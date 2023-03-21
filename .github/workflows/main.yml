@@ -29,12 +29,12 @@ jobs:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: style
 
-  smoke:
+  sanity:
     needs: build
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: smoke
+      test: sanity
 
   asan:
     needs: build
@@ -78,8 +78,9 @@ jobs:
       name: l0
       reset-cache: ${{ !!inputs.reset-cache }}
 
-  sanity-test:
-    uses: ./.github/workflows/build-docker-hdk.yml
+#
+#  sanity-test:
+#    uses: ./.github/workflows/build-docker-hdk.yml
 
   pytest:
     uses: ./.github/workflows/pytest.yml

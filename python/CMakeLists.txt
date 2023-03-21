@@ -18,6 +18,10 @@ set(pydeps
 set(SETUP_LDFLAGS "-L$<TARGET_FILE_DIR:Calcite> -L$<TARGET_FILE_DIR:IR> -L$<TARGET_FILE_DIR:ArrowStorage> -L$<TARGET_FILE_DIR:QueryBuilder> -L$<TARGET_FILE_DIR:QueryEngine> -L$<TARGET_FILE_DIR:SchemaMgr> -L$<TARGET_FILE_DIR:ConfigBuilder> -L$<TARGET_FILE_DIR:Logger> -L$<TARGET_FILE_DIR:Shared> -L$<TARGET_FILE_DIR:DataMgr>")
 set(SETUP_FLAGS -g -f -I ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(ENABLE_FOLLY)
+   list(APPEND SETUP_FLAGS "-DHAVE_FOLLY") 
+endif()
+
 set(SETUP_INSTALL_FLAGS "--prefix \${CMAKE_INSTALL_PREFIX}")
 
 add_custom_target(pyhdk ALL

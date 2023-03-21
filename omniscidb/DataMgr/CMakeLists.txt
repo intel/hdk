@@ -43,7 +43,11 @@ endif()
 
 add_library(DataMgr ${datamgr_source_files})
 
-target_link_libraries(DataMgr CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS})
+set(DataMgrLibs CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS})
+if(ENABLE_FOLLY)
+  list(APPEND DataMgrLibs ${Folly_LIBRARIES})
+endif()
+target_link_libraries(DataMgr ${DataMgrLibs})
 
 option(ENABLE_CRASH_CORRUPTION_TEST "Enable crash using SIGUSR2 during page deletion to faster and affirmative test/repro db corruption" OFF)
 if(ENABLE_CRASH_CORRUPTION_TEST)

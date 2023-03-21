@@ -1,6 +1,24 @@
 #!/bin/bash
 
+usage() { echo "Usage: $0 [-s (skip large buffers)]" 1>&2; exit 1; }
+
+TEST_FLAGS=''
+
+while getopts "s" o; do
+    case "${o}" in
+        s)
+            TEST_FLAGS='SKIP_LARGE_BUFFERS=true'
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
 set -ex
+
+export ${TEST_FLAGS}
 
 cd $(dirname "$0")
 

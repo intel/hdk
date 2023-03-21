@@ -50,16 +50,16 @@ jobs:
       #   NoCatalogSqlTest
       # that's not possible to manage instance memory with standard actions
       - name: Set Swap Space
-        if: inputs.test == 'smoke' || inputs.test == 'asan'
+        if: inputs.test == 'asan'
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 12
 
-      - name: Run smoke tests
-        if: inputs.test == 'smoke'
+      - name: Run sanity tests
+        if: inputs.test == 'sanity'
+        # skip large buffer tests due to limited memory on ghrunnners instances 
         run: |
-          sudo sh -c 'echo 2 >/proc/sys/vm/overcommit_memory'
-          conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh
+          conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh -s 
 
       - name: Run ASAN test
         if: inputs.test == 'asan'

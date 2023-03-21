@@ -49,6 +49,10 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
+# External Dependencies
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
+
 set(ENABLE_CONDA OFF)
 if(DEFINED ENV{CONDA_PREFIX})
   set(ENABLE_CONDA ON)
@@ -83,6 +87,25 @@ configure_file(
     )
 include_directories(${CMAKE_BINARY_DIR})
 
+# Folly
+option(ENABLE_FOLLY "Use Folly" ON)
+if(ENABLE_FOLLY)
+  find_package(Folly)
+  if(NOT Folly_FOUND)
+    set(ENABLE_FOLLY OFF CACHE BOOL "Use Folly" FORCE)
+  else()
+    set(FOLLY_LIBRARIES "")
+    add_definitions("-DHAVE_FOLLY")
+    list(APPEND Folly_LIBRARIES Folly::folly ${Glog_LIBRARIES})
+    # TODO: use Folly::folly_deps?
+    if(MSVC)
+      find_package(Libevent COMPONENTS core REQUIRED)
+      list(APPEND Folly_LIBRARIES libevent::core)
+    endif()
+  endif()
+endif()
+
+
 # SQLite
 include_directories(omniscidb/ThirdParty/sqlite3)
 add_subdirectory(omniscidb/ThirdParty/sqlite3)
@@ -99,10 +122,6 @@ endif()
 
 # Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
 file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
-
-# External Dependencies
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/omniscidb/cmake/Modules")
 
 # Google log
 add_subdirectory(third_party/glog-0.5.0 EXCLUDE_FROM_ALL)
