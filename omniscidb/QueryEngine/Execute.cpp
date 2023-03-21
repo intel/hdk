@@ -746,11 +746,7 @@ std::vector<int8_t> Executor::serializeLiterals(
         const auto p = boost::get<std::pair<std::string, int>>(&lit);
         CHECK(p);
         const auto str_id =
-            (config_->exec.enable_experimental_string_functions ||
-             // With WorkUnitBuilder we might produce complex expressions where encoded
-             // literals are decoded back to plain strings. In this case, we cannot use
-             // INVALID_STR_ID and should add the literal to the dictionary.
-             config_->exec.use_legacy_work_unit_builder)
+            (config_->exec.enable_experimental_string_functions)
                 ? getStringDictionaryProxy(p->second, row_set_mem_owner_, true)
                       ->getIdOfString(p->first)
                 : getStringDictionaryProxy(p->second, row_set_mem_owner_, true)

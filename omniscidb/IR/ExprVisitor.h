@@ -27,9 +27,6 @@ class ExprVisitor {
     if (auto column_ref = expr->as<ColumnRef>()) {
       return visitColumnRef(column_ref);
     }
-    if (auto group_column_ref = expr->as<GroupColumnRef>()) {
-      return visitGroupColumnRef(group_column_ref);
-    }
     if (auto column_var_tuple = expr->as<ExpressionTuple>()) {
       return visitColumnVarTuple(column_var_tuple);
     }
@@ -130,10 +127,6 @@ class ExprVisitor {
 
   virtual T visitColumnRef(const hdk::ir::ColumnRef* col_ref) {
     return defaultResult(col_ref);
-  }
-
-  virtual T visitGroupColumnRef(const hdk::ir::GroupColumnRef* group_col_ref) {
-    return defaultResult(group_col_ref);
   }
 
   virtual T visitColumnVarTuple(const hdk::ir::ExpressionTuple* tuple) {

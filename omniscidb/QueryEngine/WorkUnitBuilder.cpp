@@ -68,6 +68,180 @@ class NestLevelRewriter : public ir::ExprRewriter {
   std::unordered_map<std::pair<int, int>, int> table_to_rte_idx_;
 };
 
+// TODO(alex): Once we're fully migrated to the relational algebra model, change
+// the executor interface to use the collation directly and remove this conversion.
+std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort) {
+  std::list<hdk::ir::OrderEntry> result;
+  for (size_t i = 0; i < sort->collationCount(); ++i) {
+    const auto sort_field = sort->getCollation(i);
+    result.emplace_back(
+        sort_field.getField() + 1,
+        sort_field.getSortDir() == hdk::ir::SortDirection::Descending,
+        sort_field.getNullsPosition() == hdk::ir::NullSortedPosition::First);
+  }
+  return result;
+}
+
+hdk::ir::ExprPtr build_logical_expression(const std::vector<hdk::ir::ExprPtr>& factors,
+                                          hdk::ir::OpType sql_op) {
+  CHECK(!factors.empty());
+  auto acc = factors.front();
+  for (size_t i = 1; i < factors.size(); ++i) {
+    acc = Analyzer::normalizeOperExpr(sql_op, hdk::ir::Qualifier::kOne, acc, factors[i]);
+  }
+  return acc;
+}
+
+template <class QualsList>
+bool list_contains_expression(const QualsList& haystack, const hdk::ir::ExprPtr& needle) {
+  for (const auto& qual : haystack) {
+    if (*qual == *needle) {
+      return true;
+    }
+  }
+  return false;
+}
+
+hdk::ir::ExprPtr get_bitwise_equals(const hdk::ir::Expr* expr) {
+  const auto condition = dynamic_cast<const hdk::ir::BinOper*>(expr);
+  if (!condition || !condition->isOr()) {
+    return nullptr;
+  }
+  const hdk::ir::BinOper* equi_join_condition = nullptr;
+  const hdk::ir::BinOper* both_are_null_condition = nullptr;
+
+  if (auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(condition->leftOperand())) {
+    if (bin_oper->isEq()) {
+      equi_join_condition = bin_oper;
+    } else if (bin_oper->isAnd()) {
+      both_are_null_condition = bin_oper;
+    }
+  }
+
+  if (auto bin_oper = dynamic_cast<const hdk::ir::BinOper*>(condition->rightOperand())) {
+    if (bin_oper->isEq()) {
+      equi_join_condition = bin_oper;
+    } else if (bin_oper->isAnd()) {
+      both_are_null_condition = bin_oper;
+    }
+  }
+
+  if (!equi_join_condition || !both_are_null_condition) {
+    return nullptr;
+  }
+
+  auto lhs_is_null =
+      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->leftOperand());
+  auto rhs_is_null =
+      dynamic_cast<const hdk::ir::UOper*>(both_are_null_condition->rightOperand());
+  if (!lhs_is_null || !rhs_is_null || !lhs_is_null->isIsNull() ||
+      !rhs_is_null->isIsNull()) {
+    return nullptr;
+  }
+
+  auto eq_lhs =
+      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->leftOperand());
+  auto eq_rhs =
+      dynamic_cast<const hdk::ir::ColumnRef*>(equi_join_condition->rightOperand());
+  if (auto cast =
+          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->leftOperand())) {
+    eq_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
+  }
+  if (auto cast =
+          dynamic_cast<const hdk::ir::UOper*>(equi_join_condition->rightOperand())) {
+    eq_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(cast->operand());
+  }
+
+  auto is_null_lhs = dynamic_cast<const hdk::ir::ColumnRef*>(lhs_is_null->operand());
+  auto is_null_rhs = dynamic_cast<const hdk::ir::ColumnRef*>(rhs_is_null->operand());
+  if (!eq_lhs || !eq_rhs || !is_null_lhs || !is_null_rhs) {
+    return nullptr;
+  }
+  if ((*eq_lhs == *is_null_lhs && *eq_rhs == *is_null_rhs) ||
+      (*eq_lhs == *is_null_rhs && *eq_rhs == *is_null_lhs)) {
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(expr->ctx().boolean(),
+                                               hdk::ir::OpType::kBwEq,
+                                               hdk::ir::Qualifier::kOne,
+                                               equi_join_condition->leftOperandShared(),
+                                               equi_join_condition->rightOperandShared());
+  }
+  return nullptr;
+}
+
+hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr) {
+  const auto condition = dynamic_cast<const hdk::ir::BinOper*>(expr);
+  if (condition && condition->isAnd()) {
+    auto acc = get_bitwise_equals(condition->leftOperand());
+    if (!acc) {
+      return nullptr;
+    }
+    return hdk::ir::makeExpr<hdk::ir::BinOper>(
+        expr->ctx().boolean(),
+        hdk::ir::OpType::kAnd,
+        hdk::ir::Qualifier::kOne,
+        acc,
+        get_bitwise_equals_conjunction(condition->rightOperand()));
+  }
+  return get_bitwise_equals(expr);
+}
+
+// Transform `(p AND q) OR (p AND r)` to `p AND (q OR r)`. Avoids redundant
+// evaluations of `p` and allows use of the original form in joins if `p`
+// can be used for hash joins.
+hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr) {
+  const auto expr_terms = qual_to_disjunctive_form(expr);
+  CHECK_GE(expr_terms.size(), size_t(1));
+  const auto& first_term = expr_terms.front();
+  const auto first_term_factors = qual_to_conjunctive_form(first_term);
+  std::vector<hdk::ir::ExprPtr> common_factors;
+  // First, collect the conjunctive components common to all the disjunctive
+  // components. Don't do it for simple qualifiers, we only care about expensive or
+  // join qualifiers.
+  for (const auto& first_term_factor : first_term_factors.quals) {
+    bool is_common =
+        expr_terms.size() > 1;  // Only report common factors for disjunction.
+    for (size_t i = 1; i < expr_terms.size(); ++i) {
+      const auto crt_term_factors = qual_to_conjunctive_form(expr_terms[i]);
+      if (!list_contains_expression(crt_term_factors.quals, first_term_factor)) {
+        is_common = false;
+        break;
+      }
+    }
+    if (is_common) {
+      common_factors.push_back(first_term_factor);
+    }
+  }
+  if (common_factors.empty()) {
+    return expr;
+  }
+  // Now that the common expressions are known, collect the remaining expressions.
+  std::vector<hdk::ir::ExprPtr> remaining_terms;
+  for (const auto& term : expr_terms) {
+    const auto term_cf = qual_to_conjunctive_form(term);
+    std::vector<hdk::ir::ExprPtr> remaining_quals(term_cf.simple_quals.begin(),
+                                                  term_cf.simple_quals.end());
+    for (const auto& qual : term_cf.quals) {
+      if (!list_contains_expression(common_factors, qual)) {
+        remaining_quals.push_back(qual);
+      }
+    }
+    if (!remaining_quals.empty()) {
+      remaining_terms.push_back(
+          build_logical_expression(remaining_quals, hdk::ir::OpType::kAnd));
+    }
+  }
+  // Reconstruct the expression with the transformation applied.
+  const auto common_expr =
+      build_logical_expression(common_factors, hdk::ir::OpType::kAnd);
+  if (remaining_terms.empty()) {
+    return common_expr;
+  }
+  const auto remaining_expr =
+      build_logical_expression(remaining_terms, hdk::ir::OpType::kOr);
+  return Analyzer::normalizeOperExpr(
+      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, common_expr, remaining_expr);
+}
+
 }  // namespace
 
 WorkUnitBuilder::WorkUnitBuilder(const ir::Node* root,
@@ -503,16 +677,10 @@ void WorkUnitBuilder::computeJoinTypes(const ir::Node* node, bool allow_join) {
 
   // We expect that joins can have other joins only in its outer
   // input.
-  if (node->is<ir::Join>() || node->is<ir::LeftDeepInnerJoin>()) {
+  if (node->is<ir::Join>()) {
     CHECK(allow_join) << "Unsupported bushy join detected";
     computeJoinTypes(node->getInput(0), true);
-
-    if (auto deep_join = node->as<ir::LeftDeepInnerJoin>()) {
-      auto join_types = left_deep_join_types(deep_join);
-      join_types_.insert(join_types_.end(), join_types.begin(), join_types.end());
-    } else {
-      join_types_.push_back(node->as<ir::Join>()->getJoinType());
-    }
+    join_types_.push_back(node->as<ir::Join>()->getJoinType());
 
     // That is only to check we don't have bushy joins.
     for (size_t i = 1; i < node->inputCount(); ++i) {

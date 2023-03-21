@@ -473,7 +473,6 @@ build_du_web(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept 
             dynamic_cast<const hdk::ir::Aggregate*>(walker) ||
             dynamic_cast<const hdk::ir::Filter*>(walker) ||
             dynamic_cast<const hdk::ir::Sort*>(walker) ||
-            dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(walker) ||
             dynamic_cast<const hdk::ir::LogicalValues*>(walker) ||
             dynamic_cast<const hdk::ir::LogicalUnion*>(walker));
       for (size_t i = 0; i < walker->inputCount(); ++i) {
@@ -1726,9 +1725,6 @@ void sync_field_names_if_necessary(std::shared_ptr<const hdk::ir::Project> from_
     } else if (auto agg_to = dynamic_cast<hdk::ir::Aggregate*>(to_node);
                agg_to && agg_to->getFields().size() == from_fields.size()) {
       agg_to->setFields(std::move(from_fields));
-    } else if (auto compound_to = dynamic_cast<hdk::ir::Compound*>(to_node);
-               compound_to && compound_to->getFields().size() == from_fields.size()) {
-      compound_to->setFields(std::move(from_fields));
     }
   }
 }

@@ -5,8 +5,6 @@ set(ir_source_files
     Exception.h
     Expr.cpp
     Expr.h
-    LeftDeepInnerJoin.cpp
-    LeftDeepInnerJoin.h
     Node.cpp
     Node.h
     Type.cpp

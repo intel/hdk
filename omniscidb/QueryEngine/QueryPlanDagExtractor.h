@@ -125,7 +125,6 @@ class QueryPlanDagExtractor {
  private:
   void visit(const hdk::ir::Node*, const hdk::ir::Node*);
   hdk::ir::ColumnVar const* getColVar(const hdk::ir::Expr* col_info);
-  void handleLeftDeepJoinTree(const hdk::ir::Node*, const hdk::ir::LeftDeepInnerJoin*);
   void handleTranslatedJoin(const hdk::ir::Node*, const hdk::ir::TranslatedJoin*);
   bool validateNodeId(const hdk::ir::Node* node,
                       std::optional<RelNodeId> retrieved_node_id);

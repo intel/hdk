@@ -118,35 +118,6 @@ class ColumnRef : public Expr {
 };
 
 /*
- * Used in Compound nodes to referene group by keys columns in target
- * expressions. Numbering starts with 1 to be consistent with RexRef.
- */
-class GroupColumnRef : public Expr {
- public:
-  GroupColumnRef(const Type* type, unsigned idx) : Expr(type), idx_(idx) {}
-
-  ExprPtr withType(const Type* new_type) const override {
-    return makeExpr<GroupColumnRef>(new_type, idx_);
-  }
-
-  bool operator==(const Expr& rhs) const override {
-    const GroupColumnRef* rhsp = dynamic_cast<const GroupColumnRef*>(&rhs);
-    return rhsp && idx_ == rhsp->idx_;
-  }
-
-  std::string toString() const override {
-    return "(GroupColumnRef idx=" + std::to_string(idx_) + ")";
-  }
-
-  unsigned index() const { return idx_; }
-
-  size_t hash() const override;
-
- protected:
-  unsigned idx_;
-};
-
-/*
  * @type ColumnVar
  * @brief expression that evaluates to the value of a column in a given row from a base
  * table. It is used in parse trees and is only used in Scan nodes in a query plan for

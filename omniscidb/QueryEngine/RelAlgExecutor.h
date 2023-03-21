@@ -55,54 +55,27 @@ class RelAlgExecutor {
                  DataProvider* data_provider,
                  std::unique_ptr<hdk::ir::QueryDag> query_dag);
 
-  size_t getOuterFragmentCount(const CompilationOptions& co, const ExecutionOptions& eo);
-
   ExecutionResult executeRelAlgQuery(const CompilationOptions& co,
                                      const ExecutionOptions& eo,
                                      const bool just_explain_plan);
 
-  // does preparational stuff and compiles kernels
-  void prepareStreamingExecution(const CompilationOptions& co,
-                                 const ExecutionOptions& eo);
-
-  // process batch
-  ResultSetPtr runOnBatch(const FragmentsPerTable& fragments);
-
-  // when the last batch has been send, invoke this function.
-  ResultSetPtr finishStreamingExecution();
-
-  ExecutionResult executeRelAlgQueryWithFilterPushDown(const RaExecutionSequence& seq,
-                                                       const CompilationOptions& co,
-                                                       const ExecutionOptions& eo,
-                                                       const int64_t queue_time_ms);
+  ExecutionResult executeRelAlgQueryWithFilterPushDown(
+      const hdk::QueryExecutionSequence& seq,
+      const CompilationOptions& co,
+      const ExecutionOptions& eo,
+      const int64_t queue_time_ms);
 
   void prepareLeafExecution(
       const AggregatedColRange& agg_col_range,
       const StringDictionaryGenerations& string_dictionary_generations,
       const TableGenerations& table_generations);
 
-  ExecutionResult executeRelAlgSeq(const RaExecutionSequence& seq,
-                                   const CompilationOptions& co,
-                                   const ExecutionOptions& eo,
-                                   const int64_t queue_time_ms,
-                                   const bool with_existing_temp_tables = false);
   std::shared_ptr<const ExecutionResult> execute(
       const hdk::QueryExecutionSequence& seq,
       const CompilationOptions& co,
       const ExecutionOptions& eo,
       const int64_t queue_time_ms,
       const bool with_existing_temp_tables = false);
-
-  ExecutionResult executeRelAlgSubSeq(const RaExecutionSequence& seq,
-                                      const std::pair<size_t, size_t> interval,
-                                      const CompilationOptions& co,
-                                      const ExecutionOptions& eo,
-                                      const int64_t queue_time_ms);
-
-  QueryStepExecutionResult executeRelAlgQuerySingleStep(const RaExecutionSequence& seq,
-                                                        const size_t step_idx,
-                                                        const CompilationOptions& co,
-                                                        const ExecutionOptions& eo);
 
   const hdk::ir::Node* getRootNode() const {
     CHECK(query_dag_);
@@ -146,11 +119,6 @@ class RelAlgExecutor {
                                             const ExecutionOptions& eo,
                                             const bool just_explain_plan);
 
-  void executeRelAlgStep(const RaExecutionSequence& seq,
-                         const size_t step_idx,
-                         const CompilationOptions&,
-                         const ExecutionOptions&,
-                         const int64_t queue_time_ms);
   void executeStep(const hdk::ir::Node* step_root,
                    const CompilationOptions& co,
                    const ExecutionOptions& eo,
@@ -160,22 +128,6 @@ class RelAlgExecutor {
                               const ExecutionOptions& eo,
                               const int64_t queue_time_ms,
                               bool allow_speculative_sort);
-
-  ExecutionResult executeCompound(const hdk::ir::Compound*,
-                                  const CompilationOptions&,
-                                  const ExecutionOptions&,
-                                  const int64_t queue_time_ms);
-
-  ExecutionResult executeAggregate(const hdk::ir::Aggregate* aggregate,
-                                   const CompilationOptions& co,
-                                   const ExecutionOptions& eo,
-                                   const int64_t queue_time_ms);
-
-  ExecutionResult executeProject(const hdk::ir::Project*,
-                                 const CompilationOptions&,
-                                 const ExecutionOptions&,
-                                 const int64_t queue_time_ms,
-                                 const std::optional<size_t> previous_count);
 
   // Computes the window function results to be used by the query.
   void computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
@@ -194,24 +146,8 @@ class RelAlgExecutor {
       ColumnCacheMap& column_cache_map,
       std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner);
 
-  ExecutionResult executeFilter(const hdk::ir::Filter*,
-                                const CompilationOptions&,
-                                const ExecutionOptions&,
-                                const int64_t queue_time_ms);
-
-  ExecutionResult executeSort(const hdk::ir::Sort*,
-                              const CompilationOptions&,
-                              const ExecutionOptions&,
-                              const int64_t queue_time_ms);
-
   ExecutionResult executeLogicalValues(const hdk::ir::LogicalValues*,
                                        const ExecutionOptions&);
-
-  ExecutionResult executeUnion(const hdk::ir::LogicalUnion*,
-                               const RaExecutionSequence&,
-                               const CompilationOptions&,
-                               const ExecutionOptions&,
-                               const int64_t queue_time_ms);
 
   // TODO(alex): just move max_groups_buffer_entry_guess to RelAlgExecutionUnit once
   //             we deprecate the plan-based executor paths and remove WorkUnit
@@ -223,12 +159,6 @@ class RelAlgExecutor {
     const std::vector<size_t> input_permutation;
     const std::vector<size_t> left_deep_join_input_sizes;
   };
-
-  WorkUnit createWorkUnitForStreaming(const hdk::ir::Node* body,
-                                      const CompilationOptions& co,
-                                      const ExecutionOptions& eo);
-
-  WorkUnit createSortInputWorkUnit(const hdk::ir::Sort*, const ExecutionOptions& eo);
 
   ExecutionResult executeWorkUnit(
       const WorkUnit& work_unit,
@@ -282,26 +212,6 @@ class RelAlgExecutor {
                           const ExecutionOptions& eo,
                           bool allow_speculative_sort);
 
-  WorkUnit createCompoundWorkUnit(const hdk::ir::Compound*,
-                                  const SortInfo&,
-                                  const ExecutionOptions& eo);
-
-  WorkUnit createAggregateWorkUnit(const hdk::ir::Aggregate*,
-                                   const SortInfo&,
-                                   const bool just_explain);
-
-  WorkUnit createProjectWorkUnit(const hdk::ir::Project*,
-                                 const SortInfo&,
-                                 const ExecutionOptions& eo);
-
-  WorkUnit createFilterWorkUnit(const hdk::ir::Filter*,
-                                const SortInfo&,
-                                const bool just_explain);
-
-  WorkUnit createUnionWorkUnit(const hdk::ir::LogicalUnion*,
-                               const SortInfo&,
-                               const ExecutionOptions& eo);
-
   void addTemporaryTable(const int table_id, const ResultSetPtr& result) {
     CHECK_LT(size_t(0), result->colCount());
     CHECK_LT(table_id, 0);
@@ -322,20 +232,6 @@ class RelAlgExecutor {
   std::unordered_map<unsigned, JoinQualsPerNestingLevel>& getLeftDeepJoinTreesInfo() {
     return left_deep_join_info_;
   }
-
-  JoinQualsPerNestingLevel translateLeftDeepJoinFilter(
-      const hdk::ir::LeftDeepInnerJoin* join,
-      const std::vector<InputDescriptor>& input_descs,
-      const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
-      const bool just_explain);
-
-  // Transform the provided `join_condition` to conjunctive form, find composite
-  // key opportunities and finally translate it to an Analyzer expression.
-  std::list<hdk::ir::ExprPtr> makeJoinQuals(
-      const hdk::ir::Expr* join_condition_expr,
-      const std::vector<JoinType>& join_types,
-      const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
-      const bool just_explain) const;
 
   Executor* executor_;
   std::unique_ptr<hdk::ir::QueryDag> query_dag_;
@@ -360,15 +256,6 @@ hdk::ir::ExprPtr set_transient_dict(const hdk::ir::ExprPtr expr);
 hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
                            const RelAlgTranslator& translator,
                            ::ExecutorType executor_type);
-bool first_oe_is_desc(const std::list<hdk::ir::OrderEntry>& order_entries);
-std::list<hdk::ir::OrderEntry> get_order_entries(const hdk::ir::Sort* sort);
-std::vector<JoinType> left_deep_join_types(
-    const hdk::ir::LeftDeepInnerJoin* left_deep_join);
-std::vector<size_t> get_left_deep_join_input_sizes(
-    const hdk::ir::LeftDeepInnerJoin* left_deep_join);
-hdk::ir::ExprPtr get_bitwise_equals_conjunction(const hdk::ir::Expr* expr);
-hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr);
-
 const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr);
 
 #endif  // QUERYENGINE_RELALGEXECUTOR_H

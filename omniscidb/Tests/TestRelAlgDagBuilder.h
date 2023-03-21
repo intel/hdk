@@ -12,7 +12,6 @@
  * limitations under the License.
  */
 
-#include "IR/LeftDeepInnerJoin.h"
 #include "QueryEngine/RelAlgDagBuilder.h"
 #include "QueryEngine/RelAlgOptimizer.h"
 
@@ -107,12 +106,8 @@ class TestRelAlgDagBuilder : public hdk::ir::QueryDag {
   void setRoot(hdk::ir::NodePtr root);
 
   void finalize() {
-    if (config_->exec.use_legacy_work_unit_builder) {
-      hdk::ir::create_left_deep_join(nodes_);
-    } else {
-      insert_join_projections(nodes_);
-      eliminate_dead_columns(nodes_);
-    }
+    insert_join_projections(nodes_);
+    eliminate_dead_columns(nodes_);
     setRoot(nodes_.back());
   }
 

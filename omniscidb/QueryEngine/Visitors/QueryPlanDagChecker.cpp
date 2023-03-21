@@ -42,25 +42,6 @@ void QueryPlanDagChecker::visitLogicalValues(const hdk::ir::LogicalValues* rel_a
   return;
 }
 
-void QueryPlanDagChecker::visitCompound(const hdk::ir::Compound* rel_alg_node) {
-  // SINGLE_VALUE / SAMPLE query
-  if (rel_alg_node->isAggregate() && rel_alg_node->size() > 0) {
-    for (size_t i = 0; i < rel_alg_node->size(); ++i) {
-      auto target_expr = rel_alg_node->getExpr(i);
-      auto agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr.get());
-      if (agg_expr && (agg_expr->aggType() == hdk::ir::AggType::kSingleValue ||
-                       agg_expr->aggType() == hdk::ir::AggType::kSample ||
-                       agg_expr->aggType() == hdk::ir::AggType::kApproxQuantile)) {
-        detectNonSupportedNode(
-            "Detect non-supported aggregation function: "
-            "SINGLE_VALUE/SAMPLE/APPROX_QUANTILE");
-        return;
-      }
-    }
-  }
-  ExprDagVisitor::visitCompound(rel_alg_node);
-}
-
 void QueryPlanDagChecker::visitLogicalUnion(const hdk::ir::LogicalUnion* rel_alg_node) {
   detectNonSupportedNode("Detect LogicalUnion node");
 }

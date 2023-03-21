@@ -131,17 +131,14 @@ class QueryExecutionSequenceImpl {
       execution_points_.insert(node);
     }
 
-    bool is_join = node->is<ir::Join>() || node->is<ir::LeftDeepInnerJoin>();
+    bool is_join = node->is<ir::Join>();
     if (execute_join && is_join) {
       execution_points_.insert(node);
     }
 
     for (size_t i = 0; i < node->inputCount(); ++i) {
       if (is_join && i > 0) {
-        bool left_join =
-            node->is<ir::Join>()
-                ? node->as<ir::Join>()->getJoinType() == JoinType::LEFT
-                : node->as<ir::LeftDeepInnerJoin>()->getJoinType(i) == JoinType::LEFT;
+        bool left_join = node->as<ir::Join>()->getJoinType() == JoinType::LEFT;
         // In case of left join, all quals of inner input should be applied
         // before join hash table build. Applying it after the join might
         // filter out additional rows because it shouldn't be applied to
@@ -170,8 +167,7 @@ class QueryExecutionSequenceImpl {
       // Only aggregations and joins can now be merged with a following
       // projection.
       // TODO: Use recursive search to cover multiple consequent projections?
-      if (!input->is<ir::Aggregate>() && !input->is<ir::Join>() &&
-          !input->is<ir::LeftDeepInnerJoin>()) {
+      if (!input->is<ir::Aggregate>() && !input->is<ir::Join>()) {
         continue;
       }
 

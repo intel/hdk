@@ -16,14 +16,10 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
   void visit(const hdk::ir::Node* node) {
     if (auto agg = dynamic_cast<const hdk::ir::Aggregate*>(node)) {
       visitAggregate(agg);
-    } else if (auto compound = dynamic_cast<const hdk::ir::Compound*>(node)) {
-      visitCompound(compound);
     } else if (auto filter = dynamic_cast<const hdk::ir::Filter*>(node)) {
       visitFilter(filter);
     } else if (auto join = dynamic_cast<const hdk::ir::Join*>(node)) {
       visitJoin(join);
-    } else if (auto deep_join = dynamic_cast<const hdk::ir::LeftDeepInnerJoin*>(node)) {
-      visitLeftDeepInnerJoin(deep_join);
     } else if (auto logical_union = dynamic_cast<const hdk::ir::LogicalUnion*>(node)) {
       visitLogicalUnion(logical_union);
     } else if (auto values = dynamic_cast<const hdk::ir::LogicalValues*>(node)) {
@@ -52,32 +48,11 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     }
   }
 
-  virtual void visitCompound(const hdk::ir::Compound* compound) {
-    if (compound->getFilter()) {
-      visit(compound->getFilter().get());
-    }
-    for (auto& expr : compound->getGroupByExprs()) {
-      visit(expr.get());
-    }
-    for (auto& expr : compound->getExprs()) {
-      visit(expr.get());
-    }
-  }
-
   virtual void visitFilter(const hdk::ir::Filter* filter) {
     visit(filter->getConditionExpr());
   }
 
   virtual void visitJoin(const hdk::ir::Join* join) { visit(join->getCondition()); }
-
-  virtual void visitLeftDeepInnerJoin(const hdk::ir::LeftDeepInnerJoin* join) {
-    visit(join->getInnerCondition());
-    for (size_t level = 1; level < join->inputCount(); ++level) {
-      if (auto* outer_condition = join->getOuterCondition(level)) {
-        visit(outer_condition);
-      }
-    }
-  }
 
   virtual void visitLogicalUnion(const hdk::ir::LogicalUnion*) {}
 

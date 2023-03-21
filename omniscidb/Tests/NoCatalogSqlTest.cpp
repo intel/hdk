@@ -33,7 +33,6 @@ constexpr int TEST_DB_ID = (TEST_SCHEMA_ID << 24) + 1;
 constexpr int TEST1_TABLE_ID = 1;
 constexpr int TEST2_TABLE_ID = 2;
 constexpr int TEST_AGG_TABLE_ID = 3;
-constexpr int TEST_STREAMING_TABLE_ID = 4;
 
 static bool use_groupby_buffer_desc = false;
 
@@ -79,18 +78,6 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 1, "id", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 2, "val", ctx_.int32(), false);
     addRowidColumn(TEST_DB_ID, TEST_AGG_TABLE_ID);
-
-    // Table test_streaming
-    addTableInfo(TEST_DB_ID,
-                 TEST_STREAMING_TABLE_ID,
-                 "test_streaming",
-                 false,
-                 Data_Namespace::MemoryLevel::CPU_LEVEL,
-                 1,
-                 true);
-    addColumnInfo(TEST_DB_ID, TEST_STREAMING_TABLE_ID, 1, "id", ctx_.int32(), false);
-    addColumnInfo(TEST_DB_ID, TEST_STREAMING_TABLE_ID, 2, "val", ctx_.int32(), false);
-    addRowidColumn(TEST_DB_ID, TEST_STREAMING_TABLE_ID);
   }
 
   ~TestSchemaProvider() override = default;
@@ -130,10 +117,6 @@ class TestDataProvider : public TestHelpers::TestDataProvider {
     test_agg.addColFragment<int32_t>(
         2, {inline_null_value<int32_t>(), 70, inline_null_value<int32_t>(), 90, 100});
     tables_.emplace(std::make_pair(TEST_AGG_TABLE_ID, test_agg));
-
-    TestHelpers::TestTableData test_streaming(
-        TEST_DB_ID, TEST_STREAMING_TABLE_ID, 2, schema_provider_);
-    tables_.emplace(std::make_pair(TEST_STREAMING_TABLE_ID, test_streaming));
   }
 
   ~TestDataProvider() override = default;
@@ -251,72 +234,6 @@ TEST_F(NoCatalogSqlTest, GroupBySingleColumn) {
                    std::vector<int32_t>({5, 2, 1}),
                    std::vector<int64_t>({250, 60, 100}),
                    std::vector<double>({50, 30, 100}));
-}
-
-TEST_F(NoCatalogSqlTest, StreamingAggregate) {
-  auto orig_use_legacy_work_unit_builder = config_->exec.use_legacy_work_unit_builder;
-  config_->exec.use_legacy_work_unit_builder = true;
-  ScopeGuard g([&]() {
-    config_->exec.use_legacy_work_unit_builder = orig_use_legacy_work_unit_builder;
-  });
-
-  auto ra_executor = getExecutor("SELECT SUM(val) FROM test_streaming;");
-  ra_executor.prepareStreamingExecution(
-      CompilationOptions::defaults(ExecutorDeviceType::CPU),
-      ExecutionOptions::fromConfig(config()));
-  TestDataProvider& data_provider = getDataProvider();
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {1, 2, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {2, 1, 2});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 3, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 1, 4});
-
-  (void)ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {0, 1}});
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {4, 5, 6});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {7, 8, 9});
-
-  (void)ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {2}});
-
-  auto rs = ra_executor.finishStreamingExecution();
-
-  std::vector<std::string> col_names;
-  col_names.push_back("sum");
-  auto converter = std::make_unique<ArrowResultSetConverter>(rs, col_names, -1);
-  auto at = converter->convertToArrowTable();
-
-  ArrowTestHelpers::compare_arrow_table(at, std::vector<int64_t>{41});
-}
-
-TEST_F(NoCatalogSqlTest, StreamingFilter) {
-  GTEST_SKIP();
-  auto ra_executor = getExecutor("SELECT val FROM test_streaming WHERE val > 20;");
-  ra_executor.prepareStreamingExecution(CompilationOptions::defaults(),
-                                        ExecutionOptions::fromConfig(config()));
-
-  std::vector<std::string> col_names;
-  col_names.push_back("val");
-
-  TestDataProvider& data_provider = getDataProvider();
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {10, 20, 30});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {2, 1, 2});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 30, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {30, 1, 40});
-
-  ASSERT_EQ(ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {0, 1}}),
-            nullptr);
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {40, 50, 60});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {70, 8, 90});
-
-  ASSERT_EQ(ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {2}}), nullptr);
-
-  auto rs = ra_executor.finishStreamingExecution();
-
-  auto converter = std::make_unique<ArrowResultSetConverter>(rs, col_names, -1);
-  auto at = converter->convertToArrowTable();
-  ArrowTestHelpers::compare_arrow_table(at, std::vector<int32_t>{30, 30, 40, 70, 90});
 }
 
 TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {

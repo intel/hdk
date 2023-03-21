@@ -1859,14 +1859,6 @@ size_t ColumnRef::hash() const {
   return *hash_;
 }
 
-size_t GroupColumnRef::hash() const {
-  if (!hash_) {
-    hash_ = Expr::hash();
-    boost::hash_combine(*hash_, idx_);
-  }
-  return *hash_;
-}
-
 size_t ColumnVar::hash() const {
   if (!hash_) {
     hash_ = Expr::hash();
