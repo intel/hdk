@@ -20,6 +20,7 @@ RUN apt-get install -y \
   python \
   python-dev \
   libtbb-dev \
+  sqlite3 \ 
   openjdk-11-jdk 
 
 # Maven (after openjdk)
