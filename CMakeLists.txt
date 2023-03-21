@@ -34,6 +34,10 @@ if (WIN32)
   # to be built with debug runtime which we don't have.
   set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
   set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Od")
+  # Add a special option to require MSVC to define __cplusplus macro to a proper value
+  # corresponding to the real C++ language standard version. Without this option Microsoft compiler
+  # always defines __cplusplus to 199711L. A valid number is needed in llvm headers.
+  add_compile_options(/Zc:__cplusplus)
 else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 endif()
