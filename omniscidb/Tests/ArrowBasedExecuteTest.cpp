@@ -17435,22 +17435,9 @@ TEST_F(Select, UnionAll) {
                                   "SELECT fixed_str FROM test ORDER BY str;",
                                   dt),
                  std::runtime_error);
-    if (config().exec.use_legacy_work_unit_builder) {
-      // Exception: UNION ALL not yet supported in this context.
-      EXPECT_THROW(run_multiple_agg("SELECT COUNT(*) FROM ("
-                                    " SELECT a0, a1, a2, a3 FROM union_all_a"
-                                    " UNION ALL"
-                                    " SELECT b0, b1, b2, b3 FROM union_all_b"
-                                    ");",
-                                    dt),
-                   std::runtime_error);
-    } else {
-      // With WorkUnitBuilder we don't have Compound which triggers an exception
-      // in this case and query is correctly supported.
-      c("SELECT COUNT(*) FROM ( SELECT a0, a1, a2, a3 FROM union_all_a"
-        " UNION ALL SELECT b0, b1, b2, b3 FROM union_all_b);",
-        dt);
-    }
+    c("SELECT COUNT(*) FROM ( SELECT a0, a1, a2, a3 FROM union_all_a"
+      " UNION ALL SELECT b0, b1, b2, b3 FROM union_all_b);",
+      dt);
   }
 }
 
@@ -18050,11 +18037,6 @@ int main(int argc, char** argv) {
                          ->default_value(config->debug.use_ra_cache),
                      "Used in tests to load pre-generated cache of parsed SQL "
                      "queries from the specified file to avoid Calcite usage.");
-  desc.add_options()("legacy-work-units",
-                     po::value<bool>(&config->exec.use_legacy_work_unit_builder)
-                         ->default_value(config->exec.use_legacy_work_unit_builder)
-                         ->implicit_value(true),
-                     "Use legacy query execution sequence with compound and deep join.");
   desc.add_options()("materialize-inner-join-tables",
                      po::value<bool>(&config->exec.materialize_inner_join_tables)
                          ->default_value(config->exec.materialize_inner_join_tables)

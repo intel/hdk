@@ -33,25 +33,6 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
 
   using RelAlgVisitor<ResultType>::visit;
 
-  ResultType visitCompound(const hdk::ir::Compound* compound) const override {
-    ResultType result;
-    ExprVisitor visitor;
-    for (auto& expr : compound->getGroupByExprs()) {
-      auto inputs = visitor.visit(expr.get());
-      result.insert(inputs.begin(), inputs.end());
-    }
-    for (auto& expr : compound->getExprs()) {
-      auto inputs = visitor.visit(expr.get());
-      result.insert(inputs.begin(), inputs.end());
-    }
-    auto filter = compound->getFilter();
-    if (filter) {
-      auto inputs = visitor.visit(filter.get());
-      result.insert(inputs.begin(), inputs.end());
-    }
-    return result;
-  }
-
   ResultType visitFilter(const hdk::ir::Filter* filter) const override {
     ExprVisitor visitor;
     return visitor.visit(filter->getConditionExpr());
@@ -64,25 +45,6 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     }
     ExprVisitor visitor;
     return visitor.visit(condition);
-  }
-
-  ResultType visitLeftDeepInnerJoin(
-      const hdk::ir::LeftDeepInnerJoin* left_deep_inner_join) const override {
-    ResultType result;
-    auto condition = left_deep_inner_join->getInnerCondition();
-    ExprVisitor visitor;
-    if (condition) {
-      result = visitor.visit(condition);
-    }
-    for (size_t nesting_level = 1; nesting_level < left_deep_inner_join->inputCount();
-         ++nesting_level) {
-      auto outer_condition = left_deep_inner_join->getOuterCondition(nesting_level);
-      if (outer_condition) {
-        auto outer_result = visitor.visit(outer_condition);
-        result.insert(outer_result.begin(), outer_result.end());
-      }
-    }
-    return result;
   }
 
   ResultType visitProject(const hdk::ir::Project* project) const override {

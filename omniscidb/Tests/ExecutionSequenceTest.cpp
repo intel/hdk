@@ -86,15 +86,7 @@ class ExecutionSequenceTest : public ::testing::Test {
 
   static void TearDownTestSuite() {}
 
-  ExecutionResult runQuery(std::unique_ptr<QueryDag> dag,
-                           bool legacy_work_units = false,
-                           bool just_explain = false) {
-    auto orig_use_legacy_work_unit_builder = config().exec.use_legacy_work_unit_builder;
-    ScopeGuard g([&]() {
-      config().exec.use_legacy_work_unit_builder = orig_use_legacy_work_unit_builder;
-    });
-    config().exec.use_legacy_work_unit_builder = legacy_work_units;
-
+  ExecutionResult runQuery(std::unique_ptr<QueryDag> dag, bool just_explain = false) {
     auto ra_executor = RelAlgExecutor(
         getExecutor(), getStorage(), getDataMgr()->getDataProvider(), std::move(dag));
     auto eo = ExecutionOptions::fromConfig(config());
@@ -739,7 +731,7 @@ TEST_F(ExecutionSequenceTest, TwoStepExplain) {
   QueryExecutionSequence new_seq(dag->getRootNode(), configPtr());
   CHECK_EQ(new_seq.size(), (size_t)2);
 
-  auto res = runQuery(std::move(dag), false, true);
+  auto res = runQuery(std::move(dag), true);
   EXPECT_EQ(res.getRows()->rowCount(), (size_t)1);
 }
 

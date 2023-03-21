@@ -103,7 +103,6 @@ struct ExecutionConfig {
   size_t override_gpu_grid_size = 0;
   bool cpu_only = false;
 
-  bool use_legacy_work_unit_builder = false;
   bool materialize_inner_join_tables = true;
 };
 
@@ -166,7 +165,6 @@ struct DebugConfig {
   std::string build_ra_cache = "";
   std::string use_ra_cache = "";
   bool enable_automatic_ir_metadata = true;
-  bool check_query_exec_seq = true;
 };
 
 struct Config {

@@ -135,7 +135,7 @@ std::vector<PushedDownFilterInfo> RelAlgExecutor::selectFiltersToBePushedDown(
 }
 
 ExecutionResult RelAlgExecutor::executeRelAlgQueryWithFilterPushDown(
-    const RaExecutionSequence& seq,
+    const hdk::QueryExecutionSequence& seq,
     const CompilationOptions& co,
     const ExecutionOptions& eo,
     const int64_t queue_time_ms) {
@@ -157,20 +157,23 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryWithFilterPushDown(
     }();
 
     // Dispatch the subqueries first
-    for (auto& subquery : subqueries) {
-      // Execute the subquery and cache the result.
-      RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
-      const auto subquery_ra = subquery->node();
+    for (auto& subquery : getSubqueries()) {
+      auto subquery_ra = subquery->node();
       CHECK(subquery_ra);
-      RaExecutionSequence subquery_seq(subquery_ra);
-      auto result = ra_executor.executeRelAlgSeq(subquery_seq, co, eo_modified, 0);
-      auto shared_result = std::make_shared<ExecutionResult>(std::move(result));
-      subquery_ra->setResult(shared_result);
+      if (subquery_ra->hasContextData()) {
+        continue;
+      }
+
+      RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
+      hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
+      ra_executor.execute(subquery_seq, co, eo, 0);
     }
-    return executeRelAlgSeq(seq, co, eo_modified, queue_time_ms);
+    auto shared_res = execute(seq, co, eo, queue_time_ms);
+    return std::move(*shared_res);
   }
   // else
-  return executeRelAlgSeq(seq, co, eo, queue_time_ms);
+  auto shared_res = execute(seq, co, eo, queue_time_ms);
+  return std::move(*shared_res);
 }
 /**
  * The main purpose of this function is to prevent going through extra overhead of

@@ -15,7 +15,6 @@
  */
 
 #include "IR/ExprRewriter.h"
-#include "IR/LeftDeepInnerJoin.h"
 
 #include "CalciteDeserializerUtils.h"
 #include "DateTimePlusRewrite.h"
@@ -1487,19 +1486,6 @@ void mark_nops(const std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcep
   }
 }
 
-hdk::ir::ExprPtrVector reprojectExprs(const hdk::ir::Project* simple_project,
-                                      const hdk::ir::ExprPtrVector& exprs) noexcept {
-  hdk::ir::ExprPtrVector result;
-  for (size_t i = 0; i < simple_project->size(); ++i) {
-    const auto col_ref =
-        dynamic_cast<const hdk::ir::ColumnRef*>(simple_project->getExpr(i).get());
-    CHECK(col_ref);
-    CHECK_LT(static_cast<size_t>(col_ref->index()), exprs.size());
-    result.push_back(exprs[col_ref->index()]);
-  }
-  return result;
-}
-
 /**
  * The InputReplacementVisitor visitor visits each node in a given relational algebra
  * expression and replaces the inputs to that expression with inputs from a different
@@ -1521,128 +1507,11 @@ class InputReplacementVisitor : public hdk::ir::ExprRewriter {
     return ExprRewriter::visitColumnRef(col_ref);
   }
 
-  hdk::ir::ExprPtr visitGroupColumnRef(const hdk::ir::GroupColumnRef* col_ref) override {
-    CHECK(groupby_exprs_);
-    CHECK_LE(col_ref->index(), groupby_exprs_->size());
-    return visit((*groupby_exprs_)[col_ref->index() - 1].get());
-  }
-
  private:
   const hdk::ir::Node* node_to_keep_;
   const hdk::ir::ExprPtrVector& exprs_;
   const hdk::ir::ExprPtrVector* groupby_exprs_;
 };
-
-void create_compound(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-                     const std::vector<size_t>& pattern) noexcept {
-  CHECK_GE(pattern.size(), size_t(2));
-  CHECK_LE(pattern.size(), size_t(4));
-
-  hdk::ir::ExprPtr filter_expr;
-  size_t groupby_count{0};
-  std::vector<std::string> fields;
-  hdk::ir::ExprPtrVector exprs;
-  hdk::ir::ExprPtrVector groupby_exprs;
-  bool first_project{true};
-  bool is_agg{false};
-  hdk::ir::Node* last_node{nullptr};
-
-  for (const auto node_idx : pattern) {
-    const auto ra_node = nodes[node_idx];
-    const auto ra_filter = std::dynamic_pointer_cast<hdk::ir::Filter>(ra_node);
-    if (ra_filter) {
-      CHECK(!filter_expr);
-      filter_expr = ra_filter->getConditionExprShared();
-      CHECK(filter_expr);
-      last_node = ra_node.get();
-      continue;
-    }
-    const auto ra_project = std::dynamic_pointer_cast<hdk::ir::Project>(ra_node);
-    if (ra_project) {
-      fields = ra_project->getFields();
-
-      if (first_project) {
-        CHECK_EQ(size_t(1), ra_project->inputCount());
-        // Rebind the input of the project to the input of the filter itself
-        // since we know that we'll evaluate the filter on the fly, with no
-        // intermediate buffer. There are cases when filter is not a part of
-        // the pattern, detect it by simply cehcking current filter rex.
-        const auto filter_input =
-            dynamic_cast<const hdk::ir::Filter*>(ra_project->getInput(0));
-        if (filter_input && filter_expr) {
-          CHECK_EQ(size_t(1), filter_input->inputCount());
-          ra_project->replaceInput(ra_project->getAndOwnInput(0),
-                                   filter_input->getAndOwnInput(0));
-        }
-        for (auto& expr : ra_project->getExprs()) {
-          exprs.push_back(expr);
-        }
-        first_project = false;
-      } else {
-        if (ra_project->isSimple()) {
-          exprs = reprojectExprs(ra_project.get(), exprs);
-        } else {
-          // TODO(adb): This is essentially a more general case of simple project, we
-          // could likely merge the two
-          hdk::ir::ExprPtrVector new_exprs;
-          InputReplacementVisitor visitor(last_node, exprs, &groupby_exprs);
-          for (size_t i = 0; i < ra_project->size(); ++i) {
-            auto expr = ra_project->getExpr(i);
-            if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(expr.get())) {
-              const auto index = col_ref->index();
-              CHECK_LT(index, exprs.size());
-              new_exprs.push_back(exprs[index]);
-            } else {
-              new_exprs.push_back(visitor.visit(expr.get()));
-            }
-          }
-          exprs = std::move(new_exprs);
-        }
-      }
-      last_node = ra_node.get();
-      continue;
-    }
-    const auto ra_aggregate = std::dynamic_pointer_cast<hdk::ir::Aggregate>(ra_node);
-    if (ra_aggregate) {
-      is_agg = true;
-      fields = ra_aggregate->getFields();
-      groupby_count = ra_aggregate->getGroupByCount();
-      groupby_exprs.swap(exprs);
-      CHECK_LE(groupby_count, groupby_exprs.size());
-      InputReplacementVisitor visitor(last_node, groupby_exprs);
-      for (size_t group_idx = 0; group_idx < groupby_count; ++group_idx) {
-        exprs.push_back(hdk::ir::makeExpr<hdk::ir::GroupColumnRef>(
-            groupby_exprs[group_idx]->type(), group_idx + 1));
-      }
-      for (auto& expr : ra_aggregate->getAggs()) {
-        exprs.push_back(visitor.visit(expr.get()));
-      }
-      last_node = ra_node.get();
-      continue;
-    }
-  }
-
-  auto compound_node = std::make_shared<hdk::ir::Compound>(filter_expr,
-                                                           std::move(exprs),
-                                                           groupby_count,
-                                                           std::move(groupby_exprs),
-                                                           fields,
-                                                           is_agg);
-  auto old_node = nodes[pattern.back()];
-  nodes[pattern.back()] = compound_node;
-  auto first_node = nodes[pattern.front()];
-  CHECK_EQ(size_t(1), first_node->inputCount());
-  compound_node->addManagedInput(first_node->getAndOwnInput(0));
-  for (size_t i = 0; i < pattern.size() - 1; ++i) {
-    nodes[pattern[i]].reset();
-  }
-  for (auto node : nodes) {
-    if (!node) {
-      continue;
-    }
-    node->replaceInput(old_node, compound_node);
-  }
-}
 
 class RANodeIterator
     : public std::vector<std::shared_ptr<hdk::ir::Node>>::const_iterator {
@@ -1822,112 +1691,6 @@ bool is_window_function_expr(const hdk::ir::Expr* expr) {
     }
   }
   return false;
-}
-
-void coalesce_nodes(std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-                    const std::vector<const hdk::ir::Node*>& left_deep_joins) {
-  enum class CoalesceState { Initial, Filter, FirstProject, Aggregate };
-  std::vector<size_t> crt_pattern;
-  CoalesceState crt_state{CoalesceState::Initial};
-
-  auto reset_state = [&crt_pattern, &crt_state]() {
-    crt_state = CoalesceState::Initial;
-    std::vector<size_t>().swap(crt_pattern);
-  };
-
-  for (RANodeIterator nodeIt(nodes); !nodeIt.allVisited();) {
-    const auto ra_node = nodeIt != nodes.end() ? *nodeIt : nullptr;
-    switch (crt_state) {
-      case CoalesceState::Initial: {
-        if (std::dynamic_pointer_cast<const hdk::ir::Filter>(ra_node) &&
-            std::find(left_deep_joins.begin(), left_deep_joins.end(), ra_node.get()) ==
-                left_deep_joins.end()) {
-          crt_pattern.push_back(size_t(nodeIt));
-          crt_state = CoalesceState::Filter;
-          nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
-        } else if (auto project_node =
-                       std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
-          if (hasWindowFunctionExpr(project_node.get())) {
-            nodeIt.advance(RANodeIterator::AdvancingMode::InOrder);
-          } else {
-            crt_pattern.push_back(size_t(nodeIt));
-            crt_state = CoalesceState::FirstProject;
-            nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
-          }
-        } else {
-          nodeIt.advance(RANodeIterator::AdvancingMode::InOrder);
-        }
-        break;
-      }
-      case CoalesceState::Filter: {
-        if (auto project_node =
-                std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
-          // Given we now add preceding projects for all window functions following
-          // Filter nodes, the following should never occur
-          CHECK(!hasWindowFunctionExpr(project_node.get()));
-          crt_pattern.push_back(size_t(nodeIt));
-          crt_state = CoalesceState::FirstProject;
-          nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
-        } else {
-          reset_state();
-        }
-        break;
-      }
-      case CoalesceState::FirstProject: {
-        if (std::dynamic_pointer_cast<const hdk::ir::Aggregate>(ra_node)) {
-          crt_pattern.push_back(size_t(nodeIt));
-          crt_state = CoalesceState::Aggregate;
-          nodeIt.advance(RANodeIterator::AdvancingMode::DUChain);
-        } else {
-          if (crt_pattern.size() >= 2) {
-            create_compound(nodes, crt_pattern);
-          }
-          reset_state();
-        }
-        break;
-      }
-      case CoalesceState::Aggregate: {
-        if (auto project_node =
-                std::dynamic_pointer_cast<const hdk::ir::Project>(ra_node)) {
-          if (!hasWindowFunctionExpr(project_node.get())) {
-            // TODO(adb): overloading the simple project terminology again here
-            bool is_simple_project{true};
-            for (auto& expr : project_node->getExprs()) {
-              // If the top level scalar rex is an input node, we can bypass the visitor
-              if (auto col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(expr.get())) {
-                if (!input_can_be_coalesced(col_ref->node(), col_ref->index(), true)) {
-                  is_simple_project = false;
-                  break;
-                }
-                continue;
-              }
-              CoalesceSecondaryProjectVisitor visitor;
-              if (!visitor.visit(expr.get())) {
-                is_simple_project = false;
-                break;
-              }
-            }
-            if (is_simple_project) {
-              crt_pattern.push_back(size_t(nodeIt));
-              nodeIt.advance(RANodeIterator::AdvancingMode::InOrder);
-            }
-          }
-        }
-        CHECK_GE(crt_pattern.size(), size_t(2));
-        create_compound(nodes, crt_pattern);
-        reset_state();
-        break;
-      }
-      default:
-        CHECK(false);
-    }
-  }
-  if (crt_state == CoalesceState::FirstProject || crt_state == CoalesceState::Aggregate) {
-    if (crt_pattern.size() >= 2) {
-      create_compound(nodes, crt_pattern);
-    }
-    CHECK(!crt_pattern.empty());
-  }
 }
 
 class ReplacementExprVisitor : public hdk::ir::ExprRewriter {
@@ -2185,9 +1948,6 @@ void add_window_function_pre_project(
     // filter node. This is required both for correctness and to avoid pulling
     // all source input columns into memory since non-coalesced filter node
     // inputs are currently not pruned or eliminated via dead column elimination.
-    // Note that we expect any filter node followed by a project node to be coalesced
-    // into a single compound node in RelAlgDagBuilder::coalesce_nodes, and that action
-    // prunes unused inputs.
     // TODO(todd): Investigate whether the shotgun filter node issue affects other
     // query plans, i.e. filters before joins, and whether there is a more general
     // approach to solving this (will still need the preceding project node for
@@ -2277,6 +2037,32 @@ hdk::ir::ExprPtrVector genColumnRefs(const hdk::ir::Node* node, size_t count) {
         hdk::ir::makeExpr<hdk::ir::ColumnRef>(getColumnType(node, i), node, i));
   }
   return res;
+}
+
+// Recognize the left-deep join tree pattern with an optional filter as root
+// with `node` as the parent of the join sub-tree. On match, return the root
+// of the recognized tree (either the filter node or the outermost join).
+std::shared_ptr<const hdk::ir::Node> get_join_root(
+    const std::shared_ptr<hdk::ir::Node>& node) {
+  const auto join_filter = dynamic_cast<const hdk::ir::Filter*>(node.get());
+  if (join_filter) {
+    const auto join = dynamic_cast<const hdk::ir::Join*>(join_filter->getInput(0));
+    if (!join) {
+      return nullptr;
+    }
+    if (join->getJoinType() == JoinType::INNER || join->getJoinType() == JoinType::SEMI ||
+        join->getJoinType() == JoinType::ANTI) {
+      return node;
+    }
+  }
+  if (!node || node->inputCount() != 1) {
+    return nullptr;
+  }
+  const auto join = dynamic_cast<const hdk::ir::Join*>(node->getInput(0));
+  if (!join) {
+    return nullptr;
+  }
+  return node->getAndOwnInput(0);
 }
 
 }  // namespace
@@ -2609,32 +2395,23 @@ RelAlgDagBuilder::RelAlgDagBuilder(RelAlgDagBuilder& root_dag_builder,
                                    SchemaProviderPtr schema_provider)
     : hdk::ir::QueryDag(root_dag_builder.config_, root_dag_builder.now())
     , db_id_(db_id)
-    , schema_provider_(schema_provider)
-    , coalesce_(root_dag_builder.coalesce_) {
+    , schema_provider_(schema_provider) {
   build(query_ast, root_dag_builder);
 }
 
 RelAlgDagBuilder::RelAlgDagBuilder(const rapidjson::Value& query_ast,
                                    int db_id,
                                    SchemaProviderPtr schema_provider,
-                                   ConfigPtr config,
-                                   bool coalesce)
-    : hdk::ir::QueryDag(config)
-    , db_id_(db_id)
-    , schema_provider_(schema_provider)
-    , coalesce_(coalesce && config->exec.use_legacy_work_unit_builder) {
+                                   ConfigPtr config)
+    : hdk::ir::QueryDag(config), db_id_(db_id), schema_provider_(schema_provider) {
   build(query_ast, *this);
 }
 
 RelAlgDagBuilder::RelAlgDagBuilder(const std::string& query_ra,
                                    int db_id,
                                    SchemaProviderPtr schema_provider,
-                                   ConfigPtr config,
-                                   bool coalesce)
-    : hdk::ir::QueryDag(config)
-    , db_id_(db_id)
-    , schema_provider_(schema_provider)
-    , coalesce_(coalesce && config->exec.use_legacy_work_unit_builder) {
+                                   ConfigPtr config)
+    : hdk::ir::QueryDag(config), db_id_(db_id), schema_provider_(schema_provider) {
   rapidjson::Document query_ast;
   query_ast.Parse(query_ra.c_str());
   VLOG(2) << "Parsing query RA JSON: " << query_ra;
@@ -2668,24 +2445,21 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   simplify_sort(nodes_);
   sink_projected_boolean_expr_to_join(nodes_);
   eliminate_identical_copy(nodes_);
-  if (!coalesce_) {
-    insert_join_projections(nodes_);
-  }
+  insert_join_projections(nodes_);
   fold_filters(nodes_);
-  std::vector<const hdk::ir::Node*> filtered_left_deep_joins;
-  std::vector<const hdk::ir::Node*> left_deep_joins;
+  bool has_filtered_join = false;
   for (const auto& node : nodes_) {
-    const auto left_deep_join_root = hdk::ir::get_left_deep_join_root(node);
+    const auto join_root = get_join_root(node);
     // The filter which starts a left-deep join pattern must not be coalesced
     // since it contains (part of) the join condition.
-    if (left_deep_join_root) {
-      left_deep_joins.push_back(left_deep_join_root.get());
-      if (std::dynamic_pointer_cast<const hdk::ir::Filter>(left_deep_join_root)) {
-        filtered_left_deep_joins.push_back(left_deep_join_root.get());
+    if (join_root) {
+      if (std::dynamic_pointer_cast<const hdk::ir::Filter>(join_root)) {
+        has_filtered_join = true;
+        break;
       }
     }
   }
-  if (filtered_left_deep_joins.empty()) {
+  if (has_filtered_join) {
     hoist_filter_cond_to_cross_join(nodes_);
   }
   eliminate_dead_columns(nodes_);
@@ -2693,22 +2467,8 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   separate_window_function_expressions(nodes_);
   add_window_function_pre_project(
       nodes_, false /* always_add_project_if_first_project_is_window_expr */);
-  if (coalesce_) {
-    coalesce_nodes(nodes_, left_deep_joins);
-    if (config_->debug.check_query_exec_seq) {
-      // Don't create non coalesced versions for subqueries, they will be
-      // parsed in the root non coalesced builder.
-      if (&lead_dag_builder == this) {
-        not_coalesced.reset(
-            new RelAlgDagBuilder(query_ast, db_id_, schema_provider_, config_, false));
-      }
-    }
-  }
-  CHECK(nodes_.back().use_count() == 1);
-  if (coalesce_) {
-    hdk::ir::create_left_deep_join(nodes_);
-  }
   CHECK(nodes_.size());
+  CHECK(nodes_.back().use_count() == 1);
   root_ = nodes_.back();
 }
 
@@ -2725,9 +2485,8 @@ hdk::ir::ExprPtrVector getInputExprsForAgg(const hdk::ir::Node* node) {
   hdk::ir::ExprPtrVector res;
   res.reserve(node->size());
   auto project = dynamic_cast<const hdk::ir::Project*>(node);
-  auto compound = dynamic_cast<const hdk::ir::Compound*>(node);
-  if (project || compound) {
-    const auto& exprs = project ? project->getExprs() : compound->getExprs();
+  if (project) {
+    const auto& exprs = project->getExprs();
     for (unsigned col_idx = 0; col_idx < static_cast<unsigned>(exprs.size()); ++col_idx) {
       auto& expr = exprs[col_idx];
       if (dynamic_cast<const hdk::ir::Constant*>(expr.get())) {

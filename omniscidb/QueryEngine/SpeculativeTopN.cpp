@@ -183,7 +183,7 @@ bool SpeculativeTopNBlacklist::contains(const hdk::ir::ExprPtr expr,
  * (when GPU sort is used on multiple devices, refer to
  * MemoryLayoutBuilder::gpu_can_handle_order_entries), and we want to pick top n elements
  * (LIMIT caluse exists), and we have already chosen this algorithm when creating the
- * proper work unit (refer to RelAlgExecutor::createSortInputWorkUnit).
+ * proper work unit.
  *
  * Besides, we currently only support cases with 2 target expressions and only with COUNT
  * aggregate (similar limitations exists in whether or not we support GPU sort).

@@ -753,12 +753,6 @@ else()
   message(STATUS "jq not found, disabling run-clang-tidy target")
 endif()
 
-# doxygen
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/docs/CMakeLists.txt)
-endif(DOXYGEN_FOUND)
-
 # Packaging
 
 if(NOT "${CMAKE_BUILD_TYPE_LOWER}" STREQUAL "debug" AND NOT "${CMAKE_BUILD_TYPE_LOWER}" STREQUAL "relwithdebinfo")

@@ -29,7 +29,6 @@ constexpr int TEST_DB_ID = (TEST_SCHEMA_ID << 24) + 1;
 constexpr int TEST1_TABLE_ID = 1;
 constexpr int TEST2_TABLE_ID = 2;
 constexpr int TEST_AGG_TABLE_ID = 3;
-constexpr int TEST_STREAMING_TABLE_ID = 4;
 
 constexpr int TEST_SCHEMA_ID2 = 2;
 constexpr int TEST_DB2_ID = (TEST_SCHEMA_ID2 << 24) + 1;
@@ -87,18 +86,6 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 1, "id", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 2, "val", ctx_.int32(), false);
     addRowidColumn(TEST_DB_ID, TEST_AGG_TABLE_ID);
-
-    // Table test_streaming
-    addTableInfo(TEST_DB_ID,
-                 TEST_STREAMING_TABLE_ID,
-                 "test_streaming",
-                 false,
-                 Data_Namespace::MemoryLevel::CPU_LEVEL,
-                 1,
-                 true);
-    addColumnInfo(TEST_DB_ID, TEST_STREAMING_TABLE_ID, 1, "id", ctx_.int32(), false);
-    addColumnInfo(TEST_DB_ID, TEST_STREAMING_TABLE_ID, 2, "val", ctx_.int32(), false);
-    addRowidColumn(TEST_DB_ID, TEST_STREAMING_TABLE_ID);
   }
 
   ~TestSchemaProvider() override = default;
@@ -138,10 +125,6 @@ class TestDataProvider : public TestHelpers::TestDataProvider {
     test_agg.addColFragment<int32_t>(
         2, {inline_null_value<int32_t>(), 70, inline_null_value<int32_t>(), 90, 100});
     tables_.emplace(std::make_pair(TEST_AGG_TABLE_ID, test_agg));
-
-    TestHelpers::TestTableData test_streaming(
-        TEST_DB_ID, TEST_STREAMING_TABLE_ID, 2, schema_provider_);
-    tables_.emplace(std::make_pair(TEST_STREAMING_TABLE_ID, test_streaming));
   }
 
   ~TestDataProvider() override = default;
@@ -303,200 +286,6 @@ TEST_F(NoCatalogRelAlgTest, InterDatabaseJoin) {
                    std::vector<int64_t>({1, 2, 3, 4, 5}),
                    std::vector<int32_t>({10, 20, 30, 40, 50}),
                    std::vector<int32_t>({111, 122, 133, 144, 155}));
-}
-
-TEST_F(NoCatalogRelAlgTest, StreamingAggregate) {
-  auto orig_use_legacy_work_unit_builder = config_->exec.use_legacy_work_unit_builder;
-  config_->exec.use_legacy_work_unit_builder = true;
-  ScopeGuard g([&]() {
-    config_->exec.use_legacy_work_unit_builder = orig_use_legacy_work_unit_builder;
-  });
-
-  auto ra = R"""(
-{
-  "rels": [
-    {
-      "id": "0",
-      "relOp": "EnumerableTableScan",
-      "table": [
-        "omnisci",
-        "test_streaming"
-      ],
-      "fieldNames": [
-        "id",
-        "val",
-        "rowid"
-      ],
-      "inputs": []
-    },
-    {
-      "id": "1",
-      "relOp": "LogicalProject",
-      "fields": [
-        "val"
-      ],
-      "exprs": [
-        {
-          "input": 1 
-        }
-      ]
-    },
-    {
-      "id": "2",
-      "relOp": "LogicalAggregate",
-      "fields": [
-        "sum"
-      ],
-      "group":[],
-      "aggs": [
-        {
-          "agg": "SUM",
-          "distinct" : false,
-          "operands": [0],
-          "type": {
-            "type": "BIGINT",
-            "nullable": true
-          }
-        }
-      ]
-    }
-  ]
-})""";
-
-  auto dag =
-      std::make_unique<RelAlgDagBuilder>(ra, TEST_DB_ID, schema_provider_, config_);
-  if (executor_.get() == nullptr) {
-    std::cout << "** Error ** -- executor_ is nulltpr. Aborting." << std::endl;
-    std::abort();
-  }
-
-  auto ra_executor = RelAlgExecutor(
-      executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
-
-  ra_executor.prepareStreamingExecution(
-      CompilationOptions::defaults(ExecutorDeviceType::CPU),
-      ExecutionOptions::fromConfig(executor_->getConfig()));
-
-  TestDataProvider& data_provider = getDataProvider();
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {1, 2, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {2, 1, 2});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 3, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 1, 4});
-
-  (void)ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {0, 1}});
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {4, 5, 6});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {7, 8, 9});
-
-  (void)ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {2}});
-
-  auto rs = ra_executor.finishStreamingExecution();
-
-  std::vector<std::string> col_names;
-  col_names.push_back("sum");
-  auto converter = std::make_unique<ArrowResultSetConverter>(rs, col_names, -1);
-  auto at = converter->convertToArrowTable();
-
-  ArrowTestHelpers::compare_arrow_table(at, std::vector<int64_t>{41});
-}
-
-TEST_F(NoCatalogRelAlgTest, StreamingFilter) {
-  GTEST_SKIP();
-  auto ra = R"""(
-{
-  "rels": [
-    {
-      "id": "0",
-      "relOp": "LogicalTableScan",
-      "fieldNames": [
-        "id",
-        "val",
-        "rowid"
-      ],
-      "table": [
-        "omnisci",
-        "test_streaming"
-      ],
-      "inputs": []
-    },
-    {
-      "id": "1",
-      "relOp": "LogicalFilter",
-      "condition": {
-        "op": ">",
-        "operands": [
-          {
-            "input": 1
-          },
-          {
-            "literal": 20,
-            "type": "DECIMAL",
-            "target_type": "INTEGER",
-            "scale": 0,
-            "precision": 1,
-            "type_scale": 0,
-            "type_precision": 10
-          }
-        ],
-        "type": {
-          "type": "BOOLEAN",
-          "nullable": true
-        }
-      }
-    },
-    {
-      "id": "2",
-      "relOp": "LogicalProject",
-      "fields": [
-        "res"
-      ],
-      "exprs": [
-        {
-          "input": 1
-        }
-      ]
-    }
-  ]
-})""";
-
-  auto dag =
-      std::make_unique<RelAlgDagBuilder>(ra, TEST_DB_ID, schema_provider_, config_);
-  if (executor_.get() == nullptr) {
-    std::cout << "** Error ** -- executor_ is nulltpr. Aborting." << std::endl;
-    std::abort();
-  }
-
-  auto ra_executor = RelAlgExecutor(
-      executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
-
-  ra_executor.prepareStreamingExecution(
-      CompilationOptions::defaults(ExecutorDeviceType::CPU),
-      ExecutionOptions::fromConfig(executor_->getConfig()));
-
-  std::vector<std::string> col_names;
-  col_names.push_back("res");
-
-  TestDataProvider& data_provider = getDataProvider();
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {10, 20, 30});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {2, 1, 2});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {3, 30, 3});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {30, 1, 40});
-
-  ASSERT_EQ(ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {0, 1}}),
-            nullptr);
-
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 1, {40, 50, 60});
-  data_provider.addTableColumn<int32_t>(TEST_STREAMING_TABLE_ID, 2, {70, 8, 90});
-
-  ASSERT_EQ(ra_executor.runOnBatch({TEST_DB_ID, TEST_STREAMING_TABLE_ID, {2}}), nullptr);
-
-  auto rs = ra_executor.finishStreamingExecution();
-
-  auto converter = std::make_unique<ArrowResultSetConverter>(rs, col_names, -1);
-  auto at = converter->convertToArrowTable();
-  ArrowTestHelpers::compare_arrow_table(at, std::vector<int32_t>{30, 30, 40, 70, 90});
 }
 
 int main(int argc, char** argv) {

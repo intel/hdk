@@ -63,8 +63,6 @@ class WorkUnitBuilder {
   void processSort(const ir::Sort* sort);
   void processUnion(const ir::LogicalUnion* logical_union);
   void processJoin(const ir::Join* join);
-  JoinQualsPerNestingLevel translateLeftDeepJoinFilter(
-      const ir::LeftDeepInnerJoin* deep_join);
   std::list<hdk::ir::ExprPtr> makeJoinQuals(const hdk::ir::Expr* join_condition);
   void reorderTables();
   void computeSimpleQuals();
@@ -90,11 +88,6 @@ class WorkUnitBuilder {
         return replacements_.at(std::make_pair(col_ref->node(), col_ref->index()));
       }
       return ExprRewriter::visitColumnRef(col_ref);
-    }
-
-    ir::ExprPtr visitGroupColumnRef(const ir::GroupColumnRef* col_ref) override {
-      CHECK(false) << "Unsupported expression: " << col_ref->toString();
-      return defaultResult(col_ref);
     }
 
    private:

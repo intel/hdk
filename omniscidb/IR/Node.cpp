@@ -7,7 +7,6 @@
 
 #include "Node.h"
 #include "ExprRewriter.h"
-#include "LeftDeepInnerJoin.h"
 
 namespace hdk::ir {
 
@@ -22,10 +21,6 @@ class RebindInputsVisitor : public ExprRewriter {
 
   ExprPtr visitColumnRef(const ColumnRef* col_ref) override {
     if (col_ref->node() == old_input_) {
-      auto left_deep_join = dynamic_cast<const LeftDeepInnerJoin*>(new_input_);
-      if (left_deep_join) {
-        return rebind_inputs_from_left_deep_join(col_ref, left_deep_join);
-      }
       return makeExpr<ColumnRef>(col_ref->type(), new_input_, col_ref->index());
     }
     return ExprRewriter::visitColumnRef(col_ref);
@@ -260,67 +255,6 @@ void Filter::replaceInput(std::shared_ptr<const Node> old_input,
   condition_ = visitor.visit(condition_.get());
 }
 
-Compound::Compound(Compound const& rhs)
-    : Node(rhs)
-    , filter_(rhs.filter_)
-    , groupby_count_(rhs.groupby_count_)
-    , fields_(rhs.fields_)
-    , is_agg_(rhs.is_agg_)
-    , groupby_exprs_(rhs.groupby_exprs_)
-    , exprs_(rhs.exprs_) {}
-
-void Compound::replaceInput(std::shared_ptr<const Node> old_input,
-                            std::shared_ptr<const Node> input) {
-  Node::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  if (filter_) {
-    filter_ = visitor.visit(filter_.get());
-  }
-  for (size_t i = 0; i < groupby_exprs_.size(); ++i) {
-    groupby_exprs_[i] = visitor.visit(groupby_exprs_[i].get());
-  }
-  for (size_t i = 0; i < exprs_.size(); ++i) {
-    exprs_[i] = visitor.visit(exprs_[i].get());
-  }
-}
-
-std::string Compound::toString() const {
-  return cat(::typeName(this),
-             getIdString(),
-             "(filter=",
-             (filter_ ? filter_->toString() : "null"),
-             ", ",
-             std::to_string(groupby_count_),
-             ", fields=",
-             ::toString(fields_),
-             ", groupby_exprs=",
-             ::toString(groupby_exprs_),
-             ", exprs=",
-             ::toString(exprs_),
-             ", is_agg=",
-             std::to_string(is_agg_),
-             ", inputs=",
-             inputsToString(inputs_),
-             ")");
-}
-
-size_t Compound::toHash() const {
-  if (!hash_) {
-    hash_ = typeid(Compound).hash_code();
-    boost::hash_combine(*hash_, filter_ ? filter_->hash() : boost::hash_value("n"));
-    boost::hash_combine(*hash_, is_agg_);
-    for (auto& expr : exprs_) {
-      boost::hash_combine(*hash_, expr->hash());
-    }
-    for (auto& expr : groupby_exprs_) {
-      boost::hash_combine(*hash_, expr->hash());
-    }
-    boost::hash_combine(*hash_, groupby_count_);
-    boost::hash_combine(*hash_, ::toString(fields_));
-  }
-  return *hash_;
-}
-
 bool Sort::hasEquivCollationOf(const Sort& that) const {
   if (collation_.size() != that.collation_.size()) {
     return false;
@@ -378,9 +312,7 @@ size_t LogicalUnion::toHash() const {
 }
 
 std::string LogicalUnion::getFieldName(const size_t i) const {
-  if (auto const* input = dynamic_cast<Compound const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<Project const*>(inputs_[0].get())) {
+  if (auto const* input = dynamic_cast<Project const*>(inputs_[0].get())) {
     return input->getFieldName(i);
   } else if (auto const* input = dynamic_cast<LogicalUnion const*>(inputs_[0].get())) {
     return input->getFieldName(i);
@@ -457,13 +389,7 @@ void QueryDag::resetQueryExecutionState() {
 // TODO: always simply use node->size()
 size_t getNodeColumnCount(const Node* node) {
   // Nodes that don't depend on input.
-  if (is_one_of<Scan,
-                Project,
-                Aggregate,
-                Compound,
-                LogicalUnion,
-                LogicalValues,
-                LeftDeepInnerJoin>(node)) {
+  if (is_one_of<Scan, Project, Aggregate, LogicalUnion, LogicalValues>(node)) {
     return node->size();
   }
 
@@ -497,22 +423,12 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
   if (is_one_of<Scan,
                 Project,
                 Aggregate,
-                Compound,
                 LogicalUnion,
                 LogicalValues,
                 Filter,
                 Sort,
                 Join>(node)) {
     return genColumnRefs(node, getNodeColumnCount(node));
-  }
-
-  if (is_one_of<LeftDeepInnerJoin>(node)) {
-    auto res = genColumnRefs(node->getInput(0), node->getInput(0)->size());
-    for (size_t i = 1; i < node->inputCount(); ++i) {
-      auto input_refs = genColumnRefs(node->getInput(i), node->getInput(i)->size());
-      res.insert(res.end(), input_refs.begin(), input_refs.end());
-    }
-    return res;
   }
 
   LOG(FATAL) << "Unhandled ra_node type: " << ::toString(node);
@@ -525,25 +441,12 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
   if (is_one_of<Scan,
                 Project,
                 Aggregate,
-                Compound,
                 LogicalUnion,
                 LogicalValues,
                 Filter,
                 Sort,
                 Join>(node)) {
     return makeExpr<ColumnRef>(getColumnType(node, index), node, index);
-  }
-
-  if (is_one_of<LeftDeepInnerJoin>(node)) {
-    unsigned offs = 0;
-    for (size_t i = 0; i < node->inputCount(); ++i) {
-      auto input = node->getInput(i);
-      if (index - offs < input->size()) {
-        return getNodeColumnRef(input, index - offs);
-      }
-      offs += input->size();
-    }
-    UNREACHABLE();
   }
 
   LOG(FATAL) << "Unhandled node type: " << ::toString(node);
@@ -618,26 +521,6 @@ const Type* getColumnType(const Node* node, size_t col_idx) {
     } else {
       return getColumnType(join->getInput(1), col_idx - join->getInput(0)->size());
     }
-  }
-
-  const auto deep_join = dynamic_cast<const LeftDeepInnerJoin*>(node);
-  if (deep_join) {
-    CHECK_GT(deep_join->size(), col_idx);
-    unsigned offs = 0;
-    for (size_t i = 0; i < deep_join->inputCount(); ++i) {
-      auto input = deep_join->getInput(i);
-      if (col_idx - offs < input->size()) {
-        return getColumnType(input, col_idx - offs);
-      }
-      offs += input->size();
-    }
-  }
-
-  // For coumpounds type can be extracted from Exprs.
-  const auto compound = dynamic_cast<const Compound*>(node);
-  if (compound) {
-    CHECK_GT(compound->size(), col_idx);
-    return compound->getExprs()[col_idx]->type();
   }
 
   CHECK(false) << "Missing output metainfo for node " + node->toString() +

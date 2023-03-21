@@ -44,11 +44,9 @@
 /**
  * Builder class to create an in-memory, easy-to-navigate relational algebra DAG
  * interpreted from a JSON representation from Calcite. Also, applies high level
- * optimizations which can be expressed through relational algebra extended with
- * Compound. The Compound node is an equivalent representation for sequences of
- * Filter, Project and Aggregate nodes. This coalescing minimizes the amount of
- * intermediate buffers required to evaluate a query. Lower level optimizations are
- * taken care by lower levels, mainly RelAlgTranslator and the IR code generation.
+ * optimizations which can be expressed through relational algebra. Lower level
+ * optimizations are taken care by lower levels, mainly RelAlgTranslator and the
+ * IR code generation.
  */
 class RelAlgDagBuilder : public hdk::ir::QueryDag, public boost::noncopyable {
  public:
@@ -63,14 +61,12 @@ class RelAlgDagBuilder : public hdk::ir::QueryDag, public boost::noncopyable {
   RelAlgDagBuilder(const std::string& query_ra,
                    int db_id,
                    SchemaProviderPtr schema_provider,
-                   ConfigPtr config,
-                   bool coalesce = true);
+                   ConfigPtr config);
 
   RelAlgDagBuilder(const rapidjson::Value& query_ast,
                    int db_id,
                    SchemaProviderPtr schema_provider,
-                   ConfigPtr config,
-                   bool coalesce);
+                   ConfigPtr config);
 
   /**
    * Constructs a sub-DAG for any subqueries. Should only be called during DAG
@@ -95,7 +91,6 @@ class RelAlgDagBuilder : public hdk::ir::QueryDag, public boost::noncopyable {
 
   int db_id_;
   SchemaProviderPtr schema_provider_;
-  bool coalesce_ = false;
 };
 
 std::string tree_string(const hdk::ir::Node*, const size_t depth = 0);
