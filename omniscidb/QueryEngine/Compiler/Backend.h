@@ -69,12 +69,7 @@ class CodegenTraits {
   static CodegenTraitsDescriptor getDescriptor(unsigned local_addr_space,
                                                unsigned global_addr_space,
                                                llvm::CallingConv::ID calling_conv,
-                                               const std::string triple = "") {
-    return CodegenTraitsDescriptor(local_addr_space,
-                                   global_addr_space,
-                                   llvmCallingConvToDesc.at(calling_conv),
-                                   triple);
-  }
+                                               const std::string triple = "");
 
   CodegenTraitsDescriptor getDescriptor() {
     return CodegenTraitsDescriptor(local_addr_space_,
