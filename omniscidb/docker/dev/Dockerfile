@@ -78,6 +78,7 @@ RUN apt-get update && apt-get install -y \
     python3-numpy \
     python3-pip \
     sqlite3 \
+    libsqlite3-dev \
     --
 
 # Arrow
