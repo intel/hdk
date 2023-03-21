@@ -105,10 +105,9 @@ if(ENABLE_FOLLY)
   endif()
 endif()
 
-
 # SQLite
-include_directories(omniscidb/ThirdParty/sqlite3)
-add_subdirectory(omniscidb/ThirdParty/sqlite3)
+find_package(SQLite3 REQUIRED)
+include_directories(${SQLite3_INCLUDE_DIRS})
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(ENABLE_PYTHON "Build Python libraries" ON)
