@@ -20,6 +20,7 @@ import pyhdk.sql as sql
 import pyhdk.storage as storage
 from pyhdk.hdk import init
 from pyhdk._builder import QueryBuilder
+from pyhdk.version import Version 
 
 if sys.platform == "linux":
     sys.setdlopenflags(prev)
