@@ -574,8 +574,8 @@ if(NOT MSVC)
 endif()
 
 # SQLite
-include_directories(ThirdParty/sqlite3)
-add_subdirectory(ThirdParty/sqlite3)
+find_package(SQLite3 REQUIRED)
+include_directories(${SQLite3_INCLUDE_DIRS})
 
 find_package(CURL REQUIRED QUIET)
 if(CURL_FOUND)

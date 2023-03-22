@@ -19,11 +19,12 @@
 #include <string>
 #include <vector>
 
+#include <sqlite3.h>
+
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/PlanState.h"
 #include "QueryEngine/SerializeToSql.h"
 #include "QueryEngine/TargetMetaInfo.h"
-#include "ThirdParty/sqlite3/sqlite3.h"
 
 class Executor;
 
