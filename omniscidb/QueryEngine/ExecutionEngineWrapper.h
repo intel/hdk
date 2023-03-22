@@ -59,6 +59,10 @@ class ORCJITExecutionEngineWrapper {
             *object_layer_,
             std::make_unique<llvm::orc::ConcurrentIRCompiler>(
                 std::move(target_machine_builder)))) {
+#ifdef _WIN32
+    object_layer_->setOverrideObjectFlagsWithResponsibilityFlags(true);
+    object_layer_->setAutoClaimResponsibilityForObjectSymbols(true);
+#endif
     auto dylib_or_error = execution_session_->createJITDylib("<main>");
     if (!dylib_or_error) {
       LOG(FATAL) << "Failed to initialize JITTargetMachineBuilder: "
@@ -70,7 +74,9 @@ class ORCJITExecutionEngineWrapper {
             data_layout_->getGlobalPrefix())));
   }
 
-  ~ORCJITExecutionEngineWrapper() { llvm::cantFail(execution_session_->endSession()); }
+  ~ORCJITExecutionEngineWrapper() {
+    llvm::cantFail(execution_session_->endSession());
+  }
 
   ORCJITExecutionEngineWrapper(const ORCJITExecutionEngineWrapper& other) = delete;
   ORCJITExecutionEngineWrapper(ORCJITExecutionEngineWrapper&& other) = delete;
@@ -96,7 +102,9 @@ class ORCJITExecutionEngineWrapper {
     return reinterpret_cast<void*>(symbol->getAddress());
   }
 
-  bool exists() const { return !(execution_session_ == nullptr); }
+  bool exists() const {
+    return !(execution_session_ == nullptr);
+  }
 
   void removeModule(llvm::Module* module) {
     // Do nothing here. Module is deleted by ORC after materialization.
