@@ -8,6 +8,8 @@ HDK is used as a fast execution backend in [Modin](https://github.com/intel-ai/m
 
 We are committed to supporting a baseline set of functionality on all x86 CPUs, later-generation NVIDIA GPUs (supporting CUDA 11+), and Intel GPUs. The x86 backend uses LLVM ORCJIT for x86 byte code generation. The NVIDIA backend uses NVPTX extensions in LLVM to generate PTX, which is JIT-compiled by the CUDA runtime compiler. The Intel GPU backend leverages the LLVM [SPIR-V translator](https://github.com/KhronosGroup/SPIRV-LLVM-Translator) to produce SPIR-V. Device code is generated using the [Intel Graphics Compiler (IGC)](https://github.com/intel/intel-graphics-compiler) via the [oneAPI L0 driver](https://github.com/oneapi-src/level-zero).
 
+![Nightly Status](https://github.com/Devjiu/hdk/actions/workflows/nightly.yml/badge.svg?branch=dmitriim/matrix-check)
+
 ## Components
 
 ### Config
