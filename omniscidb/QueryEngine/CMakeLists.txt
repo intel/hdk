@@ -52,6 +52,7 @@ set(query_engine_source_files
     ExtensionsIR.cpp
     ExternalExecutor.cpp
     FromTableReordering.cpp
+    GpuInitGroupsImpl.cpp
     GpuInterrupt.cpp
     GpuMemUtils.cpp
     GpuSharedMemoryUtils.cpp
