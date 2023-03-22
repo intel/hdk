@@ -781,8 +781,10 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
   }
   insert_emtpy_abort_replacement(llvm_module);
 
-  // LLVM intrinsics can be generated due to optimizations (e.g., peephole) and thus need a declaration alongside __nv_ calls.
-  // TODO: Currently CUDA seems to accept llvm intrinsics, it would be good to compare the benefit of using __nv_ calls from libdevice.
+  // LLVM intrinsics can be generated due to optimizations (e.g., peephole) and thus need
+  // a declaration alongside __nv_ calls.
+  // TODO: Currently CUDA seems to accept llvm intrinsics, it would be good to compare the
+  // benefit of using __nv_ calls from libdevice.
   add_intrinsics_to_module(llvm_module);
 
   // LLVM 14 emits
