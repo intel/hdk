@@ -61,7 +61,6 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     , must_use_baseline_sort_(must_use_baseline_sort)
     , is_table_function_(false)
     , use_streaming_top_n_(use_streaming_top_n)
-    , force_4byte_float_(false)
     , col_slot_context_(col_slot_context) {
   col_slot_context_.setAllUnsetSlotsPaddedSize(8);
   col_slot_context_.validate();
@@ -126,8 +125,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor()
     , output_columnar_(false)
     , must_use_baseline_sort_(false)
     , is_table_function_(false)
-    , use_streaming_top_n_(false)
-    , force_4byte_float_(false) {}
+    , use_streaming_top_n_(false) {}
 
 QueryMemoryDescriptor::QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
                                              ConfigPtr config,
@@ -150,8 +148,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(Data_Namespace::DataMgr* data_mgr,
     , output_columnar_(false)
     , must_use_baseline_sort_(false)
     , is_table_function_(is_table_function)
-    , use_streaming_top_n_(false)
-    , force_4byte_float_(false) {}
+    , use_streaming_top_n_(false) {}
 
 QueryMemoryDescriptor::QueryMemoryDescriptor(const QueryDescriptionType query_desc_type,
                                              const int64_t min_val,
@@ -175,8 +172,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(const QueryDescriptionType query_de
     , output_columnar_(false)
     , must_use_baseline_sort_(false)
     , is_table_function_(false)
-    , use_streaming_top_n_(false)
-    , force_4byte_float_(false) {}
+    , use_streaming_top_n_(false) {}
 
 bool QueryMemoryDescriptor::operator==(const QueryMemoryDescriptor& other) const {
   // Note that this method does not check ptr reference members (e.g. data_mgr_) or
@@ -191,9 +187,6 @@ bool QueryMemoryDescriptor::operator==(const QueryMemoryDescriptor& other) const
     return false;
   }
   if (idx_target_as_key_ != other.idx_target_as_key_) {
-    return false;
-  }
-  if (force_4byte_float_ != other.force_4byte_float_) {
     return false;
   }
   if (group_col_widths_ != other.group_col_widths_) {

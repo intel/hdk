@@ -1206,7 +1206,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
                                        const size_t entry_buff_idx) const {
   auto actual_compact_sz = compact_sz;
   auto type = target_info.type;
-  if (type->isFp32() && !query_mem_desc_.forceFourByteFloat()) {
+  if (type->isFp32()) {
     if (query_mem_desc_.isLogicalSizedColumnsAllowed()) {
       actual_compact_sz = sizeof(float);
     } else {
