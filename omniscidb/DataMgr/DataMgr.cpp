@@ -40,7 +40,7 @@
 namespace Data_Namespace {
 
 DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
-    : gpuMgrContext_(nullptr)
+    : gpuMgrContext_(std::make_unique<GpuMgrContext>())
     , hasGpus_(false)
     , reservedGpuMem_(config.mem.gpu.reserved_mem_bytes)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
@@ -201,7 +201,7 @@ void DataMgr::populateDeviceMgrs(const Config& config) {
                  "CPU-only mode.";
     hasGpus_ = false;
   } else {
-    gpuMgrContext_ = gpuMgrs_.begin()->second.get();
+    gpuMgrContext_->gpu_mgr = gpuMgrs_.begin()->second.get();
     hasGpus_ = true;
   }
 }
@@ -410,7 +410,7 @@ void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
   CHECK(gpuMgr);
   // TODO: modify `bufferMgrs_` so the `bufferMgrs[GPU_LEVEL]` point to the selected
   // manager's buffers
-  gpuMgrContext_ = gpuMgr;
+  gpuMgrContext_->gpu_mgr = gpuMgr;
 }
 
 void DataMgr::getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,

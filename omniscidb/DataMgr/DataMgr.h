@@ -28,7 +28,7 @@
 #include "CudaMgr/CudaMgr.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
-#include "GpuMgr.h"
+#include "GpuMgrContext.h"
 #include "L0Mgr/L0Mgr.h"
 #include "MemoryLevel.h"
 #include "OSDependent/omnisci_fs.h"
@@ -145,21 +145,11 @@ class ProcBuddyinfoParser {
     fragmentationPercent_ = (scaled * 100) / total;
   }
 
-  auto operator[](size_t order) {
-    return orders_[order];
-  }
-  auto begin() {
-    return orders_.begin();
-  }
-  auto end() {
-    return orders_.end();
-  }
-  auto getFragmentationPercent() {
-    return fragmentationPercent_;
-  }
-  auto getInputText() {
-    return inputText_;
-  }
+  auto operator[](size_t order) { return orders_[order]; }
+  auto begin() { return orders_.begin(); }
+  auto end() { return orders_.end(); }
+  auto getFragmentationPercent() { return fragmentationPercent_; }
+  auto getInputText() { return inputText_; }
 };
 
 class DataMgr {
@@ -204,7 +194,7 @@ class DataMgr {
     return dynamic_cast<l0::L0Manager*>(getGpuMgr(GpuMgrPlatform::L0));
   }
   GpuMgr* getGpuMgr(GpuMgrPlatform name) const;
-  GpuMgr* getGpuMgr() const { return gpuMgrContext_; }
+  GpuMgr* getGpuMgr() const { return gpuMgrContext_->gpu_mgr; }
 
   // database_id, table_id, column_id, fragment_id
   std::vector<int> levelSizes_;
@@ -249,7 +239,7 @@ class DataMgr {
                             const std::vector<size_t>& cpu_tier_sizes);
 
   std::vector<std::vector<AbstractBufferMgr*>> bufferMgrs_;
-  GpuMgr* gpuMgrContext_;
+  std::unique_ptr<GpuMgrContext> gpuMgrContext_;
   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpuMgrs_;
   bool hasGpus_;
   size_t reservedGpuMem_;
