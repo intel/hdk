@@ -5,12 +5,15 @@ on:
       reset-cache:
         type: boolean
         default: true
-  push:
-    branches: main
-  pull_request:
-    branches: main
-  schedule:
-    - cron: '51 2 * * *'
+  push: []
+  #   branches: main
+  # pull_request:
+  #   branches: main
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   modin:
