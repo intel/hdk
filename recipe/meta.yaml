@@ -62,7 +62,7 @@ outputs:
         - make
         - maven
         - ninja
-        - sqlite 3.41.1
+        - libsqlite
         - folly 2022.11.07.00
       host:
         - arrow-cpp ={{ arrow_version }}=*{{ build_ext }}
@@ -83,6 +83,7 @@ outputs:
         - openjdk 17.*
         - zlib
         - tbb
+        - libsqlite
         - boost-cpp
 
       run_constrained:
