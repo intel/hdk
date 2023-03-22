@@ -24,12 +24,6 @@
 
 #include "Logger/Logger.h"
 
-#ifdef HAVE_CUDA
-#include <cuda.h>
-#else
-#include <Shared/nocuda.h>
-#endif
-
 namespace Data_Namespace {
 class AbstractBuffer;
 }  // namespace Data_Namespace
