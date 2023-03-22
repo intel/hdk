@@ -24,3 +24,5 @@ from pyhdk.version import Version
 
 if sys.platform == "linux":
     sys.setdlopenflags(prev)
+
+__version__ = Version.str()

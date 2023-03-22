@@ -8,7 +8,7 @@ class Version:
 
     @staticmethod
     def str():
-        return "@HDK_VERSION_RAW_NUMERIC@"
+        return "@HDK_VERSION_RAW@"
 
     @staticmethod
     def major():

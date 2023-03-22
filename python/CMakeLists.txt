@@ -11,6 +11,7 @@ file(GLOB_RECURSE PXD_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} pyhdk/*.pyx)
 
 set(pydeps
     ${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/pyhdk/version.py.in
     ${PY_SOURCES}
     ${PYX_SOURCES}
     ${PXD_SOURCES}
