@@ -64,18 +64,16 @@ outputs:
         - ninja
         - libsqlite
         - folly 2022.11.07.00
+        - tbb-devel
       host:
         - arrow-cpp ={{ arrow_version }}=*{{ build_ext }}
         - boost-cpp
-        - clangdev {{ llvm_version }}
         - cython
         - glog
-        - llvmdev {{ llvm_version }}
         - llvm {{ llvm_version }}
         - numpy
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
         - python
-        - tbb-devel
       run:
         - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
