@@ -234,11 +234,6 @@ class QueryMemoryDescriptor {
 
   bool mustUseBaselineSort() const { return must_use_baseline_sort_; }
 
-  // TODO(adb): remove and store this info more naturally in another
-  // member
-  bool forceFourByteFloat() const { return force_4byte_float_; }
-  void setForceFourByteFloat(const bool val) { force_4byte_float_ = val; }
-
   // Getters derived from state
   size_t getGroupbyColCount() const { return group_col_widths_.size(); }
   size_t getKeyCount() const { return keyless_hash_ ? 0 : getGroupbyColCount(); }
@@ -343,8 +338,6 @@ class QueryMemoryDescriptor {
   bool must_use_baseline_sort_;
   bool is_table_function_;
   bool use_streaming_top_n_;
-
-  bool force_4byte_float_;
 
   ColSlotContext col_slot_context_;
 
