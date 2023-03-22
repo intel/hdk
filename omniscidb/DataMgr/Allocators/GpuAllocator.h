@@ -25,12 +25,6 @@
 #include <cstdint>
 #include <cstdlib>
 
-#ifdef HAVE_CUDA
-#include <cuda.h>
-#else
-#include <Shared/nocuda.h>
-#endif
-
 #include "BufferProvider/BufferProvider.h"
 #include "DataMgr/Allocators/DeviceAllocator.h"
 

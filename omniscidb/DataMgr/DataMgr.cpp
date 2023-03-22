@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <numeric>
 
 namespace Data_Namespace {
 
@@ -239,10 +240,7 @@ void DataMgr::populateMgrs(const Config& config,
               << (float)config.mem.cpu.pmem_size / (1024 * 1024) << "MB";
   }
 
-  size_t total_cpu_size = 0;
-  for (auto cpu_tier_size : cpu_tier_sizes) {
-    total_cpu_size += cpu_tier_size;
-  }
+  auto total_cpu_size = std::reduce(cpu_tier_sizes.begin(), cpu_tier_sizes.end());
 
   if (hasGpus_) {
     // TODO: iterate over the vector to populate buffers one by one?
