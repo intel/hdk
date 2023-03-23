@@ -19,7 +19,7 @@ dependencies:
   - sysroot_linux-64 >=2.14
   - arrow-cpp  11.0
   - pyarrow    11.0
-  - pandas     1.3.3
+  - pandas     1.5.3
   - llvmdev     14.*
   - openjdk     17.*
   - cmake 
