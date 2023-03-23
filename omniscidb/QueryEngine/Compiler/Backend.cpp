@@ -981,6 +981,23 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   pass_manager_builder.populateModulePassManager(PM);
   compiler::optimize_ir(func, module, PM, live_funcs, false /*smem_used*/, co);
 
+  // Remove the remaining freeze instruction after the optimization
+  std::vector<llvm::Instruction*> ToErase;
+  for (auto& Fn : *module) {
+    for (auto I = llvm::inst_begin(Fn), E = llvm::inst_end(Fn); I != E; ++I) {
+      if (auto* FI = llvm::dyn_cast<llvm::FreezeInst>(&*I)) {
+        FI->replaceAllUsesWith(FI->getOperand(0));
+        FI->dropAllReferences();
+        ToErase.push_back(FI);
+      }
+    }
+  }
+
+  for (llvm::Instruction* V : ToErase) {
+    assert(V->user_empty());
+    V->eraseFromParent();
+  }
+
   SPIRV::TranslatorOpts opts;
   opts.enableAllExtensions();
   opts.setDesiredBIsRepresentation(SPIRV::BIsRepresentation::OpenCL12);
