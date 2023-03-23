@@ -1,0 +1,41 @@
+from datetime import datetime
+
+class Version:
+
+    @staticmethod
+    def full():
+        return "@HDK_VERSION_RAW@-@HDK_BUILD_DATE@-@HDK_GIT_HASH@"        
+
+    @staticmethod
+    def str():
+        return "@HDK_VERSION_RAW@"
+
+    @staticmethod
+    def major():
+        return @HDK_VERSION_MAJOR@
+
+    @staticmethod
+    def minor():
+        return @HDK_VERSION_MINOR@
+
+    @staticmethod
+    def patch():
+        return @HDK_VERSION_PATCH@
+
+    @staticmethod
+    def extra():
+        return "@HDK_VERSION_EXTRA@"
+
+    @staticmethod
+    def date():
+        return datetime.strptime("@HDK_BUILD_DATE@", "%Y%m%d")
+        
+    @staticmethod
+    def hash():
+        return "@HDK_GIT_HASH@"
+
+    def __str__(self):
+        return Version.str()
+    
+    def __repr__(self):
+        return Version.str()
