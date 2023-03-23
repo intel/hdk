@@ -19,13 +19,13 @@
 #include <mutex>
 #include <vector>
 
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/DynamicWatchdog.h"
 #include "QueryEngine/ErrorHandling.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ExternalExecutor.h"
 #include "QueryEngine/MemoryLayoutBuilder.h"
 #include "QueryEngine/SerializeToSql.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 
 namespace {
 

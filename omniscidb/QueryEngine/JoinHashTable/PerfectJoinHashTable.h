@@ -29,11 +29,11 @@
 #include "QueryEngine/DataRecycler/HashingSchemeRecycler.h"
 #include "QueryEngine/DataRecycler/HashtableRecycler.h"
 #include "QueryEngine/Descriptors/InputDescriptors.h"
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/ExpressionRange.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/JoinHashTable/PerfectHashTable.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 
 #include <llvm/IR/Value.h>
 

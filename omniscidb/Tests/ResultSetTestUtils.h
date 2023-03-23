@@ -17,9 +17,8 @@
 #ifndef RESULTSETTESTUTILS_H
 #define RESULTSETTESTUTILS_H
 
-#include "../QueryEngine/ResultSet.h"
 #include "../QueryEngine/RuntimeFunctions.h"
-#include "../QueryEngine/TargetValue.h"
+#include "../ResultSet/ResultSet.h"
 #include "../Shared/TargetInfo.h"
 #include "../Shared/sqldefs.h"
 

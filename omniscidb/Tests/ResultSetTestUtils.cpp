@@ -15,7 +15,8 @@
  */
 
 #include "ResultSetTestUtils.h"
-#include "../QueryEngine/ResultSetBufferAccessors.h"
+
+#include "ResultSet/ResultSetBufferAccessors.h"
 
 // TODO: move this into the ResultSet
 int8_t* advance_to_next_columnar_key_buff(int8_t* key_ptr,

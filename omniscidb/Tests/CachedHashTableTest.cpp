@@ -26,7 +26,7 @@
 #include "QueryEngine/MurmurHash1Inl.h"
 #include "QueryEngine/QueryPlanDagExtractor.h"
 #include "QueryEngine/RelAlgExecutor.h"
-#include "QueryEngine/ResultSet.h"
+#include "ResultSet/ResultSet.h"
 
 #include <gtest/gtest.h>
 #include <boost/filesystem/operations.hpp>

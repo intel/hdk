@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "ResultSetStorage.h"
+#include "ResultSet/ResultSetStorage.h"
 
 struct ReductionCode;
 

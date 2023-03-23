@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "ResultSet.h"
+#include "ResultSet/ResultSet.h"
 
 #include <functional>
 

@@ -15,9 +15,10 @@
  */
 
 #include "ColumnarResults.h"
-#include "Descriptors/RowSetMemoryOwner.h"
 #include "ErrorHandling.h"
 #include "Execute.h"
+
+#include "ResultSet/RowSetMemoryOwner.h"
 #include "Shared/Intervals.h"
 #include "Shared/likely.h"
 #include "Shared/thread_count.h"

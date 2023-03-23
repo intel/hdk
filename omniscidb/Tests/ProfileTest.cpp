@@ -31,9 +31,9 @@
 #include <unordered_set>
 
 #include "DataMgr/Allocators/ArenaAllocator.h"
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
-#include "QueryEngine/ResultSet.h"
 #include "QueryEngine/ResultSetReduction.h"
+#include "ResultSet/ResultSet.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 #include "Shared/measure.h"
 #include "Shared/thread_count.h"
 #include "Tests/TestHelpers.h"

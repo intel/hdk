@@ -15,10 +15,10 @@
  */
 
 #include "SpeculativeTopN.h"
+#include "RelAlgExecutor.h"
 
 #include "Logger/Logger.h"
-#include "RelAlgExecutor.h"
-#include "ResultSet.h"
+#include "ResultSet/ResultSet.h"
 
 SpeculativeTopNMap::SpeculativeTopNMap() : unknown_(0) {}
 

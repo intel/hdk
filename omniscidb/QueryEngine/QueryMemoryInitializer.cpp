@@ -20,13 +20,13 @@
 #include "GpuInitGroups.h"
 #include "GpuMemUtils.h"
 #include "HashTableDesc.h"
-#include "Logger/Logger.h"
 #include "OutputBufferInitialization.h"
-#include "ResultSet.h"
 #include "StreamingTopN.h"
 
-#include <Shared/checked_alloc.h>
-#include <ThirdParty/robin_hood.h>
+#include "Logger/Logger.h"
+#include "ResultSet/ResultSet.h"
+#include "Shared/checked_alloc.h"
+#include "ThirdParty/robin_hood.h"
 
 #ifndef _MSC_VER
 #include <x86intrin.h>

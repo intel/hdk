@@ -20,8 +20,7 @@
  * @brief   Utility functions for easy access to the result set buffers.
  */
 
-#ifndef QUERYENGINE_RESULTSETBUFFERACCESSORS_H
-#define QUERYENGINE_RESULTSETBUFFERACCESSORS_H
+#pragma once
 
 #include "Shared/BufferCompaction.h"
 #include "Shared/SqlTypesLayout.h"
@@ -30,7 +29,7 @@
 
 #ifndef __CUDACC__
 
-#include "Descriptors/QueryMemoryDescriptor.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
 
 #include <algorithm>
 
@@ -234,5 +233,3 @@ inline int64_t read_int_from_buff(const int8_t* ptr, const int8_t compact_sz) {
   UNREACHABLE();
   return 0;
 }
-
-#endif  // QUERYENGINE_RESULTSETBUFFERACCESSORS_H

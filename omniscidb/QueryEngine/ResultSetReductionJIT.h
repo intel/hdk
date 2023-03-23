@@ -19,7 +19,7 @@
 #include "CodeCache.h"
 #include "ResultSetReductionOps.h"
 
-#include "Descriptors/QueryMemoryDescriptor.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
 #include "Shared/Config.h"
 #include "Shared/TargetInfo.h"
 

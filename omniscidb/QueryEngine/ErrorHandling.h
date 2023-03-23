@@ -18,7 +18,7 @@
 
 #include <stdexcept>
 
-#include "Descriptors/Types.h"
+#include "ResultSet/ResultType.h"
 
 struct QueryExecutionProperties {
   QueryDescriptionType query_type;

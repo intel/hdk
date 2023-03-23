@@ -26,7 +26,8 @@
 #define QUERYENGINE_RESULTSETBUILDER_H
 
 #include "RelAlgDagBuilder.h"
-#include "ResultSet.h"
+
+#include "ResultSet/ResultSet.h"
 
 // ********************************************************
 // * Usage

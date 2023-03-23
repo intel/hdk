@@ -24,7 +24,7 @@
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
 #include "QueryEngine/ExternalCacheInvalidators.h"
-#include "QueryEngine/ResultSet.h"
+#include "ResultSet/ResultSet.h"
 
 #include <gtest/gtest.h>
 #include <boost/program_options.hpp>

@@ -91,7 +91,7 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     @staticmethod
     CExecutionOptions fromConfig(const CConfig)
 
-cdef extern from "omniscidb/QueryEngine/ResultSet.h":
+cdef extern from "omniscidb/ResultSet/ResultSet.h":
   cdef cppclass CResultSet "ResultSet":
     size_t rowCount()
 

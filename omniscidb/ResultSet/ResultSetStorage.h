@@ -26,9 +26,9 @@
 #define QUERYENGINE_RESULTSETSTORAGE_H
 
 #include "DataMgr/Chunk/Chunk.h"
-#include "ResultSetBufferAccessors.h"
+#include "ResultSet/ResultSetBufferAccessors.h"
+#include "ResultSet/TargetValue.h"
 #include "Shared/Config.h"
-#include "TargetValue.h"
 
 #include <atomic>
 #include <functional>

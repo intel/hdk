@@ -19,8 +19,8 @@
 
 #include <IR/Expr.h>
 #include "DataMgr/Allocators/ThrustAllocator.h"
-#include "Descriptors/QueryMemoryDescriptor.h"
 #include "Logger/Logger.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
 
 #include <cstdint>
 

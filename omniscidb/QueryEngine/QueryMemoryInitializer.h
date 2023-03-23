@@ -17,11 +17,11 @@
 #pragma once
 
 #include "DataMgr/Allocators/DeviceAllocator.h"
+#include "ResultSet/QueryMemoryDescriptor.h"
+#include "ResultSet/ResultSet.h"
 
-#include "Descriptors/QueryMemoryDescriptor.h"
 #include "GpuMemUtils.h"
 #include "HashTableDesc.h"
-#include "ResultSet.h"
 
 #include <memory>
 

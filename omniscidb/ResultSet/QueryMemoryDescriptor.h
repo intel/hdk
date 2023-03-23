@@ -22,12 +22,11 @@
  * Copyright (c) 2014 MapD Technologies, Inc.  All rights reserved.
  */
 
-#ifndef QUERYENGINE_QUERYMEMORYDESCRIPTOR_H
-#define QUERYENGINE_QUERYMEMORYDESCRIPTOR_H
+#pragma once
 
 #include "ColSlotContext.h"
 #include "CountDistinctDescriptor.h"
-#include "Types.h"
+#include "ResultType.h"
 
 #include <boost/optional.hpp>
 #include "Logger/Logger.h"
@@ -367,5 +366,3 @@ std::vector<TargetInfo> target_exprs_to_infos(
     const std::vector<const hdk::ir::Expr*>& targets,
     const QueryMemoryDescriptor& query_mem_desc,
     bool bigint_count);
-
-#endif  // QUERYENGINE_QUERYMEMORYDESCRIPTOR_H

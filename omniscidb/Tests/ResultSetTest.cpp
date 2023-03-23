@@ -26,13 +26,13 @@
 #include "TestHelpers.h"
 
 #include "DataMgr/DataMgrDataProvider.h"
-#include "QueryEngine/Descriptors/RowSetMemoryOwner.h"
 #include "QueryEngine/Execute.h"
-#include "QueryEngine/ResultSet.h"
 #include "QueryEngine/ResultSetReduction.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
 #include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/RuntimeFunctions.h"
+#include "ResultSet/ResultSet.h"
+#include "ResultSet/RowSetMemoryOwner.h"
 #include "StringDictionary/StringDictionary.h"
 
 #include <gtest/gtest.h>

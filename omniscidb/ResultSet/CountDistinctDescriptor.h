@@ -26,9 +26,9 @@
 #ifndef QUERYENGINE_COUNTDISTINCTDESCRIPTOR_H
 #define QUERYENGINE_COUNTDISTINCTDESCRIPTOR_H
 
-#include "../CompilationOptions.h"
 #include "Logger/Logger.h"
 #include "Shared/BufferCompaction.h"
+#include "Shared/DeviceType.h"
 
 #include <vector>
 

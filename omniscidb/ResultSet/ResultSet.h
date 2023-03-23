@@ -25,14 +25,15 @@
 #ifndef QUERYENGINE_RESULTSET_H
 #define QUERYENGINE_RESULTSET_H
 
-#include <boost/optional/optional_io.hpp>
 #include "BufferProvider/BufferProvider.h"
 #include "DataMgr/Chunk/Chunk.h"
 #include "IR/CardinalityEstimator.h"
-#include "ResultSetBufferAccessors.h"
-#include "ResultSetStorage.h"
+#include "ResultSet/ResultSetBufferAccessors.h"
+#include "ResultSet/ResultSetStorage.h"
+#include "ResultSet/TargetValue.h"
 #include "Shared/quantile.h"
-#include "TargetValue.h"
+
+#include <boost/optional/optional_io.hpp>
 
 #include <atomic>
 #include <functional>
@@ -91,7 +92,7 @@ struct OrderEntry;
 
 }  // namespace hdk::ir
 
-class Executor;
+class RowSetMemoryOwner;
 class StringDictionaryProxy;
 class ResultSet;
 

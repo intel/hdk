@@ -20,15 +20,12 @@
  * @brief   Basic constructors and methods of the row set interface.
  */
 
-#include "ResultSet.h"
 #include "CountDistinct.h"
+#include "RowSetMemoryOwner.h"
+
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
-#include "Execute.h"
-#include "GpuMemUtils.h"
-#include "InPlaceSort.h"
-#include "OutputBufferInitialization.h"
-#include "RuntimeFunctions.h"
+#include "ResultSet/ResultSet.h"
 #include "Shared/InlineNullValues.h"
 #include "Shared/Intervals.h"
 #include "Shared/SqlTypesLayout.h"
@@ -37,6 +34,8 @@
 #include "Shared/thread_count.h"
 #include "Shared/threading.h"
 #include "Utils/ExtractFromTime.h"
+
+#include <boost/math/special_functions/fpclassify.hpp>
 
 #include <algorithm>
 #include <atomic>

@@ -19,6 +19,7 @@
 
 #include <thrust/device_vector.h>
 #include "DataMgr/Allocators/ThrustAllocator.h"
+#include "Shared/BufferCompaction.h"
 
 template <typename T>
 inline thrust::device_ptr<T> get_device_ptr(const size_t host_vec_size,
