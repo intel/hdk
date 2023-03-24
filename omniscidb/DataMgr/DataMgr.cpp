@@ -243,12 +243,6 @@ void DataMgr::populateMgrs(const Config& config,
   auto total_cpu_size = std::reduce(cpu_tier_sizes.begin(), cpu_tier_sizes.end());
 
   if (hasGpus_) {
-    // TODO: iterate over the vector to populate buffers one by one?
-    // in order to support multiple gpuMgrs we have to distinctly store their buffer
-    // managers and switch to them in `bufferMgrs_` when the gpuMgr context changes
-    CHECK_EQ(gpuMgrs_.size(), (size_t)1)
-        << "Multiple GPU managers handling is not implemented yet.";
-
     LOG(INFO) << "Reserved GPU memory is " << (float)reservedGpuMem_ / (1024 * 1024)
               << "MB includes render buffer allocation";
     bufferMgrs_.resize(3);
@@ -261,49 +255,53 @@ void DataMgr::populateMgrs(const Config& config,
                          cpu_tier_sizes);
 
     levelSizes_.push_back(1);  // levelSizes_[CPU_LEVEL] = 1
-    int numGpus = getGpuMgr()->getDeviceCount();
-    for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
-      size_t deviceMemSize = 0;
-      // TODO: get rid of manager-specific branches by introducing some kind of device
-      // properties in GpuMgr
-      switch (getGpuMgr()->getPlatform()) {
-        case GpuMgrPlatform::CUDA:
-          deviceMemSize = getCudaMgr()->getDeviceProperties(gpuNum)->globalMem;
-          break;
-        case GpuMgrPlatform::L0:
-          deviceMemSize = getL0Mgr()->getMaxAllocationSize(gpuNum);
-          page_size = getL0Mgr()->getPageSize(gpuNum);
-          break;
-        default:
-          CHECK(false);
+    for (auto& [p, gpu_mgr] : gpuMgrs_) {
+      int numGpus = gpu_mgr->getDeviceCount();
+      for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
+        size_t deviceMemSize = 0;
+        // TODO: get rid of manager-specific branches by introducing some kind of device
+        // properties in GpuMgr
+        switch (p) {
+          case GpuMgrPlatform::CUDA:
+            deviceMemSize = getCudaMgr()->getDeviceProperties(gpuNum)->globalMem;
+            break;
+          case GpuMgrPlatform::L0:
+            deviceMemSize = getL0Mgr()->getMaxAllocationSize(gpuNum);
+            page_size = getL0Mgr()->getPageSize(gpuNum);
+            break;
+          default:
+            CHECK(false);
+        }
+
+        size_t gpuMaxMemSize = config.mem.gpu.max_size;
+        if (gpuMaxMemSize == 0) {
+          CHECK_GT(deviceMemSize, reservedGpuMem_);
+          gpuMaxMemSize = deviceMemSize - reservedGpuMem_;
+        }
+
+        size_t minGpuSlabSize = std::min(config.mem.gpu.min_slab_size, gpuMaxMemSize);
+        minGpuSlabSize = (minGpuSlabSize / page_size) * page_size;
+        size_t maxGpuSlabSize = std::min(config.mem.gpu.max_slab_size, gpuMaxMemSize);
+        maxGpuSlabSize = (maxGpuSlabSize / page_size) * page_size;
+        LOG(INFO) << "Min GPU Slab size for GPU " << gpuNum << " is "
+                  << (float)minGpuSlabSize / (1024 * 1024) << "MB";
+        LOG(INFO) << "Max GPU Slab size for GPU " << gpuNum << " is "
+                  << (float)maxGpuSlabSize / (1024 * 1024) << "MB";
+        LOG(INFO) << "Max memory pool size for GPU " << gpuNum << " is "
+                  << (float)gpuMaxMemSize / (1024 * 1024) << "MB";
+
+        bufferMgrs_[2].push_back(new Buffer_Namespace::GpuBufferMgr(gpuNum,
+                                                                    gpuMaxMemSize,
+                                                                    gpu_mgr.get(),
+                                                                    minGpuSlabSize,
+                                                                    maxGpuSlabSize,
+                                                                    page_size,
+                                                                    bufferMgrs_[1][0]));
       }
-
-      size_t gpuMaxMemSize = config.mem.gpu.max_size;
-      if (gpuMaxMemSize == 0) {
-        CHECK_GT(deviceMemSize, reservedGpuMem_);
-        gpuMaxMemSize = deviceMemSize - reservedGpuMem_;
-      }
-
-      size_t minGpuSlabSize = std::min(config.mem.gpu.min_slab_size, gpuMaxMemSize);
-      minGpuSlabSize = (minGpuSlabSize / page_size) * page_size;
-      size_t maxGpuSlabSize = std::min(config.mem.gpu.max_slab_size, gpuMaxMemSize);
-      maxGpuSlabSize = (maxGpuSlabSize / page_size) * page_size;
-      LOG(INFO) << "Min GPU Slab size for GPU " << gpuNum << " is "
-                << (float)minGpuSlabSize / (1024 * 1024) << "MB";
-      LOG(INFO) << "Max GPU Slab size for GPU " << gpuNum << " is "
-                << (float)maxGpuSlabSize / (1024 * 1024) << "MB";
-      LOG(INFO) << "Max memory pool size for GPU " << gpuNum << " is "
-                << (float)gpuMaxMemSize / (1024 * 1024) << "MB";
-
-      bufferMgrs_[2].push_back(new Buffer_Namespace::GpuBufferMgr(gpuNum,
-                                                                  gpuMaxMemSize,
-                                                                  getGpuMgr(),
-                                                                  minGpuSlabSize,
-                                                                  maxGpuSlabSize,
-                                                                  page_size,
-                                                                  bufferMgrs_[1][0]));
     }
-    levelSizes_.push_back(numGpus);  // levelSizes_[GPU_LEVEL] = numGpus
+    setGpuMgrContext(GpuMgrPlatform::L0);
+    levelSizes_.push_back(
+        getGpuMgr()->getDeviceCount());  // levelSizes_[GPU_LEVEL] = numGpus
   } else {
     allocateCpuBufferMgr(0,
                          config.mem.cpu.enable_tiered_cpu_mem,
