@@ -377,7 +377,6 @@ TEST_F(AggregationTest, Sum) {
 }
 
 TEST_F(AggregationTest, FilterAndSum) {
-  GTEST_SKIP();
   c("SELECT SUM(x * dd) FROM test;", g_dt);
   c("SELECT SUM(y * dd) FROM test;", g_dt);
   c("SELECT SUM(w * dd) FROM test;", g_dt);
