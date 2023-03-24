@@ -210,7 +210,8 @@ void DataMgr::populateMgrs(const Config& config,
                            const size_t userSpecifiedNumReaderThreads) {
   // no need for locking, as this is only called in the constructor
   bufferMgrs_.resize(2);
-  bufferMgrs_[0].push_back(new PersistentStorageMgr(userSpecifiedNumReaderThreads));
+  bufferMgrs_[MemoryLevel::DISK_LEVEL].push_back(
+      new PersistentStorageMgr(userSpecifiedNumReaderThreads));
 
   levelSizes_.push_back(1);  // levelSizes_[DISK_LEVEL] = 1
   size_t page_size{512};
@@ -290,13 +291,14 @@ void DataMgr::populateMgrs(const Config& config,
         LOG(INFO) << "Max memory pool size for GPU " << gpuNum << " is "
                   << (float)gpuMaxMemSize / (1024 * 1024) << "MB";
 
-        bufferMgrs_[2].push_back(new Buffer_Namespace::GpuBufferMgr(gpuNum,
-                                                                    gpuMaxMemSize,
-                                                                    gpu_mgr.get(),
-                                                                    minGpuSlabSize,
-                                                                    maxGpuSlabSize,
-                                                                    page_size,
-                                                                    bufferMgrs_[1][0]));
+        bufferMgrs_[MemoryLevel::GPU_LEVEL].push_back(
+            new Buffer_Namespace::GpuBufferMgr(gpuNum,
+                                               gpuMaxMemSize,
+                                               gpu_mgr.get(),
+                                               minGpuSlabSize,
+                                               maxGpuSlabSize,
+                                               page_size,
+                                               bufferMgrs_[MemoryLevel::CPU_LEVEL][0]));
       }
     }
     setGpuMgrContext(GpuMgrPlatform::L0);
@@ -413,7 +415,8 @@ void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
 
 void DataMgr::getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,
                                               const ChunkKey& keyPrefix) {
-  bufferMgrs_[0][0]->getChunkMetadataVecForKeyPrefix(chunkMetadataVec, keyPrefix);
+  bufferMgrs_[MemoryLevel::DISK_LEVEL][0]->getChunkMetadataVecForKeyPrefix(
+      chunkMetadataVec, keyPrefix);
 }
 
 AbstractBuffer* DataMgr::createChunkBuffer(const ChunkKey& key,
@@ -506,11 +509,12 @@ std::ostream& operator<<(std::ostream& os, const DataMgr::SystemMemoryUsage& mem
 }
 
 PersistentStorageMgr* DataMgr::getPersistentStorageMgr() const {
-  return dynamic_cast<PersistentStorageMgr*>(bufferMgrs_[0][0]);
+  return dynamic_cast<PersistentStorageMgr*>(bufferMgrs_[MemoryLevel::DISK_LEVEL][0]);
 }
 
 Buffer_Namespace::CpuBufferMgr* DataMgr::getCpuBufferMgr() const {
-  return dynamic_cast<Buffer_Namespace::CpuBufferMgr*>(bufferMgrs_[1][0]);
+  return dynamic_cast<Buffer_Namespace::CpuBufferMgr*>(
+      bufferMgrs_[MemoryLevel::CPU_LEVEL][0]);
 }
 
 const DictDescriptor* DataMgr::getDictMetadata(int dict_id, bool load_dict) const {
