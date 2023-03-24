@@ -982,18 +982,18 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   compiler::optimize_ir(func, module, PM, live_funcs, false /*smem_used*/, co);
 
   // Remove the remaining freeze instruction after the optimization
-  std::vector<llvm::Instruction*> ToErase;
+  std::vector<llvm::Instruction*> to_erase;
   for (auto& Fn : *module) {
     for (auto I = llvm::inst_begin(Fn), E = llvm::inst_end(Fn); I != E; ++I) {
       if (auto* FI = llvm::dyn_cast<llvm::FreezeInst>(&*I)) {
         FI->replaceAllUsesWith(FI->getOperand(0));
         FI->dropAllReferences();
-        ToErase.push_back(FI);
+        to_erase.push_back(FI);
       }
     }
   }
 
-  for (llvm::Instruction* V : ToErase) {
+  for (llvm::Instruction* V : to_erase) {
     assert(V->user_empty());
     V->eraseFromParent();
   }
