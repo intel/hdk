@@ -394,10 +394,11 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
         cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, const_zero), mul_ok, mul_check);
     cgen_state_->ir_builder_.SetInsertPoint(mul_check);
     auto rhs_is_negative_lv = cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero);
+    auto lhs_is_negative_lv = cgen_state_->ir_builder_.CreateICmpSLT(lhs_lv, const_zero);
     auto positive_rhs_lv = cgen_state_->ir_builder_.CreateSelect(
         rhs_is_negative_lv, cgen_state_->ir_builder_.CreateNeg(rhs_lv), rhs_lv);
     auto adjusted_lhs_lv = cgen_state_->ir_builder_.CreateSelect(
-        rhs_is_negative_lv, cgen_state_->ir_builder_.CreateNeg(lhs_lv), lhs_lv);
+        lhs_is_negative_lv, cgen_state_->ir_builder_.CreateNeg(lhs_lv), lhs_lv);
     auto detected = cgen_state_->ir_builder_.CreateOr(  // overflow
         cgen_state_->ir_builder_.CreateICmpSGT(
             adjusted_lhs_lv,
