@@ -209,12 +209,17 @@ class L0Kernel : public DeviceKernel {
 #endif
 
 std::unique_ptr<DeviceKernel> create_device_kernel(const CompilationContext* ctx,
+                                                   GpuMgrPlatform platform,
                                                    int device_id) {
+  if (platform == GpuMgrPlatform::CUDA) {
 #ifdef HAVE_CUDA
-  return std::make_unique<NvidiaKernel>(ctx, device_id);
-#elif HAVE_L0
-  return std::make_unique<L0Kernel>(ctx, device_id);
-#else
-  return nullptr;
+    return std::make_unique<NvidiaKernel>(ctx, device_id);
 #endif
+  } else if (platform == GpuMgrPlatform::L0) {
+#ifdef HAVE_L0
+    return std::make_unique<L0Kernel>(ctx, device_id);
+#endif
+  }
+
+  return nullptr;
 }

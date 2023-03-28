@@ -57,4 +57,5 @@ class DeviceKernel {
 };
 
 std::unique_ptr<DeviceKernel> create_device_kernel(const CompilationContext* ctx,
+                                                   GpuMgrPlatform platform,
                                                    int device_id);

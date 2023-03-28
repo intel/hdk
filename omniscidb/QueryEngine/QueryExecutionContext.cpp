@@ -262,7 +262,8 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
   bool is_group_by{query_mem_desc_.isGroupBy()};
 
   CHECK(compilation_context);
-  auto kernel = create_device_kernel(compilation_context, device_id);
+  auto kernel = create_device_kernel(
+      compilation_context, data_mgr->getGpuMgr()->getPlatform(), device_id);
 
   std::vector<int64_t*> out_vec;
   uint32_t num_fragments = col_buffers.size();
