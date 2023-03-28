@@ -17,7 +17,8 @@ package:
 
 source:
   git_url: https://github.com/intel-ai/hdk
-  git_branch: main
+  #  git_branch: main
+  git_branch: release/v0.4.0
 
 build:
   number: {{ number }}
@@ -62,8 +63,6 @@ outputs:
         - make
         - maven
         - ninja
-        - libsqlite
-        - folly 2022.11.07.00
         - tbb-devel
       host:
         - arrow-cpp ={{ arrow_version }}=*{{ build_ext }}
@@ -74,6 +73,8 @@ outputs:
         - numpy
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
         - python
+        - folly 2022.11.07.00
+        - libsqlite 3.40.0
       run:
         - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
@@ -81,7 +82,6 @@ outputs:
         - openjdk 17.*
         - zlib
         - tbb
-        - libsqlite
         - boost-cpp
 
       run_constrained:
