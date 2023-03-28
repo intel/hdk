@@ -40,8 +40,8 @@
 namespace Data_Namespace {
 
 DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
-    : gpuMgrContext_(std::make_unique<GpuMgrContext>())
-    , hasGpus_(false)
+    : current_device_mgr_(nullptr)
+    , has_gpus_(false)
     , reservedGpuMem_(config.mem.gpu.reserved_mem_bytes)
     , buffer_provider_(std::make_unique<DataMgrBufferProvider>(this))
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
@@ -51,8 +51,15 @@ DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
 }
 
 DataMgr::~DataMgr() {
-  int numLevels = bufferMgrs_.size();
-  for (int level = numLevels - 1; level >= 0; --level) {
+  for (auto& [p, ctx] : device_contexts_) {
+    for (size_t device = 0; device < ctx->buffer_mgrs.size(); device++) {
+      delete ctx->buffer_mgrs[device];
+    }
+  }
+
+  int num_levels =
+      bufferMgrs_.size() == GPU_LEVEL + 1 ? CPU_LEVEL + 1 : bufferMgrs_.size();
+  for (int level = num_levels - 1; level >= 0; --level) {
     for (size_t device = 0; device < bufferMgrs_[level].size(); device++) {
       delete bufferMgrs_[level][device];
     }
@@ -149,22 +156,25 @@ void DataMgr::allocateCpuBufferMgr(int32_t device_id,
   GpuMgr* gpuMgr = getGpuMgr();
 
   if (enable_tiered_cpu_mem) {
-    bufferMgrs_[1].push_back(new Buffer_Namespace::TieredCpuBufferMgr(0,
-                                                                      total_cpu_size,
-                                                                      gpuMgr,
-                                                                      minCpuSlabSize,
-                                                                      maxCpuSlabSize,
-                                                                      page_size,
-                                                                      cpu_tier_sizes,
-                                                                      bufferMgrs_[0][0]));
+    bufferMgrs_[MemoryLevel::CPU_LEVEL].push_back(
+        new Buffer_Namespace::TieredCpuBufferMgr(
+            0,
+            total_cpu_size,
+            gpuMgr,
+            minCpuSlabSize,
+            maxCpuSlabSize,
+            page_size,
+            cpu_tier_sizes,
+            bufferMgrs_[MemoryLevel::DISK_LEVEL][0]));
   } else {
-    bufferMgrs_[1].push_back(new Buffer_Namespace::CpuBufferMgr(0,
-                                                                total_cpu_size,
-                                                                gpuMgr,
-                                                                minCpuSlabSize,
-                                                                maxCpuSlabSize,
-                                                                page_size,
-                                                                bufferMgrs_[0][0]));
+    bufferMgrs_[MemoryLevel::CPU_LEVEL].push_back(
+        new Buffer_Namespace::CpuBufferMgr(0,
+                                           total_cpu_size,
+                                           gpuMgr,
+                                           minCpuSlabSize,
+                                           maxCpuSlabSize,
+                                           page_size,
+                                           bufferMgrs_[MemoryLevel::DISK_LEVEL][0]));
   }
 }
 
@@ -172,37 +182,28 @@ void DataMgr::populateDeviceMgrs(const Config& config) {
   if (config.exec.cpu_only)
     return;
 
-  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpu_mgrs;
 #ifdef HAVE_CUDA
   try {
-    gpu_mgrs[GpuMgrPlatform::CUDA] = std::make_unique<CudaMgr_Namespace::CudaMgr>(-1, 0);
+    device_mgrs_[GpuMgrPlatform::CUDA] =
+        std::make_unique<CudaMgr_Namespace::CudaMgr>(-1, 0);
   } catch (const std::exception& e) {
     LOG(ERROR) << "Failed to initialize CUDA GPU: " << e.what();
-    gpu_mgrs.erase(GpuMgrPlatform::CUDA);
+    device_mgrs_.erase(GpuMgrPlatform::CUDA);
   }
 #endif
 #ifdef HAVE_L0
   try {
-    gpu_mgrs[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
+    device_mgrs_[GpuMgrPlatform::L0] = std::make_unique<l0::L0Manager>();
   } catch (const std::exception& e) {
     LOG(ERROR) << "Failed to initialize L0 GPU: " << e.what();
-    gpu_mgrs.erase(GpuMgrPlatform::L0);
+    device_mgrs_.erase(GpuMgrPlatform::L0);
   }
 #endif
 
-  for (auto& pair : gpu_mgrs) {
-    if (pair.second) {
-      CHECK_EQ(pair.first, pair.second->getPlatform()) << "Inconsistent map was passed";
-      gpuMgrs_[pair.first] = std::move(pair.second);
-    }
-  }
-  if (!gpuMgrs_.size()) {
+  has_gpus_ = device_mgrs_.size();
+  if (!has_gpus_) {
     LOG(INFO) << "None of the passed GpuMgr instances is valid, falling back to "
                  "CPU-only mode.";
-    hasGpus_ = false;
-  } else {
-    gpuMgrContext_->gpu_mgr = gpuMgrs_.begin()->second.get();
-    hasGpus_ = true;
   }
 }
 
@@ -210,10 +211,11 @@ void DataMgr::populateMgrs(const Config& config,
                            const size_t userSpecifiedNumReaderThreads) {
   // no need for locking, as this is only called in the constructor
   bufferMgrs_.resize(2);
+  levelSizes_.resize(2);
   bufferMgrs_[MemoryLevel::DISK_LEVEL].push_back(
       new PersistentStorageMgr(userSpecifiedNumReaderThreads));
 
-  levelSizes_.push_back(1);  // levelSizes_[DISK_LEVEL] = 1
+  levelSizes_[DISK_LEVEL] = 1;
   size_t page_size{512};
   size_t cpuBufferSize = config.mem.cpu.max_size;
   if (cpuBufferSize == 0) {  // if size is not specified
@@ -242,11 +244,13 @@ void DataMgr::populateMgrs(const Config& config,
   }
 
   auto total_cpu_size = std::reduce(cpu_tier_sizes.begin(), cpu_tier_sizes.end());
+  levelSizes_[CPU_LEVEL] = 1;
 
-  if (hasGpus_) {
+  if (has_gpus_) {
     LOG(INFO) << "Reserved GPU memory is " << (float)reservedGpuMem_ / (1024 * 1024)
               << "MB includes render buffer allocation";
     bufferMgrs_.resize(3);
+    levelSizes_.resize(3);
     allocateCpuBufferMgr(0,
                          config.mem.cpu.enable_tiered_cpu_mem,
                          total_cpu_size,
@@ -255,46 +259,52 @@ void DataMgr::populateMgrs(const Config& config,
                          page_size,
                          cpu_tier_sizes);
 
-    levelSizes_.push_back(1);  // levelSizes_[CPU_LEVEL] = 1
-    for (auto& [p, gpu_mgr] : gpuMgrs_) {
-      int numGpus = gpu_mgr->getDeviceCount();
-      for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
-        size_t deviceMemSize = 0;
+    for (auto& [p, mgr] : device_mgrs_) {
+      if (p != GpuMgrPlatform::L0)
+        continue;
+      device_contexts_[p] = std::make_unique<GpuMgrContext>();
+      auto& device_context = device_contexts_[p];
+      device_context->platform = p;
+      device_context->gpu_mgr = mgr.get();
+      int num_gpus = mgr->getDeviceCount();
+      device_context->gpu_count = num_gpus;
+      for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
+        size_t device_mem_size = 0;
         // TODO: get rid of manager-specific branches by introducing some kind of device
         // properties in GpuMgr
         switch (p) {
           case GpuMgrPlatform::CUDA:
-            deviceMemSize = getCudaMgr()->getDeviceProperties(gpuNum)->globalMem;
+            device_mem_size = getCudaMgr()->getDeviceProperties(gpu_num)->globalMem;
             break;
           case GpuMgrPlatform::L0:
-            deviceMemSize = getL0Mgr()->getMaxAllocationSize(gpuNum);
-            page_size = getL0Mgr()->getPageSize(gpuNum);
+            device_mem_size = getL0Mgr()->getMaxAllocationSize(gpu_num);
+            page_size = getL0Mgr()->getPageSize(gpu_num);
             break;
           default:
             CHECK(false);
         }
 
-        size_t gpuMaxMemSize = config.mem.gpu.max_size;
-        if (gpuMaxMemSize == 0) {
-          CHECK_GT(deviceMemSize, reservedGpuMem_);
-          gpuMaxMemSize = deviceMemSize - reservedGpuMem_;
+        size_t gpu_max_mem_size = config.mem.gpu.max_size;
+        if (gpu_max_mem_size == 0) {
+          CHECK_GT(device_mem_size, reservedGpuMem_);
+          gpu_max_mem_size = device_mem_size - reservedGpuMem_;
         }
 
-        size_t minGpuSlabSize = std::min(config.mem.gpu.min_slab_size, gpuMaxMemSize);
+        size_t minGpuSlabSize = std::min(config.mem.gpu.min_slab_size, gpu_max_mem_size);
         minGpuSlabSize = (minGpuSlabSize / page_size) * page_size;
-        size_t maxGpuSlabSize = std::min(config.mem.gpu.max_slab_size, gpuMaxMemSize);
+        size_t maxGpuSlabSize = std::min(config.mem.gpu.max_slab_size, gpu_max_mem_size);
         maxGpuSlabSize = (maxGpuSlabSize / page_size) * page_size;
-        LOG(INFO) << "Min GPU Slab size for GPU " << gpuNum << " is "
+        LOG(INFO) << "Min GPU Slab size for GPU " << gpu_num << " is "
                   << (float)minGpuSlabSize / (1024 * 1024) << "MB";
-        LOG(INFO) << "Max GPU Slab size for GPU " << gpuNum << " is "
+        LOG(INFO) << "Max GPU Slab size for GPU " << gpu_num << " is "
                   << (float)maxGpuSlabSize / (1024 * 1024) << "MB";
-        LOG(INFO) << "Max memory pool size for GPU " << gpuNum << " is "
-                  << (float)gpuMaxMemSize / (1024 * 1024) << "MB";
+        LOG(INFO) << "Max memory pool size for GPU " << gpu_num << " is "
+                  << (float)gpu_max_mem_size / (1024 * 1024) << "MB";
 
-        bufferMgrs_[MemoryLevel::GPU_LEVEL].push_back(
-            new Buffer_Namespace::GpuBufferMgr(gpuNum,
-                                               gpuMaxMemSize,
-                                               gpu_mgr.get(),
+        device_context->buffer_mgrs.push_back(
+            new Buffer_Namespace::GpuBufferMgr(gpu_num,
+                                               gpu_max_mem_size,
+                                               mgr.get(),
                                                minGpuSlabSize,
                                                maxGpuSlabSize,
                                                page_size,
@@ -302,8 +312,6 @@ void DataMgr::populateMgrs(const Config& config,
       }
     }
     setGpuMgrContext(GpuMgrPlatform::L0);
-    levelSizes_.push_back(
-        getGpuMgr()->getDeviceCount());  // levelSizes_[GPU_LEVEL] = numGpus
   } else {
     allocateCpuBufferMgr(0,
                          config.mem.cpu.enable_tiered_cpu_mem,
@@ -312,7 +320,6 @@ void DataMgr::populateMgrs(const Config& config,
                          maxCpuSlabSize,
                          page_size,
                          cpu_tier_sizes);
-    levelSizes_.push_back(1);  // levelSizes_[CPU_LEVEL] = 1
   }
 }
 
@@ -331,12 +338,12 @@ std::vector<Buffer_Namespace::MemoryInfo> DataMgr::getMemoryInfo(
             bufferMgrs_[MemoryLevel::CPU_LEVEL][0]);
     CHECK(cpu_buffer);
     mem_info.push_back(cpu_buffer->getMemoryInfo());
-  } else if (hasGpus_) {
-    int numGpus = getGpuMgr()->getDeviceCount();
-    for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
+  } else if (has_gpus_) {
+    int num_gpus = getGpuMgr()->getDeviceCount();
+    for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
       Buffer_Namespace::BufferMgr* gpu_buffer =
           dynamic_cast<Buffer_Namespace::BufferMgr*>(
-              bufferMgrs_[MemoryLevel::GPU_LEVEL][gpuNum]);
+              bufferMgrs_[MemoryLevel::GPU_LEVEL][gpu_num]);
       CHECK(gpu_buffer);
       mem_info.push_back(gpu_buffer->getMemoryInfo());
     }
@@ -347,10 +354,10 @@ std::vector<Buffer_Namespace::MemoryInfo> DataMgr::getMemoryInfo(
 std::string DataMgr::dumpLevel(const MemoryLevel memLevel) {
   // if gpu we need to iterate through all the buffermanagers for each card
   if (memLevel == MemoryLevel::GPU_LEVEL) {
-    int numGpus = getGpuMgr()->getDeviceCount();
+    int num_gpus = getGpuMgr()->getDeviceCount();
     std::ostringstream tss;
-    for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
-      tss << bufferMgrs_[memLevel][gpuNum]->printSlabs();
+    for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
+      tss << bufferMgrs_[memLevel][gpu_num]->printSlabs();
     }
     return tss.str();
   } else {
@@ -361,12 +368,12 @@ std::string DataMgr::dumpLevel(const MemoryLevel memLevel) {
 void DataMgr::clearMemory(const MemoryLevel memLevel) {
   // if gpu we need to iterate through all the buffermanagers for each card
   if (memLevel == MemoryLevel::GPU_LEVEL) {
-    if (hasGpus_) {
-      int numGpus = getGpuMgr()->getDeviceCount();
-      for (int gpuNum = 0; gpuNum < numGpus; ++gpuNum) {
-        LOG(INFO) << "clear slabs on gpu " << gpuNum;
+    if (has_gpus_) {
+      int num_gpus = getGpuMgr()->getDeviceCount();
+      for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
+        LOG(INFO) << "clear slabs on gpu " << gpu_num;
         auto buffer_mgr_for_gpu =
-            dynamic_cast<Buffer_Namespace::BufferMgr*>(bufferMgrs_[memLevel][gpuNum]);
+            dynamic_cast<Buffer_Namespace::BufferMgr*>(bufferMgrs_[memLevel][gpu_num]);
         CHECK(buffer_mgr_for_gpu);
         buffer_mgr_for_gpu->clearSlabs();
       }
@@ -388,29 +395,27 @@ bool DataMgr::isBufferOnDevice(const ChunkKey& key,
 }
 
 GpuMgr* DataMgr::getGpuMgr(GpuMgrPlatform name) const {
-  if (!hasGpus_) {
-    return nullptr;
-  }
-
   GpuMgr* res = nullptr;
-  try {
-    res = gpuMgrs_.at(name).get();
-  } catch (const std::out_of_range& e) {
-    return nullptr;
+  if (device_mgrs_.count(name)) {
+    res = device_mgrs_.at(name).get();
+    CHECK_EQ(res->getPlatform(), name) << "Mapping of GPU managers names is incorrect";
   }
 
-  CHECK_EQ(res->getPlatform(), name) << "Mapping of GPU managers names is incorrect";
   return res;
 }
 
 void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
-  CHECK_LT(gpuMgrs_.size(), (size_t)2)
-      << "Switching context with multiple GPU managers is not yet supported";
-  GpuMgr* gpuMgr = getGpuMgr(name);
-  CHECK(gpuMgr);
-  // TODO: modify `bufferMgrs_` so the `bufferMgrs[GPU_LEVEL]` point to the selected
-  // manager's buffers
-  gpuMgrContext_->gpu_mgr = gpuMgr;
+  CHECK(device_contexts_.count(name));
+  CHECK(device_mgrs_.count(name));
+  if (current_device_mgr_ && current_device_mgr_->getPlatform() == name) {
+    LOG(INFO) << "Current platform is the same as requested (" << name
+              << "). Skipping context switch.";
+    return;
+  }
+  current_device_mgr_ = device_mgrs_.at(name).get();
+  bufferMgrs_[MemoryLevel::GPU_LEVEL] = device_contexts_.at(name)->buffer_mgrs;
+  levelSizes_[GPU_LEVEL] = device_contexts_.at(name)->gpu_count;
+  LOG(INFO) << "Set GPU manager context to " << name;
 }
 
 void DataMgr::getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,
