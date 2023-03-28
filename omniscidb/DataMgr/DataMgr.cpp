@@ -260,11 +260,8 @@ void DataMgr::populateMgrs(const Config& config,
                          cpu_tier_sizes);
 
     for (auto& [p, mgr] : device_mgrs_) {
-      if (p != GpuMgrPlatform::L0)
-        continue;
       device_contexts_[p] = std::make_unique<GpuMgrContext>();
       auto& device_context = device_contexts_[p];
-      device_context->platform = p;
       device_context->gpu_mgr = mgr.get();
       int num_gpus = mgr->getDeviceCount();
       device_context->gpu_count = num_gpus;
@@ -311,7 +308,7 @@ void DataMgr::populateMgrs(const Config& config,
                                                bufferMgrs_[MemoryLevel::CPU_LEVEL][0]));
       }
     }
-    setGpuMgrContext(GpuMgrPlatform::L0);
+    setGpuMgrContext(device_mgrs_.begin()->second->getPlatform());
   } else {
     allocateCpuBufferMgr(0,
                          config.mem.cpu.enable_tiered_cpu_mem,
@@ -408,13 +405,14 @@ void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
   CHECK(device_contexts_.count(name));
   CHECK(device_mgrs_.count(name));
   if (current_device_mgr_ && current_device_mgr_->getPlatform() == name) {
-    LOG(INFO) << "Current platform is the same as requested (" << name
+    LOG(INFO) << "Current platform is the same as requested ("
+              << (name == GpuMgrPlatform::L0 ? "L0" : "CUDA")
               << "). Skipping context switch.";
     return;
   }
   current_device_mgr_ = device_mgrs_.at(name).get();
   bufferMgrs_[MemoryLevel::GPU_LEVEL] = device_contexts_.at(name)->buffer_mgrs;
-  levelSizes_[GPU_LEVEL] = device_contexts_.at(name)->gpu_count;
+  levelSizes_[MemoryLevel::GPU_LEVEL] = device_contexts_.at(name)->gpu_count;
   LOG(INFO) << "Set GPU manager context to " << name;
 }
 
