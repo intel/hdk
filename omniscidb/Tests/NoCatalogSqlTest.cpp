@@ -154,8 +154,8 @@ class NoCatalogSqlTest : public ::testing::Test {
   ExecutionResult runRAQuery(const std::string& query_ra, Executor* executor) {
     auto dag = std::make_unique<RelAlgDagBuilder>(
         query_ra, TEST_DB_ID, schema_provider_, config_);
-    auto ra_executor = RelAlgExecutor(
-        executor, schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
+    auto ra_executor =
+        RelAlgExecutor(executor, schema_provider_, data_mgr_.get(), std::move(dag));
 
     auto co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
     co.use_groupby_buffer_desc = use_groupby_buffer_desc;
@@ -173,7 +173,7 @@ class NoCatalogSqlTest : public ::testing::Test {
     auto dag = std::make_unique<RelAlgDagBuilder>(
         query_ra, TEST_DB_ID, schema_provider_, config_);
     return RelAlgExecutor(
-        executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
+        executor_.get(), schema_provider_, data_mgr_.get(), std::move(dag));
   }
 
   TestDataProvider& getDataProvider() {

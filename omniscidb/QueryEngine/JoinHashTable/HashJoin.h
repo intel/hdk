@@ -24,12 +24,12 @@
 #include "DataMgr/Allocators/ThrustAllocator.h"
 #include "DataProvider/DataProvider.h"
 #include "IR/Expr.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/JoinHashTable/HashTable.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinRuntime.h"
 #include "ResultSet/RowSetMemoryOwner.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 
 #ifdef HAVE_CUDA
 #include <cuda.h>

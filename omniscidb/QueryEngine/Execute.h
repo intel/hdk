@@ -69,6 +69,7 @@
 #include "DataMgr/Chunk/Chunk.h"
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
+#include "ResultSetRegistry/ResultSetTable.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/Config.h"
 #include "Shared/funcannotations.h"
@@ -143,8 +144,9 @@ inline std::string numeric_type_name(const hdk::ir::Type* type) {
   return "int64_t";
 }
 
-inline const TemporaryTable& get_temporary_table(const TemporaryTables* temporary_tables,
-                                                 const int table_id) {
+inline hdk::ResultSetTableTokenPtr get_temporary_table(
+    const TemporaryTables* temporary_tables,
+    const int table_id) {
   CHECK_LT(table_id, 0);
   const auto it = temporary_tables->find(table_id);
   CHECK(it != temporary_tables->end());
@@ -161,8 +163,8 @@ inline const hdk::ir::Type* get_column_type(const int col_id,
     CHECK_EQ(table_id, col_info->table_id);
     return col_info->type;
   }
-  const auto& temp = get_temporary_table(temporary_tables, table_id);
-  return temp.colType(col_id);
+  auto token = get_temporary_table(temporary_tables, table_id);
+  return token->resultSet(0)->colType(col_id);
 }
 
 // TODO(alex): Adjust interfaces downstream and make this not needed.
@@ -297,6 +299,7 @@ class Executor : public StringDictionaryProxyProvider {
    * executor.
    */
   const TemporaryTables* getTemporaryTables() const;
+  hdk::ResultSetTableTokenPtr getTemporaryTable(int table_id) const;
 
   /**
    * Returns a string dictionary proxy using the currently active row set memory owner.
@@ -384,15 +387,15 @@ class Executor : public StringDictionaryProxyProvider {
   unsigned blockSize() const;
   size_t maxGpuSlabSize() const;
 
-  TemporaryTable executeWorkUnit(size_t& max_groups_buffer_entry_guess,
-                                 const bool is_agg,
-                                 const std::vector<InputTableInfo>&,
-                                 const RelAlgExecutionUnit&,
-                                 const CompilationOptions&,
-                                 const ExecutionOptions& options,
-                                 const bool has_cardinality_estimation,
-                                 DataProvider* data_provider,
-                                 ColumnCacheMap& column_cache);
+  hdk::ResultSetTable executeWorkUnit(size_t& max_groups_buffer_entry_guess,
+                                      const bool is_agg,
+                                      const std::vector<InputTableInfo>&,
+                                      const RelAlgExecutionUnit&,
+                                      const CompilationOptions&,
+                                      const ExecutionOptions& options,
+                                      const bool has_cardinality_estimation,
+                                      DataProvider* data_provider,
+                                      ColumnCacheMap& column_cache);
 
   void addTransientStringLiterals(
       const RelAlgExecutionUnit& ra_exe_unit,
@@ -654,11 +657,11 @@ class Executor : public StringDictionaryProxyProvider {
                                                    const bool float_argument_input);
 
  private:
-  TemporaryTable resultsUnion(SharedKernelContext& shared_context,
-                              const RelAlgExecutionUnit& ra_exe_unit,
-                              bool merge = true,
-                              bool sort_by_table_id = false,
-                              const std::map<int, size_t>& order_map = {});
+  hdk::ResultSetTable resultsUnion(SharedKernelContext& shared_context,
+                                   const RelAlgExecutionUnit& ra_exe_unit,
+                                   bool merge,
+                                   bool sort_by_table_id = false,
+                                   const std::map<int, size_t>& order_map = {});
 
   std::vector<int64_t> getJoinHashTablePtrs(const ExecutorDeviceType device_type,
                                             const int device_id);
@@ -679,28 +682,29 @@ class Executor : public StringDictionaryProxyProvider {
       std::shared_ptr<RowSetMemoryOwner>,
       const QueryMemoryDescriptor&) const;
 
-  TemporaryTable executeWorkUnitImpl(size_t& max_groups_buffer_entry_guess,
-                                     const bool is_agg,
-                                     const bool allow_single_frag_table_opt,
-                                     const std::vector<InputTableInfo>&,
-                                     const RelAlgExecutionUnit&,
-                                     const CompilationOptions&,
-                                     const ExecutionOptions& options,
-                                     std::shared_ptr<RowSetMemoryOwner>,
-                                     const bool has_cardinality_estimation,
-                                     DataProvider* data_provider,
-                                     ColumnCacheMap& column_cache);
-  TemporaryTable executeHeterogeneousWorkUnitImpl(size_t& max_groups_buffer_entry_guess,
-                                                  const bool is_agg,
-                                                  const bool allow_single_frag_table_opt,
-                                                  const std::vector<InputTableInfo>&,
-                                                  const RelAlgExecutionUnit&,
-                                                  const CompilationOptions&,
-                                                  const ExecutionOptions& options,
-                                                  std::shared_ptr<RowSetMemoryOwner>,
-                                                  const bool has_cardinality_estimation,
-                                                  DataProvider* data_provider,
-                                                  ColumnCacheMap& column_cache);
+  hdk::ResultSetTable executeWorkUnitImpl(size_t& max_groups_buffer_entry_guess,
+                                          const bool is_agg,
+                                          const bool allow_single_frag_table_opt,
+                                          const std::vector<InputTableInfo>&,
+                                          const RelAlgExecutionUnit&,
+                                          const CompilationOptions&,
+                                          const ExecutionOptions& options,
+                                          std::shared_ptr<RowSetMemoryOwner>,
+                                          const bool has_cardinality_estimation,
+                                          DataProvider* data_provider,
+                                          ColumnCacheMap& column_cache);
+  hdk::ResultSetTable executeHeterogeneousWorkUnitImpl(
+      size_t& max_groups_buffer_entry_guess,
+      const bool is_agg,
+      const bool allow_single_frag_table_opt,
+      const std::vector<InputTableInfo>&,
+      const RelAlgExecutionUnit&,
+      const CompilationOptions&,
+      const ExecutionOptions& options,
+      std::shared_ptr<RowSetMemoryOwner>,
+      const bool has_cardinality_estimation,
+      DataProvider* data_provider,
+      ColumnCacheMap& column_cache);
 
   std::shared_ptr<StreamExecutionContext> prepareStreamingExecution(
       const RelAlgExecutionUnit& ra_exe_unit,
@@ -713,7 +717,7 @@ class Executor : public StringDictionaryProxyProvider {
   ResultSetPtr runOnBatch(std::shared_ptr<StreamExecutionContext> ctx,
                           const FragmentsList& fragments);
 
-  ResultSetPtr finishStreamExecution(std::shared_ptr<StreamExecutionContext> ctx);
+  hdk::ResultSetTable finishStreamExecution(std::shared_ptr<StreamExecutionContext> ctx);
 
   std::vector<llvm::Value*> inlineHoistedLiterals();
 

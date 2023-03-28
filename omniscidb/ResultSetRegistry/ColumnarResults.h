@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef COLUMNAR_RESULTS_H
-#define COLUMNAR_RESULTS_H
+#pragma once
 
 #include "ResultSet/ResultSet.h"
 #include "Shared/SqlTypesLayout.h"
@@ -23,8 +22,6 @@
 
 #include <memory>
 #include <unordered_map>
-
-class Executor;
 
 class ColumnarConversionNotSupported : public std::runtime_error {
  public:
@@ -67,15 +64,14 @@ class ColumnarResults {
                   const size_t num_columns,
                   const std::vector<const hdk::ir::Type*>& target_types,
                   const size_t thread_idx,
-                  Executor* executor,
+                  const Config& config,
                   const bool is_parallel_execution_enforced = false);
 
   ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                   const int8_t* one_col_buffer,
                   const size_t num_rows,
                   const hdk::ir::Type* target_type,
-                  const size_t thread_idx,
-                  Executor* executor);
+                  const size_t thread_idx);
 
   static std::unique_ptr<ColumnarResults> mergeResults(
       const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
@@ -199,12 +195,8 @@ class ColumnarResults {
   bool direct_columnar_conversion_;  // whether columnar conversion might happen directly
   // with minimal ussage of result set's iterator access
   size_t thread_idx_;
-  Executor* executor_;
-  bool enable_interrupt_;
 };
 
 using ColumnCacheMap =
     std::unordered_map<int,
                        std::unordered_map<int, std::shared_ptr<const ColumnarResults>>>;
-
-#endif  // COLUMNAR_RESULTS_H

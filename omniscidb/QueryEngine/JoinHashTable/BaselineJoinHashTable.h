@@ -28,7 +28,6 @@
 
 #include "DataMgr/MemoryLevel.h"
 #include "IR/Expr.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/DataRecycler/HashingSchemeRecycler.h"
 #include "QueryEngine/DataRecycler/HashtableRecycler.h"
 #include "QueryEngine/InputMetadata.h"
@@ -36,6 +35,7 @@
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinRuntime.h"
 #include "ResultSet/RowSetMemoryOwner.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 
 class Executor;
 

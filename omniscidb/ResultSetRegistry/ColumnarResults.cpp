@@ -15,8 +15,6 @@
  */
 
 #include "ColumnarResults.h"
-#include "ErrorHandling.h"
-#include "Execute.h"
 
 #include "ResultSet/RowSetMemoryOwner.h"
 #include "Shared/Intervals.h"
@@ -44,7 +42,7 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
                                  const size_t num_columns,
                                  const std::vector<const hdk::ir::Type*>& target_types,
                                  const size_t thread_idx,
-                                 Executor* executor,
+                                 const Config& config,
                                  const bool is_parallel_execution_enforced)
     : column_buffers_(num_columns)
     , num_rows_(result_set::use_parallel_algorithms(rows) ||
@@ -55,15 +53,9 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
     , parallel_conversion_(is_parallel_execution_enforced
                                ? true
                                : result_set::use_parallel_algorithms(rows))
-    , direct_columnar_conversion_(
-          (!executor || executor->getConfig().rs.enable_direct_columnarization) &&
-          rows.isDirectColumnarConversionPossible())
-    , thread_idx_(thread_idx)
-    , executor_(executor)
-    , enable_interrupt_(executor_
-                            ? executor_->getConfig()
-                                  .exec.interrupt.enable_non_kernel_time_query_interrupt
-                            : false) {
+    , direct_columnar_conversion_(config.rs.enable_direct_columnarization &&
+                                  rows.isDirectColumnarConversionPossible())
+    , thread_idx_(thread_idx) {
   auto timer = DEBUG_TIMER(__func__);
   column_buffers_.resize(num_columns);
   for (size_t i = 0; i < num_columns; ++i) {
@@ -89,19 +81,13 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
                                  const int8_t* one_col_buffer,
                                  const size_t num_rows,
                                  const hdk::ir::Type* target_type,
-                                 const size_t thread_idx,
-                                 Executor* executor)
+                                 const size_t thread_idx)
     : column_buffers_(1)
     , num_rows_(num_rows)
     , target_types_{target_type}
     , parallel_conversion_(false)
     , direct_columnar_conversion_(false)
-    , thread_idx_(thread_idx)
-    , executor_(executor)
-    , enable_interrupt_(executor_
-                            ? executor_->getConfig()
-                                  .exec.interrupt.enable_non_kernel_time_query_interrupt
-                            : false) {
+    , thread_idx_(thread_idx) {
   auto timer = DEBUG_TIMER(__func__);
   const bool is_varlen = target_type->isArray() || target_type->isString();
 
@@ -177,19 +163,8 @@ void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& row
       conversion_threads.push_back(std::async(
           std::launch::async,
           [&do_work, this](const size_t start, const size_t end) {
-            if (enable_interrupt_) {
-              size_t local_idx = 0;
-              for (size_t i = start; i < end; ++i, ++local_idx) {
-                if (UNLIKELY((local_idx & 0xFFFF) == 0 && executor_ &&
-                             executor_->checkNonKernelTimeInterrupted())) {
-                  throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-                }
-                do_work(i);
-              }
-            } else {
-              for (size_t i = start; i < end; ++i) {
-                do_work(i);
-              }
+            for (size_t i = start; i < end; ++i) {
+              do_work(i);
             }
           },
           interval.begin,
@@ -200,11 +175,6 @@ void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& row
       for (auto& child : conversion_threads) {
         child.wait();
       }
-    } catch (QueryExecutionError& e) {
-      if (e.getErrorCode() == Executor::ERR_INTERRUPTED) {
-        throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-      }
-      throw e;
     } catch (...) {
       throw;
     }
@@ -225,18 +195,8 @@ void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& row
     }
     ++row_idx;
   };
-  if (enable_interrupt_) {
-    while (!done) {
-      if (UNLIKELY((row_idx & 0xFFFF) == 0 && executor_ &&
-                   executor_->checkNonKernelTimeInterrupted())) {
-        throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-      }
-      do_work();
-    }
-  } else {
-    while (!done) {
-      do_work();
-    }
+  while (!done) {
+    do_work();
   }
 
   rows.moveToBegin();
@@ -371,10 +331,9 @@ void ColumnarResults::materializeAllColumnsDirectly(const ResultSet& rows,
  */
 void ColumnarResults::materializeAllColumnsProjection(const ResultSet& rows,
                                                       const size_t num_columns) {
-  CHECK(rows.query_mem_desc_.didOutputColumnar());
+  CHECK(rows.getQueryMemDesc().didOutputColumnar());
   CHECK(isDirectColumnarConversionPossible() &&
-        rows.query_mem_desc_.getQueryDescriptionType() ==
-            QueryDescriptionType::Projection);
+        rows.getQueryDescriptionType() == QueryDescriptionType::Projection);
 
   const auto& lazy_fetch_info = rows.getLazyFetchInfo();
 
@@ -478,24 +437,14 @@ void ColumnarResults::materializeAllLazyColumns(
         targets_to_skip.push_back(!lazy_fetch_info[i].is_lazily_fetched);
       }
     }
+    // TODO: use threading::parallel_for with blocked_range
     for (auto interval : makeIntervals(size_t(0), rows.entryCount(), worker_count)) {
       conversion_threads.push_back(std::async(
           std::launch::async,
           [&do_work_just_lazy_columns, &targets_to_skip, this](const size_t start,
                                                                const size_t end) {
-            if (enable_interrupt_) {
-              size_t local_idx = 0;
-              for (size_t i = start; i < end; ++i, ++local_idx) {
-                if (UNLIKELY((local_idx & 0xFFFF) == 0 && executor_ &&
-                             executor_->checkNonKernelTimeInterrupted())) {
-                  throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-                }
-                do_work_just_lazy_columns(i, targets_to_skip);
-              }
-            } else {
-              for (size_t i = start; i < end; ++i) {
-                do_work_just_lazy_columns(i, targets_to_skip);
-              }
+            for (size_t i = start; i < end; ++i) {
+              do_work_just_lazy_columns(i, targets_to_skip);
             }
           },
           interval.begin,
@@ -506,11 +455,6 @@ void ColumnarResults::materializeAllLazyColumns(
       for (auto& child : conversion_threads) {
         child.wait();
       }
-    } catch (QueryExecutionError& e) {
-      if (e.getErrorCode() == Executor::ERR_INTERRUPTED) {
-        throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-      }
-      throw e;
     } catch (...) {
       throw;
     }
@@ -582,20 +526,9 @@ void ColumnarResults::locateAndCountEntries(const ResultSet& rows,
           size_t start_index, size_t end_index, size_t thread_idx) {
         size_t total_non_empty = 0;
         size_t local_idx = 0;
-        if (enable_interrupt_) {
-          for (size_t entry_idx = start_index; entry_idx < end_index;
-               entry_idx++, local_idx++) {
-            if (UNLIKELY((local_idx & 0xFFFF) == 0 && executor_ &&
-                         executor_->checkNonKernelTimeInterrupted())) {
-              throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-            }
-            do_work(total_non_empty, local_idx, entry_idx, thread_idx);
-          }
-        } else {
-          for (size_t entry_idx = start_index; entry_idx < end_index;
-               entry_idx++, local_idx++) {
-            do_work(total_non_empty, local_idx, entry_idx, thread_idx);
-          }
+        for (size_t entry_idx = start_index; entry_idx < end_index;
+             entry_idx++, local_idx++) {
+          do_work(total_non_empty, local_idx, entry_idx, thread_idx);
         }
         non_empty_per_thread[thread_idx] = total_non_empty;
       };
@@ -612,11 +545,6 @@ void ColumnarResults::locateAndCountEntries(const ResultSet& rows,
     for (auto& child : conversion_threads) {
       child.wait();
     }
-  } catch (QueryExecutionError& e) {
-    if (e.getErrorCode() == Executor::ERR_INTERRUPTED) {
-      throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-    }
-    throw e;
   } catch (...) {
     throw;
   }
@@ -756,22 +684,10 @@ void ColumnarResults::compactAndCopyEntriesWithTargetSkipping(
     const size_t total_non_empty = non_empty_per_thread[thread_idx];
     size_t non_empty_idx = 0;
     size_t local_idx = 0;
-    if (enable_interrupt_) {
-      for (size_t entry_idx = start_index; entry_idx < end_index;
-           entry_idx++, local_idx++) {
-        if (UNLIKELY((local_idx & 0xFFFF) == 0 && executor_ &&
-                     executor_->checkNonKernelTimeInterrupted())) {
-          throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-        }
-        do_work(
-            non_empty_idx, total_non_empty, local_idx, entry_idx, thread_idx, end_index);
-      }
-    } else {
-      for (size_t entry_idx = start_index; entry_idx < end_index;
-           entry_idx++, local_idx++) {
-        do_work(
-            non_empty_idx, total_non_empty, local_idx, entry_idx, thread_idx, end_index);
-      }
+    for (size_t entry_idx = start_index; entry_idx < end_index;
+         entry_idx++, local_idx++) {
+      do_work(
+          non_empty_idx, total_non_empty, local_idx, entry_idx, thread_idx, end_index);
     }
   };
 
@@ -787,11 +703,6 @@ void ColumnarResults::compactAndCopyEntriesWithTargetSkipping(
     for (auto& child : compaction_threads) {
       child.wait();
     }
-  } catch (QueryExecutionError& e) {
-    if (e.getErrorCode() == Executor::ERR_INTERRUPTED) {
-      throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-    }
-    throw e;
   } catch (...) {
     throw;
   }
@@ -858,22 +769,10 @@ void ColumnarResults::compactAndCopyEntriesWithoutTargetSkipping(
     const size_t total_non_empty = non_empty_per_thread[thread_idx];
     size_t non_empty_idx = 0;
     size_t local_idx = 0;
-    if (enable_interrupt_) {
-      for (size_t entry_idx = start_index; entry_idx < end_index;
-           entry_idx++, local_idx++) {
-        if (UNLIKELY((local_idx & 0xFFFF) == 0 && executor_ &&
-                     executor_->checkNonKernelTimeInterrupted())) {
-          throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-        }
-        do_work(
-            entry_idx, non_empty_idx, total_non_empty, local_idx, thread_idx, end_index);
-      }
-    } else {
-      for (size_t entry_idx = start_index; entry_idx < end_index;
-           entry_idx++, local_idx++) {
-        do_work(
-            entry_idx, non_empty_idx, total_non_empty, local_idx, thread_idx, end_index);
-      }
+    for (size_t entry_idx = start_index; entry_idx < end_index;
+         entry_idx++, local_idx++) {
+      do_work(
+          entry_idx, non_empty_idx, total_non_empty, local_idx, thread_idx, end_index);
     }
   };
 
@@ -889,11 +788,6 @@ void ColumnarResults::compactAndCopyEntriesWithoutTargetSkipping(
     for (auto& child : compaction_threads) {
       child.wait();
     }
-  } catch (QueryExecutionError& e) {
-    if (e.getErrorCode() == Executor::ERR_INTERRUPTED) {
-      throw QueryExecutionError(Executor::ERR_INTERRUPTED);
-    }
-    throw e;
   } catch (...) {
     throw;
   }
@@ -1114,9 +1008,9 @@ std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
     if (QUERY_TYPE == QueryDescriptionType::GroupByBaselineHash) {
       if (rows.getPaddedSlotWidthBytes(slot_idx_per_target_idx[target_idx]) == 0) {
         // for key columns only
-        CHECK(rows.query_mem_desc_.getTargetGroupbyIndex(target_idx) >= 0);
+        CHECK(rows.getQueryMemDesc().getTargetGroupbyIndex(target_idx) >= 0);
         if (target_types_[target_idx]->isFloatingPoint()) {
-          CHECK_EQ(size_t(8), rows.query_mem_desc_.getEffectiveKeyWidth());
+          CHECK_EQ(size_t(8), rows.getQueryMemDesc().getEffectiveKeyWidth());
           switch (
               target_types_[target_idx]->as<hdk::ir::FloatingPointType>()->precision()) {
             case hdk::ir::FloatingPointType::kFloat:
@@ -1132,7 +1026,7 @@ std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
               break;
           }
         } else {
-          switch (rows.query_mem_desc_.getEffectiveKeyWidth()) {
+          switch (rows.getQueryMemDesc().getEffectiveKeyWidth()) {
             case 8:
               read_functions.emplace_back(read_int64_func<QUERY_TYPE, COLUMNAR_OUTPUT>);
               break;

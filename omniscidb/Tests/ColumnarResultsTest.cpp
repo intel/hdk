@@ -15,10 +15,10 @@
  */
 
 #include "Logger/Logger.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/Execute.h"
 #include "ResultSet/ResultSet.h"
 #include "ResultSet/RowSetMemoryOwner.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 #include "Shared/TargetInfo.h"
 #include "Tests/ResultSetTestUtils.h"
 #include "Tests/TestHelpers.h"
@@ -40,13 +40,14 @@ class ColumnarResultsTester : public ColumnarResults {
                         const ResultSet& rows,
                         const size_t num_columns,
                         const std::vector<const hdk::ir::Type*> target_types,
+                        Config& config,
                         const bool is_parallel_execution_enforced = false)
       : ColumnarResults(row_set_mem_owner,
                         rows,
                         num_columns,
                         target_types,
                         0,
-                        /*executor=*/nullptr,
+                        config,
                         is_parallel_execution_enforced) {}
 
   template <typename ENTRY_TYPE>
@@ -101,8 +102,13 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
   for (size_t i = 0; i < result_set.colCount(); ++i) {
     col_types.push_back(result_set.colType(i)->canonicalize());
   }
-  ColumnarResultsTester columnar_results(
-      row_set_mem_owner, result_set, col_types.size(), col_types, is_parallel_conversion);
+  Config config;
+  ColumnarResultsTester columnar_results(row_set_mem_owner,
+                                         result_set,
+                                         col_types.size(),
+                                         col_types,
+                                         config,
+                                         is_parallel_conversion);
 
   // Validate the results:
   for (size_t rs_row_idx = 0, cr_row_idx = 0; rs_row_idx < query_mem_desc.getEntryCount();
@@ -197,8 +203,9 @@ TEST(Construct, Empty) {
                        nullptr,
                        0,
                        0);
+  Config config;
   ColumnarResultsTester columnar_results(
-      row_set_mem_owner, result_set, types.size(), types);
+      row_set_mem_owner, result_set, types.size(), types, config);
 }
 
 // Projections:

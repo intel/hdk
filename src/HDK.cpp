@@ -50,7 +50,7 @@ ExecutionResult HDK::query(const std::string& sql, const bool is_explain) {
   CHECK(internal_->data_mgr);
   RelAlgExecutor ra_executor(internal_->executor.get(),
                              internal_->storage,
-                             internal_->data_mgr->getDataProvider(),
+                             internal_->data_mgr.get(),
                              std::move(dag));
 
   auto co = CompilationOptions::defaults(ExecutorDeviceType::CPU);

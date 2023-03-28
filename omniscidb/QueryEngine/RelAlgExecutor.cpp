@@ -15,6 +15,7 @@
  */
 
 #include "RelAlgExecutor.h"
+#include "DataMgr/DataMgr.h"
 #include "IR/TypeUtils.h"
 #include "QueryEngine/CalciteDeserializerUtils.h"
 #include "QueryEngine/CardinalityEstimator.h"
@@ -37,6 +38,7 @@
 #include "QueryEngine/WindowContext.h"
 #include "QueryEngine/WorkUnitBuilder.h"
 #include "ResultSet/HyperLogLog.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
 #include "SessionInfo.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
@@ -91,25 +93,31 @@ bool is_extracted_dag_valid(ExtractedPlanDag& dag) {
 
 RelAlgExecutor::RelAlgExecutor(Executor* executor,
                                SchemaProviderPtr schema_provider,
-                               DataProvider* data_provider)
+                               Data_Namespace::DataMgr* data_mgr)
     : executor_(executor)
     , schema_provider_(schema_provider)
-    , data_provider_(data_provider)
+    , data_mgr_(data_mgr)
+    , data_provider_(executor->getDataMgr()->getDataProvider())
     , config_(executor_->getConfig())
     , now_(0)
-    , queue_time_ms_(0) {}
+    , queue_time_ms_(0) {
+  rs_registry_ = hdk::ResultSetRegistry::init(data_mgr_, executor->getConfigPtr());
+}
 
 RelAlgExecutor::RelAlgExecutor(Executor* executor,
                                SchemaProviderPtr schema_provider,
-                               DataProvider* data_provider,
+                               Data_Namespace::DataMgr* data_mgr,
                                std::unique_ptr<hdk::ir::QueryDag> query_dag)
     : executor_(executor)
     , query_dag_(std::move(query_dag))
     , schema_provider_(std::make_shared<RelAlgSchemaProvider>(*query_dag_->getRootNode()))
-    , data_provider_(data_provider)
+    , data_mgr_(data_mgr)
+    , data_provider_(data_mgr->getDataProvider())
     , config_(executor_->getConfig())
     , now_(0)
-    , queue_time_ms_(0) {}
+    , queue_time_ms_(0) {
+  rs_registry_ = hdk::ResultSetRegistry::init(data_mgr_, executor->getConfigPtr());
+}
 
 ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
                                                    const ExecutionOptions& eo,
@@ -205,7 +213,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
       }
     }
     auto rs = std::make_shared<ResultSet>(ss.str());
-    return {rs, {}};
+    return registerResultSetTable({rs}, {}, true);
   }
 
   if (eo.find_push_down_candidates) {
@@ -223,7 +231,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
       continue;
     }
 
-    RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
+    RelAlgExecutor ra_executor(executor_, schema_provider_, data_mgr_);
     hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
     ra_executor.execute(subquery_seq, co, eo, 0);
   }
@@ -368,8 +376,7 @@ void RelAlgExecutor::handleNop(RaExecutionDesc& ed) {
   const auto it = temporary_tables_.find(-input->getId());
   CHECK(it != temporary_tables_.end());
 
-  CHECK_EQ(it->second.getFragCount(), 1);
-  ed.setResult({it->second.getResultSet(0), input->getOutputMetainfo()});
+  ed.setResult({it->second, input->getOutputMetainfo()});
 
   // set up temp table as it could be used by the outer query or next step
   addTemporaryTable(-body->getId(), it->second);
@@ -602,7 +609,10 @@ void RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
 
   auto shared_res = std::make_shared<ExecutionResult>(std::move(res));
   step_root->setResult(shared_res);
-  addTemporaryTable(-step_root->getId(), shared_res->getDataPtr());
+  // Logical values are always executed and ignore just_explain flag.
+  if (!eo.just_explain || step_root->is<hdk::ir::LogicalValues>()) {
+    addTemporaryTable(-step_root->getId(), shared_res->getToken());
+  }
 }
 
 ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
@@ -638,10 +648,9 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
       const auto input_node = project->getInput(0);
       if (input_node->is<hdk::ir::Sort>()) {
         cpu_only = true;
-        const auto& input_table =
-            get_temporary_table(&temporary_tables_, -input_node->getId());
-        work_unit.exe_unit.scan_limit =
-            std::min(input_table.getLimit(), input_table.rowCount());
+        // TODO: why do we need scan limit here?
+        auto token = get_temporary_table(&temporary_tables_, -input_node->getId());
+        work_unit.exe_unit.scan_limit = token->rowCount();
       }
     }
   }
@@ -659,7 +668,7 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
     }
     auto rows_to_sort = res.getRows();
     if (eo.just_explain) {
-      return {rows_to_sort, {}};
+      return res;
     }
     const size_t limit = sort->getLimit();
     const size_t offset = sort->getOffset();
@@ -677,7 +686,10 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
         rows_to_sort->keepFirstN(limit);
       }
     }
-    return {rows_to_sort, res.getTargetsMeta()};
+    // Already registered table cannot be used after sort, limit, and offset are applied.
+    // Register a new table. The previous token in res should die at the exit and remove
+    // the previous table from the registry.
+    return registerResultSetTable({rows_to_sort}, res.getTargetsMeta(), eo.just_explain);
   }
 
   return res;
@@ -881,7 +893,9 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
                                     executor_}
           .build()};
 
-  return {rs, tuple_type};
+  // Ignore just_explain flag for logical values node which is always executed
+  // and whose result can be used for actual explain description generation.
+  return registerResultSetTable({rs}, tuple_type, false);
 }
 
 namespace {
@@ -1071,15 +1085,7 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
     }
   }
 
-  ExecutionResult result{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
-                                                     co.device_type,
-                                                     QueryMemoryDescriptor(),
-                                                     nullptr,
-                                                     executor_->getDataMgr(),
-                                                     executor_->blockSize(),
-                                                     executor_->gridSize()),
-                         {}};
-
+  ExecutionResult result;
   auto execute_and_handle_errors = [&](const auto max_groups_buffer_entry_guess_in,
                                        const bool has_cardinality_estimation,
                                        const bool has_ndv_estimation) -> ExecutionResult {
@@ -1088,16 +1094,17 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
     // due to OOM
     auto local_groups_buffer_entry_guess = max_groups_buffer_entry_guess_in;
     try {
-      return {executor_->executeWorkUnit(local_groups_buffer_entry_guess,
-                                         is_agg,
-                                         table_infos,
-                                         ra_exe_unit,
-                                         co,
-                                         eo,
-                                         has_cardinality_estimation,
-                                         data_provider_,
-                                         column_cache),
-              targets_meta};
+      auto rs_table = executor_->executeWorkUnit(local_groups_buffer_entry_guess,
+                                                 is_agg,
+                                                 table_infos,
+                                                 ra_exe_unit,
+                                                 co,
+                                                 eo,
+                                                 has_cardinality_estimation,
+                                                 data_provider_,
+                                                 column_cache);
+      rs_table.setQueueTime(queue_time_ms);
+      return registerResultSetTable(rs_table, targets_meta, eo.just_explain);
     } catch (const QueryExecutionError& e) {
       if (!has_ndv_estimation && e.getErrorCode() < 0) {
         throw CardinalityEstimationRequired(/*range=*/0);
@@ -1149,7 +1156,6 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
     }
   }
 
-  result.setQueueTime(queue_time_ms);
   return result;
 }
 
@@ -1166,7 +1172,7 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
   const auto count_all_exe_unit =
       create_count_all_execution_unit(work_unit.exe_unit, count);
   size_t one{1};
-  TemporaryTable count_all_result;
+  hdk::ResultSetTable count_all_result;
   try {
     ColumnCacheMap column_cache;
     count_all_result =
@@ -1186,7 +1192,7 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
     LOG(WARNING) << "Failed to run pre-flight filtered count with error " << e.what();
     return std::nullopt;
   }
-  CHECK_EQ(count_all_result.getFragCount(), 1);
+  CHECK_EQ(count_all_result.size(), (size_t)1);
   const auto count_row = count_all_result[0]->getNextRow(false, false);
   CHECK_EQ(size_t(1), count_row.size());
   const auto& count_tv = count_row.front();
@@ -1242,15 +1248,7 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
   // = 0 path and the bump allocator path for kernel per fragment execution.
   auto ra_exe_unit_in = work_unit.exe_unit;
 
-  auto result = ExecutionResult{std::make_shared<ResultSet>(std::vector<TargetInfo>{},
-                                                            co.device_type,
-                                                            QueryMemoryDescriptor(),
-                                                            nullptr,
-                                                            executor_->getDataMgr(),
-                                                            executor_->blockSize(),
-                                                            executor_->gridSize()),
-                                {}};
-
+  hdk::ResultSetTable result;
   const auto table_infos = get_table_infos(ra_exe_unit_in, executor_);
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;
   const ExecutionOptions eo_no_multifrag = [&]() {
@@ -1271,17 +1269,15 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
       const auto ra_exe_unit = decide_approx_count_distinct_implementation(
           ra_exe_unit_in, table_infos, executor_, co.device_type, target_exprs_owned_);
       ColumnCacheMap column_cache;
-      result = {executor_->executeWorkUnit(max_groups_buffer_entry_guess,
-                                           is_agg,
-                                           table_infos,
-                                           ra_exe_unit,
-                                           co,
-                                           eo_no_multifrag,
-                                           true,
-                                           data_provider_,
-                                           column_cache),
-                targets_meta};
-      result.setQueueTime(queue_time_ms);
+      result = executor_->executeWorkUnit(max_groups_buffer_entry_guess,
+                                          is_agg,
+                                          table_infos,
+                                          ra_exe_unit,
+                                          co,
+                                          eo_no_multifrag,
+                                          true,
+                                          data_provider_,
+                                          column_cache);
     } catch (const QueryExecutionError& e) {
       handlePersistentError(e.getErrorCode());
       LOG(WARNING) << "Kernel per fragment query ran out of memory, retrying on CPU.";
@@ -1298,22 +1294,21 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
   max_groups_buffer_entry_guess = 0;
 
   int iteration_ctr = -1;
-  while (true) {
+  while (!result.empty()) {
     iteration_ctr++;
     auto ra_exe_unit = decide_approx_count_distinct_implementation(
         ra_exe_unit_in, table_infos, executor_, co_cpu.device_type, target_exprs_owned_);
     ColumnCacheMap column_cache;
     try {
-      result = {executor_->executeWorkUnit(max_groups_buffer_entry_guess,
-                                           is_agg,
-                                           table_infos,
-                                           ra_exe_unit,
-                                           co_cpu,
-                                           eo_no_multifrag,
-                                           true,
-                                           data_provider_,
-                                           column_cache),
-                targets_meta};
+      result = executor_->executeWorkUnit(max_groups_buffer_entry_guess,
+                                          is_agg,
+                                          table_infos,
+                                          ra_exe_unit,
+                                          co_cpu,
+                                          eo_no_multifrag,
+                                          true,
+                                          data_provider_,
+                                          column_cache);
     } catch (const QueryExecutionError& e) {
       // Ran out of slots
       if (e.getErrorCode() < 0) {
@@ -1334,12 +1329,10 @@ ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
       } else {
         handlePersistentError(e.getErrorCode());
       }
-      continue;
     }
-    result.setQueueTime(queue_time_ms);
-    return result;
   }
-  return result;
+  result.setQueueTime(queue_time_ms);
+  return registerResultSetTable(result, targets_meta, eo.just_explain);
 }
 
 void RelAlgExecutor::handlePersistentError(const int32_t error_code) {
@@ -1357,6 +1350,26 @@ void RelAlgExecutor::handlePersistentError(const int32_t error_code) {
     return;
   }
   throw std::runtime_error(getErrorMessageFromCode(error_code));
+}
+
+ExecutionResult RelAlgExecutor::registerResultSetTable(
+    hdk::ResultSetTable table,
+    const std::vector<TargetMetaInfo>& targets_meta,
+    bool just_explain_result) {
+  std::vector<std::string> col_names;
+  if (just_explain_result) {
+    col_names.push_back("explain");
+  } else {
+    col_names.reserve(targets_meta.size());
+    for (auto& meta : targets_meta) {
+      col_names.emplace_back(meta.get_resname());
+    }
+  }
+
+  CHECK(!table.empty());
+  table[0]->setColNames(std::move(col_names));
+  auto token = rs_registry_->put(std::move(table));
+  return {token, targets_meta};
 }
 
 namespace {

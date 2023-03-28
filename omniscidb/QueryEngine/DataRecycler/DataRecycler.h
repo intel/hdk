@@ -17,12 +17,12 @@
 #pragma once
 
 #include "Analyzer/Analyzer.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/Descriptors/InputDescriptors.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 #include "QueryEngine/JoinHashTable/HashTable.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
 #include "ResultSet/ResultSet.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 #include "Shared/mapd_shared_mutex.h"
 #include "Shared/misc.h"
 

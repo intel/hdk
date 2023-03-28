@@ -33,50 +33,6 @@ TableFragmentsInfo copy_table_info(const TableFragmentsInfo& table_info) {
 
 }  // namespace
 
-size_t TemporaryTable::getLimit() const {
-  size_t res = 0;
-  for (auto& rs : results_) {
-    if (rs)
-      res += rs->getLimit();
-  }
-  return res;
-}
-
-size_t TemporaryTable::rowCount() const {
-  size_t res = 0;
-  for (auto& rs : results_) {
-    if (rs)
-      res += rs->rowCount();
-  }
-  return res;
-}
-
-size_t TemporaryTable::colCount() const {
-  return results_.front()->colCount();
-}
-
-const hdk::ir::Type* TemporaryTable::colType(const size_t col_idx) const {
-  return results_.front()->colType(col_idx);
-}
-
-void TemporaryTable::setKernelQueueTime(const int64_t kernel_queue_time) {
-  if (empty()) {
-    results_.front()->setKernelQueueTime(kernel_queue_time);
-  }
-}
-
-void TemporaryTable::addCompilationQueueTime(const int64_t compilation_queue_time) {
-  if (!empty()) {
-    results_.front()->addCompilationQueueTime(compilation_queue_time);
-  }
-}
-
-void TemporaryTable::setValidationOnlyRes() {
-  if (!empty()) {
-    results_.front()->setValidationOnlyRes();
-  }
-}
-
 TableFragmentsInfo InputTableInfoCache::getTableInfo(int db_id, int table_id) {
   const auto it = cache_.find({db_id, table_id});
   if (it != cache_.end()) {
@@ -103,15 +59,15 @@ bool uses_int_meta(const hdk::ir::Type* col_type) {
          col_type->isBoolean() || col_type->isExtDictionary();
 }
 
-TableFragmentsInfo synthesize_table_info(const TemporaryTable& table) {
+TableFragmentsInfo synthesize_table_info(hdk::ResultSetTableTokenPtr token) {
   std::vector<FragmentInfo> result;
   bool non_empty = false;
-  for (int frag_id = 0; frag_id < table.getFragCount(); ++frag_id) {
+  for (int frag_id = 0; frag_id < token->resultSetCount(); ++frag_id) {
     result.emplace_back();
     auto& fragment = result.back();
     fragment.fragmentId = frag_id;
     fragment.deviceIds.resize(3);
-    fragment.resultSet = table.getResultSet(frag_id).get();
+    fragment.resultSet = token->resultSet(frag_id).get();
     fragment.resultSetMutex.reset(new std::mutex());
     fragment.setPhysicalNumTuples(fragment.resultSet ? fragment.resultSet->entryCount()
                                                      : 0);

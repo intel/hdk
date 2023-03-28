@@ -395,7 +395,7 @@ hdk::ir::ExprPtr RelAlgTranslator::translateInSubquery(
     std::shared_ptr<const ExecutionResult> result) const {
   CHECK(result);
   auto type = lhs->type();
-  auto& row_set = result->getRows();
+  auto row_set = result->getRows();
   CHECK_EQ(size_t(1), row_set->colCount());
   const auto& rhs_type = row_set->colType(0);
   if (rhs_type->id() != type->id() || rhs_type->size() != type->size()) {

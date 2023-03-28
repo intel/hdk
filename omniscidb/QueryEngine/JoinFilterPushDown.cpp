@@ -84,7 +84,7 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
                                   {{}, SortAlgorithm::Default, 0, 0},
                                   0};
   size_t one{1};
-  TemporaryTable filtered_result;
+  hdk::ResultSetTable filtered_result;
   const auto table_infos = get_table_infos(input_descs, executor_);
   CHECK_EQ(size_t(1), table_infos.size());
   const size_t total_rows_upper_bound = table_infos.front().info.getNumTuplesUpperBound();
@@ -95,7 +95,7 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
   } catch (...) {
     return {false, 1.0, 0};
   }
-  CHECK_EQ(filtered_result.getFragCount(), 1);
+  CHECK_EQ(filtered_result.size(), (size_t)1);
   const auto count_row = filtered_result[0]->getNextRow(false, false);
   CHECK_EQ(size_t(1), count_row.size());
   const auto& count_tv = count_row.front();
@@ -157,14 +157,14 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryWithFilterPushDown(
     }();
 
     // Dispatch the subqueries first
-    for (auto& subquery : getSubqueries()) {
+    for (auto& subquery : subqueries) {
       auto subquery_ra = subquery->node();
       CHECK(subquery_ra);
       if (subquery_ra->hasContextData()) {
         continue;
       }
 
-      RelAlgExecutor ra_executor(executor_, schema_provider_, data_provider_);
+      RelAlgExecutor ra_executor(executor_, schema_provider_, data_mgr_);
       hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
       ra_executor.execute(subquery_seq, co, eo, 0);
     }

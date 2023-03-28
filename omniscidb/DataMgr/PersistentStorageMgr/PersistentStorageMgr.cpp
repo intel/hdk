@@ -152,6 +152,10 @@ void PersistentStorageMgr::registerDataProvider(
   mgr_by_schema_id_[schema_id] = provider;
 }
 
+bool PersistentStorageMgr::hasDataProvider(int schema_id) const {
+  return mgr_by_schema_id_.count(schema_id);
+}
+
 std::shared_ptr<AbstractBufferMgr> PersistentStorageMgr::getDataProvider(
     int schema_id) const {
   CHECK_EQ(mgr_by_schema_id_.count(schema_id), (size_t)1);

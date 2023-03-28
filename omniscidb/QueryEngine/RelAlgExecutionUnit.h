@@ -146,7 +146,4 @@ struct RelAlgExecutionUnit {
 std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_unit);
 std::string ra_exec_unit_desc_for_caching(const RelAlgExecutionUnit& ra_exe_unit);
 
-class ResultSet;
-using ResultSetPtr = std::shared_ptr<ResultSet>;
-
 #endif  // QUERYENGINE_RELALGEXECUTIONUNIT_H

@@ -42,17 +42,21 @@ struct QueryStepExecutionResult {
   bool is_outermost_query;
 };
 
+namespace Data_Namespace {
+class DataMgr;
+}
+
+namespace hdk {
+class ResultSetRegistry;
+}
+
 class RelAlgExecutor {
  public:
   using TargetInfoList = std::vector<TargetInfo>;
 
   RelAlgExecutor(Executor* executor,
                  SchemaProviderPtr schema_provider,
-                 DataProvider* data_provider);
-
-  RelAlgExecutor(Executor* executor,
-                 SchemaProviderPtr schema_provider,
-                 DataProvider* data_provider,
+                 Data_Namespace::DataMgr* data_mgr,
                  std::unique_ptr<hdk::ir::QueryDag> query_dag);
 
   ExecutionResult executeRelAlgQuery(const CompilationOptions& co,
@@ -115,6 +119,10 @@ class RelAlgExecutor {
   }
 
  private:
+  RelAlgExecutor(Executor* executor,
+                 SchemaProviderPtr schema_provider,
+                 Data_Namespace::DataMgr* data_mgr);
+
   ExecutionResult executeRelAlgQueryNoRetry(const CompilationOptions& co,
                                             const ExecutionOptions& eo,
                                             const bool just_explain_plan);
@@ -212,16 +220,14 @@ class RelAlgExecutor {
                           const ExecutionOptions& eo,
                           bool allow_speculative_sort);
 
-  void addTemporaryTable(const int table_id, const ResultSetPtr& result) {
-    CHECK_LT(size_t(0), result->colCount());
-    CHECK_LT(table_id, 0);
-    const auto it_ok = temporary_tables_.emplace(table_id, result);
-    CHECK(it_ok.second);
-  }
+  ExecutionResult registerResultSetTable(hdk::ResultSetTable table,
+                                         const std::vector<TargetMetaInfo>& targets_meta,
+                                         bool just_explain_result);
 
-  void addTemporaryTable(const int table_id, const TemporaryTable& table) {
+  void addTemporaryTable(const int table_id, const hdk::ResultSetTableTokenPtr& token) {
     CHECK_LT(table_id, 0);
-    const auto it_ok = temporary_tables_.emplace(table_id, table);
+    CHECK(token);
+    const auto it_ok = temporary_tables_.emplace(table_id, token);
     CHECK(it_ok.second);
   }
 
@@ -236,7 +242,9 @@ class RelAlgExecutor {
   Executor* executor_;
   std::unique_ptr<hdk::ir::QueryDag> query_dag_;
   std::shared_ptr<SchemaProvider> schema_provider_;
+  Data_Namespace::DataMgr* data_mgr_;
   DataProvider* data_provider_;
+  std::shared_ptr<hdk::ResultSetRegistry> rs_registry_;
   const Config& config_;
   TemporaryTables temporary_tables_;
   time_t now_;

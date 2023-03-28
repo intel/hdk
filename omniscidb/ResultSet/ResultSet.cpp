@@ -405,6 +405,28 @@ const hdk::ir::Type* ResultSet::colType(const size_t col_idx) const {
              : targets_[col_idx].type;
 }
 
+void ResultSet::setColNames(std::vector<std::string> fields) {
+  if (just_explain_) {
+    CHECK_EQ((size_t)1, fields.size());
+  } else {
+    CHECK_EQ(targets_.size(), fields.size());
+  }
+  fields_ = std::move(fields);
+}
+
+bool ResultSet::hasColNames() const {
+  return targets_.size() == fields_.size();
+}
+
+std::string ResultSet::colName(size_t col_idx) const {
+  if (fields_.empty()) {
+    return "col" + std::to_string(col_idx);
+  } else {
+    CHECK_LT(col_idx, fields_.size());
+    return fields_[col_idx];
+  }
+}
+
 StringDictionaryProxy* ResultSet::getStringDictionaryProxy(int const dict_id) const {
   return row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
 }

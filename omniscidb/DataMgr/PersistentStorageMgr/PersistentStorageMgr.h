@@ -58,6 +58,7 @@ class PersistentStorageMgr : public AbstractBufferMgr {
 
   void registerDataProvider(int schema_id, std::shared_ptr<AbstractBufferMgr>);
 
+  bool hasDataProvider(int schema_id) const;
   std::shared_ptr<AbstractBufferMgr> getDataProvider(int schema_id) const;
 
  protected:

@@ -19,6 +19,7 @@
 #include "QueryEngine/JoinFilterPushDown.h"
 #include "ResultSet/QueryMemoryDescriptor.h"
 #include "ResultSet/ResultSet.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
 #include "Shared/TargetInfo.h"
 #include "Shared/toString.h"
 
@@ -28,15 +29,7 @@ class ExecutionResult {
  public:
   ExecutionResult();
 
-  ExecutionResult(const ResultSetPtr& rows,
-                  const std::vector<TargetMetaInfo>& targets_meta);
-
-  ExecutionResult(ResultSetPtr&& result, const std::vector<TargetMetaInfo>& targets_meta);
-
-  ExecutionResult(const TemporaryTable& results,
-                  const std::vector<TargetMetaInfo>& targets_meta);
-
-  ExecutionResult(TemporaryTable&& results,
+  ExecutionResult(hdk::ResultSetTableTokenPtr token,
                   const std::vector<TargetMetaInfo>& targets_meta);
 
   ExecutionResult(const ExecutionResult& that);
@@ -48,19 +41,17 @@ class ExecutionResult {
 
   ExecutionResult& operator=(const ExecutionResult& that);
 
-  const ResultSetPtr& getRows() const {
-    CHECK_EQ(results_.getFragCount(), 1);
-    return results_[0];
+  hdk::ResultSetTableTokenPtr getToken() const { return result_token_; }
+
+  ResultSetPtr getRows() const {
+    CHECK(result_token_);
+    CHECK_EQ(result_token_->resultSetCount(), (size_t)1);
+    return result_token_->resultSet(0);
   }
 
-  bool empty() const { return results_.empty(); }
+  bool empty() const { return !result_token_; }
 
-  const ResultSetPtr& getDataPtr() const {
-    CHECK_EQ(results_.getFragCount(), 1);
-    return results_[0];
-  }
-
-  const TemporaryTable& getTable() const { return results_; }
+  ResultSetPtr getDataPtr() const { return getRows(); }
 
   const std::vector<TargetMetaInfo>& getTargetsMeta() const { return targets_meta_; }
 
@@ -69,19 +60,24 @@ class ExecutionResult {
   const bool isFilterPushDownEnabled() const { return filter_push_down_enabled_; }
 
   void setQueueTime(const int64_t queue_time_ms) {
-    CHECK(!results_.empty());
-    results_[0]->setQueueTime(queue_time_ms);
+    CHECK(false);
+    getRows()->setQueueTime(queue_time_ms);
   }
 
   std::string toString() const {
-    return ::typeName(this) + "(" + ::toString(results_) + ", " +
-           ::toString(targets_meta_) + ")";
+    std::string res = ::typeName(this) + "(";
+    if (result_token_) {
+      res += ::toString(result_token_);
+    } else {
+      res += "empty";
+    }
+    res += ", " + ::toString(targets_meta_) + ")";
+    return res;
   }
 
   enum RType { QueryResult, SimpleResult, Explaination, CalciteDdl };
 
   std::string getExplanation();
-  void updateResultSet(const std::string& query_ra, RType type, bool success = true);
   RType getResultType() const { return type_; }
   void setResultType(RType type) { type_ = type; }
   int64_t getExecutionTime() const { return execution_time_ms_; }
@@ -93,7 +89,7 @@ class ExecutionResult {
   }
 
  private:
-  TemporaryTable results_;
+  hdk::ResultSetTableTokenPtr result_token_;
   std::vector<TargetMetaInfo> targets_meta_;
   // filters chosen to be pushed down
   std::vector<PushedDownFilterInfo> pushed_down_filter_info_;
@@ -111,16 +107,7 @@ class Node;
 
 class RaExecutionDesc {
  public:
-  RaExecutionDesc(const hdk::ir::Node* body)
-      : body_(body)
-      , result_(std::make_shared<ResultSet>(std::vector<TargetInfo>{},
-                                            ExecutorDeviceType::CPU,
-                                            QueryMemoryDescriptor(),
-                                            nullptr,
-                                            nullptr,
-                                            0,
-                                            0),
-                {}) {}
+  RaExecutionDesc(const hdk::ir::Node* body) : body_(body) {}
 
   const ExecutionResult& getResult() const { return result_; }
 
