@@ -40,10 +40,6 @@ class ResultSetRegistry : public SimpleSchemaProvider,
   ResultSetPtr get(const ResultSetTableToken& token, size_t frag_id) const;
   void drop(const ResultSetTableToken& token);
 
-  ChunkStats getChunkStats(const ResultSetTableToken& token,
-                           size_t frag_idx,
-                           size_t col_idx) const;
-
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
                    const size_t num_bytes = 0) override;
@@ -58,6 +54,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
 
  private:
   bool useColumnarResults(const ResultSet& rs) const;
+
+  ChunkStats getChunkStats(int table_id, size_t frag_idx, size_t col_idx) const;
 
   struct DataFragment {
     size_t offset = 0;

@@ -39,6 +39,7 @@
 #include "QueryEngine/WorkUnitBuilder.h"
 #include "ResultSet/HyperLogLog.h"
 #include "ResultSetRegistry/ResultSetRegistry.h"
+#include "SchemaMgr/SchemaMgr.h"
 #include "SessionInfo.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
@@ -114,6 +115,21 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
     , queue_time_ms_(0) {
   rs_registry_ = hdk::ResultSetRegistry::getOrCreate(executor->getDataMgr(),
                                                      executor->getConfigPtr());
+
+  // Add ResultSetRegistry to the schema provider by wrapping the current provider
+  // and the registry in SchemaMgr.
+  std::set<int> used_schemas;
+  for (int db_id : schema_provider_->listDatabases()) {
+    used_schemas.insert(getSchemaId(db_id));
+  }
+  auto schema_mgr = std::make_shared<SchemaMgr>();
+  for (int schema_id : used_schemas) {
+    schema_mgr->registerProvider(schema_id, schema_provider_);
+  }
+  schema_mgr->registerProvider(
+      hdk::ResultSetRegistry::SCHEMA_ID,
+      std::dynamic_pointer_cast<hdk::ResultSetRegistry>(rs_registry_));
+  schema_provider_ = schema_mgr;
 }
 
 ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
@@ -130,6 +146,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
     if constexpr (vlog_result_set_summary) {
       VLOG(1) << execution_result.getRows()->summaryToString();
     }
+    execution_result.getRows()->moveToBegin();
 
     if (post_execution_callback_) {
       VLOG(1) << "Running post execution callback.";
@@ -1208,9 +1225,6 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
     return false;
   }
   const auto& table_desc = ra_exe_unit.input_descs.front();
-  if (table_desc.getSourceType() != InputSourceType::TABLE) {
-    return false;
-  }
   for (const auto& simple_qual : ra_exe_unit.simple_quals) {
     const auto comp_expr = std::dynamic_pointer_cast<const hdk::ir::BinOper>(simple_qual);
     if (!comp_expr || !comp_expr->isEq()) {

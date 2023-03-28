@@ -136,13 +136,18 @@ std::unordered_set<InputColDescriptor> setup_str_col_caching(
   std::unordered_set<std::pair<int, int>> phys_table_ids;
   phys_table_ids.insert({group_col_desc.getDatabaseId(), group_col_desc.getTableId()});
   executor->setupCaching(data_provider, col_descs, phys_table_ids);
-  auto filter_col_range =
-      executor->getColRange({filter_col_desc.getColId(), filter_col_desc.getTableId()});
+  auto filter_col_range = executor->getColRange({filter_col_desc.getColId(),
+                                                 filter_col_desc.getTableId(),
+                                                 filter_col_desc.getDatabaseId()});
   // reset the col range to trigger the optimization
   AggregatedColRange col_range_cache;
-  col_range_cache.setColRange({group_col_desc.getColId(), group_col_desc.getTableId()},
+  col_range_cache.setColRange({group_col_desc.getColId(),
+                               group_col_desc.getTableId(),
+                               group_col_desc.getDatabaseId()},
                               ExpressionRange::makeIntRange(min, max, 0, false));
-  col_range_cache.setColRange({filter_col_desc.getColId(), filter_col_desc.getTableId()},
+  col_range_cache.setColRange({filter_col_desc.getColId(),
+                               filter_col_desc.getTableId(),
+                               group_col_desc.getDatabaseId()},
                               filter_col_range);
   executor->setColRangeCache(col_range_cache);
   return col_descs;

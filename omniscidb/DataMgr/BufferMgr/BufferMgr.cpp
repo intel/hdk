@@ -28,6 +28,7 @@
 #include "DataMgr/BufferMgr/Buffer.h"
 #include "Logger/Logger.h"
 #include "Shared/measure.h"
+#include "Shared/scope.h"
 
 using namespace std;
 
@@ -95,8 +96,16 @@ void BufferMgr::clear() {
   std::lock_guard<std::mutex> chunk_index_lock(chunk_index_mutex_);
   std::lock_guard<std::mutex> unsized_segs_lock(unsized_segs_mutex_);
 
+  // Some buffers can actually depend on other buffers and pin them.
+  // E.g. zero-copy buffers can hold ResultSetDataToken with a
+  // ResultSet which can hold chunks and therefore keep other buffers
+  // pinned. Here we delete unpinned buffers and mark pinned buffers
+  // for removal to have them deleted when unpinned.
   for (auto& buf : chunk_index_) {
-    delete buf.second->buffer;
+    if (buf.second->buffer) {
+      buf.second->buffer->deleteWhenUnpinned();
+      buf.second->buffer = nullptr;
+    }
   }
 
   chunk_index_.clear();
@@ -139,8 +148,8 @@ AbstractBuffer* BufferMgr::createBuffer(const ChunkKey& chunk_key,
     auto buffer_it = chunk_index_.find(chunk_key);
     CHECK(buffer_it != chunk_index_.end());
     buffer_it->second->buffer =
-        nullptr;  // constructor failed for the buffer object so make sure to mark it null
-                  // so deleteBuffer doesn't try to delete it
+        nullptr;  // constructor failed for the buffer object so make sure to mark it
+                  // null so deleteBuffer doesn't try to delete it
     deleteBuffer(chunk_key);
     throw;
   }
@@ -186,8 +195,8 @@ BufferList::iterator BufferMgr::evict(BufferList::iterator& evict_start,
       chunk_index_.erase(evict_it->chunk_key);
     }
     if (evict_it->buffer != nullptr) {
-      // If we don't delete buffers here then we lose reference to them later and cause a
-      // memleak.
+      // If we don't delete buffers here then we lose reference to them later and cause
+      // a memleak.
       delete evict_it->buffer;
     }
     evict_it = slab_segments_[slab_num].erase(
@@ -383,9 +392,9 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
   for (auto slab_it = slab_segments_.begin(); slab_it != slab_segments_.end();
        ++slab_it, ++slab_num) {
     for (auto buffer_it = slab_it->begin(); buffer_it != slab_it->end(); ++buffer_it) {
-      // Note there are some shortcuts we could take here - like we should never consider
-      // a USED buffer coming after a free buffer as we would have used the FREE buffer,
-      // but we won't worry about this for now
+      // Note there are some shortcuts we could take here - like we should never
+      // consider a USED buffer coming after a free buffer as we would have used the
+      // FREE buffer, but we won't worry about this for now
 
       // We can't evict pinned buffers - only normal usedbuffers
 
@@ -407,9 +416,10 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
           // score += evictIt->lastTouched;
           // Issue was thrashing when going from 8M fragment size chunks back to 64M
           // basically the large chunks were being evicted prior to small as many small
-          // chunk score was larger than one large chunk so it always would evict a large
-          // chunk so under memory pressure a query would evict its own current chunks and
-          // cause reloads rather than evict several smaller unused older chunks.
+          // chunk score was larger than one large chunk so it always would evict a
+          // large chunk so under memory pressure a query would evict its own current
+          // chunks and cause reloads rather than evict several smaller unused older
+          // chunks.
           score = std::max(score, static_cast<size_t>(evict_it->last_touched));
         }
         if (page_count >= num_pages_requested) {
@@ -749,27 +759,24 @@ AbstractBuffer* BufferMgr::getBuffer(const ChunkKey& key, const size_t num_bytes
         in_progress_buffer_cvs_[key] = std::make_shared<std::condition_variable>();
         chunk_index_lock.unlock();
 
+        ScopeGuard sg([&]() {
+          chunk_index_lock.lock();
+          in_progress_buffer_cvs_[key]->notify_all();
+          in_progress_buffer_cvs_.erase(key);
+          chunk_index_lock.unlock();
+        });
+
         // Check if we can zero-copy fetch requested chunk.
         if (auto token = getZeroCopyBufferMemory(key, num_bytes)) {
           res = createZeroCopyBuffer(key, std::move(token));
         } else {
           // createChunk pins for us
           AbstractBuffer* buffer = createBuffer(key, page_size_, num_bytes);
-          try {
-            parent_mgr_->fetchBuffer(
-                key, buffer, num_bytes);  // this should put buffer in a BufferSegment
-          } catch (const std::exception& error) {
-            LOG(FATAL) << "Get chunk - Could not find chunk " << keyToString(key)
-                       << " in buffer pool or parent buffer pools. Error was "
-                       << error.what();
-          }
+          // This should put buffer in a BufferSegment.
+          // ColumnarConversionNotSupported exception can be thrown here.
+          parent_mgr_->fetchBuffer(key, buffer, num_bytes);
           res = buffer;
         }
-
-        chunk_index_lock.lock();
-        in_progress_buffer_cvs_[key]->notify_all();
-        in_progress_buffer_cvs_.erase(key);
-        chunk_index_lock.unlock();
       }
     }
   }
@@ -792,11 +799,15 @@ void BufferMgr::fetchBuffer(const ChunkKey& key,
   if (!found_buffer) {
     sized_segs_lock.unlock();
     CHECK(parent_mgr_ != 0);
-    buffer = createBuffer(key, page_size_, num_bytes);  // will pin buffer
-    try {
-      parent_mgr_->fetchBuffer(key, buffer, num_bytes);
-    } catch (std::runtime_error& error) {
-      LOG(FATAL) << "Could not fetch parent buffer " << keyToString(key);
+    if (auto token = getZeroCopyBufferMemory(key, num_bytes)) {
+      buffer = createZeroCopyBuffer(key, std::move(token));
+    } else {
+      buffer = createBuffer(key, page_size_, num_bytes);  // will pin buffer
+      try {
+        parent_mgr_->fetchBuffer(key, buffer, num_bytes);
+      } catch (std::runtime_error& error) {
+        LOG(FATAL) << "Could not fetch parent buffer " << keyToString(key);
+      }
     }
   } else {
     buffer = buffer_it->second->buffer;

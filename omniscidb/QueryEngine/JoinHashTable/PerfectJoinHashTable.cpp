@@ -148,7 +148,8 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
   // We don't want to build huge and very sparse tables
   // to consume lots of memory.
   if (bucketized_entry_count > executor->getConfig().exec.join.huge_join_hash_threshold) {
-    const auto& query_info = get_inner_query_info(inner_col->tableId(), query_infos).info;
+    const auto& query_info =
+        get_inner_query_info(inner_col->dbId(), inner_col->tableId(), query_infos).info;
     if (query_info.getNumTuplesUpperBound() * 100 <
         executor->getConfig().exec.join.huge_join_hash_min_load *
             bucketized_entry_count) {
@@ -1029,15 +1030,17 @@ llvm::Value* PerfectJoinHashTable::codegenSlot(const CompilationOptions& co,
 
 const InputTableInfo& PerfectJoinHashTable::getInnerQueryInfo(
     const hdk::ir::ColumnVar* inner_col) const {
-  return get_inner_query_info(inner_col->tableId(), query_infos_);
+  return get_inner_query_info(inner_col->dbId(), inner_col->tableId(), query_infos_);
 }
 
 const InputTableInfo& get_inner_query_info(
+    const int inner_db_id,
     const int inner_table_id,
     const std::vector<InputTableInfo>& query_infos) {
   std::optional<size_t> ti_idx;
   for (size_t i = 0; i < query_infos.size(); ++i) {
-    if (inner_table_id == query_infos[i].table_id) {
+    if (inner_db_id == query_infos[i].db_id &&
+        inner_table_id == query_infos[i].table_id) {
       ti_idx = i;
       break;
     }

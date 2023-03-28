@@ -14,6 +14,8 @@
 
 #include "SchemaJson.h"
 
+#include "ResultSetRegistry/ResultSetRegistry.h"
+
 #include <rapidjson/document.h>
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/ostreamwrapper.h>
@@ -186,9 +188,20 @@ std::string schema_to_json(SchemaProviderPtr schema_provider) {
   if (dbs.empty()) {
     return "{}";
   }
-  // Current JSON format supports a single database only.
-  CHECK_EQ(dbs.size(), (size_t)1);
-  auto tables = schema_provider->listTables(dbs.front());
+  // Current JSON format supports a single database only. So, we exclude
+  // ResultSetRegistry from the schema for now (which makes it impossible
+  // to run SQL queries on result sets).
+  int db_id;
+  if (dbs.size() == (size_t)1) {
+    db_id = dbs.front();
+  } else {
+    CHECK_EQ(dbs.size(), (size_t)2);
+    CHECK(dbs[0] == hdk::ResultSetRegistry::DB_ID ||
+          dbs[1] == hdk::ResultSetRegistry::DB_ID);
+    db_id = dbs[0] == hdk::ResultSetRegistry::DB_ID ? dbs[1] : dbs[0];
+  }
+
+  auto tables = schema_provider->listTables(db_id);
 
   rapidjson::Document doc(rapidjson::kObjectType);
 

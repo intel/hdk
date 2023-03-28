@@ -273,5 +273,6 @@ TableInfoMap get_physical_table_infos(const hdk::ir::Node* ra) {
 }
 
 std::ostream& operator<<(std::ostream& os, PhysicalInput const& physical_input) {
-  return os << '(' << physical_input.col_id << ',' << physical_input.table_id << ')';
+  return os << '(' << physical_input.col_id << ',' << physical_input.table_id << ','
+            << physical_input.db_id << ')';
 }

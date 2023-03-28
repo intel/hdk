@@ -327,8 +327,14 @@ void WorkUnitBuilder::process(const ir::Node* node) {
       if (scan) {
         col_var = ir::makeExpr<ir::ColumnVar>(scan->getColumnInfo(i), rte_idx);
       } else {
-        col_var = ir::makeExpr<ir::ColumnVar>(
-            node->getOutputMetainfo()[i].type(), -node->getId(), i, rte_idx, false);
+        CHECK(temporary_tables_.count(-node->getId()));
+        auto& token = temporary_tables_.at(-node->getId());
+        col_var = ir::makeExpr<ir::ColumnVar>(node->getOutputMetainfo()[i].type(),
+                                              token->dbId(),
+                                              token->tableId(),
+                                              i + 1,
+                                              rte_idx,
+                                              false);
       }
 
       // RHS of left join is always nullable.
@@ -658,7 +664,10 @@ int WorkUnitBuilder::assignNestLevels(const ir::Node* node, int start_idx) {
       if (auto scan = input_node->as<ir::Scan>()) {
         union_order_[{scan->getDatabaseId(), scan->getTableId()}] = i;
       } else {
-        union_order_[{-1, -(int)input_node->getId()}] = i;
+        CHECK(input_node->getResult());
+        auto token = input_node->getResult()->getToken();
+        CHECK(token);
+        union_order_[{token->dbId(), token->tableId()}] = i;
       }
     }
     ++start_idx;
@@ -700,7 +709,9 @@ void WorkUnitBuilder::computeInputDescs() {
     if (auto scan = node->as<ir::Scan>()) {
       input_descs_.emplace_back(scan->getDatabaseId(), scan->getTableId(), rte_idx);
     } else {
-      input_descs_.emplace_back(-1, -node->getId(), rte_idx);
+      CHECK(temporary_tables_.count(-node->getId()));
+      auto& token = temporary_tables_.at(-node->getId());
+      input_descs_.emplace_back(token->dbId(), token->tableId(), rte_idx);
     }
   }
 

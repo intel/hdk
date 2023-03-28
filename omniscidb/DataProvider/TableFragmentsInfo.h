@@ -25,8 +25,6 @@
 #include <map>
 #include <mutex>
 
-class ResultSet;
-
 /**
  * @class FragmentInfo
  * @brief Used by Fragmenter classes to store info about each
@@ -36,13 +34,7 @@ class ResultSet;
 
 class FragmentInfo {
  public:
-  FragmentInfo()
-      : fragmentId(-1)
-      , shadowNumTuples(0)
-      , physicalTableId(-1)
-      , resultSet(nullptr)
-      , numTuples(0)
-      , synthesizedNumTuplesIsValid(false) {}
+  FragmentInfo() : fragmentId(-1), physicalTableId(-1), numTuples(0) {}
 
   void setChunkMetadataMap(const ChunkMetadataMap& chunk_metadata_map) {
     this->chunkMetadataMap = chunk_metadata_map;
@@ -66,20 +58,13 @@ class FragmentInfo {
 
   void setPhysicalNumTuples(const size_t physNumTuples) { numTuples = physNumTuples; }
 
-  void invalidateNumTuples() const { synthesizedNumTuplesIsValid = false; }
-
   int fragmentId;
-  size_t shadowNumTuples;
   std::vector<int> deviceIds;
   int physicalTableId;
-  ChunkMetadataMap shadowChunkMetadataMap;
-  mutable ResultSet* resultSet;
-  mutable std::shared_ptr<std::mutex> resultSetMutex;
 
  private:
   mutable size_t numTuples;
   mutable ChunkMetadataMap chunkMetadataMap;
-  mutable bool synthesizedNumTuplesIsValid;
 };
 
 class TableFragmentsInfo {

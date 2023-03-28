@@ -30,8 +30,12 @@ RelAlgSchemaProvider::RelAlgSchemaProvider(const hdk::ir::Node& root) {
 }
 
 std::vector<int> RelAlgSchemaProvider::listDatabases() const {
-  UNREACHABLE();
-  return std::vector<int>{};
+  std::vector<int> res;
+  res.reserve(table_index_by_name_.size());
+  for (auto& pr : table_index_by_name_) {
+    res.push_back(pr.first);
+  }
+  return res;
 }
 
 TableInfoList RelAlgSchemaProvider::listTables(int db_id) const {

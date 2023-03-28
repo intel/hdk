@@ -74,6 +74,8 @@ class BaselineJoinHashTable : public HashJoin {
   HashJoinMatchingSet codegenMatchingSet(const CompilationOptions&,
                                          const size_t) override;
 
+  int getInnerDbId() const noexcept override;
+
   int getInnerTableId() const noexcept override;
 
   int getInnerTableRteIdx() const noexcept override;
@@ -95,14 +97,16 @@ class BaselineJoinHashTable : public HashJoin {
   std::string getHashJoinType() const final { return "Baseline"; }
 
   static auto getCacheInvalidator() -> std::function<void()> {
-    CHECK(hash_table_cache_);
-    CHECK(hash_table_layout_cache_);
     return []() -> void {
-      auto layout_cache_invalidator = hash_table_layout_cache_->getCacheInvalidator();
-      layout_cache_invalidator();
+      if (hash_table_layout_cache_) {
+        auto layout_cache_invalidator = hash_table_layout_cache_->getCacheInvalidator();
+        layout_cache_invalidator();
+      }
 
-      auto main_cache_invalidator = hash_table_cache_->getCacheInvalidator();
-      main_cache_invalidator();
+      if (hash_table_cache_) {
+        auto main_cache_invalidator = hash_table_cache_->getCacheInvalidator();
+        main_cache_invalidator();
+      }
     };
   }
 

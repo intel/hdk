@@ -153,20 +153,6 @@ inline hdk::ResultSetTableTokenPtr get_temporary_table(
   return it->second;
 }
 
-inline const hdk::ir::Type* get_column_type(const int col_id,
-                                            const int table_id,
-                                            ColumnInfoPtr col_info,
-                                            const TemporaryTables* temporary_tables) {
-  CHECK(col_info || temporary_tables);
-  if (col_info) {
-    CHECK_EQ(col_id, col_info->column_id);
-    CHECK_EQ(table_id, col_info->table_id);
-    return col_info->type;
-  }
-  auto token = get_temporary_table(temporary_tables, table_id);
-  return token->resultSet(0)->colType(col_id);
-}
-
 // TODO(alex): Adjust interfaces downstream and make this not needed.
 inline std::vector<const hdk::ir::Expr*> get_exprs_not_owned(
     const std::vector<hdk::ir::ExprPtr>& exprs) {
@@ -564,7 +550,7 @@ class Executor : public StringDictionaryProxyProvider {
       const ExecutorDeviceType device_type,
       const size_t table_idx,
       const size_t outer_frag_idx,
-      std::map<int, const TableFragments*>& selected_tables_fragments,
+      std::map<TableRef, const TableFragments*>& selected_tables_fragments,
       const std::unordered_map<int, const hdk::ir::BinOper*>&
           inner_table_id_to_join_condition);
 
@@ -580,7 +566,7 @@ class Executor : public StringDictionaryProxyProvider {
                           const RelAlgExecutionUnit& ra_exe_unit,
                           const int device_id,
                           const Data_Namespace::MemoryLevel,
-                          const std::map<int, const TableFragments*>&,
+                          const std::map<TableRef, const TableFragments*>&,
                           const FragmentsList& selected_fragments,
                           std::list<ChunkIter>&,
                           std::list<std::shared_ptr<Chunk_NS::Chunk>>&,
@@ -592,7 +578,7 @@ class Executor : public StringDictionaryProxyProvider {
                                const RelAlgExecutionUnit& ra_exe_unit,
                                const int device_id,
                                const Data_Namespace::MemoryLevel,
-                               const std::map<int, const TableFragments*>&,
+                               const std::map<TableRef, const TableFragments*>&,
                                const FragmentsList& selected_fragments,
                                std::list<ChunkIter>&,
                                std::list<std::shared_ptr<Chunk_NS::Chunk>>&,
@@ -605,7 +591,7 @@ class Executor : public StringDictionaryProxyProvider {
       const RelAlgExecutionUnit& ra_exe_unit,
       const CartesianProduct<std::vector<std::vector<size_t>>>& frag_ids_crossjoin,
       const std::vector<InputDescriptor>& input_descs,
-      const std::map<int, const TableFragments*>& all_tables_fragments);
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments);
 
   void buildSelectedFragsMapping(
       std::vector<std::vector<size_t>>& selected_fragments_crossjoin,

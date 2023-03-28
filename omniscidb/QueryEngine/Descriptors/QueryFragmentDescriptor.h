@@ -71,7 +71,7 @@ class QueryFragmentDescriptor {
                           const std::vector<size_t> allowed_outer_fragment_indices);
 
   static void computeAllTablesFragments(
-      std::map<int, const TableFragments*>& all_tables_fragments,
+      std::map<TableRef, const TableFragments*>& all_tables_fragments,
       const RelAlgExecutionUnit& ra_exe_unit,
       const std::vector<InputTableInfo>& query_infos);
 
@@ -155,7 +155,7 @@ class QueryFragmentDescriptor {
   size_t outer_fragments_size_ = 0;
   int64_t rowid_lookup_key_ = -1;
 
-  std::map<int, const TableFragments*> selected_tables_fragments_;
+  std::map<TableRef, const TableFragments*> selected_tables_fragments_;
 
   std::map<ExecutorDeviceType, std::map<int, std::vector<ExecutionKernelDescriptor>>>
       execution_kernels_per_device_;

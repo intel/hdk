@@ -75,6 +75,8 @@ class PerfectJoinHashTable : public HashJoin {
   HashJoinMatchingSet codegenMatchingSet(const CompilationOptions&,
                                          const size_t) override;
 
+  int getInnerDbId() const noexcept override { return col_var_.get()->dbId(); }
+
   int getInnerTableId() const noexcept override { return col_var_.get()->tableId(); };
 
   int getInnerTableRteIdx() const noexcept override { return col_var_.get()->rteIdx(); };
@@ -105,14 +107,16 @@ class PerfectJoinHashTable : public HashJoin {
   }
 
   static auto getCacheInvalidator() -> std::function<void()> {
-    CHECK(hash_table_cache_);
-    CHECK(hash_table_layout_cache_);
     return []() -> void {
-      auto layout_cache_invalidator = hash_table_layout_cache_->getCacheInvalidator();
-      layout_cache_invalidator();
+      if (hash_table_layout_cache_) {
+        auto layout_cache_invalidator = hash_table_layout_cache_->getCacheInvalidator();
+        layout_cache_invalidator();
+      }
 
-      auto main_cache_invalidator = hash_table_cache_->getCacheInvalidator();
-      main_cache_invalidator();
+      if (hash_table_cache_) {
+        auto main_cache_invalidator = hash_table_cache_->getCacheInvalidator();
+        main_cache_invalidator();
+      }
     };
   }
 
@@ -265,5 +269,6 @@ bool needs_dictionary_translation(const hdk::ir::ColumnVar* inner_col,
                                   const Executor* executor);
 
 const InputTableInfo& get_inner_query_info(
+    const int inner_db_id,
     const int inner_table_id,
     const std::vector<InputTableInfo>& query_infos);

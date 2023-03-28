@@ -232,8 +232,9 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
       }
     }
 
+    auto token = executor_->getTemporaryTable(-source->getId());
     return std::make_shared<hdk::ir::ColumnVar>(
-        col_type, -source->getId(), col_idx, rte_idx);
+        col_type, token->dbId(), token->tableId(), col_idx + 1, rte_idx);
   }
 
   hdk::ir::ExprPtr visitBinOper(const hdk::ir::BinOper* bin_oper) override {

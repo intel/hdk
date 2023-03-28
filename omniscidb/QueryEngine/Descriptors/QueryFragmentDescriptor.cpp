@@ -33,10 +33,9 @@ QueryFragmentDescriptor::QueryFragmentDescriptor(
   const size_t input_desc_count{ra_exe_unit.input_descs.size()};
   CHECK_EQ(query_infos.size(), input_desc_count);
   for (size_t table_idx = 0; table_idx < input_desc_count; ++table_idx) {
-    const auto table_id = ra_exe_unit.input_descs[table_idx].getTableId();
-    if (!selected_tables_fragments_.count(table_id)) {
-      selected_tables_fragments_[ra_exe_unit.input_descs[table_idx].getTableId()] =
-          &query_infos[table_idx].info.fragments;
+    const auto table_ref = ra_exe_unit.input_descs[table_idx].getTableRef();
+    if (!selected_tables_fragments_.count(table_ref)) {
+      selected_tables_fragments_[table_ref] = &query_infos[table_idx].info.fragments;
     }
   }
 
@@ -48,15 +47,17 @@ QueryFragmentDescriptor::QueryFragmentDescriptor(
 }
 
 void QueryFragmentDescriptor::computeAllTablesFragments(
-    std::map<int, const TableFragments*>& all_tables_fragments,
+    std::map<TableRef, const TableFragments*>& all_tables_fragments,
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<InputTableInfo>& query_infos) {
   for (size_t tab_idx = 0; tab_idx < ra_exe_unit.input_descs.size(); ++tab_idx) {
+    int db_id = ra_exe_unit.input_descs[tab_idx].getDatabaseId();
     int table_id = ra_exe_unit.input_descs[tab_idx].getTableId();
+    TableRef table_ref{db_id, table_id};
     CHECK_EQ(query_infos[tab_idx].table_id, table_id);
     const auto& fragments = query_infos[tab_idx].info.fragments;
-    if (!all_tables_fragments.count(table_id)) {
-      all_tables_fragments.insert(std::make_pair(table_id, &fragments));
+    if (!all_tables_fragments.count(table_ref)) {
+      all_tables_fragments.insert(std::make_pair(table_ref, &fragments));
     }
   }
 }
@@ -190,7 +191,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
                                               executor->getInnerTabIdToJoinCond());
         const auto db_id = ra_exe_unit.input_descs[j].getDatabaseId();
         const auto table_id = ra_exe_unit.input_descs[j].getTableId();
-        auto table_frags_it = selected_tables_fragments_.find(table_id);
+        auto table_frags_it = selected_tables_fragments_.find({db_id, table_id});
         CHECK(table_frags_it != selected_tables_fragments_.end());
 
         execution_kernel_desc.fragments.emplace_back(
@@ -222,21 +223,18 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
 
   for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
     auto const& table_desc = ra_exe_unit.input_descs[j];
-    int db_id = table_desc.getDatabaseId();
-    int const table_id = table_desc.getTableId();
-    TableFragments const* fragments = selected_tables_fragments_.at(table_id);
+    auto table_ref = table_desc.getTableRef();
+    TableFragments const* fragments = selected_tables_fragments_.at(table_ref);
 
     bool is_temporary_table = false;
-    if (table_id > 0) {
-      // Temporary tables will not have a table descriptor and not have deleted rows.
-      const auto table_info = schema_provider->getTableInfo(db_id, table_id);
-      CHECK(table_info);
-      if (table_info->isTemporary()) {
-        // for temporary tables, we won't have delete column metadata available. However,
-        // we know the table fits in memory as it is a temporary table, so signal to the
-        // lower layers that we can disregard the early out select * optimization
-        is_temporary_table = true;
-      }
+    // Temporary tables will not have a table descriptor and not have deleted rows.
+    const auto table_info = schema_provider->getTableInfo(table_ref);
+    CHECK(table_info);
+    if (table_info->isTemporary()) {
+      // for temporary tables, we won't have delete column metadata available. However,
+      // we know the table fits in memory as it is a temporary table, so signal to the
+      // lower layers that we can disregard the early out select * optimization
+      is_temporary_table = true;
     }
 
     buildFragmentPerKernelForTable(fragments,
@@ -287,25 +285,22 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const auto& outer_table_desc = ra_exe_unit.input_descs.front();
-  const int db_id = outer_table_desc.getDatabaseId();
-  const int outer_table_id = outer_table_desc.getTableId();
-  auto it = selected_tables_fragments_.find(outer_table_id);
+  const auto outer_table_ref = outer_table_desc.getTableRef();
+  auto it = selected_tables_fragments_.find(outer_table_ref);
   CHECK(it != selected_tables_fragments_.end());
   const auto outer_fragments = it->second;
   outer_fragments_size_ = outer_fragments->size();
 
   bool is_temporary_table = false;
-  if (outer_table_id > 0) {
-    auto schema_provider = executor->getSchemaProvider();
-    auto table_info = schema_provider->getTableInfo(db_id, outer_table_id);
-    CHECK(table_info);
-    // Temporary tables will not have a table descriptor and not have deleted rows.
-    if (table_info->isTemporary()) {
-      // for temporary tables, we won't have delete column metadata available. However, we
-      // know the table fits in memory as it is a temporary table, so signal to the lower
-      // layers that we can disregard the early out select * optimization
-      is_temporary_table = true;
-    }
+  auto schema_provider = executor->getSchemaProvider();
+  auto table_info = schema_provider->getTableInfo(outer_table_ref);
+  CHECK(table_info);
+  // Temporary tables will not have a table descriptor and not have deleted rows.
+  if (table_info->isTemporary()) {
+    // for temporary tables, we won't have delete column metadata available. However, we
+    // know the table fits in memory as it is a temporary table, so signal to the lower
+    // layers that we can disregard the early out select * optimization
+    is_temporary_table = true;
   }
 
   buildFragmentPerKernelForTable(outer_fragments,
@@ -334,8 +329,8 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
   // query (the first table in a join) and we need to broadcast the fragments
   // in the inner table to each device. Sharding will change this model.
   const auto& outer_table_desc = ra_exe_unit.input_descs.front();
-  const int outer_table_id = outer_table_desc.getTableId();
-  auto it = selected_tables_fragments_.find(outer_table_id);
+  const auto outer_table_ref = outer_table_desc.getTableRef();
+  auto it = selected_tables_fragments_.find(outer_table_ref);
   CHECK(it != selected_tables_fragments_.end());
   const auto outer_fragments = it->second;
   outer_fragments_size_ = outer_fragments->size();
@@ -379,7 +374,7 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
     for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
       const auto db_id = ra_exe_unit.input_descs[j].getDatabaseId();
       const auto table_id = ra_exe_unit.input_descs[j].getTableId();
-      auto table_frags_it = selected_tables_fragments_.find(table_id);
+      auto table_frags_it = selected_tables_fragments_.find({db_id, table_id});
       CHECK(table_frags_it != selected_tables_fragments_.end());
       const auto frag_ids =
           executor->getTableFragmentIndices(ra_exe_unit,

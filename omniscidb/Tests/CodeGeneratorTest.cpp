@@ -148,7 +148,7 @@ TEST(CodeGeneratorTest, IntegerColumn) {
   int column_id = 5;
   int rte_idx = 0;
 
-  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
+  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, 0, table_id, column_id, rte_idx);
   const auto compiled_expr = code_generator.compile(col.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -178,7 +178,7 @@ TEST(CodeGeneratorTest, IntegerExpr) {
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
-  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, 0, table_id, column_id, rte_idx);
   Datum d;
   d.intval = 42;
 
@@ -334,7 +334,7 @@ TEST(CodeGeneratorTest, IntegerColumnGPU) {
   int column_id = 5;
   int rte_idx = 0;
 
-  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
+  auto col = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, 0, table_id, column_id, rte_idx);
   const auto compiled_expr = code_generator.compile(col.get(), true, co, get_traits());
 
   compiler::verify_function_ir(compiled_expr.func);
@@ -395,7 +395,7 @@ TEST(CodeGeneratorTest, IntegerExprGPU) {
   int table_id = 1;
   int column_id = 5;
   int rte_idx = 0;
-  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, table_id, column_id, rte_idx);
+  auto lhs = hdk::ir::makeExpr<hdk::ir::ColumnVar>(type, 0, table_id, column_id, rte_idx);
   Datum d;
   d.intval = 42;
 

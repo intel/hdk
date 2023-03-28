@@ -99,6 +99,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   void addVarlenInputBuffer(Data_Namespace::AbstractBuffer* buffer) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     CHECK_EQ(buffer->getType(), Data_Namespace::MemoryLevel::GPU_LEVEL);
+    buffer->pin();
     varlen_input_buffers_.push_back(buffer);
   }
 

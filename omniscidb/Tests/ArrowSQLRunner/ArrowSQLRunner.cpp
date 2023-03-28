@@ -19,6 +19,8 @@
 #include "DataMgr/DataMgr.h"
 #include "DataMgr/DataMgrDataProvider.h"
 #include "QueryEngine/RelAlgExecutor.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
+#include "SchemaMgr/SchemaMgr.h"
 
 #include "SQLiteComparator.h"
 

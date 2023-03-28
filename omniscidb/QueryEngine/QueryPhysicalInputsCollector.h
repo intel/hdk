@@ -37,11 +37,16 @@ class Node;
 }
 
 struct PhysicalInput {
+  PhysicalInput(int col_id_, int table_id_, int db_id_)
+      : col_id(col_id_), table_id(table_id_), db_id(db_id_) {}
+  PhysicalInput(const PhysicalInput& other) = default;
+
   int col_id;
   int table_id;
+  int db_id;
 
   bool operator==(const PhysicalInput& that) const {
-    return col_id == that.col_id && table_id == that.table_id;
+    return col_id == that.col_id && table_id == that.table_id && db_id == that.db_id;
   }
 };
 

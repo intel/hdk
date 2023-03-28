@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #ifdef BUFFER_MUTEX
@@ -98,6 +99,7 @@ class AbstractBuffer {
   virtual inline int pin() { return 0; }
   virtual inline int unPin() { return 0; }
   virtual inline int getPinCount() { return 0; }
+  virtual inline void deleteWhenUnpinned() {}
 
   // These getters should not vary when inherited and therefore don't need to be virtual.
   inline size_t size() const { return size_; }

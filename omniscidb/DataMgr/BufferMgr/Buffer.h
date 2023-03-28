@@ -137,11 +137,25 @@ class Buffer : public AbstractBuffer {
 
   inline int unPin() override {
     std::lock_guard<std::mutex> pin_lock(pin_mutex_);
-    return (--pin_count_);
+    int res = (--pin_count_);
+    if (!res && delete_on_unpin_) {
+      delete this;
+    }
+    return res;
   }
   inline int getPinCount() override {
     std::lock_guard<std::mutex> pin_lock(pin_mutex_);
     return (pin_count_);
+  }
+
+  inline void deleteWhenUnpinned() override {
+    std::unique_lock<std::mutex> pin_lock(pin_mutex_);
+    if (pin_count_) {
+      delete_on_unpin_ = true;
+    } else {
+      pin_lock.unlock();
+      delete this;
+    }
   }
 
   // Added for testing.
@@ -171,6 +185,7 @@ class Buffer : public AbstractBuffer {
   int epoch_;  /// indicates when the buffer was last flushed
   std::vector<bool> page_dirty_flags_;
   int pin_count_;
+  bool delete_on_unpin_;
   std::mutex pin_mutex_;
   std::unique_ptr<AbstractDataToken> token_;
 };

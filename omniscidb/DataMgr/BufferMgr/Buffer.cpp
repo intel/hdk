@@ -35,7 +35,8 @@ Buffer::Buffer(BufferMgr* bm,
     , seg_it_(seg_it)
     , page_size_(page_size)
     , num_pages_(0)
-    , pin_count_(0) {
+    , pin_count_(0)
+    , delete_on_unpin_(false) {
   pin();
   // so that the pointer value of this Buffer is stored
   seg_it_->buffer = this;
@@ -56,6 +57,7 @@ Buffer::Buffer(BufferMgr* bm,
     , page_size_(page_size)
     , num_pages_(0)
     , pin_count_(0)
+    , delete_on_unpin_(false)
     , token_(std::move(token)) {
   pin();
   seg_it_->buffer = this;
