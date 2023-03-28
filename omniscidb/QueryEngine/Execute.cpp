@@ -529,16 +529,12 @@ size_t Executor::getNumBytesForFetchedRow(const std::set<int>& table_ids_to_fetc
       continue;
     }
 
-    if (table_id < 0) {
-      num_bytes += 8;
+    const auto sz = fetched_col.type()->size();
+    if (sz < 0) {
+      // for varlen types, only account for the pointer/size for each row, for now
+      num_bytes += 16;
     } else {
-      const auto sz = fetched_col.type()->size();
-      if (sz < 0) {
-        // for varlen types, only account for the pointer/size for each row, for now
-        num_bytes += 16;
-      } else {
-        num_bytes += sz;
-      }
+      num_bytes += sz;
     }
   }
   return num_bytes;
@@ -1371,15 +1367,10 @@ size_t compute_buffer_entry_guess(const std::vector<InputTableInfo>& query_infos
 
 std::string get_table_name(const InputDescriptor& input_desc,
                            const SchemaProvider& schema_provider) {
-  const auto source_type = input_desc.getSourceType();
-  if (source_type == InputSourceType::TABLE) {
-    const auto tinfo =
-        schema_provider.getTableInfo(input_desc.getDatabaseId(), input_desc.getTableId());
-    CHECK(tinfo);
-    return tinfo->name;
-  } else {
-    return "$TEMPORARY_TABLE" + std::to_string(-input_desc.getTableId());
-  }
+  const auto tinfo =
+      schema_provider.getTableInfo(input_desc.getDatabaseId(), input_desc.getTableId());
+  CHECK(tinfo);
+  return tinfo->name;
 }
 
 inline size_t getDeviceBasedScanLimit(const ExecutorDeviceType device_type,
@@ -2384,7 +2375,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
 
     if (allow_single_frag_table_opt &&
         (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) &&
-        table_infos.size() == 1 && table_infos.front().table_id > 0) {
+        table_infos.size() == 1) {
       const auto max_frag_size =
           table_infos.front().info.getFragmentNumTuplesUpperBound();
       if (max_frag_size < query_mem_desc.getEntryCount()) {
@@ -2473,7 +2464,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
   if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
       (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
        QueryDescriptionType::Projection) &&
-      table_infos.size() == 1 && table_infos.front().table_id > 0) {
+      table_infos.size() == 1) {
     const auto max_frag_size = table_infos.front().info.getFragmentNumTuplesUpperBound();
     if (max_frag_size < query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()) {
       LOG(INFO) << "Lowering scan limit from "
@@ -2584,15 +2575,15 @@ std::vector<size_t> Executor::getTableFragmentIndices(
     const ExecutorDeviceType device_type,
     const size_t table_idx,
     const size_t outer_frag_idx,
-    std::map<int, const TableFragments*>& selected_tables_fragments,
+    std::map<TableRef, const TableFragments*>& selected_tables_fragments,
     const std::unordered_map<int, const hdk::ir::BinOper*>&
         inner_table_id_to_join_condition) {
-  const int table_id = ra_exe_unit.input_descs[table_idx].getTableId();
-  auto table_frags_it = selected_tables_fragments.find(table_id);
+  const auto table_ref = ra_exe_unit.input_descs[table_idx].getTableRef();
+  auto table_frags_it = selected_tables_fragments.find(table_ref);
   CHECK(table_frags_it != selected_tables_fragments.end());
   const auto& outer_input_desc = ra_exe_unit.input_descs[0];
   const auto outer_table_fragments_it =
-      selected_tables_fragments.find(outer_input_desc.getTableId());
+      selected_tables_fragments.find(outer_input_desc.getTableRef());
   const auto outer_table_fragments = outer_table_fragments_it->second;
   CHECK(outer_table_fragments_it != selected_tables_fragments.end());
   CHECK_LT(outer_frag_idx, outer_table_fragments->size());
@@ -2633,10 +2624,10 @@ bool Executor::skipFragmentPair(const FragmentInfo& outer_fragment_info,
 
 std::map<size_t, std::vector<uint64_t>> get_table_id_to_frag_offsets(
     const std::vector<InputDescriptor>& input_descs,
-    const std::map<int, const TableFragments*>& all_tables_fragments) {
+    const std::map<TableRef, const TableFragments*>& all_tables_fragments) {
   std::map<size_t, std::vector<uint64_t>> tab_id_to_frag_offsets;
   for (auto& desc : input_descs) {
-    const auto fragments_it = all_tables_fragments.find(desc.getTableId());
+    const auto fragments_it = all_tables_fragments.find(desc.getTableRef());
     CHECK(fragments_it != all_tables_fragments.end());
     const auto& fragments = *fragments_it->second;
     std::vector<uint64_t> frag_offsets(fragments.size(), 0);
@@ -2654,7 +2645,7 @@ Executor::getRowCountAndOffsetForAllFrags(
     const RelAlgExecutionUnit& ra_exe_unit,
     const CartesianProduct<std::vector<std::vector<size_t>>>& frag_ids_crossjoin,
     const std::vector<InputDescriptor>& input_descs,
-    const std::map<int, const TableFragments*>& all_tables_fragments) {
+    const std::map<TableRef, const TableFragments*>& all_tables_fragments) {
   std::vector<std::vector<int64_t>> all_num_rows;
   std::vector<std::vector<uint64_t>> all_frag_offsets;
   const auto tab_id_to_frag_offsets =
@@ -2669,7 +2660,7 @@ Executor::getRowCountAndOffsetForAllFrags(
     for (size_t tab_idx = 0; tab_idx < input_descs.size(); ++tab_idx) {
       const auto frag_id = ra_exe_unit.union_all ? 0 : selected_frag_ids[tab_idx];
       const auto fragments_it =
-          all_tables_fragments.find(input_descs[tab_idx].getTableId());
+          all_tables_fragments.find(input_descs[tab_idx].getTableRef());
       CHECK(fragments_it != all_tables_fragments.end());
       const auto& fragments = *fragments_it->second;
       if (ra_exe_unit.join_quals.empty() || tab_idx == 0 ||
@@ -2704,8 +2695,7 @@ bool Executor::needFetchAllFragments(const InputColDescriptor& inner_col_desc,
                                      const FragmentsList& selected_fragments) const {
   const auto& input_descs = ra_exe_unit.input_descs;
   const int nest_level = inner_col_desc.getNestLevel();
-  if (nest_level < 1 || inner_col_desc.getSourceType() != InputSourceType::TABLE ||
-      ra_exe_unit.join_quals.empty() || input_descs.size() < 2 ||
+  if (nest_level < 1 || ra_exe_unit.join_quals.empty() || input_descs.size() < 2 ||
       (ra_exe_unit.join_quals.empty() &&
        plan_state_->isLazyFetchColumn(inner_col_desc))) {
     return false;
@@ -2729,7 +2719,7 @@ bool Executor::needLinearizeAllFragments(
   const auto& fragments = selected_fragments[nest_level].fragment_ids;
   auto need_linearize =
       inner_col_desc.type()->isArray() || inner_col_desc.type()->isString();
-  return table_id > 0 && need_linearize && fragments.size() > 1;
+  return need_linearize && fragments.size() > 1;
 }
 
 std::ostream& operator<<(std::ostream& os, FetchResult const& fetch_result) {
@@ -2743,7 +2733,7 @@ FetchResult Executor::fetchChunks(
     const RelAlgExecutionUnit& ra_exe_unit,
     const int device_id,
     const Data_Namespace::MemoryLevel memory_level,
-    const std::map<int, const TableFragments*>& all_tables_fragments,
+    const std::map<TableRef, const TableFragments*>& all_tables_fragments,
     const FragmentsList& selected_fragments,
     std::list<ChunkIter>& chunk_iterators,
     std::list<std::shared_ptr<Chunk_NS::Chunk>>& chunks,
@@ -2778,7 +2768,7 @@ FetchResult Executor::fetchChunks(
         continue;
       }
       const int table_id = col_id->getTableId();
-      const auto fragments_it = all_tables_fragments.find(table_id);
+      const auto fragments_it = all_tables_fragments.find(col_id->getTableRef());
       CHECK(fragments_it != all_tables_fragments.end());
       const auto fragments = fragments_it->second;
       auto it = plan_state_->global_to_local_col_ids_.find(*col_id);
@@ -2852,7 +2842,7 @@ FetchResult Executor::fetchUnionChunks(
     const RelAlgExecutionUnit& ra_exe_unit,
     const int device_id,
     const Data_Namespace::MemoryLevel memory_level,
-    const std::map<int, const TableFragments*>& all_tables_fragments,
+    const std::map<TableRef, const TableFragments*>& all_tables_fragments,
     const FragmentsList& selected_fragments,
     std::list<ChunkIter>& chunk_iterators,
     std::list<std::shared_ptr<Chunk_NS::Chunk>>& chunks,
@@ -2924,7 +2914,7 @@ FetchResult Executor::fetchUnionChunks(
         if (col_id->isVirtual()) {
           continue;
         }
-        const auto fragments_it = all_tables_fragments.find(table_id);
+        const auto fragments_it = all_tables_fragments.find(col_id->getTableRef());
         CHECK(fragments_it != all_tables_fragments.end());
         const auto fragments = fragments_it->second;
         auto it = plan_state_->global_to_local_col_ids_.find(*col_id);
@@ -3953,8 +3943,9 @@ AggregatedColRange Executor::computeColRangesCache(
     if (ExpressionRange::typeSupportsRange(col_desc.type())) {
       const auto col_var = std::make_unique<hdk::ir::ColumnVar>(col_desc.getColInfo(), 0);
       const auto col_range = getLeafColumnRange(col_var.get(), query_infos, this, false);
-      agg_col_range_cache.setColRange({col_desc.getColId(), col_desc.getTableId()},
-                                      col_range);
+      agg_col_range_cache.setColRange(
+          {col_desc.getColId(), col_desc.getTableId(), col_desc.getDatabaseId()},
+          col_range);
     }
   }
   return agg_col_range_cache;

@@ -114,6 +114,8 @@ class HashJoin {
   virtual HashJoinMatchingSet codegenMatchingSet(const CompilationOptions&,
                                                  const size_t) = 0;
 
+  virtual int getInnerDbId() const noexcept = 0;
+
   virtual int getInnerTableId() const noexcept = 0;
 
   virtual int getInnerTableRteIdx() const noexcept = 0;

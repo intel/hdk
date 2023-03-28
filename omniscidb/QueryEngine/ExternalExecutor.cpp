@@ -364,14 +364,9 @@ std::vector<TargetMetaInfo> create_table_schema(const PlanState* plan_state) {
     const int table_id = kv.first.getTableId();
     const int column_id = kv.first.getColId();
     const hdk::ir::Type* column_type;
-    if (table_id < 0) {
-      auto token =
-          get_temporary_table(plan_state->executor_->getTemporaryTables(), table_id);
-      column_type = token->resultSet(0)->colType(column_id);
-    } else {
-      const auto col_info = schema_provider->getColumnInfo(db_id, table_id, column_id);
-      column_type = col_info->type;
-    }
+    const auto col_info = schema_provider->getColumnInfo(db_id, table_id, column_id);
+    CHECK(col_info);
+    column_type = col_info->type;
     if (!is_supported_type_for_extern_execution(column_type)) {
       throw std::runtime_error("Type not supported yet for extern execution: " +
                                column_type->toString());

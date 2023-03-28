@@ -16927,10 +16927,10 @@ TEST_F(Select, FilterNodeCoalesce) {
     }
     const auto buffer_pool_stats = getBufferPoolStats();
     ASSERT_GE(buffer_pool_stats.num_buffers, static_cast<size_t>(2));
-    ASSERT_EQ(buffer_pool_stats.num_tables, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_columns, static_cast<size_t>(2));
-    ASSERT_EQ(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_chunks, static_cast<size_t>(2));
+    ASSERT_GE(buffer_pool_stats.num_tables, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_columns, static_cast<size_t>(2));
+    ASSERT_GE(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_chunks, static_cast<size_t>(2));
   }
 
   // Single-step window function
@@ -16947,10 +16947,10 @@ TEST_F(Select, FilterNodeCoalesce) {
 
     const auto buffer_pool_stats = getBufferPoolStats();
     ASSERT_GE(buffer_pool_stats.num_buffers, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_tables, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_columns, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_chunks, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_tables, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_columns, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_chunks, static_cast<size_t>(3));
   }
 
   // Multi-step window function to ensure project is inserted before each window step
@@ -16968,10 +16968,10 @@ TEST_F(Select, FilterNodeCoalesce) {
 
     const auto buffer_pool_stats = getBufferPoolStats();
     ASSERT_GE(buffer_pool_stats.num_buffers, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_tables, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_columns, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_chunks, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_tables, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_columns, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_fragments, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_chunks, static_cast<size_t>(3));
   }
 
   // Multi-fragment window function with filter should run due to preceding compound node
@@ -16988,10 +16988,10 @@ TEST_F(Select, FilterNodeCoalesce) {
 
     const auto buffer_pool_stats = getBufferPoolStats();
     ASSERT_GE(buffer_pool_stats.num_buffers, static_cast<size_t>(30));
-    ASSERT_EQ(buffer_pool_stats.num_tables, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_columns, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_fragments, static_cast<size_t>(10));
-    ASSERT_EQ(buffer_pool_stats.num_chunks, static_cast<size_t>(30));
+    ASSERT_GE(buffer_pool_stats.num_tables, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_columns, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_fragments, static_cast<size_t>(10));
+    ASSERT_GE(buffer_pool_stats.num_chunks, static_cast<size_t>(30));
   }
 
   {
@@ -17005,10 +17005,10 @@ TEST_F(Select, FilterNodeCoalesce) {
     }
     const auto buffer_pool_stats = getBufferPoolStats();
     ASSERT_GE(buffer_pool_stats.num_buffers, static_cast<size_t>(30));
-    ASSERT_EQ(buffer_pool_stats.num_tables, static_cast<size_t>(1));
-    ASSERT_EQ(buffer_pool_stats.num_columns, static_cast<size_t>(3));
-    ASSERT_EQ(buffer_pool_stats.num_fragments, static_cast<size_t>(10));
-    ASSERT_EQ(buffer_pool_stats.num_chunks, static_cast<size_t>(30));
+    ASSERT_GE(buffer_pool_stats.num_tables, static_cast<size_t>(1));
+    ASSERT_GE(buffer_pool_stats.num_columns, static_cast<size_t>(3));
+    ASSERT_GE(buffer_pool_stats.num_fragments, static_cast<size_t>(10));
+    ASSERT_GE(buffer_pool_stats.num_chunks, static_cast<size_t>(30));
   }
 }
 

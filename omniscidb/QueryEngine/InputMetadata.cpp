@@ -50,45 +50,9 @@ void InputTableInfoCache::clear() {
   decltype(cache_)().swap(cache_);
 }
 
-namespace {
-
-TableFragmentsInfo synthesize_table_info(hdk::ResultSetTableTokenPtr token) {
-  std::vector<FragmentInfo> result;
-  bool non_empty = false;
-  for (int frag_id = 0; frag_id < static_cast<int>(token->resultSetCount()); ++frag_id) {
-    result.emplace_back();
-    auto& fragment = result.back();
-    fragment.fragmentId = frag_id;
-    fragment.deviceIds.resize(3);
-    fragment.resultSet = token->resultSet(frag_id).get();
-    fragment.resultSetMutex.reset(new std::mutex());
-    fragment.setPhysicalNumTuples(fragment.resultSet->entryCount());
-
-    for (size_t col_idx = 0;
-         col_idx < static_cast<size_t>(fragment.resultSet->colCount());
-         ++col_idx) {
-      auto meta = std::make_shared<ChunkMetadata>(
-          fragment.resultSet->colType(col_idx),
-          0,
-          0,
-          [frag_id, col_idx, token](ChunkStats& stats) {
-            stats = token->getChunkStats(frag_id, col_idx);
-          });
-      fragment.setChunkMetadata(static_cast<int>(col_idx), meta);
-    }
-
-    non_empty |= (fragment.resultSet != nullptr);
-  }
-  TableFragmentsInfo table_info;
-  if (non_empty)
-    table_info.fragments = std::move(result);
-  return table_info;
-}
-
 void collect_table_infos(std::vector<InputTableInfo>& table_infos,
                          const std::vector<InputDescriptor>& input_descs,
                          Executor* executor) {
-  const auto temporary_tables = executor->getTemporaryTables();
   std::unordered_map<TableRef, size_t> info_cache;
   for (const auto& input_desc : input_descs) {
     int db_id = input_desc.getDatabaseId();
@@ -100,23 +64,11 @@ void collect_table_infos(std::vector<InputTableInfo>& table_infos,
           {db_id, table_id, copy_table_info(table_infos[cached_index_it->second].info)});
       continue;
     }
-    if (input_desc.getSourceType() == InputSourceType::RESULT) {
-      CHECK_LT(table_id, 0);
-      CHECK(temporary_tables);
-      const auto it = temporary_tables->find(table_id);
-      LOG_IF(FATAL, it == temporary_tables->end())
-          << "Failed to find previous query result for node " << -table_id;
-      table_infos.push_back({db_id, table_id, synthesize_table_info(it->second)});
-    } else {
-      CHECK(input_desc.getSourceType() == InputSourceType::TABLE);
-      table_infos.push_back({db_id, table_id, executor->getTableInfo(db_id, table_id)});
-    }
+    table_infos.push_back({db_id, table_id, executor->getTableInfo(db_id, table_id)});
     CHECK(!table_infos.empty());
     info_cache.insert(std::make_pair(TableRef{db_id, table_id}, table_infos.size() - 1));
   }
 }
-
-}  // namespace
 
 size_t get_frag_count_of_table(const int db_id, const int table_id, Executor* executor) {
   const auto temporary_tables = executor->getTemporaryTables();
@@ -160,36 +112,18 @@ ChunkMetadataMap FragmentInfo::getChunkMetadataMapPhysicalCopy() const {
 }
 
 size_t FragmentInfo::getNumTuples() const {
-  std::unique_ptr<std::lock_guard<std::mutex>> lock;
-  if (resultSetMutex) {
-    lock.reset(new std::lock_guard<std::mutex>(*resultSetMutex));
-  }
-  CHECK_EQ(!!resultSet, !!resultSetMutex);
-  if (resultSet && !synthesizedNumTuplesIsValid) {
-    numTuples = resultSet->rowCount();
-    synthesizedNumTuplesIsValid = true;
-  }
   return numTuples;
 }
 
 size_t TableFragmentsInfo::getNumTuples() const {
-  if (!fragments.empty() && fragments.front().resultSet) {
-    return fragments.front().getNumTuples();
-  }
   return numTuples;
 }
 
 size_t TableFragmentsInfo::getNumTuplesUpperBound() const {
-  if (!fragments.empty() && fragments.front().resultSet) {
-    return fragments.front().resultSet->entryCount();
-  }
   return numTuples;
 }
 
 size_t TableFragmentsInfo::getFragmentNumTuplesUpperBound() const {
-  if (!fragments.empty() && fragments.front().resultSet) {
-    return fragments.front().resultSet->entryCount();
-  }
   size_t fragment_num_tupples_upper_bound = 0;
   for (const auto& fragment : fragments) {
     fragment_num_tupples_upper_bound =

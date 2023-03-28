@@ -107,6 +107,7 @@ Encoder* Encoder::Create(Data_Namespace::AbstractBuffer* buffer,
       }
     case hdk::ir::Type::kTime:
     case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kInterval:
       return createFixedLengthEncoderBySize(buffer, type->size());
     default:
       CHECK(false);

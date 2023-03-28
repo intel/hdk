@@ -68,7 +68,7 @@ class ColumnFetcher {
   const int8_t* getOneTableColumnFragment(
       ColumnInfoPtr col_info,
       const int frag_id,
-      const std::map<int, const TableFragments*>& all_tables_fragments,
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments,
       std::list<std::shared_ptr<Chunk_NS::Chunk>>& chunk_holder,
       std::list<ChunkIter>& chunk_iter_holder,
       const Data_Namespace::MemoryLevel memory_level,
@@ -77,23 +77,15 @@ class ColumnFetcher {
 
   const int8_t* getAllTableColumnFragments(
       ColumnInfoPtr col_info,
-      const std::map<int, const TableFragments*>& all_tables_fragments,
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments,
       const Data_Namespace::MemoryLevel memory_level,
       const int device_id,
       DeviceAllocator* device_allocator,
       const size_t thread_idx) const;
 
-  const int8_t* getResultSetColumn(const int table_id,
-                                   const int col_id,
-                                   const int frag_id,
-                                   const Data_Namespace::MemoryLevel memory_level,
-                                   const int device_id,
-                                   DeviceAllocator* device_allocator,
-                                   const size_t thread_idx) const;
-
   const int8_t* linearizeColumnFragments(
       ColumnInfoPtr col_info,
-      const std::map<int, const TableFragments*>& all_tables_fragments,
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments,
       std::list<std::shared_ptr<Chunk_NS::Chunk>>& chunk_holder,
       std::list<ChunkIter>& chunk_iter_holder,
       const Data_Namespace::MemoryLevel memory_level,
@@ -158,15 +150,6 @@ class ColumnFetcher {
                              ChunkIter& chunk_iter,
                              bool is_true_varlen_type,
                              const size_t total_num_tuples) const;
-
-  const int8_t* getResultSetColumn(const ResultSetPtr& buffer,
-                                   const int table_id,
-                                   const int frag_id,
-                                   const int col_id,
-                                   const Data_Namespace::MemoryLevel memory_level,
-                                   const int device_id,
-                                   DeviceAllocator* device_allocator,
-                                   const size_t thread_idx) const;
 
   Executor* executor_;
   DataProvider* data_provider_;

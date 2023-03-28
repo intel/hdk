@@ -19,11 +19,10 @@
 
 #include "Logger/Logger.h"
 #include "SchemaMgr/ColumnInfo.h"
+#include "SchemaMgr/TableInfo.h"
 #include "Shared/toString.h"
 
 #include <memory>
-
-enum class InputSourceType { TABLE, RESULT };
 
 class InputDescriptor {
  public:
@@ -41,9 +40,7 @@ class InputDescriptor {
 
   int getNestLevel() const { return nest_level_; }
 
-  InputSourceType getSourceType() const {
-    return table_id_ > 0 ? InputSourceType::TABLE : InputSourceType::RESULT;
-  }
+  TableRef getTableRef() const { return {db_id_, table_id_}; }
 
   std::string toString() const {
     return ::typeName(this) + "(table_id=" + std::to_string(table_id_) +
@@ -86,14 +83,12 @@ class InputColDescriptor {
 
   int getDatabaseId() const { return col_info_->db_id; }
 
+  TableRef getTableRef() const { return {getDatabaseId(), getTableId()}; }
+
   int getNestLevel() const { return nest_level_; }
 
   InputDescriptor getScanDesc() const {
     return {col_info_->db_id, col_info_->table_id, nest_level_};
-  }
-
-  InputSourceType getSourceType() const {
-    return col_info_->table_id > 0 ? InputSourceType::TABLE : InputSourceType::RESULT;
   }
 
   const hdk::ir::Type* type() const { return col_info_->type; }

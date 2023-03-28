@@ -474,6 +474,7 @@ std::vector<InputTableInfo> getSyntheticInputTableInfo(
   std::vector<InputTableInfo> query_infos(phys_table_ids.size());
   size_t i = 0;
   for (auto [db_id, table_id] : phys_table_ids) {
+    query_infos[i].db_id = db_id;
     query_infos[i].table_id = table_id;
     query_infos[i].info = executor->getDataMgr()->getTableMetadata(db_id, table_id);
     ++i;
@@ -670,8 +671,8 @@ InnerOuter HashJoin::normalizeColumnPair(const hdk::ir::Expr* lhs,
   // We need to fetch the actual type information from the schema provider since
   // Analyzer always reports nullable as true for inner table columns in left joins.
   const auto inner_col_info = schema_provider->getColumnInfo(*inner_col->columnInfo());
-  const auto inner_col_real_type = get_column_type(
-      inner_col->columnId(), inner_col->tableId(), inner_col_info, temporary_tables);
+  CHECK(inner_col_info);
+  const auto inner_col_real_type = inner_col_info->type;
   auto outer_col_type = !(dynamic_cast<const hdk::ir::FunctionOper*>(lhs)) && outer_col
                             ? outer_col->type()
                             : outer_type;

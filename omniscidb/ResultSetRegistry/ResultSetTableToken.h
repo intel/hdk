@@ -42,8 +42,6 @@ class ResultSetTableToken {
   size_t resultSetCount() const { return tinfo_->fragments; }
   ResultSetPtr resultSet(size_t idx) const;
 
-  ChunkStats getChunkStats(size_t rs_idx, size_t col_idx) const;
-
   static std::string tableName(int table_id) {
     return std::string("__result_set_") + std::to_string(table_id);
   }

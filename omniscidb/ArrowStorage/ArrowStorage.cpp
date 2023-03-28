@@ -305,7 +305,6 @@ TableFragmentsInfo ArrowStorage::getEmptyTableMetadata(int table_id) const {
   // Executor requires dummy empty fragment for empty tables
   FragmentInfo& empty_frag = res.fragments.emplace_back();
   empty_frag.fragmentId = 0;
-  empty_frag.shadowNumTuples = 0;
   empty_frag.setPhysicalNumTuples(0);
   empty_frag.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
   empty_frag.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL

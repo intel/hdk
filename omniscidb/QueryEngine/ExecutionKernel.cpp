@@ -183,7 +183,7 @@ void ExecutionKernel::runImpl(Executor* executor,
   }
   std::shared_ptr<FetchResult> fetch_result(new FetchResult);
   try {
-    std::map<int, const TableFragments*> all_tables_fragments;
+    std::map<TableRef, const TableFragments*> all_tables_fragments;
     TableFragments streaming_table_fragment;
     QueryFragmentDescriptor::computeAllTablesFragments(
         all_tables_fragments, ra_exe_unit_, shared_context.getQueryInfos());
@@ -195,7 +195,7 @@ void ExecutionKernel::runImpl(Executor* executor,
         CHECK(data_provider);
         auto table_meta = data_provider->getTableMetadata(qi.db_id, qi.table_id);
         streaming_table_fragment = table_meta.fragments;
-        all_tables_fragments[qi.table_id] = &streaming_table_fragment;
+        all_tables_fragments[{qi.db_id, qi.table_id}] = &streaming_table_fragment;
       }
     }
 

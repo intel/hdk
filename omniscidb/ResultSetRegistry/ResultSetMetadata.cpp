@@ -33,7 +33,7 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
     for (size_t i = 0; i < rows->colCount(); ++i) {
       decoders.emplace_back(Encoder::Create(nullptr, rows->colType(i)));
       const auto it_ok =
-          metadata_map.emplace(i, decoders.back()->getMetadata(rows->colType(i)));
+          metadata_map.emplace(i + 1, decoders.back()->getMetadata(rows->colType(i)));
       CHECK(it_ok.second);
     }
     return metadata_map;
@@ -136,8 +136,12 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
     }
   }
   for (size_t i = 0; i < rows->colCount(); ++i) {
-    const auto it_ok =
-        metadata_map.emplace(i, dummy_encoders[0][i]->getMetadata(rows->colType(i)));
+    auto meta = std::make_shared<ChunkMetadata>(
+        rows->colType(i),
+        rows->rowCount() * rows->colType(i)->size(),
+        rows->rowCount(),
+        dummy_encoders[0][i]->getMetadata(rows->colType(i))->chunkStats());
+    const auto it_ok = metadata_map.emplace(i + 1, meta);
     CHECK(it_ok.second);
   }
   return metadata_map;

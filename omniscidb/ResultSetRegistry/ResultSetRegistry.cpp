@@ -37,7 +37,6 @@ TableFragmentsInfo getEmptyTableMetadata(int table_id) {
   // Executor requires dummy empty fragment for empty tables
   FragmentInfo& empty_frag = res.fragments.emplace_back();
   empty_frag.fragmentId = 0;
-  empty_frag.shadowNumTuples = 0;
   empty_frag.setPhysicalNumTuples(0);
   // Add ids for DISK_LEVEL, CPU_LEVEL, and GPU_LEVEL
   empty_frag.deviceIds.resize(3, 0);
@@ -149,12 +148,12 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
   SimpleSchemaProvider::dropTable(token.dbId(), token.tableId());
 }
 
-ChunkStats ResultSetRegistry::getChunkStats(const ResultSetTableToken& token,
+ChunkStats ResultSetRegistry::getChunkStats(int table_id,
                                             size_t frag_idx,
                                             size_t col_idx) const {
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
-  CHECK(tables_.count(token.tableId()));
-  auto& table = *tables_.at(token.tableId());
+  CHECK(tables_.count(table_id));
+  auto& table = *tables_.at(table_id);
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
   CHECK_LT(frag_idx, table.fragments.size());
   auto& frag = table.fragments[frag_idx];
@@ -167,7 +166,8 @@ ChunkStats ResultSetRegistry::getChunkStats(const ResultSetTableToken& token,
       frag.meta = synthesizeMetadata(frag.rs.get());
     }
   }
-  return frag.meta.at(col_idx)->chunkStats();
+  CHECK(frag.meta.count(col_idx + 1));
+  return frag.meta.at(col_idx + 1)->chunkStats();
 }
 
 void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
@@ -272,8 +272,22 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
     frag_info.setPhysicalNumTuples(frag.row_count);
     // Add ids for DISK_LEVEL, CPU_LEVEL, and GPU_LEVEL
     frag_info.deviceIds.resize(3, 0);
-    frag_info.resultSet = frag.rs.get();
-    frag_info.resultSetMutex = std::make_shared<std::mutex>();
+    mapd_shared_lock<mapd_shared_mutex> frag_lock(*frag.mutex);
+    if (frag.meta.empty()) {
+      for (size_t col_idx = 0; col_idx < (size_t)frag.rs->colCount(); ++col_idx) {
+        auto col_type = frag.rs->colType(col_idx);
+        auto meta = std::make_shared<ChunkMetadata>(
+            col_type,
+            frag.rs->rowCount() * col_type->size(),
+            frag.rs->rowCount(),
+            [this, table_id, frag_idx, col_idx](ChunkStats& stats) {
+              stats = this->getChunkStats(table_id, frag_idx, col_idx);
+            });
+        frag_info.setChunkMetadata(static_cast<int>(col_idx + 1), meta);
+      }
+    } else {
+      frag_info.setChunkMetadataMap(frag.meta);
+    }
   }
 
   return res;

@@ -21,6 +21,7 @@
 #include "Descriptors/InputDescriptors.h"
 #include "Execute.h"
 #include "QueryPhysicalInputsCollector.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
 
 #include "IR/TypeUtils.h"
 #include "Utils/ExtractFromTime.h"
@@ -537,7 +538,8 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
     case hdk::ir::Type::kFloatingPoint: {
       std::optional<size_t> ti_idx;
       for (size_t i = 0; i < query_infos.size(); ++i) {
-        if (col_expr->tableId() == query_infos[i].table_id) {
+        if (col_expr->tableId() == query_infos[i].table_id &&
+            col_expr->dbId() == query_infos[i].db_id) {
           ti_idx = i;
           break;
         }
@@ -626,9 +628,9 @@ ExpressionRange getExpressionRange(
   CHECK_GE(rte_idx, 0);
   CHECK_LT(static_cast<size_t>(rte_idx), query_infos.size());
   bool is_outer_join_proj = rte_idx > 0 && executor->containsLeftDeepOuterJoin();
-  if (col_expr->tableId() > 0) {
-    auto col_range =
-        executor->getColRange(PhysicalInput{col_expr->columnId(), col_expr->tableId()});
+  if (col_expr->tableId() > 0 && col_expr->dbId() != hdk::ResultSetRegistry::DB_ID) {
+    auto col_range = executor->getColRange(
+        PhysicalInput{col_expr->columnId(), col_expr->tableId(), col_expr->dbId()});
     if (is_outer_join_proj) {
       col_range.setHasNulls();
     }

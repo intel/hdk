@@ -242,7 +242,8 @@ void BaselineJoinHashTable::reify(const HashType preferred_layout) {
 }
 
 void BaselineJoinHashTable::reifyWithLayout(const HashType layout) {
-  const auto& query_info = get_inner_query_info(getInnerTableId(), query_infos_).info;
+  const auto& query_info =
+      get_inner_query_info(getInnerDbId(), getInnerTableId(), query_infos_).info;
   if (query_info.fragments.empty()) {
     return;
   }
@@ -928,6 +929,12 @@ llvm::Value* BaselineJoinHashTable::hashPtr(const size_t index,
 #undef LL_INT
 #undef LL_BUILDER
 #undef LL_CONTEXT
+
+int BaselineJoinHashTable::getInnerDbId() const noexcept {
+  CHECK(!inner_outer_pairs_.empty());
+  const auto first_inner_col = inner_outer_pairs_.front().first;
+  return first_inner_col->dbId();
+}
 
 int BaselineJoinHashTable::getInnerTableId() const noexcept {
   try {

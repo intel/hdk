@@ -1298,7 +1298,8 @@ bool ArrayExpr::operator==(Expr const& rhs) const {
 }
 
 std::string ColumnVar::toString() const {
-  return "(ColumnVar table: " + std::to_string(tableId()) +
+  return "(ColumnVar db: " + std::to_string(dbId()) +
+         " table: " + std::to_string(tableId()) +
          " column: " + std::to_string(columnId()) + " rte: " + std::to_string(rte_idx_) +
          " " + type()->toString() + ") ";
 }
