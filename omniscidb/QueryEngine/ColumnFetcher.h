@@ -19,9 +19,9 @@
 #include "DataMgr/Allocators/DeviceAllocator.h"
 #include "DataProvider/DataProvider.h"
 #include "IR/Expr.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/Descriptors/QueryFragmentDescriptor.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinRuntime.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 #include "Shared/hash.h"
 
 struct FetchResult {

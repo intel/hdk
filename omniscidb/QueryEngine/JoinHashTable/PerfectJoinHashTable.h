@@ -25,7 +25,6 @@
 #include "DataMgr/Allocators/ThrustAllocator.h"
 #include "DataMgr/Chunk/Chunk.h"
 #include "IR/Expr.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/DataRecycler/HashingSchemeRecycler.h"
 #include "QueryEngine/DataRecycler/HashtableRecycler.h"
 #include "QueryEngine/Descriptors/InputDescriptors.h"
@@ -34,6 +33,7 @@
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/JoinHashTable/PerfectHashTable.h"
 #include "ResultSet/RowSetMemoryOwner.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 
 #include <llvm/IR/Value.h>
 

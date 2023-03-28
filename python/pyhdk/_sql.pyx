@@ -92,7 +92,6 @@ cdef class RelAlgExecutor:
   def __cinit__(self, Executor executor, SchemaProvider schema_provider, DataMgr data_mgr, ra_json=None, QueryDag dag=None):
     cdef CExecutor* c_executor = executor.c_executor.get()
     cdef CSchemaProviderPtr c_schema_provider = schema_provider.c_schema_provider
-    cdef CDataProvider* c_data_provider = data_mgr.c_data_mgr.get().getDataProvider()
     cdef unique_ptr[CQueryDag] c_dag
     cdef int db_id = 0
 
@@ -107,7 +106,7 @@ cdef class RelAlgExecutor:
       assert dag is not None
       c_dag = move(dag.c_dag)
 
-    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, c_data_provider, move(c_dag))
+    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, data_mgr.c_data_mgr.get(), move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
   def execute(self, **kwargs):

@@ -170,7 +170,7 @@ class NoCatalogRelAlgTest : public ::testing::Test {
 
   ExecutionResult runRelAlgQuery(std::unique_ptr<hdk::ir::QueryDag> dag) {
     auto ra_executor = RelAlgExecutor(
-        executor_.get(), schema_provider_, data_mgr_->getDataProvider(), std::move(dag));
+        executor_.get(), schema_provider_, data_mgr_.get(), std::move(dag));
     return ra_executor.executeRelAlgQuery(
         CompilationOptions::defaults(ExecutorDeviceType::CPU),
         ExecutionOptions::fromConfig(executor_->getConfig()),

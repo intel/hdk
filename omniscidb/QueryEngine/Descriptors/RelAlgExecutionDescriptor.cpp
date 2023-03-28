@@ -23,36 +23,9 @@ ExecutionResult::ExecutionResult()
     , execution_time_ms_(0)
     , type_(QueryResult) {}
 
-ExecutionResult::ExecutionResult(const ResultSetPtr& rows,
+ExecutionResult::ExecutionResult(hdk::ResultSetTableTokenPtr token,
                                  const std::vector<TargetMetaInfo>& targets_meta)
-    : results_(rows)
-    , targets_meta_(targets_meta)
-    , filter_push_down_enabled_(false)
-    , success_(true)
-    , execution_time_ms_(0)
-    , type_(QueryResult) {}
-
-ExecutionResult::ExecutionResult(ResultSetPtr&& result,
-                                 const std::vector<TargetMetaInfo>& targets_meta)
-    : results_(std::move(result))
-    , targets_meta_(targets_meta)
-    , filter_push_down_enabled_(false)
-    , success_(true)
-    , execution_time_ms_(0)
-    , type_(QueryResult) {}
-
-ExecutionResult::ExecutionResult(const TemporaryTable& results,
-                                 const std::vector<TargetMetaInfo>& targets_meta)
-    : results_(results)
-    , targets_meta_(targets_meta)
-    , filter_push_down_enabled_(false)
-    , success_(true)
-    , execution_time_ms_(0)
-    , type_(QueryResult) {}
-
-ExecutionResult::ExecutionResult(TemporaryTable&& results,
-                                 const std::vector<TargetMetaInfo>& targets_meta)
-    : results_(results)
+    : result_token_(std::move(token))
     , targets_meta_(targets_meta)
     , filter_push_down_enabled_(false)
     , success_(true)
@@ -70,7 +43,7 @@ ExecutionResult::ExecutionResult(const ExecutionResult& that)
       (filter_push_down_enabled_ && pushed_down_filter_info_.empty())) {
     return;
   }
-  results_ = that.results_;
+  result_token_ = that.result_token_;
 }
 
 ExecutionResult::ExecutionResult(ExecutionResult&& that)
@@ -84,7 +57,7 @@ ExecutionResult::ExecutionResult(ExecutionResult&& that)
       (filter_push_down_enabled_ && pushed_down_filter_info_.empty())) {
     return;
   }
-  results_ = std::move(that.results_);
+  result_token_ = std::move(that.result_token_);
 }
 
 ExecutionResult::ExecutionResult(
@@ -103,7 +76,7 @@ ExecutionResult& ExecutionResult::operator=(const ExecutionResult& that) {
     filter_push_down_enabled_ = that.filter_push_down_enabled_;
     return *this;
   }
-  results_ = that.results_;
+  result_token_ = that.result_token_;
   targets_meta_ = that.targets_meta_;
   success_ = that.success_;
   execution_time_ms_ = that.execution_time_ms_;
@@ -114,16 +87,6 @@ ExecutionResult& ExecutionResult::operator=(const ExecutionResult& that) {
 const std::vector<PushedDownFilterInfo>& ExecutionResult::getPushedDownFilterInfo()
     const {
   return pushed_down_filter_info_;
-}
-
-void ExecutionResult::updateResultSet(const std::string& query,
-                                      RType type,
-                                      bool success) {
-  targets_meta_.clear();
-  pushed_down_filter_info_.clear();
-  success_ = success;
-  type_ = type;
-  results_ = std::make_shared<ResultSet>(query);
 }
 
 std::string ExecutionResult::getExplanation() {

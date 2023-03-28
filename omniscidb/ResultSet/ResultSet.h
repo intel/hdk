@@ -279,6 +279,10 @@ class ResultSet {
 
   const hdk::ir::Type* colType(const size_t col_idx) const;
 
+  void setColNames(std::vector<std::string> fields);
+  bool hasColNames() const;
+  std::string colName(size_t col_idx) const;
+
   /**
    * @brief Returns the number of valid entries in the result set (i.e that will
    * be returned from the SQL query or inputted into the next query step)
@@ -744,6 +748,7 @@ class ResultSet {
 
   const std::vector<TargetInfo> targets_;
   const ExecutorDeviceType device_type_;
+  std::vector<std::string> fields_;
   const int device_id_;
   QueryMemoryDescriptor query_mem_desc_;
   mutable std::unique_ptr<ResultSetStorage> storage_;
@@ -787,6 +792,8 @@ class ResultSet {
   friend class ResultSetRowIterator;
   friend class ColumnarResults;
 };
+
+using ResultSetPtr = std::shared_ptr<ResultSet>;
 
 ResultSetRowIterator::value_type ResultSetRowIterator::operator*() const {
   if (!global_entry_idx_valid_) {

@@ -20,54 +20,14 @@
 #include "DataProvider/DataProvider.h"
 #include "QueryEngine/Descriptors/InputDescriptors.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
+#include "ResultSetRegistry/ResultSetTableToken.h"
 #include "Shared/hash.h"
 
 #include <unordered_map>
 
 class Executor;
 
-class TemporaryTable {
- public:
-  TemporaryTable() {}
-  TemporaryTable(const ResultSetPtr& rs) { results_.emplace_back(rs); }
-  TemporaryTable(ResultSetPtr&& rs) { results_.emplace_back(rs); }
-  TemporaryTable(const std::vector<ResultSetPtr>& results) : results_(results) {}
-  TemporaryTable(std::vector<ResultSetPtr>&& results) : results_(results) {}
-
-  TemporaryTable(const TemporaryTable& other) = default;
-  TemporaryTable(TemporaryTable&& other) = default;
-
-  TemporaryTable& operator=(const TemporaryTable& other) = default;
-  TemporaryTable& operator=(TemporaryTable&& other) = default;
-
-  int getFragCount() const { return static_cast<int>(results_.size()); }
-
-  const ResultSetPtr& getResultSet(const int frag_id) const {
-    CHECK(frag_id < getFragCount());
-    return results_[frag_id];
-  }
-
-  size_t getLimit() const;
-  size_t rowCount() const;
-  size_t colCount() const;
-
-  const hdk::ir::Type* colType(const size_t col_idx) const;
-
-  bool empty() const { return results_.empty(); }
-
-  void setKernelQueueTime(const int64_t kernel_queue_time);
-  void addCompilationQueueTime(const int64_t compilation_queue_time);
-  void setValidationOnlyRes();
-
-  ResultSetPtr& operator[](size_t idx) { return results_[idx]; }
-  const ResultSetPtr& operator[](size_t idx) const { return results_[idx]; }
-
- private:
-  std::vector<ResultSetPtr> results_;
-};
-
-// using TemporaryTables = std::unordered_map<int, const ResultSetPtr&>;
-using TemporaryTables = std::unordered_map<int, TemporaryTable>;
+using TemporaryTables = std::unordered_map<int, hdk::ResultSetTableTokenPtr>;
 
 struct InputTableInfo {
   int db_id;

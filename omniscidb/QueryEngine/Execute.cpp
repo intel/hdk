@@ -526,6 +526,10 @@ const TemporaryTables* Executor::getTemporaryTables() const {
   return temporary_tables_;
 }
 
+hdk::ResultSetTableTokenPtr Executor::getTemporaryTable(int table_id) const {
+  return get_temporary_table(temporary_tables_, table_id);
+}
+
 TableFragmentsInfo Executor::getTableInfo(const int db_id, const int table_id) const {
   return input_table_info_cache_.getTableInfo(db_id, table_id);
 }
@@ -1075,7 +1079,7 @@ std::pair<int64_t, int32_t> Executor::reduceResults(hdk::ir::AggType agg,
 
 namespace {
 
-TemporaryTable get_merged_result(
+hdk::ResultSetTable get_merged_result(
     std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device) {
   auto& first = results_per_device.front().first;
   CHECK(first);
@@ -1084,26 +1088,26 @@ TemporaryTable get_merged_result(
     CHECK(next);
     first->append(*next);
   }
-  return TemporaryTable(std::move(first));
+  return hdk::ResultSetTable(std::move(first));
 }
 
-TemporaryTable get_separate_results(
+hdk::ResultSetTable get_separate_results(
     std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device) {
   std::vector<ResultSetPtr> results;
   results.reserve(results_per_device.size());
   for (auto& r : results_per_device) {
     results.emplace_back(r.first);
   }
-  return TemporaryTable(std::move(results));
+  return hdk::ResultSetTable(std::move(results));
 }
 
 }  // namespace
 
-TemporaryTable Executor::resultsUnion(SharedKernelContext& shared_context,
-                                      const RelAlgExecutionUnit& ra_exe_unit,
-                                      bool merge,
-                                      bool sort_by_table_id,
-                                      const std::map<int, size_t>& order_map) {
+hdk::ResultSetTable Executor::resultsUnion(SharedKernelContext& shared_context,
+                                           const RelAlgExecutionUnit& ra_exe_unit,
+                                           bool merge,
+                                           bool sort_by_table_id,
+                                           const std::map<int, size_t>& order_map) {
   auto timer = DEBUG_TIMER(__func__);
   auto& results_per_device = shared_context.getFragmentResults();
   if (results_per_device.empty()) {
@@ -1138,7 +1142,7 @@ TemporaryTable Executor::resultsUnion(SharedKernelContext& shared_context,
             });
 
   if (merge) {
-    return {get_merged_result(results_per_device)};
+    return get_merged_result(results_per_device);
   }
   return get_separate_results(results_per_device);
 }
@@ -1633,15 +1637,16 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
 
 }  // namespace
 
-TemporaryTable Executor::executeWorkUnit(size_t& max_groups_buffer_entry_guess,
-                                         const bool is_agg,
-                                         const std::vector<InputTableInfo>& query_infos,
-                                         const RelAlgExecutionUnit& ra_exe_unit_in,
-                                         const CompilationOptions& co,
-                                         const ExecutionOptions& eo,
-                                         const bool has_cardinality_estimation,
-                                         DataProvider* data_provider,
-                                         ColumnCacheMap& column_cache) {
+hdk::ResultSetTable Executor::executeWorkUnit(
+    size_t& max_groups_buffer_entry_guess,
+    const bool is_agg,
+    const std::vector<InputTableInfo>& query_infos,
+    const RelAlgExecutionUnit& ra_exe_unit_in,
+    const CompilationOptions& co,
+    const ExecutionOptions& eo,
+    const bool has_cardinality_estimation,
+    DataProvider* data_provider,
+    ColumnCacheMap& column_cache) {
   VLOG(1) << "Executor " << executor_id_ << " is executing work unit:" << ra_exe_unit_in;
 
   ScopeGuard cleanup_post_execution = [this] {
@@ -1782,7 +1787,7 @@ ResultSetPtr Executor::runOnBatch(std::shared_ptr<StreamExecutionContext> ctx,
   return nullptr;
 }
 
-ResultSetPtr Executor::finishStreamExecution(
+hdk::ResultSetTable Executor::finishStreamExecution(
     std::shared_ptr<StreamExecutionContext> ctx) {
   for (auto& exec_ctx : ctx->shared_context->getTlsExecutionContext()) {
     if (exec_ctx) {
@@ -1816,16 +1821,15 @@ ResultSetPtr Executor::finishStreamExecution(
       order_map[ctx->ra_exe_unit.input_descs[i].getTableId()] = i;
     }
   }
-  auto table = resultsUnion(*ctx->shared_context,
-                            ctx->ra_exe_unit,
-                            true,  // always merge for now
-                            ctx->eo.preserve_order,
-                            order_map);
-  CHECK_EQ(table.getFragCount(), 1);
-  return table[0];
+  auto result = resultsUnion(*ctx->shared_context,
+                             ctx->ra_exe_unit,
+                             true,  // always merge for now
+                             ctx->eo.preserve_order,
+                             order_map);
+  return result;
 }
 
-TemporaryTable Executor::executeWorkUnitImpl(
+hdk::ResultSetTable Executor::executeWorkUnitImpl(
     size_t& max_groups_buffer_entry_guess,
     const bool is_agg,
     const bool allow_single_frag_table_opt,

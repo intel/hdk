@@ -365,9 +365,9 @@ std::vector<TargetMetaInfo> create_table_schema(const PlanState* plan_state) {
     const int column_id = kv.first.getColId();
     const hdk::ir::Type* column_type;
     if (table_id < 0) {
-      const auto& table =
+      auto token =
           get_temporary_table(plan_state->executor_->getTemporaryTables(), table_id);
-      column_type = table.colType(column_id);
+      column_type = token->resultSet(0)->colType(column_id);
     } else {
       const auto col_info = schema_provider->getColumnInfo(db_id, table_id, column_id);
       column_type = col_info->type;

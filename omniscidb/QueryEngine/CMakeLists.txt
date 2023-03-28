@@ -22,7 +22,6 @@ set(query_engine_source_files
     CgenState.cpp
     Codec.cpp
     ColRangeInfo.cpp
-    ColumnarResults.cpp
     ColumnFetcher.cpp
     ColumnIR.cpp
     CompareIR.cpp
@@ -326,6 +325,7 @@ set(QUERY_ENGINE_LIBS
         Utils
         Logger
         ResultSet
+        ResultSetRegistry
         Shared
         SchemaMgr
         SqliteConnector

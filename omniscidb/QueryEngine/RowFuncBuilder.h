@@ -26,7 +26,6 @@
 
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
-#include "QueryEngine/ColumnarResults.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/GpuMemUtils.h"
 #include "QueryEngine/GpuSharedMemoryContext.h"
@@ -34,6 +33,7 @@
 #include "QueryEngine/QueryExecutionContext.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "QueryEngine/Utils/DiamondCodegen.h"
+#include "ResultSetRegistry/ColumnarResults.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/sqltypes.h"
 
