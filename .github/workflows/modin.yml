@@ -29,7 +29,6 @@ jobs:
         run: |
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
-          conda install -n ${{ env.CONDA_ENV }} -c conda-forge python=3.8
 
       - name: Restore Maven cache
         uses: actions/cache@v3
