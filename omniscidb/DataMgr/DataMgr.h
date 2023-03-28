@@ -182,7 +182,7 @@ class DataMgr {
   const std::map<ChunkKey, File_Namespace::FileBuffer*>& getChunkMap();
   void getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,
                                        const ChunkKey& keyPrefix);
-  inline bool gpusPresent() const { return hasGpus_; }
+  inline bool gpusPresent() const { return has_gpus_; }
   void setTableEpoch(const int db_id, const int tb_id, const int start_epoch);
   size_t getTableEpoch(const int db_id, const int tb_id);
 
@@ -194,7 +194,7 @@ class DataMgr {
     return dynamic_cast<l0::L0Manager*>(getGpuMgr(GpuMgrPlatform::L0));
   }
   GpuMgr* getGpuMgr(GpuMgrPlatform name) const;
-  GpuMgr* getGpuMgr() const { return gpuMgrContext_->gpu_mgr; }
+  GpuMgr* getGpuMgr() const { return current_device_mgr_; }
 
   // database_id, table_id, column_id, fragment_id
   std::vector<int> levelSizes_;
@@ -239,9 +239,10 @@ class DataMgr {
                             const std::vector<size_t>& cpu_tier_sizes);
 
   std::vector<std::vector<AbstractBufferMgr*>> bufferMgrs_;
-  std::unique_ptr<GpuMgrContext> gpuMgrContext_;
-  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> gpuMgrs_;
-  bool hasGpus_;
+  GpuMgr* current_device_mgr_;
+  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgrContext>> device_contexts_;
+  std::map<GpuMgrPlatform, std::unique_ptr<GpuMgr>> device_mgrs_;
+  bool has_gpus_;
   size_t reservedGpuMem_;
   std::unique_ptr<DataMgrBufferProvider> buffer_provider_;
   std::unique_ptr<DataMgrDataProvider> data_provider_;

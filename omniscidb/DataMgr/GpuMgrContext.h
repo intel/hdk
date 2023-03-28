@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "Shared/GpuPlatform.h"
 #include "GpuMgr.h"
+#include "Shared/GpuPlatform.h"
 
 struct GpuMgrContext {
   GpuMgrPlatform platform;
   GpuMgr* gpu_mgr;
+  size_t gpu_count;
+  std::vector<Data_Namespace::AbstractBufferMgr*> buffer_mgrs;
 };
