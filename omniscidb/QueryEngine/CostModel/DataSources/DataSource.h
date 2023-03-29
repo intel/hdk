@@ -42,8 +42,8 @@ class DataSource {
   DataSource(const DataSourceConfig& config);
 
  private:
-  DataSourceConfig config;
-  std::string dataSourceName;
+  DataSourceConfig config_;
+  std::string dataSourceName_;
 };
 
 class DataSourceException : public std::runtime_error {
