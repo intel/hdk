@@ -89,47 +89,66 @@ void eliminate_dead_self_recursive_funcs(
 
 void optimize_ir(llvm::Function* query_func,
                  llvm::Module* llvm_module,
-                 llvm::legacy::PassManager& pass_manager,
+                 llvm::PassBuilder& PB,
                  const std::unordered_set<llvm::Function*>& live_funcs,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
+
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+  llvm::LoopPassManager LPM;
+  llvm::CGSCCPassManager CGPM;
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::ModulePassManager MPM =
+      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
+  llvm::FunctionPassManager FPM;
+
   // the always inliner legacy pass must always run first
-  pass_manager.add(llvm::createVerifierPass());
-  pass_manager.add(llvm::createAlwaysInlinerLegacyPass());
+  FPM.addPass(llvm::VerifierPass());
+  MPM.addPass(llvm::AlwaysInlinerPass());
 
-  pass_manager.add(new AnnotateInternalFunctionsPass());
+  CGPM.addPass(AnnotateInternalFunctionsPass());
+  MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
 
-  pass_manager.add(llvm::createSROAPass());
+  FPM.addPass(llvm::SROAPass());
   // mem ssa drops unused load and store instructions, e.g. passing variables directly
   // where possible
-  pass_manager.add(
-      llvm::createEarlyCSEPass(/*enable_mem_ssa=*/true));  // Catch trivial redundancies
+  FPM.addPass(llvm::EarlyCSEPass(/*enable_mem_ssa=*/true));  // Catch trivial redundancies
 
   if (!is_gpu_smem_used) {
     // thread jumps can change the execution order around SMEM sections guarded by
     // `__syncthreads()`, which results in race conditions. For now, disable jump
-    // threading for shared memory queries. In the future, consider handling shared memory
+    // threading for shared memory queries. In the future, consider handling shared
+    // memory
     // aggregations with a separate kernel launch
-    pass_manager.add(llvm::createJumpThreadingPass());  // Thread jumps.
+    FPM.addPass(llvm::JumpThreadingPass());  // Thread jumps.
   }
-  pass_manager.add(llvm::createCFGSimplificationPass());
+  FPM.addPass(llvm::SimplifyCFGPass());
+  // remove load/stores in PHIs if instructions can be accessed directly post thread
+  FPM.addPass(llvm::GVNPass());
 
-  // remove load/stores in PHIs if instructions can be accessed directly post thread jumps
-  pass_manager.add(llvm::createNewGVNPass());
+  FPM.addPass(llvm::DSEPass());  // DeadStoreEliminationPass
+  LPM.addPass(llvm::LICMPass());
+  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM), /*UseMemorySSA=*/true));
 
-  pass_manager.add(llvm::createDeadStoreEliminationPass());
-  pass_manager.add(llvm::createLICMPass());
+  FPM.addPass(llvm::InstCombinePass());
+  FPM.addPass(llvm::PromotePass());
 
-  pass_manager.add(llvm::createInstructionCombiningPass());
+  MPM.addPass(llvm::GlobalOptPass());
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 
-  // module passes
-  pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
-  pass_manager.add(llvm::createGlobalOptimizerPass());
+  FPM.addPass(llvm::SimplifyCFGPass());  // cleanup after everything
 
-  pass_manager.add(llvm::createCFGSimplificationPass());  // cleanup after everything
-
-  pass_manager.run(*llvm_module);
+  MPM.run(*llvm_module, MAM);
 
   eliminate_dead_self_recursive_funcs(*llvm_module, live_funcs);
 }

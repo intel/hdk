@@ -17,9 +17,25 @@
 #include <string>
 #include <unordered_set>
 
+#include <llvm/Analysis/MemorySSA.h>
 #include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_os_ostream.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
+#include <llvm/Transforms/IPO/GlobalOpt.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/DeadStoreElimination.h>
+#include <llvm/Transforms/Scalar/EarlyCSE.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/JumpThreading.h>
+#include <llvm/Transforms/Scalar/LICM.h>
+#include <llvm/Transforms/Scalar/MemCpyOptimizer.h>
+#include <llvm/Transforms/Scalar/SROA.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <llvm/Transforms/Utils/Mem2Reg.h>
+#include "llvm/IR/PassManager.h"
 
 #include "QueryEngine/CompilationOptions.h"
 
@@ -50,7 +66,7 @@ void verify_function_ir(const llvm::Function* func);
 
 void optimize_ir(llvm::Function* query_func,
                  llvm::Module* llvm_module,
-                 llvm::legacy::PassManager& pass_manager,
+                 llvm::PassBuilder& PB,
                  const std::unordered_set<llvm::Function*>& live_funcs,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co);
