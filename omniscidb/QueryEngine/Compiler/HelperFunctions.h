@@ -18,7 +18,6 @@
 #include <unordered_set>
 
 #include <llvm/Analysis/MemorySSA.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_os_ostream.h>

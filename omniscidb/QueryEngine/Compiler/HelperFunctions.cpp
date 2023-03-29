@@ -108,8 +108,7 @@ void optimize_ir(llvm::Function* query_func,
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  llvm::ModulePassManager MPM =
-      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
+  llvm::ModulePassManager MPM;
   llvm::FunctionPassManager FPM;
 
   // the always inliner legacy pass must always run first
