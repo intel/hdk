@@ -36,7 +36,7 @@ class LinearRegression : public ExtrapolationModel {
   arma::mat buildFeaturesMatrix();
   arma::vec buildTargets();
 
-  arma::vec w;
+  arma::vec w_;
 };
 
 }  // namespace costmodel

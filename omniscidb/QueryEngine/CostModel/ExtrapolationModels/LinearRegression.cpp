@@ -17,7 +17,7 @@ namespace costmodel {
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
   arma::vec x = {1.0, (double)bytes};
-  return (size_t)arma::dot(x, w);
+  return (size_t)arma::dot(x, w_);
 }
 
 void LinearRegression::buildRegressionCoefficients() {
@@ -25,25 +25,25 @@ void LinearRegression::buildRegressionCoefficients() {
   arma::mat X = buildFeaturesMatrix();
   arma::vec y = buildTargets();
 
-  w = arma::inv(X.t() * X) * X.t() * y;
+  w_ = arma::inv(X.t() * X) * X.t() * y;
 }
 
 arma::mat LinearRegression::buildFeaturesMatrix() {
   // x = (1, bytes)
   const size_t featuresSize = 2;
-  arma::mat X(measurement.size(), featuresSize, arma::fill::ones);
+  arma::mat X(measurement_.size(), featuresSize, arma::fill::ones);
 
-  for (size_t row = 0; row < measurement.size(); row++) {
-    X(row, 1) = (double)measurement[row].bytes;
+  for (size_t row = 0; row < measurement_.size(); row++) {
+    X(row, 1) = (double)measurement_[row].bytes;
   }
 
   return X;
 }
 
 arma::vec LinearRegression::buildTargets() {
-  arma::vec y(measurement.size());
-  for (size_t m = 0; m < measurement.size(); m++) {
-    y(m) = measurement[m].milliseconds;
+  arma::vec y(measurement_.size());
+  for (size_t m = 0; m < measurement_.size(); m++) {
+    y(m) = measurement_[m].milliseconds;
   }
 
   return y;

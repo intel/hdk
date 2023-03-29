@@ -22,21 +22,21 @@ size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) {
   Detail::Measurement tmp = {bytes, 0};
 
   auto iter =
-      std::upper_bound(measurement.begin(), measurement.end(), tmp, Detail::BytesOrder());
+      std::upper_bound(measurement_.begin(), measurement_.end(), tmp, Detail::BytesOrder());
 
-  if (iter == measurement.begin()) {
+  if (iter == measurement_.begin()) {
     id1 = 0;
     id2 = 1;
-  } else if (iter == measurement.end()) {
-    id1 = measurement.size() - 2;
-    id2 = measurement.size() - 1;
+  } else if (iter == measurement_.end()) {
+    id1 = measurement_.size() - 2;
+    id2 = measurement_.size() - 1;
   } else {
-    id2 = iter - measurement.begin();
+    id2 = iter - measurement_.begin();
     id1 = id2 - 1;
   }
 
-  size_t y1 = measurement[id1].milliseconds, y2 = measurement[id2].milliseconds;
-  size_t x1 = measurement[id1].bytes, x2 = measurement[id2].bytes;
+  size_t y1 = measurement_[id1].milliseconds, y2 = measurement_[id2].milliseconds;
+  size_t x1 = measurement_[id1].bytes, x2 = measurement_[id2].bytes;
 
   return y1 + ((double)bytes - x1) / (x2 - x1) * (y2 - y1);
 }

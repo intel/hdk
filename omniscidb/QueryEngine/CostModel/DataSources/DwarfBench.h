@@ -36,8 +36,8 @@ class DwarfBenchDataSource : public DataSource {
       const std::vector<AnalyticalTemplate>& templates) override;
 
  private:
-  const size_t dwarfBenchIterations = 10;
-  const std::vector<size_t> dwarfBenchInputSizes = {256, 512, 1024, 2048};
+  const size_t dwarfBenchIterations_ = 10;
+  const std::vector<size_t> dwarfBenchInputSizes_ = {256, 512, 1024, 2048};
 
   std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device,
                                                            AnalyticalTemplate templ);
@@ -48,7 +48,7 @@ class DwarfBenchDataSource : public DataSource {
   std::vector<Detail::Measurement> convertMeasurement(
       const std::vector<DwarfBench::Measurement> measurements);
 
-  DwarfBench::DwarfBench db;
+  DwarfBench::DwarfBench db_;
 };
 
 }  // namespace costmodel
