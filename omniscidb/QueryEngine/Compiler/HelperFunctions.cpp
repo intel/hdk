@@ -103,6 +103,7 @@ void eliminate_dead_self_recursive_funcs(
 
 void optimize_ir(llvm::Function* query_func,
                  llvm::Module* llvm_module,
+                 llvm::PassBuilder& PB,
                  const std::unordered_set<llvm::Function*>& live_funcs,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co) {

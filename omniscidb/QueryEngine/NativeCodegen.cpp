@@ -1739,8 +1739,11 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 #else
       // Note that we don't run the NVVM reflect pass here. Use LOG(IR) to get the
       // optimized IR after NVVM reflect
+      // llvm::legacy::PassManager pass_manager;
+      llvm::PassBuilder pass_builder;
       compiler::optimize_ir(query_func,
                             cgen_state_->module_,
+                            pass_builder,
                             live_funcs,
                             gpu_smem_context.isSharedMemoryUsed(),
                             co_codegen_traits);
