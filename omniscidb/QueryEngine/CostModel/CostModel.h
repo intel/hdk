@@ -44,16 +44,16 @@ class CostModel {
       const RelAlgExecutionUnit& queryDag) = 0;
 
  protected:
-  std::unique_ptr<DataSource> dataSource;
+  std::unique_ptr<DataSource> dataSource_;
 
-  DevicePredictions dp;
+  DevicePredictions dp_;
 
-  static const std::vector<AnalyticalTemplate> templates;
+  static const std::vector<AnalyticalTemplate> templates_;
 
-  std::vector<ExecutorDeviceType> devices = {ExecutorDeviceType::CPU,
+  std::vector<ExecutorDeviceType> devices_ = {ExecutorDeviceType::CPU,
                                              ExecutorDeviceType::GPU};
 
-  std::mutex latch;
+  std::mutex latch_;
 };
 
 class CostModelException : std::runtime_error {

@@ -45,10 +45,10 @@ class LinearRegressionTest : public LinearRegression {
       : LinearRegression(measurement) {}
 
   void equalsWs(arma::vec wExpected) {
-    ASSERT_EQ(w.size(), wExpected.size());
+    ASSERT_EQ(w_.size(), wExpected.size());
 
-    for (size_t i = 0; i < w.size(); i++) {
-      ASSERT_TRUE(doubleEquals(w(i), wExpected(i)));
+    for (size_t i = 0; i < w_.size(); i++) {
+      ASSERT_TRUE(doubleEquals(w_(i), wExpected(i)));
     }
   }
 };
