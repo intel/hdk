@@ -46,16 +46,16 @@ std::vector<Detail::Measurement> DwarfBenchDataSource::measureTemplateOnDevice(
     ExecutorDeviceType device,
     AnalyticalTemplate templ) {
   std::vector<Detail::Measurement> ms;
-  for (size_t inputSize : dwarfBenchInputSizes) {
+  for (size_t inputSize : dwarfBenchInputSizes_) {
     DwarfBench::RunConfig rc = {
         .device = convertDeviceType(device),
         .inputSize = inputSize,
-        .iterations = dwarfBenchIterations,
+        .iterations = dwarfBenchIterations_,
         .dwarf = convertToDwarf(templ),
     };
 
     std::vector<Detail::Measurement> inputSizeMeasurements =
-        convertMeasurement(db.makeMeasurements(rc));
+        convertMeasurement(db_.makeMeasurements(rc));
 
     ms.insert(ms.end(), inputSizeMeasurements.begin(), inputSizeMeasurements.end());
   }

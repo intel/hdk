@@ -17,28 +17,28 @@
 namespace costmodel {
 
 CostModel::CostModel(std::unique_ptr<DataSource> _dataSource)
-    : dataSource(std::move(_dataSource)) {
-  for (AnalyticalTemplate templ : templates) {
-    if (!dataSource->isTemplateSupported(templ))
+    : dataSource_(std::move(_dataSource)) {
+  for (AnalyticalTemplate templ : templates_) {
+    if (!dataSource_->isTemplateSupported(templ))
       throw CostModelException("template " + templateToString(templ) +
-                               " not supported in " + dataSource->getName() +
+                               " not supported in " + dataSource_->getName() +
                                " data source");
   }
 
-  for (ExecutorDeviceType device : devices) {
-    if (!dataSource->isDeviceSupported(device))
+  for (ExecutorDeviceType device : devices_) {
+    if (!dataSource_->isDeviceSupported(device))
       throw CostModelException("device " + deviceToString(device) + " not supported in " +
-                               dataSource->getName() + " data source");
+                               dataSource_->getName() + " data source");
   }
 }
 
 void CostModel::calibrate(const CaibrationConfig& conf) {
-  std::lock_guard<std::mutex> g{latch};
+  std::lock_guard<std::mutex> g{latch_};
 
   Detail::DeviceMeasurements dm;
 
   try {
-    dm = dataSource->getMeasurements(conf.devices, templates);
+    dm = dataSource_->getMeasurements(conf.devices, templates_);
   } catch (const std::exception& e) {
     LOG(ERROR) << "Cost model calibration failure: " << e.what();
     return;
@@ -49,13 +49,13 @@ void CostModel::calibrate(const CaibrationConfig& conf) {
 
     for (auto& templateMeasurement : dmEntry.second) {
       AnalyticalTemplate templ = templateMeasurement.first;
-      dp[device][templ] =
+      dp_[device][templ] =
           std::make_unique<LinearExtrapolation>(std::move(templateMeasurement.second));
     }
   }
 }
 
-const std::vector<AnalyticalTemplate> CostModel::templates = {GroupBy,
+const std::vector<AnalyticalTemplate> CostModel::templates_ = {GroupBy,
                                                               Join,
                                                               Scan,
                                                               Reduce};
