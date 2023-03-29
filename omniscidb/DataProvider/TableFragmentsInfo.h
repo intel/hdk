@@ -42,8 +42,7 @@ class FragmentInfo {
       , physicalTableId(-1)
       , resultSet(nullptr)
       , numTuples(0)
-      , synthesizedNumTuplesIsValid(false)
-      , synthesizedMetadataIsValid(false) {}
+      , synthesizedNumTuplesIsValid(false) {}
 
   void setChunkMetadataMap(const ChunkMetadataMap& chunk_metadata_map) {
     this->chunkMetadataMap = chunk_metadata_map;
@@ -67,7 +66,6 @@ class FragmentInfo {
 
   void setPhysicalNumTuples(const size_t physNumTuples) { numTuples = physNumTuples; }
 
-  void invalidateChunkMetadataMap() const { synthesizedMetadataIsValid = false; };
   void invalidateNumTuples() const { synthesizedNumTuplesIsValid = false; }
 
   int fragmentId;
@@ -82,7 +80,6 @@ class FragmentInfo {
   mutable size_t numTuples;
   mutable ChunkMetadataMap chunkMetadataMap;
   mutable bool synthesizedNumTuplesIsValid;
-  mutable bool synthesizedMetadataIsValid;
 };
 
 class TableFragmentsInfo {

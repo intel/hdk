@@ -205,7 +205,7 @@ ChunkIter Chunk::begin_iterator(const std::shared_ptr<ChunkMetadata>& chunk_meta
     it.end_pos = buffer_->getMemoryPtr() + buffer_->size();
     it.second_buf = nullptr;
   }
-  it.num_elems = chunk_metadata->numElements;
+  it.num_elems = chunk_metadata->numElements();
   return it;
 }
 }  // namespace Chunk_NS

@@ -215,10 +215,10 @@ void checkChunkMeta(std::shared_ptr<ChunkMetadata> meta,
                     size_t num_rows,
                     size_t num_bytes,
                     bool has_nulls) {
-  CHECK(meta->type->equal(type));
-  CHECK_EQ(meta->numElements, num_rows);
-  CHECK_EQ(meta->numBytes, num_bytes);
-  CHECK_EQ(meta->chunkStats.has_nulls, has_nulls);
+  CHECK(meta->type()->equal(type));
+  CHECK_EQ(meta->numElements(), num_rows);
+  CHECK_EQ(meta->numBytes(), num_bytes);
+  CHECK_EQ(meta->chunkStats().has_nulls, has_nulls);
 }
 
 template <typename T>
@@ -230,8 +230,8 @@ void checkChunkMeta(std::shared_ptr<ChunkMetadata> meta,
                     T min,
                     T max) {
   checkChunkMeta(meta, type, num_rows, num_bytes, has_nulls);
-  checkDatum(meta->chunkStats.min, min, type);
-  checkDatum(meta->chunkStats.max, max, type);
+  checkDatum(meta->chunkStats().min, min, type);
+  checkDatum(meta->chunkStats().max, max, type);
 }
 
 template <typename T>

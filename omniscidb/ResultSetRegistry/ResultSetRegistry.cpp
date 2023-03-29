@@ -5,6 +5,7 @@
  */
 
 #include "ResultSetRegistry.h"
+#include "ResultSetMetadata.h"
 
 #include "DataMgr/DataMgr.h"
 
@@ -106,6 +107,8 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                   false);
   }
 
+  // TODO: lazily compute row count and try to avoid global write
+  // locks for that
   auto table_data = std::make_unique<TableData>();
   size_t row_count = 0;
   for (auto& rs : table.results()) {
@@ -113,9 +116,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
     frag.offset = row_count;
     frag.row_count = rs->rowCount();
     frag.rs = rs;
-    if (useColumnarResults(*rs)) {
-      frag.mutex = std::make_unique<std::mutex>();
-    }
+    frag.mutex = std::make_unique<mapd_shared_mutex>();
 
     row_count += frag.row_count;
     table_data->fragments.emplace_back(std::move(frag));
@@ -146,6 +147,27 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
   tables_.erase(token.tableId());
 
   SimpleSchemaProvider::dropTable(token.dbId(), token.tableId());
+}
+
+ChunkStats ResultSetRegistry::getChunkStats(const ResultSetTableToken& token,
+                                            size_t frag_idx,
+                                            size_t col_idx) const {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK(tables_.count(token.tableId()));
+  auto& table = *tables_.at(token.tableId());
+  mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
+  CHECK_LT(frag_idx, table.fragments.size());
+  auto& frag = table.fragments[frag_idx];
+  mapd_shared_lock<mapd_shared_mutex> frag_read_lock(*frag.mutex);
+
+  if (frag.meta.empty()) {
+    frag_read_lock.unlock();
+    mapd_unique_lock<mapd_shared_mutex> frag_write_lock(*frag.mutex);
+    if (frag.meta.empty()) {
+      frag.meta = synthesizeMetadata(frag.rs.get());
+    }
+  }
+  return frag.meta.at(col_idx)->chunkStats();
 }
 
 void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
@@ -189,11 +211,12 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
   // clean-up tokens we are not going to use in TemporaryTables of
   // RelAlgExecutor.
   if (useColumnarResults(*frag.rs)) {
+    mapd_shared_lock<mapd_shared_mutex> frag_read_lock(*frag.mutex);
     if (frag.columnar_res) {
       buf = frag.columnar_res->getColumnBuffers()[col_idx];
     } else {
-      CHECK(frag.mutex);
-      std::lock_guard<std::mutex> columnaraize_lock(*frag.mutex);
+      frag_read_lock.unlock();
+      mapd_unique_lock<mapd_shared_mutex> frag_write_lock(*frag.mutex);
       if (!frag.columnar_res) {
         std::vector<const hdk::ir::Type*> col_types;
         for (size_t i = 0; i < frag.rs->colCount(); ++i) {

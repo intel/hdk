@@ -154,34 +154,67 @@ inline void mergeStats(ChunkStats& lhs,
   }
 }
 
-struct ChunkMetadata {
-  const hdk::ir::Type* type;
-  size_t numBytes;
-  size_t numElements;
-  ChunkStats chunkStats;
+class ChunkMetadata {
+ public:
+  using StatsMaterializeFn = std::function<void(ChunkStats&)>;
+
+  ChunkMetadata(const hdk::ir::Type* type,
+                const size_t num_bytes,
+                const size_t num_elements)
+      : type_(type), num_bytes_(num_bytes), num_elements_(num_elements) {}
+
+  ChunkMetadata(const hdk::ir::Type* type,
+                const size_t num_bytes,
+                const size_t num_elements,
+                const ChunkStats& chunk_stats)
+      : type_(type)
+      , num_bytes_(num_bytes)
+      , num_elements_(num_elements)
+      , chunk_stats_(chunk_stats) {}
+
+  ChunkMetadata(const hdk::ir::Type* type,
+                const size_t num_bytes,
+                const size_t num_elements,
+                StatsMaterializeFn stats_materialize_fn)
+      : type_(type)
+      , num_bytes_(num_bytes)
+      , num_elements_(num_elements)
+      , stats_materialize_fn_(std::move(stats_materialize_fn)) {}
+
+  const hdk::ir::Type* type() const { return type_; }
+  size_t numBytes() const { return num_bytes_; }
+  size_t numElements() const { return num_elements_; }
+  const ChunkStats& chunkStats() const {
+    maybeMaterializeStats();
+    return chunk_stats_;
+  }
 
 #ifndef __CUDACC__
   std::string dump() const {
+    std::string res = "type: " + type_->toString() +
+                      " numBytes: " + to_string(num_bytes_) + " numElements " +
+                      to_string(num_elements_);
     auto elem_type =
-        type->isArray() ? type->as<hdk::ir::ArrayBaseType>()->elemType() : type;
-    // Unencoded strings have no min/max.
-    if (elem_type->isString()) {
-      return "type: " + type->toString() + " numBytes: " + to_string(numBytes) +
-             " numElements " + to_string(numElements) + " min: <invalid>" +
-             " max: <invalid>" + " has_nulls: " + to_string(chunkStats.has_nulls);
+        type_->isArray() ? type_->as<hdk::ir::ArrayBaseType>()->elemType() : type_;
+    if (stats_materialize_fn_) {
+      res +=
+          " min: <not materialized> max: <not materialized> has_nulls: <not "
+          "materialized>";
+    } else if (elem_type->isString()) {
+      // Unencoded strings have no min/max.
+      res += " min: <invalid> max: <invalid> has_nulls: " +
+             to_string(chunk_stats_.has_nulls);
     } else if (elem_type->isExtDictionary()) {
-      return "type: " + type->toString() + " numBytes: " + to_string(numBytes) +
-             " numElements " + to_string(numElements) +
-             " min: " + to_string(chunkStats.min.intval) +
-             " max: " + to_string(chunkStats.max.intval) +
-             " has_nulls: " + to_string(chunkStats.has_nulls);
+      res += " min: " + to_string(chunk_stats_.min.intval) +
+             " max: " + to_string(chunk_stats_.max.intval) +
+             " has_nulls: " + to_string(chunk_stats_.has_nulls);
     } else {
-      return "type: " + type->toString() + " numBytes: " + to_string(numBytes) +
-             " numElements " + to_string(numElements) +
-             " min: " + DatumToString(chunkStats.min, elem_type) +
-             " max: " + DatumToString(chunkStats.max, elem_type) +
-             " has_nulls: " + to_string(chunkStats.has_nulls);
+      res += " min: " + DatumToString(chunk_stats_.min, elem_type) +
+             " max: " + DatumToString(chunk_stats_.max, elem_type) +
+             " has_nulls: " + to_string(chunk_stats_.has_nulls);
     }
+
+    return res;
   }
 
   std::string toString() const {
@@ -189,41 +222,66 @@ struct ChunkMetadata {
   }
 #endif
 
-  ChunkMetadata(const hdk::ir::Type* type_,
-                const size_t num_bytes,
-                const size_t num_elements,
-                const ChunkStats& chunk_stats)
-      : type(type_)
-      , numBytes(num_bytes)
-      , numElements(num_elements)
-      , chunkStats(chunk_stats) {}
-
-  ChunkMetadata() {}
-
   template <typename T>
   void fillChunkStats(const T min, const T max, const bool has_nulls) {
-    ::fillChunkStats(chunkStats, type, min, max, has_nulls);
+    StatsMaterializeFn().swap(stats_materialize_fn_);
+    ::fillChunkStats(chunk_stats_, type_, min, max, has_nulls);
+  }
+
+  void fillChunkStats(const ChunkStats& new_stats) {
+    StatsMaterializeFn().swap(stats_materialize_fn_);
+    chunk_stats_ = new_stats;
   }
 
   void fillChunkStats(const Datum min, const Datum max, const bool has_nulls) {
-    chunkStats.has_nulls = has_nulls;
-    chunkStats.min = min;
-    chunkStats.max = max;
+    StatsMaterializeFn().swap(stats_materialize_fn_);
+    chunk_stats_.has_nulls = has_nulls;
+    chunk_stats_.min = min;
+    chunk_stats_.max = max;
+  }
+
+  void fillStringChunkStats(const bool has_nulls) {
+    StatsMaterializeFn().swap(stats_materialize_fn_);
+    chunk_stats_.has_nulls = has_nulls;
+#ifndef __CUDACC__
+    chunk_stats_.min.stringval = nullptr;
+    chunk_stats_.max.stringval = nullptr;
+#endif
   }
 
   bool operator==(const ChunkMetadata& that) const {
-    return type->equal(that.type) && numBytes == that.numBytes &&
-           numElements == that.numElements &&
-           DatumEqual(
-               chunkStats.min,
-               that.chunkStats.min,
-               type->isArray() ? type->as<hdk::ir::ArrayBaseType>()->elemType() : type) &&
-           DatumEqual(
-               chunkStats.max,
-               that.chunkStats.max,
-               type->isArray() ? type->as<hdk::ir::ArrayBaseType>()->elemType() : type) &&
-           chunkStats.has_nulls == that.chunkStats.has_nulls;
+    if (!type_->equal(that.type_) || num_bytes_ != that.num_bytes_ ||
+        num_elements_ != that.num_elements_) {
+      return false;
+    }
+
+    maybeMaterializeStats();
+    that.maybeMaterializeStats();
+
+    return DatumEqual(chunk_stats_.min,
+                      that.chunk_stats_.min,
+                      type_->isArray() ? type_->as<hdk::ir::ArrayBaseType>()->elemType()
+                                       : type_) &&
+           DatumEqual(chunk_stats_.max,
+                      that.chunk_stats_.max,
+                      type_->isArray() ? type_->as<hdk::ir::ArrayBaseType>()->elemType()
+                                       : type_) &&
+           chunk_stats_.has_nulls == that.chunk_stats_.has_nulls;
   }
+
+ private:
+  void maybeMaterializeStats() const {
+    if (stats_materialize_fn_) {
+      stats_materialize_fn_(chunk_stats_);
+      StatsMaterializeFn().swap(stats_materialize_fn_);
+    }
+  }
+
+  const hdk::ir::Type* type_;
+  size_t num_bytes_;
+  size_t num_elements_;
+  mutable ChunkStats chunk_stats_;
+  mutable StatsMaterializeFn stats_materialize_fn_;
 };
 
 inline int64_t extract_min_stat_int_type(const ChunkStats& stats,

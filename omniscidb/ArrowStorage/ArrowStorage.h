@@ -167,9 +167,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                            const TableOptions& options) const;
   void compareSchemas(std::shared_ptr<arrow::Schema> lhs,
                       std::shared_ptr<arrow::Schema> rhs);
-  void computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
-                    const hdk::ir::Type* type,
-                    ChunkStats& stats);
+  ChunkStats computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
+                          const hdk::ir::Type* type);
   std::shared_ptr<arrow::Table> parseCsvFile(const std::string& file_name,
                                              const CsvParseOptions parse_options,
                                              const ColumnInfoList& col_infos = {});

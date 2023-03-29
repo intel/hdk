@@ -75,15 +75,14 @@ class TestTableData {
       info_.setPhysicalNumTuples(info_.getPhysicalNumTuples() + vals.size());
     }
 
-    auto chunk_meta = std::make_shared<ChunkMetadata>();
-    chunk_meta->type = col_types_.at(col_id);
-    chunk_meta->numBytes = frag_data.size();
-    chunk_meta->numElements = vals.size();
-
     // No computed meta.
-    chunk_meta->chunkStats.has_nulls = true;
-    set_datum(chunk_meta->chunkStats.min, *std::min_element(vals.begin(), vals.end()));
-    set_datum(chunk_meta->chunkStats.max, *std::max_element(vals.begin(), vals.end()));
+    ChunkStats stats;
+    stats.has_nulls = true;
+    set_datum(stats.min, *std::min_element(vals.begin(), vals.end()));
+    set_datum(stats.max, *std::max_element(vals.begin(), vals.end()));
+
+    auto chunk_meta = std::make_shared<ChunkMetadata>(
+        col_types_.at(col_id), frag_data.size(), vals.size(), stats);
 
     auto& frag_info = info_.fragments[data_[col_id - 1].size() - 1];
     frag_info.setChunkMetadata(col_id, chunk_meta);

@@ -66,9 +66,10 @@ class ArrayNoneEncoder : public Encoder {
     return n - start_idx;
   }
 
-  void getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata) override {
-    Encoder::getMetadata(chunkMetadata);  // call on parent class
-    chunkMetadata->fillChunkStats(elem_min, elem_max, has_nulls);
+  std::shared_ptr<ChunkMetadata> getMetadata() override {
+    auto res = Encoder::getMetadata();
+    res->fillChunkStats(elem_min, elem_max, has_nulls);
+    return res;
   }
 
   // Only called from the executor for synthesized meta-information.
