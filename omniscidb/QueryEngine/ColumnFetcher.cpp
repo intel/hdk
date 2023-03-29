@@ -109,8 +109,8 @@ std::pair<const int8_t*, size_t> ColumnFetcher::getOneColumnFragment(
         chunk_key,
         effective_mem_lvl,
         effective_mem_lvl == Data_Namespace::CPU_LEVEL ? 0 : device_id,
-        chunk_meta_it->second->numBytes,
-        chunk_meta_it->second->numElements);
+        chunk_meta_it->second->numBytes(),
+        chunk_meta_it->second->numElements());
     chunks_owner.push_back(chunk);
     CHECK(chunk);
     auto ab = chunk->getBuffer();
@@ -255,8 +255,8 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
         chunk_key,
         memory_level,
         memory_level == Data_Namespace::CPU_LEVEL ? 0 : device_id,
-        chunk_meta_it->second->numBytes,
-        chunk_meta_it->second->numElements);
+        chunk_meta_it->second->numBytes(),
+        chunk_meta_it->second->numElements());
     std::lock_guard<std::mutex> chunk_list_lock(chunk_list_mutex_);
     chunk_holder.push_back(chunk);
   }
@@ -334,7 +334,7 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
             std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
                                               col_buffer,
                                               fragment.getNumTuples(),
-                                              chunk_meta_it->second->type,
+                                              chunk_meta_it->second->type(),
                                               thread_idx));
       }
       auto merged_results =
@@ -445,8 +445,8 @@ const int8_t* ColumnFetcher::linearizeColumnFragments(
                                         chunk_key,
                                         Data_Namespace::CPU_LEVEL,
                                         0,
-                                        chunk_meta_it->second->numBytes,
-                                        chunk_meta_it->second->numElements);
+                                        chunk_meta_it->second->numBytes(),
+                                        chunk_meta_it->second->numElements());
       local_chunk_holder.push_back(chunk);
       auto chunk_iter = chunk->begin_iterator(chunk_meta_it->second);
       local_chunk_iter_holder.push_back(chunk_iter);

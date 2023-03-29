@@ -45,11 +45,10 @@ class StringNoneEncoder : public Encoder {
                                        const size_t byteLimit,
                                        const bool replicating = false);
 
-  void getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata) override {
-    Encoder::getMetadata(chunkMetadata);  // call on parent class
-    chunkMetadata->chunkStats.min.stringval = nullptr;
-    chunkMetadata->chunkStats.max.stringval = nullptr;
-    chunkMetadata->chunkStats.has_nulls = has_nulls;
+  std::shared_ptr<ChunkMetadata> getMetadata() override {
+    auto res = Encoder::getMetadata();
+    res->fillStringChunkStats(has_nulls);
+    return res;
   }
 
   // Only called from the executor for synthesized meta-information.

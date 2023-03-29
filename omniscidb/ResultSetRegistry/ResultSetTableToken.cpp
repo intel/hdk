@@ -35,4 +35,9 @@ void ResultSetTableToken::reset() {
   }
 }
 
+ChunkStats ResultSetTableToken::getChunkStats(size_t rs_idx, size_t col_idx) const {
+  CHECK(!empty());
+  return registry_->getChunkStats(*this, rs_idx, col_idx);
+}
+
 }  // namespace hdk

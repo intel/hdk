@@ -120,8 +120,6 @@ Encoder::Encoder(Data_Namespace::AbstractBuffer* buffer)
     , decimal_overflow_validator_(buffer ? buffer->type() : nullptr)
     , date_days_overflow_validator_(buffer ? buffer->type() : nullptr){};
 
-void Encoder::getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata) {
-  chunkMetadata->type = buffer_->type();
-  chunkMetadata->numBytes = buffer_->size();
-  chunkMetadata->numElements = num_elems_;
+std::shared_ptr<ChunkMetadata> Encoder::getMetadata() {
+  return std::make_shared<ChunkMetadata>(buffer_->type(), buffer_->size(), num_elems_);
 }

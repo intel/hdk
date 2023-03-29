@@ -3686,8 +3686,8 @@ FragmentSkipStatus Executor::canSkipFragmentForFpQual(
   double chunk_min{0.};
   double chunk_max{0.};
   const auto& chunk_type = lhs_col->type();
-  chunk_min = extract_min_stat_fp_type(chunk_meta_it->second->chunkStats, chunk_type);
-  chunk_max = extract_max_stat_fp_type(chunk_meta_it->second->chunkStats, chunk_type);
+  chunk_min = extract_min_stat_fp_type(chunk_meta_it->second->chunkStats(), chunk_type);
+  chunk_max = extract_max_stat_fp_type(chunk_meta_it->second->chunkStats(), chunk_type);
   if (chunk_min > chunk_max) {
     return FragmentSkipStatus::INVALID;
   }
@@ -3809,9 +3809,9 @@ std::pair<bool, int64_t> Executor::skipFragment(
     } else {
       const auto& chunk_type = lhs_col->type();
       chunk_min =
-          extract_min_stat_int_type(chunk_meta_it->second->chunkStats, chunk_type);
+          extract_min_stat_int_type(chunk_meta_it->second->chunkStats(), chunk_type);
       chunk_max =
-          extract_max_stat_int_type(chunk_meta_it->second->chunkStats, chunk_type);
+          extract_max_stat_int_type(chunk_meta_it->second->chunkStats(), chunk_type);
     }
     if (chunk_min > chunk_max) {
       // invalid metadata range, do not skip fragment

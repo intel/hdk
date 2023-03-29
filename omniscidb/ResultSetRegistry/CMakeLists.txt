@@ -1,5 +1,6 @@
 set(result_set_registry_source_files
     ColumnarResults.cpp
+    ResultSetMetadata.cpp
     ResultSetRegistry.cpp
     ResultSetTableToken.cpp
 )

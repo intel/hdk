@@ -168,7 +168,7 @@ class Encoder {
   Encoder(Data_Namespace::AbstractBuffer* buffer);
   virtual ~Encoder() {}
 
-  virtual void getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata);
+  virtual std::shared_ptr<ChunkMetadata> getMetadata();
   // Only called from the executor for synthesized meta-information.
   virtual std::shared_ptr<ChunkMetadata> getMetadata(const hdk::ir::Type* type) = 0;
   virtual void updateStats(const int64_t val, const bool is_null) = 0;

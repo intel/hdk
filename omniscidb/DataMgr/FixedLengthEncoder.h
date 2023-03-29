@@ -36,9 +36,10 @@ class FixedLengthEncoder : public Encoder {
     resetChunkStats();
   }
 
-  void getMetadata(const std::shared_ptr<ChunkMetadata>& chunkMetadata) override {
-    Encoder::getMetadata(chunkMetadata);  // call on parent class
-    chunkMetadata->fillChunkStats(dataMin, dataMax, has_nulls);
+  std::shared_ptr<ChunkMetadata> getMetadata() override {
+    auto res = Encoder::getMetadata();
+    res->fillChunkStats(dataMin, dataMax, has_nulls);
+    return res;
   }
 
   // Only called from the executor for synthesized meta-information.

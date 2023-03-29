@@ -48,8 +48,6 @@ class InputTableInfoCache {
   Executor* executor_;
 };
 
-ChunkMetadataMap synthesize_metadata(const ResultSet* rows);
-
 size_t get_frag_count_of_table(const int db_id, const int table_id, Executor* executor);
 
 std::vector<InputTableInfo> get_table_infos(

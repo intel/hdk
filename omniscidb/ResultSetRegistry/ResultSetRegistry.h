@@ -40,6 +40,10 @@ class ResultSetRegistry : public SimpleSchemaProvider,
   ResultSetPtr get(const ResultSetTableToken& token, size_t frag_id) const;
   void drop(const ResultSetTableToken& token);
 
+  ChunkStats getChunkStats(const ResultSetTableToken& token,
+                           size_t frag_idx,
+                           size_t col_idx) const;
+
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
                    const size_t num_bytes = 0) override;
@@ -60,7 +64,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
     size_t row_count = 0;
     ResultSetPtr rs;
     std::unique_ptr<ColumnarResults> columnar_res;
-    std::unique_ptr<std::mutex> mutex;
+    std::unique_ptr<mapd_shared_mutex> mutex;
+    ChunkMetadataMap meta;
   };
 
   struct TableData {
