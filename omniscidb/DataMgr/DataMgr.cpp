@@ -204,7 +204,9 @@ void DataMgr::populateDeviceMgrs(const Config& config) {
   if (!has_gpus_) {
     LOG(INFO) << "None of the passed GpuMgr instances is valid, falling back to "
                  "CPU-only mode.";
+    return;
   }
+  current_device_mgr_ = device_mgrs_.begin()->second.get();
 }
 
 void DataMgr::populateMgrs(const Config& config,
@@ -260,6 +262,8 @@ void DataMgr::populateMgrs(const Config& config,
                          cpu_tier_sizes);
 
     for (auto& [p, mgr] : device_mgrs_) {
+      LOG(DEBUG2) << "Creating device context for platform "
+                  << (p == GpuMgrPlatform::L0 ? "L0" : "CUDA");
       device_contexts_[p] = std::make_unique<GpuMgrContext>();
       auto& device_context = device_contexts_[p];
       device_context->gpu_mgr = mgr.get();
@@ -337,6 +341,7 @@ std::vector<Buffer_Namespace::MemoryInfo> DataMgr::getMemoryInfo(
     mem_info.push_back(cpu_buffer->getMemoryInfo());
   } else if (has_gpus_) {
     int num_gpus = getGpuMgr()->getDeviceCount();
+    CHECK_EQ(num_gpus, bufferMgrs_[MemoryLevel::GPU_LEVEL].size());
     for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
       Buffer_Namespace::BufferMgr* gpu_buffer =
           dynamic_cast<Buffer_Namespace::BufferMgr*>(
@@ -404,12 +409,6 @@ GpuMgr* DataMgr::getGpuMgr(GpuMgrPlatform name) const {
 void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
   CHECK(device_contexts_.count(name));
   CHECK(device_mgrs_.count(name));
-  if (current_device_mgr_ && current_device_mgr_->getPlatform() == name) {
-    LOG(INFO) << "Current platform is the same as requested ("
-              << (name == GpuMgrPlatform::L0 ? "L0" : "CUDA")
-              << "). Skipping context switch.";
-    return;
-  }
   current_device_mgr_ = device_mgrs_.at(name).get();
   bufferMgrs_[MemoryLevel::GPU_LEVEL] = device_contexts_.at(name)->buffer_mgrs;
   levelSizes_[MemoryLevel::GPU_LEVEL] = device_contexts_.at(name)->gpu_count;

@@ -17,4 +17,11 @@
 
 #pragma once
 
+#include <ostream>
+
 enum GpuMgrPlatform { CUDA, L0 };
+
+inline std::ostream& operator<<(std::ostream& os, GpuMgrPlatform p) {
+  constexpr char const* names[]{"CUDA", "L0"};
+  return os << names[static_cast<int>(p)];
+}
