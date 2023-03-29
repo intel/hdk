@@ -258,7 +258,9 @@ QueryMemoryInitializer::QueryMemoryInitializer(
     , device_allocator_(device_allocator)
     , use_hash_table_desc_(use_hash_table_desc)
     , thread_idx_(thread_idx)
-    , gpu_mgr_platform_(executor->getDataMgr()->getGpuMgr()->getPlatform()) {
+    , gpu_mgr_platform_(executor->getDataMgr()->getGpuMgr()
+                            ? executor->getDataMgr()->getGpuMgr()->getPlatform()
+                            : GpuMgrPlatform::CUDA) {
   CHECK(!sort_on_gpu || output_columnar);
 
   const auto& consistent_frag_sizes = get_consistent_frags_sizes(frag_offsets);
