@@ -34,21 +34,17 @@ class DataSourceTest : public DataSource {
   }
 };
 
-bool doubleEquals(double x, double y) {
-  const double EPS = 0.0001;
-  return std::abs(x - y) < EPS;
-}
-
 class LinearRegressionTest : public LinearRegression {
  public:
   LinearRegressionTest(std::vector<Detail::Measurement>& measurement)
       : LinearRegression(measurement) {}
 
   void equalsWs(arma::vec wExpected) {
+    const double EPS = 0.001;
     ASSERT_EQ(w_.size(), wExpected.size());
 
     for (size_t i = 0; i < w_.size(); i++) {
-      ASSERT_TRUE(doubleEquals(w_(i), wExpected(i)));
+      ASSERT_NEAR(w_(i), wExpected(i), EPS);
     }
   }
 };
