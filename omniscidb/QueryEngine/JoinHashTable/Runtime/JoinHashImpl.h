@@ -37,15 +37,21 @@
                              static_cast<long>(val),                    \
                              static_cast<long>(compare))
 #else
-#define insert_key_cas(address, compare, val) \
-  __sync_val_compare_and_swap(address, compare, val)
+// returns true if desired is written into ptr which implies *ptr == expected
+#define insert_key_cas(ptr, expected, desired) \
+  __atomic_compare_exchange_n(                 \
+      ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
 extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_one_to_one_hashtable)(
     size_t idx,
     GENERIC_ADDR_SPACE int32_t* entry_ptr,
     const int32_t invalid_slot_val) {
-  if (insert_key_cas(entry_ptr, invalid_slot_val, idx) != invalid_slot_val) {
+  // the atomic takes the address of invalid_slot_val to write the value of entry_ptr if
+  // not equal to invalid_slot_val. make a copy to avoid dereferencing a const value.
+  auto invalid_slot_val_copy = invalid_slot_val;
+  if (!insert_key_cas(entry_ptr, invalid_slot_val_copy, idx)) {
+    // slot is full
     return -1;
   }
   return 0;
@@ -57,7 +63,8 @@ extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_hashtable_for_semi_join)(
     const int32_t invalid_slot_val) {
   // just mark the existence of value to the corresponding hash slot
   // regardless of hashtable collision
-  insert_key_cas(entry_ptr, invalid_slot_val, idx);
+  auto invalid_slot_val_copy = invalid_slot_val;
+  insert_key_cas(entry_ptr, invalid_slot_val_copy, idx);
   return 0;
 }
 

@@ -222,7 +222,9 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
                              static_cast<long>(val),                    \
                              static_cast<long>(compare))
 #else
-#define mapd_cas(address, compare, val) __sync_val_compare_and_swap(address, compare, val)
+#define mapd_cas(ptr, expected, desired) \
+  __atomic_compare_exchange_n(           \
+      ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
 template <typename HASHTABLE_FILLING_FUNC>
@@ -522,7 +524,8 @@ DEVICE int write_baseline_hash_slot(const int32_t val,
   if (!with_val_slot) {
     return 0;
   }
-  if (mapd_cas(matching_group, invalid_slot_val, val) != invalid_slot_val) {
+  int32_t invalid_slot_val_copy = invalid_slot_val;
+  if (!mapd_cas(matching_group, invalid_slot_val_copy, val)) {
     return -1;
   }
   return 0;
@@ -558,7 +561,8 @@ DEVICE int write_baseline_hash_slot_for_semi_join(const int32_t val,
   if (!with_val_slot) {
     return 0;
   }
-  mapd_cas(matching_group, invalid_slot_val, val);
+  int32_t invalid_slot_val_copy = invalid_slot_val;
+  mapd_cas(matching_group, invalid_slot_val_copy, val);
   return 0;
 }
 

@@ -456,7 +456,9 @@ namespace {
                              static_cast<long>(val),                    \
                              static_cast<long>(compare))
 #else
-#define mapd_cas(address, compare, val) __sync_val_compare_and_swap(address, compare, val)
+#define mapd_cas(ptr, expected, desired) \
+  __atomic_compare_exchange_n(           \
+      ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
 GroupValueInfo get_matching_group_value_columnar_reduction(int64_t* groups_buffer,
@@ -465,8 +467,8 @@ GroupValueInfo get_matching_group_value_columnar_reduction(int64_t* groups_buffe
                                                            const uint32_t key_qw_count,
                                                            const size_t entry_count) {
   auto off = h;
-  const auto old_key = mapd_cas(&groups_buffer[off], EMPTY_KEY_64, *key);
-  if (old_key == EMPTY_KEY_64) {
+  auto empty_key = EMPTY_KEY_64;
+  if (mapd_cas(&groups_buffer[off], empty_key, *key)) {
     for (size_t i = 0; i < key_qw_count; ++i) {
       groups_buffer[off] = key[i];
       off += entry_count;
