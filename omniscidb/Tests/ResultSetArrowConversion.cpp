@@ -112,7 +112,7 @@ std::shared_ptr<arrow::RecordBatch> getArrowRecordBatch(const ExecutionResult& r
     col_names.push_back(target.get_resname());
   }
   auto converter =
-      std::make_unique<ArrowResultSetConverter>(res.getDataPtr(), col_names, -1);
+      std::make_unique<ArrowResultSetConverter>(res.getRows(), col_names, -1);
   return converter->convertToArrow();
 }
 
@@ -122,7 +122,7 @@ std::shared_ptr<arrow::Table> getArrowTable(const ExecutionResult& res) {
     col_names.push_back(target.get_resname());
   }
   auto converter =
-      std::make_unique<ArrowResultSetConverter>(res.getDataPtr(), col_names, -1);
+      std::make_unique<ArrowResultSetConverter>(res.getRows(), col_names, -1);
   return converter->convertToArrowTable();
 }
 
@@ -426,10 +426,10 @@ TEST(ArrowTable, SameLimitedOffsetSelection) {
 
   auto res = runSqlQuery(
       "SELECT * FROM LargeTable offset 2 limit 2;", ExecutorDeviceType::CPU, true);
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 2);
+  ASSERT_EQ(res.getRows()->getLimit(), 2);
+  ASSERT_EQ(res.getRows()->getOffset(), 2);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)2);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(0), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(0), true);
 
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -484,15 +484,15 @@ TEST(ArrowTable, ColumnarLimitedJoin) {
       ExecutorDeviceType::CPU,
       true);
 
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 5);
+  ASSERT_EQ(res.getRows()->getLimit(), 2);
+  ASSERT_EQ(res.getRows()->getOffset(), 5);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)1);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(4), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(5), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(6), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(4), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(5), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(6), true);
 
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -533,8 +533,8 @@ TEST(ArrowTable, ColumnarEmptyLimitedJoin) {
   auto res = runSqlQuery(
       "SELECT * FROM test_chunked offset 8 limit 2;", ExecutorDeviceType::CPU, true);
 
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 2);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 8);
+  ASSERT_EQ(res.getRows()->getLimit(), 2);
+  ASSERT_EQ(res.getRows()->getOffset(), 8);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)0);
 
   auto table = getArrowTable(res);
@@ -557,12 +557,12 @@ TEST(ArrowTable, ColumnarMultiStoragedJoin) {
   auto res = runSqlQuery(
       "SELECT * FROM test_chunked offset 3 limit 7;", ExecutorDeviceType::CPU, true);
 
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 7);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 3);
+  ASSERT_EQ(res.getRows()->getLimit(), 7);
+  ASSERT_EQ(res.getRows()->getOffset(), 3);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)3);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(3), true);
 
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -593,12 +593,12 @@ TEST(ArrowTable, ColumnarMultiStoraged) {
   auto res = runSqlQuery(
       "SELECT * FROM test_chunked offset 5 limit 7;", ExecutorDeviceType::CPU, true);
 
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 7);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 5);
+  ASSERT_EQ(res.getRows()->getLimit(), 7);
+  ASSERT_EQ(res.getRows()->getOffset(), 5);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)1);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(1), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(2), true);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(3), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(1), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(2), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(3), true);
 
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -638,10 +638,10 @@ TEST(ArrowTable, ColumnarLargeStoraged) {
   auto res = runSqlQuery(
       "SELECT * FROM LargeTable offset 7000 limit 3000;", ExecutorDeviceType::CPU, true);
 
-  ASSERT_EQ(res.getDataPtr()->getLimit(), 3000);
-  ASSERT_EQ(res.getDataPtr()->getOffset(), 7000);
+  ASSERT_EQ(res.getRows()->getLimit(), 3000);
+  ASSERT_EQ(res.getRows()->getOffset(), 7000);
   ASSERT_EQ(res.getRows()->rowCount(), (int64_t)3000);
-  ASSERT_EQ(res.getDataPtr()->isChunkedZeroCopyColumnarConversionPossible(0), true);
+  ASSERT_EQ(res.getRows()->isChunkedZeroCopyColumnarConversionPossible(0), true);
 
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);

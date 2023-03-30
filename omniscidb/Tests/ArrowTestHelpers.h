@@ -182,7 +182,7 @@ std::shared_ptr<arrow::Table> toArrow(const ExecutionResult& res) {
     col_names.push_back(target.get_resname());
   }
   auto converter =
-      std::make_unique<ArrowResultSetConverter>(res.getDataPtr(), col_names, -1);
+      std::make_unique<ArrowResultSetConverter>(res.getRows(), col_names, -1);
   return converter->convertToArrowTable();
 }
 

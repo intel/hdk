@@ -51,8 +51,6 @@ class ExecutionResult {
 
   bool empty() const { return !result_token_; }
 
-  ResultSetPtr getDataPtr() const { return getRows(); }
-
   const std::vector<TargetMetaInfo>& getTargetsMeta() const { return targets_meta_; }
 
   const std::vector<PushedDownFilterInfo>& getPushedDownFilterInfo() const;
