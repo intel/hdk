@@ -33,8 +33,6 @@ if(ENABLE_FOLLY)
    list(APPEND SETUP_FLAGS "-DHAVE_FOLLY") 
 endif()
 
-set(SETUP_INSTALL_FLAGS "--prefix \${CMAKE_INSTALL_PREFIX}")
-
 add_custom_target(pyhdk ALL
     COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
     DEPENDS Calcite ${pydeps}
@@ -42,9 +40,9 @@ add_custom_target(pyhdk ALL
 )
 
 add_custom_target(pyhdk-install
-    COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${SETUP_INSTALL_FLAGS}
+    COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install
     DEPENDS Calcite ${pydeps}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install ${SETUP_INSTALL_FLAGS})")
+install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS} install)")
