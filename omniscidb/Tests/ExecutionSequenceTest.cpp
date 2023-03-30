@@ -87,8 +87,7 @@ class ExecutionSequenceTest : public ::testing::Test {
   static void TearDownTestSuite() {}
 
   ExecutionResult runQuery(std::unique_ptr<QueryDag> dag, bool just_explain = false) {
-    auto ra_executor =
-        RelAlgExecutor(getExecutor(), getStorage(), getDataMgr(), std::move(dag));
+    auto ra_executor = RelAlgExecutor(getExecutor(), getStorage(), std::move(dag));
     auto eo = ExecutionOptions::fromConfig(config());
     eo.just_explain = just_explain;
     eo.allow_loop_joins = true;

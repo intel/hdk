@@ -91,32 +91,29 @@ bool is_extracted_dag_valid(ExtractedPlanDag& dag) {
 
 }  // namespace
 
-RelAlgExecutor::RelAlgExecutor(Executor* executor,
-                               SchemaProviderPtr schema_provider,
-                               Data_Namespace::DataMgr* data_mgr)
+RelAlgExecutor::RelAlgExecutor(Executor* executor, SchemaProviderPtr schema_provider)
     : executor_(executor)
     , schema_provider_(schema_provider)
-    , data_mgr_(data_mgr)
     , data_provider_(executor->getDataMgr()->getDataProvider())
     , config_(executor_->getConfig())
     , now_(0)
     , queue_time_ms_(0) {
-  rs_registry_ = hdk::ResultSetRegistry::init(data_mgr_, executor->getConfigPtr());
+  rs_registry_ = hdk::ResultSetRegistry::getOrCreate(executor->getDataMgr(),
+                                                     executor->getConfigPtr());
 }
 
 RelAlgExecutor::RelAlgExecutor(Executor* executor,
                                SchemaProviderPtr schema_provider,
-                               Data_Namespace::DataMgr* data_mgr,
                                std::unique_ptr<hdk::ir::QueryDag> query_dag)
     : executor_(executor)
     , query_dag_(std::move(query_dag))
     , schema_provider_(std::make_shared<RelAlgSchemaProvider>(*query_dag_->getRootNode()))
-    , data_mgr_(data_mgr)
-    , data_provider_(data_mgr->getDataProvider())
+    , data_provider_(executor->getDataMgr()->getDataProvider())
     , config_(executor_->getConfig())
     , now_(0)
     , queue_time_ms_(0) {
-  rs_registry_ = hdk::ResultSetRegistry::init(data_mgr_, executor->getConfigPtr());
+  rs_registry_ = hdk::ResultSetRegistry::getOrCreate(executor->getDataMgr(),
+                                                     executor->getConfigPtr());
 }
 
 ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
@@ -231,7 +228,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
       continue;
     }
 
-    RelAlgExecutor ra_executor(executor_, schema_provider_, data_mgr_);
+    RelAlgExecutor ra_executor(executor_, schema_provider_);
     hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
     ra_executor.execute(subquery_seq, co, eo, 0);
   }

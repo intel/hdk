@@ -33,8 +33,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
                     const std::string& schema_name = "rs_registry",
                     int db_id = DB_ID);
 
-  static std::shared_ptr<ResultSetRegistry> init(Data_Namespace::DataMgr* data_mgr,
-                                                 ConfigPtr config);
+  static std::shared_ptr<ResultSetRegistry> getOrCreate(Data_Namespace::DataMgr* data_mgr,
+                                                        ConfigPtr config);
 
   ResultSetTableTokenPtr put(ResultSetTable table);
   ResultSetPtr get(const ResultSetTableToken& token, size_t frag_id) const;
@@ -69,11 +69,11 @@ class ResultSetRegistry : public SimpleSchemaProvider,
     size_t row_count;
   };
 
-  int db_id_;
-  int schema_id_;
+  const int db_id_;
+  const int schema_id_;
   int next_table_id_ = 1;
   std::unordered_map<int, std::unique_ptr<TableData>> tables_;
-  ConfigPtr config_;
+  const ConfigPtr config_;
   mutable mapd_shared_mutex data_mutex_;
 };
 

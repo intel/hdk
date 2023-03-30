@@ -42,8 +42,7 @@ std::string getFilePath(const std::string& file_name) {
 class TestSuite : public ::testing::Test {
  public:
   ExecutionResult runQuery(std::unique_ptr<QueryDag> dag) {
-    auto ra_executor =
-        RelAlgExecutor(getExecutor(), getStorage(), getDataMgr(), std::move(dag));
+    auto ra_executor = RelAlgExecutor(getExecutor(), getStorage(), std::move(dag));
     auto eo = ExecutionOptions::fromConfig(config());
     return ra_executor.executeRelAlgQuery(CompilationOptions(), eo, false);
   }

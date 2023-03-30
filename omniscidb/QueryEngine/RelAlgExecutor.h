@@ -42,10 +42,6 @@ struct QueryStepExecutionResult {
   bool is_outermost_query;
 };
 
-namespace Data_Namespace {
-class DataMgr;
-}
-
 namespace hdk {
 class ResultSetRegistry;
 }
@@ -56,7 +52,6 @@ class RelAlgExecutor {
 
   RelAlgExecutor(Executor* executor,
                  SchemaProviderPtr schema_provider,
-                 Data_Namespace::DataMgr* data_mgr,
                  std::unique_ptr<hdk::ir::QueryDag> query_dag);
 
   ExecutionResult executeRelAlgQuery(const CompilationOptions& co,
@@ -119,9 +114,7 @@ class RelAlgExecutor {
   }
 
  private:
-  RelAlgExecutor(Executor* executor,
-                 SchemaProviderPtr schema_provider,
-                 Data_Namespace::DataMgr* data_mgr);
+  RelAlgExecutor(Executor* executor, SchemaProviderPtr schema_provider);
 
   ExecutionResult executeRelAlgQueryNoRetry(const CompilationOptions& co,
                                             const ExecutionOptions& eo,
@@ -242,7 +235,6 @@ class RelAlgExecutor {
   Executor* executor_;
   std::unique_ptr<hdk::ir::QueryDag> query_dag_;
   std::shared_ptr<SchemaProvider> schema_provider_;
-  Data_Namespace::DataMgr* data_mgr_;
   DataProvider* data_provider_;
   std::shared_ptr<hdk::ResultSetRegistry> rs_registry_;
   const Config& config_;

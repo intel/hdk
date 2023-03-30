@@ -164,7 +164,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryWithFilterPushDown(
         continue;
       }
 
-      RelAlgExecutor ra_executor(executor_, schema_provider_, data_mgr_);
+      RelAlgExecutor ra_executor(executor_, schema_provider_);
       hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
       ra_executor.execute(subquery_seq, co, eo, 0);
     }

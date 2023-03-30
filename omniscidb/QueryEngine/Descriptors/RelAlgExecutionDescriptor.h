@@ -59,11 +59,6 @@ class ExecutionResult {
 
   const bool isFilterPushDownEnabled() const { return filter_push_down_enabled_; }
 
-  void setQueueTime(const int64_t queue_time_ms) {
-    CHECK(false);
-    getRows()->setQueueTime(queue_time_ms);
-  }
-
   std::string toString() const {
     std::string res = ::typeName(this) + "(";
     if (result_token_) {
