@@ -106,7 +106,7 @@ cdef class RelAlgExecutor:
       assert dag is not None
       c_dag = move(dag.c_dag)
 
-    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, data_mgr.c_data_mgr.get(), move(c_dag))
+    self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
   def execute(self, **kwargs):

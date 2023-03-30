@@ -88,8 +88,7 @@ class ArrowSQLRunnerImpl {
     auto dag =
         std::make_unique<RelAlgDagBuilder>(query_ra, TEST_DB_ID, storage_, config_);
 
-    return std::make_unique<RelAlgExecutor>(
-        executor_.get(), storage_, data_mgr_.get(), std::move(dag));
+    return std::make_unique<RelAlgExecutor>(executor_.get(), storage_, std::move(dag));
   }
 
   ExecutionResult runSqlQuery(const std::string& sql,

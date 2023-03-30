@@ -59,19 +59,21 @@ ResultSetRegistry::ResultSetRegistry(ConfigPtr config,
     , schema_id_(getSchemaId(db_id))
     , config_(config) {}
 
-std::shared_ptr<ResultSetRegistry> ResultSetRegistry::init(
+std::shared_ptr<ResultSetRegistry> ResultSetRegistry::getOrCreate(
     Data_Namespace::DataMgr* data_mgr,
     ConfigPtr config) {
   static mapd_shared_mutex res_registry_init_mutex;
-  mapd_shared_lock<mapd_shared_mutex> check_init_lock(res_registry_init_mutex);
-
   auto* ps_mgr = data_mgr->getPersistentStorageMgr();
-  if (!ps_mgr->hasDataProvider(hdk::ResultSetRegistry::SCHEMA_ID)) {
-    check_init_lock.unlock();
-    mapd_unique_lock<mapd_shared_mutex> init_lock(res_registry_init_mutex);
+
+  {
+    mapd_shared_lock<mapd_shared_mutex> check_init_lock(res_registry_init_mutex);
     if (!ps_mgr->hasDataProvider(hdk::ResultSetRegistry::SCHEMA_ID)) {
-      ps_mgr->registerDataProvider(hdk::ResultSetRegistry::SCHEMA_ID,
-                                   std::make_shared<hdk::ResultSetRegistry>(config));
+      check_init_lock.unlock();
+      mapd_unique_lock<mapd_shared_mutex> init_lock(res_registry_init_mutex);
+      if (!ps_mgr->hasDataProvider(hdk::ResultSetRegistry::SCHEMA_ID)) {
+        ps_mgr->registerDataProvider(hdk::ResultSetRegistry::SCHEMA_ID,
+                                     std::make_shared<hdk::ResultSetRegistry>(config));
+      }
     }
   }
 
@@ -121,16 +123,6 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   }
   table_data->row_count = row_count;
 
-  /*
-  std::cout << "Imported ResultSet #" << table_id << ":" << std::endl;
-  int i = 1;
-  for (auto& frag : table_data->fragments) {
-    std::cout << "  Fragment #" << i++ << std::endl;
-    std::cout << frag.rs->summaryToString() << std::endl;
-    std::cout << frag.rs->contentToString() << std::endl;
-  }
-  */
-
   tables_[table_id] = std::move(table_data);
 
   return std::make_shared<ResultSetTableToken>(tinfo, row_count, shared_from_this());
@@ -160,9 +152,6 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
 void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
                                     Data_Namespace::AbstractBuffer* dest,
                                     const size_t num_bytes) {
-  // std::cout << "ResultSetRegistry::fetchBuffer key=" << ::toString(key)
-  //           << " num_bytes=" << num_bytes << std::endl;
-
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
   CHECK_EQ(key[CHUNK_KEY_DB_IDX], db_id_);
   CHECK_EQ(tables_.count(key[CHUNK_KEY_TABLE_IDX]), (size_t)1);
@@ -182,9 +171,6 @@ void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
 
 std::unique_ptr<Data_Namespace::AbstractDataToken>
 ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes) {
-  // std::cout << "ResultSetRegistry::getZeroCopyBufferMemory key=" << ::toString(key)
-  //           << " num_bytes=" << num_bytes << std::endl;
-
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
   CHECK_EQ(key[CHUNK_KEY_DB_IDX], db_id_);
   CHECK_EQ(tables_.count(key[CHUNK_KEY_TABLE_IDX]), (size_t)1);
@@ -221,32 +207,12 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
                                               col_types,
                                               0,
                                               *config_);
-        // std::cout << "Materiazlied ColumnarResults for ResultSet #"
-        //           << key[CHUNK_KEY_TABLE_IDX] << std::endl;
       }
       buf = frag.columnar_res->getColumnBuffers()[col_idx];
     }
   } else if (frag.rs->isZeroCopyColumnarConversionPossible(col_idx)) {
     buf = frag.rs->getColumnarBuffer(col_idx);
-    // std::cout << "Use zero-copy fetch for for ResultSet #" << key[CHUNK_KEY_TABLE_IDX]
-    //           << ":" << col_idx << ":" << frag_idx << std::endl;
   }
-
-  /*
-  if (buf) {
-    std::cout << " Return data:" << std::endl;
-    for (size_t i = 0; i < num_bytes; ++i) {
-      std::cout << std::hex << std::setw(2) << (unsigned)((unsigned char*)buf)[i] << " ";
-      if (i % 16 == 15) {
-        std::cout << std::endl;
-      }
-    }
-    if (num_bytes % 16) {
-      std::cout << std::endl;
-    }
-    std::cout << std::dec;
-  }
-  */
 
   return buf ? std::make_unique<ResultSetDataToken>(frag.rs, buf, num_bytes) : nullptr;
 }
@@ -288,14 +254,7 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
     frag_info.resultSet = frag.rs.get();
     frag_info.resultSetMutex = std::make_shared<std::mutex>();
   }
-  /*
-  std::cout << "Table metadata for ResultSet #" << table_id << ":" << std::endl
-            << "  num rows: " << res.getPhysicalNumTuples() << std::endl;
-  for (auto& frag : res.fragments) {
-    std::cout << "  Fragment #" << frag.fragmentId << std::endl
-              << "    num tuples: " << frag.getPhysicalNumTuples() << std::endl;
-  }
-  */
+
   return res;
 }
 
