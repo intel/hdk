@@ -240,6 +240,7 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
     return false;
   }
 
+  // Arithmetic operates with immediate values only
   template <typename T>
   T foldArithmetic(hdk::ir::OpType optype, T t1, T t2) const {
     bool t2_is_zero = (t2 == (t2 - t2));
@@ -612,7 +613,8 @@ class ConstantFoldingVisitor : public hdk::ir::ExprRewriter {
         return rhs;
       }
     }
-    if (*lhs == *rhs) {
+    // If any value is null (N/A) result value of any op is also null (N/A)
+    if (*lhs == *rhs && !lhs->type()->nullable()) {
       // Tautologies: v=v; v<=v; v>=v
       if (optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kLe ||
           optype == hdk::ir::OpType::kGe) {

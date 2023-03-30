@@ -334,9 +334,21 @@ class QueryBuilderTest : public TestSuite {
 
     createTable("join2", {{"id", ctx().int32()}, {"val2", ctx().int32()}});
     insertCsvValues("join2", "2,101\n3,102\n4,103\n,104\n6,105");
+
+    createTable("withNull", {{"a", ctx().int64()}});
+    insertCsvValues("withNull", "1\nNULL");
   }
 
-  static void TearDownTestSuite() {}
+  static void TearDownTestSuite() {
+    dropTable("test1");
+    dropTable("test2");
+    dropTable("test3");
+    dropTable("sort");
+    dropTable("ambiguous");
+    dropTable("join1");
+    dropTable("join2");
+    dropTable("withNull");
+  }
 
   void compare_res_fields(const ExecutionResult& res,
                           const std::vector<std::string> fields) {
@@ -465,6 +477,31 @@ TEST_F(QueryBuilderTest, Scan) {
   compare_test1_data(builder.scan(TEST_DB_ID, "test1"));
   compare_test1_data(builder.scan(TEST_DB_ID, tinfo->table_id));
   compare_test1_data(builder.scan(*tinfo));
+}
+
+TEST_F(QueryBuilderTest, Arithmetics) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_a = builder.scan("withNull");
+
+  auto dag = tinfo_a.proj(tinfo_a.ref("a").sub(1)).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int64_t>({0, NULL_BIGINT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("a").sub(tinfo_a.ref("a"))).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int64_t>({0, NULL_BIGINT}));
+}
+
+TEST_F(QueryBuilderTest, Arithmetics2) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_test2 = builder.scan("test2");
+
+  auto dag = tinfo_test2.proj(tinfo_test2.ref("val1").sub(1)).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res, std::vector<int32_t>({9, 10, 11, 12, 13, 14, NULL_INT, 16, NULL_INT, 18}));
 }
 
 TEST_F(QueryBuilderTest, ScanErrors) {
