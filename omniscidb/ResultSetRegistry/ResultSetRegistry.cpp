@@ -48,6 +48,9 @@ TableFragmentsInfo getEmptyTableMetadata(int table_id) {
 
 }  // namespace
 
+ResultSetRegistry::ResultSetRegistry(ConfigPtr config)
+    : ResultSetRegistry(config, "rs_registry") {}
+
 ResultSetRegistry::ResultSetRegistry(ConfigPtr config,
                                      const std::string& schema_name,
                                      int db_id)
@@ -89,10 +92,11 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   mapd_unique_lock<mapd_shared_mutex> data_lock(data_mutex_);
 
   auto table_id = next_table_id_++;
+  auto table_name = std::string("__result_set_") + std::to_string(table_id);
   // Add schema information for the ResultSet.
   auto tinfo = addTableInfo(db_id_,
                             table_id,
-                            ResultSetTableToken::tableName(table_id),
+                            table_name,
                             false,
                             Data_Namespace::MemoryLevel::CPU_LEVEL,
                             table.size());
@@ -105,6 +109,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                   first_rs->colType(col_idx),
                   false);
   }
+  addRowidColumn(db_id_, table_id);
 
   // TODO: lazily compute row count and try to avoid global write
   // locks for that

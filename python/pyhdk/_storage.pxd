@@ -88,6 +88,13 @@ cdef class SchemaProvider:
   cpdef getTableInfo(self, db, table)
   cpdef getColumnInfo(self, db, table, column)
 
+cdef extern from "omniscidb/SchemaMgr/SchemaMgr.h":
+  cdef cppclass CSchemaMgr "SchemaMgr"(CSchemaProvider):
+    void registerProvider(int, shared_ptr[CSchemaProvider]) except +
+
+cdef class SchemaMgr(SchemaProvider):
+  cdef shared_ptr[CSchemaMgr] c_schema_mgr
+
 cdef extern from "omniscidb/DataMgr/AbstractBufferMgr.h" namespace "Data_Namespace":
   cdef cppclass CAbstractBufferMgr "AbstractBufferMgr":
     pass

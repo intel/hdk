@@ -108,7 +108,7 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
                                std::unique_ptr<hdk::ir::QueryDag> query_dag)
     : executor_(executor)
     , query_dag_(std::move(query_dag))
-    , schema_provider_(std::make_shared<RelAlgSchemaProvider>(*query_dag_->getRootNode()))
+    , schema_provider_(schema_provider)
     , data_provider_(executor->getDataMgr()->getDataProvider())
     , config_(executor_->getConfig())
     , now_(0)
@@ -118,18 +118,14 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
 
   // Add ResultSetRegistry to the schema provider by wrapping the current provider
   // and the registry in SchemaMgr.
-  std::set<int> used_schemas;
-  for (int db_id : schema_provider_->listDatabases()) {
-    used_schemas.insert(getSchemaId(db_id));
+  // TODO: In the future we expect pre-initialized registry and passed schema provider
+  // to cover it.
+  auto db_ids = schema_provider->listDatabases();
+  if (std::find(db_ids.begin(), db_ids.end(), hdk::ResultSetRegistry::DB_ID) ==
+      db_ids.end()) {
+    schema_provider_ =
+        mergeProviders(std::vector<SchemaProviderPtr>({schema_provider, rs_registry_}));
   }
-  auto schema_mgr = std::make_shared<SchemaMgr>();
-  for (int schema_id : used_schemas) {
-    schema_mgr->registerProvider(schema_id, schema_provider_);
-  }
-  schema_mgr->registerProvider(
-      hdk::ResultSetRegistry::SCHEMA_ID,
-      std::dynamic_pointer_cast<hdk::ResultSetRegistry>(rs_registry_));
-  schema_provider_ = schema_mgr;
 }
 
 RelAlgExecutor::~RelAlgExecutor() {

@@ -269,6 +269,8 @@ class QueryBuilderTest : public TestSuite {
     schema_mgr_ = std::make_shared<SchemaMgr>();
     schema_mgr_->registerProvider(TEST_SCHEMA_ID, getStorage());
     schema_mgr_->registerProvider(TEST_SCHEMA_ID2, storage2_);
+    schema_mgr_->registerProvider(hdk::ResultSetRegistry::SCHEMA_ID,
+                                  getResultSetRegistry());
 
     createTable("test1",
                 {{"col_bi", ctx().int64()},
@@ -4675,6 +4677,75 @@ TEST_F(Issue355, Reproducer) {
   auto dag = step31.finalize();
   auto res = runQuery(std::move(dag));
   compare_res_data(res, std::vector<int64_t>({1}), std::vector<int64_t>({12}));
+}
+
+TEST_F(QueryBuilderTest, RunOnResult) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  {
+    auto dag1 = builder.scan("test1").proj({0, 1}).finalize();
+    auto res1 = runQuery(std::move(dag1));
+    compare_res_data(res1,
+                     std::vector<int64_t>({1, 2, 3, 4, 5}),
+                     std::vector<int32_t>({11, 22, 33, 44, 55}));
+
+    auto dag2 = builder.scan(res1.tableName()).proj({1, 0}).finalize();
+    auto res2 = runQuery(std::move(dag2));
+    compare_res_data(res2,
+                     std::vector<int32_t>({11, 22, 33, 44, 55}),
+                     std::vector<int64_t>({1, 2, 3, 4, 5}));
+
+    auto scan = builder.scan(res2.tableName());
+    auto dag3 = scan.proj({scan["col_i"] + 1, scan["col_bi"] + 2}).finalize();
+    auto res3 = runQuery(std::move(dag3));
+    compare_res_data(res3,
+                     std::vector<int32_t>({12, 23, 34, 45, 56}),
+                     std::vector<int64_t>({3, 4, 5, 6, 7}));
+  }
+
+  {
+    auto scan1 = builder.scan("test1");
+    auto dag1 = scan1.proj({scan1["col_bi"] + 1, scan1["col_f"]}).finalize();
+    auto res1 = runQuery(std::move(dag1));
+    compare_res_data(res1,
+                     std::vector<int64_t>({2, 3, 4, 5, 6}),
+                     std::vector<float>({1.1, 2.2, 3.3, 4.4, 5.5}));
+
+    auto scan2 = builder.scan("test1");
+    auto dag2 = scan2.proj({scan2["col_bi"] + 2, scan2["col_d"]}).finalize();
+    auto res2 = runQuery(std::move(dag2));
+    compare_res_data(res2,
+                     std::vector<int64_t>({3, 4, 5, 6, 7}),
+                     std::vector<double>({11.11, 22.22, 33.33, 44.44, 55.55}));
+
+    auto dag3 =
+        builder.scan(res1.tableName()).join(builder.scan(res2.tableName())).finalize();
+    auto res3 = runQuery(std::move(dag3));
+    compare_res_data(res3,
+                     std::vector<int64_t>({3, 4, 5, 6}),
+                     std::vector<float>({2.2, 3.3, 4.4, 5.5}),
+                     std::vector<double>({11.11, 22.22, 33.33, 44.44}));
+  }
+}
+
+TEST_F(QueryBuilderTest, RowidOnResult) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  {
+    auto dag1 = builder.scan("test1").proj({0, 1}).finalize();
+    auto res1 = runQuery(std::move(dag1));
+    compare_res_data(res1,
+                     std::vector<int64_t>({1, 2, 3, 4, 5}),
+                     std::vector<int32_t>({11, 22, 33, 44, 55}));
+
+    auto dag2 =
+        builder.scan(res1.tableName()).proj({"col_i", "col_bi", "rowid"}).finalize();
+    auto res2 = runQuery(std::move(dag2));
+    compare_res_data(res2,
+                     std::vector<int32_t>({11, 22, 33, 44, 55}),
+                     std::vector<int64_t>({1, 2, 3, 4, 5}),
+                     std::vector<int64_t>({0, 1, 2, 3, 4}));
+  }
 }
 
 class Taxi : public TestSuite {

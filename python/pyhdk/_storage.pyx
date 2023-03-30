@@ -172,6 +172,15 @@ cdef class SchemaProvider:
     res.c_column_info = column_info
     return res
 
+cdef class SchemaMgr:
+  def __cinit__(self):
+    self.c_schema_mgr = make_shared[CSchemaMgr]()
+    self.c_schema_provider = static_pointer_cast[CSchemaProvider, CSchemaMgr](self.c_schema_mgr)
+
+  def registerProvider(self, SchemaProvider provider):
+    cdef schema_id = provider.getId()
+    self.c_schema_mgr.get().registerProvider(schema_id, provider.c_schema_provider)
+
 cdef class TableOptions:
   cdef CTableOptions c_options
 

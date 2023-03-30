@@ -29,9 +29,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
   constexpr static int SCHEMA_ID = 100;
   constexpr static int DB_ID = (SCHEMA_ID << 24) + 1;
 
-  ResultSetRegistry(ConfigPtr config,
-                    const std::string& schema_name = "rs_registry",
-                    int db_id = DB_ID);
+  ResultSetRegistry(ConfigPtr config);
+  ResultSetRegistry(ConfigPtr config, const std::string& schema_name, int db_id = DB_ID);
 
   static std::shared_ptr<ResultSetRegistry> getOrCreate(Data_Namespace::DataMgr* data_mgr,
                                                         ConfigPtr config);

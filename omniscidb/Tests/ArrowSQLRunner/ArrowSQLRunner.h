@@ -21,6 +21,7 @@
 #include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
 #include "Shared/Config.h"
 
 #include "BufferPoolStats.h"
@@ -114,6 +115,10 @@ BufferPoolStats getBufferPoolStats(const Data_Namespace::MemoryLevel memory_leve
                                        Data_Namespace::MemoryLevel::CPU_LEVEL);
 
 std::shared_ptr<ArrowStorage> getStorage();
+
+SchemaProviderPtr getSchemaProvider();
+
+std::shared_ptr<hdk::ResultSetRegistry> getResultSetRegistry();
 
 DataMgr* getDataMgr();
 

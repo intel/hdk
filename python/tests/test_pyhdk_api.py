@@ -848,6 +848,40 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_run_on_res(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
+
+        res1 = ht.proj("b", "a").run()
+        self.check_res(res1, {"b": [10, 20, 30, 40, 50], "a": [1, 2, 3, 4, 5]})
+
+        res2 = res1.agg(["a"], "count").run()
+        self.check_res(res2, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
+
+        res3 = res2.join(res1, "count", "a").run()
+        self.check_res(
+            res3,
+            {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1], "b": [10, 10, 10, 10, 10]},
+        )
+
+        res4 = res2.run()
+        self.check_res(res4, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
+
+        res5 = res4.filter(res4.ref("a") > res4["count"]).run()
+        self.check_res(res5, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
+
+        res6 = res5.run()
+        self.check_res(res6, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
+
+        assert res6.is_scan
+        assert res6.size == 2
+        self.check_schema(res6.schema, {"a": "INT64", "count": "INT32[NN]"})
+
+        res7 = res6.proj("rowid", "a", "count").run()
+        self.check_res(
+            res7, {"rowid": [0, 1, 2, 3], "a": [2, 3, 4, 5], "count": [1, 1, 1, 1]}
+        )
+
 
 class TestSql(BaseTest):
     def test_no_alias(self):

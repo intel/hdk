@@ -450,6 +450,8 @@ cdef class QueryNode:
     return res
 
   def join(self, rhs_node, lhs_cols=None, rhs_cols=None, cond=None, how="inner"):
+    if isinstance(rhs_node, ExecutionResult):
+      rhs_node = rhs_node.scan
     if not isinstance(rhs_node, QueryNode):
       raise TypeError(f"Expected QueryNode for 'rhs_node' arg. Provided: {type(rhs_node)}.")
     if not isinstance(how, str):
@@ -604,7 +606,9 @@ cdef class QueryNode:
     dag = QueryDag()
     dag.c_dag.reset(c_dag)
     rel_alg_executor = RelAlgExecutor(self._hdk._executor, self._hdk._storage, self._hdk._data_mgr, dag=dag)
-    return rel_alg_executor.execute(**kwargs)
+    res = rel_alg_executor.execute(**kwargs)
+    res.scan = self._hdk.scan(res.table_name)
+    return res
 
   def finalize(self):
     cdef CQueryDag* c_dag = self.c_node.finalize().release()

@@ -12,7 +12,7 @@ from libcpp.utility cimport move
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CType, CConfig
-from pyhdk._storage cimport CDataMgr, CBufferProvider
+from pyhdk._storage cimport CDataMgr, CBufferProvider, CSchemaProvider, CAbstractDataProvider
 
 cdef extern from "omniscidb/QueryEngine/Compiler/CodegenTraitsDescriptor.h" namespace "compiler":
   enum CCallingConvDesc "CallingConvDesc":
@@ -100,6 +100,10 @@ cdef extern from "omniscidb/ResultSet/ResultSet.h":
     string summaryToString() const
 
 ctypedef shared_ptr[CResultSet] CResultSetPtr
+
+cdef extern from "omniscidb/ResultSetRegistry/ResultSetRegistry.h":
+  cdef cppclass CResultSetRegistry "hdk::ResultSetRegistry"(CSchemaProvider, CAbstractDataProvider):
+    CResultSetRegistry(shared_ptr[CConfig]) except +;
 
 cdef extern from "omniscidb/QueryEngine/TargetMetaInfo.h":
   cdef cppclass CTargetMetaInfo "TargetMetaInfo":
