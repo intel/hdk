@@ -42,11 +42,7 @@ class ResultSetTableToken {
   size_t resultSetCount() const { return tinfo_->fragments; }
   ResultSetPtr resultSet(size_t idx) const;
 
-  static std::string tableName(int table_id) {
-    return std::string("__result_set_") + std::to_string(table_id);
-  }
-
-  std::string tableName() const { return tableName(tableId()); }
+  const std::string& tableName() const { return tinfo_->name; }
 
   std::string toString() const {
     return "ResultSetTableToken(" + std::to_string(dbId()) + ":" +

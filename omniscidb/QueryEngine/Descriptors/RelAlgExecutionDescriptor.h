@@ -51,6 +51,11 @@ class ExecutionResult {
 
   bool empty() const { return !result_token_; }
 
+  const std::string& tableName() const {
+    CHECK(!empty());
+    return result_token_->tableName();
+  }
+
   const std::vector<TargetMetaInfo>& getTargetsMeta() const { return targets_meta_; }
 
   const std::vector<PushedDownFilterInfo>& getPushedDownFilterInfo() const;

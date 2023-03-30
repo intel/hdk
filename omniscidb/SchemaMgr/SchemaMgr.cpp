@@ -80,3 +80,18 @@ const SchemaProvider* SchemaMgr::getMgr(int db_id) const {
   }
   return nullptr;
 }
+
+SchemaProviderPtr mergeProviders(const std::vector<SchemaProviderPtr>& providers) {
+  auto res = std::make_shared<SchemaMgr>();
+  for (auto& provider : providers) {
+    std::set<int> provider_schemas;
+    for (int db_id : provider->listDatabases()) {
+      int schema_id = getSchemaId(db_id);
+      provider_schemas.insert(schema_id);
+    }
+    for (int schema_id : provider_schemas) {
+      res->registerProvider(schema_id, provider);
+    }
+  }
+  return res;
+}

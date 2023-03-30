@@ -90,7 +90,7 @@ class ArrowSQLRunnerImpl {
     auto dag =
         std::make_unique<RelAlgDagBuilder>(query_ra, TEST_DB_ID, storage_, config_);
 
-    return std::make_unique<RelAlgExecutor>(executor_.get(), storage_, std::move(dag));
+    return std::make_unique<RelAlgExecutor>(executor_.get(), schema_mgr_, std::move(dag));
   }
 
   ExecutionResult runSqlQuery(const std::string& sql,
@@ -290,6 +290,10 @@ class ArrowSQLRunnerImpl {
 
   std::shared_ptr<ArrowStorage> getStorage() { return storage_; }
 
+  SchemaProviderPtr getSchemaProvider() { return schema_mgr_; }
+
+  std::shared_ptr<hdk::ResultSetRegistry> getResultSetRegistry() { return rs_registry_; }
+
   DataMgr* getDataMgr() { return data_mgr_.get(); }
 
   Executor* getExecutor() { return executor_.get(); }
@@ -299,6 +303,8 @@ class ArrowSQLRunnerImpl {
   ~ArrowSQLRunnerImpl() {
     executor_.reset();
     storage_.reset();
+    rs_registry_.reset();
+    schema_mgr_.reset();
     calcite_.reset();
     rel_alg_cache_.reset();
 
@@ -314,16 +320,21 @@ class ArrowSQLRunnerImpl {
     }
 
     storage_ = std::make_shared<ArrowStorage>(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+    rs_registry_ = std::make_shared<hdk::ResultSetRegistry>(config_);
+    schema_mgr_ = std::make_shared<SchemaMgr>();
+    schema_mgr_->registerProvider(TEST_SCHEMA_ID, storage_);
+    schema_mgr_->registerProvider(hdk::ResultSetRegistry::SCHEMA_ID, rs_registry_);
 
     data_mgr_ = std::make_unique<DataMgr>(*config_);
     auto* ps_mgr = data_mgr_->getPersistentStorageMgr();
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID, storage_);
+    ps_mgr->registerDataProvider(hdk::ResultSetRegistry::SCHEMA_ID, rs_registry_);
 
     executor_ = Executor::getExecutor(data_mgr_.get(), config_, "", "");
-    executor_->setSchemaProvider(storage_);
+    executor_->setSchemaProvider(schema_mgr_);
 
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
-      calcite_ = std::make_shared<CalciteJNI>(storage_, config_, udf_filename, 1024);
+      calcite_ = std::make_shared<CalciteJNI>(schema_mgr_, config_, udf_filename, 1024);
 
       if (config_->debug.use_ra_cache.empty()) {
         ExtensionFunctionsWhitelist::add(calcite_->getExtensionFunctionWhitelist());
@@ -336,13 +347,15 @@ class ArrowSQLRunnerImpl {
       calcite_->setRuntimeExtensionFunctions({}, /*is_runtime=*/false);
     }
 
-    rel_alg_cache_ = std::make_shared<RelAlgCache>(calcite_, storage_, config_);
+    rel_alg_cache_ = std::make_shared<RelAlgCache>(calcite_, schema_mgr_, config_);
   }
 
   ConfigPtr config_;
   std::unique_ptr<DataMgr> data_mgr_;
   std::shared_ptr<Executor> executor_;
   std::shared_ptr<ArrowStorage> storage_;
+  std::shared_ptr<hdk::ResultSetRegistry> rs_registry_;
+  std::shared_ptr<SchemaMgr> schema_mgr_;
   std::shared_ptr<CalciteJNI> calcite_;
   std::shared_ptr<RelAlgCache> rel_alg_cache_;
 
@@ -489,6 +502,14 @@ BufferPoolStats getBufferPoolStats(const Data_Namespace::MemoryLevel memory_leve
 
 std::shared_ptr<ArrowStorage> getStorage() {
   return ArrowSQLRunnerImpl::get()->getStorage();
+}
+
+SchemaProviderPtr getSchemaProvider() {
+  return ArrowSQLRunnerImpl::get()->getSchemaProvider();
+}
+
+std::shared_ptr<hdk::ResultSetRegistry> getResultSetRegistry() {
+  return ArrowSQLRunnerImpl::get()->getResultSetRegistry();
 }
 
 DataMgr* getDataMgr() {

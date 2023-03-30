@@ -38,3 +38,5 @@ class SchemaMgr : public SchemaProvider {
 };
 
 using SchemaMgrPtr = std::shared_ptr<SchemaMgr>;
+
+SchemaProviderPtr mergeProviders(const std::vector<SchemaProviderPtr>& providers);

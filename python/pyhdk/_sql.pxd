@@ -57,6 +57,7 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
     const CResultSetPtr& getRows()
     const vector[CTargetMetaInfo]& getTargetsMeta()
     string getExplanation()
+    const string& tableName()
 
 cdef class ExecutionResult:
   cdef CExecutionResult c_result
@@ -65,6 +66,10 @@ cdef class ExecutionResult:
   # obects lifetime control. In Python we achieve it by holding DataMgr in
   # each ExecutionResult object.
   cdef shared_ptr[CDataMgr] c_data_mgr
+  # Scan object is used to forward query builder related calls. It is used
+  # to provide an ability to work with an execution result as with a regular
+  # table
+  cdef object _scan
 
 cdef extern from "omniscidb/QueryEngine/RelAlgExecutor.h":
   cdef cppclass CRelAlgExecutor "RelAlgExecutor":

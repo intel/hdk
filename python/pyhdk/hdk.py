@@ -4,9 +4,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from pyhdk._common import buildConfig, initLogger
-from pyhdk._storage import TableOptions, CsvParseOptions, ArrowStorage, DataMgr
+from pyhdk._storage import (
+    TableOptions,
+    CsvParseOptions,
+    ArrowStorage,
+    DataMgr,
+    SchemaMgr,
+)
 from pyhdk._sql import Calcite, RelAlgExecutor
-from pyhdk._execute import Executor
+from pyhdk._execute import Executor, ResultSetRegistry
 from pyhdk._builder import QueryBuilder, QueryExpr, QueryNode
 
 import pyarrow
@@ -1652,11 +1658,16 @@ class HDK:
             initLogger(debug_logs=kwargs.pop("debug_logs"))
         self._config = buildConfig(**kwargs)
         self._storage = ArrowStorage(1)
+        rs_registry = ResultSetRegistry(self._config)
         self._data_mgr = DataMgr(self._config)
         self._data_mgr.registerDataProvider(self._storage)
-        self._calcite = Calcite(self._storage, self._config)
+        self._data_mgr.registerDataProvider(rs_registry)
+        self._schema_mgr = SchemaMgr()
+        self._schema_mgr.registerProvider(self._storage)
+        self._schema_mgr.registerProvider(rs_registry)
+        self._calcite = Calcite(self._schema_mgr, self._config)
         self._executor = Executor(self._data_mgr, self._config)
-        self._builder = QueryBuilder(self._storage, self._config, self)
+        self._builder = QueryBuilder(self._schema_mgr, self._config, self)
 
     def create_table(self, table_name, schema, fragment_size=None):
         """

@@ -60,22 +60,24 @@ cdef class ExecutionResult:
     return self.c_result.getExplanation()
 
   @property
-  def schema(self):
-    cdef const vector[CTargetMetaInfo]* meta = &self.c_result.getTargetsMeta()
-    res = dict()
-    for col_idx in range(meta.size()):
-      key = meta.at(col_idx).get_resname()
-      val = meta.at(col_idx).type().toString()
-      res[key] = val
-    return res
-
-  @property
   def desc(self):
     return self.c_result.getRows().get().summaryToString()
 
   @property
   def memory_desc(self):
     return self.c_result.getRows().get().toString()
+
+  @property
+  def table_name(self):
+    return self.c_result.tableName()
+
+  @property
+  def scan(self):
+    return self._scan
+
+  @scan.setter
+  def scan(self, val):
+    self._scan = val
 
   def __str__(self):
     res = "Schema:\n"
@@ -87,6 +89,12 @@ cdef class ExecutionResult:
 
   def __repr__(self):
     return self.__str__()
+
+  def __getattr__(self, attr):
+    return self._scan.__getattribute__(attr)
+
+  def __getitem__(self, col):
+    return self._scan.__getitem__(col)
 
 cdef class RelAlgExecutor:
   def __cinit__(self, Executor executor, SchemaProvider schema_provider, DataMgr data_mgr, ra_json=None, QueryDag dag=None):
