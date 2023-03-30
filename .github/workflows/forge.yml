@@ -1,4 +1,4 @@
-name: Build
+name: conda-forge
 on:
   workflow_dispatch:
     inputs:
@@ -6,9 +6,9 @@ on:
         type: boolean
         default: true
   push:
-#    branches: main
-#  pull_request:
-#    branches: main
+    branches: main
+  pull_request:
+    branches: main
   schedule:
     - cron: '51 3 * * *'
 
