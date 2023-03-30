@@ -206,9 +206,6 @@ class DataMgr {
   GpuMgr* getGpuMgr(GpuMgrPlatform name) const;
   GpuMgr* getGpuMgr() const { return current_device_mgr_; }
 
-  // database_id, table_id, column_id, fragment_id
-  std::vector<int> levelSizes_;
-
   struct SystemMemoryUsage {
     size_t free;      // available CPU RAM memory in bytes
     size_t total;     // total CPU RAM memory in bytes
@@ -246,6 +243,7 @@ class DataMgr {
                             size_t page_size,
                             const std::vector<size_t>& cpu_tier_sizes);
 
+  std::vector<int> levelSizes_;
   std::vector<std::vector<AbstractBufferMgr*>> bufferMgrs_;
   GpuMgr* current_device_mgr_;
   std::map<GpuMgrPlatform, std::unique_ptr<GpuMgrContext>> device_contexts_;
