@@ -189,6 +189,7 @@ cdef extern from "omniscidb/Shared/Config.h":
     size_t override_gpu_block_size
     size_t override_gpu_grid_size
     bool cpu_only
+    string initialize_with_gpu_vendor;
 
   cdef cppclass CFilterPushdownConfig "FilterPushdownConfig":
     bool enable

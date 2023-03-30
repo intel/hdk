@@ -354,6 +354,11 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->exec.cpu_only)
                              ->implicit_value(true),
                          "Run on CPU only, even if GPUs are available.");
+  opt_desc.add_options()("initialize-with-gpu-vendor",
+                         po::value<std::string>(&config_->exec.initialize_with_gpu_vendor)
+                             ->default_value(config_->exec.initialize_with_gpu_vendor),
+                         "GPU vendor to use for Data Manager initialization. Valid "
+                         "values are \"intel\" and \"nvidia\".");
 
   // opts.filter_pushdown
   opt_desc.add_options()("enable-filter-push-down",

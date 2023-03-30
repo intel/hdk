@@ -106,6 +106,7 @@ struct ExecutionConfig {
   bool cpu_only = false;
 
   bool materialize_inner_join_tables = true;
+  std::string initialize_with_gpu_vendor = "";
 };
 
 struct FilterPushdownConfig {
