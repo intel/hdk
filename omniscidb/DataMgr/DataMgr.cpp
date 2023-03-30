@@ -36,6 +36,19 @@
 #include <algorithm>
 #include <limits>
 #include <numeric>
+#include <optional>
+
+namespace {
+std::optional<GpuMgrPlatform> fromString(const std::string& vendor) {
+  if (vendor == "intel") {
+    return GpuMgrPlatform::L0;
+  }
+  if (vendor == "nvidia") {
+    return GpuMgrPlatform::CUDA;
+  }
+  return std::nullopt;
+}
+}  // namespace
 
 namespace Data_Namespace {
 
@@ -311,7 +324,12 @@ void DataMgr::populateMgrs(const Config& config,
                                                bufferMgrs_[MemoryLevel::CPU_LEVEL][0]));
       }
     }
-    setGpuMgrContext(device_mgrs_.begin()->second->getPlatform());
+    if (auto platform = fromString(config.exec.initialize_with_gpu_vendor)) {
+      LOG(INFO) << "Using user's preffered vendor: " << platform.value();
+      setGpuMgrContext(platform.value());
+    } else {
+      setGpuMgrContext(device_mgrs_.begin()->second->getPlatform());
+    }
   } else {
     allocateCpuBufferMgr(0,
                          config.mem.cpu.enable_tiered_cpu_mem,
