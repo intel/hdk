@@ -98,9 +98,7 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
   llvm::Module* llvm_module = func->getParent();
   // run optimizations
 #ifndef WITH_JIT_DEBUG
-  llvm::PassBuilder pass_builder;
-  compiler::optimize_ir(
-      func, llvm_module, pass_builder, live_funcs, /*is_gpu_smem_used=*/false, co);
+  compiler::optimize_ir(func, llvm_module, live_funcs, /*is_gpu_smem_used=*/false, co);
 #endif  // WITH_JIT_DEBUG
 
   auto init_err = llvm::InitializeNativeTarget();
@@ -989,8 +987,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   llvm::NamedMDNode* spirv_src = module->getOrInsertNamedMetadata("spirv.Source");
   spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
 
-  llvm::PassBuilder pass_builder;
-  compiler::optimize_ir(func, module, pass_builder, live_funcs, false /*smem_used*/, co);
+  compiler::optimize_ir(func, module, live_funcs, false /*smem_used*/, co);
 
   // Remove the remaining freeze instruction after the optimization
   std::vector<llvm::Instruction*> to_erase;
