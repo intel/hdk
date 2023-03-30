@@ -238,8 +238,6 @@ class DataMgr {
  private:
   void populateDeviceMgrs(const Config& config);
   void populateMgrs(const Config& config, const size_t userSpecifiedNumReaderThreads);
-  void convertDB(const std::string basePath);
-  void createTopLevelMetadata() const;
   void allocateCpuBufferMgr(int32_t device_id,
                             bool enable_tiered_cpu_mem,
                             size_t total_cpu_size,

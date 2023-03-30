@@ -47,7 +47,6 @@ DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
     , data_provider_(std::make_unique<DataMgrDataProvider>(this)) {
   populateDeviceMgrs(config);
   populateMgrs(config, numReaderThreads);
-  createTopLevelMetadata();
 }
 
 DataMgr::~DataMgr() {
@@ -323,12 +322,6 @@ void DataMgr::populateMgrs(const Config& config,
                          cpu_tier_sizes);
   }
 }
-
-void DataMgr::convertDB(const std::string basePath) {
-  UNREACHABLE();
-}
-
-void DataMgr::createTopLevelMetadata() const {}
 
 std::vector<Buffer_Namespace::MemoryInfo> DataMgr::getMemoryInfo(
     const MemoryLevel memLevel) {
