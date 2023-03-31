@@ -524,8 +524,8 @@ DEVICE int write_baseline_hash_slot(const int32_t val,
   if (!with_val_slot) {
     return 0;
   }
-  int32_t invalid_slot_val_copy = invalid_slot_val;
-  if (!mapd_cas(matching_group, invalid_slot_val_copy, val)) {
+  T invalid_slot_val_copy = static_cast<T>(invalid_slot_val);
+  if (!mapd_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val))) {
     return -1;
   }
   return 0;
@@ -561,8 +561,8 @@ DEVICE int write_baseline_hash_slot_for_semi_join(const int32_t val,
   if (!with_val_slot) {
     return 0;
   }
-  int32_t invalid_slot_val_copy = invalid_slot_val;
-  mapd_cas(matching_group, invalid_slot_val_copy, val);
+  T invalid_slot_val_copy = static_cast<T>(invalid_slot_val);
+  mapd_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val));
   return 0;
 }
 

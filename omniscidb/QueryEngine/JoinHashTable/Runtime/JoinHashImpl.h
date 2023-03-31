@@ -49,8 +49,8 @@ extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_one_to_one_hashtable)(
     const int32_t invalid_slot_val) {
   // the atomic takes the address of invalid_slot_val to write the value of entry_ptr if
   // not equal to invalid_slot_val. make a copy to avoid dereferencing a const value.
-  auto invalid_slot_val_copy = invalid_slot_val;
-  if (!insert_key_cas(entry_ptr, invalid_slot_val_copy, idx)) {
+  int32_t invalid_slot_val_copy = invalid_slot_val;
+  if (!insert_key_cas(entry_ptr, invalid_slot_val_copy, static_cast<int32_t>(idx))) {
     // slot is full
     return -1;
   }
