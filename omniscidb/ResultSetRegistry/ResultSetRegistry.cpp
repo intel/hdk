@@ -38,9 +38,8 @@ TableFragmentsInfo getEmptyTableMetadata(int table_id) {
   empty_frag.fragmentId = 0;
   empty_frag.shadowNumTuples = 0;
   empty_frag.setPhysicalNumTuples(0);
-  empty_frag.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
-  empty_frag.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
-  empty_frag.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
+  // Add ids for DISK_LEVEL, CPU_LEVEL, and GPU_LEVEL
+  empty_frag.deviceIds.resize(3, 0);
   empty_frag.physicalTableId = table_id;
   res.fragments.push_back(empty_frag);
 
@@ -248,9 +247,8 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
     frag_info.fragmentId = static_cast<int>(frag_idx + 1);
     frag_info.physicalTableId = table_id;
     frag_info.setPhysicalNumTuples(frag.row_count);
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
+    // Add ids for DISK_LEVEL, CPU_LEVEL, and GPU_LEVEL
+    frag_info.deviceIds.resize(3, 0);
     frag_info.resultSet = frag.rs.get();
     frag_info.resultSetMutex = std::make_shared<std::mutex>();
   }
