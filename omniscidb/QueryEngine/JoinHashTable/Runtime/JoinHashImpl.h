@@ -29,17 +29,26 @@
 #include "../../../Shared/funcannotations.h"
 
 #ifdef __CUDACC__
-#define insert_key_cas(address, compare, val) atomicCAS(address, compare, val)
-#elif defined(_WIN32)
-#include "Shared/clean_windows.h"
-#define insert_key_cas(address, compare, val)                           \
-  InterlockedCompareExchange(reinterpret_cast<volatile long*>(address), \
-                             static_cast<long>(val),                    \
-                             static_cast<long>(compare))
+#define hdk_cas(address, compare, val) atomicCAS(address, compare, val)
+#elif defined(_MSC_VER)
+#define hdk_cas(ptr, expected, desired) template <typename T>
+template <typename T>
+bool hdk_cas(T* ptr, T* expected, T desired) {
+  if constexpr (sizeof(T) == 4) {
+    return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
+                                      static_cast<long>(desired),
+                                      static_cast<long>(*expected)) ==
+           static_cast<long>(*expected);
+  } else if constexpr (sizeof(T) == 8) {
+    return InterlockedCompareExchange64(
+               reinterpret_cast<volatile int64_t*>(ptr), desired, *expected) == *expected;
+  } else {
+    LOG(FATAL) << "Unsupported atomic operation";
+  }
+}
 #else
-// returns true if desired is written into ptr which implies *ptr == expected
-#define insert_key_cas(ptr, expected, desired) \
-  __atomic_compare_exchange_n(                 \
+#define hdk_cas(ptr, expected, desired) \
+  __atomic_compare_exchange_n(          \
       ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
@@ -50,7 +59,7 @@ extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_one_to_one_hashtable)(
   // the atomic takes the address of invalid_slot_val to write the value of entry_ptr if
   // not equal to invalid_slot_val. make a copy to avoid dereferencing a const value.
   int32_t invalid_slot_val_copy = invalid_slot_val;
-  if (!insert_key_cas(entry_ptr, invalid_slot_val_copy, static_cast<int32_t>(idx))) {
+  if (!hdk_cas(entry_ptr, invalid_slot_val_copy, static_cast<int32_t>(idx))) {
     // slot is full
     return -1;
   }
@@ -64,11 +73,13 @@ extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_hashtable_for_semi_join)(
   // just mark the existence of value to the corresponding hash slot
   // regardless of hashtable collision
   auto invalid_slot_val_copy = invalid_slot_val;
-  insert_key_cas(entry_ptr, invalid_slot_val_copy, idx);
+  hdk_cas(entry_ptr, invalid_slot_val_copy, idx);
   return 0;
 }
 
-#undef insert_key_cas
+#ifndef _MSC_VER
+#undef hdk_cas
+#endif
 
 extern "C" ALWAYS_INLINE DEVICE GENERIC_ADDR_SPACE int32_t* SUFFIX(
     get_bucketized_hash_slot)(GENERIC_ADDR_SPACE int32_t* buff,

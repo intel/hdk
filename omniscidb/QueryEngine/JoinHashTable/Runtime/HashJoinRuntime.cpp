@@ -215,16 +215,50 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
 #endif  // #ifndef __CUDACC__
 
 #ifdef __CUDACC__
-#define mapd_cas(address, compare, val) atomicCAS(address, compare, val)
+#define hdk_cas(address, compare, val) atomicCAS(address, compare, val)
 #elif defined(_MSC_VER)
-#define mapd_cas(address, compare, val)                                 \
-  InterlockedCompareExchange(reinterpret_cast<volatile long*>(address), \
-                             static_cast<long>(val),                    \
-                             static_cast<long>(compare))
+#define hdk_cas(ptr, expected, desired) template <typename T>
+template <typename T>
+bool hdk_cas(T* ptr, T* expected, T desired) {
+  if constexpr (sizeof(T) == 4) {
+    return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
+                                      static_cast<long>(desired),
+                                      static_cast<long>(*expected)) ==
+           static_cast<long>(*expected);
+  } else if constexpr (sizeof(T) == 8) {
+    return InterlockedCompareExchange64(
+               reinterpret_cast<volatile int64_t*>(ptr), desired, *expected) == *expected;
+  } else {
+    LOG(FATAL) << "Unsupported atomic operation";
+  }
+}
+template <typename T>
+void store_cst(T* ptr, T val) {
+  if constexpr (sizeof(T) == 4) {
+    InterlockedExchange(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val));
+  } else if constexpr (sizeof(T) == 8) {
+    InterlockedExchange64(reinterpret_cast<volatile int64_t*>(ptr), val);
+  } else {
+    LOG(FATAL) << "Unsupported atomic operation";
+  }
+}
+
+template <typename T>
+T load_cst(T* ptr) {
+  if constexpr (sizeof(T) == 4) {
+    return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr), 0, 0);
+  } else if constexpr (sizeof(T) == 8) {
+    return InterlockedCompareExchange64(reinterpret_cast<volatile int64_t*>(ptr), 0, 0);
+  } else {
+    LOG(FATAL) << "Unsupported atomic operation";
+  }
+}
 #else
-#define mapd_cas(ptr, expected, desired) \
-  __atomic_compare_exchange_n(           \
+#define hdk_cas(ptr, expected, desired) \
+  __atomic_compare_exchange_n(          \
       ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define store_cst(ptr, val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+#define load_cst(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
 #endif
 
 template <typename HASHTABLE_FILLING_FUNC>
@@ -436,24 +470,6 @@ __device__ T* get_matching_baseline_hash_slot_at(int8_t* hash_buff,
 }
 #else
 
-#ifdef _MSC_VER
-#define cas_cst(ptr, expected, desired)                                      \
-  (InterlockedCompareExchangePointer(reinterpret_cast<void* volatile*>(ptr), \
-                                     reinterpret_cast<void*>(&desired),      \
-                                     expected) == expected)
-#define store_cst(ptr, val)                                          \
-  InterlockedExchangePointer(reinterpret_cast<void* volatile*>(ptr), \
-                             reinterpret_cast<void*>(val))
-#define load_cst(ptr) \
-  InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr), 0, 0)
-#else
-#define cas_cst(ptr, expected, desired) \
-  __atomic_compare_exchange_n(          \
-      ptr, expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define store_cst(ptr, val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
-#define load_cst(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
-#endif
-
 template <typename T>
 T* get_matching_baseline_hash_slot_at(int8_t* hash_buff,
                                       const uint32_t h,
@@ -469,7 +485,7 @@ T* get_matching_baseline_hash_slot_at(int8_t* hash_buff,
     // write special value. Should never happen, but avoid doing wrong things.
     return nullptr;
   }
-  const bool success = cas_cst(row_ptr, &empty_key, write_pending);
+  const bool success = hdk_cas(row_ptr, empty_key, write_pending);
   if (success) {
     if (key_component_count > 1) {
       memcpy(row_ptr + 1, key + 1, (key_component_count - 1) * sizeof(T));
@@ -488,9 +504,10 @@ T* get_matching_baseline_hash_slot_at(int8_t* hash_buff,
   return reinterpret_cast<T*>(row_ptr + key_component_count);
 }
 
+#ifndef _MSC_VER
 #undef load_cst
 #undef store_cst
-#undef cas_cst
+#endif
 
 #endif  // __CUDACC__
 
@@ -525,7 +542,7 @@ DEVICE int write_baseline_hash_slot(const int32_t val,
     return 0;
   }
   T invalid_slot_val_copy = static_cast<T>(invalid_slot_val);
-  if (!mapd_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val))) {
+  if (!hdk_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val))) {
     return -1;
   }
   return 0;
@@ -562,7 +579,7 @@ DEVICE int write_baseline_hash_slot_for_semi_join(const int32_t val,
     return 0;
   }
   T invalid_slot_val_copy = static_cast<T>(invalid_slot_val);
-  mapd_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val));
+  hdk_cas(matching_group, invalid_slot_val_copy, static_cast<T>(val));
   return 0;
 }
 
@@ -632,7 +649,9 @@ DEVICE int SUFFIX(fill_baseline_hash_join_buff)(int8_t* hash_buff,
   return 0;
 }
 
-#undef mapd_cas
+#ifndef _MSC_VER
+#undef hdk_cas
+#endif
 
 #ifdef __CUDACC__
 #define mapd_add(address, val) atomicAdd(address, val)
