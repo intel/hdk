@@ -468,7 +468,7 @@ GroupValueInfo get_matching_group_value_columnar_reduction(int64_t* groups_buffe
                                                            const size_t entry_count) {
   auto off = h;
   auto empty_key = EMPTY_KEY_64;
-  if (mapd_cas(&groups_buffer[off], empty_key, *key)) {
+  if (!mapd_cas(&groups_buffer[off], empty_key, *key)) {
     for (size_t i = 0; i < key_qw_count; ++i) {
       groups_buffer[off] = key[i];
       off += entry_count;
