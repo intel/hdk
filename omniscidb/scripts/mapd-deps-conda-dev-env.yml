@@ -22,7 +22,7 @@ dependencies:
   - pandas     1.5.3
   - llvmdev     14.*
   - openjdk     17.*
-  - cmake 
+  - cmake
   - tbb-devel
   - cython
   - make
@@ -34,7 +34,6 @@ dependencies:
   - double-conversion
   - snappy
   - gflags
-  - glog
   - libkml
   - libiconv
   - ncurses
@@ -51,4 +50,3 @@ dependencies:
   - folly 2022.11.07.00
   - sqlite 3.40.0
   - python 3.9.*
-

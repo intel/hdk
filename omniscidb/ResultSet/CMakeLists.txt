@@ -9,4 +9,4 @@ set(result_set_source_files
 
 add_library(ResultSet ${result_set_source_files})
 
-target_link_libraries(ResultSet DataMgr IR Logger Utils)
+target_link_libraries(ResultSet DataMgr IR Logger Utils ${Folly_LIBRARIES})

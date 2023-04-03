@@ -100,7 +100,8 @@ if(ENABLE_FOLLY)
   else()
     set(FOLLY_LIBRARIES "")
     add_definitions("-DHAVE_FOLLY")
-    list(APPEND Folly_LIBRARIES Folly::folly ${Glog_LIBRARIES})
+    find_package(gflags CONFIG REQUIRED)
+    list(APPEND Folly_LIBRARIES Folly::folly)
     # TODO: use Folly::folly_deps?
     if(MSVC)
       find_package(Libevent COMPONENTS core REQUIRED)
@@ -122,15 +123,6 @@ if(BUILD_SHARED_LIBS)
   # rpath that would break a link with libjvm.so.
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 endif()
-
-# Copy ThirdParty to build dir so OmniSciDB dependencies can be copied over. Note that third_party is available internally for HDK specific dependencies.
-file(COPY "${CMAKE_SOURCE_DIR}/ThirdParty" DESTINATION "${CMAKE_BINARY_DIR}/")
-
-# Google log
-add_subdirectory(third_party/glog-0.5.0 EXCLUDE_FROM_ALL)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/glog-0.5.0/cmake")
-cmake_policy(SET CMP0024 OLD) # build glog with cmake bundled standard on 20.04
-find_package(glog REQUIRED)
 
 # Arrow
 find_package(Arrow REQUIRED)
