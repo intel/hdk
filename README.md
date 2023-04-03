@@ -80,6 +80,9 @@ df = res.to_arrow().to_pandas()
 
 Standalone examples are available in the `examples` directory. Most examples run via Jupyter notebooks. 
 
+## Formatting
+
+Project uses clang-format for cpp files and [black](https://pypi.org/project/black/) for py files. Formatting is described in .clang-format file, the version is matches the version of LLVM, described at `omniscidb/scripts/mapd-deps-conda-dev-env.yml`.
 
 ## Build
 

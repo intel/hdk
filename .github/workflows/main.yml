@@ -87,3 +87,42 @@ jobs:
 
   pytest:
     uses: ./.github/workflows/pytest.yml
+
+  style-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set env context
+        run: |
+          echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
+          echo CONDA_ENV_PATH=$CONDA/envs/omnisci-dev >>$GITHUB_ENV
+          echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Restore Conda env cache
+        id: conda-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          restore-keys: |
+            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
+
+      - name: Update Conda env
+        if: steps.conda-cache.cache-hit != 'true'
+        run: |
+          conda update conda
+          conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+
+      - name: C++ Style check
+        run: |
+          source /usr/share/miniconda/etc/profile.d/conda.sh
+          conda activate omnisci-dev
+          find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file
+        shell: bash
+    # - name: Py Style check
+    #   run: |
+    #     find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.py' -print \) | xargs black --check
+    # - if: failure()
+    #   run: |
+    #     gh run cancel ${{ github.run_id }}
