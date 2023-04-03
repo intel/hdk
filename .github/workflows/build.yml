@@ -83,10 +83,6 @@ jobs:
           conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           tar -zcf /tmp/build.tgz .
 
-          mkdir install-prefix
-          conda run --no-capture-output -n omnisci-dev cmake --install build --prefix $(pwd)/install-prefix
-          tar -zcf /tmp/release.tgz -C install-prefix .
-
       - name: Upload build and src files
         uses: actions/upload-artifact@v3
         with:
