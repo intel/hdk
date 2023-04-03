@@ -11,7 +11,7 @@ from pyhdk._storage import (
     DataMgr,
     SchemaMgr,
 )
-from pyhdk._sql import Calcite, RelAlgExecutor
+from pyhdk._sql import Calcite, RelAlgExecutor, ExecutionResult
 from pyhdk._execute import Executor, ResultSetRegistry
 from pyhdk._builder import QueryBuilder, QueryExpr, QueryNode
 
@@ -2035,7 +2035,10 @@ class HDK:
 
         parts = []
         for name, orig_table in kwargs.items():
-            if isinstance(orig_table, QueryNode) and orig_table.is_scan:
+            if (
+                isinstance(orig_table, (QueryNode, ExecutionResult))
+                and orig_table.is_scan
+            ):
                 orig_table = orig_table.table_name
             if not isinstance(orig_table, str):
                 raise TypeError(
@@ -2050,8 +2053,12 @@ class HDK:
 
         sql_query = "".join(parts) + sql_query
         ra = self._calcite.process(sql_query)
-        ra_executor = RelAlgExecutor(self._executor, self._storage, self._data_mgr, ra)
-        return ra_executor.execute(**query_opts)
+        ra_executor = RelAlgExecutor(
+            self._executor, self._schema_mgr, self._data_mgr, ra
+        )
+        res = ra_executor.execute(**query_opts)
+        res.scan = self.scan(res.table_name)
+        return res
 
     def scan(self, table_name):
         """

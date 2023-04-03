@@ -27,6 +27,7 @@
 #include "JsonAccessors.h"
 #include "RelAlgDagBuilder.h"
 #include "RelAlgOptimizer.h"
+#include "ResultSetRegistry/ResultSetRegistry.h"
 #include "ScalarExprVisitor.h"
 #include "Shared/sqldefs.h"
 
@@ -2019,7 +2020,13 @@ TableInfoPtr getTableFromScanNode(int db_id,
   const auto& table_json = field(scan_ra, "table");
   CHECK(table_json.IsArray());
   CHECK_EQ(unsigned(2), table_json.Size());
-  const auto info = schema_provider->getTableInfo(db_id, table_json[1].GetString());
+  auto info = schema_provider->getTableInfo(db_id, table_json[1].GetString());
+  // If table wasn't found in the default database, then try search in the
+  // result set registry.
+  if (!info) {
+    info = schema_provider->getTableInfo(hdk::ResultSetRegistry::DB_ID,
+                                         table_json[1].GetString());
+  }
   CHECK(info);
   return info;
 }

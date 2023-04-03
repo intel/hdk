@@ -188,20 +188,17 @@ std::string schema_to_json(SchemaProviderPtr schema_provider) {
   if (dbs.empty()) {
     return "{}";
   }
-  // Current JSON format supports a single database only. So, we exclude
-  // ResultSetRegistry from the schema for now (which makes it impossible
-  // to run SQL queries on result sets).
-  int db_id;
-  if (dbs.size() == (size_t)1) {
-    db_id = dbs.front();
-  } else {
+  // Current JSON format supports a single database only. To support result
+  // sets in SQL queries, we add tables from the ResultSetRegistry using
+  // negative table ids.
+  auto tables = schema_provider->listTables(dbs[0]);
+  if (dbs.size() != (size_t)1) {
     CHECK_EQ(dbs.size(), (size_t)2);
     CHECK(dbs[0] == hdk::ResultSetRegistry::DB_ID ||
           dbs[1] == hdk::ResultSetRegistry::DB_ID);
-    db_id = dbs[0] == hdk::ResultSetRegistry::DB_ID ? dbs[1] : dbs[0];
+    auto more_tables = schema_provider->listTables(dbs[1]);
+    tables.insert(tables.end(), more_tables.begin(), more_tables.end());
   }
-
-  auto tables = schema_provider->listTables(db_id);
 
   rapidjson::Document doc(rapidjson::kObjectType);
 
@@ -210,7 +207,9 @@ std::string schema_to_json(SchemaProviderPtr schema_provider) {
     table.AddMember("name",
                     rapidjson::Value().SetString(rapidjson::StringRef(tinfo->name)),
                     doc.GetAllocator());
-    table.AddMember("id", rapidjson::Value().SetInt(tinfo->table_id), doc.GetAllocator());
+    int table_id = tinfo->db_id == hdk::ResultSetRegistry::DB_ID ? -tinfo->table_id
+                                                                 : tinfo->table_id;
+    table.AddMember("id", rapidjson::Value().SetInt(table_id), doc.GetAllocator());
     table.AddMember(
         "columns", rapidjson::Value(rapidjson::kArrayType), doc.GetAllocator());
 
