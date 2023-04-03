@@ -65,7 +65,6 @@ RUN apt-get update && apt-get install -y \
     libbz2-dev \
     libdouble-conversion-dev \
     libgflags-dev \
-    libgoogle-glog-dev \
     libgtest-dev \
     libncurses-dev \
     libsnappy-dev \

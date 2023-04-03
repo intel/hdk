@@ -304,7 +304,6 @@ if(MSVC)
 endif()
 
 find_package(Git)
-find_package(Glog CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 
 option(ENABLE_FOLLY "Use Folly" ON)
@@ -315,7 +314,8 @@ if(ENABLE_FOLLY)
   else()
     set(FOLLY_LIBRARIES "")
     add_definitions("-DHAVE_FOLLY")
-    list(APPEND Folly_LIBRARIES Folly::folly ${Glog_LIBRARIES})
+    find_package(gflags CONFIG REQUIRED)
+    list(APPEND Folly_LIBRARIES Folly::folly gflags)
     # TODO: use Folly::folly_deps?
     if(MSVC)
       find_package(Libevent COMPONENTS core REQUIRED)
