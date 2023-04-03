@@ -977,6 +977,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
 
   DUMP_MODULE(module, "after.optimization.spirv.ll")
 
+  // Write IR with the LOG channel
   std::stringstream stringstream_L0;
   llvm::raw_os_ostream os(stringstream_L0);
   auto L0_llir = stringstream_L0.str();
