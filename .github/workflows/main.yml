@@ -25,13 +25,6 @@ jobs:
       name: cuda
       cuda_compiler_version: 12-0
 
-  style:
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: style
-
   sanity:
     needs: build
     uses: ./.github/workflows/test.yml
@@ -120,9 +113,3 @@ jobs:
           conda activate omnisci-dev
           find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file
         shell: bash
-    # - name: Py Style check
-    #   run: |
-    #     find . -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.py' -print \) | xargs black --check
-    # - if: failure()
-    #   run: |
-    #     gh run cancel ${{ github.run_id }}

@@ -36,11 +36,6 @@ jobs:
             ${{ env.CONDA_ENV_PATH }}
           key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ inputs.cache-suffix }}
 
-      - name: Check style
-        if: inputs.test == 'style'
-        run: |
-          conda run --no-capture-output -n omnisci-dev bash -c "find . -name python -prune -or -name build -prune -or -name ThirdParty -prune -or -name third_party -prune -or \( -name '*.cpp' -print -or -name '*.h' -print \) | xargs clang-format --dry-run --Werror -style=file"
-
       #	The following tests need more memory than a standard instance has:
       #	  ArrowBasedExecuteTest
       #   ArrowBasedExecuteTestColumnarOutput
