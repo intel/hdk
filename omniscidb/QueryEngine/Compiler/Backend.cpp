@@ -975,6 +975,13 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
 
   compiler::optimize_ir(func, module, live_funcs, false /*smem_used*/, co);
 
+  DUMP_MODULE(module, "after.optimization.spirv.ll")
+
+  std::stringstream stringstream_L0;
+  llvm::raw_os_ostream os(stringstream_L0);
+  auto L0_llir = stringstream_L0.str();
+  LOG(IR) << "CodeGenerator L0::generateIR:\n" << L0_llir << "\nEnd of IR";
+
   // Remove the remaining freeze instruction after the optimization
   std::vector<llvm::Instruction*> to_erase;
   for (auto& Fn : *module) {
