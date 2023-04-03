@@ -925,6 +925,21 @@ class TestSql(BaseTest):
             },
         )
 
+    def test_run_on_res(self):
+        hdk = pyhdk.init()
+        ht1 = hdk.import_pydict(
+            {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
+        )
+
+        res1 = hdk.sql("SELECT a, b FROM t1;", t1=ht1)
+        self.check_res(res1, {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+
+        res2 = hdk.sql("SELECT b + 1 as b, a - 1 as a FROM t1;", t1=res1)
+        self.check_res(res2, {"b": [6, 5, 4, 3, 2], "a": [0, 1, 2, 3, 4]})
+
+        res3 = hdk.sql(f"SELECT b - 1 as b, a + 1 as a FROM {res1.table_name};")
+        self.check_res(res3, {"b": [4, 3, 2, 1, 0], "a": [2, 3, 4, 5, 6]})
+
 
 class BaseTaxiTest:
     @staticmethod

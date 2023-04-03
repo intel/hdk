@@ -107,10 +107,13 @@ cdef class RelAlgExecutor:
     cdef unique_ptr[CQueryDag] c_dag
     cdef int db_id = 0
 
+    # Choose the default database ID. Ignore ResultSetRegistry.
     db_ids = schema_provider.listDatabases()
-    assert len(db_ids) <= 1
+    assert len(db_ids) <= 2
     if len(db_ids) == 1:
       db_id = db_ids[0]
+    elif len(db_ids) == 2:
+      db_id = db_ids[1] if db_ids[0] == ((100 << 24) + 1) else db_ids[0]
 
     if ra_json is not None:
       c_dag.reset(new CRelAlgDagBuilder(ra_json, db_id, c_schema_provider, c_executor.getConfigPtr()))

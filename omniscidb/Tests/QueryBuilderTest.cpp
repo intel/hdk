@@ -4748,6 +4748,29 @@ TEST_F(QueryBuilderTest, RowidOnResult) {
   }
 }
 
+TEST_F(QueryBuilderTest, SqlOnResult) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto res1 =
+      runSqlQuery("SELECT col_bi, col_i FROM test1;", ExecutorDeviceType::CPU, false);
+  compare_res_data(res1,
+                   std::vector<int64_t>({1, 2, 3, 4, 5}),
+                   std::vector<int32_t>({11, 22, 33, 44, 55}));
+
+  auto dag = builder.scan(res1.tableName()).proj({1, 0}).finalize();
+  auto res2 = runQuery(std::move(dag));
+  compare_res_data(res2,
+                   std::vector<int32_t>({11, 22, 33, 44, 55}),
+                   std::vector<int64_t>({1, 2, 3, 4, 5}));
+
+  auto res3 = runSqlQuery("SELECT col_bi + 1, col_i - 1 FROM " + res2.tableName() + ";",
+                          ExecutorDeviceType::CPU,
+                          false);
+  compare_res_data(res3,
+                   std::vector<int64_t>({2, 3, 4, 5, 6}),
+                   std::vector<int32_t>({10, 21, 32, 43, 54}));
+}
+
 class Taxi : public TestSuite {
  protected:
   static void SetUpTestSuite() {
