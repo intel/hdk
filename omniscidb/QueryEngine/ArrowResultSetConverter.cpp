@@ -97,6 +97,27 @@ void create_or_append_value(const ScalarTargetValue& val_cty,
   values_ty->push_back(val_ty);
 }
 
+template <>
+void create_or_append_value<std::string, NullableString>(
+    const ScalarTargetValue& val_cty,
+    std::shared_ptr<ValueArray>& values,
+    const size_t max_size) {
+  auto pval_cty = boost::get<NullableString>(&val_cty);
+  CHECK(pval_cty);
+  std::string val_ty;
+  if (pval_cty->type() != typeid(void*)) {
+    val_ty = boost::get<std::string>(*pval_cty);
+  }
+  if (!values) {
+    values = std::make_shared<ValueArray>(std::vector<std::string>());
+    boost::get<std::vector<std::string>>(*values).reserve(max_size);
+  }
+  CHECK(values);
+  auto values_ty = boost::get<std::vector<std::string>>(values.get());
+  CHECK(values_ty);
+  values_ty->push_back(val_ty);
+}
+
 template <typename TYPE>
 void create_or_append_validity(const ScalarTargetValue& value,
                                const hdk::ir::Type* col_type,
@@ -119,6 +140,33 @@ void create_or_append_validity(const ScalarTargetValue& value,
     is_valid = inline_fp_null_value(col_type) != static_cast<double>(*pvalue);
   } else if (col_type->isDecimal()) {
     is_valid = inline_int_null_value(col_type) != static_cast<int64_t>(*pvalue);
+  } else {
+    UNREACHABLE();
+  }
+
+  if (!null_bitmap) {
+    null_bitmap = std::make_shared<std::vector<bool>>();
+    null_bitmap->reserve(max_size);
+  }
+  CHECK(null_bitmap);
+  null_bitmap->push_back(is_valid);
+}
+
+template <>
+void create_or_append_validity<NullableString>(
+    const ScalarTargetValue& value,
+    const hdk::ir::Type* col_type,
+    std::shared_ptr<std::vector<bool>>& null_bitmap,
+    const size_t max_size) {
+  if (!col_type->nullable()) {
+    CHECK(!null_bitmap);
+    return;
+  }
+  auto pvalue = boost::get<NullableString>(&value);
+  CHECK(pvalue);
+  bool is_valid = false;
+  if (col_type->isText()) {
+    is_valid = pvalue->type() != typeid(void*);
   } else {
     UNREACHABLE();
   }
@@ -893,6 +941,13 @@ size_t convert_rowwise(
           create_or_append_validity<int64_t>(
               *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
           break;
+        case hdk::ir::Type::kText:
+        case hdk::ir::Type::kVarChar:
+          create_or_append_value<std::string, NullableString>(
+              *scalar_value, value_seg[j], local_entry_count);
+          create_or_append_validity<NullableString>(
+              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
+          break;
         default:
           // TODO(miyu): support more scalar types.
           throw std::runtime_error(column.col_type->toString() +
@@ -1640,6 +1695,28 @@ void appendToColumnBuilder<arrow::StringDictionary32Builder, int32_t>(
   }
 }
 
+template <>
+void appendToColumnBuilder<arrow::StringBuilder, std::string>(
+    ArrowResultSetConverter::ColumnBuilder& column_builder,
+    const ValueArray& values,
+    const std::shared_ptr<std::vector<bool>>& is_valid) {
+  std::vector<std::string> vals = boost::get<std::vector<std::string>>(values);
+  auto typed_builder = dynamic_cast<arrow::StringBuilder*>(column_builder.builder.get());
+  CHECK(typed_builder);
+  if (column_builder.field->nullable()) {
+    CHECK(is_valid.get());
+    for (size_t i = 0; i < vals.size(); ++i) {
+      if (is_valid->at(i)) {
+        ARROW_THROW_NOT_OK(typed_builder->Append(vals[i]));
+      } else {
+        ARROW_THROW_NOT_OK(typed_builder->AppendNull());
+      }
+    }
+  } else {
+    ARROW_THROW_NOT_OK(typed_builder->AppendValues(vals));
+  }
+}
+
 }  // anonymous namespace
 
 void ArrowResultSetConverter::append(
@@ -1718,6 +1795,9 @@ void ArrowResultSetConverter::append(
       break;
     case hdk::ir::Type::kVarChar:
     case hdk::ir::Type::kText:
+      appendToColumnBuilder<arrow::StringBuilder, std::string>(
+          column_builder, values, is_valid);
+      break;
     default:
       // TODO(miyu): support more scalar types.
       throw std::runtime_error(column_builder.col_type->toString() +
