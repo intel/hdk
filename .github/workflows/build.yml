@@ -67,6 +67,11 @@ jobs:
           sudo apt-get install cuda-nvcc-${{ inputs.cuda_compiler_version }}
           conda install -n omnisci-dev -c conda-forge arrow-cpp-proc=4.0.0=cuda
 
+      - name: Install L0
+        if: inputs.name == 'l0'
+        run: |
+          conda install -n omnisci-dev -c conda-forge level-zero
+
       - name: Restore Maven cache
         uses: actions/cache@v3
         with:

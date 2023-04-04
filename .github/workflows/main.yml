@@ -24,6 +24,13 @@ jobs:
     with:
       name: cuda
       cuda_compiler_version: 12-0
+      options: -DENABLE_CUDA=on
+
+  build-l0:
+    uses: ./.github/workflows/build.yml
+    with:
+      name: l0
+      options: -DENABLE_CUDA=off -DENABLE_L0=on
 
   style:
     needs: build
