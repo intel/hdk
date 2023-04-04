@@ -7,8 +7,9 @@ HDK uses a semantic versioning scheme for software version numbers. The version 
 1. Create a new release branch with the name `release/vMAJOR.MINOR.PATCH`.
     * For major and minor version releases, create a branch from `main`.
     * For patch version releases, create a branch from the existing release branch on which the patch is going to be based (e.g. `release/v0.1.1` would be branched from `release/v0.1.0`).
-2. Bump the version number in `CMakeLists.txt` in the release branch.
-3. Ensure CI on the release branch is green.
-4. Create a tag for the release. 
-5. Create GitHub Release w/ source code archive. 
-6. Build and publish updated `conda-forge` packages.
+2. Bump the version number in `CMakeLists.txt` in the release branch and remove the `dev` tag.
+3. Bump the version number in main if needed (e.g. when releasing v0.1.0, bump main to v0.2.0dev).
+4. Ensure CI on the release branch is green.
+5. Create a tag for the release. 
+6. Create GitHub Release w/ source code archive. 
+7. Build and publish updated `conda-forge` packages.
