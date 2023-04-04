@@ -109,11 +109,8 @@ void compare_arrow_array_impl(const std::vector<TYPE>& expected,
   ASSERT_EQ(compared, expected.size());
 }
 
-template <>
-void compare_arrow_array_impl(const std::vector<std::string>& expected,
+void compare_arrow_array_dict(const std::vector<std::string>& expected,
                               const std::shared_ptr<arrow::ChunkedArray>& actual) {
-  ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
-  ASSERT_EQ(actual->type()->id(), arrow::Type::DICTIONARY);
   const arrow::ArrayVector& chunks = actual->chunks();
 
   std::string null_val = "<NULL>";
@@ -136,6 +133,41 @@ void compare_arrow_array_impl(const std::vector<std::string>& expected,
   }
 
   ASSERT_EQ(compared, expected.size());
+}
+
+void compare_arrow_array_str(const std::vector<std::string>& expected,
+                             const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  const arrow::ArrayVector& chunks = actual->chunks();
+
+  std::string null_val = "<NULL>";
+  size_t compared = 0;
+
+  for (int i = 0; i < actual->num_chunks(); i++) {
+    auto chunk = chunks[i];
+    auto str_array = std::static_pointer_cast<arrow::StringArray>(chunk);
+    for (int64_t j = 0; j < chunk->length(); j++, compared++) {
+      if (expected[compared] == null_val) {
+        ASSERT_TRUE(chunk->IsNull(j));
+      } else {
+        ASSERT_TRUE(chunk->IsValid(j));
+        ASSERT_EQ(str_array->GetString(j), expected[compared]);
+      }
+    }
+  }
+
+  ASSERT_EQ(compared, expected.size());
+}
+
+template <>
+void compare_arrow_array_impl(const std::vector<std::string>& expected,
+                              const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
+  if (actual->type()->id() == arrow::Type::DICTIONARY) {
+    compare_arrow_array_dict(expected, actual);
+  } else {
+    ASSERT_EQ(actual->type()->id(), arrow::Type::STRING);
+    compare_arrow_array_str(expected, actual);
+  }
 }
 
 template <typename TYPE>

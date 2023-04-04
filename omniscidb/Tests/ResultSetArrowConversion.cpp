@@ -15,6 +15,7 @@
  */
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "ArrowTestHelpers.h"
 
 #include "QueryEngine/ArrowResultSet.h"
 #include "Shared/ArrowUtil.h"
@@ -52,6 +53,8 @@ static std::array<int64_t, 6> table6x4_col_bi = {1, 2, 3, 4, 5, 6};
 static std::array<double, 6> table6x4_col_d = {10.1, 20.2, 30.3, 40.4, 50.5, 60.6};
 
 using namespace TestHelpers::ArrowSQLRunner;
+using namespace std::string_literals;
+using namespace ArrowTestHelpers;
 
 //  HELPERS
 namespace {
@@ -104,6 +107,9 @@ void import_data() {
                               ArrowStorage::TableOptions{3});
   getStorage()->importCsvFile(
       getFilePath(JOIN_TABLE_CSV_FILE), "join_table", ArrowStorage::TableOptions{2});
+
+  createTable("test_str", {{"id", ctx().int32()}, {"str", ctx().text()}});
+  insertCsvValues("test_str", "1,str1\n,\n3,str333\n");
 }
 
 std::shared_ptr<arrow::RecordBatch> getArrowRecordBatch(const ExecutionResult& res) {
@@ -841,6 +847,24 @@ TEST(ArrowTable, LargeTablesRowWise) {
   test_single_column_table<int64_t>(N, 150);
   test_single_column_table<float>(N, 150);
   test_single_column_table<double>(N, 150);
+}
+
+TEST(ArrowTable, NoneEncodedStrings) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+
+  ScopeGuard reset = [prev_enable_columnar_output] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+  };
+
+  for (bool enable_columnar_output : {true, false}) {
+    config().rs.enable_columnar_output = enable_columnar_output;
+
+    auto res =
+        runSqlQuery("select id, str from test_str;", ExecutorDeviceType::CPU, false);
+    compare_res_data(res,
+                     std::vector<int32_t>({1, inline_null_value<int32_t>(), 3}),
+                     std::vector<std::string>({"str1"s, "<NULL>"s, "str333"s}));
+  }
 }
 
 int main(int argc, char* argv[]) {
