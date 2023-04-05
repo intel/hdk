@@ -180,7 +180,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 
 if (ENABLE_JIT_DEBUG AND NOT ENABLE_CUDA)
-    set(RT_OPT_FLAGS -O0 -g)
+    set(RT_OPT_FLAGS -O0 -g -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer)
 else ()
     set(RT_OPT_FLAGS -O3)
 endif ()

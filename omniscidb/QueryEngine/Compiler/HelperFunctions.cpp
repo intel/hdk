@@ -131,6 +131,8 @@ void optimize_ir(llvm::Function* query_func,
 
   pass_manager.run(*llvm_module);
 
+#if defined(HAVE_CUDA) || defined(HAVE_L0) || !defined(WITH_JIT_DEBUG)
   eliminate_dead_self_recursive_funcs(*llvm_module, live_funcs);
+#endif
 }
 }  // namespace compiler
