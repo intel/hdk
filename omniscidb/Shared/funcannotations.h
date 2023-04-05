@@ -50,7 +50,7 @@
     defined(WITH_JIT_DEBUG)
 #define ALWAYS_INLINE
 #elif defined(_WIN32)
-#define ALWAYS_INLINE __inline
+#define ALWAYS_INLINE
 #elif defined(ENABLE_SHARED_LIBS)
 // Protected visibility allows to inline non-private functions which can
 // be overwritten at dynamic link time with the default visibility.
