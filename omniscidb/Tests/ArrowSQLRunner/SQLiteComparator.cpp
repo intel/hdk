@@ -177,7 +177,8 @@ void compare_impl(SqliteConnector& connector,
               };
 #ifdef _WIN32
               auto ret_code = gmtime_s(&tm_struct, &nsec);
-              CHECK(ret_code == 0) << "Error code returned " << ret_code;
+              if (ret_code != 0)
+                LOG(WARNING) << "gmtime_s returned errno value" << ret_code;
 #else
               gmtime_r(&nsec, &tm_struct);
 #endif
