@@ -243,6 +243,10 @@ void CudaMgr::fillDeviceProperties() {
   min_num_mps_for_all_devices = computeMinNumMPsForAllDevices();
 }
 
+size_t CudaMgr::getGlobalMemorySize(const int device_num) const {
+  return getDeviceProperties(gpu_num)->globalMem;
+}
+
 int8_t* CudaMgr::allocatePinnedHostMem(const size_t num_bytes) {
   setContext(0);
   void* host_ptr;

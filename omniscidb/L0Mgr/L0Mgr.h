@@ -238,6 +238,7 @@ class L0Manager : public GpuMgr {
   size_t getMaxAllocationSize(const int device_num) const;
   size_t getPageSize(const int device_num) const { return 4096u; }
 
+  virtual size_t getGlobalMemorySize(const int device_num) const override;
   virtual uint32_t getMaxBlockSize() const override;
   virtual int8_t getSubGroupSize() const override;
   virtual uint32_t getGridSize() const override;

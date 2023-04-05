@@ -113,6 +113,11 @@ void L0Manager::synchronizeDevices() const {
   CHECK(false);
 }
 
+size_t L0Manager::getGlobalMemorySize(const int device_num) const {
+  CHECK(false);
+  return 0u;
+}
+
 size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   CHECK(false);
   return 0u;

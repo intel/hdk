@@ -282,19 +282,9 @@ void DataMgr::populateMgrs(const Config& config,
       int num_gpus = mgr->getDeviceCount();
       device_context->gpu_count = num_gpus;
       for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
-        size_t device_mem_size = 0;
-        // TODO: get rid of manager-specific branches by introducing some kind of device
-        // properties in GpuMgr
-        switch (p) {
-          case GpuMgrPlatform::CUDA:
-            device_mem_size = getCudaMgr()->getDeviceProperties(gpu_num)->globalMem;
-            break;
-          case GpuMgrPlatform::L0:
-            device_mem_size = getL0Mgr()->getMaxAllocationSize(gpu_num);
-            page_size = getL0Mgr()->getPageSize(gpu_num);
-            break;
-          default:
-            CHECK(false);
+        size_t device_mem_size = device_context->gpu_mgr->getGlobalMemorySize(gpu_num);
+        if (p == GpuMgrPlatform::L0) {  // FIXME
+          page_size = getL0Mgr()->getPageSize(gpu_num);
         }
 
         size_t gpu_max_mem_size = config.mem.gpu.max_size;

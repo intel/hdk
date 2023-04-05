@@ -370,8 +370,20 @@ void L0Manager::synchronizeDevices() const {
   }
 }
 
+size_t L0Manager::getGlobalMemorySize(const int device_num) const {
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+  ze_device_memory_properties_t props;
+  uint32_t props_count = 0;
+  L0_SAFE_CALL(zeDeviceGetMemoryProperties(
+      drivers_[0]->devices()[device_num]->device(), &props_count, &props));
+  CHECK_GT(props_count, 0);
+  LOG(INFO) << "Intel GPU global memory size: " << props.totalSize / (1024 * 1024)
+            << "MB\n";
+  return props.totalSize;
+}
+
 size_t L0Manager::getMaxAllocationSize(const int device_num) const {
-  CHECK_LE(device_num, drivers_[0]->devices().size());
+  CHECK_LT(device_num, drivers_[0]->devices().size());
   ze_device_properties_t device_properties;
   L0_SAFE_CALL(zeDeviceGetProperties(drivers_[0]->devices()[device_num]->device(),
                                      &device_properties));

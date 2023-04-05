@@ -57,6 +57,7 @@ struct GpuMgr {
   virtual void synchronizeDevices() const = 0;
   virtual int getDeviceCount() const = 0;
   virtual GpuMgrPlatform getPlatform() const = 0;
+  virtual size_t getGlobalMemorySize(const int device_num) const = 0;
   virtual uint32_t getMaxBlockSize() const = 0;
   virtual int8_t getSubGroupSize() const = 0;
   virtual uint32_t getGridSize() const = 0;

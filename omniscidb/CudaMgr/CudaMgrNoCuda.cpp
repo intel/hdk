@@ -88,4 +88,8 @@ void CudaMgr::setContext(const int) const {
   CHECK(false);
 }
 
+size_t CudaMgr::getGlobalMemorySize(const int device_num) const {
+  CHECK(false);
+}
+
 }  // namespace CudaMgr_Namespace
