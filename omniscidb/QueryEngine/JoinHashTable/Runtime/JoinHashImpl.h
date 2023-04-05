@@ -31,19 +31,19 @@
 #ifdef __CUDACC__
 #define hdk_cas(address, compare, val) atomicCAS(address, compare, val)
 #elif defined(_MSC_VER)
-#define hdk_cas(ptr, expected, desired) template <typename T>
+#include "Shared/clean_windows.h"
 template <typename T>
-bool hdk_cas(T* ptr, T* expected, T desired) {
+bool hdk_cas(T* ptr, T expected, T desired) {
+  static_assert(sizeof(T) == 4 || sizeof(T) == 8, "Unsupported atomic operation");
+
   if constexpr (sizeof(T) == 4) {
     return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
                                       static_cast<long>(desired),
-                                      static_cast<long>(*expected)) ==
-           static_cast<long>(*expected);
+                                      static_cast<long>(expected)) ==
+           static_cast<long>(expected);
   } else if constexpr (sizeof(T) == 8) {
     return InterlockedCompareExchange64(
-               reinterpret_cast<volatile int64_t*>(ptr), desired, *expected) == *expected;
-  } else {
-    LOG(FATAL) << "Unsupported atomic operation";
+               reinterpret_cast<volatile int64_t*>(ptr), desired, expected) == expected;
   }
 }
 #else
@@ -73,7 +73,7 @@ extern "C" ALWAYS_INLINE DEVICE int SUFFIX(fill_hashtable_for_semi_join)(
   // just mark the existence of value to the corresponding hash slot
   // regardless of hashtable collision
   auto invalid_slot_val_copy = invalid_slot_val;
-  hdk_cas(entry_ptr, invalid_slot_val_copy, idx);
+  hdk_cas(entry_ptr, invalid_slot_val_copy, static_cast<int32_t>(idx));
   return 0;
 }
 

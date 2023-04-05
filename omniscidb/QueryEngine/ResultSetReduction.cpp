@@ -513,15 +513,15 @@ GroupValueInfo get_group_value_columnar_reduction(
 
 #ifdef _MSC_VER
 template <typename T>
-bool cas_cst(T* ptr, T* expected, T desired) {
+bool hdk_cas(T* ptr, T expected, T desired) {
   if constexpr (sizeof(T) == 4) {
     return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
                                       static_cast<long>(desired),
-                                      static_cast<long>(*expected)) ==
-           static_cast<long>(*expected);
+                                      static_cast<long>(expected)) ==
+           static_cast<long>(expected);
   } else if constexpr (sizeof(T) == 8) {
     return InterlockedCompareExchange64(
-               reinterpret_cast<volatile int64_t*>(ptr), desired, *expected) == *expected;
+               reinterpret_cast<volatile int64_t*>(ptr), desired, expected) == expected;
   } else {
     LOG(FATAL) << "Unsupported atomic operation";
   }
@@ -549,9 +549,9 @@ T load_cst(T* ptr) {
   }
 }
 #else
-#define cas_cst(ptr, expected, desired) \
+#define hdk_cas(ptr, expected, desired) \
   __atomic_compare_exchange_n(          \
-      ptr, expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+      ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #define store_cst(ptr, val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
 #define load_cst(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
 #endif
@@ -572,7 +572,7 @@ GroupValueInfo get_matching_group_value_reduction(
   T write_pending = get_empty_key<typename remove_addr_space<T>::type>() - 1;
   auto row_ptr = reinterpret_cast<T*>(groups_buffer + off);
   const auto slot_off_quad = get_slot_off_quad(query_mem_desc);
-  const bool success = cas_cst(row_ptr, &empty_key, write_pending);
+  const bool success = hdk_cas(row_ptr, empty_key, write_pending);
   if (success) {
     fill_slots(groups_buffer + off + slot_off_quad,
                query_mem_desc.getEntryCount(),
@@ -601,7 +601,7 @@ GroupValueInfo get_matching_group_value_reduction(
 #ifndef _MSC_VER
 #undef load_cst
 #undef store_cst
-#undef cas_cst
+#undef hdk_cas
 #endif
 
 inline GroupValueInfo get_matching_group_value_reduction(

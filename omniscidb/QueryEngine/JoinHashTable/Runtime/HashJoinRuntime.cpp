@@ -219,6 +219,8 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
 #elif defined(_MSC_VER)
 template <typename T>
 bool hdk_cas(T* ptr, T expected, T desired) {
+  static_assert(sizeof(T) == 4 || sizeof(T) == 8, "Unsupported atomic operation");
+
   if constexpr (sizeof(T) == 4) {
     return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
                                       static_cast<long>(desired),
@@ -227,8 +229,6 @@ bool hdk_cas(T* ptr, T expected, T desired) {
   } else if constexpr (sizeof(T) == 8) {
     return InterlockedCompareExchange64(
                reinterpret_cast<volatile int64_t*>(ptr), desired, expected) == expected;
-  } else {
-    LOG(FATAL) << "Unsupported atomic operation";
   }
 }
 template <typename T>
