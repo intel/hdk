@@ -124,6 +124,11 @@ if(BUILD_SHARED_LIBS)
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 endif()
 
+option(ENABLE_JIT_DEBUG "Enable debugging symbols for the JIT" OFF)
+if (ENABLE_JIT_DEBUG)
+  add_definitions("-DWITH_JIT_DEBUG")
+endif()
+
 # Arrow
 find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
@@ -454,4 +459,3 @@ option(ENABLE_BENCHMARKS "Build benchmarks" ON)
 if (ENABLE_TESTS AND ENABLE_BENCHMARKS)
   add_subdirectory(omniscidb/Benchmarks/taxi)
 endif()
-
