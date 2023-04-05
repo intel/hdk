@@ -387,45 +387,104 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
       codegenSkipOverflowCheckForNull(lhs_lv, rhs_lv, mul_ok, type);
     }
 
-    // Create LLVM obj for overflow check
+    // Create LLVM BasicBlock for overflow check
     mul_fail = llvm::BasicBlock::Create(
         cgen_state_->context_, "mul_fail", cgen_state_->current_func_);
-    auto mul_check = llvm::BasicBlock::Create(
-        cgen_state_->context_, "mul_check", cgen_state_->current_func_);
+    auto mul_check_1 = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mul_check_1", cgen_state_->current_func_);
+    auto mul_check_2 = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mul_check_2", cgen_state_->current_func_);
+    auto mul_check_3 = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mul_check_3", cgen_state_->current_func_);
+    auto mul_check_4 = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mul_check_4", cgen_state_->current_func_);
+    auto mul_check_5 = llvm::BasicBlock::Create(
+        cgen_state_->context_, "mul_check_5", cgen_state_->current_func_);
+
     auto const_zero = llvm::ConstantInt::get(rhs_lv->getType(), 0, true);
+    auto const_minus_one = llvm::ConstantInt::get(rhs_lv->getType(), -1, true);
 
-    // Check if rhs==0 to avoid div by 0 at the overflow/underflow check.
+    // Follow overflow/underflow GNU lib implementation
+    // see: https://vladris.com/blog/2018/10/13/arithmetic-overflow-and-underflow.html
+    // see: https://github.com/coreutils/gnulib/blob/master/lib/intprops.h
+
+    // rhs==0 // No overflow and avoid division by 0
+    llvm::Value* rhs_is_0 = cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, const_zero);
     cgen_state_->ir_builder_.CreateCondBr(
-        cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, const_zero), mul_ok, mul_check);
-    cgen_state_->ir_builder_.SetInsertPoint(mul_check);
+        /*Cond=*/rhs_is_0, /*True=*/mul_ok, /*False=*/mul_check_1);
+    cgen_state_->ir_builder_.SetInsertPoint(mul_check_1);
 
-    // Check if rhs,lhs are negative. SLT=signed less than
-    auto rhs_is_negative_lv = cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero);
-    auto lhs_is_negative_lv = cgen_state_->ir_builder_.CreateICmpSLT(lhs_lv, const_zero);
+    // if(rhs<0 AND lhs<0 AND lhs<max/rhs) return overflow
+    // ((b < 0) && (a < 0) && (a < std::numeric_limits<T>::max() / b))
+    auto rhs_neg_and_lhs_neg = cgen_state_->ir_builder_.CreateAnd(
+        cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero),
+        cgen_state_->ir_builder_.CreateICmpSLT(lhs_lv, const_zero));
 
-    // If negative rhs,lhs then create positive rhs,lhs
-    // why???
-    auto positive_rhs_lv = cgen_state_->ir_builder_.CreateSelect(
-        rhs_is_negative_lv, cgen_state_->ir_builder_.CreateNeg(rhs_lv), rhs_lv);
-    auto adjusted_lhs_lv = cgen_state_->ir_builder_.CreateSelect(
-        lhs_is_negative_lv, cgen_state_->ir_builder_.CreateNeg(lhs_lv), lhs_lv);
+    auto less_than_max = cgen_state_->ir_builder_.CreateICmpSLT(
+        lhs_lv, cgen_state_->ir_builder_.CreateSDiv(chosen_max, rhs_lv));
 
-    // Check for overflow or underflow
-    // SGT=signed greater than. >
-    // SLT=signed less than. <
-    // no div by 0 for rhs with the CreateICmpEQ branch above
-    // >>>> check for lhs>0 and rhs>0 only?! <<<<
-    auto detected = cgen_state_->ir_builder_.CreateOr(
-        // overflow, lhs*rhs>c <=> lhs>c/rhs with c=MAX_INT.
-        cgen_state_->ir_builder_.CreateICmpSGT(
-            adjusted_lhs_lv,
-            cgen_state_->ir_builder_.CreateSDiv(chosen_max, positive_rhs_lv)),
-        // underflow, lhs*rhs<c <=> lhs<c/rhs with c=MIN_INT
-        cgen_state_->ir_builder_.CreateICmpSLT(
-            adjusted_lhs_lv,
-            cgen_state_->ir_builder_.CreateSDiv(chosen_min, positive_rhs_lv)));
+    auto check_overflow_neg_neg =
+        cgen_state_->ir_builder_.CreateAnd(rhs_neg_and_lhs_neg, less_than_max);
 
-    cgen_state_->ir_builder_.CreateCondBr(detected, mul_fail, mul_ok);
+    cgen_state_->ir_builder_.CreateCondBr(check_overflow_neg_neg, mul_fail, mul_check_2);
+    cgen_state_->ir_builder_.SetInsertPoint(mul_check_2);
+
+    // if(rhs>0 AND lhs>0 AND lhs>max/rhs) return overflow
+    // ((b > 0) && (a > 0) && (a > std::numeric_limits<T>::max() / b)
+    auto rhs_pos_and_lhs_pos = cgen_state_->ir_builder_.CreateAnd(
+        cgen_state_->ir_builder_.CreateICmpSGT(rhs_lv, const_zero),
+        cgen_state_->ir_builder_.CreateICmpSGT(lhs_lv, const_zero));
+
+    auto greater_than_max = cgen_state_->ir_builder_.CreateICmpSGT(
+        lhs_lv, cgen_state_->ir_builder_.CreateSDiv(chosen_max, rhs_lv));
+
+    auto check_overflow_pos_pos =
+        cgen_state_->ir_builder_.CreateAnd(rhs_pos_and_lhs_pos, greater_than_max);
+
+    cgen_state_->ir_builder_.CreateCondBr(check_overflow_pos_pos, mul_fail, mul_check_3);
+    cgen_state_->ir_builder_.SetInsertPoint(mul_check_3);
+
+    // if(rhs>0 AND lhs<0 AND lhs<min/rhs) return overflow
+    // ((b > 0) && (a < 0) && (a < std::numeric_limits<T>::min() / b))
+    auto rhs_pos_and_lhs_neg = cgen_state_->ir_builder_.CreateAnd(
+        cgen_state_->ir_builder_.CreateICmpSGT(rhs_lv, const_zero),
+        cgen_state_->ir_builder_.CreateICmpSLT(lhs_lv, const_zero));
+
+    auto less_than_min = cgen_state_->ir_builder_.CreateICmpSLT(
+        lhs_lv, cgen_state_->ir_builder_.CreateSDiv(chosen_min, rhs_lv));
+
+    auto check_overflow_pos_neg =
+        cgen_state_->ir_builder_.CreateAnd(rhs_pos_and_lhs_neg, less_than_min);
+
+    cgen_state_->ir_builder_.CreateCondBr(check_overflow_pos_neg, mul_fail, mul_check_4);
+    cgen_state_->ir_builder_.SetInsertPoint(mul_check_4);
+
+    // if(rhs<0 AND lhs>0 AND lhs>min/rhs) return overflow
+    // ((b < 0) && (a > 0) && (a > std::numeric_limits<T>::min() / b));
+    auto rhs_neg_and_lhs_pos = cgen_state_->ir_builder_.CreateAnd(
+        cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero),
+        cgen_state_->ir_builder_.CreateICmpSGT(lhs_lv, const_zero));
+
+    auto greater_than_min = cgen_state_->ir_builder_.CreateICmpSGT(
+        lhs_lv, cgen_state_->ir_builder_.CreateSDiv(chosen_min, rhs_lv));
+
+    auto check_overflow_neg_pos =
+        cgen_state_->ir_builder_.CreateAnd(rhs_neg_and_lhs_pos, greater_than_min);
+
+    cgen_state_->ir_builder_.CreateCondBr(check_overflow_neg_pos, mul_fail, mul_check_5);
+    cgen_state_->ir_builder_.SetInsertPoint(mul_check_5);
+
+    // DivisionOverflows
+    // lhs==min AND rhs==-1 AND lhs!=0
+    // (a == std::numeric_limits<T>::min()) && (b == -1) && (a != 0);
+    auto lhs_diff_zero = cgen_state_->ir_builder_.CreateICmpNE(lhs_lv, const_zero);
+    auto rhs_minus_one = cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, const_minus_one);
+    auto lhs_and_rhs = cgen_state_->ir_builder_.CreateAnd(lhs_diff_zero, rhs_minus_one);
+    auto lhs_with_min = cgen_state_->ir_builder_.CreateICmpEQ(lhs_lv, chosen_min);
+
+    auto final_cmp = cgen_state_->ir_builder_.CreateAnd(lhs_with_min, lhs_and_rhs);
+
+    cgen_state_->ir_builder_.CreateCondBr(final_cmp, mul_fail, mul_ok);
     cgen_state_->ir_builder_.SetInsertPoint(mul_ok);
   }
 
@@ -442,7 +501,6 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
         cgen_state_->llInt(Executor::ERR_OVERFLOW_OR_UNDERFLOW));
     cgen_state_->ir_builder_.SetInsertPoint(mul_ok);
   }
-
   return ret;
 }
 
