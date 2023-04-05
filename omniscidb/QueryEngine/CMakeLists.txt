@@ -185,11 +185,6 @@ else ()
     set(RT_OPT_FLAGS -O3)
 endif ()
 
-if(MSVC)
-  message(STATUS "MSVC BUILD removing RT_OPT_FLAGS")
-  unset(RT_OPT_FLAGS)
-endif()
-
 add_library(QueryEngine ${query_engine_source_files} $<$<BOOL:ENABLE_CUDA>:${query_engine_cuda_source_files}>)
 add_dependencies(QueryEngine QueryEngineFunctionsTargets)
 
