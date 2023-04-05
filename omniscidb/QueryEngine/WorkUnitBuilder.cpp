@@ -34,12 +34,8 @@ class UsedInputsCollector : public ir::ExprCollector<ColumnVarSet, UsedInputsCol
 
 class NestLevelRewriter : public ir::ExprRewriter {
  public:
-  NestLevelRewriter(const std::vector<InputDescriptor>& input_descs) {
-    for (auto& desc : input_descs) {
-      table_to_rte_idx_[std::make_pair(desc.getDatabaseId(), desc.getTableId())] =
-          desc.getNestLevel();
-    }
-  }
+  NestLevelRewriter(std::vector<size_t> permutation)
+      : permutation_(std::move(permutation)) {}
 
  protected:
   ir::ExprPtr visitColumnRef(const ir::ColumnRef* col_ref) override {
@@ -48,24 +44,29 @@ class NestLevelRewriter : public ir::ExprRewriter {
   }
 
   ir::ExprPtr visitColumnVar(const ir::ColumnVar* col_var) override {
-    auto rte_idx =
-        table_to_rte_idx_.at(std::make_pair(col_var->dbId(), col_var->tableId()));
-    if (col_var->rteIdx() != rte_idx) {
-      return ir::makeExpr<ir::ColumnVar>(col_var->columnInfo(), rte_idx);
+    int old_rte_idx = col_var->rteIdx();
+    if (old_rte_idx < permutation_.size()) {
+      int new_rte_idx = static_cast<int>(permutation_.at(old_rte_idx));
+      if (new_rte_idx != old_rte_idx) {
+        return ir::makeExpr<ir::ColumnVar>(col_var->columnInfo(), new_rte_idx);
+      }
     }
     return defaultResult(col_var);
   }
 
   ir::ExprPtr visitVar(const ir::Var* var) override {
-    auto rte_idx = table_to_rte_idx_.at(std::make_pair(var->dbId(), var->tableId()));
-    if (var->rteIdx() != rte_idx) {
-      return ir::makeExpr<ir::Var>(
-          var->columnInfo(), rte_idx, var->whichRow(), var->varNo());
+    int old_rte_idx = var->rteIdx();
+    if (old_rte_idx < permutation_.size()) {
+      int new_rte_idx = static_cast<int>(permutation_.at(old_rte_idx));
+      if (new_rte_idx != old_rte_idx) {
+        return ir::makeExpr<ir::Var>(
+            var->columnInfo(), new_rte_idx, var->whichRow(), var->varNo());
+      }
     }
     return defaultResult(var);
   }
 
-  std::unordered_map<std::pair<int, int>, int> table_to_rte_idx_;
+  std::vector<size_t> permutation_;
 };
 
 // TODO(alex): Once we're fully migrated to the relational algebra model, change
@@ -597,7 +598,7 @@ void WorkUnitBuilder::reorderTables() {
     }
     computeInputDescs();
 
-    NestLevelRewriter rewriter(input_descs_);
+    NestLevelRewriter rewriter(input_permutation_);
     for (auto& expr : target_exprs_[0]) {
       expr = rewriter.visit(expr.get());
     }

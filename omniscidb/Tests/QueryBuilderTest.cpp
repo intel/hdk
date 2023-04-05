@@ -4568,6 +4568,78 @@ TEST_F(QueryBuilderTest, Join) {
   }
 }
 
+class Issue355 : public TestSuite {
+ protected:
+  static void SetUpTestSuite() {
+    createTable("frame1",
+                {{"col0", ctx().int64()},
+                 {"col1", ctx().int64()},
+                 {"col2", ctx().int64()},
+                 {"col3", ctx().int64()},
+                 {"col4", ctx().int64()},
+                 {"col5", ctx().int64()},
+                 {"col6", ctx().int64()},
+                 {"col7", ctx().int64()},
+                 {"col8", ctx().int64()},
+                 {"col9", ctx().int64()},
+                 {"col10", ctx().int64()},
+                 {"col11", ctx().int64()},
+                 {"col12", ctx().int64()},
+                 {"col13", ctx().int64()},
+                 {"col14", ctx().int64()},
+                 {"col15", ctx().int64()}});
+    insertCsvValues("frame1", "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16");
+    createTable("frame2", {{"col1", ctx().int64()}, {"col2", ctx().int64()}});
+    insertCsvValues("frame2", "1,2");
+    createTable("frame3", {{"col1", ctx().int64()}, {"col2", ctx().int64()}});
+    insertCsvValues("frame3", "1,2");
+  }
+
+  static void TearDownTestSuite() {}
+};
+
+TEST_F(Issue355, Reproducer) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
+  auto step0 = builder.scan("frame1");
+  auto step1 = step0.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+  auto step2 = builder.scan("frame1");
+  auto step3 = step1.join(step2, step1.ref(0) == step2.ref(0));
+  auto step4 = step3.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 27});
+  auto step5 = builder.scan("frame2");
+  auto step6 = step4.join(step5, step4.ref(0) == step5.ref(0));
+  auto step7 = builder.scan("frame1");
+  auto step8 = step7.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+  auto step9 = builder.scan("frame1");
+  auto step10 = step8.join(step9, step8.ref(0) == step9.ref(0));
+  auto step11 =
+      step10.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 27});
+  auto step12 = step6.join(step11, step6.ref(0) == step11.ref(0));
+  auto step13 = step12.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18});
+  auto step14 = builder.scan("frame3");
+  auto step15 = step13.join(step14, step13.ref(0) == step14.ref(0));
+  auto step16 = builder.scan("frame1");
+  auto step17 = step16.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+  auto step18 = builder.scan("frame1");
+  auto step19 = step17.join(step18, step17.ref(0) == step18.ref(0));
+  auto step20 = step19.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 27});
+  auto step21 = builder.scan("frame2");
+  auto step22 = step20.join(step21, step20.ref(0) == step21.ref(0));
+  auto step23 = builder.scan("frame1");
+  auto step24 = step23.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+  auto step25 = builder.scan("frame1");
+  auto step26 = step24.join(step25, step24.ref(0) == step25.ref(0));
+  auto step27 = step26.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 27});
+  auto step28 = step22.join(step27, step22.ref(0) == step27.ref(0));
+  auto step29 =
+      step28.proj({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20});
+  auto step30 = step15.join(step29, step15.ref(0) == step29.ref(0));
+  auto step31 = step30.proj({0, 11});
+
+  auto dag = step31.finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int64_t>({1}), std::vector<int64_t>({12}));
+}
+
 class Taxi : public TestSuite {
  protected:
   static void SetUpTestSuite() {
