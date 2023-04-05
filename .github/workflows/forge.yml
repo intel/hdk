@@ -1,0 +1,31 @@
+name: Build
+on:
+  workflow_dispatch:
+    inputs:
+      reset-cache:
+        type: boolean
+        default: true
+  push:
+#    branches: main
+#  pull_request:
+#    branches: main
+  schedule:
+    - cron: '51 3 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/checkout@v3
+        with:
+          path: hdk-feedstock
+          repository: conda-forge/hdk-feedstock
+
+      - name: Run build-locally.py
+        run: |
+          cp recipe/* hdk-feedstock/recipe/
+          cd hdk-feedstock
+          python build-locally.py linux_64_c_compiler_version11cuda_compiler_versionNonecxx_compiler_version11numpy1.21python3.9.____cpython
