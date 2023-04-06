@@ -14,6 +14,9 @@ on:
       reset-cache:
         type: boolean
         default: false
+    secrets:
+      DOCKERHUB_PASSWORD:
+        required: true
 
 jobs:
   build:
@@ -37,14 +40,18 @@ jobs:
         run: |
           tar -zxf build.tgz
 
-      - name: Build docker image
-        run: |
-          cat omniscidb/docker/dev/Dockerfile omniscidb/docker/dev/Dockerfile.${{ inputs.name }} >Dockerfile
-          docker build . ${{ inputs.reset-cache && '--no-cache' || '' }} --tag hdk-build.${{ inputs.name }}
+      - name: Login to image repository
+        uses: docker/login-action@v2
+        with:
+          username: dataved
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Start the container
         run:  |
-          docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl hdk-build.${{ inputs.name }}:latest
+          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
+          DOCKER_NAME=docker.io/dataved/build.${{ inputs.name }}:${{ hashFiles('docker/Dockerfile', 'docker/Dockerfile.${{ inputs.name }}') }}
+
+          docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl $DOCKER_NAME
           docker exec hdk-build.${{ inputs.name }} mkdir -p /_work/
           docker cp build.tgz hdk-build.${{ inputs.name }}:/_work/
           docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/

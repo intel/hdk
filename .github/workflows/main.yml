@@ -59,6 +59,8 @@ jobs:
     with:
       name: cuda
       options: -DENABLE_PYTHON=off 
+    secrets:
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   test-cuda-docker:
     needs: build-cuda-docker
@@ -67,12 +69,16 @@ jobs:
       name: cuda
       # input for a push event is an empty string, convert it to boolean
       reset-cache: ${{ !!inputs.reset-cache }}
+    secrets:
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   build-l0-docker:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: l0
       options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
+    secrets:
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   test-l0-docker:
     needs: build-l0-docker
@@ -81,9 +87,6 @@ jobs:
       name: l0
       reset-cache: ${{ !!inputs.reset-cache }}
 
-#
-#  sanity-test:
-#    uses: ./.github/workflows/build-docker-hdk.yml
-
   pytest:
     uses: ./.github/workflows/pytest.yml
+
