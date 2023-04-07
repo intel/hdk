@@ -21,6 +21,7 @@
 #include "IR/Type.h"
 #include "Shared/types.h"
 
+#include <functional>
 #include <map>
 
 #include "Logger/Logger.h"
