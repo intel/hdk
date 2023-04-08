@@ -245,7 +245,7 @@ std::string ResultSet::contentToString(bool header) const {
   }
   moveToBegin();
   while (true) {
-    const auto row = getNextRow(false, false);
+    const auto row = getNextRow(true, true);
     if (row.empty()) {
       break;
     } else {
