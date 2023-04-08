@@ -145,7 +145,6 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
 
   if (col_type->isExtDictionary() &&
       (table.lazy_fetch_col_ids.find(col_idx) != table.lazy_fetch_col_ids.end())) {
-#if 1
     auto& frag = table.fragments[frag_idx];
     size_t elem_size = col_type->size();
     size_t rows_to_fetch = num_bytes ? num_bytes / elem_size : frag.row_count;
@@ -169,9 +168,11 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
 
     // dictionary conversion
     std::vector<std::string_view> bulk(bulk_size);
-    for (int j = 0; j < bulk_size; j++) {
-      auto view = crt_frag_strings->GetView(j);
-      bulk[j] = std::string_view(view.data(), view.length());
+    for (size_t j = 0; j < bulk_size; j++) {
+      if (!crt_frag_strings->IsNull(j)) {
+        auto view = crt_frag_strings->GetView(j);
+        bulk[j] = std::string_view(view.data(), view.length());
+      }
     }
 
     std::shared_ptr<arrow::Array> chunk;
@@ -201,7 +202,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
           CHECK(encoded_indices_buf_ptr);
           for (size_t i = 0; i < bulk_size; i++) {
             encoded_indices_buf_ptr[i] =
-                indices_buffer[i] > std::numeric_limits<uint8_t>::max()
+                indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
+                        indices_buffer[i] > std::numeric_limits<uint8_t>::max()
                     ? std::numeric_limits<uint8_t>::max()
                     : indices_buffer[i];
           }
@@ -214,7 +216,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
           CHECK(encoded_indices_buf_ptr);
           for (size_t i = 0; i < bulk_size; i++) {
             encoded_indices_buf_ptr[i] =
-                indices_buffer[i] > std::numeric_limits<uint16_t>::max()
+                indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
+                        indices_buffer[i] > std::numeric_limits<uint16_t>::max()
                     ? std::numeric_limits<uint16_t>::max()
                     : indices_buffer[i];
           }
@@ -232,49 +235,6 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
         chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * elem_size);
     size_t chunk_size = chunk->length() * elem_size;
     return std::make_unique<ArrowChunkDataToken>(std::move(chunk), ptr, chunk_size);
-#else
-    // raw data
-    auto& frag = table.fragments[frag_idx];
-    size_t elem_size = col_type->size();
-    size_t rows_to_fetch = num_bytes ? num_bytes / elem_size : frag.row_count;
-
-    // todo: we need number of elems in the col data
-    // does fragment size == chunk size??
-    const size_t elems = 0;
-
-    auto& col_arr = table.arrow_col_data[col_idx];
-    CHECK_LT(int(frag_idx), col_arr->num_chunks());
-    CHECK_EQ(col_arr->type(), arrow::utf8());
-
-    auto raw_string_data =
-        std::static_pointer_cast<arrow::StringArray>(col_arr->chunk(frag_idx));
-    CHECK(raw_string_data);
-
-    const auto bulk_size = col_arr->chunk(frag_idx)->length();
-
-    auto dict =
-        dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
-            ->stringDict.get();
-
-    // dictionary conversion
-    std::vector<std::string_view> bulk(bulk_size);
-    for (int j = 0; j < raw_string_data->length(); j++) {
-      auto view = raw_string_data->GetView(j);
-      bulk[j] = std::string_view(view.data(), view.length());
-    }
-
-    std::shared_ptr<arrow::Buffer> indices_buf;
-    auto res = arrow::AllocateBuffer(bulk_size * sizeof(int32_t));
-    CHECK(res.ok());
-    indices_buf = std::move(res).ValueOrDie();
-    auto raw_data = reinterpret_cast<int*>(indices_buf->mutable_data());
-    dict->getOrAddBulk(bulk, raw_data);
-
-    auto array = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
-
-    CHECK(false);
-// return std::make_shared<arrow::ChunkedArray>(array);
-#endif
   }
 
   if (!col_type->isVarLen()) {
