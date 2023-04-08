@@ -161,7 +161,7 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
     CHECK(crt_frag_strings);
     CHECK_LE(crt_frag_strings->length(), static_cast<int64_t>(frag.row_count));
 
-    const auto bulk_size = crt_frag_strings->length();
+    const size_t bulk_size = static_cast<size_t>(crt_frag_strings->length());
 
     auto dict =
         dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
@@ -169,23 +169,68 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
 
     // dictionary conversion
     std::vector<std::string_view> bulk(bulk_size);
-    for (int j = 0; j < crt_frag_strings->length(); j++) {
+    for (int j = 0; j < bulk_size; j++) {
       auto view = crt_frag_strings->GetView(j);
       bulk[j] = std::string_view(view.data(), view.length());
     }
 
-    std::shared_ptr<arrow::Buffer> indices_buf;
-    auto res = arrow::AllocateBuffer(bulk_size * sizeof(int32_t));
-    CHECK(res.ok());
-    indices_buf = std::move(res).ValueOrDie();
-    auto raw_data = reinterpret_cast<int*>(indices_buf->mutable_data());
-    dict->getOrAddBulk(bulk, raw_data);
+    std::shared_ptr<arrow::Array> chunk;
+    if (elem_size == 4) {
+      // not an encoded dictionary
+      std::shared_ptr<arrow::Buffer> indices_buf;
+      auto res = arrow::AllocateBuffer(bulk_size * 4);
+      CHECK(res.ok());
+      indices_buf = std::move(res).ValueOrDie();
+      auto raw_data = reinterpret_cast<int32_t*>(indices_buf->mutable_data());
+      dict->getOrAddBulk(bulk, raw_data);
+      chunk = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
+    } else {
+      // encoded
+      std::vector<int32_t> indices_buffer(bulk_size);
+      dict->getOrAddBulk(bulk, indices_buffer.data());
 
-    const int64_t arrow_elem_size = 4;  // 32-bit integer
-    auto chunk = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
+      // create arrow buffer of encoded size and copy into it
+      std::shared_ptr<arrow::Buffer> encoded_indices_buf;
+      auto res = arrow::AllocateBuffer(bulk_size * elem_size);
+      CHECK(res.ok());
+      encoded_indices_buf = std::move(res).ValueOrDie();
+      switch (elem_size) {
+        case 1: {
+          auto encoded_indices_buf_ptr =
+              reinterpret_cast<int8_t*>(encoded_indices_buf->mutable_data());
+          CHECK(encoded_indices_buf_ptr);
+          for (size_t i = 0; i < bulk_size; i++) {
+            encoded_indices_buf_ptr[i] =
+                indices_buffer[i] > std::numeric_limits<uint8_t>::max()
+                    ? std::numeric_limits<uint8_t>::max()
+                    : indices_buffer[i];
+          }
+          chunk = std::make_shared<arrow::Int8Array>(bulk_size, encoded_indices_buf);
+          break;
+        }
+        case 2: {
+          auto encoded_indices_buf_ptr =
+              reinterpret_cast<int16_t*>(encoded_indices_buf->mutable_data());
+          CHECK(encoded_indices_buf_ptr);
+          for (size_t i = 0; i < bulk_size; i++) {
+            encoded_indices_buf_ptr[i] =
+                indices_buffer[i] > std::numeric_limits<uint16_t>::max()
+                    ? std::numeric_limits<uint16_t>::max()
+                    : indices_buffer[i];
+          }
+          chunk = std::make_shared<arrow::Int16Array>(bulk_size, encoded_indices_buf);
+          break;
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+    }
+    CHECK(chunk);
+
     const int8_t* ptr =
-        chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * arrow_elem_size);
-    size_t chunk_size = chunk->length() * arrow_elem_size;
+        chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * elem_size);
+    size_t chunk_size = chunk->length() * elem_size;
     return std::make_unique<ArrowChunkDataToken>(std::move(chunk), ptr, chunk_size);
 #else
     // raw data
@@ -723,18 +768,15 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                     if (table.lazy_fetch_col_ids.find(col_idx) !=
                         table.lazy_fetch_col_ids.end()) {
                       CHECK(table.record_batch);
-                      Datum min_datum;
-                      min_datum.intval = int32_t(0);
-                      meta->chunkStats.min = min_datum;
-                      Datum max_datum;
-                      max_datum.intval =
-                          int32_t(table.record_batch->column(col_idx)->length());
-                      meta->chunkStats.max = max_datum;
+                      int32_t min = 0;
+                      int32_t max = static_cast<int32_t>(
+                          table.record_batch->column(col_idx)->length());
+                      meta->fillChunkStats(
+                          min, max, /*has_nulls=*/false);  // TODO has nulls
                     } else {
-                      computeStats(
+                      meta->fillChunkStats(computeStats(
                           col_arr->Slice(frag.offset, frag.row_count * elems_count),
-                          col_type,
-                          meta->chunkStats);
+                          col_type));
                     }
                     frag.metadata[col_idx] = meta;
                   }
@@ -758,12 +800,10 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                 // it would be better to count the number of unique strings, but start
                 // with a count of all strings (in the record batch?)
                 CHECK(table.record_batch);
-                Datum min_datum;
-                min_datum.intval = int32_t(0);
-                meta->chunkStats.min = min_datum;
-                Datum max_datum;
-                max_datum.intval = int32_t(table.record_batch->column(col_idx)->length());
-                meta->chunkStats.max = max_datum;
+                int32_t min = 0;
+                int32_t max =
+                    static_cast<int32_t>(table.record_batch->column(col_idx)->length());
+                meta->fillChunkStats(min, max, /*has_nulls=*/false);  // TODO has nulls
                 CHECK(false) << "TODO: remove this and make sure we don't hit this path "
                                 "for lazy dictionary encoding";
               }
