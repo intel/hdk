@@ -13,10 +13,63 @@
 
 #include "DwarfBench.h"
 
+#include "Logger/Logger.h"
+
+#include <bench.hpp>
+
 #include <fstream>
 #include <iostream>
 
 namespace costmodel {
+
+struct DwarfBenchDataSource::PrivateImpl {
+  DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
+  DwarfBench::DeviceType convertDeviceType(
+    ExecutorDeviceType device);
+    std::vector<Detail::Measurement> convertMeasurement(
+    const std::vector<DwarfBench::Measurement> measurements);
+
+  DwarfBench::DwarfBench db;
+};
+
+DwarfBench::Dwarf DwarfBenchDataSource::PrivateImpl::convertToDwarf(AnalyticalTemplate templ) {
+  switch (templ) {
+    case AnalyticalTemplate::GroupBy:
+      return DwarfBench::Dwarf::GroupBy;
+    case AnalyticalTemplate::Scan:
+      return DwarfBench::Dwarf::Scan;
+    case AnalyticalTemplate::Join:
+      return DwarfBench::Dwarf::Join;
+    case AnalyticalTemplate::Reduce:
+      throw UnsupportedAnalyticalTemplate(templ);
+    case AnalyticalTemplate::Sort:
+      return DwarfBench::Dwarf::Sort;
+  }
+}
+
+DwarfBench::DeviceType DwarfBenchDataSource::PrivateImpl::convertDeviceType(
+    ExecutorDeviceType device) {
+  switch (device) {
+    case ExecutorDeviceType::CPU:
+      return DwarfBench::DeviceType::CPU;
+    case ExecutorDeviceType::GPU:
+      return DwarfBench::DeviceType::GPU;
+  }
+}
+
+std::vector<Detail::Measurement> DwarfBenchDataSource::PrivateImpl::convertMeasurement(
+    const std::vector<DwarfBench::Measurement> measurements) {
+  std::vector<Detail::Measurement> ms;
+  std::transform(measurements.begin(),
+                 measurements.end(),
+                 std::back_inserter(ms),
+                 [](DwarfBench::Measurement m) {
+                   return Detail::Measurement{.bytes = m.dataSize,
+                                              .milliseconds = m.microseconds / 1000};
+                 });
+  return ms;
+}
+
 
 DwarfBenchDataSource::DwarfBenchDataSource()
     : DataSource(DataSourceConfig{
@@ -24,7 +77,10 @@ DwarfBenchDataSource::DwarfBenchDataSource()
           .supportedDevices = {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU},
           .supportedTemplates = {AnalyticalTemplate::GroupBy,
                                  AnalyticalTemplate::Join,
-                                 AnalyticalTemplate::Scan}}) {}
+                                 AnalyticalTemplate::Scan,
+                                 AnalyticalTemplate::Sort}}), pimpl_(new PrivateImpl()) {}
+
+DwarfBenchDataSource::~DwarfBenchDataSource() { delete pimpl_; }
 
 Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
     const std::vector<ExecutorDeviceType>& devices,
@@ -48,54 +104,18 @@ std::vector<Detail::Measurement> DwarfBenchDataSource::measureTemplateOnDevice(
   std::vector<Detail::Measurement> ms;
   for (size_t inputSize : dwarfBenchInputSizes_) {
     DwarfBench::RunConfig rc = {
-        .device = convertDeviceType(device),
+        .device = pimpl_->convertDeviceType(device),
         .inputSize = inputSize,
         .iterations = dwarfBenchIterations_,
-        .dwarf = convertToDwarf(templ),
+        .dwarf = pimpl_->convertToDwarf(templ),
     };
 
     std::vector<Detail::Measurement> inputSizeMeasurements =
-        convertMeasurement(db_.makeMeasurements(rc));
+        pimpl_->convertMeasurement(pimpl_->db.makeMeasurements(rc));
 
     ms.insert(ms.end(), inputSizeMeasurements.begin(), inputSizeMeasurements.end());
   }
 
-  return ms;
-}
-
-DwarfBench::Dwarf DwarfBenchDataSource::convertToDwarf(AnalyticalTemplate templ) {
-  switch (templ) {
-    case AnalyticalTemplate::GroupBy:
-      return DwarfBench::Dwarf::GroupBy;
-    case AnalyticalTemplate::Scan:
-      return DwarfBench::Dwarf::Scan;
-    case AnalyticalTemplate::Join:
-      return DwarfBench::Dwarf::Join;
-    case AnalyticalTemplate::Reduce:
-      throw UnsupportedAnalyticalTemplate(templ);
-  }
-}
-
-DwarfBench::DeviceType DwarfBenchDataSource::convertDeviceType(
-    ExecutorDeviceType device) {
-  switch (device) {
-    case ExecutorDeviceType::CPU:
-      return DwarfBench::DeviceType::CPU;
-    case ExecutorDeviceType::GPU:
-      return DwarfBench::DeviceType::GPU;
-  }
-}
-
-std::vector<Detail::Measurement> DwarfBenchDataSource::convertMeasurement(
-    const std::vector<DwarfBench::Measurement> measurements) {
-  std::vector<Detail::Measurement> ms;
-  std::transform(measurements.begin(),
-                 measurements.end(),
-                 std::back_inserter(ms),
-                 [](DwarfBench::Measurement m) {
-                   return Detail::Measurement{.bytes = m.dataSize,
-                                              .milliseconds = m.microseconds / 1000};
-                 });
   return ms;
 }
 
