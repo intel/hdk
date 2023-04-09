@@ -51,7 +51,7 @@ class CostModel {
   static const std::vector<AnalyticalTemplate> templates_;
 
   std::vector<ExecutorDeviceType> devices_ = {ExecutorDeviceType::CPU,
-                                             ExecutorDeviceType::GPU};
+                                              ExecutorDeviceType::GPU};
 
   std::mutex latch_;
 };

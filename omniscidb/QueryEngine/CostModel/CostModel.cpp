@@ -56,8 +56,8 @@ void CostModel::calibrate(const CaibrationConfig& conf) {
 }
 
 const std::vector<AnalyticalTemplate> CostModel::templates_ = {GroupBy,
-                                                              Join,
-                                                              Scan,
-                                                              Reduce};
+                                                               Join,
+                                                               Scan,
+                                                               Reduce};
 
 }  // namespace costmodel
