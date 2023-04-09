@@ -21,15 +21,17 @@
 
 #include "DataSource.h"
 
-#include <bench.hpp>
-
 namespace costmodel {
+
+class DwarfBenchCoverter;
 
 // This is a temporary implementation while there is no
 // library for interaction in dwarf bench
 class DwarfBenchDataSource : public DataSource {
  public:
   DwarfBenchDataSource();
+
+  virtual ~DwarfBenchDataSource();
 
   Detail::DeviceMeasurements getMeasurements(
       const std::vector<ExecutorDeviceType>& devices,
@@ -41,14 +43,9 @@ class DwarfBenchDataSource : public DataSource {
 
   std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device,
                                                            AnalyticalTemplate templ);
-
-  DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
-  DwarfBench::DeviceType convertDeviceType(ExecutorDeviceType device);
-
-  std::vector<Detail::Measurement> convertMeasurement(
-      const std::vector<DwarfBench::Measurement> measurements);
-
-  DwarfBench::DwarfBench db_;
+    
+    struct PrivateImpl;
+    PrivateImpl *pimpl_;
 };
 
 }  // namespace costmodel

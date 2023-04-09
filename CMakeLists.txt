@@ -151,13 +151,13 @@ add_definitions("-DENABLE_TBB")
 add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
-# Dwarf Bench
-option(ENABLE_DWARF_BENCH "Enable DwarfBench library for Cost Model" OFF)
-if(ENABLE_DWARF_BENCH)
+# Cost Model
+option(ENABLE_COST_MODEL "Enable Cost Model" OFF)
+if(ENABLE_COST_MODEL)
   find_package(dbench REQUIRED)
   find_package(Armadillo REQUIRED)
-  message(STATUS "Dwarf Bench enabled ${dbench_DIR}")
-  add_definitions("-DENABLE_DWARF_BENCH")
+  message(STATUS "Cost Model enabled ${dbench_DIR}")
+  add_definitions("-DENABLE_COST_MODEL")
 endif()
 
 option(ENABLE_L0 "Enable level zero support" OFF)
