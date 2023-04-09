@@ -43,9 +43,9 @@ class DwarfBenchDataSource : public DataSource {
 
   std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device,
                                                            AnalyticalTemplate templ);
-    
-    struct PrivateImpl;
-    PrivateImpl *pimpl_;
+
+  struct PrivateImpl;
+  PrivateImpl* pimpl_;
 };
 
 }  // namespace costmodel
