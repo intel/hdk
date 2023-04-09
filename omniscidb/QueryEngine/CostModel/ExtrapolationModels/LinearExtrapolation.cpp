@@ -21,8 +21,8 @@ size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) {
   size_t id1, id2;
   Detail::Measurement tmp = {bytes, 0};
 
-  auto iter =
-      std::upper_bound(measurement_.begin(), measurement_.end(), tmp, Detail::BytesOrder());
+  auto iter = std::upper_bound(
+      measurement_.begin(), measurement_.end(), tmp, Detail::BytesOrder());
 
   if (iter == measurement_.begin()) {
     id1 = 0;

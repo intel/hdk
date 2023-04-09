@@ -15,9 +15,9 @@
 
 #include "QueryEngine/CostModel/Measurements.h"
 
+#include <set>
 #include <unordered_map>
 #include <vector>
-#include <set>
 
 namespace costmodel {
 

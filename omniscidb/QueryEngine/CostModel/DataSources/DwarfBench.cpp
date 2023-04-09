@@ -24,15 +24,15 @@ namespace costmodel {
 
 struct DwarfBenchDataSource::PrivateImpl {
   DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
-  DwarfBench::DeviceType convertDeviceType(
-    ExecutorDeviceType device);
-    std::vector<Detail::Measurement> convertMeasurement(
-    const std::vector<DwarfBench::Measurement> measurements);
+  DwarfBench::DeviceType convertDeviceType(ExecutorDeviceType device);
+  std::vector<Detail::Measurement> convertMeasurement(
+      const std::vector<DwarfBench::Measurement> measurements);
 
   DwarfBench::DwarfBench db;
 };
 
-DwarfBench::Dwarf DwarfBenchDataSource::PrivateImpl::convertToDwarf(AnalyticalTemplate templ) {
+DwarfBench::Dwarf DwarfBenchDataSource::PrivateImpl::convertToDwarf(
+    AnalyticalTemplate templ) {
   switch (templ) {
     case AnalyticalTemplate::GroupBy:
       return DwarfBench::Dwarf::GroupBy;
@@ -70,7 +70,6 @@ std::vector<Detail::Measurement> DwarfBenchDataSource::PrivateImpl::convertMeasu
   return ms;
 }
 
-
 DwarfBenchDataSource::DwarfBenchDataSource()
     : DataSource(DataSourceConfig{
           .dataSourceName = "DwarfBench",
@@ -78,9 +77,12 @@ DwarfBenchDataSource::DwarfBenchDataSource()
           .supportedTemplates = {AnalyticalTemplate::GroupBy,
                                  AnalyticalTemplate::Join,
                                  AnalyticalTemplate::Scan,
-                                 AnalyticalTemplate::Sort}}), pimpl_(new PrivateImpl()) {}
+                                 AnalyticalTemplate::Sort}})
+    , pimpl_(new PrivateImpl()) {}
 
-DwarfBenchDataSource::~DwarfBenchDataSource() { delete pimpl_; }
+DwarfBenchDataSource::~DwarfBenchDataSource() {
+  delete pimpl_;
+}
 
 Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
     const std::vector<ExecutorDeviceType>& devices,
