@@ -129,19 +129,6 @@ set(query_engine_source_files
     NvidiaKernel.h
     QueryTemplateGenerator.h)
 
-list(APPEND query_engine_source_files
-        CostModel/CostModel.cpp
-        CostModel/DataSources/EmptyDataSource.cpp
-        CostModel/ExtrapolationModels/LinearExtrapolation.cpp
-        CostModel/ExtrapolationModels/LinearRegression.cpp
-        CostModel/DummyCostModel.cpp
-        CostModel/DataSources/DataSource.cpp
-        CostModel/Measurements.cpp)
-
-if(ENABLE_DWARF_BENCH)
-    list(APPEND query_engine_source_files CostModel/DataSources/DwarfBench.cpp)
-endif()
-
 set(query_engine_cuda_source_files
     TopKSort.cu
     InPlaceSortImpl.cu
@@ -338,8 +325,9 @@ set(QUERY_ENGINE_LIBS
 list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})
 
 
-if(ENABLE_DWARF_BENCH)
-    list(APPEND QUERY_ENGINE_LIBS dbench::dbench ${ARMADILLO_LIBRARIES})
+if(ENABLE_COST_MODEL)
+    add_subdirectory(CostModel)
+    list(APPEND QUERY_ENGINE_LIBS CostModel)
 endif()
 
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
