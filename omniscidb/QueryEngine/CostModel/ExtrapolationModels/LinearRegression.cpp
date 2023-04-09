@@ -17,22 +17,25 @@
 namespace costmodel {
 
 struct LinearRegression::PrivateImpl {
-  arma::mat buildFeaturesMatrix(const std::vector<Detail::Measurement> &measurement);
-  arma::vec buildTargets(const std::vector<Detail::Measurement> &measurement);
+  arma::mat buildFeaturesMatrix(const std::vector<Detail::Measurement>& measurement);
+  arma::vec buildTargets(const std::vector<Detail::Measurement>& measurement);
 
   arma::vec w_;
 };
 
-LinearRegression::LinearRegression(const std::vector<Detail::Measurement>& measurement) 
-      : ExtrapolationModel(measurement), pimpl_(new PrivateImpl()) {
+LinearRegression::LinearRegression(const std::vector<Detail::Measurement>& measurement)
+    : ExtrapolationModel(measurement), pimpl_(new PrivateImpl()) {
   buildRegressionCoefficients();
 }
 
-LinearRegression::LinearRegression(std::vector<Detail::Measurement>&& measurement) : ExtrapolationModel(std::move(measurement)), pimpl_(new PrivateImpl()) {
+LinearRegression::LinearRegression(std::vector<Detail::Measurement>&& measurement)
+    : ExtrapolationModel(std::move(measurement)), pimpl_(new PrivateImpl()) {
   buildRegressionCoefficients();
 }
 
-LinearRegression::~LinearRegression() { delete pimpl_; }
+LinearRegression::~LinearRegression() {
+  delete pimpl_;
+}
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
   arma::vec x = {1.0, (double)bytes};
@@ -47,7 +50,8 @@ void LinearRegression::buildRegressionCoefficients() {
   pimpl_->w_ = arma::inv(X.t() * X) * X.t() * y;
 }
 
-arma::mat LinearRegression::PrivateImpl::buildFeaturesMatrix(const std::vector<Detail::Measurement> &measurement) {
+arma::mat LinearRegression::PrivateImpl::buildFeaturesMatrix(
+    const std::vector<Detail::Measurement>& measurement) {
   // x = (1, bytes)
   const size_t featuresSize = 2;
   arma::mat X(measurement.size(), featuresSize, arma::fill::ones);
@@ -59,7 +63,8 @@ arma::mat LinearRegression::PrivateImpl::buildFeaturesMatrix(const std::vector<D
   return X;
 }
 
-arma::vec LinearRegression::PrivateImpl::buildTargets(const std::vector<Detail::Measurement> &measurement) {
+arma::vec LinearRegression::PrivateImpl::buildTargets(
+    const std::vector<Detail::Measurement>& measurement) {
   arma::vec y(measurement.size());
   for (size_t m = 0; m < measurement.size(); m++) {
     y(m) = measurement[m].milliseconds;
