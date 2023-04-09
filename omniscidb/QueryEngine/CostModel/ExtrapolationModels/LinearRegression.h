@@ -13,30 +13,27 @@
 
 #pragma once
 
-#include <armadillo>
 #include "ExtrapolationModel.h"
+
+#include <memory>
 
 namespace costmodel {
 
 class LinearRegression : public ExtrapolationModel {
  public:
-  LinearRegression(const std::vector<Detail::Measurement>& measurement)
-      : ExtrapolationModel(measurement) {
-    buildRegressionCoefficients();
-  }
-  LinearRegression(std::vector<Detail::Measurement>&& measurement)
-      : ExtrapolationModel(std::move(measurement)) {
-    buildRegressionCoefficients();
-  }
+  LinearRegression(const std::vector<Detail::Measurement>& measurement);
+
+  LinearRegression(std::vector<Detail::Measurement>&& measurement);
+
+  virtual ~LinearRegression();
 
   size_t getExtrapolatedData(size_t bytes) override;
 
  protected:
   void buildRegressionCoefficients();
-  arma::mat buildFeaturesMatrix();
-  arma::vec buildTargets();
 
-  arma::vec w_;
+  struct PrivateImpl;
+  PrivateImpl *pimpl_;
 };
 
 }  // namespace costmodel

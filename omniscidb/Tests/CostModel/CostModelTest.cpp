@@ -12,6 +12,7 @@
 */
 
 #include <gtest/gtest.h>
+#include <armadillo>
 
 #include "QueryEngine/CostModel/DataSources/DataSource.h"
 #include "QueryEngine/CostModel/ExtrapolationModels/LinearExtrapolation.h"
@@ -31,21 +32,6 @@ class DataSourceTest : public DataSource {
       const std::vector<ExecutorDeviceType>& devices,
       const std::vector<AnalyticalTemplate>& templates) override {
     return {};
-  }
-};
-
-class LinearRegressionTest : public LinearRegression {
- public:
-  LinearRegressionTest(std::vector<Detail::Measurement>& measurement)
-      : LinearRegression(measurement) {}
-
-  void equalsWs(arma::vec wExpected) {
-    const double EPS = 0.001;
-    ASSERT_EQ(w_.size(), wExpected.size());
-
-    for (size_t i = 0; i < w_.size(); i++) {
-      ASSERT_NEAR(w_(i), wExpected(i), EPS);
-    }
   }
 };
 
@@ -77,10 +63,25 @@ TEST(ExtrapolationModelsTests, LinearRegressionTest1) {
       {.bytes = 30, .milliseconds = 30},
   };
 
-  LinearRegressionTest lrt(ms);
-  lrt.equalsWs({0.0, 1.0});
+  LinearRegression lrt(ms);
 
   ASSERT_EQ(lrt.getExtrapolatedData(40), 40);
+  ASSERT_EQ(lrt.getExtrapolatedData(50), 50);
+  ASSERT_EQ(lrt.getExtrapolatedData(60), 60);
+}
+
+TEST(ExtrapolationModelsTests, LinearRegressionTest2) {
+  std::vector<Detail::Measurement> ms = {
+      {.bytes = 10, .milliseconds = 20},
+      {.bytes = 20, .milliseconds = 40},
+      {.bytes = 30, .milliseconds = 60},
+  };
+
+  LinearRegression lrt(ms);
+
+  ASSERT_EQ(lrt.getExtrapolatedData(40), 80);
+  ASSERT_EQ(lrt.getExtrapolatedData(50), 100);
+  ASSERT_EQ(lrt.getExtrapolatedData(60), 120);
 }
 
 int main(int argc, char** argv) {

@@ -12,6 +12,8 @@ std::string templateToString(AnalyticalTemplate templ) {
       return "Scan";
     case AnalyticalTemplate::Reduce:
       return "Reduce";
+    case AnalyticalTemplate::Sort:
+      return "Sort";
     default:
       return "Unknown";
   }

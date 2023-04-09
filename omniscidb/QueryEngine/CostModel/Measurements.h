@@ -28,6 +28,7 @@ enum AnalyticalTemplate {
   Scan,
   Join,
   Reduce,
+  Sort
 };
 
 std::string templateToString(AnalyticalTemplate templ);

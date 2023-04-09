@@ -42,7 +42,7 @@ TEST(DwarfBenchIntegrationTests, GetMeasurements) {
                                              ExecutorDeviceType::GPU};
   std::vector<AnalyticalTemplate> templates = {AnalyticalTemplate::GroupBy,
                                                AnalyticalTemplate::Join,
-                                               AnalyticalTemplate::Reduce,
+                                               AnalyticalTemplate::Sort,
                                                AnalyticalTemplate::Scan};
 
   Detail::DeviceMeasurements ms;
