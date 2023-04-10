@@ -78,6 +78,7 @@ class ColumnarResults {
       const std::vector<std::unique_ptr<ColumnarResults>>& sub_results);
 
   const std::vector<int8_t*>& getColumnBuffers() const { return column_buffers_; }
+  const std::vector<int8_t*>& getOffsetBuffers() const { return offset_buffers_; }
 
   const size_t size() const { return num_rows_; }
 
@@ -106,6 +107,8 @@ class ColumnarResults {
 
  protected:
   std::vector<int8_t*> column_buffers_;
+  // Offset buffers are used for varlen data.
+  std::vector<int8_t*> offset_buffers_;
   size_t num_rows_;
 
  private:

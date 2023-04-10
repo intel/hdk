@@ -156,7 +156,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
       const int8_t* ptr =
           chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * arrow_elem_size);
       size_t chunk_size = chunk->length() * arrow_elem_size;
-      return std::make_unique<ArrowChunkDataToken>(std::move(chunk), ptr, chunk_size);
+      return std::make_unique<ArrowChunkDataToken>(
+          std::move(chunk), col_type, ptr, chunk_size);
     }
   }
 

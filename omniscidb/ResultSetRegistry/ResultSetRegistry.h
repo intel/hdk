@@ -51,9 +51,9 @@ class ResultSetRegistry : public SimpleSchemaProvider,
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
 
- private:
-  bool useColumnarResults(const ResultSet& rs) const;
+  std::vector<int> listDatabases() const override { return {{DB_ID}}; }
 
+ private:
   ChunkStats getChunkStats(int table_id, size_t frag_idx, size_t col_idx) const;
 
   struct DataFragment {
@@ -69,6 +69,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
     mapd_shared_mutex mutex;
     std::vector<DataFragment> fragments;
     size_t row_count;
+    bool use_columnar_res;
+    bool has_varlen_col;
   };
 
   const int db_id_;

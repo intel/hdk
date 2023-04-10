@@ -51,6 +51,7 @@ class AbstractDataToken {
 
   virtual const int8_t* getMemoryPtr() const = 0;
   virtual size_t getSize() const = 0;
+  virtual const hdk::ir::Type* getType() const = 0;
 };
 
 class AbstractBuffer {

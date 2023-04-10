@@ -892,41 +892,15 @@ const VarlenOutputInfo* ResultSet::getVarlenOutputInfo(const size_t entry_idx) c
 void ResultSet::copyColumnIntoBuffer(const size_t column_idx,
                                      int8_t* output_buffer,
                                      const size_t output_buffer_size) const {
-  CHECK(isDirectColumnarConversionPossible());
-  CHECK_LT(column_idx, query_mem_desc_.getSlotCount());
-  CHECK(output_buffer_size > 0);
-  CHECK(output_buffer);
-  const auto column_width_size = query_mem_desc_.getPaddedSlotWidthBytes(column_idx);
+  const size_t slot_idx = query_mem_desc_.getSlotIndexForSingleSlotCol(column_idx);
+  const auto column_width_size = query_mem_desc_.getPaddedSlotWidthBytes(slot_idx);
+  auto chunks = getChunkedColumnarBuffer(column_idx);
   size_t out_buff_offset = 0;
-
-  // the main storage:
-  const size_t crt_storage_row_count = storage_->query_mem_desc_.getEntryCount();
-  const size_t crt_buffer_size = crt_storage_row_count * column_width_size;
-  const size_t column_offset = storage_->query_mem_desc_.getColOffInBytes(column_idx);
-  const int8_t* storage_buffer = storage_->getUnderlyingBuffer() + column_offset;
-  CHECK(crt_buffer_size <= output_buffer_size);
-  std::memcpy(output_buffer, storage_buffer, crt_buffer_size);
-
-  out_buff_offset += crt_buffer_size;
-
-  // the appended storages:
-  for (size_t i = 0; i < appended_storage_.size(); i++) {
-    const size_t crt_storage_row_count =
-        appended_storage_[i]->query_mem_desc_.getEntryCount();
-    if (crt_storage_row_count == 0) {
-      // skip an empty appended storage
-      continue;
-    }
-    CHECK_LT(out_buff_offset, output_buffer_size);
-    const size_t crt_buffer_size = crt_storage_row_count * column_width_size;
-    const size_t column_offset =
-        appended_storage_[i]->query_mem_desc_.getColOffInBytes(column_idx);
-    const int8_t* storage_buffer =
-        appended_storage_[i]->getUnderlyingBuffer() + column_offset;
-    CHECK(out_buff_offset + crt_buffer_size <= output_buffer_size);
-    std::memcpy(output_buffer + out_buff_offset, storage_buffer, crt_buffer_size);
-
-    out_buff_offset += crt_buffer_size;
+  for (auto& chunk : chunks) {
+    size_t bytes_to_copy = chunk.second * column_width_size;
+    CHECK_LE(out_buff_offset + bytes_to_copy, output_buffer_size);
+    std::memcpy(output_buffer + out_buff_offset, chunk.first, bytes_to_copy);
+    out_buff_offset += bytes_to_copy;
   }
 }
 
