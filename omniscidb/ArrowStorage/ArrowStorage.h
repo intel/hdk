@@ -149,15 +149,18 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   class ArrowChunkDataToken : public Data_Namespace::AbstractDataToken {
    public:
     ArrowChunkDataToken(std::shared_ptr<arrow::Array> chunk,
+                        const hdk::ir::Type* type,
                         const int8_t* ptr,
                         size_t size)
-        : chunk_(std::move(chunk)), ptr_(ptr), size_(size) {}
+        : chunk_(std::move(chunk)), type_(type), ptr_(ptr), size_(size) {}
 
     const int8_t* getMemoryPtr() const override { return ptr_; }
     size_t getSize() const override { return size_; }
+    const hdk::ir::Type* getType() const override { return type_; }
 
    private:
     std::shared_ptr<arrow::Array> chunk_;
+    const hdk::ir::Type* type_;
     const int8_t* ptr_;
     size_t size_;
   };

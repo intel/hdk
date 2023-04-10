@@ -17,15 +17,20 @@ namespace {
 
 class ResultSetDataToken : public Data_Namespace::AbstractDataToken {
  public:
-  ResultSetDataToken(ResultSetPtr rs, const int8_t* buf, size_t size)
-      : rs_(std::move(rs)), buf_(buf), size_(size) {}
+  ResultSetDataToken(ResultSetPtr rs,
+                     const hdk::ir::Type* type,
+                     const int8_t* buf,
+                     size_t size)
+      : rs_(std::move(rs)), type_(type), buf_(buf), size_(size) {}
   ~ResultSetDataToken() override {}
 
   const int8_t* getMemoryPtr() const override { return buf_; }
   size_t getSize() const override { return size_; }
+  const hdk::ir::Type* getType() const override { return type_; }
 
  private:
   ResultSetPtr rs_;
+  const hdk::ir::Type* type_;
   const int8_t* buf_;
   size_t size_;
 };
@@ -101,6 +106,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                             Data_Namespace::MemoryLevel::CPU_LEVEL,
                             table.size());
   auto& first_rs = table.result(0);
+  bool has_varlen = false;
   for (size_t col_idx = 0; col_idx < first_rs->colCount(); ++col_idx) {
     addColumnInfo(db_id_,
                   table_id,
@@ -108,6 +114,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                   first_rs->colName(col_idx),
                   first_rs->colType(col_idx),
                   false);
+    has_varlen = has_varlen || first_rs->colType(col_idx)->isVarLen();
   }
   addRowidColumn(db_id_, table_id);
 
@@ -126,6 +133,16 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
     table_data->fragments.emplace_back(std::move(frag));
   }
   table_data->row_count = row_count;
+  table_data->has_varlen_col = has_varlen;
+  // We use ColumnarResults for all cases except those when can use
+  // zero-copy fetch or copyColumnIntoBuffer for all columns.
+  // It would be better to convert comlumns more lazily especially when
+  // columnar format is used and multiple columns might be fetched in
+  // parallel.
+  table_data->use_columnar_res =
+      !first_rs->isDirectColumnarConversionPossible() ||
+      first_rs->getQueryDescriptionType() != QueryDescriptionType::Projection ||
+      first_rs->areAnyColumnsLazyFetched() || has_varlen;
 
   tables_[table_id] = std::move(table_data);
 
@@ -191,7 +208,7 @@ void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
   auto& rs = table.fragments[frag_idx].rs;
   dest->reserve(num_bytes);
 
-  CHECK(!useColumnarResults(*rs));
+  CHECK(!table.use_columnar_res);
   rs->copyColumnIntoBuffer(col_idx, dest->getMemoryPtr(), num_bytes);
 }
 
@@ -215,10 +232,14 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
   // TODO: To avoid having data cached here we don't need anymore, we should
   // clean-up tokens we are not going to use in TemporaryTables of
   // RelAlgExecutor.
-  if (useColumnarResults(*frag.rs)) {
+  if (table.use_columnar_res) {
     mapd_shared_lock<mapd_shared_mutex> frag_read_lock(*frag.mutex);
     if (frag.columnar_res) {
-      buf = frag.columnar_res->getColumnBuffers()[col_idx];
+      if (key.size() < 5 || key[CHUNK_KEY_VARLEN_IDX] == 1) {
+        buf = frag.columnar_res->getColumnBuffers()[col_idx];
+      } else {
+        buf = frag.columnar_res->getOffsetBuffers()[col_idx];
+      }
     } else {
       frag_read_lock.unlock();
       mapd_unique_lock<mapd_shared_mutex> frag_write_lock(*frag.mutex);
@@ -235,24 +256,20 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
                                               0,
                                               *config_);
       }
-      buf = frag.columnar_res->getColumnBuffers()[col_idx];
+      if (key.size() < 5 || key[CHUNK_KEY_VARLEN_IDX] == 1) {
+        buf = frag.columnar_res->getColumnBuffers()[col_idx];
+      } else {
+        buf = frag.columnar_res->getOffsetBuffers()[col_idx];
+      }
     }
   } else if (frag.rs->isZeroCopyColumnarConversionPossible(col_idx)) {
+    CHECK_EQ(key.size(), (size_t)4);
     buf = frag.rs->getColumnarBuffer(col_idx);
   }
 
-  return buf ? std::make_unique<ResultSetDataToken>(frag.rs, buf, num_bytes) : nullptr;
-}
-
-bool ResultSetRegistry::useColumnarResults(const ResultSet& rs) const {
-  // We use ColumnarResults for all cases except those when can use
-  // zero-copy fetch or copyColumnIntoBuffer for all columns.
-  // It would be better to convert comlumns more lazily especially when
-  // columnar format is used and multiple columns might be fetched in
-  // parallel.
-  return !rs.isDirectColumnarConversionPossible() ||
-         rs.getQueryDescriptionType() != QueryDescriptionType::Projection ||
-         rs.areAnyColumnsLazyFetched();
+  return buf ? std::make_unique<ResultSetDataToken>(
+                   frag.rs, frag.rs->colType(col_idx), buf, num_bytes)
+             : nullptr;
 }
 
 TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) const {
@@ -279,16 +296,27 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
     frag_info.deviceIds.resize(3, 0);
     mapd_shared_lock<mapd_shared_mutex> frag_lock(*frag.mutex);
     if (frag.meta.empty()) {
-      for (size_t col_idx = 0; col_idx < (size_t)frag.rs->colCount(); ++col_idx) {
-        auto col_type = frag.rs->colType(col_idx);
-        auto meta = std::make_shared<ChunkMetadata>(
-            col_type,
-            frag.rs->rowCount() * col_type->size(),
-            frag.rs->rowCount(),
-            [this, table_id, frag_idx, col_idx](ChunkStats& stats) {
-              stats = this->getChunkStats(table_id, frag_idx, col_idx);
-            });
-        frag_info.setChunkMetadata(static_cast<int>(col_idx + 1), meta);
+      // For now, we don't have lazy fragment size computation. For varlen columns
+      // it means we should compute real fragment size right now. Do it through
+      // stats materialization.
+      if (table.has_varlen_col) {
+        frag_lock.unlock();
+        getChunkStats(table_id, frag_idx, 0);
+        frag_lock.lock();
+        CHECK(!frag.meta.empty());
+        frag_info.setChunkMetadataMap(frag.meta);
+      } else {
+        for (size_t col_idx = 0; col_idx < (size_t)frag.rs->colCount(); ++col_idx) {
+          auto col_type = frag.rs->colType(col_idx);
+          auto meta = std::make_shared<ChunkMetadata>(
+              col_type,
+              frag.rs->rowCount() * col_type->size(),
+              frag.rs->rowCount(),
+              [this, table_id, frag_idx, col_idx](ChunkStats& stats) {
+                stats = this->getChunkStats(table_id, frag_idx, col_idx);
+              });
+          frag_info.setChunkMetadata(static_cast<int>(col_idx + 1), meta);
+        }
       }
     } else {
       frag_info.setChunkMetadataMap(frag.meta);

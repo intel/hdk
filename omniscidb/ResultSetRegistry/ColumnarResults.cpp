@@ -59,12 +59,24 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
   auto timer = DEBUG_TIMER(__func__);
   column_buffers_.resize(num_columns);
   for (size_t i = 0; i < num_columns; ++i) {
-    const bool is_varlen = target_types[i]->isArray() || target_types[i]->isString();
-    if (is_varlen) {
+    if (target_types[i]->isFixedLenArray()) {
       throw ColumnarConversionNotSupported();
     }
-    if (!isDirectColumnarConversionPossible() ||
-        !rows.isZeroCopyColumnarConversionPossible(i)) {
+    if (target_types[i]->isVarLen()) {
+      // Allocate and fill offsets buffer.
+      offset_buffers_.resize(num_columns, nullptr);
+      offset_buffers_[i] =
+          row_set_mem_owner->allocate((num_rows_ + 1) * sizeof(int32_t), thread_idx_);
+      auto offsets = reinterpret_cast<int32_t*>(offset_buffers_[i]);
+      size_t offsets_count = rows.computeVarLenOffsets(i, offsets);
+      // We probably have more accurate number of rows now. Use it to allocate less
+      // memory.
+      num_rows_ = offsets_count - 1;
+      // Allocate buffer for varlen data.
+      column_buffers_[i] =
+          row_set_mem_owner->allocate(std::abs(offsets[num_rows_]), thread_idx_);
+    } else if (!isDirectColumnarConversionPossible() ||
+               !rows.isZeroCopyColumnarConversionPossible(i)) {
       column_buffers_[i] =
           row_set_mem_owner->allocate(num_rows_ * target_types[i]->size(), thread_idx_);
     }
@@ -147,7 +159,8 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
 void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& rows,
                                                             const size_t num_columns) {
   std::atomic<size_t> row_idx{0};
-  if (isParallelConversion()) {
+  // For varlen data we should follow the original rows order to match computed offsets.
+  if (isParallelConversion() && offset_buffers_.empty()) {
     const size_t worker_count = cpu_threads();
     std::vector<std::future<void>> conversion_threads;
     const auto do_work = [num_columns, &rows, &row_idx, this](const size_t i) {
@@ -184,6 +197,7 @@ void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& row
     return;
   }
   bool done = false;
+  rows.moveToBegin();
   const auto do_work = [num_columns, &row_idx, &rows, &done, this]() {
     const auto crt_row = rows.getNextRow(false, false);
     if (crt_row.empty()) {
@@ -213,37 +227,64 @@ void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& row
 inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
                                            const size_t row_idx,
                                            const size_t column_idx) {
-  const auto scalar_col_val = boost::get<ScalarTargetValue>(&col_val);
-  CHECK(scalar_col_val);
-  auto i64_p = boost::get<int64_t>(scalar_col_val);
-  auto type = target_types_[column_idx];
-  if (i64_p) {
-    const auto val = fixed_encoding_nullable_val(*i64_p, type);
-    switch (type->size()) {
-      case 1:
-        ((int8_t*)column_buffers_[column_idx])[row_idx] = static_cast<int8_t>(val);
-        break;
-      case 2:
-        ((int16_t*)column_buffers_[column_idx])[row_idx] = static_cast<int16_t>(val);
-        break;
-      case 4:
-        ((int32_t*)column_buffers_[column_idx])[row_idx] = static_cast<int32_t>(val);
-        break;
-      case 8:
-        ((int64_t*)column_buffers_[column_idx])[row_idx] = val;
-        break;
-      default:
-        CHECK(false);
-    }
-  } else {
-    CHECK(type->isFloatingPoint());
-    if (type->isFp32()) {
-      auto float_p = boost::get<float>(scalar_col_val);
-      ((float*)column_buffers_[column_idx])[row_idx] = static_cast<float>(*float_p);
+  auto write_scalar = [this, column_idx](const ScalarTargetValue* scalar_col_val,
+                                         size_t row_idx,
+                                         const hdk::ir::Type* type) {
+    auto i64_p = boost::get<int64_t>(scalar_col_val);
+    if (i64_p) {
+      const auto val = fixed_encoding_nullable_val(*i64_p, type);
+      switch (type->size()) {
+        case 1:
+          ((int8_t*)column_buffers_[column_idx])[row_idx] = static_cast<int8_t>(val);
+          break;
+        case 2:
+          ((int16_t*)column_buffers_[column_idx])[row_idx] = static_cast<int16_t>(val);
+          break;
+        case 4:
+          ((int32_t*)column_buffers_[column_idx])[row_idx] = static_cast<int32_t>(val);
+          break;
+        case 8:
+          ((int64_t*)column_buffers_[column_idx])[row_idx] = val;
+          break;
+        default:
+          CHECK(false);
+      }
+    } else if (type->isFloatingPoint()) {
+      if (type->isFp32()) {
+        auto float_p = boost::get<float>(scalar_col_val);
+        ((float*)column_buffers_[column_idx])[row_idx] = static_cast<float>(*float_p);
+      } else {
+        CHECK(type->isFp64());
+        auto double_p = boost::get<double>(scalar_col_val);
+        ((double*)column_buffers_[column_idx])[row_idx] = static_cast<double>(*double_p);
+      }
     } else {
-      CHECK(type->isFp64());
-      auto double_p = boost::get<double>(scalar_col_val);
-      ((double*)column_buffers_[column_idx])[row_idx] = static_cast<double>(*double_p);
+      CHECK(type->isString());
+      auto str_p = boost::get<NullableString>(scalar_col_val);
+      if (str_p->type() != typeid(void*)) {
+        auto str = boost::get<std::string>(str_p);
+        auto offsets = reinterpret_cast<int32_t*>(offset_buffers_[column_idx]);
+        auto offset = offsets[row_idx];
+        memcpy(column_buffers_[column_idx] + offset, str->data(), str->size());
+      }
+    }
+  };
+
+  auto type = target_types_[column_idx];
+  const auto scalar_col_val = boost::get<ScalarTargetValue>(&col_val);
+  if (scalar_col_val) {
+    write_scalar(scalar_col_val, row_idx, type);
+  } else {
+    const auto arr_col_val = boost::get<ArrayTargetValue>(&col_val);
+    CHECK(arr_col_val);
+    CHECK(type->isVarLenArray());
+    if (*arr_col_val) {
+      auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
+      auto offsets = reinterpret_cast<int32_t*>(offset_buffers_[column_idx]);
+      size_t offset = static_cast<size_t>(std::abs(offsets[row_idx])) / elem_type->size();
+      for (auto& elem_val : **arr_col_val) {
+        write_scalar(&elem_val, offset++, elem_type);
+      }
     }
   }
 }
@@ -347,6 +388,7 @@ void ColumnarResults::materializeAllColumnsProjection(const ResultSet& rows,
 /*
  * For all non-lazy columns, we can directly copy back the results of each column's
  * contents from different storages and put them into the corresponding output buffer.
+ * This is not supported for varlen data, so it's handled as if it's lazily fetched.
  *
  * This function is parallelized through assigning each column to a CPU thread.
  */
@@ -355,7 +397,11 @@ void ColumnarResults::copyAllNonLazyColumns(
     const ResultSet& rows,
     const size_t num_columns) {
   CHECK(isDirectColumnarConversionPossible());
-  const auto is_column_non_lazily_fetched = [&lazy_fetch_info](const size_t col_idx) {
+  const auto is_column_non_lazily_fetched = [this,
+                                             &lazy_fetch_info](const size_t col_idx) {
+    if (target_types_[col_idx]->isVarLen()) {
+      return false;
+    }
     // Saman: make sure when this lazy_fetch_info is empty
     if (lazy_fetch_info.empty()) {
       return true;
@@ -389,7 +435,8 @@ void ColumnarResults::copyAllNonLazyColumns(
 
 /**
  * For all lazy fetched columns, we should iterate through the column's content and
- * properly materialize it.
+ * properly materialize it. This also include columns with varlen data which has to
+ * be copied through iteration.
  *
  * This function is parallelized through dividing total rows among all existing threads.
  * Since there's no invalid element in the result set (e.g., columnar projections), the
@@ -407,24 +454,14 @@ void ColumnarResults::materializeAllLazyColumns(
     const auto crt_row = rows.getRowAtNoTranslations(row_idx, targets_to_skip);
     for (size_t i = 0; i < num_columns; ++i) {
       if (!targets_to_skip.empty() && !targets_to_skip[i]) {
-        writeBackCell(crt_row[i], row_idx, i);
+        writeBackCell(crt_row[i], row_idx - rows.getOffset(), i);
       }
     }
   };
 
-  const auto contains_lazy_fetched_column =
-      [](const std::vector<ColumnLazyFetchInfo>& lazy_fetch_info) {
-        for (auto& col_info : lazy_fetch_info) {
-          if (col_info.is_lazily_fetched) {
-            return true;
-          }
-        }
-        return false;
-      };
-
   // parallelized by assigning a chunk of rows to each thread)
   const bool skip_non_lazy_columns = rows.isPermutationBufferEmpty();
-  if (contains_lazy_fetched_column(lazy_fetch_info)) {
+  if (rows.areAnyColumnsLazyFetched() || !offset_buffers_.empty()) {
     const size_t worker_count =
         result_set::use_parallel_algorithms(rows) ? cpu_threads() : 1;
     std::vector<std::future<void>> conversion_threads;
@@ -433,16 +470,22 @@ void ColumnarResults::materializeAllLazyColumns(
       CHECK_EQ(lazy_fetch_info.size(), size_t(num_columns));
       targets_to_skip.reserve(num_columns);
       for (size_t i = 0; i < num_columns; i++) {
-        // we process lazy columns (i.e., skip non-lazy columns)
-        targets_to_skip.push_back(!lazy_fetch_info[i].is_lazily_fetched);
+        // we process lazy and varlen columns (i.e., skip non-lazy and non-varlen columns)
+        targets_to_skip.push_back(
+            (lazy_fetch_info.empty() || !lazy_fetch_info[i].is_lazily_fetched) &&
+            !target_types_[i]->isVarLen());
       }
     }
-    // TODO: use threading::parallel_for with blocked_range
-    for (auto interval : makeIntervals(size_t(0), rows.entryCount(), worker_count)) {
+    size_t first = rows.getOffset();
+    size_t last = rows.entryCount();
+    if (rows.isTruncated()) {
+      last = std::min(last, first + rows.getLimit());
+    }
+    for (auto interval : makeIntervals(first, last, worker_count)) {
       conversion_threads.push_back(std::async(
           std::launch::async,
-          [&do_work_just_lazy_columns, &targets_to_skip, this](const size_t start,
-                                                               const size_t end) {
+          [&do_work_just_lazy_columns, &targets_to_skip, first, this](const size_t start,
+                                                                      const size_t end) {
             for (size_t i = start; i < end; ++i) {
               do_work_just_lazy_columns(i, targets_to_skip);
             }
@@ -472,6 +515,10 @@ void ColumnarResults::materializeAllColumnsGroupBy(const ResultSet& rows,
   CHECK(isDirectColumnarConversionPossible());
   CHECK(rows.getQueryDescriptionType() == QueryDescriptionType::GroupByPerfectHash ||
         rows.getQueryDescriptionType() == QueryDescriptionType::GroupByBaselineHash);
+
+  if (!offset_buffers_.empty()) {
+    throw ColumnarConversionNotSupported();
+  }
 
   const size_t num_threads = isParallelConversion() ? cpu_threads() : 1;
   const size_t entry_count = rows.entryCount();

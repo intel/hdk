@@ -9222,8 +9222,9 @@ TEST_F(Select, Subqueries) {
       "((SELECT COUNT(x) FROM test) - "
       "1)) FROM test;",
       dt);
-    EXPECT_THROW(run_multiple_agg("SELECT * FROM (SELECT * FROM test LIMIT 5);", dt),
-                 std::runtime_error);
+    c("SELECT * FROM (SELECT * FROM test LIMIT 5);", dt);
+    c("SELECT * FROM (SELECT * FROM test LIMIT 5 OFFSET 7);", dt);
+    c("SELECT * FROM (SELECT * FROM test LIMIT 5 OFFSET 16);", dt);
     EXPECT_THROW(run_simple_agg("SELECT AVG(SELECT x FROM test LIMIT 5) FROM test;", dt),
                  std::runtime_error);
     EXPECT_THROW(
@@ -11242,11 +11243,10 @@ TEST_F(Select, UnsupportedExtensions) {
   }
 }
 
-TEST_F(Select, UnsupportedSortOfIntermediateResult) {
+TEST_F(Select, SortOfIntermediateResult) {
   for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
     SKIP_NO_GPU();
-    EXPECT_THROW(run_multiple_agg("SELECT real_str FROM test ORDER BY x;", dt),
-                 std::runtime_error);
+    c("SELECT real_str FROM test ORDER BY x, rowid;", dt);
   }
 }
 
@@ -17431,11 +17431,9 @@ TEST_F(Select, UnionAll) {
                                   "SELECT real_str FROM test ORDER BY str;",
                                   dt),
                  std::runtime_error);
-    // Exception: Columnar conversion not supported for variable length types
-    EXPECT_THROW(run_multiple_agg("SELECT real_str FROM test UNION ALL "
-                                  "SELECT real_str FROM test ORDER BY real_str;",
-                                  dt),
-                 std::runtime_error);
+    c("SELECT real_str FROM test UNION ALL "
+      "SELECT real_str FROM test ORDER BY real_str;",
+      dt);
     // Exception: Subqueries of a UNION must have exact same data types.
     EXPECT_THROW(run_multiple_agg("SELECT str FROM test UNION ALL "
                                   "SELECT fixed_str FROM test ORDER BY str;",

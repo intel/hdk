@@ -60,6 +60,7 @@ Buffer::Buffer(BufferMgr* bm,
     , token_(std::move(token)) {
   pin();
   setSize(token_->getSize());
+  initEncoder(token_->getType());
 }
 
 Buffer::~Buffer() {}

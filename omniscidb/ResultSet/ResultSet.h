@@ -462,6 +462,12 @@ class ResultSet {
   std::vector<std::pair<const int8_t*, size_t>> getChunkedColumnarBuffer(
       size_t column_idx) const;
 
+  // For columns with varlen data writes element offsets to the output buffer.
+  // It is 0 for the first element and cumulative length of all previous elements
+  // for others. The total length is written at the end.
+  // Returns the number of values written.
+  size_t computeVarLenOffsets(size_t col_idx, int32_t* offsets) const;
+
   QueryDescriptionType getQueryDescriptionType() const {
     return query_mem_desc_.getQueryDescriptionType();
   }
