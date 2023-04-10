@@ -62,6 +62,6 @@ add_library(Calcite CalciteAdapter.cpp CalciteJNI.cpp SchemaJson.cpp)
 
 add_dependencies(Calcite calcite_java_lib)
 
-target_link_libraries(Calcite OSDependent Shared ${JAVA_JVM_LIBRARY})
+target_link_libraries(Calcite PRIVATE IR OSDependent Shared ${JAVA_JVM_LIBRARY})
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/java/calcite/target/calcite-1.0-SNAPSHOT-jar-with-dependencies.jar DESTINATION bin COMPONENT "jar")

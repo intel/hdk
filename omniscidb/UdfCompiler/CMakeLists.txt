@@ -16,5 +16,4 @@ find_package(Clang REQUIRED)
 include_directories(${CLANG_INCLUDE_DIRS})
 add_definitions(${CLANG_DEFINITIONS})
 
-target_link_libraries(UdfCompiler OSDependent ${clang_libs})
-
+target_link_libraries(UdfCompiler PRIVATE OSDependent Logger CudaMgr ${clang_libs} ${llvm_libs})

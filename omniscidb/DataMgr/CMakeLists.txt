@@ -43,7 +43,7 @@ endif()
 
 add_library(DataMgr ${datamgr_source_files})
 
-set(DataMgrLibs CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS})
+set(DataMgrLibs CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS} ${CUDA_LIBRARIES})
 if(ENABLE_FOLLY)
   list(APPEND DataMgrLibs ${Folly_LIBRARIES})
 endif()
