@@ -40,6 +40,9 @@ if (WIN32)
   add_compile_options(/Zc:__cplusplus)
 else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+  # Do not allow undefined symbols when linking shared libraries because such symbols break
+  # Windows build.
+  add_link_options("LINKER:-z,defs,-ldl")
 endif()
 
 # set default build type to "Release w/ Debug Info" 

@@ -4,4 +4,4 @@ else()
     add_library(CudaMgr CudaMgrNoCuda.cpp)
 endif()
 
-target_link_libraries(CudaMgr Logger ${CUDA_LIBRARIES})
+target_link_libraries(CudaMgr Logger Shared ${CUDA_LIBRARIES})
