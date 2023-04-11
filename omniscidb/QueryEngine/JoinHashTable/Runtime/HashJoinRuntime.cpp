@@ -215,7 +215,7 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
 #endif  // #ifndef __CUDACC__
 
 #ifdef __CUDACC__
-#define hdk_cas(address, compare, val) atomicCAS(address, compare, val)
+#define hdk_cas(address, compare, val) (atomicCAS(address, compare, val) == compare)
 #elif defined(_MSC_VER)
 #define hdk_cas(ptr, expected, desired) template <typename T>
 template <typename T>
