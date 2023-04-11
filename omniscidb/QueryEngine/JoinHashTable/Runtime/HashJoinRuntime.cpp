@@ -217,17 +217,16 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
 #ifdef __CUDACC__
 #define hdk_cas(address, compare, val) (atomicCAS(address, compare, val) == compare)
 #elif defined(_MSC_VER)
-#define hdk_cas(ptr, expected, desired) template <typename T>
 template <typename T>
-bool hdk_cas(T* ptr, T* expected, T desired) {
+bool hdk_cas(T* ptr, T expected, T desired) {
   if constexpr (sizeof(T) == 4) {
     return InterlockedCompareExchange(reinterpret_cast<volatile long*>(ptr),
                                       static_cast<long>(desired),
-                                      static_cast<long>(*expected)) ==
-           static_cast<long>(*expected);
+                                      static_cast<long>(expected)) ==
+           static_cast<long>(expected);
   } else if constexpr (sizeof(T) == 8) {
     return InterlockedCompareExchange64(
-               reinterpret_cast<volatile int64_t*>(ptr), desired, *expected) == *expected;
+               reinterpret_cast<volatile int64_t*>(ptr), desired, expected) == expected;
   } else {
     LOG(FATAL) << "Unsupported atomic operation";
   }
