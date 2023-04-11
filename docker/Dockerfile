@@ -1,68 +1,99 @@
 FROM ubuntu:20.04
 
-RUN apt-get update
-RUN apt-get upgrade -y
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
+# Tools
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    build-essential \
+    ccache \
+    curl \
+    gdb \
+    git \
+    libtbb-dev \
+    make \
+    rsync \
+    tar \
+    vim \
+    wget \
+    lsb-release \
+    software-properties-common \
+    --
 
-# HDK Deps
+# cmake
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    libcurl4-openssl-dev \
+    --
 
-RUN apt-get install -y \
-  build-essential \
-  cmake \
-  gdb \
-  make \
-  autoconf \
-  automake \
-  rsync \
-  tar \
-  wget \
-  python \
-  python-dev \
-  libtbb-dev \
-  sqlite3 \ 
-  libsqlite3-dev \
-  openjdk-11-jdk 
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.24.1/cmake-3.24.1.tar.gz && \
+    tar xzvf cmake-3.24.1.tar.gz && \
+    cd cmake-3.24.1/ && \
+    ./bootstrap && \
+    make -j`nproc` && \
+    make install
 
-# Maven (after openjdk)
-RUN apt-get install -y maven 
-
-# Apache Arrow
-RUN apt install -y -V ca-certificates lsb-release wget
-RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-RUN apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-RUN apt update
-RUN apt install -y -V libarrow-dev libparquet-dev
+# Toolchains
+RUN apt-get update && apt-get install -y \
+    gcc-9 \
+    g++-9 \
+    openjdk-11-jdk \
+    -- && \
+    update-alternatives \
+        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
+        --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
 # LLVM
-RUN apt install -y llvm-12 llvm-12-dev clang-12
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    apt-add-repository \
+        'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main' && \
+    apt-get update && apt-get install -y \
+        llvm-14 \
+        llvm-14-dev \
+        clang-14 \
+        libclang-14-dev \
+        --
 
-# Gflags (for Glog)
-RUN apt install -y libgflags-dev
+ENV PATH=/usr/lib/llvm-14/bin${PATH:+:${PATH}}
 
-# Boost
-RUN apt install -y libboost-all-dev
+# Dependencies
+RUN apt-get update && apt-get install -y \
+    binutils-dev \
+    bzip2 \
+    libboost-all-dev \
+    libbz2-dev \
+    libdouble-conversion-dev \
+    libgflags-dev \
+    libgtest-dev \
+    libncurses-dev \
+    libsnappy-dev \
+    libtbb-dev \
+    libunwind-dev \
+    libz-dev \
+    maven \
+    libfmt-dev \
+    cython3 \
+    python3-numpy \
+    python3-pip \
+    sqlite3 \
+    libsqlite3-dev \
+    --
 
-# convenient utilities
-RUN apt-get install -y curl git vim
+# Arrow
+# https://arrow.apache.org/install/
+RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
+    apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
+    apt-get update && apt-get install -y -V \
+        libarrow-dev \
+        libparquet-dev \
+        libarrow-dataset-dev \
+        libarrow-flight-dev \
+        --
 
-RUN apt-get upgrade -y
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get clean
 
-RUN apt-get clean
+RUN useradd -m --uid 1001 ghrunner
 
-# Gtest
-RUN apt install -y libgtest-dev
-
-# Unwind (glog)
-RUN apt install -y libunwind-dev
-
-# Python
-RUN apt install -y python3-pip
-ADD requirements.txt /requirements.txt
-RUN pip3 install -r /requirements.txt 
-RUN rm /requirements.txt
-
-# symlink pyarrow, dropping the library suffix 
-RUN python3 -c "import pyarrow;print(pyarrow.create_library_symlinks())"
-
-RUN apt-get clean

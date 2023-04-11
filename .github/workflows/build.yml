@@ -89,12 +89,6 @@ jobs:
           name: ${{ env.RUN_STAMP }}-build
           path: /tmp/build.tgz
 
-      - name: Upload release
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.RUN_STAMP }}-release
-          path: /tmp/release.tgz          
-
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v3
