@@ -31,6 +31,7 @@
 #include "Shared/sqldefs.h"
 #include "Shared/toString.h"
 
+#include <boost/functional/hash.hpp>
 #include <boost/graph/adjacency_list.hpp>
 
 #include <list>
@@ -98,8 +99,8 @@ enum JoinColumnSide {
   kDirect  // set target directly (i.e., put hdk::ir::Expr* instead of
            // hdk::ir::BinOper*)
 };
-constexpr char const* EMPTY_QUERY_PLAN = "";
-constexpr QueryPlanHash EMPTY_HASHED_PLAN_DAG_KEY = 0;
+const QueryPlan EMPTY_QUERY_PLAN("");
+const QueryPlanHash EMPTY_HASHED_PLAN_DAG_KEY = boost::hash_value(EMPTY_QUERY_PLAN);
 
 enum class SortAlgorithm { Default, SpeculativeTopN, StreamingTopN };
 
