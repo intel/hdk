@@ -1026,8 +1026,9 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   try {
     bin_result = spv_to_bin(ss.str(), func_name, gpu_target.block_size, l0_mgr);
   } catch (l0::L0Exception& e) {
-    llvm::errs() << e.what() << "\n";
-    return {};
+    LOG(WARNING) << "Failed to generate native GPU code: " << e.what()
+                 << ". Switching to CPU execution target.";
+    throw QueryMustRunOnCpu();
   }
 
   auto compilation_ctx = std::make_shared<L0CompilationContext>();
