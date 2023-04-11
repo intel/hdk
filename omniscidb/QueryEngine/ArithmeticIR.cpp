@@ -415,10 +415,10 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
     cgen_state_->ir_builder_.SetInsertPoint(mul_check_1);
 
     // Check b==-1, no overflow
-    // ((b) < 0 && ((a) > 0 && (b) == -1)
+    // ((b) < 0 && ((a) >= 0 && (b) == -1)
     auto rhs_neg_and_lhs_pos = cgen_state_->ir_builder_.CreateAnd(
         cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero),
-        cgen_state_->ir_builder_.CreateICmpSGT(lhs_lv, const_zero));
+        cgen_state_->ir_builder_.CreateICmpSGE(lhs_lv, const_zero));
 
     auto rhs_minus_one = cgen_state_->ir_builder_.CreateICmpEQ(rhs_lv, const_minus_one);
 
