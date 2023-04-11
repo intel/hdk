@@ -445,6 +445,26 @@ TEST_F(AggregationTest, NullHandling) {
   c("SELECT COUNT(*) FROM test WHERE ofq >= 0 OR ofq IS NULL;", g_dt);
 }
 
+class OverflowTest : public ExecuteTestBase, public ::testing::Test {};
+
+TEST_F(OverflowTest, OverflowAndUnderFlow) {
+  c("SELECT dd * ufd FROM test;", g_dt);
+  c("SELECT dd * -1 FROM test;", g_dt);
+  c("SELECT -1 * dd FROM test;", g_dt);
+  c("SELECT ofq * -1 FROM test;", g_dt);
+  c("SELECT 1 * ofq FROM test;", g_dt);
+  c("SELECT 566 * 244 FROM test;", g_dt);
+  EXPECT_THROW(c("SELECT ofd * ofd FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 9223372036854775807 * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -9223372036854775808 * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 2*9223372036854775807 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -2*-9223372036854775808 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT ofq * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT ofq * -2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 2* ofq FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -2* ofq FROM test;", g_dt), std::runtime_error);
+}
+
 class GroupByAggTest : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(GroupByAggTest, GroupByCount) {
