@@ -24,6 +24,7 @@ jobs:
     with:
       name: cuda
       cuda_compiler_version: 12-0
+      options: -DENABLE_CUDA=on
 
   style:
     needs: build
