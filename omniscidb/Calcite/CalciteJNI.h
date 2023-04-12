@@ -50,4 +50,5 @@ class CalciteJNI {
  private:
   class Impl;
   std::unique_ptr<Impl> impl_;
+  static std::mutex mutex_;
 };

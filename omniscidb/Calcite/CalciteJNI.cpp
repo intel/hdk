@@ -176,6 +176,8 @@ class CalciteJNI::Impl {
       : schema_provider_(schema_provider), config_(config) {
     // Initialize JVM.
     jvm_ = JVM::getInstance(calcite_max_mem_mb);
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
 
     // Create CalciteServerHandler object.
@@ -193,6 +195,8 @@ class CalciteJNI::Impl {
   }
 
   ~Impl() {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     for (auto obj : global_refs_) {
       env->DeleteGlobalRef(obj);
@@ -205,6 +209,8 @@ class CalciteJNI::Impl {
                       const bool legacy_syntax,
                       const bool is_explain,
                       const bool is_view_optimize) {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     jstring arg_catalog = env->NewStringUTF(db_name.c_str());
     std::string modified_sql = pg_shim(sql_string);
@@ -257,6 +263,8 @@ class CalciteJNI::Impl {
   }
 
   std::string getExtensionFunctionWhitelist() {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     jstring java_res =
         (jstring)env->CallObjectMethod(handler_obj_, handler_get_ext_fn_list_);
@@ -264,6 +272,8 @@ class CalciteJNI::Impl {
   }
 
   std::string getUserDefinedFunctionWhitelist() {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     jstring java_res =
         (jstring)env->CallObjectMethod(handler_obj_, handler_get_udf_list_);
@@ -271,6 +281,8 @@ class CalciteJNI::Impl {
   }
 
   std::string getRuntimeExtensionFunctionWhitelist() {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     jstring java_res =
         (jstring)env->CallObjectMethod(handler_obj_, handlhandler_get_rt_fn_list_);
@@ -279,6 +291,8 @@ class CalciteJNI::Impl {
 
   void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
                                     bool is_runtime) {
+    std::lock_guard<std::mutex> jvm_lock(mutex_);
+
     auto env = jvm_->getEnv();
     jobject udfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
     for (auto& udf : udfs) {
@@ -602,3 +616,5 @@ void CalciteJNI::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
                                               bool is_runtime) {
   return impl_->setRuntimeExtensionFunctions(udfs, is_runtime);
 }
+
+std::mutex CalciteJNI::mutex_;
