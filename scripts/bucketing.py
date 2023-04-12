@@ -34,6 +34,8 @@ parser = argparse.ArgumentParser(prog='bucketing',
 parser.add_argument('testname', help='Path to the gtest executable.')
 parser.add_argument('--no-run', default=False, action='store_true',
                     help="Don't run the tests, just print their names.")
+parser.add_argument('-a', '--advanced-bucketing', default=False,
+                    action='store_true', help="Use fine-grained bucketing. No effect if --no-run is enabled.")
 parser.add_argument('-o', '--output', type=argparse.FileType('w'),
                     help="Re-route output to a yaml file.")
 args = parser.parse_args()
@@ -60,15 +62,19 @@ if args.no_run:
 report = {}
 
 
-def add_to_report(bucket, test):
-    if bucket not in report.keys():
-        report[bucket] = [test]
+def add_to_bucket(category: dict, bucket, test, stderr=None):
+    record = test if not stderr else {'name': test, 'output': stderr}
+    if bucket not in category.keys():
+        category[bucket] = [record]
     else:
-        report[bucket].append(test)
+        category[bucket].append(record)
 
 
-for test in tests:
-    p = subprocess.run([executable, '--gtest_filter=' + test])
+def add_to_report(bucket, test):
+    add_to_bucket(report, bucket, test)
+
+
+def basic_bucketize(p: subprocess.CompletedProcess):
     if p.returncode < 0:
         add_to_report(signal_to_name(-p.returncode), test)
     elif p.returncode == 0:
@@ -77,6 +83,40 @@ for test in tests:
         add_to_report('ERROR', test)
     else:
         assert (False)
+
+
+def advanced_bucketize(p: subprocess.CompletedProcess):
+    if p.returncode == 0:
+        add_to_report('PASS', test)
+    else:
+        top_level_bucket = signal_to_name(
+            -p.returncode) if p.returncode < 0 else 'ERROR'
+        if top_level_bucket not in report.keys():
+            report[top_level_bucket] = {}
+        if 'Check failed: Data_Namespace::CPU_LEVEL' in p.stderr:
+            add_to_bucket(report[top_level_bucket],
+                          'MEMORY_LEVEL', test)
+        elif 'Abort /opt/src/l0_gpu_driver/shared/source/memory_manager/memory_manager.cpp' in p.stdout:
+            add_to_bucket(report[top_level_bucket], 'DRIVER_FAILURE', test)
+        elif 'Check failed: func' in p.stderr:
+            add_to_bucket(report[top_level_bucket], 'CODEGEN_FAILURE', test)
+        elif 'Check failed: hash_table_cache_' in p.stderr:
+            add_to_bucket(report[top_level_bucket], 'HASH_TABLE_CACHE', test)
+        elif 'SQLiteComparator' in p.stdout:
+            add_to_bucket(report[top_level_bucket], 'INCORRECT_RESULT', test)
+        else:
+            add_to_bucket(report[top_level_bucket], 'OTHER', test, p.stderr)
+
+
+for test in tests:
+    if args.advanced_bucketing:
+        p = subprocess.run([executable, '--gtest_filter=' + test],
+                           capture_output=True, encoding='utf-8')
+        print(p.stdout, p.stderr)
+        advanced_bucketize(p)
+    else:
+        p = subprocess.run([executable, '--gtest_filter=' + test])
+        basic_bucketize(p)
 
 if args.output:
     yaml.dump(report, args.output)
