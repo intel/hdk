@@ -53,6 +53,7 @@ class RelAlgExecutor {
   RelAlgExecutor(Executor* executor,
                  SchemaProviderPtr schema_provider,
                  std::unique_ptr<hdk::ir::QueryDag> query_dag);
+  ~RelAlgExecutor();
 
   ExecutionResult executeRelAlgQuery(const CompilationOptions& co,
                                      const ExecutionOptions& eo,
@@ -223,8 +224,6 @@ class RelAlgExecutor {
     const auto it_ok = temporary_tables_.emplace(table_id, token);
     CHECK(it_ok.second);
   }
-
-  void eraseFromTemporaryTables(const int table_id) { temporary_tables_.erase(table_id); }
 
   void handleNop(RaExecutionDesc& ed);
 

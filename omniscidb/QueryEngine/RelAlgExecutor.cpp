@@ -132,6 +132,25 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
   schema_provider_ = schema_mgr;
 }
 
+RelAlgExecutor::~RelAlgExecutor() {
+  // We don't need temporary tables anymore. On desctruction we are going to lose
+  // all tokens and have ResultSets removed from the ResultSetRegistry. But some
+  // zero-copy Buffers might still live DataMgr and hold ResultSets alive. Here
+  // we clear these chunk to avoid unnecessary cached data. Remove in the reverse
+  // order because later results can re-use and pin earlier ones. Some buffers
+  // may still remain pinned by the final query result though.
+  std::set<int, std::greater<int>> tmp_table_ids;
+  for (auto& pr : temporary_tables_) {
+    tmp_table_ids.insert(pr.second->tableId());
+  }
+  auto data_mgr = executor_->getDataMgr();
+  ChunkKey prefix = {hdk::ResultSetRegistry::DB_ID, 0};
+  for (auto table_id : tmp_table_ids) {
+    prefix[1] = table_id;
+    data_mgr->deleteChunksWithPrefix(prefix, MemoryLevel::CPU_LEVEL);
+  }
+}
+
 ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
                                                    const ExecutionOptions& eo,
                                                    const bool just_explain_plan) {
