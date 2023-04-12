@@ -6806,7 +6806,7 @@ TEST_F(Select, DateTruncate) {
         run_multiple_agg(
             R"(SELECT EXTRACT('epoch' FROM date_trunc('century', dt)) FROM test_date_time ORDER BY dt;)",
             dt),
-        {-2177452800, -2177452800, -2177452800, -2177452800});
+        {-2177452800ll, -2177452800ll, -2177452800ll, -2177452800ll});
     check_epoch_result(
         run_multiple_agg(
             R"(SELECT EXTRACT('epoch' FROM date_trunc('decade', dt)) FROM test_date_time ORDER BY dt;)",
@@ -7572,7 +7572,7 @@ TEST_F(Select, CastRound) {
 
     EXPECT_EQ(2147483647, v<int64_t>(run("2147483647.499999999", "INT", dt)));
     EXPECT_ANY_THROW(run("2147483647.5", "INT", dt));  // overflow
-    EXPECT_EQ(-2147483648, v<int64_t>(run("-2147483648.499999999", "INT", dt)));
+    EXPECT_EQ(-2147483648ll, v<int64_t>(run("-2147483648.499999999", "INT", dt)));
     EXPECT_ANY_THROW(run("-2147483648.5", "INT", dt));  // overflow
 
     BOOST_PRAGMA_MESSAGE(
