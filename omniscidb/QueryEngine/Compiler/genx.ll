@@ -9,6 +9,20 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
+; Math functions
+declare float @__spirv_ocl_floor(float noundef)
+declare double @llvm.floor.f64(double)
+
+define float @Floor__(float noundef %0) {
+    %rs = tail call float @__spirv_ocl_floor(float %0)
+    ret float %rs
+}
+
+define double @Floor(double noundef %0) {
+    %rs = tail call double @llvm.floor.f64(double %0)
+    ret double %rs
+}
+
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)

@@ -802,6 +802,12 @@ TEST_F(BasicTest, In) {
     g_dt);
 }
 
+TEST_F(BasicTest, Floor) {
+  c("SELECT FLOOR(1.5);", g_dt);
+  c("SELECT FLOOR(f) from test;", g_dt);
+  c("SELECT FLOOR(d) from test;", g_dt);
+}
+
 int main(int argc, char* argv[]) {
   auto config = std::make_shared<Config>();
   testing::InitGoogleTest(&argc, argv);
