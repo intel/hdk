@@ -80,9 +80,7 @@ DwarfBenchDataSource::DwarfBenchDataSource()
                                  AnalyticalTemplate::Sort}})
     , pimpl_(new PrivateImpl()) {}
 
-DwarfBenchDataSource::~DwarfBenchDataSource() {
-  delete pimpl_;
-}
+DwarfBenchDataSource::~DwarfBenchDataSource() = default;
 
 Detail::DeviceMeasurements DwarfBenchDataSource::getMeasurements(
     const std::vector<ExecutorDeviceType>& devices,
