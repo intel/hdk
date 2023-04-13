@@ -38,8 +38,8 @@ LinearRegression::~LinearRegression() {
 }
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
-  arma::vec x = {1.0, (double)bytes};
-  return (size_t)arma::dot(x, pimpl_->weights);
+  arma::vec x = {1.0, static_cast<double>(bytes)};
+  return static_cast<size_t>(arma::dot(x, pimpl_->weights));
 }
 
 void LinearRegression::buildRegressionCoefficients() {
@@ -57,7 +57,7 @@ arma::mat LinearRegression::PrivateImpl::buildFeaturesMatrix(
   arma::mat X(measurement.size(), featuresSize, arma::fill::ones);
 
   for (size_t row = 0; row < measurement.size(); row++) {
-    X(row, 1) = (double)measurement[row].bytes;
+    X(row, 1) = static_cast<double>(measurement[row].bytes);
   }
 
   return X;
