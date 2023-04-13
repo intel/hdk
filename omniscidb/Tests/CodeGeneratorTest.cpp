@@ -69,9 +69,9 @@ compiler::CodegenTraits get_traits() {
 
 compiler::CodegenTraitsDescriptor get_traits_desc() {
 #ifdef HAVE_L0
-  return compiler::CodegenTraits::getDescriptor(4, 1, llvm::CallingConv::SPIR_FUNC);
+  return compiler::CodegenTraits::getDescriptor(4, 3, 1, llvm::CallingConv::SPIR_FUNC);
 #else
-  return compiler::CodegenTraits::getDescriptor(0, 0, llvm::CallingConv::C);
+  return compiler::CodegenTraits::getDescriptor(0, 0, 0, llvm::CallingConv::C);
 #endif
 }
 }  // namespace

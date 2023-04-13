@@ -66,18 +66,21 @@ class CodegenTraits {
     CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) !=
           descCallingConvToLLVM.end());
     return CodegenTraits(codegen_traits_desc.local_addr_space_,
+                         codegen_traits_desc.smem_addr_space_,
                          codegen_traits_desc.global_addr_space_,
                          descCallingConvToLLVM.at(codegen_traits_desc.conv_),
                          codegen_traits_desc.triple_);
   }
 
   static CodegenTraitsDescriptor getDescriptor(unsigned local_addr_space,
+                                               unsigned shared_addr_space,
                                                unsigned global_addr_space,
                                                llvm::CallingConv::ID calling_conv,
                                                const std::string triple = "");
 
   CodegenTraitsDescriptor getDescriptor() {
     return CodegenTraitsDescriptor(local_addr_space_,
+                                   smem_addr_space_,
                                    global_addr_space_,
                                    llvmCallingConvToDesc.at(conv_),
                                    triple_.str());
