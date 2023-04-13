@@ -38,7 +38,7 @@ size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) {
   size_t y1 = measurement_[id1].milliseconds, y2 = measurement_[id2].milliseconds;
   size_t x1 = measurement_[id1].bytes, x2 = measurement_[id2].bytes;
 
-  return y1 + ((double)bytes - x1) / (x2 - x1) * (y2 - y1);
+  return y1 + (static_cast<double>(bytes) - x1) / (x2 - x1) * (y2 - y1);
 }
 
 }  // namespace costmodel
