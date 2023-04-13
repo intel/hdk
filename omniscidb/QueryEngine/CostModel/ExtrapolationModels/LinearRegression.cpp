@@ -20,7 +20,7 @@ struct LinearRegression::PrivateImpl {
   arma::mat buildFeaturesMatrix(const std::vector<Detail::Measurement>& measurement);
   arma::vec buildTargets(const std::vector<Detail::Measurement>& measurement);
 
-  arma::vec w_;
+  arma::vec weights;
 };
 
 LinearRegression::LinearRegression(const std::vector<Detail::Measurement>& measurement)
@@ -39,7 +39,7 @@ LinearRegression::~LinearRegression() {
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
   arma::vec x = {1.0, (double)bytes};
-  return (size_t)arma::dot(x, pimpl_->w_);
+  return (size_t)arma::dot(x, pimpl_->weights);
 }
 
 void LinearRegression::buildRegressionCoefficients() {
@@ -47,7 +47,7 @@ void LinearRegression::buildRegressionCoefficients() {
   arma::mat X = pimpl_->buildFeaturesMatrix(measurement_);
   arma::vec y = pimpl_->buildTargets(measurement_);
 
-  pimpl_->w_ = arma::inv(X.t() * X) * X.t() * y;
+  pimpl_->weights = arma::inv(X.t() * X) * X.t() * y;
 }
 
 arma::mat LinearRegression::PrivateImpl::buildFeaturesMatrix(
