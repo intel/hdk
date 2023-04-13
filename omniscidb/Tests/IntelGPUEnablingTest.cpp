@@ -445,6 +445,26 @@ TEST_F(AggregationTest, NullHandling) {
   c("SELECT COUNT(*) FROM test WHERE ofq >= 0 OR ofq IS NULL;", g_dt);
 }
 
+class OverflowTest : public ExecuteTestBase, public ::testing::Test {};
+
+TEST_F(OverflowTest, OverflowAndUnderFlow) {
+  c("SELECT dd * ufd FROM test;", g_dt);
+  c("SELECT dd * -1 FROM test;", g_dt);
+  c("SELECT -1 * dd FROM test;", g_dt);
+  c("SELECT ofq * -1 FROM test;", g_dt);
+  c("SELECT 1 * ofq FROM test;", g_dt);
+  c("SELECT 566 * 244 FROM test;", g_dt);
+  EXPECT_THROW(c("SELECT ofd * ofd FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 9223372036854775807 * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -9223372036854775808 * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 2*9223372036854775807 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -2*-9223372036854775808 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT ofq * 2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT ofq * -2 FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT 2* ofq FROM test;", g_dt), std::runtime_error);
+  EXPECT_THROW(c("SELECT -2* ofq FROM test;", g_dt), std::runtime_error);
+}
+
 class GroupByAggTest : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(GroupByAggTest, GroupByCount) {
@@ -809,14 +829,25 @@ int main(int argc, char* argv[]) {
   namespace po = boost::program_options;
   po::options_description desc("Options");
 
+  desc.add_options()("dump-ir",
+                     po::value<bool>()->default_value(false)->implicit_value(true),
+                     "Dump IR and PTX for all executed queries to file."
+                     " Currently only supports single node tests.");
+
   logger::LogOptions log_options(argv[0]);
-  log_options.severity_ = logger::Severity::INFO;
+  log_options.severity_ = logger::Severity::FATAL;
   log_options.set_options();
   desc.add(log_options.get_options());
 
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
   po::notify(vm);
+
+  if (vm["dump-ir"].as<bool>()) {
+    // Only log IR, PTX channels to file with no rotation size.
+    log_options.channels_ = {logger::Channel::IR, logger::Channel::PTX};
+    log_options.rotation_size_ = std::numeric_limits<size_t>::max();
+  }
 
   logger::init(log_options);
 
