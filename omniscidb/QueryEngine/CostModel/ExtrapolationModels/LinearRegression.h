@@ -33,7 +33,7 @@ class LinearRegression : public ExtrapolationModel {
   void buildRegressionCoefficients();
 
   struct PrivateImpl;
-  PrivateImpl* pimpl_;
+    std::unique_ptr<PrivateImpl> pimpl_;
 };
 
 }  // namespace costmodel

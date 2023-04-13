@@ -33,9 +33,7 @@ LinearRegression::LinearRegression(std::vector<Detail::Measurement>&& measuremen
   buildRegressionCoefficients();
 }
 
-LinearRegression::~LinearRegression() {
-  delete pimpl_;
-}
+LinearRegression::~LinearRegression() = default;
 
 size_t LinearRegression::getExtrapolatedData(size_t bytes) {
   arma::vec x = {1.0, static_cast<double>(bytes)};
