@@ -58,10 +58,12 @@ const std::unordered_map<llvm::CallingConv::ID, CallingConvDesc>
     };
 
 CodegenTraitsDescriptor CodegenTraits::getDescriptor(unsigned local_addr_space,
+                                                     unsigned shared_addr_space,
                                                      unsigned global_addr_space,
                                                      llvm::CallingConv::ID calling_conv,
                                                      const std::string triple) {
   return CodegenTraitsDescriptor(local_addr_space,
+                                 shared_addr_space,
                                  global_addr_space,
                                  llvmCallingConvToDesc.at(calling_conv),
                                  triple);
