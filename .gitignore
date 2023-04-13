@@ -13,3 +13,4 @@ __pycache__
 # Logs
 hdk_log/*
 omniscidb/Calcite/java/calcite/hdk_log/*
+omniscidb/Calcite/java/calcite/dependency-reduced-pom.xml
