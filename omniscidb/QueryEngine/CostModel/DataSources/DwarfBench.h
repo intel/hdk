@@ -45,7 +45,7 @@ class DwarfBenchDataSource : public DataSource {
                                                            AnalyticalTemplate templ);
 
   struct PrivateImpl;
-    std::unique_ptr<PrivateImpl> pimpl_;
+  std::unique_ptr<PrivateImpl> pimpl_;
 };
 
 }  // namespace costmodel
