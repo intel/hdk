@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# 
+#
 # Copyright 2022 Intel Corporation.
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -16,7 +16,7 @@ import pyhdk
 class TestSql:
     @classmethod
     def setup_class(cls):
-        #pyhdk.initLogger(debug_logs=True)
+        # pyhdk.initLogger(debug_logs=True)
         cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
@@ -52,7 +52,7 @@ class TestSql:
     def test_simple_count(self):
         res = self.execute_sql("SELECT COUNT(*) FROM test;")
         df = res.to_arrow().to_pandas()
-        assert df.shape == (1,1)
+        assert df.shape == (1, 1)
         assert df["EXPR$0"].tolist()[0] == 3
 
     def test_simple_projection(self):
@@ -62,11 +62,10 @@ class TestSql:
         assert df["a"].tolist() == [1, 2, 3]
         assert df["b"].tolist() == [10, 20, 30]
 
-
     def test_simple_filter(self):
         res = self.execute_sql("SELECT COUNT(*) FROM test WHERE a < 3;")
         df = res.to_arrow().to_pandas()
-        assert df.shape == (1,1)
+        assert df.shape == (1, 1)
         assert df["EXPR$0"].tolist()[0] == 2
 
     def test_explain(self):

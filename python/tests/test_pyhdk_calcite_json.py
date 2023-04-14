@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# 
+#
 # Copyright 2023 Intel Corporation.
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -15,7 +15,7 @@ import pyhdk
 class TestCalciteJson:
     @classmethod
     def setup_class(cls):
-        #pyhdk.initLogger(debug_logs=True)
+        # pyhdk.initLogger(debug_logs=True)
         cls.config = pyhdk.buildConfig()
         cls.storage = pyhdk.storage.ArrowStorage(1)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
@@ -43,7 +43,7 @@ class TestCalciteJson:
             cls.executor, cls.storage, cls.data_mgr, ra
         )
         return rel_alg_executor.execute(**kwargs)
-        
+
     def test_filter_json(self):
         json_ra_str = """execute calcite 
         {
@@ -160,6 +160,6 @@ class TestCalciteJson:
 
         res = self.execute_json_ra(json_ra_str)
         df = res.to_arrow().to_pandas()
-        assert df.shape == (1,1)
+        assert df.shape == (1, 1)
         print(df)
         assert df["$f0"].tolist()[0] == 1
