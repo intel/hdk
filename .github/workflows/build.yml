@@ -67,6 +67,18 @@ jobs:
           sudo apt-get install cuda-nvcc-${{ inputs.cuda_compiler_version }}
           conda install -n omnisci-dev -c conda-forge arrow-cpp-proc=4.0.0=cuda
 
+      - name: Install Intel GPU drivers
+        if: inputs.name == 'l0'
+        run: |
+          wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero-devel_1.9.4+u18.04_amd64.deb
+          wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero_1.9.4+u18.04_amd64.deb
+          wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-core_1.0.12812.24_amd64.deb
+          wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-opencl_1.0.12812.24_amd64.deb
+          wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-level-zero-gpu_1.3.25018.24_amd64.deb
+          wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/libigdgmm12_22.3.0_amd64.deb
+          sudo dpkg -i intel-igc-core_1.0.12812.24_amd64.deb intel-level-zero-gpu_1.3.25018.24_amd64.deb libigdgmm12_22.3.0_amd64.deb intel-igc-opencl_1.0.12812.24_amd64.deb
+          conda install -n omnisci-dev -c conda-forge level-zero-devel pkg-config
+
       - name: Restore Maven cache
         uses: actions/cache@v3
         with:
