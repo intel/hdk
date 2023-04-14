@@ -32,6 +32,23 @@ class UsedInputsCollector : public ir::ExprCollector<ColumnVarSet, UsedInputsCol
   void visitColumnVar(const ir::ColumnVar* col_var) override { result_.insert(*col_var); }
 };
 
+class StringGuardForL0 : public ir::ExprVisitor<void> {
+ public:
+  bool isStrPresent() { return string_present_; }
+
+ protected:
+  void visitConstant(const hdk::ir::Constant* cst) override {
+    if (cst->type()->isString() ||
+        (cst->type()->isExtDictionary() &&
+         cst->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString())) {
+      string_present_ = true;
+    }
+  }
+
+ private:
+  bool string_present_{false};
+};
+
 class NestLevelRewriter : public ir::ExprRewriter {
  public:
   NestLevelRewriter(std::vector<size_t> permutation)
@@ -423,6 +440,14 @@ void WorkUnitBuilder::processFilter(const ir::Filter* filter) {
       executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
   auto rte_idx = all_nest_levels_.at(filter);
 
+#ifdef HAVE_L0
+  StringGuardForL0 strConstCollector;
+  strConstCollector.visit(filter->getConditionExpr());
+  if (strConstCollector.isStrPresent() && co_.device_type == ExecutorDeviceType::GPU) {
+    throw QueryMustRunOnCpu();
+  }
+#endif
+
   // If we filter the result of join then we can merge the filter with
   // join conditions. That maght help to filter-out rows earlier.
   if (!rte_idx && !join_quals_.empty()) {
@@ -476,6 +501,15 @@ void WorkUnitBuilder::processSort(const ir::Sort* sort) {
     if (expr->type()->isArray()) {
       throw std::runtime_error("Columns with array types cannot be used for sorting.");
     }
+#ifdef HAVE_L0
+    if (expr->type()->isString() ||
+        (expr->type()->isExtDictionary() &&
+         expr->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString())) {
+      if (co_.device_type == ExecutorDeviceType::GPU) {
+        throw QueryMustRunOnCpu();
+      }
+    }
+#endif
   }
 }
 
@@ -719,9 +753,6 @@ void WorkUnitBuilder::computeInputDescs() {
 void WorkUnitBuilder::computeInputColDescs() {
   // Scan all currently used expressions to determine used columns.
   UsedInputsCollector collector;
-  for (auto& expr : target_exprs_[0]) {
-    collector.visit(expr.get());
-  }
   for (auto& expr : simple_quals_) {
     collector.visit(expr.get());
   }
@@ -738,8 +769,26 @@ void WorkUnitBuilder::computeInputColDescs() {
       collector.visit(expr.get());
     }
   }
+#ifdef HAVE_L0
+  ColumnVarSet non_targets_touch = collector.result();
+  for (const auto& col_var : non_targets_touch) {
+    if (col_var.columnInfo()->type->isString() ||
+        (col_var.columnInfo()->type->isExtDictionary() &&
+         col_var.columnInfo()
+             ->type->as<hdk::ir::ExtDictionaryType>()
+             ->elemType()
+             ->isString())) {
+      if (co_.device_type == ExecutorDeviceType::GPU) {
+        throw QueryMustRunOnCpu();
+      }
+    }
+  }
+#endif
 
-  auto cols = collector.result();
+  for (auto& expr : target_exprs_[0]) {
+    collector.visit(expr.get());
+  }
+
   std::vector<std::shared_ptr<const InputColDescriptor>> col_descs;
   for (auto& col_var : collector.result()) {
     col_descs.push_back(std::make_shared<const InputColDescriptor>(col_var.columnInfo(),

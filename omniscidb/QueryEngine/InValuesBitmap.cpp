@@ -44,7 +44,7 @@ InValuesBitmap::InValuesBitmap(const std::vector<int64_t>& values,
     , memory_level_(memory_level)
     , device_count_(device_count)
     , buffer_provider_(buffer_provider) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   CHECK(memory_level_ == Data_Namespace::CPU_LEVEL ||
         memory_level == Data_Namespace::GPU_LEVEL);
 #else
@@ -87,7 +87,7 @@ InValuesBitmap::InValuesBitmap(const std::vector<int64_t>& values,
     }
     agg_count_distinct_bitmap(reinterpret_cast<int64_t*>(&cpu_bitset), value, min_val_);
   }
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   if (memory_level_ == Data_Namespace::GPU_LEVEL) {
     for (int device_id = 0; device_id < device_count_; ++device_id) {
       gpu_buffers_.emplace_back(GpuAllocator::allocGpuAbstractBuffer(
