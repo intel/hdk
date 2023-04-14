@@ -1,4 +1,4 @@
-name: Build
+name: CI
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +13,12 @@ on:
     - cron: '51 2 * * *'
 
 jobs:
-  modin:
-    uses: ./.github/workflows/modin.yml
-
   build:
+    name: Build
     uses: ./.github/workflows/build.yml
 
   build-cuda:
+    name: Build
     uses: ./.github/workflows/build.yml
     with:
       name: cuda
@@ -27,12 +26,14 @@ jobs:
       options: -DENABLE_CUDA=on
 
   build-l0:
+    name: Build
     uses: ./.github/workflows/build.yml
     with:
       name: l0
       options: -DENABLE_L0=on
 
   build-both-l0-cuda:
+    name: Build
     uses: ./.github/workflows/build.yml
     with:
       name: 'all-gpus'
@@ -40,6 +41,7 @@ jobs:
       options: -DENABLE_L0=on -DENABLE_CUDA=on
 
   style:
+    name: Style-check
     needs: build
     uses: ./.github/workflows/test.yml
     with:
@@ -47,6 +49,7 @@ jobs:
       test: style
 
   sanity:
+    name: Sanity test (Gtests)
     needs: build
     uses: ./.github/workflows/test.yml
     with:
@@ -54,6 +57,7 @@ jobs:
       test: sanity
 
   asan:
+    name: Asan test (Gtests)
     needs: build
     uses: ./.github/workflows/test.yml
     with:
@@ -69,12 +73,14 @@ jobs:
 
 
   build-cuda-docker:
+    name: Build
     uses: ./.github/workflows/build-docker.yml
     with:
       name: cuda
       options: -DENABLE_PYTHON=off 
 
   test-cuda-docker:
+    name: Sanity test (Gtests)
     needs: build-cuda-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -83,17 +89,24 @@ jobs:
       reset-cache: ${{ !!inputs.reset-cache }}
 
   build-l0-docker:
+    name: Build 
     uses: ./.github/workflows/build-docker.yml
     with:
       name: l0
       options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
 
   test-l0-docker:
+    name: Sanity test (Gtests) 
     needs: build-l0-docker
     uses: ./.github/workflows/test-l0-docker.yml
     with:
       name: l0
       reset-cache: ${{ !!inputs.reset-cache }}
 
+  modin:
+    name: Integration HDK with Modin (Pytest)
+    uses: ./.github/workflows/modin.yml
+
   pytest:
+    name: PyHDK (Pytest)
     uses: ./.github/workflows/pytest.yml
