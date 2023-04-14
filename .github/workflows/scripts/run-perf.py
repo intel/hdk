@@ -5,13 +5,13 @@ import statistics, json
 import matplotlib.pyplot as plt
 
 NUM_TEST = 4
-JSON_NAME = 'perf.json'
+JSON_NAME = "perf.json"
 
 
 def parse_arguments():
     cmd = sys.argv[1:]
     num_runs = cmd[0]
-    if num_runs[-1] == 'x':
+    if num_runs[-1] == "x":
         num_runs = int(num_runs[:-1])
         cmd.pop(0)
     else:
@@ -24,8 +24,8 @@ def do_runs(num_runs, cmd):
     cpu = [[] for _ in range(NUM_TEST)]
 
     for i in range(num_runs):
-        r = subprocess.run(cmd, stdout = subprocess.PIPE)
-        lines = r.stdout.decode('utf-8').splitlines()
+        r = subprocess.run(cmd, stdout=subprocess.PIPE)
+        lines = r.stdout.decode("utf-8").splitlines()
 
         for j in range(NUM_TEST):
             r = lines[j - NUM_TEST].split()
@@ -38,7 +38,8 @@ def do_runs(num_runs, cmd):
 
 
 def load_json():
-    if not os.path.exists(JSON_NAME): return [[], []]
+    if not os.path.exists(JSON_NAME):
+        return [[], []]
 
     with open(JSON_NAME) as f:
         data = json.load(f)
@@ -53,7 +54,7 @@ def draw_graphs(name, data):
         plt.plot(d)
         plt.title(n)
         plt.xticks([])
-        plt.savefig(n + '.pdf')
+        plt.savefig(n + ".pdf")
         plt.close()
 
 
@@ -61,14 +62,14 @@ def process_runs(perf_json, time, cpu):
     perf_json[0].append(time)
     perf_json[1].append(cpu)
 
-    with open(JSON_NAME, 'w') as f:
+    with open(JSON_NAME, "w") as f:
         json.dump(perf_json, f)
     return perf_json
 
 
 def draw_all(perf_json):
-    draw_graphs('time', perf_json[0])
-    draw_graphs('cpu', perf_json[1])
+    draw_graphs("time", perf_json[0])
+    draw_graphs("cpu", perf_json[1])
 
 
 num_runs, cmd = parse_arguments()
@@ -76,4 +77,3 @@ time, cpu = do_runs(num_runs, cmd)
 perf_json = load_json()
 perf_json = process_runs(perf_json, time, cpu)
 draw_all(perf_json)
-
