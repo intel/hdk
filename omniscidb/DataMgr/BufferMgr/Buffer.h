@@ -70,7 +70,6 @@ class Buffer : public AbstractBuffer {
 
   // Create zero-copy read-only buffer referencing external memory.
   Buffer(BufferMgr* bm,
-         BufferList::iterator seg_it,
          int device_id,
          size_t page_size,
          std::unique_ptr<AbstractDataToken> token);

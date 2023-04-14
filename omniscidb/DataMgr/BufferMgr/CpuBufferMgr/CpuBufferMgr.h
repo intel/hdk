@@ -49,7 +49,6 @@ class CpuBufferMgr : public BufferMgr {
   inline std::string getStringMgrType() override { return ToString(CPU_MGR); }
 
   AbstractBuffer* allocateZeroCopyBuffer(
-      BufferList::iterator seg_it,
       const size_t page_size,
       std::unique_ptr<AbstractDataToken> token) override;
 

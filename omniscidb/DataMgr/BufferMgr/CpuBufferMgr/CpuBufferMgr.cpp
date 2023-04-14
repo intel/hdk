@@ -55,10 +55,9 @@ void CpuBufferMgr::allocateBuffer(BufferList::iterator seg_it,
 }
 
 AbstractBuffer* CpuBufferMgr::allocateZeroCopyBuffer(
-    BufferList::iterator seg_it,
     const size_t page_size,
     std::unique_ptr<AbstractDataToken> token) {
-  return new CpuBuffer(this, seg_it, device_id_, page_size, std::move(token), gpu_mgr_);
+  return new CpuBuffer(this, device_id_, page_size, std::move(token), gpu_mgr_);
 }
 
 void CpuBufferMgr::initializeMem() {

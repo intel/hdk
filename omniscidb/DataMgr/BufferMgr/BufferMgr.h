@@ -222,7 +222,6 @@ class BufferMgr : public AbstractBufferMgr {  // implements
                               const size_t page_size,
                               const size_t num_bytes) = 0;
   virtual AbstractBuffer* allocateZeroCopyBuffer(
-      BufferList::iterator seg_it,
       const size_t page_size,
       std::unique_ptr<AbstractDataToken> token) {
     UNREACHABLE();

@@ -30,7 +30,6 @@ class CpuBuffer : public Buffer {
             const size_t num_bytes = 0);
 
   CpuBuffer(BufferMgr* bm,
-            BufferList::iterator segment_iter,
             int device_id,
             const size_t page_size,
             std::unique_ptr<AbstractDataToken> token,
