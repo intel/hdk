@@ -4,6 +4,7 @@ on:
 
 jobs:
   build:
+    name: Build and Test (env=Conda build_type=cpu)
     runs-on: ubuntu-latest
 
     env:
@@ -39,8 +40,8 @@ jobs:
         with:
           path: |
             ~/.m2
-          key: ${{ env.RUN_STAMP }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ env.RUN_STAMP }}-maven
+          key: maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-
 
       - name: Build
         env:

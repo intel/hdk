@@ -18,6 +18,7 @@ on:
 
 jobs:
   build:
+    name: env=Conda build_type=${{ inputs.name }}
     runs-on: ubuntu-latest
 
     outputs:
@@ -84,10 +85,10 @@ jobs:
         with:
           path: |
             ~/.m2
-          key: ${{ env.RUN_STAMP }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ env.RUN_STAMP }}-maven-
+          key: maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-
 
-      - name: Build
+      - name: env=Conda build_type=${{ inputs.name }}
         run: |
           set -vx
           conda info

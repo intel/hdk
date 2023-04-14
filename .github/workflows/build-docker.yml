@@ -14,6 +14,7 @@ on:
 
 jobs:
   build:
+    name: env=Docker build_type=${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -58,10 +59,25 @@ jobs:
             rm -rf /tmp/.buildx-cache
             mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+      - name: Restore Maven cache
+        id: maven-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2
+          key: maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-
+
       - name: Start the container
         run:  |
           mkdir -p build
           docker run -id --name build.${{ inputs.name }} --network host -v $(pwd):/_work build.${{ inputs.name }}:latest
+
+      - name: Copy maven cache inside container
+        if: steps.maven-cache.cache-hit == 'true'
+        run: |
+          docker cp ~/.m2 build.${{ inputs.name }}:/home/ghrunner/.m2
+          docker exec -u ghrunner -i build.${{ inputs.name }} chown -R ghrunner:ghrunner /home/ghrunner
 
       - name: Configure and build the project
         run: |

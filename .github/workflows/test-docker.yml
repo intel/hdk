@@ -17,6 +17,7 @@ on:
 
 jobs:
   build:
+    name: Test (env=Docker build_type=${{ inputs.name }})
     runs-on: [self-hosted, linux, docker]
     steps:
       - name: Clean
@@ -50,7 +51,7 @@ jobs:
           docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
           docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
 
-      - name: sanity test
+      - name: Sanity test
         if: inputs.name == 'cuda'
         run: |
           docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l
