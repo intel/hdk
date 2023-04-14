@@ -219,11 +219,11 @@ std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
                                                       0,
                                                       0));
     const auto storage = result_sets.back()->allocateStorage();
-    // fill_storage_buffer(storage->getUnderlyingBuffer(),
-    //                     target_infos,
-    //                     query_mem_desc,
-    //                     generators[i],
-    // steps[i]);
+    fill_storage_buffer(storage->getUnderlyingBuffer(),
+                        target_infos,
+                        query_mem_desc,
+                        generators[i],
+                        steps[i]);
   }
   return result_sets;
 }

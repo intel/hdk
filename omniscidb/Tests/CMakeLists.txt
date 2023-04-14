@@ -65,7 +65,7 @@ if(ENABLE_L0)
   add_executable(SpirvBuildTest SpirvBuildTest.cpp)
   add_executable(DataMgrWithL0Test DataMgrWithL0Test.cpp)
   add_executable(IntelGPUEnablingTest IntelGPUEnablingTest.cpp)
-  add_executable(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel.cpp)
+  add_executable(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel.cpp ResultSetTestUtils.cpp)
 
   target_link_libraries(L0MgrExecuteTest L0Mgr gtest ${llvm_libs} Logger OSDependent)
   target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
