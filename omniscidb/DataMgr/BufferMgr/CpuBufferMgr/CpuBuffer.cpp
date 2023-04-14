@@ -33,13 +33,11 @@ CpuBuffer::CpuBuffer(BufferMgr* bm,
     : Buffer(bm, segment_iter, device_id, page_size, num_bytes), gpu_mgr_(gpu_mgr) {}
 
 CpuBuffer::CpuBuffer(BufferMgr* bm,
-                     BufferList::iterator segment_iter,
                      int device_id,
                      const size_t page_size,
                      std::unique_ptr<AbstractDataToken> token,
                      GpuMgr* gpu_mgr)
-    : Buffer(bm, segment_iter, device_id, page_size, std::move(token))
-    , gpu_mgr_(gpu_mgr) {}
+    : Buffer(bm, device_id, page_size, std::move(token)), gpu_mgr_(gpu_mgr) {}
 
 void CpuBuffer::readData(int8_t* const dst,
                          const size_t num_bytes,

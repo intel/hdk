@@ -162,18 +162,7 @@ AbstractBuffer* BufferMgr::createBuffer(const ChunkKey& chunk_key,
 AbstractBuffer* BufferMgr::createZeroCopyBuffer(
     const ChunkKey& chunk_key,
     std::unique_ptr<AbstractDataToken> token) {
-  BufferList::iterator seg_it;
-  {
-    std::lock_guard<std::mutex> lock(chunk_index_mutex_);
-    CHECK(chunk_index_.find(chunk_key) == chunk_index_.end());
-    BufferSeg buffer_seg(BufferSeg(-1, 0, USED));
-    buffer_seg.chunk_key = chunk_key;
-    std::lock_guard<std::mutex> unsizedSegsLock(unsized_segs_mutex_);
-    unsized_segs_.push_back(buffer_seg);
-    seg_it = std::prev(unsized_segs_.end(), 1);
-    chunk_index_[chunk_key] = seg_it;
-  }
-  return allocateZeroCopyBuffer(seg_it, page_size_, std::move(token));
+  return allocateZeroCopyBuffer(page_size_, std::move(token));
 }
 
 BufferList::iterator BufferMgr::evict(BufferList::iterator& evict_start,
