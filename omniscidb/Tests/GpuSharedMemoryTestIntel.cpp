@@ -174,6 +174,7 @@ void prepare_generated_gpu_kernel(llvm::Module* module,
 }
 
 std::unique_ptr<L0DeviceCompilationContext> compile_and_link_gpu_code(
+    const std::string& l0_llir,
     llvm::Module* module,
     l0::L0Manager* l0_mgr,
     const std::string& kernel_name,
@@ -181,7 +182,6 @@ std::unique_ptr<L0DeviceCompilationContext> compile_and_link_gpu_code(
     const size_t gpu_device_idx = 0) {
   CHECK(module);
   CHECK(l0_mgr);
-  auto& context = module->getContext();
 
   SPIRV::TranslatorOpts opts;
   opts.enableAllExtensions();
@@ -414,112 +414,119 @@ void GpuReductionTester::performReductionTest(
   os.flush();
   std::string module_str(ss.str());
 
-  // std::unique_ptr<CudaDeviceCompilationContext> gpu_context(compile_and_link_gpu_code(
-  //     module_str, module_, cuda_mgr_, getWrapperKernel()->getName().str()));
+  std::unique_ptr<L0DeviceCompilationContext> gpu_context(compile_and_link_gpu_code(
+      module_str, module_, l0_mgr_, getWrapperKernel()->getName().str()));
 
-  // const auto buffer_size = query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU);
-  // const size_t num_buffers = result_sets.size();
-  // std::vector<int8_t*> d_input_buffers;
-  // for (size_t i = 0; i < num_buffers; i++) {
-  //   d_input_buffers.push_back(cuda_mgr_->allocateDeviceMem(buffer_size, device_id));
-  //   cuda_mgr_->copyHostToDevice(d_input_buffers[i],
-  //                               result_sets[i]->getStorage()->getUnderlyingBuffer(),
-  //                               buffer_size,
-  //                               device_id);
-  // }
+  const auto buffer_size = query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU);
+  const size_t num_buffers = result_sets.size();
+  std::vector<int8_t*> d_input_buffers;
+  for (size_t i = 0; i < num_buffers; i++) {
+    d_input_buffers.push_back(l0_mgr_->allocateDeviceMem(buffer_size, device_id));
+    l0_mgr_->copyHostToDevice(d_input_buffers[i],
+                              result_sets[i]->getStorage()->getUnderlyingBuffer(),
+                              buffer_size,
+                              device_id);
+  }
 
-  // constexpr size_t num_kernel_params = 3;
-  // CHECK_EQ(getWrapperKernel()->arg_size(), num_kernel_params);
+  constexpr size_t num_kernel_params = 3;
+  CHECK_EQ(getWrapperKernel()->arg_size(), num_kernel_params);
 
-  // // parameter 1: an array of device pointers
-  // std::vector<CUdeviceptr> h_input_buffer_dptrs;
-  // h_input_buffer_dptrs.reserve(num_buffers);
-  // std::transform(d_input_buffers.begin(),
-  //                d_input_buffers.end(),
-  //                std::back_inserter(h_input_buffer_dptrs),
-  //                [](int8_t* dptr) { return reinterpret_cast<CUdeviceptr>(dptr); });
+  // parameter 1: an array of device pointers
+  typedef int8_t* L0deviceptr;
+  std::vector<L0deviceptr> h_input_buffer_dptrs;
+  h_input_buffer_dptrs.reserve(num_buffers);
+  std::transform(d_input_buffers.begin(),
+                 d_input_buffers.end(),
+                 std::back_inserter(h_input_buffer_dptrs),
+                 [](int8_t* dptr) { return reinterpret_cast<L0deviceptr>(dptr); });
 
-  // auto d_input_buffer_dptrs =
-  //     cuda_mgr_->allocateDeviceMem(num_buffers * sizeof(CUdeviceptr), device_id);
-  // cuda_mgr_->copyHostToDevice(d_input_buffer_dptrs,
-  //                             reinterpret_cast<int8_t*>(h_input_buffer_dptrs.data()),
-  //                             num_buffers * sizeof(CUdeviceptr),
-  //                             device_id);
+  auto d_input_buffer_dptrs =
+      l0_mgr_->allocateDeviceMem(num_buffers * sizeof(L0deviceptr), device_id);
+  l0_mgr_->copyHostToDevice(d_input_buffer_dptrs,
+                            reinterpret_cast<int8_t*>(h_input_buffer_dptrs.data()),
+                            num_buffers * sizeof(L0deviceptr),
+                            device_id);
 
-  // // parameter 2: number of buffers
-  // auto d_num_buffers = cuda_mgr_->allocateDeviceMem(sizeof(int64_t), device_id);
-  // cuda_mgr_->copyHostToDevice(d_num_buffers,
-  //                             reinterpret_cast<const int8_t*>(&num_buffers),
-  //                             sizeof(int64_t),
-  //                             device_id);
+  // parameter 2: number of buffers
+  auto d_num_buffers = l0_mgr_->allocateDeviceMem(sizeof(int64_t), device_id);
+  l0_mgr_->copyHostToDevice(d_num_buffers,
+                            reinterpret_cast<const int8_t*>(&num_buffers),
+                            sizeof(int64_t),
+                            device_id);
 
-  // // parameter 3: device pointer to the output buffer
-  // auto d_result_buffer = cuda_mgr_->allocateDeviceMem(buffer_size, device_id);
-  // cuda_mgr_->copyHostToDevice(
-  //     d_result_buffer, gpu_result_storage->getUnderlyingBuffer(), buffer_size,
-  //     device_id);
+  // parameter 3: device pointer to the output buffer
+  auto d_result_buffer = l0_mgr_->allocateDeviceMem(buffer_size, device_id);
+  l0_mgr_->copyHostToDevice(
+      d_result_buffer, gpu_result_storage->getUnderlyingBuffer(), buffer_size, device_id);
 
-  // // collecting all kernel parameters:
-  // std::vector<CUdeviceptr> h_kernel_params{
-  //     reinterpret_cast<CUdeviceptr>(d_input_buffer_dptrs),
-  //     reinterpret_cast<CUdeviceptr>(d_num_buffers),
-  //     reinterpret_cast<CUdeviceptr>(d_result_buffer)};
+  // collecting all kernel parameters:
+  std::vector<L0deviceptr> h_kernel_params{
+      reinterpret_cast<L0deviceptr>(d_input_buffer_dptrs),
+      reinterpret_cast<L0deviceptr>(d_num_buffers),
+      reinterpret_cast<L0deviceptr>(d_result_buffer)};
 
-  // // casting each kernel parameter to be a void* device ptr itself:
-  // std::vector<void*> kernel_param_ptrs;
-  // kernel_param_ptrs.reserve(num_kernel_params);
-  // std::transform(h_kernel_params.begin(),
-  //                h_kernel_params.end(),
-  //                std::back_inserter(kernel_param_ptrs),
-  //                [](CUdeviceptr& param) { return &param; });
+  // casting each kernel parameter to be a void* device ptr itself:
+  std::vector<void*> kernel_param_ptrs;
+  kernel_param_ptrs.reserve(num_kernel_params);
+  std::transform(h_kernel_params.begin(),
+                 h_kernel_params.end(),
+                 std::back_inserter(kernel_param_ptrs),
+                 [](L0deviceptr& param) { return &param; });
 
-  // // launching a kernel:
-  // auto cu_func = static_cast<CUfunction>(gpu_context->kernel());
-  // // we launch as many threadblocks as there are input buffers:
-  // // in other words, each input buffer is handled by a single threadblock.
+  // launching a kernel:
+  typedef void* L0function;
+  auto l0_func = static_cast<L0function>(gpu_context->kernel());
+  // we launch as many threadblocks as there are input buffers:
+  // in other words, each input buffer is handled by a single threadblock.
 
-  // // checkCudaErrors(cuLaunchKernel(cu_func,
-  // //                                num_buffers,
-  // //                                1,
-  // //                                1,
-  // //                                1024,
-  // //                                1,
-  // //                                1,
-  // //                                buffer_size,
-  // //                                0,
-  // //  kernel_param_ptrs.data(),
-  // //  nullptr));
+  // std::unique_ptr<L0DeviceCompilationContext> gpu_context
+  // auto l0_ctx = dynamic_cast<const L0CompilationContext*>(gpu_context);
+  // l0::L0Kernel* kernel = l0_ctx->getNativeCode(device_id);
+  // l0::L0Device* device = l0_ctx->getDevice(device_id);
 
-  // // transfer back the results:
-  // cuda_mgr_->copyDeviceToHost(
-  //     gpu_result_storage->getUnderlyingBuffer(), d_result_buffer, buffer_size,
-  //     device_id);
+  auto kernel = gpu_context->kernel();
+  auto device = gpu_context->device();
 
-  // // release the gpu memory used:
-  // for (auto& d_buffer : d_input_buffers) {
-  //   cuda_mgr_->freeDeviceMem(d_buffer);
-  // }
-  // cuda_mgr_->freeDeviceMem(d_input_buffer_dptrs);
-  // cuda_mgr_->freeDeviceMem(d_num_buffers);
-  // cuda_mgr_->freeDeviceMem(d_result_buffer);
+  auto q = device->command_queue();
+  auto q_list = device->create_command_list();
+  // l0::GroupCount gc = {ko.gridDimX, ko.gridDimY, ko.gridDimZ};
+  l0::GroupCount gc = {1, 1, 1024};
+  // LOG(INFO) << "Launching L0 kernel with group size: {" << ko.gridDimX << ","
+  //           << ko.gridDimY << "," << ko.gridDimZ << "}\n";
+  // q_list->launch(kernel, kernel_param_ptrs.data(), gc); //<< here is the problem
+
+  q_list->launch(*kernel, gc);
+  q_list->submit(*q.get());
+
+  // transfer back the results:
+  l0_mgr_->copyDeviceToHost(
+      gpu_result_storage->getUnderlyingBuffer(), d_result_buffer, buffer_size, device_id);
+
+  // release the gpu memory used:
+  for (auto& d_buffer : d_input_buffers) {
+    l0_mgr_->freeDeviceMem(d_buffer);
+  }
+  l0_mgr_->freeDeviceMem(d_input_buffer_dptrs);
+  l0_mgr_->freeDeviceMem(d_num_buffers);
+  l0_mgr_->freeDeviceMem(d_result_buffer);
 }
 
-// TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
-//   for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
-//     TestInputData input;
-//     input.setDeviceId(0)
-//         .setNumInputBuffers(4)
-//         .setTargetInfos(generate_custom_agg_target_infos(
-//             {4}, {hdk::ir::AggType::kCount}, {int32_type}, {int32_type}))
-//         .setAggWidth(4)
-//         .setMinEntry(0)
-//         .setMaxEntry(num_entries)
-//         .setStepSize(2)
-//         .setKeylessHash(true)
-//         .setTargetIndexForKey(0);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
+  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {4}, {hdk::ir::AggType::kCount}, {int32_type}, {int32_type}))
+        .setAggWidth(4)
+        .setMinEntry(0)
+        .setMaxEntry(num_entries)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
 
 // TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
 //   for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
