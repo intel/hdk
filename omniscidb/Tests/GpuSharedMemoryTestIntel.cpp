@@ -15,6 +15,7 @@
  */
 
 #include "GpuSharedMemoryTestIntel.h"
+#include <LLVMSPIRVLib/LLVMSPIRVLib.h>
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
@@ -172,8 +173,7 @@ void prepare_generated_gpu_kernel(llvm::Module* module,
   md->addOperand(llvm::MDNode::get(context, md_vals));
 }
 
-std::unique_ptr<CudaDeviceCompilationContext> compile_and_link_gpu_code(
-    const std::string& cuda_llir,
+std::unique_ptr<L0DeviceCompilationContext> compile_and_link_gpu_code(
     llvm::Module* module,
     l0::L0Manager* l0_mgr,
     const std::string& kernel_name,
@@ -182,29 +182,24 @@ std::unique_ptr<CudaDeviceCompilationContext> compile_and_link_gpu_code(
   CHECK(module);
   CHECK(l0_mgr);
   auto& context = module->getContext();
-  // std::unique_ptr<llvm::TargetMachine> nvptx_target_machine =
-  //     compiler::CUDABackend::initializeNVPTXBackend(cuda_mgr->getDeviceArch());
-  // const auto ptx =
-  //     compiler::CUDABackend::generatePTX(cuda_llir, nvptx_target_machine.get(),
-  //     context);
 
-  // auto cubin_result = ptx_to_cubin(ptx, gpu_block_size, cuda_mgr);
-  // auto& option_keys = cubin_result.option_keys;
-  // auto& option_values = cubin_result.option_values;
-  // auto cubin = cubin_result.cubin;
-  // auto link_state = cubin_result.link_state;
-  // const auto num_options = option_keys.size();
-  // auto gpu_context = std::make_unique<CudaDeviceCompilationContext>(cubin,
-  //                                                                   kernel_name,
-  //                                                                   gpu_device_idx,
-  //                                                                   cuda_mgr,
-  //                                                                   num_options,
-  //                                                                   &option_keys[0],
-  //                                                                   &option_values[0]);
+  SPIRV::TranslatorOpts opts;
+  opts.enableAllExtensions();
+  opts.setDesiredBIsRepresentation(SPIRV::BIsRepresentation::OpenCL12);
+  opts.setDebugInfoEIS(SPIRV::DebugInfoEIS::OpenCL_DebugInfo_100);
 
-  // checkCudaErrors(cuLinkDestroy(link_state)); @LM
-  // return gpu_context;
-  return NULL;
+  std::ostringstream ss;
+  std::string err;
+  auto success = writeSpirv(module, opts, ss, err);
+  CHECK(success) << "Spirv translation failed with error: " << err << "\n";
+
+  L0BinResult bin_result;
+  bin_result = spv_to_bin(ss.str(), kernel_name, gpu_block_size, l0_mgr);
+
+  auto l0_context = std::make_unique<L0DeviceCompilationContext>(
+      bin_result.device, bin_result.kernel, bin_result.module, l0_mgr, 0, 1);
+
+  return l0_context;
 }
 
 std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
