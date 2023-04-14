@@ -7,6 +7,7 @@
 
 #pragma once
 #include <string>
+#include "AddressSpace.h"
 namespace compiler {
 enum class CallingConvDesc { C, SPIR_FUNC };
 struct CodegenTraitsDescriptor {
@@ -29,15 +30,24 @@ struct CodegenTraitsDescriptor {
   std::string_view triple_{"DUMMY"};
 };
 
-const CodegenTraitsDescriptor cpu_cgen_traits_desc = {0,
-                                                      0,
-                                                      0,
-                                                      CallingConvDesc::C,
-                                                      std::string_view{""}};
+const CodegenTraitsDescriptor cpu_cgen_traits_desc = {
+    static_cast<unsigned>(CpuAddrSpace::kLocal),
+    static_cast<unsigned>(CpuAddrSpace::kShared),
+    static_cast<unsigned>(CpuAddrSpace::kGlobal),
+    CallingConvDesc::C,
+    std::string_view{""}};
 
-const CodegenTraitsDescriptor cuda_cgen_traits_desc =
-    {0, 3, 0, CallingConvDesc::C, std::string_view{"nvptx64-nvidia-cuda"}};
+const CodegenTraitsDescriptor cuda_cgen_traits_desc = {
+    static_cast<unsigned>(CudaAddrSpace::kLocal),
+    static_cast<unsigned>(CudaAddrSpace::kShared),
+    static_cast<unsigned>(CudaAddrSpace::kGlobal),
+    CallingConvDesc::C,
+    std::string_view{"nvptx64-nvidia-cuda"}};
 
-const CodegenTraitsDescriptor l0_cgen_traits_desc =
-    {4, 3, 1, CallingConvDesc::SPIR_FUNC, std::string_view{"spir64-unknown-unknown"}};
+const CodegenTraitsDescriptor l0_cgen_traits_desc = {
+    static_cast<unsigned>(L0AddrSpace::kLocal),
+    static_cast<unsigned>(L0AddrSpace::kShared),
+    static_cast<unsigned>(L0AddrSpace::kGlobal),
+    CallingConvDesc::SPIR_FUNC,
+    std::string_view{"spir64-unknown-unknown"}};
 }  // namespace compiler
