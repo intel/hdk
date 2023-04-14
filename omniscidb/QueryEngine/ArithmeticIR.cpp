@@ -411,11 +411,8 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
     // Check the sign of the args
     auto lhs_is_neg = cgen_state_->ir_builder_.CreateICmpSLT(lhs_lv, const_zero);
     auto rhs_is_neg = cgen_state_->ir_builder_.CreateICmpSLT(rhs_lv, const_zero);
-    auto args_is_neg = cgen_state_->ir_builder_.CreateOr(lhs_is_neg, rhs_is_neg);
-
-    auto lhs_is_pos = cgen_state_->ir_builder_.CreateICmpSGT(lhs_lv, const_zero);
-    auto rhs_is_pos = cgen_state_->ir_builder_.CreateICmpSGT(rhs_lv, const_zero);
-    auto args_is_pos = cgen_state_->ir_builder_.CreateOr(lhs_is_pos, rhs_is_pos);
+    auto args_is_neg = cgen_state_->ir_builder_.CreateXor(lhs_is_neg, rhs_is_neg);
+    auto args_not_neg = cgen_state_->ir_builder_.CreateNot(args_is_neg);
 
     // Get the absolute value of the args
     auto lhs_neg = cgen_state_->ir_builder_.CreateNeg(lhs_lv);
@@ -438,7 +435,7 @@ llvm::Value* CodeGenerator::codegenMul(const hdk::ir::BinOper* bin_oper,
     // if !(IsNegative) && UX > (static_cast<U>(std::numeric_limits<T>::max())) / UY;
     auto div_limit = cgen_state_->ir_builder_.CreateUDiv(chosen_max, rhs_pos);
     auto cmp = cgen_state_->ir_builder_.CreateICmpUGT(lhs_pos, div_limit);
-    auto pos_overflow = cgen_state_->ir_builder_.CreateAnd(args_is_pos, cmp);
+    auto pos_overflow = cgen_state_->ir_builder_.CreateAnd(args_not_neg, cmp);
     cgen_state_->ir_builder_.CreateCondBr(pos_overflow, mul_fail, mul_ok);
     cgen_state_->ir_builder_.SetInsertPoint(mul_ok);
   }
