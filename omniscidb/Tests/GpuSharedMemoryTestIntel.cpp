@@ -343,61 +343,61 @@ void perform_test_and_verify_results(TestInputData input) {
       new CgenState({}, false, false, executor->getExtensionModuleContext(), context));
   cgen_state->set_module_shallow_copy(
       executor->getExtensionModuleContext()->getRTModule(/*is_l0=*/false));
-  // auto module = cgen_state->module_;
-  // module->setDataLayout(
-  //     "e-p:64:64:64-i1:8:8-i8:8:8-"
-  //     "i16:16:16-i32:32:32-i64:64:64-"
-  //     "f32:32:32-f64:64:64-v16:16:16-"
-  //     "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
-  // module->setTargetTriple("nvptx64-nvidia-cuda");
-  // auto cuda_mgr = std::make_unique<CudaMgr_Namespace::CudaMgr>(1);
-  // const auto row_set_mem_owner =
-  //     std::make_shared<RowSetMemoryOwner>(nullptr, Executor::getArenaBlockSize());
-  // auto query_mem_desc = perfect_hash_one_col_desc(
-  //     input.target_infos, input.suggested_agg_widths, input.min_entry,
-  //     input.max_entry);
-  // if (input.keyless_hash) {
-  //   query_mem_desc.setHasKeylessHash(true);
-  //   query_mem_desc.setTargetIdxForKey(input.target_index_for_key);
-  // }
+  auto module = cgen_state->module_;
+  module->setDataLayout(
+      "e-p:64:64:64-i1:8:8-i8:8:8-"
+      "i16:16:16-i32:32:32-i64:64:64-"
+      "f32:32:32-f64:64:64-v16:16:16-"
+      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
+  module->setTargetTriple("spir-unknown-unknown");
+  auto l0_mgr = std::make_unique<l0::L0Manager>();
+  const auto row_set_mem_owner =
+      std::make_shared<RowSetMemoryOwner>(nullptr, Executor::getArenaBlockSize());
+  auto query_mem_desc = perfect_hash_one_col_desc(
+      input.target_infos, input.suggested_agg_widths, input.min_entry, input.max_entry);
+  if (input.keyless_hash) {
+    query_mem_desc.setHasKeylessHash(true);
+    query_mem_desc.setTargetIdxForKey(input.target_index_for_key);
+  }
 
-  // std::vector<StrideNumberGenerator> generators(
-  //     input.num_input_buffers, StrideNumberGenerator(1, input.step_size));
-  // std::vector<size_t> steps(input.num_input_buffers, input.step_size);
-  // auto input_result_sets = create_and_fill_input_result_sets(input.num_input_buffers,
-  //                                                            row_set_mem_owner,
-  //                                                            query_mem_desc,
-  //                                                            input.target_infos,
-  //                                                            generators,
-  //                                                            steps);
+  std::vector<StrideNumberGenerator> generators(
+      input.num_input_buffers, StrideNumberGenerator(1, input.step_size));
+  std::vector<size_t> steps(input.num_input_buffers, input.step_size);
+  auto input_result_sets = create_and_fill_input_result_sets(input.num_input_buffers,
+                                                             row_set_mem_owner,
+                                                             query_mem_desc,
+                                                             input.target_infos,
+                                                             generators,
+                                                             steps);
 
-  // const auto [cpu_result_set, gpu_result_set] = create_and_init_output_result_sets(
-  //     row_set_mem_owner, query_mem_desc, input.target_infos);
+  const auto [cpu_result_set, gpu_result_set] = create_and_init_output_result_sets(
+      row_set_mem_owner, query_mem_desc, input.target_infos);
 
-  // // performing reduciton using the GPU reduction code:
-  // Config config;
-  // GpuReductionTester gpu_smem_tester(config,
-  //                                    module,
-  //                                    context,
-  //                                    query_mem_desc,
-  //                                    input.target_infos,
-  //                                    init_agg_val_vec(input.target_infos,
-  //                                    query_mem_desc), cuda_mgr.get(), executor.get());
-  // gpu_smem_tester.codegen(CompilationOptions::defaults(
-  //     ExecutorDeviceType::GPU,
-  //     false));  // generate code for gpu reduciton and initialization
-  // gpu_smem_tester.codegenWrapperKernel();
-  // gpu_smem_tester.performReductionTest(
-  //     input_result_sets, gpu_result_set->getStorage(), input.device_id);
+  // performing reduciton using the GPU reduction code:
+  Config config;
+  GpuReductionTester gpu_smem_tester(config,
+                                     module,
+                                     context,
+                                     query_mem_desc,
+                                     input.target_infos,
+                                     init_agg_val_vec(input.target_infos, query_mem_desc),
+                                     l0_mgr.get(),
+                                     executor.get());
+  gpu_smem_tester.codegen(CompilationOptions::defaults(
+      ExecutorDeviceType::GPU,
+      false));  // generate code for gpu reduciton and initialization
+  gpu_smem_tester.codegenWrapperKernel();
+  gpu_smem_tester.performReductionTest(
+      input_result_sets, gpu_result_set->getStorage(), input.device_id);
 
-  // // CPU reduction for validation:
-  // perform_reduction_on_cpu(input_result_sets, cpu_result_set->getStorage());
+  // CPU reduction for validation:
+  perform_reduction_on_cpu(input_result_sets, cpu_result_set->getStorage());
 
-  // const auto cmp_result =
-  //     std::memcmp(cpu_result_set->getStorage()->getUnderlyingBuffer(),
-  //                 gpu_result_set->getStorage()->getUnderlyingBuffer(),
-  //                 query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU));
-  // ASSERT_EQ(cmp_result, 0);
+  const auto cmp_result =
+      std::memcmp(cpu_result_set->getStorage()->getUnderlyingBuffer(),
+                  gpu_result_set->getStorage()->getUnderlyingBuffer(),
+                  query_mem_desc.getBufferSizeBytes(ExecutorDeviceType::GPU));
+  ASSERT_EQ(cmp_result, 0);
 }
 
 }  // namespace
