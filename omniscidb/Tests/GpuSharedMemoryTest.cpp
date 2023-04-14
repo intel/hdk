@@ -16,6 +16,7 @@
 
 #include "GpuSharedMemoryTest.h"
 #include "QueryEngine/CompilationOptions.h"
+#include "QueryEngine/Compiler/CodegenTraitsDescriptor.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/ResultSetReduction.h"
@@ -33,8 +34,7 @@ auto double_type = hdk::ir::Context::defaultCtx().fp64();
 namespace {
 
 compiler::CodegenTraits get_codegen_traits() {
-  return compiler::CodegenTraits::get(
-      0, 3, 0, llvm::CallingConv::C, "nvptx64-nvidia-cuda");
+  return compiler::CodegenTraits::get(compiler::cuda_cgen_traits_desc);
 }
 
 void init_storage_buffer(int8_t* buffer,
