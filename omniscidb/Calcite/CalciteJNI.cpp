@@ -602,3 +602,5 @@ void CalciteJNI::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
                                               bool is_runtime) {
   return impl_->setRuntimeExtensionFunctions(udfs, is_runtime);
 }
+
+std::shared_ptr<CalciteWorker> CalciteWorker::instance_;

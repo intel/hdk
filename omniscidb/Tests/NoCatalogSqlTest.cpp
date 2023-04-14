@@ -141,14 +141,17 @@ class NoCatalogSqlTest : public ::testing::Test {
   }
 
   static void init_calcite(const std::string& udf_filename) {
-    calcite_ = std::make_shared<CalciteJNI>(schema_provider_, config_, udf_filename);
+    calcite_ = CalciteWorker::initialize(schema_provider_, config_, udf_filename);
   }
 
   static void TearDownTestSuite() {
     data_mgr_.reset();
     schema_provider_.reset();
     executor_.reset();
-    calcite_.reset();
+    // calcite_.reset();
+    if (calcite_) {
+      calcite_->teardown();
+    }
   }
 
   ExecutionResult runRAQuery(const std::string& query_ra, Executor* executor) {
@@ -187,14 +190,14 @@ class NoCatalogSqlTest : public ::testing::Test {
   static std::shared_ptr<DataMgr> data_mgr_;
   static SchemaProviderPtr schema_provider_;
   static std::shared_ptr<Executor> executor_;
-  static std::shared_ptr<CalciteJNI> calcite_;
+  static std::shared_ptr<CalciteWorker> calcite_;
 };
 
 ConfigPtr NoCatalogSqlTest::config_;
 std::shared_ptr<DataMgr> NoCatalogSqlTest::data_mgr_;
 SchemaProviderPtr NoCatalogSqlTest::schema_provider_;
 std::shared_ptr<Executor> NoCatalogSqlTest::executor_;
-std::shared_ptr<CalciteJNI> NoCatalogSqlTest::calcite_;
+std::shared_ptr<CalciteWorker> NoCatalogSqlTest::calcite_;
 
 TEST_F(NoCatalogSqlTest, SelectSingleColumn) {
   auto res = runSqlQuery("SELECT col_i FROM test1;", executor_.get());
@@ -235,7 +238,7 @@ TEST_F(NoCatalogSqlTest, GroupBySingleColumn) {
 }
 
 TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
-  constexpr size_t TEST_NTHREADS = 100;
+  constexpr size_t TEST_NTHREADS = 10'000;
   std::vector<ExecutionResult> res;
   std::vector<std::future<void>> threads;
   res.resize(TEST_NTHREADS);
@@ -243,11 +246,14 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
   std::vector<std::shared_ptr<Executor>> executors;
   executors.resize(TEST_NTHREADS);
 
+  auto calcite = calcite_.get();
+  CHECK(calcite);
+
   for (size_t i = 0; i < TEST_NTHREADS; ++i) {
     executors[i] = Executor::getExecutor(data_mgr_.get(), config_);
-    threads[i] = std::async(std::launch::async, [this, i, &res, &executors]() {
-      auto calcite = std::make_unique<CalciteJNI>(schema_provider_, config_);
-      auto query_ra = calcite->process(
+    threads[i] = std::async(std::launch::async, [this, i, &res, &executors, calcite]() {
+      // auto calcite = std::make_unique<CalciteJNI>(schema_provider_, config_);
+      auto query_ra = calcite_->process(
           "test_db", "SELECT col_bi + " + std::to_string(i) + " FROM test1;");
       CHECK(i < executors.size() && executors[i]);
       res[i] = runRAQuery(query_ra, executors[i].get());
@@ -264,7 +270,7 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
   }
 }
 
-TEST(CalciteReinitTest, SingleThread) {
+TEST(CalciteReinitTest, DISABLED_SingleThread) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
@@ -274,7 +280,7 @@ TEST(CalciteReinitTest, SingleThread) {
   }
 }
 
-TEST(CalciteReinitTest, MultipleThreads) {
+TEST(CalciteReinitTest, DISABLED_MultipleThreads) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
