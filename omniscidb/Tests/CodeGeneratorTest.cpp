@@ -25,6 +25,7 @@
 
 #include "IR/Expr.h"
 #include "QueryEngine/CodeGenerator.h"
+#include "QueryEngine/Compiler/AddressSpace.h"
 #include "QueryEngine/Compiler/HelperFunctions.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/IRCodegenUtils.h"
@@ -61,17 +62,33 @@ void run_test_kernel(DeviceFuncPtr func, std::vector<void*>& params, GpuMgr* mgr
 
 compiler::CodegenTraits get_traits() {
 #ifdef HAVE_L0
-  return compiler::CodegenTraits::get(4, 3, 1, llvm::CallingConv::SPIR_FUNC);
+  return compiler::CodegenTraits::get(
+      static_cast<unsigned>(compiler::L0AddrSpace::kLocal),
+      static_cast<unsigned>(compiler::L0AddrSpace::kShared),
+      static_cast<unsigned>(compiler::L0AddrSpace::kGlobal),
+      llvm::CallingConv::SPIR_FUNC);
 #else
-  return compiler::CodegenTraits::get(0, 0, 0, llvm::CallingConv::C);
+  return compiler::CodegenTraits::get(
+      static_cast<unsigned>(compiler::CpuAddrSpace::kLocal),
+      static_cast<unsigned>(compiler::CpuAddrSpace::kShared),
+      static_cast<unsigned>(compiler::CpuAddrSpace::kGlobal),
+      llvm::CallingConv::C);
 #endif
 }
 
 compiler::CodegenTraitsDescriptor get_traits_desc() {
 #ifdef HAVE_L0
-  return compiler::CodegenTraits::getDescriptor(4, 3, 1, llvm::CallingConv::SPIR_FUNC);
+  return compiler::CodegenTraits::getDescriptor(
+      static_cast<unsigned>(compiler::L0AddrSpace::kLocal),
+      static_cast<unsigned>(compiler::L0AddrSpace::kShared),
+      static_cast<unsigned>(compiler::L0AddrSpace::kGlobal),
+      llvm::CallingConv::SPIR_FUNC);
 #else
-  return compiler::CodegenTraits::getDescriptor(0, 0, 0, llvm::CallingConv::C);
+  return compiler::CodegenTraits::getDescriptor(
+      static_cast<unsigned>(compiler::CpuAddrSpace::kLocal),
+      static_cast<unsigned>(compiler::CpuAddrSpace::kShared),
+      static_cast<unsigned>(compiler::CpuAddrSpace::kGlobal),
+      llvm::CallingConv::C);
 #endif
 }
 }  // namespace
