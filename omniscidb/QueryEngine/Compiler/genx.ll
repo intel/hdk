@@ -10,17 +10,21 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
-; TODO(Petr): this should be a dynamically sized depending on the arch, but at least 64KB
+; TODO(Petr): this should be dynamically sized depending on the arch, but at least 64KB
 @slm.buf.i64 = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 8
 
 ; https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpControlBarrier
 declare void @__spirv_ControlBarrier(i32 %execution_scope, i32 %memory_scope, i32 %memory_semantics)
 
 ; L0 zeroes out the memory by default, so an empty implementation can work in simple cases
-define i64 addrspace(3)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 noundef %groups_buffer_size) {}
+define i64 addrspace(3)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 noundef %groups_buffer_size) {
+    %res = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    ret i64 addrspace(3)* %res
+}
 
 define void @write_back_non_grouped_agg(i64 addrspace(3)* %input_buffer, i64 addrspace(4)* %output_buffer, i32 noundef %agg_idx) { 
     ; TODO
+    ret void
 }
 
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
