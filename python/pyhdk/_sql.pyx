@@ -15,20 +15,24 @@ from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
 from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter, CResultSet
 
 cdef class Calcite:
-  cdef shared_ptr[CalciteJNI] calcite
+  cdef CalciteMgr* calcite
+  cdef CSchemaProviderPtr schema_provider
+  cdef shared_ptr[CConfig] config
 
   def __cinit__(self, SchemaProvider schema_provider, Config config, **kwargs):
     cdef string udf_filename = kwargs.get("udf_filename", "")
     cdef size_t calcite_max_mem_mb = kwargs.get("calcite_max_mem_mb", 1024)
 
-    self.calcite = make_shared[CalciteJNI](schema_provider.c_schema_provider, config.c_config, udf_filename, calcite_max_mem_mb)
+    self.calcite = CalciteMgr.get(udf_filename, calcite_max_mem_mb)
+    self.schema_provider = schema_provider.c_schema_provider
+    self.config = config.c_config
 
-    CExtensionFunctionsWhitelist.add(self.calcite.get().getExtensionFunctionWhitelist())
+    CExtensionFunctionsWhitelist.add(self.calcite.getExtensionFunctionWhitelist())
     if not udf_filename.empty():
-      CExtensionFunctionsWhitelist.addUdfs(self.calcite.get().getUserDefinedFunctionWhitelist())
+      CExtensionFunctionsWhitelist.addUdfs(self.calcite.getUserDefinedFunctionWhitelist())
 
     cdef vector[CExtensionFunction] udfs = move(vector[CExtensionFunction]())
-    self.calcite.get().setRuntimeExtensionFunctions(udfs, False)
+    self.calcite.setRuntimeExtensionFunctions(udfs, False)
 
   def process(self, string sql, **kwargs):
     cdef string db_name = kwargs.get("db_name", "test-db")
@@ -36,7 +40,7 @@ cdef class Calcite:
     cdef bool legacy_syntax = kwargs.get("legacy_syntax", False)
     cdef bool is_explain = kwargs.get("is_explain", False)
     cdef bool is_view_optimize = kwargs.get("is_view_optimize", False)
-    return self.calcite.get().process(db_name, sql, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
+    return self.calcite.process(db_name, sql, self.schema_provider, self.config, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
 
 cdef class ExecutionResult:
   def row_count(self):

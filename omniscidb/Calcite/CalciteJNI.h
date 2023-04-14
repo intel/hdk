@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <future>
+#include <queue>
+
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
 #include "SchemaMgr/SchemaProvider.h"
 #include "Shared/Config.h"
@@ -26,28 +29,57 @@ struct FilterPushDownInfo {
   int input_next;
 };
 
-class CalciteJNI {
+class CalciteJNI;
+
+/**
+ * Run CalciteJNI on a single thread.
+ */
+class CalciteMgr {
  public:
-  CalciteJNI(SchemaProviderPtr schema_provider,
-             ConfigPtr config,
-             const std::string& udf_filename = "",
-             size_t calcite_max_mem_mb = 1024);
-  ~CalciteJNI();
+  using Task = std::packaged_task<std::string(CalciteJNI* calcite_jni)>;
+
+  CalciteMgr(const CalciteMgr&) = delete;
+
+  ~CalciteMgr();
+
+  static CalciteMgr* get(const std::string& udf_filename = "",
+                         size_t calcite_max_mem_mb = 1024) {
+    std::call_once(instance_init_flag_, [=] {
+      instance_ =
+          std::unique_ptr<CalciteMgr>(new CalciteMgr(udf_filename, calcite_max_mem_mb));
+    });
+    return instance_.get();
+  }
 
   std::string process(const std::string& db_name,
                       const std::string& sql_string,
+                      SchemaProviderPtr schema_provider,
+                      ConfigPtr config,
                       const std::vector<FilterPushDownInfo>& filter_push_down_info = {},
                       const bool legacy_syntax = false,
                       const bool is_explain = false,
                       const bool is_view_optimize = false);
-
   std::string getExtensionFunctionWhitelist();
   std::string getUserDefinedFunctionWhitelist();
   std::string getRuntimeExtensionFunctionWhitelist();
+
   void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
                                     bool is_runtime = true);
 
  private:
-  class Impl;
-  std::unique_ptr<Impl> impl_;
+  explicit CalciteMgr(const std::string& udf_filename, size_t calcite_max_mem_mb);
+
+  void worker(const std::string& udf_filename, size_t calcite_max_mem_mb);
+
+  void submitTaskToQueue(Task&& task);
+
+  std::mutex queue_mutex_;
+  std::condition_variable worker_cv_;
+  std::thread worker_;
+
+  std::queue<Task> queue_;
+
+  bool should_exit_{false};
+  static std::once_flag instance_init_flag_;
+  static std::unique_ptr<CalciteMgr> instance_;
 };

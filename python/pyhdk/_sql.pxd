@@ -29,9 +29,11 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
     int input_start;
     int input_next;
 
-  cdef cppclass CalciteJNI:
-    CalciteJNI(CSchemaProviderPtr, shared_ptr[CConfig], const string&, size_t);
-    string process(const string&, const string&, const vector[FilterPushDownInfo]&, bool, bool, bool) except +
+  cdef cppclass CalciteMgr:    
+    @staticmethod
+    CalciteMgr* get(const string&, size_t);
+    
+    string process(const string&, const string&, CSchemaProviderPtr, shared_ptr[CConfig], const vector[FilterPushDownInfo]&, bool, bool, bool) except +
 
     string getExtensionFunctionWhitelist()
     string getUserDefinedFunctionWhitelist()
