@@ -25,7 +25,7 @@ struct Internal {
   std::shared_ptr<Config> config;
   std::shared_ptr<ArrowStorage> storage;
   std::shared_ptr<Data_Namespace::DataMgr> data_mgr;
-  std::shared_ptr<CalciteJNI> calcite;
+  CalciteMgr* calcite;
   std::shared_ptr<Executor> executor;
 };
 
@@ -38,8 +38,12 @@ void HDK::read(std::shared_ptr<arrow::Table>& table, const std::string& table_na
 ExecutionResult HDK::query(const std::string& sql, const bool is_explain) {
   CHECK(internal_);
   CHECK(internal_->calcite);
-  auto ra =
-      internal_->calcite->process(internal_->db_name, sql, {}, /*legacy_syntax=*/true);
+  auto ra = internal_->calcite->process(internal_->db_name,
+                                        sql,
+                                        internal_->storage,
+                                        internal_->config,
+                                        {},
+                                        /*legacy_syntax=*/true);
 
   CHECK(internal_->storage);
   CHECK(internal_->config);
@@ -86,10 +90,8 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
       internal_->schema_id, internal_->storage);
 
   // Calcite
-  internal_->calcite = std::make_shared<CalciteJNI>(internal_->storage,
-                                                    internal_->config,
-                                                    /*udf_filename=*/"",
-                                                    /*calcite_max_mem_mb=*/1024);
+  internal_->calcite = CalciteMgr::get(/*udf_filename=*/"",
+                                       /*calcite_max_mem_mb=*/1024);
 
   // Executor
   internal_->executor =

@@ -27,7 +27,7 @@
 
 #include <fstream>
 
-RelAlgCache::RelAlgCache(std::shared_ptr<CalciteJNI> calcite,
+RelAlgCache::RelAlgCache(CalciteMgr* calcite,
                          SchemaProviderPtr schema_provider,
                          ConfigPtr config)
     : calcite_(calcite), schema_provider_(schema_provider), config_(config) {
@@ -89,6 +89,8 @@ std::string RelAlgCache::process(
 
   auto ra = calcite_->process(db_name,
                               sql_string,
+                              schema_provider_,
+                              config_,
                               filter_push_down_info,
                               legacy_syntax,
                               is_explain,

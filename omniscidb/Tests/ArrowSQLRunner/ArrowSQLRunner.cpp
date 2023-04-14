@@ -298,14 +298,13 @@ class ArrowSQLRunnerImpl {
 
   Executor* getExecutor() { return executor_.get(); }
 
-  std::shared_ptr<CalciteJNI> getCalcite() { return calcite_; }
+  CalciteMgr* getCalcite() { return calcite_; }
 
   ~ArrowSQLRunnerImpl() {
     executor_.reset();
     storage_.reset();
     rs_registry_.reset();
     schema_mgr_.reset();
-    calcite_.reset();
     rel_alg_cache_.reset();
 
     Executor::resetCodeCache();  // flush caches before tearing down buffer mgrs
@@ -334,7 +333,7 @@ class ArrowSQLRunnerImpl {
     executor_->setSchemaProvider(schema_mgr_);
 
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
-      calcite_ = std::make_shared<CalciteJNI>(schema_mgr_, config_, udf_filename, 1024);
+      calcite_ = CalciteMgr::get(udf_filename, 1024);
 
       if (config_->debug.use_ra_cache.empty()) {
         ExtensionFunctionsWhitelist::add(calcite_->getExtensionFunctionWhitelist());
@@ -356,7 +355,7 @@ class ArrowSQLRunnerImpl {
   std::shared_ptr<ArrowStorage> storage_;
   std::shared_ptr<hdk::ResultSetRegistry> rs_registry_;
   std::shared_ptr<SchemaMgr> schema_mgr_;
-  std::shared_ptr<CalciteJNI> calcite_;
+  CalciteMgr* calcite_;
   std::shared_ptr<RelAlgCache> rel_alg_cache_;
 
   SQLiteComparator sqlite_comparator_;
@@ -520,7 +519,7 @@ Executor* getExecutor() {
   return ArrowSQLRunnerImpl::get()->getExecutor();
 }
 
-std::shared_ptr<CalciteJNI> getCalcite() {
+CalciteMgr* getCalcite() {
   return ArrowSQLRunnerImpl::get()->getCalcite();
 }
 
