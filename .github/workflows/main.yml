@@ -33,10 +33,10 @@ jobs:
       options: -DENABLE_L0=on
 
   build-both-l0-cuda:
-  uses: ./.github/workflows/build.yml
-  with:
-    name: 'all-gpus'
-    options: -DENABLE_L0=on -DENABLE_CUDA=on
+    uses: ./.github/workflows/build.yml
+    with:
+      name: 'all-gpus'
+      options: -DENABLE_L0=on -DENABLE_CUDA=on
 
   style:
     needs: build
