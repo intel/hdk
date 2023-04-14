@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include "CudaMgr/CudaMgr.h"
+#include "L0Mgr/L0Mgr.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/CodeGenerator.h"
 #include "QueryEngine/GpuSharedMemoryUtils.h"
 #include "QueryEngine/LLVMFunctionAttributesUtil.h"
-#include "QueryEngine/NvidiaKernel.h"
+// #include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "ResultSetTestUtils.h"
 #include "Shared/TargetInfo.h"
@@ -65,7 +65,7 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
                      const QueryMemoryDescriptor& qmd,
                      const std::vector<TargetInfo>& targets,
                      const std::vector<int64_t>& init_agg_values,
-                     CudaMgr_Namespace::CudaMgr* cuda_mgr,
+                     l0::L0Manager* l0_mgr,
                      Executor* executor)
       : GpuSharedMemCodeBuilder(module,
                                 context,
@@ -74,7 +74,7 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
                                 init_agg_values,
                                 config,
                                 executor)
-      , cuda_mgr_(cuda_mgr) {
+      , l0_mgr_(l0_mgr) {
     // CHECK(getReductionFunction());
   }
   void codegenWrapperKernel();
@@ -84,6 +84,6 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
                             const size_t device_id);
 
  private:
-  CudaMgr_Namespace::CudaMgr* cuda_mgr_;
+  l0::L0Manager* l0_mgr_;
   llvm::Function* wrapper_kernel_;
 };

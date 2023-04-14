@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "GpuSharedMemoryTest.h"
+#include "GpuSharedMemoryTestIntel.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
@@ -175,13 +175,13 @@ void prepare_generated_gpu_kernel(llvm::Module* module,
 std::unique_ptr<CudaDeviceCompilationContext> compile_and_link_gpu_code(
     const std::string& cuda_llir,
     llvm::Module* module,
-    // CudaMgr_Namespace::CudaMgr* cuda_mgr,
+    l0::L0Manager* l0_mgr,
     const std::string& kernel_name,
     const size_t gpu_block_size = 1024,
     const size_t gpu_device_idx = 0) {
   CHECK(module);
-  // CHECK(cuda_mgr);
-  // auto& context = module->getContext();
+  CHECK(l0_mgr);
+  auto& context = module->getContext();
   // std::unique_ptr<llvm::TargetMachine> nvptx_target_machine =
   //     compiler::CUDABackend::initializeNVPTXBackend(cuda_mgr->getDeviceArch());
   // const auto ptx =
@@ -267,21 +267,21 @@ void perform_reduction_on_cpu(std::vector<std::unique_ptr<ResultSet>>& result_se
   CHECK(result_sets.size() > 0);
   Config config;
   // for codegen only
-  // auto executor = Executor::getExecutor(nullptr);
-  // ResultSetReductionJIT reduction_jit(result_sets.front()->getQueryMemDesc(),
-  //                                     result_sets.front()->getTargetInfos(),
-  //                                     result_sets.front()->getTargetInitVals(),
-  //                                     config,
-  //                                     executor.get());
-  // const auto reduction_code = reduction_jit.codegen();
-  // for (auto& result_set : result_sets) {
-  //   ResultSetReduction::reduce(*cpu_result_storage,
-  //                              *(result_set->getStorage()),
-  //                              {},
-  //                              reduction_code,
-  //                              config,
-  //                              executor.get());
-  // }
+  auto executor = Executor::getExecutor(nullptr);
+  ResultSetReductionJIT reduction_jit(result_sets.front()->getQueryMemDesc(),
+                                      result_sets.front()->getTargetInfos(),
+                                      result_sets.front()->getTargetInitVals(),
+                                      config,
+                                      executor.get());
+  const auto reduction_code = reduction_jit.codegen();
+  for (auto& result_set : result_sets) {
+    ResultSetReduction::reduce(*cpu_result_storage,
+                               *(result_set->getStorage()),
+                               {},
+                               reduction_code,
+                               config,
+                               executor.get());
+  }
 }
 
 struct TestInputData {
