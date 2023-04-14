@@ -502,12 +502,11 @@ void WorkUnitBuilder::processSort(const ir::Sort* sort) {
       throw std::runtime_error("Columns with array types cannot be used for sorting.");
     }
 #ifdef HAVE_L0
-    if (expr->type()->isString() ||
-        (expr->type()->isExtDictionary() &&
-         expr->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString())) {
-      if (co_.device_type == ExecutorDeviceType::GPU) {
-        throw QueryMustRunOnCpu();
-      }
+    if ((expr->type()->isString() ||
+         (expr->type()->isExtDictionary() &&
+          expr->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString())) &&
+        co_.device_type == ExecutorDeviceType::GPU) {
+      throw QueryMustRunOnCpu();
     }
 #endif
   }
@@ -772,15 +771,14 @@ void WorkUnitBuilder::computeInputColDescs() {
 #ifdef HAVE_L0
   ColumnVarSet non_targets_touch = collector.result();
   for (const auto& col_var : non_targets_touch) {
-    if (col_var.columnInfo()->type->isString() ||
-        (col_var.columnInfo()->type->isExtDictionary() &&
-         col_var.columnInfo()
-             ->type->as<hdk::ir::ExtDictionaryType>()
-             ->elemType()
-             ->isString())) {
-      if (co_.device_type == ExecutorDeviceType::GPU) {
-        throw QueryMustRunOnCpu();
-      }
+    if ((col_var.columnInfo()->type->isString() ||
+         (col_var.columnInfo()->type->isExtDictionary() &&
+          col_var.columnInfo()
+              ->type->as<hdk::ir::ExtDictionaryType>()
+              ->elemType()
+              ->isString())) &&
+        co_.device_type == ExecutorDeviceType::GPU) {
+      throw QueryMustRunOnCpu();
     }
   }
 #endif
