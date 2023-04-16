@@ -26,7 +26,7 @@ struct DwarfBenchDataSource::PrivateImpl {
   DwarfBench::Dwarf convertToDwarf(AnalyticalTemplate templ);
   DwarfBench::DeviceType convertDeviceType(ExecutorDeviceType device);
   std::vector<Detail::Measurement> convertMeasurement(
-      const std::vector<DwarfBench::Measurement> measurements);
+      const std::vector<DwarfBench::Measurement> &measurements);
 
   DwarfBench::DwarfBench db;
 };
@@ -58,7 +58,7 @@ DwarfBench::DeviceType DwarfBenchDataSource::PrivateImpl::convertDeviceType(
 }
 
 std::vector<Detail::Measurement> DwarfBenchDataSource::PrivateImpl::convertMeasurement(
-    const std::vector<DwarfBench::Measurement> measurements) {
+    const std::vector<DwarfBench::Measurement> &measurements) {
   std::vector<Detail::Measurement> ms;
   std::transform(measurements.begin(),
                  measurements.end(),
