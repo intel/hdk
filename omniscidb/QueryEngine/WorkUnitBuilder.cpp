@@ -440,13 +440,14 @@ void WorkUnitBuilder::processFilter(const ir::Filter* filter) {
       executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
   auto rte_idx = all_nest_levels_.at(filter);
 
-#ifdef HAVE_L0
-  StringGuardForL0 strConstCollector;
-  strConstCollector.visit(filter->getConditionExpr());
-  if (strConstCollector.isStrPresent() && co_.device_type == ExecutorDeviceType::GPU) {
-    throw QueryMustRunOnCpu();
+  if (co_.device_type == ExecutorDeviceType::GPU &&
+      executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+    StringGuardForL0 strConstCollector;
+    strConstCollector.visit(filter->getConditionExpr());
+    if (strConstCollector.isStrPresent() && co_.device_type == ExecutorDeviceType::GPU) {
+      throw QueryMustRunOnCpu();
+    }
   }
-#endif
 
   // If we filter the result of join then we can merge the filter with
   // join conditions. That maght help to filter-out rows earlier.
@@ -501,14 +502,13 @@ void WorkUnitBuilder::processSort(const ir::Sort* sort) {
     if (expr->type()->isArray()) {
       throw std::runtime_error("Columns with array types cannot be used for sorting.");
     }
-#ifdef HAVE_L0
-    if ((expr->type()->isString() ||
+    if ((co_.device_type == ExecutorDeviceType::GPU &&
+         executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) &&
+        (expr->type()->isString() ||
          (expr->type()->isExtDictionary() &&
-          expr->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString())) &&
-        co_.device_type == ExecutorDeviceType::GPU) {
+          expr->type()->as<hdk::ir::ExtDictionaryType>()->elemType()->isString()))) {
       throw QueryMustRunOnCpu();
     }
-#endif
   }
 }
 
@@ -768,20 +768,21 @@ void WorkUnitBuilder::computeInputColDescs() {
       collector.visit(expr.get());
     }
   }
-#ifdef HAVE_L0
-  ColumnVarSet non_targets_touch = collector.result();
-  for (const auto& col_var : non_targets_touch) {
-    if ((col_var.columnInfo()->type->isString() ||
-         (col_var.columnInfo()->type->isExtDictionary() &&
-          col_var.columnInfo()
-              ->type->as<hdk::ir::ExtDictionaryType>()
-              ->elemType()
-              ->isString())) &&
-        co_.device_type == ExecutorDeviceType::GPU) {
-      throw QueryMustRunOnCpu();
+
+  if (co_.device_type == ExecutorDeviceType::GPU &&
+      executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+    ColumnVarSet non_targets_touch = collector.result();
+    for (const auto& col_var : non_targets_touch) {
+      if (col_var.columnInfo()->type->isString() ||
+          (col_var.columnInfo()->type->isExtDictionary() &&
+           col_var.columnInfo()
+               ->type->as<hdk::ir::ExtDictionaryType>()
+               ->elemType()
+               ->isString())) {
+        throw QueryMustRunOnCpu();
+      }
     }
   }
-#endif
 
   for (auto& expr : target_exprs_[0]) {
     collector.visit(expr.get());
