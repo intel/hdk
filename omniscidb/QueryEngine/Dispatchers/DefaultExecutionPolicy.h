@@ -23,6 +23,7 @@ class FragmentIDAssignmentExecutionPolicy : public ExecutionPolicy {
                                               size_t frag_id,
                                               size_t frag_num) const override;
   std::vector<ExecutorDeviceType> devices() const override;
+  std::string name() const override { return "ExecutionPolicy::FragmentIDAssignment"; };
 
  private:
   const ExecutorDeviceType dt_;
