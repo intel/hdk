@@ -453,15 +453,15 @@ TEST_F(OverflowTest, OverflowAndUnderFlow) {
   c("SELECT -1 * dd FROM test;", g_dt);
   c("SELECT ofq * -1 FROM test;", g_dt);
   c("SELECT 1 * ofq FROM test;", g_dt);
-  c("SELECT 566 * 244 FROM test;", g_dt);
+  c("SELECT 566 * 244;", g_dt);
   EXPECT_THROW(run_multiple_agg("SELECT ofd * ofd FROM test;", g_dt), std::runtime_error);
-  EXPECT_THROW(run_multiple_agg("SELECT 9223372036854775807 * 2 FROM test;", g_dt),
+  EXPECT_THROW(run_multiple_agg("SELECT 9223372036854775807 * 2;", g_dt),
                std::runtime_error);
-  EXPECT_THROW(run_multiple_agg("SELECT -9223372036854775808 * 2 FROM test;", g_dt),
+  EXPECT_THROW(run_multiple_agg("SELECT -9223372036854775808 * 2;", g_dt),
                std::runtime_error);
-  EXPECT_THROW(run_multiple_agg("SELECT 2*9223372036854775807 FROM test;", g_dt),
+  EXPECT_THROW(run_multiple_agg("SELECT 2*9223372036854775807;", g_dt),
                std::runtime_error);
-  EXPECT_THROW(run_multiple_agg("SELECT -2*-9223372036854775808 FROM test;", g_dt),
+  EXPECT_THROW(run_multiple_agg("SELECT -2*-9223372036854775808;", g_dt),
                std::runtime_error);
   EXPECT_THROW(run_multiple_agg("SELECT ofq * 2 FROM test;", g_dt), std::runtime_error);
   EXPECT_THROW(run_multiple_agg("SELECT ofq * -2 FROM test;", g_dt), std::runtime_error);
