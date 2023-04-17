@@ -110,6 +110,16 @@ void import_data() {
 
   createTable("test_str", {{"id", ctx().int32()}, {"str", ctx().text()}});
   insertCsvValues("test_str", "1,str1\n,\n3,str333\n");
+
+  createTable("test_varr",
+              {{"id", ctx().int32()},
+               {"arr1", ctx().arrayVarLen(ctx().int32())},
+               {"arr2", ctx().arrayVarLen(ctx().fp64())}});
+  insertJsonValues("test_varr",
+                   R"___({"id": 1, "arr1":[1, null, 3], "arr2" : [4.0, null]}
+                 {"id": 2, "arr1":null, "arr2" : []}
+                 {"id": 3, "arr1":[], "arr2" : null}
+                 {"id": 4, "arr1":[null, 2, null, 4], "arr2" : [null, 5.0, 6.0]})___");
 }
 
 std::shared_ptr<arrow::RecordBatch> getArrowRecordBatch(const ExecutionResult& res) {
@@ -864,6 +874,35 @@ TEST(ArrowTable, NoneEncodedStrings) {
     compare_res_data(res,
                      std::vector<int32_t>({1, inline_null_value<int32_t>(), 3}),
                      std::vector<std::string>({"str1"s, "<NULL>"s, "str333"s}));
+  }
+}
+
+TEST(ArrowTable, VarLenArrays) {
+  bool prev_enable_columnar_output = config().rs.enable_columnar_output;
+
+  ScopeGuard reset = [prev_enable_columnar_output] {
+    config().rs.enable_columnar_output = prev_enable_columnar_output;
+  };
+
+  for (bool enable_columnar_output : {true, false}) {
+    config().rs.enable_columnar_output = enable_columnar_output;
+
+    auto res = runSqlQuery(
+        "select id, arr1, arr2 from test_varr;", ExecutorDeviceType::CPU, false);
+    compare_res_data(
+        res,
+        std::vector<int32_t>({1, 2, 3, 4}),
+        std::vector<std::vector<int32_t>>(
+            {std::vector<int32_t>({1, inline_null_value<int32_t>(), 3}),
+             std::vector<int32_t>({inline_null_array_value<int32_t>()}),
+             std::vector<int32_t>({}),
+             std::vector<int32_t>(
+                 {inline_null_value<int32_t>(), 2, inline_null_value<int32_t>(), 4})}),
+        std::vector<std::vector<double>>(
+            {std::vector<double>({4.0, inline_null_value<double>()}),
+             std::vector<double>({}),
+             std::vector<double>({inline_null_array_value<double>()}),
+             std::vector<double>({inline_null_value<double>(), 5.0, 6.0})}));
   }
 }
 

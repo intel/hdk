@@ -327,7 +327,9 @@ class ArrowResultSetConverter {
 
   void append(ColumnBuilder& column_builder,
               const ValueArray& values,
-              const std::shared_ptr<std::vector<bool>>& is_valid) const;
+              const std::shared_ptr<ValueArray>& offset_values,
+              const std::shared_ptr<std::vector<bool>>& is_valid,
+              const std::shared_ptr<std::vector<uint8_t>>& offset_is_valid) const;
 
   inline std::shared_ptr<arrow::Array> finishColumnBuilder(
       ColumnBuilder& column_builder) const;
