@@ -447,7 +447,7 @@ void WorkUnitBuilder::processFilter(const ir::Filter* filter) {
   auto rte_idx = all_nest_levels_.at(filter);
 
   if (co_.device_type == ExecutorDeviceType::GPU && executor_ &&
-      executor_->getDataMgr() && executor_->getDataMgr()->getGpuMgr() &&
+      executor_->getDataMgr()->getGpuMgr() &&
       executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
     StringGuardForL0 strConstCollector;
     strConstCollector.visit(filter->getConditionExpr());
@@ -510,7 +510,7 @@ void WorkUnitBuilder::processSort(const ir::Sort* sort) {
       throw std::runtime_error("Columns with array types cannot be used for sorting.");
     }
     if ((co_.device_type == ExecutorDeviceType::GPU && executor_ &&
-         executor_->getDataMgr() && executor_->getDataMgr()->getGpuMgr() &&
+         executor_->getDataMgr()->getGpuMgr() &&
          executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) &&
         (expr->type()->isString() ||
          (expr->type()->isExtDictionary() &&
@@ -783,7 +783,7 @@ void WorkUnitBuilder::computeInputColDescs() {
   }
 
   if (co_.device_type == ExecutorDeviceType::GPU && executor_ &&
-      executor_->getDataMgr() && executor_->getDataMgr()->getGpuMgr() &&
+      executor_->getDataMgr()->getGpuMgr() &&
       executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
     ColumnVarSet non_targets_touch = collector.result();
     for (const auto& col_var : non_targets_touch) {
