@@ -33,11 +33,7 @@
 #include <numeric>
 #include <thread>
 
-#ifdef HAVE_COST_MODEL
 #include "QueryEngine/CostModel/DummyCostModel.h"
-#endif
-
-
 #include "CudaMgr/CudaMgr.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "DataProvider/DictDescriptor.h"
@@ -1826,25 +1822,8 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
         ExecutorDeviceType::CPU);
   } else {
-#ifdef HAVE_COST_MODEL
     costmodel::DummyCostModel cost_model(device_type, config_->exec.heterogeneous);
     exe_policy = cost_model.predict(ra_exe_unit);
-#else
-    auto cfg = config_->exec.heterogeneous;
-    if (cfg.enable_heterogeneous_execution) {
-      if (cfg.forced_heterogeneous_distribution) {
-        std::map<ExecutorDeviceType, unsigned> distribution{
-            {ExecutorDeviceType::CPU, cfg.forced_cpu_proportion},
-            {ExecutorDeviceType::GPU, cfg.forced_gpu_proportion}};
-        exe_policy = std::make_unique<policy::ProportionBasedExecutionPolicy>(
-            std::move(distribution));
-      } else {
-        exe_policy = std::make_unique<policy::RoundRobinExecutionPolicy>();
-      }
-    } else {
-      exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(device_type);
-    }
-#endif
   }
 
   int8_t crt_min_byte_width{MAX_BYTE_WIDTH_SUPPORTED};
