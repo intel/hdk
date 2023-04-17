@@ -29,6 +29,8 @@ class ProportionBasedExecutionPolicy : public ExecutionPolicy {
                                               size_t frag_id,
                                               size_t frag_num) const override;
 
+  std::string name() const override { return "ExecutionPolicy::ProportionBased"; };
+
  private:
   std::map<ExecutorDeviceType, unsigned> proportion_;
   unsigned total_parts_;

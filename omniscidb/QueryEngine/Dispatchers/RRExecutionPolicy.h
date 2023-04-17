@@ -21,5 +21,7 @@ class RoundRobinExecutionPolicy : public ExecutionPolicy {
   SchedulingAssignment scheduleSingleFragment(const FragmentInfo&,
                                               size_t frag_id,
                                               size_t frag_num) const override;
+
+  std::string name() const override { return "ExecutionPolicy::RoundRobin"; };
 };
 }  // namespace policy

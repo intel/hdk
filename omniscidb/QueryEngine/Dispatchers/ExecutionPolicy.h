@@ -16,6 +16,8 @@
 #include "DataProvider/TableFragmentsInfo.h"
 #include "QueryEngine/CompilationOptions.h"
 
+#include <ostream>
+
 namespace policy {
 using TableFragments = std::vector<FragmentInfo>;
 
@@ -32,8 +34,13 @@ class ExecutionPolicy {
   virtual std::vector<ExecutorDeviceType> devices() const {
     return {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU};
   }
+  virtual std::string name() const = 0;
 
   virtual ~ExecutionPolicy() = default;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const ExecutionPolicy& policy) {
+  return os << policy.name();
+}
 
 }  // namespace policy
