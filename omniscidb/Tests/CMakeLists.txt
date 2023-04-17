@@ -77,10 +77,10 @@ if(ENABLE_L0)
   add_test(IntelGPUEnablingTest IntelGPUEnablingTest ${TEST_ARGS})
 endif()
 
-if(ENABLE_COST_MODEL)
-  add_executable(CostModelTest CostModel/CostModelTest.cpp)
-  target_link_libraries(CostModelTest gtest CostModel ${ARMADILLO_LIBRARIES})
+add_executable(CostModelTest CostModel/CostModelTest.cpp)
+target_link_libraries(CostModelTest gtest CostModel ${ARMADILLO_LIBRARIES})
 
+if (ENABLE_DWARF_BENCH)
   add_executable(DwarfBenchIntegrationTest CostModel/DwarfBenchIntegrationTest.cpp)
   target_link_libraries(DwarfBenchIntegrationTest gtest CostModel)
 endif()

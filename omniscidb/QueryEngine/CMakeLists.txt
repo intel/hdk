@@ -325,10 +325,8 @@ set(QUERY_ENGINE_LIBS
 list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})
 
 
-if(ENABLE_COST_MODEL)
-    add_subdirectory(CostModel)
-    list(APPEND QUERY_ENGINE_LIBS CostModel)
-endif()
+add_subdirectory(CostModel)
+list(APPEND QUERY_ENGINE_LIBS CostModel)
 
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 
