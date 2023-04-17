@@ -170,6 +170,55 @@ void compare_arrow_array_impl(const std::vector<std::string>& expected,
   }
 }
 
+template <typename T>
+void compare_arrow_array_list_impl(const std::vector<std::vector<T>>& expected,
+                                   const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  using ArrowColType = arrow::NumericArray<typename arrow::CTypeTraits<T>::ArrowType>;
+  const arrow::ArrayVector& chunks = actual->chunks();
+  size_t compared = 0;
+
+  for (int i = 0; i < actual->num_chunks(); i++) {
+    auto chunk = chunks[i];
+    auto list_array = std::static_pointer_cast<arrow::ListArray>(chunk);
+    for (int64_t j = 0; j < chunk->length(); j++, compared++) {
+      if (expected[compared].size() == (size_t)1 &&
+          expected[compared][0] == inline_null_array_value<T>()) {
+        ASSERT_TRUE(chunk->IsNull(j));
+      } else {
+        ASSERT_TRUE(chunk->IsValid(j));
+        auto list_elem = list_array->value_slice(j);
+        const T* values = std::static_pointer_cast<ArrowColType>(list_elem)->raw_values();
+        ASSERT_EQ((size_t)list_elem->length(), expected[compared].size());
+        for (int64_t k = 0; k < list_elem->length(); k++) {
+          if (expected[compared][k] == inline_null_value<T>()) {
+            ASSERT_TRUE(list_elem->IsNull(k));
+          } else {
+            ASSERT_TRUE(list_elem->IsValid(k));
+            if constexpr (std::is_floating_point_v<T>) {
+              ASSERT_NEAR(expected[compared][k], values[k], 0.001);
+            } else {
+              ASSERT_EQ(expected[compared][k], values[k]);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  ASSERT_EQ(compared, expected.size());
+}
+
+template <typename T>
+void compare_arrow_array_impl(const std::vector<std::vector<T>>& expected,
+                              const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
+  if (actual->type()->id() == arrow::Type::LIST) {
+    compare_arrow_array_list_impl(expected, actual);
+  } else {
+    CHECK(false);
+  }
+}
+
 template <typename TYPE>
 void compare_arrow_array(const std::vector<TYPE>& expected,
                          const std::shared_ptr<arrow::ChunkedArray>& actual) {

@@ -826,12 +826,88 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::convertToArrowTable() con
   return getArrowTable(makeSchema());
 }
 
+void append_scalar_value_and_validity(const ScalarTargetValue& value,
+                                      const hdk::ir::Type* type,
+                                      ExecutorDeviceType device_type,
+                                      std::shared_ptr<ValueArray>& values,
+                                      std::shared_ptr<std::vector<bool>>& null_bitmap,
+                                      size_t max_size) {
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
+      create_or_append_value<bool, int64_t>(value, values, max_size);
+      create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+      break;
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kExtDictionary:
+      switch (type->size()) {
+        case 1:
+          create_or_append_value<int8_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        case 2:
+          create_or_append_value<int16_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        case 4:
+          create_or_append_value<int32_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        case 8:
+          create_or_append_value<int64_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        default:
+          throw std::runtime_error(type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          create_or_append_value<float, float>(value, values, max_size);
+          create_or_append_validity<float>(value, type, null_bitmap, max_size);
+          break;
+        case hdk::ir::FloatingPointType::kDouble:
+          create_or_append_value<double, double>(value, values, max_size);
+          create_or_append_validity<double>(value, type, null_bitmap, max_size);
+          break;
+        default:
+          throw std::runtime_error(type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
+      break;
+    case hdk::ir::Type::kTime:
+      create_or_append_value<int32_t, int64_t>(value, values, max_size);
+      create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+      break;
+    case hdk::ir::Type::kDate:
+      device_type == ExecutorDeviceType::GPU
+          ? create_or_append_value<int64_t, int64_t>(value, values, max_size)
+          : create_or_append_value<int32_t, int64_t>(value, values, max_size);
+      create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+      break;
+    case hdk::ir::Type::kText:
+    case hdk::ir::Type::kVarChar:
+      create_or_append_value<std::string, NullableString>(value, values, max_size);
+      create_or_append_validity<NullableString>(value, type, null_bitmap, max_size);
+      break;
+    default:
+      // TODO(miyu): support more scalar types.
+      throw std::runtime_error(type->toString() +
+                               " is not supported in Arrow result sets.");
+  }
+}
+
 size_t convert_rowwise(
     ResultSetPtr results,
     const std::vector<ArrowResultSetConverter::ColumnBuilder>& builders,
     ExecutorDeviceType device_type,
     std::vector<std::shared_ptr<ValueArray>>& value_seg,
+    std::vector<std::shared_ptr<ValueArray>>& offset_seg,
     std::vector<std::shared_ptr<std::vector<bool>>>& null_bitmap_seg,
+    std::vector<std::shared_ptr<std::vector<uint8_t>>>& offset_null_bitmap_seg,
     const std::vector<bool>& non_lazy_cols,
     const size_t start_entry,
     const size_t end_entry,
@@ -863,95 +939,49 @@ size_t convert_rowwise(
         continue;
       }
 
-      auto scalar_value = boost::get<ScalarTargetValue>(&row[j]);
-      // TODO(miyu): support more types other than scalar.
-      CHECK(scalar_value);
       const auto& column = builders[j];
-      switch (column.physical_type->id()) {
-        case hdk::ir::Type::kBoolean:
-          create_or_append_value<bool, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case hdk::ir::Type::kInteger:
-        case hdk::ir::Type::kDecimal:
-        case hdk::ir::Type::kTimestamp:
-          switch (column.physical_type->size()) {
-            case 1:
-              create_or_append_value<int8_t, int64_t>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<int64_t>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            case 2:
-              create_or_append_value<int16_t, int64_t>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<int64_t>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            case 4:
-              create_or_append_value<int32_t, int64_t>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<int64_t>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            case 8:
-              create_or_append_value<int64_t, int64_t>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<int64_t>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            default:
-              throw std::runtime_error(column.col_type->toString() +
-                                       " is not supported in Arrow result sets.");
+      auto array_value = boost::get<ArrayTargetValue>(&row[j]);
+      if (array_value) {
+        auto elem_type = column.col_type->as<hdk::ir::VarLenArrayType>()->elemType();
+        int32_t arr_size = 0;
+        if (*array_value) {
+          arr_size = static_cast<int32_t>((*array_value)->size());
+          for (auto& elem_value : **array_value) {
+            append_scalar_value_and_validity(elem_value,
+                                             elem_type,
+                                             device_type,
+                                             value_seg[j],
+                                             null_bitmap_seg[j],
+                                             local_entry_count);
           }
-          break;
-        case hdk::ir::Type::kFloatingPoint:
-          switch (column.physical_type->as<hdk::ir::FloatingPointType>()->precision()) {
-            case hdk::ir::FloatingPointType::kFloat:
-              create_or_append_value<float, float>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<float>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            case hdk::ir::FloatingPointType::kDouble:
-              create_or_append_value<double, double>(
-                  *scalar_value, value_seg[j], local_entry_count);
-              create_or_append_validity<double>(
-                  *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-              break;
-            default:
-              throw std::runtime_error(column.col_type->toString() +
-                                       " is not supported in Arrow result sets.");
+        }
+
+        auto& offsets = offset_seg[j];
+        if (!offsets) {
+          offsets = std::make_shared<ValueArray>(std::vector<int32_t>());
+          boost::get<std::vector<int32_t>>(*offsets).reserve(local_entry_count);
+          boost::get<std::vector<int32_t>>(*offsets).push_back(0);
+        }
+        auto& offset_values = boost::get<std::vector<int32_t>>(*offsets);
+        offset_values.push_back(offset_values.back() + arr_size);
+
+        if (column.col_type->nullable()) {
+          auto& validity = offset_null_bitmap_seg[j];
+          if (!validity) {
+            validity = std::make_shared<std::vector<uint8_t>>();
+            validity->reserve(local_entry_count);
           }
-          break;
-        case hdk::ir::Type::kTime:
-          create_or_append_value<int32_t, int64_t>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case hdk::ir::Type::kDate:
-          device_type == ExecutorDeviceType::GPU
-              ? create_or_append_value<int64_t, int64_t>(
-                    *scalar_value, value_seg[j], local_entry_count)
-              : create_or_append_value<int32_t, int64_t>(
-                    *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<int64_t>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        case hdk::ir::Type::kText:
-        case hdk::ir::Type::kVarChar:
-          create_or_append_value<std::string, NullableString>(
-              *scalar_value, value_seg[j], local_entry_count);
-          create_or_append_validity<NullableString>(
-              *scalar_value, column.col_type, null_bitmap_seg[j], local_entry_count);
-          break;
-        default:
-          // TODO(miyu): support more scalar types.
-          throw std::runtime_error(column.col_type->toString() +
-                                   " is not supported in Arrow result sets.");
+          validity->push_back(!!*array_value);
+        }
+      } else {
+        auto scalar_value = boost::get<ScalarTargetValue>(&row[j]);
+        CHECK(scalar_value);
+        append_scalar_value_and_validity(*scalar_value,
+                                         column.col_type,
+                                         device_type,
+                                         value_seg[j],
+                                         null_bitmap_seg[j],
+                                         local_entry_count);
       }
     }
   }
@@ -985,16 +1015,21 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
   }
 
   // TODO(miyu): speed up for columnar buffers
-  auto fetch = [&](std::vector<std::shared_ptr<ValueArray>>& value_seg,
-                   std::vector<std::shared_ptr<std::vector<bool>>>& null_bitmap_seg,
-                   const std::vector<bool>& non_lazy_cols,
-                   const size_t start_entry,
-                   const size_t end_entry) -> size_t {
+  auto fetch =
+      [&](std::vector<std::shared_ptr<ValueArray>>& value_seg,
+          std::vector<std::shared_ptr<ValueArray>>& offset_seg,
+          std::vector<std::shared_ptr<std::vector<bool>>>& null_bitmap_seg,
+          std::vector<std::shared_ptr<std::vector<uint8_t>>>& null_bitmap_offset_seg,
+          const std::vector<bool>& non_lazy_cols,
+          const size_t start_entry,
+          const size_t end_entry) -> size_t {
     return convert_rowwise(results_,
                            builders,
                            device_type_,
                            value_seg,
+                           offset_seg,
                            null_bitmap_seg,
+                           null_bitmap_offset_seg,
                            non_lazy_cols,
                            start_entry,
                            end_entry);
@@ -1015,7 +1050,10 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
   };
 
   std::vector<std::shared_ptr<ValueArray>> column_values(col_count, nullptr);
+  std::vector<std::shared_ptr<ValueArray>> column_offsets(col_count, nullptr);
   std::vector<std::shared_ptr<std::vector<bool>>> null_bitmaps(col_count, nullptr);
+  std::vector<std::shared_ptr<std::vector<uint8_t>>> offset_null_bitmaps(col_count,
+                                                                         nullptr);
   const bool multithreaded = entry_count > 10000 && !results_->isTruncated();
   bool use_columnar_converter = results_->isDirectColumnarConversionPossible() &&
                                 results_->getQueryMemDesc().getQueryDescriptionType() ==
@@ -1095,8 +1133,14 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
       std::vector<std::future<size_t>> child_threads;
       std::vector<std::vector<std::shared_ptr<ValueArray>>> column_value_segs(
           cpu_count, std::vector<std::shared_ptr<ValueArray>>(col_count, nullptr));
+      std::vector<std::vector<std::shared_ptr<ValueArray>>> column_offset_segs(
+          cpu_count, std::vector<std::shared_ptr<ValueArray>>(col_count, nullptr));
       std::vector<std::vector<std::shared_ptr<std::vector<bool>>>> null_bitmap_segs(
           cpu_count, std::vector<std::shared_ptr<std::vector<bool>>>(col_count, nullptr));
+      std::vector<std::vector<std::shared_ptr<std::vector<uint8_t>>>>
+          offset_null_bitmap_segs(
+              cpu_count,
+              std::vector<std::shared_ptr<std::vector<uint8_t>>>(col_count, nullptr));
       const auto stride = (entry_count + cpu_count - 1) / cpu_count;
       for (size_t i = 0, start_entry = 0; start_entry < entry_count;
            ++i, start_entry += stride) {
@@ -1104,7 +1148,9 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
         child_threads.push_back(std::async(std::launch::async,
                                            fetch,
                                            std::ref(column_value_segs[i]),
+                                           std::ref(column_offset_segs[i]),
                                            std::ref(null_bitmap_segs[i]),
+                                           std::ref(offset_null_bitmap_segs[i]),
                                            non_lazy_cols,
                                            start_entry,
                                            end_entry));
@@ -1123,13 +1169,22 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
             if (!column_value_segs[j][i]) {
               continue;
             }
-            append(builders[i], *column_value_segs[j][i], null_bitmap_segs[j][i]);
+            append(builders[i],
+                   *column_value_segs[j][i],
+                   column_offset_segs[j][i],
+                   null_bitmap_segs[j][i],
+                   offset_null_bitmap_segs[j][i]);
           }
         }
       }
     } else {
-      row_count =
-          fetch(column_values, null_bitmaps, non_lazy_cols, size_t(0), entry_count);
+      row_count = fetch(column_values,
+                        column_offsets,
+                        null_bitmaps,
+                        offset_null_bitmaps,
+                        non_lazy_cols,
+                        size_t(0),
+                        entry_count);
       {
         auto timer = DEBUG_TIMER("append rows to arrow single thread");
         for (int i = 0; i < schema->num_fields(); ++i) {
@@ -1137,7 +1192,11 @@ std::shared_ptr<arrow::RecordBatch> ArrowResultSetConverter::getArrowBatch(
             continue;
           }
 
-          append(builders[i], *column_values[i], null_bitmaps[i]);
+          append(builders[i],
+                 *column_values[i],
+                 column_offsets[i],
+                 null_bitmaps[i],
+                 offset_null_bitmaps[i]);
         }
       }
     }
@@ -1265,9 +1324,14 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
     std::vector<ColumnValues> column_value_segs(segments_count,
                                                 ColumnValues(col_count, nullptr));
-
+    std::vector<ColumnValues> column_offset_segs(segments_count,
+                                                 ColumnValues(col_count, nullptr));
     std::vector<NullBitmaps> null_bitmap_segs(segments_count,
                                               NullBitmaps(col_count, nullptr));
+    std::vector<std::vector<std::shared_ptr<std::vector<uint8_t>>>>
+        offset_null_bitmap_segs(
+            segments_count,
+            std::vector<std::shared_ptr<std::vector<uint8_t>>>(col_count, nullptr));
 
     std::atomic<size_t> row_count = 0;
 
@@ -1280,7 +1344,9 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
                                    builders,
                                    device_type_,
                                    column_value_segs[0],
+                                   column_offset_segs[0],
                                    null_bitmap_segs[0],
+                                   offset_null_bitmap_segs[0],
                                    columnar_conversion_flags,
                                    0,
                                    entry_count,
@@ -1295,7 +1361,9 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
                                          builders,
                                          device_type_,
                                          column_value_segs[i],
+                                         column_offset_segs[i],
                                          null_bitmap_segs[i],
+                                         offset_null_bitmap_segs[i],
                                          columnar_conversion_flags,
                                          start_entry,
                                          end_entry);
@@ -1310,7 +1378,11 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
         if (!columnar_conversion_flags[i]) {
           for (size_t j = 0; j < segments_count; ++j) {
             if (column_value_segs[j][i]) {
-              append(builders[i], *column_value_segs[j][i], null_bitmap_segs[j][i]);
+              append(builders[i],
+                     *column_value_segs[j][i],
+                     column_offset_segs[j][i],
+                     null_bitmap_segs[j][i],
+                     offset_null_bitmap_segs[j][i]);
             }
           }
           result_columns[i] =
@@ -1393,6 +1465,11 @@ std::shared_ptr<arrow::DataType> get_arrow_type(const hdk::ir::Type* type,
           throw std::runtime_error(
               "Unsupported timestamp precision for Arrow result sets: " + toString(unit));
       }
+    }
+    case hdk::ir::Type::kVarLenArray: {
+      auto elem_type = type->as<hdk::ir::VarLenArrayType>()->elemType();
+      auto arrow_elem_type = get_arrow_type(elem_type, device_type);
+      return arrow::list(arrow_elem_type);
     }
     default:
       break;
@@ -1600,6 +1677,7 @@ namespace {
 
 template <typename BUILDER_TYPE, typename VALUE_ARRAY_TYPE>
 void appendToColumnBuilder(ArrowResultSetConverter::ColumnBuilder& column_builder,
+                           arrow::ArrayBuilder* arrow_builder,
                            const ValueArray& values,
                            const std::shared_ptr<std::vector<bool>>& is_valid) {
   static_assert(!std::is_same<BUILDER_TYPE, arrow::StringDictionary32Builder>::value,
@@ -1617,7 +1695,7 @@ void appendToColumnBuilder(ArrowResultSetConverter::ColumnBuilder& column_builde
     std::transform(vals.begin(), vals.end(), vals.begin(), scale_values);
   }
 
-  auto typed_builder = dynamic_cast<BUILDER_TYPE*>(column_builder.builder.get());
+  auto typed_builder = dynamic_cast<BUILDER_TYPE*>(arrow_builder);
   CHECK(typed_builder);
   if (column_builder.field->nullable()) {
     CHECK(is_valid.get());
@@ -1630,11 +1708,11 @@ void appendToColumnBuilder(ArrowResultSetConverter::ColumnBuilder& column_builde
 template <>
 void appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
     ArrowResultSetConverter::ColumnBuilder& column_builder,
+    arrow::ArrayBuilder* arrow_builder,
     const ValueArray& values,
     const std::shared_ptr<std::vector<bool>>& is_valid) {
   std::vector<int64_t> vals = boost::get<std::vector<int64_t>>(values);
-  auto typed_builder =
-      dynamic_cast<arrow::Decimal128Builder*>(column_builder.builder.get());
+  auto typed_builder = dynamic_cast<arrow::Decimal128Builder*>(arrow_builder);
   CHECK(typed_builder);
   CHECK_EQ(is_valid->size(), vals.size());
   if (column_builder.field->nullable()) {
@@ -1658,10 +1736,10 @@ void appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
 template <>
 void appendToColumnBuilder<arrow::StringDictionary32Builder, int32_t>(
     ArrowResultSetConverter::ColumnBuilder& column_builder,
+    arrow::ArrayBuilder* arrow_builder,
     const ValueArray& values,
     const std::shared_ptr<std::vector<bool>>& is_valid) {
-  auto typed_builder =
-      dynamic_cast<arrow::StringDictionary32Builder*>(column_builder.builder.get());
+  auto typed_builder = dynamic_cast<arrow::StringDictionary32Builder*>(arrow_builder);
   CHECK(typed_builder);
 
   std::vector<int32_t> vals = boost::get<std::vector<int32_t>>(values);
@@ -1698,10 +1776,11 @@ void appendToColumnBuilder<arrow::StringDictionary32Builder, int32_t>(
 template <>
 void appendToColumnBuilder<arrow::StringBuilder, std::string>(
     ArrowResultSetConverter::ColumnBuilder& column_builder,
+    arrow::ArrayBuilder* arrow_builder,
     const ValueArray& values,
     const std::shared_ptr<std::vector<bool>>& is_valid) {
-  std::vector<std::string> vals = boost::get<std::vector<std::string>>(values);
-  auto typed_builder = dynamic_cast<arrow::StringBuilder*>(column_builder.builder.get());
+  const std::vector<std::string>& vals = boost::get<std::vector<std::string>>(values);
+  auto typed_builder = dynamic_cast<arrow::StringBuilder*>(arrow_builder);
   CHECK(typed_builder);
   if (column_builder.field->nullable()) {
     CHECK(is_valid.get());
@@ -1722,36 +1801,46 @@ void appendToColumnBuilder<arrow::StringBuilder, std::string>(
 void ArrowResultSetConverter::append(
     ColumnBuilder& column_builder,
     const ValueArray& values,
-    const std::shared_ptr<std::vector<bool>>& is_valid) const {
+    const std::shared_ptr<ValueArray>& offset_values,
+    const std::shared_ptr<std::vector<bool>>& is_valid,
+    const std::shared_ptr<std::vector<uint8_t>>& offset_is_valid) const {
+  auto arrow_builder = column_builder.builder.get();
+  auto elem_builder = arrow_builder;
+  auto type = column_builder.physical_type;
+  auto elem_type = type;
+  if (elem_type->isVarLenArray()) {
+    elem_type = elem_type->as<hdk::ir::VarLenArrayType>()->elemType();
+    elem_builder = dynamic_cast<arrow::ListBuilder*>(elem_builder)->value_builder();
+  }
   if (column_builder.col_type->isExtDictionary()) {
     CHECK(column_builder.physical_type
               ->isInt32());  // assume all dicts use none-encoded type for now
     appendToColumnBuilder<arrow::StringDictionary32Builder, int32_t>(
-        column_builder, values, is_valid);
+        column_builder, elem_builder, values, is_valid);
     return;
   }
-  switch (column_builder.physical_type->id()) {
+  switch (elem_type->id()) {
     case hdk::ir::Type::kBoolean:
       appendToColumnBuilder<arrow::BooleanBuilder, bool>(
-          column_builder, values, is_valid);
+          column_builder, elem_builder, values, is_valid);
       break;
     case hdk::ir::Type::kInteger:
-      switch (column_builder.physical_type->size()) {
+      switch (elem_type->size()) {
         case 1:
           appendToColumnBuilder<arrow::Int8Builder, int8_t>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         case 2:
           appendToColumnBuilder<arrow::Int16Builder, int16_t>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         case 4:
           appendToColumnBuilder<arrow::Int32Builder, int32_t>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         case 8:
           appendToColumnBuilder<arrow::Int64Builder, int64_t>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         default:
           throw std::runtime_error(column_builder.col_type->toString() +
@@ -1760,18 +1849,17 @@ void ArrowResultSetConverter::append(
       break;
     case hdk::ir::Type::kDecimal:
       appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
-          column_builder, values, is_valid);
+          column_builder, elem_builder, values, is_valid);
       break;
     case hdk::ir::Type::kFloatingPoint:
-      switch (
-          column_builder.physical_type->as<hdk::ir::FloatingPointType>()->precision()) {
+      switch (elem_type->as<hdk::ir::FloatingPointType>()->precision()) {
         case hdk::ir::FloatingPointType::kFloat:
           appendToColumnBuilder<arrow::FloatBuilder, float>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         case hdk::ir::FloatingPointType::kDouble:
           appendToColumnBuilder<arrow::DoubleBuilder, double>(
-              column_builder, values, is_valid);
+              column_builder, elem_builder, values, is_valid);
           break;
         default:
           throw std::runtime_error(column_builder.col_type->toString() +
@@ -1780,27 +1868,39 @@ void ArrowResultSetConverter::append(
       break;
     case hdk::ir::Type::kTime:
       appendToColumnBuilder<arrow::Time32Builder, int32_t>(
-          column_builder, values, is_valid);
+          column_builder, elem_builder, values, is_valid);
       break;
     case hdk::ir::Type::kTimestamp:
       appendToColumnBuilder<arrow::TimestampBuilder, int64_t>(
-          column_builder, values, is_valid);
+          column_builder, elem_builder, values, is_valid);
       break;
     case hdk::ir::Type::kDate:
       device_type_ == ExecutorDeviceType::GPU
           ? appendToColumnBuilder<arrow::Date64Builder, int64_t>(
-                column_builder, values, is_valid)
+                column_builder, elem_builder, values, is_valid)
           : appendToColumnBuilder<arrow::Date32Builder, int32_t>(
-                column_builder, values, is_valid);
+                column_builder, elem_builder, values, is_valid);
       break;
     case hdk::ir::Type::kVarChar:
     case hdk::ir::Type::kText:
       appendToColumnBuilder<arrow::StringBuilder, std::string>(
-          column_builder, values, is_valid);
+          column_builder, elem_builder, values, is_valid);
       break;
     default:
       // TODO(miyu): support more scalar types.
       throw std::runtime_error(column_builder.col_type->toString() +
                                " is not supported in Arrow result sets.");
+  }
+  // Append offset values
+  if (type->isVarLenArray()) {
+    CHECK(offset_values);
+    auto& offsets = boost::get<std::vector<int32_t>>(*offset_values);
+    auto* list_builder = dynamic_cast<arrow::ListBuilder*>(arrow_builder);
+    if (offset_is_valid) {
+      ARROW_THROW_NOT_OK(list_builder->AppendValues(
+          offsets.data(), offsets.size() - 1, offset_is_valid->data()));
+    } else {
+      ARROW_THROW_NOT_OK(list_builder->AppendValues(offsets.data(), offsets.size() - 1));
+    }
   }
 }
