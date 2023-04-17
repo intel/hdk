@@ -50,5 +50,3 @@ dependencies:
   - folly 2022.11.07.00
   - sqlite 3.40.0
   - python 3.9.*
-  - armadillo
-
