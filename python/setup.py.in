@@ -49,7 +49,7 @@ common = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     runtime_library_dirs=None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs),
     libraries=pa.get_libraries() + ["QueryEngine", "ConfigBuilder", "Logger", "Shared"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 execute = Extension(
@@ -60,7 +60,7 @@ execute = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     runtime_library_dirs=None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs),
     libraries=pa.get_libraries() + ["QueryEngine"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 sql = Extension(
@@ -70,7 +70,7 @@ sql = Extension(
     include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     libraries=["Calcite", "QueryEngine", "ResultSet", "ResultSetRegistry", "Logger"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 storage = Extension(
@@ -81,7 +81,7 @@ storage = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     runtime_library_dirs=None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs),
     libraries=pa.get_libraries() + ["ArrowStorage", "SchemaMgr", "DataMgr", "IR", "Logger"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 ir = Extension(
@@ -92,7 +92,7 @@ ir = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     runtime_library_dirs=None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs),
     libraries=pa.get_libraries() + ["IR"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 builder = Extension(
@@ -103,7 +103,7 @@ builder = Extension(
     library_dirs=pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
     runtime_library_dirs=None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs),
     libraries=pa.get_libraries() + ["QueryBuilder", "IR"],
-    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
+    extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK", *("@CDEFS@".split())],
 )
 
 setup(

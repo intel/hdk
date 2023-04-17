@@ -1,5 +1,11 @@
 set(SETUP_PY "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
 
+get_property(CDEFS DIRECTORY PROPERTY COMPILE_DEFINITIONS)
+message(STATUS "compile defs ${CDEFS}")
+string(REPLACE ";" " -D" L2 "${CDEFS}")
+set(CDEFS "-D${L2} ")
+message(STATUS "orig flags " ${CDEFS})
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in" "${SETUP_PY}")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/pyhdk/version.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/pyhdk/version.py")
 
@@ -29,9 +35,6 @@ if (NOT WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUA
     list(APPEND SETUP_FLAGS -g)
 endif()
 
-if(ENABLE_FOLLY)
-   list(APPEND SETUP_FLAGS "-DHAVE_FOLLY") 
-endif()
 
 add_custom_target(pyhdk ALL
     COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
