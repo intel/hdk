@@ -56,6 +56,7 @@ TEST(ExtrapolationModelsTests, LinearExtrapolationTest1) {
   ASSERT_EQ(le.getExtrapolatedData(35), (size_t)350);
 }
 
+#ifdef HAVE_ARMADILLO
 TEST(ExtrapolationModelsTests, LinearRegressionTest1) {
   std::vector<Detail::Measurement> ms = {
       {.bytes = 10, .milliseconds = 10},
@@ -83,6 +84,7 @@ TEST(ExtrapolationModelsTests, LinearRegressionTest2) {
   ASSERT_EQ(lrt.getExtrapolatedData(50), 100);
   ASSERT_EQ(lrt.getExtrapolatedData(60), 120);
 }
+#endif
 
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
