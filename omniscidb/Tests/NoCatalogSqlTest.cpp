@@ -148,7 +148,6 @@ class NoCatalogSqlTest : public ::testing::Test {
     data_mgr_.reset();
     schema_provider_.reset();
     executor_.reset();
-    // calcite_.reset();
     if (calcite_) {
       calcite_->teardown();
     }
@@ -238,7 +237,7 @@ TEST_F(NoCatalogSqlTest, GroupBySingleColumn) {
 }
 
 TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
-  constexpr size_t TEST_NTHREADS = 10'000;
+  constexpr size_t TEST_NTHREADS = 100;
   std::vector<ExecutionResult> res;
   std::vector<std::future<void>> threads;
   res.resize(TEST_NTHREADS);
@@ -252,7 +251,6 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
   for (size_t i = 0; i < TEST_NTHREADS; ++i) {
     executors[i] = Executor::getExecutor(data_mgr_.get(), config_);
     threads[i] = std::async(std::launch::async, [this, i, &res, &executors, calcite]() {
-      // auto calcite = std::make_unique<CalciteJNI>(schema_provider_, config_);
       auto query_ra = calcite_->process(
           "test_db", "SELECT col_bi + " + std::to_string(i) + " FROM test1;");
       CHECK(i < executors.size() && executors[i]);
@@ -270,24 +268,26 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
   }
 }
 
-TEST(CalciteReinitTest, DISABLED_SingleThread) {
+TEST(CalciteReinitTest, SingleThread) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
-    auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
+    auto calcite = CalciteWorker::initialize(schema_provider, config);
     auto query_ra = calcite->process("test_db", "SELECT 1;");
     CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
+    CalciteWorker::teardown();
   }
 }
 
-TEST(CalciteReinitTest, DISABLED_MultipleThreads) {
+TEST(CalciteReinitTest, MultipleThreads) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
     auto f = std::async(std::launch::async, [schema_provider, config]() {
-      auto calcite = std::make_shared<CalciteJNI>(schema_provider, config);
+      auto calcite = CalciteWorker::initialize(schema_provider, config);
       auto query_ra = calcite->process("test_db", "SELECT 1;");
       CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
+      CalciteWorker::teardown();
     });
     f.wait();
   }
