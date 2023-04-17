@@ -69,7 +69,7 @@ sql = Extension(
     language="c++",
     include_dirs=include_dirs,
     library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
-    libraries=["Calcite", "QueryEngine", "Logger"],
+    libraries=["Calcite", "QueryEngine", "ResultSet", "ResultSetRegistry", "Logger"],
     extra_compile_args=[*(["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"] if os.name == "nt" else ["-std=c++17"]), "-D__STDC_FORMAT_MACROS", "-DBOOST_LOG_DYN_LINK"],
 )
 
