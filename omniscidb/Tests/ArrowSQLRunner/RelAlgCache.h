@@ -26,7 +26,7 @@
 
 class RelAlgCache {
  public:
-  RelAlgCache(std::shared_ptr<CalciteJNI> calcite,
+  RelAlgCache(std::shared_ptr<CalciteWorker> calcite,
               SchemaProviderPtr schema_provider,
               ConfigPtr config);
   ~RelAlgCache();
@@ -76,7 +76,7 @@ class RelAlgCache {
     }
   };
 
-  std::shared_ptr<CalciteJNI> calcite_;
+  std::shared_ptr<CalciteWorker> calcite_;
   SchemaProviderPtr schema_provider_;
   ConfigPtr config_;
   std::string build_cache_;
