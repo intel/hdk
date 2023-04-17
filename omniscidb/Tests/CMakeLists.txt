@@ -143,6 +143,10 @@ if(ENABLE_CUDA)
   target_link_libraries(GpuSharedMemoryTest gtest Logger QueryEngine)
 endif()
 
+if(ENABLE_L0)
+  target_link_libraries(GpuSharedMemoryTestIntel gtest Logger QueryEngine)
+endif()
+
 set(TEST_ARGS "--gtest_output=xml:../")
 add_test(UtilTest UtilTest ${TEST_ARGS})
 add_test(ArrowBasedExecuteTest ArrowBasedExecuteTest ${TEST_ARGS})
@@ -181,6 +185,7 @@ if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
 endif()
 if(ENABLE_L0)
+  add_test(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel ${TEST_ARGS})
   add_test(NAME PuntToCpu COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.Punt*" ${TEST_ARGS})
   set_tests_properties(PuntToCpu PROPERTIES LABELS "enabling")
 endif()
@@ -236,6 +241,9 @@ if(ENABLE_CUDA)
   list(APPEND TEST_PROGRAMS GpuSharedMemoryTest)
 endif()
 
+if(ENABLE_L0)
+  list(APPEND TEST_PROGRAMS GpuSharedMemoryTestIntel)
+endif()
 #if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 #  list(APPEND TEST_PROGRAMS UdfTest)
 #endif()
@@ -292,6 +300,19 @@ if(ENABLE_L0)
     GpuSharedMemoryTestIntel
   )
   set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
+
+  # set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp DateAdd.cpp DateTruncate.cpp)
+
+  # set(intel_gpu_module_name RuntimeFunctionsL0.bc)
+  # set(intel_gpu_module_internal_suffix "L0_internal.bc")
+  # function(precompile_intel_gpu_module SOURCE_FILE)
+  #     set(module_compiler_flags -Xclang -ffake-address-space-map -DL0_RUNTIME_ENABLED)
+  #     precompile_llvm_module(${SOURCE_FILE} ${intel_gpu_module_internal_suffix} ${module_compiler_flags})
+  # endfunction()
+  # set(precompile_intel_gpu_module_cmd "precompile_intel_gpu_module")
+
+  # precompile_modules("intel_gpu_precompiled_module_list" ${intel_gpu_module_internal_suffix} ${precompile_intel_gpu_module_cmd} "${intel_gpu_runtime_function_sources}")
+  # link_runtime_module(${intel_gpu_module_name} "${intel_gpu_precompiled_module_list}")
 
   add_custom_target(enabling_tests
       COMMAND mkdir -p tmp
