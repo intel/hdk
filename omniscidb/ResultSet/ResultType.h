@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <ostream>
+
 enum class QueryDescriptionType {
   GroupByPerfectHash,
   GroupByBaselineHash,
@@ -30,3 +32,20 @@ enum class QueryDescriptionType {
   NonGroupedAggregate,
   Estimator
 };
+
+inline std::ostream& operator<<(std::ostream& os, const QueryDescriptionType& t) {
+  switch (t) {
+    case QueryDescriptionType::GroupByPerfectHash:
+      return os << "QueryDescriptionType::GroupByPerfectHash";
+    case QueryDescriptionType::GroupByBaselineHash:
+      return os << "QueryDescriptionType::GroupByBaselineHash";
+    case QueryDescriptionType::Projection:
+      return os << "QueryDescriptionType::Projection";
+    case QueryDescriptionType::NonGroupedAggregate:
+      return os << "QueryDescriptionType::NonGroupedAggregate";
+    case QueryDescriptionType::Estimator:
+      return os << "QueryDescriptionType::Estimator";
+    default:
+      return os << "Invalid Query Description Type";
+  };
+}
