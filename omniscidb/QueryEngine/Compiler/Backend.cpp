@@ -57,6 +57,16 @@ const std::unordered_map<llvm::CallingConv::ID, CallingConvDesc>
         {llvm::CallingConv::SPIR_FUNC, CallingConvDesc::SPIR_FUNC},
     };
 
+CodegenTraits CodegenTraits::get(CodegenTraitsDescriptor codegen_traits_desc) {
+  CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) !=
+        descCallingConvToLLVM.end());
+  return CodegenTraits(codegen_traits_desc.local_addr_space_,
+                       codegen_traits_desc.smem_addr_space_,
+                       codegen_traits_desc.global_addr_space_,
+                       descCallingConvToLLVM.at(codegen_traits_desc.conv_),
+                       codegen_traits_desc.triple_);
+}
+
 CodegenTraitsDescriptor CodegenTraits::getDescriptor(unsigned local_addr_space,
                                                      unsigned shared_addr_space,
                                                      unsigned global_addr_space,
