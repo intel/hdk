@@ -305,6 +305,12 @@ void L0Manager::copyHostToDevice(int8_t* device_ptr,
                                  const int8_t* host_ptr,
                                  const size_t num_bytes,
                                  const int device_num) {
+  CHECK(host_ptr);
+  CHECK(device_ptr);
+  CHECK_GT(num_bytes, 0);
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+
   auto& device = drivers()[0]->devices()[device_num];
   auto cl = device->create_command_list();
   auto queue = device->command_queue();
@@ -317,6 +323,12 @@ void L0Manager::copyDeviceToHost(int8_t* host_ptr,
                                  const int8_t* device_ptr,
                                  const size_t num_bytes,
                                  const int device_num) {
+  CHECK(host_ptr);
+  CHECK(device_ptr);
+  CHECK_GT(num_bytes, 0);
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+
   auto& device = drivers_[0]->devices()[device_num];
   auto cl = device->create_command_list();
   auto queue = device->command_queue();
@@ -343,6 +355,7 @@ void L0Manager::freePinnedHostMem(int8_t* host_ptr) {
 }
 
 void L0Manager::freeDeviceMem(int8_t* device_ptr) {
+  CHECK(device_ptr);
   auto ctx = drivers_[0]->ctx();
   L0_SAFE_CALL(zeMemFree(ctx, device_ptr));
 }
@@ -350,12 +363,20 @@ void L0Manager::freeDeviceMem(int8_t* device_ptr) {
 void L0Manager::zeroDeviceMem(int8_t* device_ptr,
                               const size_t num_bytes,
                               const int device_num) {
+  CHECK(device_ptr);
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+  CHECK_GE(num_bytes, 0);
   setDeviceMem(device_ptr, 0, num_bytes, device_num);
 }
 void L0Manager::setDeviceMem(int8_t* device_ptr,
                              const unsigned char uc,
                              const size_t num_bytes,
                              const int device_num) {
+  CHECK(device_ptr);
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+  CHECK_GE(num_bytes, 0);
   auto& device = drivers_[0]->devices()[device_num];
   auto cl = device->create_command_list();
   L0_SAFE_CALL(zeCommandListAppendMemoryFill(
@@ -371,7 +392,8 @@ void L0Manager::synchronizeDevices() const {
 }
 
 size_t L0Manager::getMaxAllocationSize(const int device_num) const {
-  CHECK_LE(device_num, drivers_[0]->devices().size());
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
   ze_device_properties_t device_properties;
   L0_SAFE_CALL(zeDeviceGetProperties(drivers_[0]->devices()[device_num]->device(),
                                      &device_properties));
@@ -382,6 +404,7 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
 }
 
 uint32_t L0Manager::getMaxBlockSize() const {
+  CHECK_GT(drivers_[0]->devices().size(), size_t(0));
   unsigned sz = drivers_[0]->devices()[0]->maxGroupSize();
   for (auto d : drivers_[0]->devices()) {
     sz = d->maxGroupSize() < sz ? d->maxGroupSize() : sz;
@@ -395,6 +418,7 @@ int8_t L0Manager::getSubGroupSize() const {
 }
 
 uint32_t L0Manager::getGridSize() const {
+  CHECK_GT(drivers_[0]->devices().size(), size_t(0));
   auto cnt = drivers_[0]->devices()[0]->maxGroupCount();
   for (auto d : drivers_[0]->devices()) {
     cnt = d->maxGroupCount() < cnt ? d->maxGroupCount() : cnt;
