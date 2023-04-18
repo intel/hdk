@@ -305,6 +305,8 @@ void L0Manager::copyHostToDevice(int8_t* device_ptr,
                                  const int8_t* host_ptr,
                                  const size_t num_bytes,
                                  const int device_num) {
+  if (!num_bytes)
+    return;
   CHECK(host_ptr);
   CHECK(device_ptr);
   CHECK_GT(num_bytes, 0);
@@ -323,6 +325,8 @@ void L0Manager::copyDeviceToHost(int8_t* host_ptr,
                                  const int8_t* device_ptr,
                                  const size_t num_bytes,
                                  const int device_num) {
+  if (!num_bytes)
+    return;
   CHECK(host_ptr);
   CHECK(device_ptr);
   CHECK_GT(num_bytes, 0);
@@ -363,6 +367,8 @@ void L0Manager::freeDeviceMem(int8_t* device_ptr) {
 void L0Manager::zeroDeviceMem(int8_t* device_ptr,
                               const size_t num_bytes,
                               const int device_num) {
+  if (!num_bytes)
+    return;
   CHECK(device_ptr);
   CHECK_GE(device_num, 0);
   CHECK_LT(device_num, drivers_[0]->devices().size());
@@ -373,6 +379,8 @@ void L0Manager::setDeviceMem(int8_t* device_ptr,
                              const unsigned char uc,
                              const size_t num_bytes,
                              const int device_num) {
+  if (!num_bytes)
+    return;
   CHECK(device_ptr);
   CHECK_GE(device_num, 0);
   CHECK_LT(device_num, drivers_[0]->devices().size());
