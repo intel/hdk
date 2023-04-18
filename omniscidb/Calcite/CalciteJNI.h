@@ -29,31 +29,7 @@ struct FilterPushDownInfo {
   int input_next;
 };
 
-class CalciteJNI {
- public:
-  CalciteJNI(SchemaProviderPtr schema_provider,
-             ConfigPtr config,
-             const std::string& udf_filename = "",
-             size_t calcite_max_mem_mb = 1024);
-  ~CalciteJNI();
-
-  std::string process(const std::string& db_name,
-                      const std::string& sql_string,
-                      const std::vector<FilterPushDownInfo>& filter_push_down_info = {},
-                      const bool legacy_syntax = false,
-                      const bool is_explain = false,
-                      const bool is_view_optimize = false);
-
-  std::string getExtensionFunctionWhitelist();
-  std::string getUserDefinedFunctionWhitelist();
-  std::string getRuntimeExtensionFunctionWhitelist();
-  void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
-                                    bool is_runtime = true);
-
- private:
-  class Impl;
-  std::unique_ptr<Impl> impl_;
-};
+class CalciteJNI;
 
 /**
  * Run CalciteJNI on a single thread.
@@ -64,14 +40,7 @@ class CalciteWorker {
 
   CalciteWorker(const CalciteWorker&) = delete;
 
-  ~CalciteWorker() {
-    {
-      std::lock_guard<decltype(queue_mutex_)> lock(queue_mutex_);
-      should_exit_ = true;
-    }
-    worker_cv_.notify_all();
-    worker_.join();
-  }
+  ~CalciteWorker();
 
   static CalciteWorker* get(SchemaProviderPtr schema_provider,
                             ConfigPtr config,
@@ -89,124 +58,26 @@ class CalciteWorker {
                       const std::vector<FilterPushDownInfo>& filter_push_down_info = {},
                       const bool legacy_syntax = false,
                       const bool is_explain = false,
-                      const bool is_view_optimize = false) {
-    auto task = Task([&db_name,
-                      &sql_string,
-                      &filter_push_down_info,
-                      legacy_syntax,
-                      is_explain,
-                      is_view_optimize](CalciteJNI* calcite_jni) {
-      CHECK(calcite_jni);
-      return calcite_jni->process(db_name,
-                                  sql_string,
-                                  filter_push_down_info,
-                                  legacy_syntax,
-                                  is_explain,
-                                  is_view_optimize);
-    });
-    auto result = task.get_future();
-    submitTaskToQueue(std::move(task));
-
-    result.wait();
-    return result.get();
-  }
-
-  std::string getExtensionFunctionWhitelist() {
-    auto task = Task([](CalciteJNI* calcite_jni) {
-      CHECK(calcite_jni);
-      return calcite_jni->getExtensionFunctionWhitelist();
-    });
-
-    auto result = task.get_future();
-    submitTaskToQueue(std::move(task));
-
-    result.wait();
-    return result.get();
-  }
-
-  std::string getUserDefinedFunctionWhitelist() {
-    auto task = Task([](CalciteJNI* calcite_jni) {
-      CHECK(calcite_jni);
-      return calcite_jni->getUserDefinedFunctionWhitelist();
-    });
-
-    auto result = task.get_future();
-    submitTaskToQueue(std::move(task));
-
-    result.wait();
-    return result.get();
-  }
-
-  std::string getRuntimeExtensionFunctionWhitelist() {
-    auto task = Task([](CalciteJNI* calcite_jni) {
-      CHECK(calcite_jni);
-      return calcite_jni->getRuntimeExtensionFunctionWhitelist();
-    });
-
-    auto result = task.get_future();
-    submitTaskToQueue(std::move(task));
-
-    result.wait();
-    return result.get();
-  }
+                      const bool is_view_optimize = false);
+  std::string getExtensionFunctionWhitelist();
+  std::string getUserDefinedFunctionWhitelist();
+  std::string getRuntimeExtensionFunctionWhitelist();
 
   void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
-                                    bool is_runtime = true) {
-    auto task = Task([&udfs, is_runtime](CalciteJNI* calcite_jni) {
-      CHECK(calcite_jni);
-      calcite_jni->setRuntimeExtensionFunctions(udfs, is_runtime);
-      return "";  // all tasks return strings
-    });
-    submitTaskToQueue(std::move(task));
-  }
+                                    bool is_runtime = true);
 
  private:
   explicit CalciteWorker(SchemaProviderPtr schema_provider,
                          ConfigPtr config,
                          const std::string& udf_filename,
-                         size_t calcite_max_mem_mb) {
-    worker_ = std::thread(&CalciteWorker::worker,
-                          this,
-                          schema_provider,
-                          config,
-                          udf_filename,
-                          calcite_max_mem_mb);
-  }
+                         size_t calcite_max_mem_mb);
 
   void worker(SchemaProviderPtr schema_provider,
               ConfigPtr config,
               const std::string& udf_filename,
-              size_t calcite_max_mem_mb) {
-    auto calcite_jni = std::make_unique<CalciteJNI>(
-        schema_provider, config, udf_filename, calcite_max_mem_mb);
+              size_t calcite_max_mem_mb);
 
-    std::unique_lock<std::mutex> lock(queue_mutex_);
-    while (true) {
-      worker_cv_.wait(lock, [this] { return !queue_.empty() || should_exit_; });
-      if (should_exit_) {
-        return;
-      }
-
-      if (!queue_.empty()) {
-        auto task = std::move(queue_.front());
-        queue_.pop();
-
-        lock.unlock();
-        task(calcite_jni.get());
-
-        lock.lock();
-      }
-    }
-  }
-
-  void submitTaskToQueue(Task&& task) {
-    std::unique_lock<decltype(queue_mutex_)> lock(queue_mutex_);
-
-    queue_.push(std::move(task));
-
-    lock.unlock();
-    worker_cv_.notify_all();
-  }
+  void submitTaskToQueue(Task&& task);
 
   std::mutex queue_mutex_;
   std::condition_variable worker_cv_;
