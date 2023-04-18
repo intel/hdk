@@ -86,6 +86,8 @@ class JVM {
     return instance_;
   }
 
+  static void destroyInstance() { instance_ = nullptr; }
+
   // Get JNI environment for the current thread.
   // You souldn't pass this obect between threads. It should be deallocated
   // in the same thread it was requrested in. It shouldn't outlive JVM object.
@@ -572,7 +574,9 @@ CalciteJNI::CalciteJNI(SchemaProviderPtr schema_provider,
       std::make_unique<Impl>(schema_provider, config, udf_filename, calcite_max_mem_mb);
 }
 
-CalciteJNI::~CalciteJNI() {}
+CalciteJNI::~CalciteJNI() {
+  JVM::destroyInstance();
+}
 
 std::string CalciteJNI::process(
     const std::string& db_name,
@@ -603,4 +607,4 @@ void CalciteJNI::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
   return impl_->setRuntimeExtensionFunctions(udfs, is_runtime);
 }
 
-std::shared_ptr<CalciteWorker> CalciteWorker::instance_;
+std::unique_ptr<CalciteWorker> CalciteWorker::instance_;

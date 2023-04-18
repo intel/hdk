@@ -73,20 +73,16 @@ class CalciteWorker {
     worker_.join();
   }
 
-  // not thread safe. does this need a thread safety guarantee?
-  static std::shared_ptr<CalciteWorker> initialize(SchemaProviderPtr schema_provider,
-                                                   ConfigPtr config,
-                                                   const std::string& udf_filename = "",
-                                                   size_t calcite_max_mem_mb = 1024) {
-    if (instance_) {
-      throw std::runtime_error("Calcite worker thread is already initialized.");
+  static CalciteWorker* get(SchemaProviderPtr schema_provider,
+                            ConfigPtr config,
+                            const std::string& udf_filename = "",
+                            size_t calcite_max_mem_mb = 1024) {
+    if (!instance_) {
+      instance_ = std::unique_ptr<CalciteWorker>(
+          new CalciteWorker(schema_provider, config, udf_filename, calcite_max_mem_mb));
     }
-    instance_ = std::shared_ptr<CalciteWorker>(
-        new CalciteWorker(schema_provider, config, udf_filename, calcite_max_mem_mb));
-    return instance_;
+    return instance_.get();
   }
-
-  static void teardown() { instance_ = nullptr; }
 
   std::string process(const std::string& db_name,
                       const std::string& sql_string,
@@ -187,7 +183,6 @@ class CalciteWorker {
     std::unique_lock<std::mutex> lock(queue_mutex_);
     while (true) {
       worker_cv_.wait(lock, [this] { return !queue_.empty() || should_exit_; });
-
       if (should_exit_) {
         return;
       }
@@ -220,5 +215,5 @@ class CalciteWorker {
   std::queue<Task> queue_;
 
   bool should_exit_{false};
-  static std::shared_ptr<CalciteWorker> instance_;
+  static std::unique_ptr<CalciteWorker> instance_;
 };

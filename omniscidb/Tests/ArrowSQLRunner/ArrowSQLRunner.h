@@ -119,7 +119,7 @@ DataMgr* getDataMgr();
 
 Executor* getExecutor();
 
-std::shared_ptr<CalciteWorker> getCalcite();
+CalciteWorker* getCalcite();
 
 std::unique_ptr<RelAlgExecutor> makeRelAlgExecutor(const std::string& query_str);
 
