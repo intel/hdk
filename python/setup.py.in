@@ -23,16 +23,14 @@ import numpy as np
 import pyarrow as pa
 
 
-include_dirs = [
-    np.get_include(),
-    pa.get_include(),
-    "@CMAKE_CURRENT_SOURCE_DIR@",
-    "@CMAKE_SOURCE_DIR@",
-    "@CMAKE_SOURCE_DIR@/omniscidb",
-    "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty",
-    "@CMAKE_SOURCE_DIR@/omniscidb/ThirdParty/rapidjson",
-    "@LLVM_INCLUDE_DIRS@",
-]
+def gen_include_dirs() -> list:
+    return [
+        np.get_include(),
+        pa.get_include(),
+        "@CMAKE_CURRENT_SOURCE_DIR@",
+        "@CMAKE_SOURCE_DIR@",
+        *("@IDIRS@".split(";")),
+    ]
 
 
 # conda-forge packages hdk and pyhdk should be built separately.
@@ -45,11 +43,9 @@ def get_hdk_shared_libs() -> list:
     return []
 
 
-def gen_compile_flags(os_name: str) -> list:
-    if not isinstance(os_name, str):
-        raise TypeError("os_name is not a string: ", os_name)
+def gen_compile_flags() -> list:
     cpp_version_flags = ["-std=c++17"]
-    if os_name == "nt":
+    if os.name == "nt":
         cpp_version_flags = [
             "/std:c++17",
             "/Zc:__cplusplus",
@@ -57,32 +53,34 @@ def gen_compile_flags(os_name: str) -> list:
         ]
     return [
         *(cpp_version_flags),
-        *("@CDEFS@".split()),
+        *("-D@CDEFS@".replace(";", " -D").split()),
         "-D__STDC_FORMAT_MACROS",
         "-DBOOST_LOG_DYN_LINK",
     ]
 
 
-def gen_rt_libs(os_name: str) -> list:
-    if os_name != "nt":
+def gen_rt_libs() -> list:
+    if os.name != "nt":
         return [*(pa.get_library_dirs()), *(get_hdk_shared_libs())]
     return []
 
 
-def gen_lib_dirs(sql: bool = False) -> list:
-    ret = ["@CMAKE_CURRENT_BINARY_DIR@", ".", *(get_hdk_shared_libs())]
-    if sql:
-        return ret
-    return [*(pa.get_library_dirs()), *(ret)]
+def gen_lib_dirs() -> list:
+    return [
+        *(pa.get_library_dirs()),
+        "@CMAKE_CURRENT_BINARY_DIR@",
+        ".",
+        *(get_hdk_shared_libs()),
+    ]
 
 
 common = Extension(
     "pyhdk._common",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_common.pyx"],
     language="c++",
-    include_dirs=include_dirs,
+    include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
-    runtime_library_dirs=gen_rt_libs(os.name),
+    runtime_library_dirs=gen_rt_libs(),
     libraries=[
         *(pa.get_libraries()),
         "QueryEngine",
@@ -90,37 +88,37 @@ common = Extension(
         "Logger",
         "Shared",
     ],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 execute = Extension(
     "pyhdk._execute",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_execute.pyx"],
     language="c++",
-    include_dirs=include_dirs,
+    include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
-    runtime_library_dirs=gen_rt_libs(os.name),
+    runtime_library_dirs=gen_rt_libs(),
     libraries=[*(pa.get_libraries()), "QueryEngine"],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 sql = Extension(
     "pyhdk._sql",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_sql.pyx"],
     language="c++",
-    include_dirs=include_dirs,
-    library_dirs=gen_lib_dirs(True),
+    include_dirs=gen_include_dirs(),
+    library_dirs=gen_lib_dirs(),
     libraries=["Calcite", "QueryEngine", "ResultSet", "ResultSetRegistry", "Logger"],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 storage = Extension(
     "pyhdk._storage",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_storage.pyx"],
     language="c++",
-    include_dirs=include_dirs,
+    include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
-    runtime_library_dirs=gen_rt_libs(os.name),
+    runtime_library_dirs=gen_rt_libs(),
     libraries=[
         *(pa.get_libraries()),
         "ArrowStorage",
@@ -129,29 +127,29 @@ storage = Extension(
         "IR",
         "Logger",
     ],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 ir = Extension(
     "pyhdk._ir",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_ir.pyx"],
     language="c++",
-    include_dirs=include_dirs,
+    include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
-    runtime_library_dirs=gen_rt_libs(os.name),
+    runtime_library_dirs=gen_rt_libs(),
     libraries=[*(pa.get_libraries()), "IR"],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 builder = Extension(
     "pyhdk._builder",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_builder.pyx"],
     language="c++",
-    include_dirs=include_dirs,
+    include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
-    runtime_library_dirs=gen_rt_libs(os.name),
+    runtime_library_dirs=gen_rt_libs(),
     libraries=[*(pa.get_libraries()), "QueryBuilder", "IR"],
-    extra_compile_args=gen_compile_flags(os.name),
+    extra_compile_args=gen_compile_flags(),
 )
 
 setup(

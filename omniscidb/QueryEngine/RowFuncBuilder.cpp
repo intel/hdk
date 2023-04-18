@@ -33,6 +33,7 @@
 #include "QueryEngine/ExpressionRange.h"
 #include "QueryEngine/ExpressionRewrite.h"
 #include "QueryEngine/GpuInitGroups.h"
+#include "QueryEngine/GpuMemUtils.h"
 #include "QueryEngine/InPlaceSort.h"
 #include "QueryEngine/LLVMFunctionAttributesUtil.h"
 #include "QueryEngine/MaxwellCodegenPatch.h"

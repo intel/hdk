@@ -16,6 +16,7 @@
 
 #include <sstream>
 
+#include "CudaMgr/CudaMgr.h"
 #include "NvidiaKernel.h"
 
 #include "Logger/Logger.h"

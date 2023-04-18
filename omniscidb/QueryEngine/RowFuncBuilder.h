@@ -27,7 +27,6 @@
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/CompilationOptions.h"
-#include "QueryEngine/GpuMemUtils.h"
 #include "QueryEngine/GpuSharedMemoryContext.h"
 #include "QueryEngine/InputMetadata.h"
 #include "QueryEngine/QueryExecutionContext.h"

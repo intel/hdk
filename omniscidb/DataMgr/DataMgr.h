@@ -25,7 +25,6 @@
 #include "AbstractBufferMgr.h"
 #include "BufferMgr/Buffer.h"
 #include "BufferMgr/BufferMgr.h"
-#include "CudaMgr/CudaMgr.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
 #include "GpuMgrContext.h"
@@ -51,6 +50,10 @@ class FileBuffer;
 
 namespace Buffer_Namespace {
 class CpuBufferMgr;
+}
+
+namespace CudaMgr_Namespace {
+class CudaMgr;
 }
 
 struct DictDescriptor;
@@ -197,12 +200,10 @@ class DataMgr {
   size_t getTableEpoch(const int db_id, const int tb_id);
 
   void setGpuMgrContext(GpuMgrPlatform name);
-  CudaMgr_Namespace::CudaMgr* getCudaMgr() const {
-    return dynamic_cast<CudaMgr_Namespace::CudaMgr*>(getGpuMgr(GpuMgrPlatform::CUDA));
-  }
-  l0::L0Manager* getL0Mgr() const {
-    return dynamic_cast<l0::L0Manager*>(getGpuMgr(GpuMgrPlatform::L0));
-  }
+
+  CudaMgr_Namespace::CudaMgr* getCudaMgr() const;
+  l0::L0Manager* getL0Mgr() const;
+
   GpuMgr* getGpuMgr(GpuMgrPlatform name) const;
   GpuMgr* getGpuMgr() const { return current_device_mgr_; }
 

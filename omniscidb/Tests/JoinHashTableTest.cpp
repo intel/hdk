@@ -17,6 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
 
+#include "CudaMgr/CudaMgr.h"
 #include "DataMgr/DataMgr.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"

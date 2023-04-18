@@ -19,6 +19,7 @@
 #include <numeric>
 
 #include "QueryEngine/Execute.h"
+#include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "ResultSet/CountDistinctDescriptor.h"

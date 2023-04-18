@@ -20,6 +20,7 @@
 #include "DeviceKernel.h"
 #include "Execute.h"
 #include "GpuInitGroups.h"
+#include "GpuMemUtils.h"
 #include "InPlaceSort.h"
 #include "QueryMemoryInitializer.h"
 #include "RelAlgExecutionUnit.h"

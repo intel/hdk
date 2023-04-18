@@ -18,7 +18,6 @@
 #define QUERYENGINE_QUERYEXECUTIONCONTEXT_H
 
 #include "CompilationOptions.h"
-#include "GpuMemUtils.h"
 #include "QueryMemoryInitializer.h"
 
 #include "DataMgr/Allocators/GpuAllocator.h"

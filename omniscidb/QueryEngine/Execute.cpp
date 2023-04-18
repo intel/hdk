@@ -56,6 +56,7 @@
 #include "QueryEngine/GpuMemUtils.h"
 #include "QueryEngine/InPlaceSort.h"
 #include "QueryEngine/JoinHashTable/BaselineJoinHashTable.h"
+#include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/JsonAccessors.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/QueryRewrite.h"
@@ -849,6 +850,37 @@ int Executor::deviceCountForMemoryLevel(
     const Data_Namespace::MemoryLevel memory_level) const {
   return memory_level == GPU_LEVEL ? deviceCount(ExecutorDeviceType::GPU)
                                    : deviceCount(ExecutorDeviceType::CPU);
+}
+
+CudaMgr_Namespace::CudaMgr* Executor::cudaMgr() const {
+  CHECK(data_mgr_);
+  auto cuda_mgr = data_mgr_->getCudaMgr();
+  CHECK(cuda_mgr);
+  return cuda_mgr;
+}
+
+GpuMgr* Executor::gpuMgr() const {
+  CHECK(data_mgr_);
+  auto gpu_mgr = data_mgr_->getGpuMgr();
+  CHECK(gpu_mgr);
+  return gpu_mgr;
+}
+
+bool Executor::isArchPascalOrLater(const ExecutorDeviceType dt) const {
+  if (dt == ExecutorDeviceType::GPU) {
+    return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA
+               ? cudaMgr()->isArchPascalOrLater()
+               : false;
+  }
+  return false;
+}
+
+bool Executor::deviceSupportsFP64(const ExecutorDeviceType dt) const {
+  if (dt == ExecutorDeviceType::GPU) {
+    return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA ? isArchPascalOrLater(dt)
+                                                           : true;
+  }
+  return true;
 }
 
 // TODO(alex): remove or split

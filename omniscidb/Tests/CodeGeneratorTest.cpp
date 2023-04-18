@@ -31,6 +31,9 @@
 #include "QueryEngine/IRCodegenUtils.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "TestHelpers.h"
+#ifdef HAVE_CUDA
+#include <cuda.h>
+#endif
 
 hdk::ir::Context& ctx = hdk::ir::Context::defaultCtx();
 

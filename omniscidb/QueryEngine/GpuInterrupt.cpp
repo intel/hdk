@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#include "CudaMgr/CudaMgr.h"
 #include "DynamicWatchdog.h"
 #include "Execute.h"
+#include "QueryEngine/NvidiaKernel.h"
 
 void Executor::registerActiveModule(void* llvm_module, const int device_id) const {
 #ifdef HAVE_CUDA

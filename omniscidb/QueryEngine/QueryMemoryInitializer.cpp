@@ -32,6 +32,12 @@
 #include <x86intrin.h>
 #endif
 
+#ifdef HAVE_CUDA
+#include <cuda.h>
+#else
+#include <Shared/nocuda.h>
+#endif
+
 // 8 GB, the limit of perfect hash group by under normal conditions
 int64_t g_bitmap_memory_limit{8LL * 1000 * 1000 * 1000};
 

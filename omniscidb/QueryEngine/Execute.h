@@ -55,7 +55,6 @@
 #include "QueryEngine/GpuSharedMemoryContext.h"
 #include "QueryEngine/JoinHashTable/HashJoin.h"
 #include "QueryEngine/LoopControlFlow/JoinLoop.h"
-#include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/PlanState.h"
 #include "QueryEngine/QueryPlanDagCache.h"
 #include "QueryEngine/RelAlgExecutionUnit.h"
@@ -425,36 +424,13 @@ class Executor : public StringDictionaryProxyProvider {
 
   llvm::Value* aggregateWindowStatePtr(const CompilationOptions& co);
 
-  CudaMgr_Namespace::CudaMgr* cudaMgr() const {
-    CHECK(data_mgr_);
-    auto cuda_mgr = data_mgr_->getCudaMgr();
-    CHECK(cuda_mgr);
-    return cuda_mgr;
-  }
+  CudaMgr_Namespace::CudaMgr* cudaMgr() const;
 
-  GpuMgr* gpuMgr() const {
-    CHECK(data_mgr_);
-    auto gpu_mgr = data_mgr_->getGpuMgr();
-    CHECK(gpu_mgr);
-    return gpu_mgr;
-  }
+  GpuMgr* gpuMgr() const;
 
-  bool isArchPascalOrLater(const ExecutorDeviceType dt) const {
-    if (dt == ExecutorDeviceType::GPU) {
-      return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA
-                 ? cudaMgr()->isArchPascalOrLater()
-                 : false;
-    }
-    return false;
-  }
+  bool isArchPascalOrLater(const ExecutorDeviceType dt) const;
 
-  bool deviceSupportsFP64(const ExecutorDeviceType dt) const {
-    if (dt == ExecutorDeviceType::GPU) {
-      return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA ? isArchPascalOrLater(dt)
-                                                             : true;
-    }
-    return true;
-  }
+  bool deviceSupportsFP64(const ExecutorDeviceType dt) const;
 
   bool needFetchAllFragments(const InputColDescriptor& col_desc,
                              const RelAlgExecutionUnit& ra_exe_unit,
