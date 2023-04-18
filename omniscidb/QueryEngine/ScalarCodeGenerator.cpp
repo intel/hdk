@@ -15,8 +15,10 @@
  */
 
 #include "CodeGenerator.h"
+#include "CudaMgr/CudaMgr.h"
 #include "IR/ExprCollector.h"
 #include "QueryEngine/Compiler/Backend.h"
+#include "QueryEngine/NvidiaKernel.h"
 
 namespace {
 

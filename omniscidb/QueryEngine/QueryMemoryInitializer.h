@@ -20,16 +20,11 @@
 #include "ResultSet/QueryMemoryDescriptor.h"
 #include "ResultSet/ResultSet.h"
 
-#include "GpuMemUtils.h"
 #include "HashTableDesc.h"
 
 #include <memory>
 
-#ifdef HAVE_CUDA
-#include <cuda.h>
-#else
-#include <Shared/nocuda.h>
-#endif
+struct GpuGroupByBuffers;
 
 class QueryMemoryInitializer {
  public:

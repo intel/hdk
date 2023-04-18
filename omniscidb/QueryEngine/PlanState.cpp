@@ -16,6 +16,7 @@
 
 #include "PlanState.h"
 #include "Execute.h"
+#include "QueryEngine/JoinHashTable/HashJoin.h"
 
 bool PlanState::isLazyFetchColumn(const hdk::ir::Expr* target_expr) const {
   if (!allow_lazy_fetch_) {

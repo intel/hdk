@@ -31,10 +31,6 @@
 #include "ResultSet/RowSetMemoryOwner.h"
 #include "ResultSetRegistry/ColumnarResults.h"
 
-#ifdef HAVE_CUDA
-#include <cuda.h>
-#endif
-
 class TooManyHashEntries : public std::runtime_error {
  public:
   TooManyHashEntries()
@@ -251,27 +247,7 @@ class HashJoin {
   }
 
   int64_t getJoinHashBuffer(const ExecutorDeviceType device_type,
-                            const int device_id) const {
-    // TODO: just make device_id a size_t
-    CHECK_LT(size_t(device_id), hash_tables_for_device_.size());
-    if (!hash_tables_for_device_[device_id]) {
-      return 0;
-    }
-    CHECK(hash_tables_for_device_[device_id]);
-    auto hash_table = hash_tables_for_device_[device_id].get();
-#ifdef HAVE_CUDA
-    if (device_type == ExecutorDeviceType::CPU) {
-      return reinterpret_cast<int64_t>(hash_table->getCpuBuffer());
-    } else {
-      CHECK(hash_table);
-      const auto gpu_buff = hash_table->getGpuBuffer();
-      return reinterpret_cast<CUdeviceptr>(gpu_buff);
-    }
-#else
-    CHECK(device_type == ExecutorDeviceType::CPU);
-    return reinterpret_cast<int64_t>(hash_table->getCpuBuffer());
-#endif
-  }
+                            const int device_id) const;
 
   void freeHashBufferMemory() {
     auto empty_hash_tables =

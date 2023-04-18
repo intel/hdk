@@ -13,11 +13,13 @@
 */
 
 #include "Backend.h"
+#include "CudaMgr/CudaMgr.h"
 #include "HelperFunctions.h"
 
 #include "QueryEngine/CodeGenerator.h"
 #include "QueryEngine/ExecutionEngineWrapper.h"
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
+#include "QueryEngine/NvidiaKernel.h"
 
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>

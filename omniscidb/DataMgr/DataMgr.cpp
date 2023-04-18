@@ -426,6 +426,14 @@ void DataMgr::setGpuMgrContext(GpuMgrPlatform name) {
   LOG(INFO) << "Set GPU manager context to " << name;
 }
 
+CudaMgr_Namespace::CudaMgr* DataMgr::getCudaMgr() const {
+  return dynamic_cast<CudaMgr_Namespace::CudaMgr*>(getGpuMgr(GpuMgrPlatform::CUDA));
+}
+
+l0::L0Manager* DataMgr::getL0Mgr() const {
+  return dynamic_cast<l0::L0Manager*>(getGpuMgr(GpuMgrPlatform::L0));
+}
+
 void DataMgr::getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,
                                               const ChunkKey& keyPrefix) {
   bufferMgrs_[MemoryLevel::DISK_LEVEL][0]->getChunkMetadataVecForKeyPrefix(

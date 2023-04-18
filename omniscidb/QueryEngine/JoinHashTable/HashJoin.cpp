@@ -25,6 +25,10 @@
 #include "QueryEngine/RangeTableIndexVisitor.h"
 #include "QueryEngine/RuntimeFunctions.h"
 
+#ifdef HAVE_CUDA
+#include <cuda.h>
+#endif
+
 //! fetchJoinColumn() calls ColumnFetcher::makeJoinColumn(), then copies the
 //! JoinColumn's col_chunks_buff memory onto the GPU if required by the
 //! effective_memory_level parameter. The dev_buff_owner parameter will
@@ -348,6 +352,29 @@ const StringDictionaryProxy::IdMap* HashJoin::translateInnerToOuterStrDictProxie
         executor->getRowSetMemoryOwner());
   }
   return nullptr;
+}
+
+int64_t HashJoin::getJoinHashBuffer(const ExecutorDeviceType device_type,
+                                    const int device_id) const {
+  // TODO: just make device_id a size_t
+  CHECK_LT(size_t(device_id), hash_tables_for_device_.size());
+  if (!hash_tables_for_device_[device_id]) {
+    return 0;
+  }
+  CHECK(hash_tables_for_device_[device_id]);
+  auto hash_table = hash_tables_for_device_[device_id].get();
+#ifdef HAVE_CUDA
+  if (device_type == ExecutorDeviceType::CPU) {
+    return reinterpret_cast<int64_t>(hash_table->getCpuBuffer());
+  } else {
+    CHECK(hash_table);
+    const auto gpu_buff = hash_table->getGpuBuffer();
+    return reinterpret_cast<CUdeviceptr>(gpu_buff);
+  }
+#else
+  CHECK(device_type == ExecutorDeviceType::CPU);
+  return reinterpret_cast<int64_t>(hash_table->getCpuBuffer());
+#endif
 }
 
 CompositeKeyInfo HashJoin::getCompositeKeyInfo(

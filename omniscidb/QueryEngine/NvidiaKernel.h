@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "CudaMgr/CudaMgr.h"
 #include "QueryEngine/CompilationContext.h"
 
 #ifdef HAVE_CUDA
@@ -26,6 +25,10 @@
 #endif  // HAVE_CUDA
 #include <string>
 #include <vector>
+
+namespace CudaMgr_Namespace {
+class CudaMgr;
+}
 
 struct CubinResult {
   void* cubin;

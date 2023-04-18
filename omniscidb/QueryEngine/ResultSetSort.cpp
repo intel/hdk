@@ -24,6 +24,7 @@
 
 #include "ResultSetSort.h"
 
+#include "CudaMgr/CudaMgr.h"
 #include "Execute.h"
 #include "InPlaceSort.h"
 #include "ResultSetSortImpl.h"

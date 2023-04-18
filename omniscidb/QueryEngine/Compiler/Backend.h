@@ -20,10 +20,16 @@
 #include "QueryEngine/ExtensionModules.h"
 #include "QueryEngine/L0Kernel.h"
 #include "QueryEngine/LLVMFunctionAttributesUtil.h"
-#include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/Target.h"
 
 #include "CodegenTraitsDescriptor.h"
+
+namespace CudaMgr_Namespace {
+enum class NvidiaDeviceArch;
+}
+
+class CudaCompilationContext;
+
 namespace compiler {
 
 class CodegenTraits {

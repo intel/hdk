@@ -61,6 +61,7 @@ static_assert(false, "LLVM Version >= 12 is required.");
 #include "QueryEngine/GpuSharedMemoryUtils.h"
 #include "QueryEngine/LLVMFunctionAttributesUtil.h"
 #include "QueryEngine/MemoryLayoutBuilder.h"
+#include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/QueryTemplateGenerator.h"
 #include "Shared/InlineNullValues.h"

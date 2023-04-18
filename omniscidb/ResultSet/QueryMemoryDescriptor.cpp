@@ -18,6 +18,7 @@
 #include "ColRangeInfo.h"
 #include "StreamingTopN.h"
 
+#include "CudaMgr/CudaMgr.h"
 #include "DataMgr/DataMgr.h"
 
 #include <boost/algorithm/string.hpp>
