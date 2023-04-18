@@ -27,7 +27,6 @@
 #include "IR/ExprCollector.h"
 #include "IR/TypeUtils.h"
 #include "QueryEngine/DateTimeUtils.h"
-#include "QueryEngine/Execute.h"  // TODO: remove
 #include "Shared/DateConverters.h"
 #include "Shared/misc.h"
 #include "Shared/sqltypes.h"
