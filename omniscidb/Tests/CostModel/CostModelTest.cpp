@@ -12,7 +12,11 @@
 */
 
 #include <gtest/gtest.h>
+
+#ifdef HAVE_ARMADILLO
 #include <armadillo>
+#endif
+
 
 #include "QueryEngine/CostModel/DataSources/DataSource.h"
 #include "QueryEngine/CostModel/ExtrapolationModels/LinearExtrapolation.h"
