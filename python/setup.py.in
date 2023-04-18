@@ -22,13 +22,6 @@ import os
 import numpy as np
 import pyarrow as pa
 
-# conda-forge packages hdk and pyhdk should be built separately.
-# HDK_ROOT_PATH is defined by the hdk activate script that
-# determines the location of HDK shared libraries required for
-# pyhdk.
-extra_library_dirs = []
-if "HDK_ROOT_PATH" in os.environ:
-    extra_library_dirs.append(os.path.join(os.environ["HDK_ROOT_PATH"], "lib64"))
 
 include_dirs = [
     np.get_include(),
@@ -41,30 +34,63 @@ include_dirs = [
     "@LLVM_INCLUDE_DIRS@",
 ]
 
+
+# conda-forge packages hdk and pyhdk should be built separately.
+# HDK_ROOT_PATH is defined by the hdk activate script that
+# determines the location of HDK shared libraries required for
+# pyhdk.
+def get_hdk_shared_libs() -> list:
+    if "HDK_ROOT_PATH" in os.environ:
+        return [os.path.join(os.environ["HDK_ROOT_PATH"], "lib64")]
+    return []
+
+
+def gen_compile_flags(os_name: str) -> list:
+    if not isinstance(os_name, str):
+        raise TypeError("os_name is not a string: ", os_name)
+    cpp_version_flags = ["-std=c++17"]
+    if os_name == "nt":
+        cpp_version_flags = [
+            "/std:c++17",
+            "/Zc:__cplusplus",
+            "/DBOOST_USE_WINAPI_VERSION=0x0600",
+        ]
+    return [
+        *(cpp_version_flags),
+        *("@CDEFS@".split()),
+        "-D__STDC_FORMAT_MACROS",
+        "-DBOOST_LOG_DYN_LINK",
+    ]
+
+
+def gen_rt_libs(os_name: str) -> list:
+    if os_name != "nt":
+        return [*(pa.get_library_dirs()), *(get_hdk_shared_libs())]
+    return []
+
+
+def gen_lib_dirs(sql: bool = False) -> list:
+    ret = ["@CMAKE_CURRENT_BINARY_DIR@", ".", *(get_hdk_shared_libs())]
+    if sql:
+        return ret
+    return [*(pa.get_library_dirs()), *(ret)]
+
+
 common = Extension(
     "pyhdk._common",
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_common.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=(
-        pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs
-    ),
-    runtime_library_dirs=(
-        None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs)
-    ),
-    libraries=(
-        pa.get_libraries() + ["QueryEngine", "ConfigBuilder", "Logger", "Shared"]
-    ),
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
+    library_dirs=gen_lib_dirs(),
+    runtime_library_dirs=gen_rt_libs(os.name),
+    libraries=[
+        *(pa.get_libraries()),
+        "QueryEngine",
+        "ConfigBuilder",
+        "Logger",
+        "Shared",
     ],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 execute = Extension(
@@ -72,23 +98,10 @@ execute = Extension(
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_execute.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=(
-        pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs
-    ),
-    runtime_library_dirs=(
-        None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs)
-    ),
-    libraries=(pa.get_libraries() + ["QueryEngine"]),
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
-    ],
+    library_dirs=gen_lib_dirs(),
+    runtime_library_dirs=gen_rt_libs(os.name),
+    libraries=[*(pa.get_libraries()), "QueryEngine"],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 sql = Extension(
@@ -96,18 +109,9 @@ sql = Extension(
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_sql.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs,
+    library_dirs=gen_lib_dirs(True),
     libraries=["Calcite", "QueryEngine", "ResultSet", "ResultSetRegistry", "Logger"],
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
-    ],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 storage = Extension(
@@ -115,25 +119,17 @@ storage = Extension(
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_storage.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=(
-        pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs
-    ),
-    runtime_library_dirs=(
-        None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs)
-    ),
-    libraries=(
-        pa.get_libraries() + ["ArrowStorage", "SchemaMgr", "DataMgr", "IR", "Logger"]
-    ),
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
+    library_dirs=gen_lib_dirs(),
+    runtime_library_dirs=gen_rt_libs(os.name),
+    libraries=[
+        *(pa.get_libraries()),
+        "ArrowStorage",
+        "SchemaMgr",
+        "DataMgr",
+        "IR",
+        "Logger",
     ],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 ir = Extension(
@@ -141,23 +137,10 @@ ir = Extension(
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_ir.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=(
-        pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs
-    ),
-    runtime_library_dirs=(
-        None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs)
-    ),
-    libraries=(pa.get_libraries() + ["IR"]),
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
-    ],
+    library_dirs=gen_lib_dirs(),
+    runtime_library_dirs=gen_rt_libs(os.name),
+    libraries=[*(pa.get_libraries()), "IR"],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 builder = Extension(
@@ -165,23 +148,10 @@ builder = Extension(
     ["@CMAKE_CURRENT_SOURCE_DIR@/pyhdk/_builder.pyx"],
     language="c++",
     include_dirs=include_dirs,
-    library_dirs=(
-        pa.get_library_dirs() + ["@CMAKE_CURRENT_BINARY_DIR@", "."] + extra_library_dirs
-    ),
-    runtime_library_dirs=(
-        None if os.name == "nt" else (pa.get_library_dirs() + extra_library_dirs)
-    ),
-    libraries=(pa.get_libraries() + ["QueryBuilder", "IR"]),
-    extra_compile_args=[
-        *(
-            ["/std:c++17", "/Zc:__cplusplus", "/DBOOST_USE_WINAPI_VERSION=0x0600"]
-            if os.name == "nt"
-            else ["-std=c++17"]
-        ),
-        "-D__STDC_FORMAT_MACROS",
-        "-DBOOST_LOG_DYN_LINK",
-        *("@CDEFS@".split()),
-    ],
+    library_dirs=gen_lib_dirs(),
+    runtime_library_dirs=gen_rt_libs(os.name),
+    libraries=[*(pa.get_libraries()), "QueryBuilder", "IR"],
+    extra_compile_args=gen_compile_flags(os.name),
 )
 
 setup(
