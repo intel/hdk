@@ -26,9 +26,7 @@
 
 class RelAlgCache {
  public:
-  RelAlgCache(Calcite* calcite,
-              SchemaProviderPtr schema_provider,
-              ConfigPtr config);
+  RelAlgCache(CalciteMgr* calcite, SchemaProviderPtr schema_provider, ConfigPtr config);
   ~RelAlgCache();
 
   std::string process(const std::string& db_name,
@@ -76,7 +74,7 @@ class RelAlgCache {
     }
   };
 
-  Calcite* calcite_;
+  CalciteMgr* calcite_;
   SchemaProviderPtr schema_provider_;
   ConfigPtr config_;
   std::string build_cache_;

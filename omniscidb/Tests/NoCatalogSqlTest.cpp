@@ -141,7 +141,7 @@ class NoCatalogSqlTest : public ::testing::Test {
   }
 
   static void init_calcite(const std::string& udf_filename) {
-    calcite_ = Calcite::get(schema_provider_, config_, udf_filename);
+    calcite_ = CalciteMgr::get(schema_provider_, config_, udf_filename);
   }
 
   static void TearDownTestSuite() {
@@ -186,14 +186,14 @@ class NoCatalogSqlTest : public ::testing::Test {
   static std::shared_ptr<DataMgr> data_mgr_;
   static SchemaProviderPtr schema_provider_;
   static std::shared_ptr<Executor> executor_;
-  static Calcite* calcite_;
+  static CalciteMgr* calcite_;
 };
 
 ConfigPtr NoCatalogSqlTest::config_;
 std::shared_ptr<DataMgr> NoCatalogSqlTest::data_mgr_;
 SchemaProviderPtr NoCatalogSqlTest::schema_provider_;
 std::shared_ptr<Executor> NoCatalogSqlTest::executor_;
-Calcite* NoCatalogSqlTest::calcite_;
+CalciteMgr* NoCatalogSqlTest::calcite_;
 
 TEST_F(NoCatalogSqlTest, SelectSingleColumn) {
   auto res = runSqlQuery("SELECT col_i FROM test1;", executor_.get());
@@ -268,7 +268,7 @@ TEST(CalciteReinitTest, SingleThread) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
-    auto calcite = Calcite::get(schema_provider, config);
+    auto calcite = CalciteMgr::get(schema_provider, config);
     auto query_ra = calcite->process("test_db", "SELECT 1;");
     CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
   }
@@ -279,7 +279,7 @@ TEST(CalciteReinitTest, MultipleThreads) {
   auto config = std::make_shared<Config>();
   for (int i = 0; i < 10; ++i) {
     auto f = std::async(std::launch::async, [schema_provider, config]() {
-      auto calcite = Calcite::get(schema_provider, config);
+      auto calcite = CalciteMgr::get(schema_provider, config);
       auto query_ra = calcite->process("test_db", "SELECT 1;");
       CHECK(query_ra.find("LogicalValues") != std::string::npos) << query_ra;
     });
