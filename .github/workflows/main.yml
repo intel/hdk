@@ -36,6 +36,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       name: 'all-gpus'
+      cuda_compiler_version: 12-0
       options: -DENABLE_L0=on -DENABLE_CUDA=on
 
   style:
