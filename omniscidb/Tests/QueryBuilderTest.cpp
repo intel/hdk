@@ -5015,6 +5015,21 @@ class Taxi : public TestSuite {
   }
 };
 
+namespace {
+
+hdk::ir::ExprPtr createColumnRef(const std::shared_ptr<hdk::ir::Scan>& scan,
+                                 const std::string& col_name) {
+  for (size_t i = 0; i < scan->size(); ++i) {
+    if (scan->getFieldName(i) == col_name) {
+      return hdk::ir::getNodeColumnRef(scan.get(), (unsigned)i);
+    }
+  }
+  CHECK(false);
+  return nullptr;
+}
+
+}  // namespace
+
 TEST_F(Taxi, Q1_NoBuilder) {
   // SELECT cab_type, count(*) FROM trips GROUP BY cab_type;
   // Create 'trips' scan.
@@ -5023,9 +5038,7 @@ TEST_F(Taxi, Q1_NoBuilder) {
   auto scan = std::make_shared<Scan>(table_info, std::move(col_infos));
   // Create a projection with `cab_type` field at the front because it is
   // required for aggregation.
-  auto cab_type_info = getStorage()->getColumnInfo(*table_info, "cab_type");
-  auto cab_type_ref = makeExpr<hdk::ir::ColumnRef>(
-      cab_type_info->type, scan.get(), cab_type_info->column_id - 1);
+  auto cab_type_ref = createColumnRef(scan, "cab_type");
   auto proj = std::make_shared<Project>(
       ExprPtrVector{cab_type_ref}, std::vector<std::string>{"cab_type"}, scan);
   // Create aggregation.
@@ -5064,19 +5077,15 @@ TEST_F(Taxi, Q2_NoBuilder) {
   auto col_infos = getStorage()->listColumns(*table_info);
   auto scan = std::make_shared<Scan>(table_info, std::move(col_infos));
   // Create a projection with `passenger_count` and `total_amount` fields.
-  auto passenger_count_info = getStorage()->getColumnInfo(*table_info, "passenger_count");
-  auto passenger_count_ref = makeExpr<hdk::ir::ColumnRef>(
-      passenger_count_info->type, scan.get(), passenger_count_info->column_id - 1);
-  auto total_amount_info = getStorage()->getColumnInfo(*table_info, "total_amount");
-  auto total_amount_ref = makeExpr<hdk::ir::ColumnRef>(
-      total_amount_info->type, scan.get(), total_amount_info->column_id - 1);
+  auto passenger_count_ref = createColumnRef(scan, "passenger_count");
+  auto total_amount_ref = createColumnRef(scan, "total_amount");
   auto proj = std::make_shared<Project>(
       ExprPtrVector{passenger_count_ref, total_amount_ref},
       std::vector<std::string>{"passenger_count", "total_amount"},
       scan);
   // Create aggregation.
   auto total_amount_proj_ref =
-      makeExpr<hdk::ir::ColumnRef>(total_amount_info->type, proj.get(), 1);
+      makeExpr<hdk::ir::ColumnRef>(total_amount_ref->type(), proj.get(), 1);
   auto avg_agg = makeExpr<AggExpr>(
       ctx().int32(), AggType::kAvg, total_amount_proj_ref, false, nullptr);
   auto agg = std::make_shared<Aggregate>(
@@ -5141,12 +5150,8 @@ TEST_F(Taxi, Q3_NoBuilder) {
   auto col_infos = getStorage()->listColumns(*table_info);
   auto scan = std::make_shared<Scan>(table_info, std::move(col_infos));
   // Create a projection with `passenger_count` and `total_amount` fields.
-  auto passenger_count_info = getStorage()->getColumnInfo(*table_info, "passenger_count");
-  auto passenger_count_ref = makeExpr<hdk::ir::ColumnRef>(
-      passenger_count_info->type, scan.get(), passenger_count_info->column_id - 1);
-  auto pickup_datetime_info = getStorage()->getColumnInfo(*table_info, "pickup_datetime");
-  auto pickup_datetime_ref = makeExpr<hdk::ir::ColumnRef>(
-      pickup_datetime_info->type, scan.get(), pickup_datetime_info->column_id - 1);
+  auto passenger_count_ref = createColumnRef(scan, "passenger_count");
+  auto pickup_datetime_ref = createColumnRef(scan, "pickup_datetime");
   auto pickup_year = makeExpr<ExtractExpr>(
       ctx().int64(), false, DateExtractField::kYear, pickup_datetime_ref);
   auto proj = std::make_shared<Project>(
@@ -5229,17 +5234,11 @@ TEST_F(Taxi, Q4_NoBuilder) {
   auto col_infos = getStorage()->listColumns(*table_info);
   auto scan = std::make_shared<Scan>(table_info, std::move(col_infos));
   // Create a projection with `passenger_count` and `total_amount` fields.
-  auto passenger_count_info = getStorage()->getColumnInfo(*table_info, "passenger_count");
-  auto passenger_count_ref = makeExpr<hdk::ir::ColumnRef>(
-      passenger_count_info->type, scan.get(), passenger_count_info->column_id - 1);
-  auto pickup_datetime_info = getStorage()->getColumnInfo(*table_info, "pickup_datetime");
-  auto pickup_datetime_ref = makeExpr<hdk::ir::ColumnRef>(
-      pickup_datetime_info->type, scan.get(), pickup_datetime_info->column_id - 1);
+  auto passenger_count_ref = createColumnRef(scan, "passenger_count");
+  auto pickup_datetime_ref = createColumnRef(scan, "pickup_datetime");
   auto pickup_year = makeExpr<ExtractExpr>(
       ctx().int64(), false, DateExtractField::kYear, pickup_datetime_ref);
-  auto trip_distance_info = getStorage()->getColumnInfo(*table_info, "trip_distance");
-  auto trip_distance_ref = makeExpr<hdk::ir::ColumnRef>(
-      trip_distance_info->type, scan.get(), trip_distance_info->column_id - 1);
+  auto trip_distance_ref = createColumnRef(scan, "trip_distance");
   auto distance = trip_distance_ref->cast(ctx().int32());
   auto proj = std::make_shared<Project>(
       ExprPtrVector{passenger_count_ref, pickup_year, distance},

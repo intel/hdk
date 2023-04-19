@@ -67,6 +67,20 @@ size_t computeTotalStringsLength(std::shared_ptr<arrow::ChunkedArray> arr,
   return total_bytes;
 }
 
+/**
+ * Get column ID by its 0-based index (position) in the table.
+ */
+int columnId(size_t col_idx) {
+  return static_cast<int>(col_idx + 1000);
+}
+
+/**
+ * Translate column ID to 0-based index (position) in the table.
+ */
+size_t columnIndex(int col_id) {
+  return static_cast<size_t>(col_id - 1000);
+}
+
 }  // anonymous namespace
 
 void ArrowStorage::fetchBuffer(const ChunkKey& key,
@@ -79,7 +93,7 @@ void ArrowStorage::fetchBuffer(const ChunkKey& key,
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
   data_lock.unlock();
 
-  size_t col_idx = static_cast<size_t>(key[CHUNK_KEY_COLUMN_IDX] - 1);
+  size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
   size_t frag_idx = static_cast<size_t>(key[CHUNK_KEY_FRAGMENT_IDX] - 1);
   CHECK_LT(frag_idx, table.fragments.size());
   CHECK_LT(col_idx, table.col_data.size());
@@ -134,7 +148,7 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
           ->type;
 
   if (!col_type->isVarLen()) {
-    size_t col_idx = static_cast<size_t>(key[CHUNK_KEY_COLUMN_IDX] - 1);
+    size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
     size_t frag_idx = static_cast<size_t>(key[CHUNK_KEY_FRAGMENT_IDX] - 1);
     CHECK_EQ(key.size(), (size_t)4);
     size_t elem_size = col_type->size();
@@ -293,7 +307,7 @@ TableFragmentsInfo ArrowStorage::getTableMetadata(int db_id, int table_id) const
     frag_info.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
     frag_info.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
     for (size_t col_idx = 0; col_idx < frag.metadata.size(); ++col_idx) {
-      frag_info.setChunkMetadata(static_cast<int>(col_idx + 1), frag.metadata[col_idx]);
+      frag_info.setChunkMetadata(columnId(col_idx), frag.metadata[col_idx]);
     }
   }
   return res;
@@ -331,6 +345,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
   TableInfoPtr res;
   int table_id;
   mapd_unique_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  size_t next_col_idx = 0;
   {
     mapd_unique_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
     mapd_unique_lock<mapd_shared_mutex> schema_lock(schema_mutex_);
@@ -338,7 +353,6 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
     checkNewTableParams(table_name, columns, options);
     res = addTableInfo(
         db_id_, table_id, table_name, false, Data_Namespace::MemoryLevel::CPU_LEVEL, 0);
-    int next_col_id = 1;
     std::unordered_map<int, int> dict_ids;
     for (auto& col : columns) {
       auto type = col.type;
@@ -382,10 +396,10 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
           type = elem_type;
         }
       }
-      auto col_info =
-          addColumnInfo(db_id_, table_id, next_col_id++, col.name, type, false);
+      auto col_info = addColumnInfo(
+          db_id_, table_id, columnId(next_col_idx++), col.name, type, false);
     }
-    addRowidColumn(db_id_, table_id);
+    addRowidColumn(db_id_, table_id, columnId(next_col_idx++));
   }
 
   std::vector<std::shared_ptr<arrow::Field>> fields;
@@ -479,7 +493,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   threading::parallel_for(
       threading::blocked_range(0, (int)at->columns().size()), [&](auto range) {
         for (auto col_idx = range.begin(); col_idx != range.end(); col_idx++) {
-          auto col_info = getColumnInfo(db_id_, table_id, col_idx + 1);
+          auto col_info = getColumnInfo(db_id_, table_id, columnId(col_idx));
           auto col_type = col_info->type;
           auto col_arr = at->column(col_idx);
 
@@ -605,7 +619,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       auto& first_frag = fragments.front();
       last_frag.row_count += first_frag.row_count;
       for (size_t col_idx = 0; col_idx < last_frag.metadata.size(); ++col_idx) {
-        auto col_type = getColumnInfo(db_id_, table_id, col_idx + 1)->type;
+        auto col_type = getColumnInfo(db_id_, table_id, columnId(col_idx))->type;
         size_t num_elems = last_frag.metadata[col_idx]->numElements() +
                            first_frag.metadata[col_idx]->numElements();
         size_t num_bytes = last_frag.metadata[col_idx]->numBytes() +

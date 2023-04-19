@@ -6,6 +6,7 @@
  */
 
 #include "ResultSetMetadata.h"
+#include "ResultSetTableToken.h"
 
 #include "Shared/thread_count.h"
 
@@ -80,7 +81,8 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
     for (size_t i = 0; i < rows->colCount(); ++i) {
       decoders.emplace_back(Encoder::Create(nullptr, rows->colType(i)));
       const auto it_ok =
-          metadata_map.emplace(i + 1, decoders.back()->getMetadata(rows->colType(i)));
+          metadata_map.emplace(ResultSetTableToken::columnId(i),
+                               decoders.back()->getMetadata(rows->colType(i)));
       CHECK(it_ok.second);
     }
     return metadata_map;
@@ -204,7 +206,7 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
         num_bytes,
         rows->rowCount(),
         dummy_encoders[0][i]->getMetadata(elem_type)->chunkStats());
-    const auto it_ok = metadata_map.emplace(i + 1, meta);
+    const auto it_ok = metadata_map.emplace(ResultSetTableToken::columnId(i), meta);
     CHECK(it_ok.second);
   }
   return metadata_map;

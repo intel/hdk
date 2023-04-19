@@ -157,9 +157,8 @@ class SimpleSchemaProvider : public SchemaProvider {
     return addColumnInfo(std::make_shared<ColumnInfo>(args...));
   }
 
-  ColumnInfoPtr addRowidColumn(int db_id, int table_id) {
+  ColumnInfoPtr addRowidColumn(int db_id, int table_id, int col_id) {
     CHECK_EQ(column_index_by_name_.count({db_id, table_id}), (size_t)1);
-    int col_id = static_cast<int>(column_index_by_name_[{db_id, table_id}].size() + 1);
     return addColumnInfo(db_id, table_id, col_id, "rowid", ctx_.int64(), true);
   }
 
