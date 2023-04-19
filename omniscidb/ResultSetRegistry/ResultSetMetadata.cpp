@@ -95,9 +95,9 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
     dummy_encoders.emplace_back();
     for (size_t i = 0; i < rows->colCount(); ++i) {
       const auto& col_type = rows->colType(i);
-      if (col_type->isVarLenArray()) {
-        // For varlen arrays we create encoders for elem type to avoid creating ArrayDatum
-        // to update stats. This requires special handling for nulls when we update stats.
+      if (col_type->isArray()) {
+        // For arrays we create encoders for elem type to avoid creating ArrayDatum to
+        // update stats. This requires special handling for nulls when we update stats.
         dummy_encoders.back().emplace_back(
             Encoder::Create(nullptr, col_type->as<hdk::ir::ArrayBaseType>()->elemType()));
       } else {
@@ -134,7 +134,15 @@ ChunkMetadataMap synthesizeMetadata(const ResultSet* rows) {
           for (auto& elem_val : **arr_col_val) {
             updateStats(&elem_val, dummy_encoders[i].get(), elem_type, true);
           }
-          varlen_lengths[i] += (*arr_col_val)->size() * elem_type->size();
+          if (col_type->isVarLenArray()) {
+            varlen_lengths[i] += (*arr_col_val)->size() * elem_type->size();
+          } else {
+            // Emtpy value provided for fixed length array type is considered as NULL.
+            CHECK(col_type->isFixedLenArray());
+            if ((*arr_col_val)->empty()) {
+              dummy_encoders[i]->updateStats((int64_t)0, true);
+            }
+          }
         } else {
           dummy_encoders[i]->updateStats((int64_t)0, true);
         }

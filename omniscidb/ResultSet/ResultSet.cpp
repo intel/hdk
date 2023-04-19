@@ -890,14 +890,16 @@ bool ResultSet::isDirectColumnarConversionPossible() const {
 bool ResultSet::isZeroCopyColumnarConversionPossible(size_t column_idx) const {
   return query_mem_desc_.didOutputColumnar() &&
          query_mem_desc_.getQueryDescriptionType() == QueryDescriptionType::Projection &&
-         !colType(column_idx)->isVarLen() && appended_storage_.empty() && storage_ &&
+         !colType(column_idx)->isVarLen() && !colType(column_idx)->isArray() &&
+         appended_storage_.empty() && storage_ &&
          (lazy_fetch_info_.empty() || !lazy_fetch_info_[column_idx].is_lazily_fetched);
 }
 
 bool ResultSet::isChunkedZeroCopyColumnarConversionPossible(size_t column_idx) const {
   return query_mem_desc_.didOutputColumnar() &&
          query_mem_desc_.getQueryDescriptionType() == QueryDescriptionType::Projection &&
-         !colType(column_idx)->isVarLen() && storage_ &&
+         !colType(column_idx)->isVarLen() && !colType(column_idx)->isArray() &&
+         storage_ &&
          (lazy_fetch_info_.empty() || !lazy_fetch_info_[column_idx].is_lazily_fetched);
 }
 

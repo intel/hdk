@@ -59,9 +59,6 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
   auto timer = DEBUG_TIMER(__func__);
   column_buffers_.resize(num_columns);
   for (size_t i = 0; i < num_columns; ++i) {
-    if (target_types[i]->isFixedLenArray()) {
-      throw ColumnarConversionNotSupported();
-    }
     if (target_types[i]->isVarLen()) {
       // Allocate and fill offsets buffer.
       offset_buffers_.resize(num_columns, nullptr);
@@ -270,6 +267,60 @@ inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
     }
   };
 
+  auto write_arr_null_value = [this, column_idx](size_t row_idx,
+                                                 const hdk::ir::Type* type) {
+    switch (type->id()) {
+      case hdk::ir::Type::kBoolean:
+        ((int8_t*)column_buffers_[column_idx])[row_idx] =
+            inline_null_array_value<int8_t>();
+        break;
+      case hdk::ir::Type::kInteger:
+      case hdk::ir::Type::kDecimal:
+      case hdk::ir::Type::kTimestamp:
+      case hdk::ir::Type::kExtDictionary:
+      case hdk::ir::Type::kTime:
+      case hdk::ir::Type::kDate:
+      case hdk::ir::Type::kInterval:
+        switch (type->size()) {
+          case 1:
+            ((int8_t*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<int8_t>();
+            break;
+          case 2:
+            ((int16_t*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<int16_t>();
+            break;
+          case 4:
+            ((int32_t*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<int32_t>();
+            break;
+          case 8:
+            ((int64_t*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<int64_t>();
+            break;
+          default:
+            CHECK(false);
+        }
+        break;
+      case hdk::ir::Type::kFloatingPoint:
+        switch (type->size()) {
+          case 4:
+            ((float*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<float>();
+            break;
+          case 8:
+            ((double*)column_buffers_[column_idx])[row_idx] =
+                inline_null_array_value<double>();
+            break;
+          default:
+            CHECK(false);
+        }
+        break;
+      default:
+        throw ColumnarConversionNotSupported();
+    }
+  };
+
   auto type = target_types_[column_idx];
   const auto scalar_col_val = boost::get<ScalarTargetValue>(&col_val);
   if (scalar_col_val) {
@@ -277,13 +328,22 @@ inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
   } else {
     const auto arr_col_val = boost::get<ArrayTargetValue>(&col_val);
     CHECK(arr_col_val);
-    CHECK(type->isVarLenArray());
     if (*arr_col_val) {
       auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
-      auto offsets = reinterpret_cast<int32_t*>(offset_buffers_[column_idx]);
-      size_t offset = static_cast<size_t>(std::abs(offsets[row_idx])) / elem_type->size();
+      size_t offset;
+      if (type->isVarLenArray()) {
+        auto offsets = reinterpret_cast<int32_t*>(offset_buffers_[column_idx]);
+        offset = static_cast<size_t>(std::abs(offsets[row_idx])) / elem_type->size();
+      } else {
+        CHECK(type->isFixedLenArray());
+        offset = row_idx * type->as<hdk::ir::FixedLenArrayType>()->numElems();
+      }
       for (auto& elem_val : **arr_col_val) {
         write_scalar(&elem_val, offset++, elem_type);
+      }
+      // Put NULL sentinel value for fixed length array
+      if (type->isFixedLenArray() && (*arr_col_val)->size() == 0) {
+        write_arr_null_value(offset, elem_type);
       }
     }
   }
@@ -388,7 +448,8 @@ void ColumnarResults::materializeAllColumnsProjection(const ResultSet& rows,
 /*
  * For all non-lazy columns, we can directly copy back the results of each column's
  * contents from different storages and put them into the corresponding output buffer.
- * This is not supported for varlen data, so it's handled as if it's lazily fetched.
+ * This is not supported for varlen and array data, so it's handled as if it's lazily
+ * fetched.
  *
  * This function is parallelized through assigning each column to a CPU thread.
  */
@@ -399,7 +460,7 @@ void ColumnarResults::copyAllNonLazyColumns(
   CHECK(isDirectColumnarConversionPossible());
   const auto is_column_non_lazily_fetched = [this,
                                              &lazy_fetch_info](const size_t col_idx) {
-    if (target_types_[col_idx]->isVarLen()) {
+    if (target_types_[col_idx]->isVarLen() || target_types_[col_idx]->isArray()) {
       return false;
     }
     // Saman: make sure when this lazy_fetch_info is empty
@@ -461,7 +522,10 @@ void ColumnarResults::materializeAllLazyColumns(
 
   // parallelized by assigning a chunk of rows to each thread)
   const bool skip_non_lazy_columns = rows.isPermutationBufferEmpty();
-  if (rows.areAnyColumnsLazyFetched() || !offset_buffers_.empty()) {
+  bool has_array = std::any_of(target_types_.begin(),
+                               target_types_.end(),
+                               [](const hdk::ir::Type* type) { return type->isArray(); });
+  if (rows.areAnyColumnsLazyFetched() || !offset_buffers_.empty() || has_array) {
     const size_t worker_count =
         result_set::use_parallel_algorithms(rows) ? cpu_threads() : 1;
     std::vector<std::future<void>> conversion_threads;
@@ -473,7 +537,7 @@ void ColumnarResults::materializeAllLazyColumns(
         // we process lazy and varlen columns (i.e., skip non-lazy and non-varlen columns)
         targets_to_skip.push_back(
             (lazy_fetch_info.empty() || !lazy_fetch_info[i].is_lazily_fetched) &&
-            !target_types_[i]->isVarLen());
+            !target_types_[i]->isVarLen() && !target_types_[i]->isArray());
       }
     }
     size_t first = rows.getOffset();
