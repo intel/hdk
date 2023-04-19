@@ -336,6 +336,16 @@ class QueryBuilderTest : public TestSuite {
                  {"id": 3, "arr1":[], "arr2" : null}
                  {"id": 4, "arr1":[null, 2, null, 4], "arr2" : [null, 5.0, 6.0]})___");
 
+    createTable("test_arr",
+                {{"id", ctx().int32()},
+                 {"arr1", ctx().arrayFixed(2, ctx().int32())},
+                 {"arr2", ctx().arrayFixed(3, ctx().fp64())}});
+    insertJsonValues("test_arr",
+                     R"___({"id": 1, "arr1": null, "arr2": [4.0, null, 6.0]}
+                 {"id": 2, "arr1":[null, 2], "arr2" : null}
+                 {"id": 3, "arr1":[1, null], "arr2" : [null, 5.0, null]}
+                 {"id": 4, "arr1":[1, 2], "arr2" : [4.0, 5.0, 6.0]})___");
+
     createTable("sort",
                 {{"x", ctx().int32()}, {"y", ctx().int32()}, {"z", ctx().int32()}});
     insertCsvValues("sort",
@@ -4913,6 +4923,66 @@ TEST_F(QueryBuilderTest, VarlenArrayInRes) {
             {std::vector<int32_t>({}),
              std::vector<int32_t>(
                  {inline_null_value<int32_t>(), 2, inline_null_value<int32_t>(), 4})}),
+        std::vector<int32_t>({3, 4}));
+  }
+}
+
+TEST_F(QueryBuilderTest, FixedArrayInRes) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+    auto dag1 = builder.scan("test_arr").proj({0, 1, 2}).finalize();
+    auto res1 = runQuery(std::move(dag1));
+    compare_res_data(
+        res1,
+        std::vector<int32_t>({1, 2, 3, 4}),
+        std::vector<std::vector<int32_t>>(
+            {std::vector<int32_t>({inline_null_array_value<int32_t>()}),
+             std::vector<int32_t>({inline_null_value<int32_t>(), 2}),
+             std::vector<int32_t>({1, inline_null_value<int32_t>()}),
+             std::vector<int32_t>({1, 2})}),
+        std::vector<std::vector<double>>(
+            {std::vector<double>({4.0, inline_null_value<double>(), 6.0}),
+             std::vector<double>({inline_null_array_value<double>()}),
+             std::vector<double>(
+                 {inline_null_value<double>(), 5.0, inline_null_value<double>()}),
+             std::vector<double>({4.0, 5.0, 6.0})}));
+
+    auto dag2 = builder.scan(res1.tableName()).proj({2, 1, 0}).finalize();
+    auto res2 = runQuery(std::move(dag2));
+    compare_res_data(
+        res2,
+        std::vector<std::vector<double>>(
+            {std::vector<double>({4.0, inline_null_value<double>(), 6.0}),
+             std::vector<double>({inline_null_array_value<double>()}),
+             std::vector<double>(
+                 {inline_null_value<double>(), 5.0, inline_null_value<double>()}),
+             std::vector<double>({4.0, 5.0, 6.0})}),
+        std::vector<std::vector<int32_t>>(
+            {std::vector<int32_t>({inline_null_array_value<int32_t>()}),
+             std::vector<int32_t>({inline_null_value<int32_t>(), 2}),
+             std::vector<int32_t>({1, inline_null_value<int32_t>()}),
+             std::vector<int32_t>({1, 2})}),
+        std::vector<int32_t>({1, 2, 3, 4}));
+
+    auto scan = builder.scan(res2.tableName());
+    auto dag3 = scan.filter(scan.ref(2) > 2).finalize();
+    auto res3 = runQuery(std::move(dag3));
+    compare_res_data(
+        res3,
+        std::vector<std::vector<double>>(
+            {std::vector<double>(
+                 {inline_null_value<double>(), 5.0, inline_null_value<double>()}),
+             std::vector<double>({4.0, 5.0, 6.0})}),
+        std::vector<std::vector<int32_t>>(
+            {std::vector<int32_t>({1, inline_null_value<int32_t>()}),
+             std::vector<int32_t>({1, 2})}),
         std::vector<int32_t>({3, 4}));
   }
 }

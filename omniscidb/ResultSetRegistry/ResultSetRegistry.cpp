@@ -107,6 +107,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                             table.size());
   auto& first_rs = table.result(0);
   bool has_varlen = false;
+  bool has_array = false;
   for (size_t col_idx = 0; col_idx < first_rs->colCount(); ++col_idx) {
     addColumnInfo(db_id_,
                   table_id,
@@ -115,6 +116,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
                   first_rs->colType(col_idx),
                   false);
     has_varlen = has_varlen || first_rs->colType(col_idx)->isVarLen();
+    has_array = has_array || first_rs->colType(col_idx)->isArray();
   }
   addRowidColumn(db_id_, table_id);
 
@@ -142,7 +144,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   table_data->use_columnar_res =
       !first_rs->isDirectColumnarConversionPossible() ||
       first_rs->getQueryDescriptionType() != QueryDescriptionType::Projection ||
-      first_rs->areAnyColumnsLazyFetched() || has_varlen;
+      first_rs->areAnyColumnsLazyFetched() || has_varlen || has_array;
 
   tables_[table_id] = std::move(table_data);
 
