@@ -173,471 +173,400 @@ class CalciteJNI {
  public:
   CalciteJNI(SchemaProviderPtr schema_provider,
              ConfigPtr config,
-             const std::string& udf_filename = "",
-             size_t calcite_max_mem_mb = 1024);
-  ~CalciteJNI();
+             const std::string& udf_filename,
+             size_t calcite_max_mem_mb)
+      : schema_provider_(schema_provider), config_(config) {
+    // Initialize JVM.
+    jvm_ = JVM::getInstance(calcite_max_mem_mb);
+    auto env = jvm_->getEnv();
+
+    // Create CalciteServerHandler object.
+    createCalciteServerHandler(env.get(), udf_filename);
+
+    // Prepare references to some Java classes and methods we will use for processing.
+    findQueryParsingOption(env.get());
+    findOptimizationOption(env.get());
+    findPlanResult(env.get());
+    findExtArgumentType(env.get());
+    findExtensionFunction(env.get());
+    findInvalidParseRequest(env.get());
+    findArrayList(env.get());
+    findHashMap(env.get());
+  }
+
+  ~CalciteJNI() {
+    auto env = jvm_->getEnv();
+    for (auto obj : global_refs_) {
+      env->DeleteGlobalRef(obj);
+    }
+
+    JVM::destroyInstance();
+  }
 
   std::string process(const std::string& db_name,
                       const std::string& sql_string,
-                      const std::vector<FilterPushDownInfo>& filter_push_down_info = {},
-                      const bool legacy_syntax = false,
-                      const bool is_explain = false,
-                      const bool is_view_optimize = false);
+                      const std::vector<FilterPushDownInfo>& filter_push_down_info,
+                      const bool legacy_syntax,
+                      const bool is_explain,
+                      const bool is_view_optimize) {
+    auto env = jvm_->getEnv();
+    jstring arg_catalog = env->NewStringUTF(db_name.c_str());
+    std::string modified_sql = pg_shim(sql_string);
+    jstring arg_query = env->NewStringUTF(modified_sql.c_str());
+    jobject arg_parsing_options = env->NewObject(parsing_opts_cls_,
+                                                 parsing_opts_ctor_,
+                                                 (jboolean)legacy_syntax,
+                                                 (jboolean)is_explain,
+                                                 /*check_privileges=*/(jboolean)(false));
+    if (!arg_parsing_options) {
+      throw std::runtime_error("cannot create QueryParsingOption object");
+    }
+    jobject arg_filter_push_down_info = env->NewObject(array_list_cls_, array_list_ctor_);
+    if (!filter_push_down_info.empty()) {
+      throw std::runtime_error(
+          "Filter pushdown info is not yet implemented in Calcite JNI client.");
+    }
+    jobject arg_optimization_options =
+        env->NewObject(optimization_opts_cls_,
+                       optimization_opts_ctor_,
+                       (jboolean)is_view_optimize,
+                       (jboolean)config_->exec.watchdog.enable,
+                       arg_filter_push_down_info);
+    jobject arg_restriction = nullptr;
+    auto schema_json = schema_to_json(schema_provider_);
+    jstring arg_schema = env->NewStringUTF(schema_json.c_str());
 
-  std::string getExtensionFunctionWhitelist();
-  std::string getUserDefinedFunctionWhitelist();
-  std::string getRuntimeExtensionFunctionWhitelist();
+    jobject java_res = env->CallObjectMethod(handler_obj_,
+                                             handler_process_,
+                                             arg_catalog,
+                                             arg_query,
+                                             arg_parsing_options,
+                                             arg_optimization_options,
+                                             arg_restriction,
+                                             arg_schema);
+    if (!java_res) {
+      if (env->ExceptionCheck() == JNI_FALSE) {
+        throw std::runtime_error(
+            "CalciteServerHandler::process call failed for unknown reason\n  Query: " +
+            sql_string + "\n  Schema: " + schema_json);
+      } else {
+        jthrowable e = env->ExceptionOccurred();
+        CHECK(e);
+        throw std::invalid_argument(
+            readStringField(env.get(), e, invalid_parse_req_msg_));
+      }
+    }
+
+    return readStringField(env.get(), java_res, plan_result_plan_result_);
+  }
+
+  std::string getExtensionFunctionWhitelist() {
+    auto env = jvm_->getEnv();
+    jstring java_res =
+        (jstring)env->CallObjectMethod(handler_obj_, handler_get_ext_fn_list_);
+    return convertJavaString(env.get(), java_res);
+  }
+
+  std::string getUserDefinedFunctionWhitelist() {
+    auto env = jvm_->getEnv();
+    jstring java_res =
+        (jstring)env->CallObjectMethod(handler_obj_, handler_get_udf_list_);
+    return convertJavaString(env.get(), java_res);
+  }
+
+  std::string getRuntimeExtensionFunctionWhitelist() {
+    auto env = jvm_->getEnv();
+    jstring java_res =
+        (jstring)env->CallObjectMethod(handler_obj_, handlhandler_get_rt_fn_list_);
+    return convertJavaString(env.get(), java_res);
+  }
+
   void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
-                                    bool is_runtime = true);
+                                    bool is_runtime) {
+    auto env = jvm_->getEnv();
+    jobject udfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
+    for (auto& udf : udfs) {
+      env->CallVoidMethod(
+          udfs_list, array_list_add_, convertExtensionFunction(env.get(), udf));
+    }
+
+    env->CallVoidMethod(
+        handler_obj_, handler_set_rt_fns_, udfs_list, (jboolean)is_runtime);
+    if (env->ExceptionCheck() != JNI_FALSE) {
+      env->ExceptionDescribe();
+      throw std::runtime_error("Failed Java call to setRuntimeExtensionFunctions");
+    }
+  }
 
  private:
-  class Impl {
-   public:
-    Impl(SchemaProviderPtr schema_provider,
-         ConfigPtr config,
-         const std::string& udf_filename,
-         size_t calcite_max_mem_mb)
-        : schema_provider_(schema_provider), config_(config) {
-      // Initialize JVM.
-      jvm_ = JVM::getInstance(calcite_max_mem_mb);
-      auto env = jvm_->getEnv();
+  jobject addGlobalRef(JNIEnv* env, jobject obj) {
+    auto res = env->NewGlobalRef(obj);
+    global_refs_.push_back(res);
+    return res;
+  }
 
-      // Create CalciteServerHandler object.
-      createCalciteServerHandler(env.get(), udf_filename);
+  jclass findClass(JNIEnv* env, std::string_view class_name) {
+    jclass cls = env->FindClass(class_name.data());
+    if (!cls) {
+      throw std::runtime_error("cannot find Java class: "s.append(class_name));
+    }
+    return (jclass)addGlobalRef(env, cls);
+  }
 
-      // Prepare references to some Java classes and methods we will use for processing.
-      findQueryParsingOption(env.get());
-      findOptimizationOption(env.get());
-      findPlanResult(env.get());
-      findExtArgumentType(env.get());
-      findExtensionFunction(env.get());
-      findInvalidParseRequest(env.get());
-      findArrayList(env.get());
-      findHashMap(env.get());
+  void createCalciteServerHandler(JNIEnv* env, const std::string& udf_filename) {
+    jclass handler_cls = findClass(env, "com/mapd/parser/server/CalciteServerHandler");
+    jmethodID handler_ctor = env->GetMethodID(
+        handler_cls, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V");
+    if (!handler_ctor) {
+      throw std::runtime_error("cannot find CalciteServerHandler ctor");
     }
 
-    ~Impl() {
-      auto env = jvm_->getEnv();
-      for (auto obj : global_refs_) {
-        env->DeleteGlobalRef(obj);
-      }
+    auto root_abs_path = omnisci::get_root_abs_path();
+    std::string ext_ast_path = root_abs_path + "/QueryEngine/ExtensionFunctions.ast";
+    jstring ext_ast_file = env->NewStringUTF(ext_ast_path.c_str());
+    jstring udf_ast_file = env->NewStringUTF(udf_filename.c_str());
+    handler_obj_ = env->NewObject(handler_cls, handler_ctor, ext_ast_file, udf_ast_file);
+    if (!handler_obj_) {
+      throw std::runtime_error("cannot create CalciteServerHandler object");
+    }
+    handler_obj_ = addGlobalRef(env, handler_obj_);
+
+    // Find 'CalciteServerHandler::process' method.
+    handler_process_ = env->GetMethodID(
+        handler_cls,
+        "process",
+        "(Ljava/lang/String;Ljava/lang/String;Lcom/"
+        "mapd/parser/server/QueryParsingOption;Lcom/mapd/parser/server/"
+        "OptimizationOption;Lorg/apache/calcite/rel/rules/Restriction;Ljava/lang/"
+        "String;)Lcom/mapd/parser/server/PlanResult;");
+    if (!handler_process_) {
+      throw std::runtime_error("cannot find CalciteServerHandler::process method");
     }
 
-    std::string process(const std::string& db_name,
-                        const std::string& sql_string,
-                        const std::vector<FilterPushDownInfo>& filter_push_down_info,
-                        const bool legacy_syntax,
-                        const bool is_explain,
-                        const bool is_view_optimize) {
-      auto env = jvm_->getEnv();
-      jstring arg_catalog = env->NewStringUTF(db_name.c_str());
-      std::string modified_sql = pg_shim(sql_string);
-      jstring arg_query = env->NewStringUTF(modified_sql.c_str());
-      jobject arg_parsing_options =
-          env->NewObject(parsing_opts_cls_,
-                         parsing_opts_ctor_,
-                         (jboolean)legacy_syntax,
-                         (jboolean)is_explain,
-                         /*check_privileges=*/(jboolean)(false));
-      if (!arg_parsing_options) {
-        throw std::runtime_error("cannot create QueryParsingOption object");
-      }
-      jobject arg_filter_push_down_info =
-          env->NewObject(array_list_cls_, array_list_ctor_);
-      if (!filter_push_down_info.empty()) {
-        throw std::runtime_error(
-            "Filter pushdown info is not yet implemented in Calcite JNI client.");
-      }
-      jobject arg_optimization_options =
-          env->NewObject(optimization_opts_cls_,
-                         optimization_opts_ctor_,
-                         (jboolean)is_view_optimize,
-                         (jboolean)config_->exec.watchdog.enable,
-                         arg_filter_push_down_info);
-      jobject arg_restriction = nullptr;
-      auto schema_json = schema_to_json(schema_provider_);
-      jstring arg_schema = env->NewStringUTF(schema_json.c_str());
-
-      jobject java_res = env->CallObjectMethod(handler_obj_,
-                                               handler_process_,
-                                               arg_catalog,
-                                               arg_query,
-                                               arg_parsing_options,
-                                               arg_optimization_options,
-                                               arg_restriction,
-                                               arg_schema);
-      if (!java_res) {
-        if (env->ExceptionCheck() == JNI_FALSE) {
-          throw std::runtime_error(
-              "CalciteServerHandler::process call failed for unknown reason\n  Query: " +
-              sql_string + "\n  Schema: " + schema_json);
-        } else {
-          jthrowable e = env->ExceptionOccurred();
-          CHECK(e);
-          throw std::invalid_argument(
-              readStringField(env.get(), e, invalid_parse_req_msg_));
-        }
-      }
-
-      return readStringField(env.get(), java_res, plan_result_plan_result_);
+    // Find 'CalciteServerHandler::getExtensionFunctionWhitelist' method.
+    handler_get_ext_fn_list_ = env->GetMethodID(
+        handler_cls, "getExtensionFunctionWhitelist", "()Ljava/lang/String;");
+    if (!handler_get_ext_fn_list_) {
+      throw std::runtime_error(
+          "cannot find CalciteServerHandler::getExtensionFunctionWhitelist method");
     }
 
-    std::string getExtensionFunctionWhitelist() {
-      auto env = jvm_->getEnv();
-      jstring java_res =
-          (jstring)env->CallObjectMethod(handler_obj_, handler_get_ext_fn_list_);
-      return convertJavaString(env.get(), java_res);
+    // Find 'CalciteServerHandler::getUserDefinedFunctionWhitelist' method.
+    handler_get_udf_list_ = env->GetMethodID(
+        handler_cls, "getUserDefinedFunctionWhitelist", "()Ljava/lang/String;");
+    if (!handler_get_udf_list_) {
+      throw std::runtime_error(
+          "cannot find CalciteServerHandler::getUserDefinedFunctionWhitelist method");
     }
 
-    std::string getUserDefinedFunctionWhitelist() {
-      auto env = jvm_->getEnv();
-      jstring java_res =
-          (jstring)env->CallObjectMethod(handler_obj_, handler_get_udf_list_);
-      return convertJavaString(env.get(), java_res);
+    // Find 'CalciteServerHandler::getRuntimeExtensionFunctionWhitelist' method.
+    handlhandler_get_rt_fn_list_ = env->GetMethodID(
+        handler_cls, "getRuntimeExtensionFunctionWhitelist", "()Ljava/lang/String;");
+    if (!handlhandler_get_rt_fn_list_) {
+      throw std::runtime_error(
+          "cannot find CalciteServerHandler::getRuntimeExtensionFunctionWhitelist "
+          "method");
     }
 
-    std::string getRuntimeExtensionFunctionWhitelist() {
-      auto env = jvm_->getEnv();
-      jstring java_res =
-          (jstring)env->CallObjectMethod(handler_obj_, handlhandler_get_rt_fn_list_);
-      return convertJavaString(env.get(), java_res);
+    // Find 'CalciteServerHandler::setRuntimeExtensionFunctions' method.
+    handler_set_rt_fns_ = env->GetMethodID(
+        handler_cls, "setRuntimeExtensionFunctions", "(Ljava/util/List;Z)V");
+    if (!handler_set_rt_fns_) {
+      throw std::runtime_error(
+          "cannot find CalciteServerHandler::setRuntimeExtensionFunctions "
+          "method");
     }
+  }
 
-    void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
-                                      bool is_runtime) {
-      auto env = jvm_->getEnv();
-      jobject udfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
-      for (auto& udf : udfs) {
+  void findQueryParsingOption(JNIEnv* env) {
+    parsing_opts_cls_ = findClass(env, "com/mapd/parser/server/QueryParsingOption");
+    parsing_opts_ctor_ = env->GetMethodID(parsing_opts_cls_, "<init>", "(ZZZ)V");
+    if (!parsing_opts_ctor_) {
+      throw std::runtime_error("cannot find QueryParsingOption ctor");
+    }
+  }
+
+  void findOptimizationOption(JNIEnv* env) {
+    optimization_opts_cls_ = findClass(env, "com/mapd/parser/server/OptimizationOption");
+    optimization_opts_ctor_ =
+        env->GetMethodID(optimization_opts_cls_, "<init>", "(ZZLjava/util/List;)V");
+    if (!optimization_opts_ctor_) {
+      throw std::runtime_error("cannot find OptimizationOption ctor");
+    }
+  }
+
+  void findPlanResult(JNIEnv* env) {
+    plan_result_cls_ = findClass(env, "com/mapd/parser/server/PlanResult");
+    plan_result_plan_result_ =
+        env->GetFieldID(plan_result_cls_, "planResult", "Ljava/lang/String;");
+    if (!plan_result_plan_result_) {
+      throw std::runtime_error("cannot find PlanResult::planResult field");
+    }
+  }
+
+  void findExtArgumentType(JNIEnv* env) {
+    jclass cls =
+        findClass(env, "com/mapd/parser/server/ExtensionFunction$ExtArgumentType");
+    jmethodID values_method = env->GetStaticMethodID(
+        cls, "values", "()[Lcom/mapd/parser/server/ExtensionFunction$ExtArgumentType;");
+    if (!values_method) {
+      throw std::runtime_error("cannot find ExtArgumentType::values method");
+    }
+    jobjectArray values = (jobjectArray)env->CallStaticObjectMethod(cls, values_method);
+    for (jsize i = 0; i < env->GetArrayLength(values); i++) {
+      ext_arg_type_vals_.push_back(
+          addGlobalRef(env, env->GetObjectArrayElement(values, i)));
+      CHECK(ext_arg_type_vals_.back());
+    }
+  }
+
+  void findExtensionFunction(JNIEnv* env) {
+    extension_fn_cls_ = findClass(env, "com/mapd/parser/server/ExtensionFunction");
+    extension_fn_udf_ctor_ =
+        env->GetMethodID(extension_fn_cls_,
+                         "<init>",
+                         "(Ljava/lang/String;Ljava/util/List;Lcom/mapd/parser/server/"
+                         "ExtensionFunction$ExtArgumentType;)V");
+    if (!extension_fn_udf_ctor_) {
+      throw std::runtime_error("cannot find ExtensionFunction (UDF) ctor");
+    }
+  }
+
+  void findInvalidParseRequest(JNIEnv* env) {
+    invalid_parse_req_cls_ = findClass(env, "com/mapd/parser/server/InvalidParseRequest");
+    invalid_parse_req_msg_ =
+        env->GetFieldID(invalid_parse_req_cls_, "msg", "Ljava/lang/String;");
+    if (!invalid_parse_req_msg_) {
+      throw std::runtime_error("cannot find InvalidParseRequest::msg field");
+    }
+  }
+
+  void findArrayList(JNIEnv* env) {
+    array_list_cls_ = findClass(env, "java/util/ArrayList");
+    array_list_ctor_ = env->GetMethodID(array_list_cls_, "<init>", "()V");
+    if (!array_list_ctor_) {
+      throw std::runtime_error("cannot find ArrayList ctor");
+    }
+    array_list_add_ = env->GetMethodID(array_list_cls_, "add", "(Ljava/lang/Object;)Z");
+    if (!array_list_add_) {
+      throw std::runtime_error("cannot find ArrayList::add method");
+    }
+  }
+
+  void findHashMap(JNIEnv* env) {
+    hash_map_cls_ = findClass(env, "java/util/HashMap");
+    hash_map_ctor_ = env->GetMethodID(hash_map_cls_, "<init>", "()V");
+    if (!hash_map_ctor_) {
+      throw std::runtime_error("cannot find HashMap ctor");
+    }
+    hash_map_put_ = env->GetMethodID(
+        hash_map_cls_, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!hash_map_put_) {
+      throw std::runtime_error("cannot find HashMap::put method");
+    }
+  }
+
+  std::string convertJavaString(JNIEnv* env, jstring str_obj) {
+    const char* res_str = env->GetStringUTFChars(str_obj, 0);
+    std::string res = res_str;
+    env->ReleaseStringUTFChars(str_obj, res_str);
+    return res;
+  }
+
+  std::string readStringField(JNIEnv* env, jobject obj, jfieldID field) {
+    auto field_obj = (jstring)env->GetObjectField(obj, field);
+    return convertJavaString(env, field_obj);
+  }
+
+  jobject convertExtArgumentType(ExtArgumentType val) {
+    size_t index = static_cast<size_t>(val);
+    if (index < ext_arg_type_vals_.size()) {
+      return ext_arg_type_vals_[index];
+    }
+    throw std::runtime_error("ExtArgumentType enum value is out of range (" +
+                             to_string(index) + ")");
+  }
+
+  void addArgTypesAndNames(
+      JNIEnv* env,
+      jobject types,
+      jobject names,
+      const std::vector<ExtArgumentType>& args,
+      const std::vector<std::map<std::string, std::string>>& annotations,
+      const std::string& prefix,
+      size_t ann_offset) {
+    for (size_t index = 0; index < args.size(); ++index) {
+      env->CallVoidMethod(types, array_list_add_, convertExtArgumentType(args[index]));
+      auto& ann = annotations[index + ann_offset];
+      if (ann.count("name")) {
         env->CallVoidMethod(
-            udfs_list, array_list_add_, convertExtensionFunction(env.get(), udf));
-      }
-
-      env->CallVoidMethod(
-          handler_obj_, handler_set_rt_fns_, udfs_list, (jboolean)is_runtime);
-      if (env->ExceptionCheck() != JNI_FALSE) {
-        env->ExceptionDescribe();
-        throw std::runtime_error("Failed Java call to setRuntimeExtensionFunctions");
+            names, array_list_add_, env->NewStringUTF(ann.at("name").c_str()));
+      } else {
+        env->CallVoidMethod(names,
+                            array_list_add_,
+                            env->NewStringUTF((prefix + std::to_string(index)).c_str()));
       }
     }
+  }
 
-   private:
-    jobject addGlobalRef(JNIEnv* env, jobject obj) {
-      auto res = env->NewGlobalRef(obj);
-      global_refs_.push_back(res);
-      return res;
+  jobject convertExtensionFunction(JNIEnv* env, const ExtensionFunction& udf) {
+    jstring name_arg = env->NewStringUTF(udf.getName().c_str());
+    jobject args_arg = env->NewObject(array_list_cls_, array_list_ctor_);
+    for (auto& arg : udf.getArgs()) {
+      env->CallVoidMethod(args_arg, array_list_add_, convertExtArgumentType(arg));
     }
+    jobject ret_arg = convertExtArgumentType(udf.getRet());
+    return env->NewObject(
+        extension_fn_cls_, extension_fn_udf_ctor_, name_arg, args_arg, ret_arg);
+  }
 
-    jclass findClass(JNIEnv* env, std::string_view class_name) {
-      jclass cls = env->FindClass(class_name.data());
-      if (!cls) {
-        throw std::runtime_error("cannot find Java class: "s.append(class_name));
-      }
-      return (jclass)addGlobalRef(env, cls);
-    }
+  SchemaProviderPtr schema_provider_;
+  ConfigPtr config_;
 
-    void createCalciteServerHandler(JNIEnv* env, const std::string& udf_filename) {
-      jclass handler_cls = findClass(env, "com/mapd/parser/server/CalciteServerHandler");
-      jmethodID handler_ctor = env->GetMethodID(
-          handler_cls, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V");
-      if (!handler_ctor) {
-        throw std::runtime_error("cannot find CalciteServerHandler ctor");
-      }
+  // com.mapd.parser.server.CalciteServerHandler instance and methods.
+  jobject handler_obj_;
+  jmethodID handler_process_;
+  jmethodID handler_get_ext_fn_list_;
+  jmethodID handler_get_udf_list_;
+  jmethodID handlhandler_get_rt_fn_list_;
+  jmethodID handler_set_rt_fns_;
 
-      auto root_abs_path = omnisci::get_root_abs_path();
-      std::string ext_ast_path = root_abs_path + "/QueryEngine/ExtensionFunctions.ast";
-      jstring ext_ast_file = env->NewStringUTF(ext_ast_path.c_str());
-      jstring udf_ast_file = env->NewStringUTF(udf_filename.c_str());
-      handler_obj_ =
-          env->NewObject(handler_cls, handler_ctor, ext_ast_file, udf_ast_file);
-      if (!handler_obj_) {
-        throw std::runtime_error("cannot create CalciteServerHandler object");
-      }
-      handler_obj_ = addGlobalRef(env, handler_obj_);
+  // com.mapd.parser.server.QueryParsingOption class and methods
+  jclass parsing_opts_cls_;
+  jmethodID parsing_opts_ctor_;
 
-      // Find 'CalciteServerHandler::process' method.
-      handler_process_ = env->GetMethodID(
-          handler_cls,
-          "process",
-          "(Ljava/lang/String;Ljava/lang/String;Lcom/"
-          "mapd/parser/server/QueryParsingOption;Lcom/mapd/parser/server/"
-          "OptimizationOption;Lorg/apache/calcite/rel/rules/Restriction;Ljava/lang/"
-          "String;)Lcom/mapd/parser/server/PlanResult;");
-      if (!handler_process_) {
-        throw std::runtime_error("cannot find CalciteServerHandler::process method");
-      }
+  // com.mapd.parser.server.OptimizationOption class and methods
+  jclass optimization_opts_cls_;
+  jmethodID optimization_opts_ctor_;
 
-      // Find 'CalciteServerHandler::getExtensionFunctionWhitelist' method.
-      handler_get_ext_fn_list_ = env->GetMethodID(
-          handler_cls, "getExtensionFunctionWhitelist", "()Ljava/lang/String;");
-      if (!handler_get_ext_fn_list_) {
-        throw std::runtime_error(
-            "cannot find CalciteServerHandler::getExtensionFunctionWhitelist method");
-      }
+  // com.mapd.parser.server.PlanResult class and fields
+  jclass plan_result_cls_;
+  jfieldID plan_result_plan_result_;
 
-      // Find 'CalciteServerHandler::getUserDefinedFunctionWhitelist' method.
-      handler_get_udf_list_ = env->GetMethodID(
-          handler_cls, "getUserDefinedFunctionWhitelist", "()Ljava/lang/String;");
-      if (!handler_get_udf_list_) {
-        throw std::runtime_error(
-            "cannot find CalciteServerHandler::getUserDefinedFunctionWhitelist method");
-      }
+  // com.mapd.parser.server.ExtensionFunction$ExtArgumentType enum values
+  std::vector<jobject> ext_arg_type_vals_;
 
-      // Find 'CalciteServerHandler::getRuntimeExtensionFunctionWhitelist' method.
-      handlhandler_get_rt_fn_list_ = env->GetMethodID(
-          handler_cls, "getRuntimeExtensionFunctionWhitelist", "()Ljava/lang/String;");
-      if (!handlhandler_get_rt_fn_list_) {
-        throw std::runtime_error(
-            "cannot find CalciteServerHandler::getRuntimeExtensionFunctionWhitelist "
-            "method");
-      }
+  // com.mapd.parser.server.ExtensionFunction class and methods
+  jclass extension_fn_cls_;
+  jmethodID extension_fn_udf_ctor_;
 
-      // Find 'CalciteServerHandler::setRuntimeExtensionFunctions' method.
-      handler_set_rt_fns_ = env->GetMethodID(
-          handler_cls, "setRuntimeExtensionFunctions", "(Ljava/util/List;Z)V");
-      if (!handler_set_rt_fns_) {
-        throw std::runtime_error(
-            "cannot find CalciteServerHandler::setRuntimeExtensionFunctions "
-            "method");
-      }
-    }
+  // com.mapd.parser.server.InvalidParseRequest class and fields
+  jclass invalid_parse_req_cls_;
+  jfieldID invalid_parse_req_msg_;
 
-    void findQueryParsingOption(JNIEnv* env) {
-      parsing_opts_cls_ = findClass(env, "com/mapd/parser/server/QueryParsingOption");
-      parsing_opts_ctor_ = env->GetMethodID(parsing_opts_cls_, "<init>", "(ZZZ)V");
-      if (!parsing_opts_ctor_) {
-        throw std::runtime_error("cannot find QueryParsingOption ctor");
-      }
-    }
+  // java.util.ArrayList class and methods
+  jclass array_list_cls_;
+  jmethodID array_list_ctor_;
+  jmethodID array_list_add_;
 
-    void findOptimizationOption(JNIEnv* env) {
-      optimization_opts_cls_ =
-          findClass(env, "com/mapd/parser/server/OptimizationOption");
-      optimization_opts_ctor_ =
-          env->GetMethodID(optimization_opts_cls_, "<init>", "(ZZLjava/util/List;)V");
-      if (!optimization_opts_ctor_) {
-        throw std::runtime_error("cannot find OptimizationOption ctor");
-      }
-    }
+  // java.util.HashMap class and methods
+  jclass hash_map_cls_;
+  jmethodID hash_map_ctor_;
+  jmethodID hash_map_put_;
 
-    void findPlanResult(JNIEnv* env) {
-      plan_result_cls_ = findClass(env, "com/mapd/parser/server/PlanResult");
-      plan_result_plan_result_ =
-          env->GetFieldID(plan_result_cls_, "planResult", "Ljava/lang/String;");
-      if (!plan_result_plan_result_) {
-        throw std::runtime_error("cannot find PlanResult::planResult field");
-      }
-    }
-
-    void findExtArgumentType(JNIEnv* env) {
-      jclass cls =
-          findClass(env, "com/mapd/parser/server/ExtensionFunction$ExtArgumentType");
-      jmethodID values_method = env->GetStaticMethodID(
-          cls, "values", "()[Lcom/mapd/parser/server/ExtensionFunction$ExtArgumentType;");
-      if (!values_method) {
-        throw std::runtime_error("cannot find ExtArgumentType::values method");
-      }
-      jobjectArray values = (jobjectArray)env->CallStaticObjectMethod(cls, values_method);
-      for (jsize i = 0; i < env->GetArrayLength(values); i++) {
-        ext_arg_type_vals_.push_back(
-            addGlobalRef(env, env->GetObjectArrayElement(values, i)));
-        CHECK(ext_arg_type_vals_.back());
-      }
-    }
-
-    void findExtensionFunction(JNIEnv* env) {
-      extension_fn_cls_ = findClass(env, "com/mapd/parser/server/ExtensionFunction");
-      extension_fn_udf_ctor_ =
-          env->GetMethodID(extension_fn_cls_,
-                           "<init>",
-                           "(Ljava/lang/String;Ljava/util/List;Lcom/mapd/parser/server/"
-                           "ExtensionFunction$ExtArgumentType;)V");
-      if (!extension_fn_udf_ctor_) {
-        throw std::runtime_error("cannot find ExtensionFunction (UDF) ctor");
-      }
-    }
-
-    void findInvalidParseRequest(JNIEnv* env) {
-      invalid_parse_req_cls_ =
-          findClass(env, "com/mapd/parser/server/InvalidParseRequest");
-      invalid_parse_req_msg_ =
-          env->GetFieldID(invalid_parse_req_cls_, "msg", "Ljava/lang/String;");
-      if (!invalid_parse_req_msg_) {
-        throw std::runtime_error("cannot find InvalidParseRequest::msg field");
-      }
-    }
-
-    void findArrayList(JNIEnv* env) {
-      array_list_cls_ = findClass(env, "java/util/ArrayList");
-      array_list_ctor_ = env->GetMethodID(array_list_cls_, "<init>", "()V");
-      if (!array_list_ctor_) {
-        throw std::runtime_error("cannot find ArrayList ctor");
-      }
-      array_list_add_ = env->GetMethodID(array_list_cls_, "add", "(Ljava/lang/Object;)Z");
-      if (!array_list_add_) {
-        throw std::runtime_error("cannot find ArrayList::add method");
-      }
-    }
-
-    void findHashMap(JNIEnv* env) {
-      hash_map_cls_ = findClass(env, "java/util/HashMap");
-      hash_map_ctor_ = env->GetMethodID(hash_map_cls_, "<init>", "()V");
-      if (!hash_map_ctor_) {
-        throw std::runtime_error("cannot find HashMap ctor");
-      }
-      hash_map_put_ =
-          env->GetMethodID(hash_map_cls_,
-                           "put",
-                           "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-      if (!hash_map_put_) {
-        throw std::runtime_error("cannot find HashMap::put method");
-      }
-    }
-
-    std::string convertJavaString(JNIEnv* env, jstring str_obj) {
-      const char* res_str = env->GetStringUTFChars(str_obj, 0);
-      std::string res = res_str;
-      env->ReleaseStringUTFChars(str_obj, res_str);
-      return res;
-    }
-
-    std::string readStringField(JNIEnv* env, jobject obj, jfieldID field) {
-      auto field_obj = (jstring)env->GetObjectField(obj, field);
-      return convertJavaString(env, field_obj);
-    }
-
-    jobject convertExtArgumentType(ExtArgumentType val) {
-      size_t index = static_cast<size_t>(val);
-      if (index < ext_arg_type_vals_.size()) {
-        return ext_arg_type_vals_[index];
-      }
-      throw std::runtime_error("ExtArgumentType enum value is out of range (" +
-                               to_string(index) + ")");
-    }
-
-    void addArgTypesAndNames(
-        JNIEnv* env,
-        jobject types,
-        jobject names,
-        const std::vector<ExtArgumentType>& args,
-        const std::vector<std::map<std::string, std::string>>& annotations,
-        const std::string& prefix,
-        size_t ann_offset) {
-      for (size_t index = 0; index < args.size(); ++index) {
-        env->CallVoidMethod(types, array_list_add_, convertExtArgumentType(args[index]));
-        auto& ann = annotations[index + ann_offset];
-        if (ann.count("name")) {
-          env->CallVoidMethod(
-              names, array_list_add_, env->NewStringUTF(ann.at("name").c_str()));
-        } else {
-          env->CallVoidMethod(
-              names,
-              array_list_add_,
-              env->NewStringUTF((prefix + std::to_string(index)).c_str()));
-        }
-      }
-    }
-
-    jobject convertExtensionFunction(JNIEnv* env, const ExtensionFunction& udf) {
-      jstring name_arg = env->NewStringUTF(udf.getName().c_str());
-      jobject args_arg = env->NewObject(array_list_cls_, array_list_ctor_);
-      for (auto& arg : udf.getArgs()) {
-        env->CallVoidMethod(args_arg, array_list_add_, convertExtArgumentType(arg));
-      }
-      jobject ret_arg = convertExtArgumentType(udf.getRet());
-      return env->NewObject(
-          extension_fn_cls_, extension_fn_udf_ctor_, name_arg, args_arg, ret_arg);
-    }
-
-    SchemaProviderPtr schema_provider_;
-    ConfigPtr config_;
-
-    // com.mapd.parser.server.CalciteServerHandler instance and methods.
-    jobject handler_obj_;
-    jmethodID handler_process_;
-    jmethodID handler_get_ext_fn_list_;
-    jmethodID handler_get_udf_list_;
-    jmethodID handlhandler_get_rt_fn_list_;
-    jmethodID handler_set_rt_fns_;
-
-    // com.mapd.parser.server.QueryParsingOption class and methods
-    jclass parsing_opts_cls_;
-    jmethodID parsing_opts_ctor_;
-
-    // com.mapd.parser.server.OptimizationOption class and methods
-    jclass optimization_opts_cls_;
-    jmethodID optimization_opts_ctor_;
-
-    // com.mapd.parser.server.PlanResult class and fields
-    jclass plan_result_cls_;
-    jfieldID plan_result_plan_result_;
-
-    // com.mapd.parser.server.ExtensionFunction$ExtArgumentType enum values
-    std::vector<jobject> ext_arg_type_vals_;
-
-    // com.mapd.parser.server.ExtensionFunction class and methods
-    jclass extension_fn_cls_;
-    jmethodID extension_fn_udf_ctor_;
-
-    // com.mapd.parser.server.InvalidParseRequest class and fields
-    jclass invalid_parse_req_cls_;
-    jfieldID invalid_parse_req_msg_;
-
-    // java.util.ArrayList class and methods
-    jclass array_list_cls_;
-    jmethodID array_list_ctor_;
-    jmethodID array_list_add_;
-
-    // java.util.HashMap class and methods
-    jclass hash_map_cls_;
-    jmethodID hash_map_ctor_;
-    jmethodID hash_map_put_;
-
-    std::vector<jobject> global_refs_;
-    std::shared_ptr<JVM> jvm_;
-  };
-  std::unique_ptr<Impl> impl_;
+  std::vector<jobject> global_refs_;
+  std::shared_ptr<JVM> jvm_;
 };
-
-CalciteJNI::CalciteJNI(SchemaProviderPtr schema_provider,
-                       ConfigPtr config,
-                       const std::string& udf_filename,
-                       size_t calcite_max_mem_mb) {
-  impl_ =
-      std::make_unique<Impl>(schema_provider, config, udf_filename, calcite_max_mem_mb);
-}
-
-CalciteJNI::~CalciteJNI() {
-  JVM::destroyInstance();
-}
-
-std::string CalciteJNI::process(
-    const std::string& db_name,
-    const std::string& sql_string,
-    const std::vector<FilterPushDownInfo>& filter_push_down_info,
-    const bool legacy_syntax,
-    const bool is_explain,
-    const bool is_view_optimize) {
-  return impl_->process(db_name,
-                        sql_string,
-                        filter_push_down_info,
-                        legacy_syntax,
-                        is_explain,
-                        is_view_optimize);
-}
-
-std::string CalciteJNI::getExtensionFunctionWhitelist() {
-  return impl_->getExtensionFunctionWhitelist();
-}
-std::string CalciteJNI::getUserDefinedFunctionWhitelist() {
-  return impl_->getUserDefinedFunctionWhitelist();
-}
-std::string CalciteJNI::getRuntimeExtensionFunctionWhitelist() {
-  return impl_->getRuntimeExtensionFunctionWhitelist();
-}
-void CalciteJNI::setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
-                                              bool is_runtime) {
-  return impl_->setRuntimeExtensionFunctions(udfs, is_runtime);
-}
 
 CalciteWorker::~CalciteWorker() {
   {
