@@ -25,7 +25,7 @@
 
 #include "BufferPoolStats.h"
 
-class CalciteWorker;
+class Calcite;
 class Executor;
 class RelAlgExecutor;
 
@@ -119,7 +119,7 @@ DataMgr* getDataMgr();
 
 Executor* getExecutor();
 
-CalciteWorker* getCalcite();
+Calcite* getCalcite();
 
 std::unique_ptr<RelAlgExecutor> makeRelAlgExecutor(const std::string& query_str);
 

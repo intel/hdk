@@ -27,7 +27,7 @@
 
 #include <fstream>
 
-RelAlgCache::RelAlgCache(CalciteWorker* calcite,
+RelAlgCache::RelAlgCache(Calcite* calcite,
                          SchemaProviderPtr schema_provider,
                          ConfigPtr config)
     : calcite_(calcite), schema_provider_(schema_provider), config_(config) {

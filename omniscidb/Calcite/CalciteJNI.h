@@ -34,21 +34,21 @@ class CalciteJNI;
 /**
  * Run CalciteJNI on a single thread.
  */
-class CalciteWorker {
+class Calcite {
  public:
   using Task = std::packaged_task<std::string(CalciteJNI* calcite_jni)>;
 
-  CalciteWorker(const CalciteWorker&) = delete;
+  Calcite(const Calcite&) = delete;
 
-  ~CalciteWorker();
+  ~Calcite();
 
-  static CalciteWorker* get(SchemaProviderPtr schema_provider,
-                            ConfigPtr config,
-                            const std::string& udf_filename = "",
-                            size_t calcite_max_mem_mb = 1024) {
+  static Calcite* get(SchemaProviderPtr schema_provider,
+                      ConfigPtr config,
+                      const std::string& udf_filename = "",
+                      size_t calcite_max_mem_mb = 1024) {
     if (!instance_) {
-      instance_ = std::unique_ptr<CalciteWorker>(
-          new CalciteWorker(schema_provider, config, udf_filename, calcite_max_mem_mb));
+      instance_ = std::unique_ptr<Calcite>(
+          new Calcite(schema_provider, config, udf_filename, calcite_max_mem_mb));
     }
     return instance_.get();
   }
@@ -67,10 +67,10 @@ class CalciteWorker {
                                     bool is_runtime = true);
 
  private:
-  explicit CalciteWorker(SchemaProviderPtr schema_provider,
-                         ConfigPtr config,
-                         const std::string& udf_filename,
-                         size_t calcite_max_mem_mb);
+  explicit Calcite(SchemaProviderPtr schema_provider,
+                   ConfigPtr config,
+                   const std::string& udf_filename,
+                   size_t calcite_max_mem_mb);
 
   void worker(SchemaProviderPtr schema_provider,
               ConfigPtr config,
@@ -86,5 +86,5 @@ class CalciteWorker {
   std::queue<Task> queue_;
 
   bool should_exit_{false};
-  static std::unique_ptr<CalciteWorker> instance_;
+  static std::unique_ptr<Calcite> instance_;
 };

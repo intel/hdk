@@ -294,7 +294,7 @@ class ArrowSQLRunnerImpl {
 
   Executor* getExecutor() { return executor_.get(); }
 
-  CalciteWorker* getCalcite() { return calcite_; }
+  Calcite* getCalcite() { return calcite_; }
 
   ~ArrowSQLRunnerImpl() {
     executor_.reset();
@@ -322,7 +322,7 @@ class ArrowSQLRunnerImpl {
     executor_->setSchemaProvider(storage_);
 
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
-      calcite_ = CalciteWorker::get(storage_, config_, udf_filename, 1024);
+      calcite_ = Calcite::get(storage_, config_, udf_filename, 1024);
 
       if (config_->debug.use_ra_cache.empty()) {
         ExtensionFunctionsWhitelist::add(calcite_->getExtensionFunctionWhitelist());
@@ -342,7 +342,7 @@ class ArrowSQLRunnerImpl {
   std::unique_ptr<DataMgr> data_mgr_;
   std::shared_ptr<Executor> executor_;
   std::shared_ptr<ArrowStorage> storage_;
-  CalciteWorker* calcite_;
+  Calcite* calcite_;
   std::shared_ptr<RelAlgCache> rel_alg_cache_;
 
   SQLiteComparator sqlite_comparator_;
@@ -498,7 +498,7 @@ Executor* getExecutor() {
   return ArrowSQLRunnerImpl::get()->getExecutor();
 }
 
-CalciteWorker* getCalcite() {
+Calcite* getCalcite() {
   return ArrowSQLRunnerImpl::get()->getCalcite();
 }
 

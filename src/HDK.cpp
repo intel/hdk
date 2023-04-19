@@ -25,7 +25,7 @@ struct Internal {
   std::shared_ptr<Config> config;
   std::shared_ptr<ArrowStorage> storage;
   std::shared_ptr<Data_Namespace::DataMgr> data_mgr;
-  CalciteWorker* calcite;
+  Calcite* calcite;
   std::shared_ptr<Executor> executor;
 };
 
@@ -86,7 +86,7 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
       internal_->schema_id, internal_->storage);
 
   // Calcite
-  internal_->calcite = CalciteWorker::get(internal_->storage,
+  internal_->calcite = Calcite::get(internal_->storage,
                                           internal_->config,
                                           /*udf_filename=*/"",
                                           /*calcite_max_mem_mb=*/1024);

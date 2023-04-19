@@ -568,7 +568,7 @@ class CalciteJNI {
   std::shared_ptr<JVM> jvm_;
 };
 
-CalciteWorker::~CalciteWorker() {
+Calcite::~Calcite() {
   {
     std::lock_guard<decltype(queue_mutex_)> lock(queue_mutex_);
     should_exit_ = true;
@@ -577,13 +577,12 @@ CalciteWorker::~CalciteWorker() {
   worker_.join();
 }
 
-std::string CalciteWorker::process(
-    const std::string& db_name,
-    const std::string& sql_string,
-    const std::vector<FilterPushDownInfo>& filter_push_down_info,
-    const bool legacy_syntax,
-    const bool is_explain,
-    const bool is_view_optimize) {
+std::string Calcite::process(const std::string& db_name,
+                             const std::string& sql_string,
+                             const std::vector<FilterPushDownInfo>& filter_push_down_info,
+                             const bool legacy_syntax,
+                             const bool is_explain,
+                             const bool is_view_optimize) {
   auto task = Task([&db_name,
                     &sql_string,
                     &filter_push_down_info,
@@ -605,7 +604,7 @@ std::string CalciteWorker::process(
   return result.get();
 }
 
-std::string CalciteWorker::getExtensionFunctionWhitelist() {
+std::string Calcite::getExtensionFunctionWhitelist() {
   auto task = Task([](CalciteJNI* calcite_jni) {
     CHECK(calcite_jni);
     return calcite_jni->getExtensionFunctionWhitelist();
@@ -618,7 +617,7 @@ std::string CalciteWorker::getExtensionFunctionWhitelist() {
   return result.get();
 }
 
-std::string CalciteWorker::getUserDefinedFunctionWhitelist() {
+std::string Calcite::getUserDefinedFunctionWhitelist() {
   auto task = Task([](CalciteJNI* calcite_jni) {
     CHECK(calcite_jni);
     return calcite_jni->getUserDefinedFunctionWhitelist();
@@ -631,7 +630,7 @@ std::string CalciteWorker::getUserDefinedFunctionWhitelist() {
   return result.get();
 }
 
-std::string CalciteWorker::getRuntimeExtensionFunctionWhitelist() {
+std::string Calcite::getRuntimeExtensionFunctionWhitelist() {
   auto task = Task([](CalciteJNI* calcite_jni) {
     CHECK(calcite_jni);
     return calcite_jni->getRuntimeExtensionFunctionWhitelist();
@@ -644,9 +643,8 @@ std::string CalciteWorker::getRuntimeExtensionFunctionWhitelist() {
   return result.get();
 }
 
-void CalciteWorker::setRuntimeExtensionFunctions(
-    const std::vector<ExtensionFunction>& udfs,
-    bool is_runtime) {
+void Calcite::setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
+                                           bool is_runtime) {
   auto task = Task([&udfs, is_runtime](CalciteJNI* calcite_jni) {
     CHECK(calcite_jni);
     calcite_jni->setRuntimeExtensionFunctions(udfs, is_runtime);
@@ -655,22 +653,18 @@ void CalciteWorker::setRuntimeExtensionFunctions(
   submitTaskToQueue(std::move(task));
 }
 
-CalciteWorker::CalciteWorker(SchemaProviderPtr schema_provider,
-                             ConfigPtr config,
-                             const std::string& udf_filename,
-                             size_t calcite_max_mem_mb) {
-  worker_ = std::thread(&CalciteWorker::worker,
-                        this,
-                        schema_provider,
-                        config,
-                        udf_filename,
-                        calcite_max_mem_mb);
+Calcite::Calcite(SchemaProviderPtr schema_provider,
+                 ConfigPtr config,
+                 const std::string& udf_filename,
+                 size_t calcite_max_mem_mb) {
+  worker_ = std::thread(
+      &Calcite::worker, this, schema_provider, config, udf_filename, calcite_max_mem_mb);
 }
 
-void CalciteWorker::worker(SchemaProviderPtr schema_provider,
-                           ConfigPtr config,
-                           const std::string& udf_filename,
-                           size_t calcite_max_mem_mb) {
+void Calcite::worker(SchemaProviderPtr schema_provider,
+                     ConfigPtr config,
+                     const std::string& udf_filename,
+                     size_t calcite_max_mem_mb) {
   auto calcite_jni = std::make_unique<CalciteJNI>(
       schema_provider, config, udf_filename, calcite_max_mem_mb);
 
@@ -693,7 +687,7 @@ void CalciteWorker::worker(SchemaProviderPtr schema_provider,
   }
 }
 
-void CalciteWorker::submitTaskToQueue(Task&& task) {
+void Calcite::submitTaskToQueue(Task&& task) {
   std::unique_lock<decltype(queue_mutex_)> lock(queue_mutex_);
 
   queue_.push(std::move(task));
@@ -702,4 +696,4 @@ void CalciteWorker::submitTaskToQueue(Task&& task) {
   worker_cv_.notify_all();
 }
 
-std::unique_ptr<CalciteWorker> CalciteWorker::instance_;
+std::unique_ptr<Calcite> Calcite::instance_;
