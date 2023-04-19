@@ -349,7 +349,7 @@ void WorkUnitBuilder::process(const ir::Node* node) {
         col_var = ir::makeExpr<ir::ColumnVar>(node->getOutputMetainfo()[i].type(),
                                               token->dbId(),
                                               token->tableId(),
-                                              i + 1,
+                                              token->columnId(i),
                                               rte_idx,
                                               false);
       }

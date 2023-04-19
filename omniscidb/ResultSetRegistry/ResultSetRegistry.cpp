@@ -51,6 +51,14 @@ TableFragmentsInfo getEmptyTableMetadata(int table_id) {
   return res;
 }
 
+int columnId(size_t col_idx) {
+  return ResultSetTableToken::columnId(col_idx);
+}
+
+size_t columnIndex(int col_id) {
+  return ResultSetTableToken::columnIndex(col_id);
+}
+
 }  // namespace
 
 ResultSetRegistry::ResultSetRegistry(ConfigPtr config)
@@ -111,14 +119,14 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   for (size_t col_idx = 0; col_idx < first_rs->colCount(); ++col_idx) {
     addColumnInfo(db_id_,
                   table_id,
-                  static_cast<int>(col_idx + 1),
+                  columnId(col_idx),
                   first_rs->colName(col_idx),
                   first_rs->colType(col_idx),
                   false);
     has_varlen = has_varlen || first_rs->colType(col_idx)->isVarLen();
     has_array = has_array || first_rs->colType(col_idx)->isArray();
   }
-  addRowidColumn(db_id_, table_id);
+  addRowidColumn(db_id_, table_id, columnId(first_rs->colCount()));
 
   // TODO: lazily compute row count and try to avoid global write
   // locks for that
@@ -190,8 +198,8 @@ ChunkStats ResultSetRegistry::getChunkStats(int table_id,
       frag.meta = synthesizeMetadata(frag.rs.get());
     }
   }
-  CHECK(frag.meta.count(col_idx + 1));
-  return frag.meta.at(col_idx + 1)->chunkStats();
+  CHECK(frag.meta.count(columnId(col_idx)));
+  return frag.meta.at(columnId(col_idx))->chunkStats();
 }
 
 void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
@@ -204,7 +212,7 @@ void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
   data_lock.unlock();
 
-  size_t col_idx = static_cast<size_t>(key[CHUNK_KEY_COLUMN_IDX] - 1);
+  size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
   size_t frag_idx = static_cast<size_t>(key[CHUNK_KEY_FRAGMENT_IDX] - 1);
   CHECK_LT(frag_idx, table.fragments.size());
   auto& rs = table.fragments[frag_idx].rs;
@@ -223,7 +231,7 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
   data_lock.unlock();
 
-  size_t col_idx = static_cast<size_t>(key[CHUNK_KEY_COLUMN_IDX] - 1);
+  size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
   size_t frag_idx = static_cast<size_t>(key[CHUNK_KEY_FRAGMENT_IDX] - 1);
   CHECK_LT(frag_idx, table.fragments.size());
   auto& frag = table.fragments[frag_idx];
@@ -317,7 +325,7 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
               [this, table_id, frag_idx, col_idx](ChunkStats& stats) {
                 stats = this->getChunkStats(table_id, frag_idx, col_idx);
               });
-          frag_info.setChunkMetadata(static_cast<int>(col_idx + 1), meta);
+          frag_info.setChunkMetadata(columnId(col_idx), meta);
         }
       }
     } else {

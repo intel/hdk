@@ -264,6 +264,8 @@ void checkChunkData(ArrowStorage& storage,
   size_t end_row = std::min(row_count, start_row + fragment_size);
   size_t frag_rows = end_row - start_row;
   std::vector<T> expected_chunk(expected.begin() + start_row, expected.begin() + end_row);
+  auto cols = storage.listColumns(TEST_DB_ID, table_id);
+  auto col_info = cols[col_idx];
 
   auto has_nulls = std::any_of(expected_chunk.begin(),
                                expected_chunk.end(),
@@ -282,7 +284,7 @@ void checkChunkData(ArrowStorage& storage,
                       [](T max, T val) -> T {
                         return val == inline_null_value<T>() ? max : std::max(max, val);
                       });
-  auto col_type = storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1)->type;
+  auto col_type = storage.getColumnInfo(TEST_DB_ID, table_id, col_info->column_id)->type;
   if (col_type->isDate()) {
     int64_t date_min = min == std::numeric_limits<T>::max()
                            ? std::numeric_limits<int64_t>::max()
@@ -290,7 +292,7 @@ void checkChunkData(ArrowStorage& storage,
     int64_t date_max = max == std::numeric_limits<T>::min()
                            ? std::numeric_limits<int64_t>::min()
                            : DateConverters::get_epoch_seconds_from_days(max);
-    checkChunkMeta(chunk_meta_map.at(col_idx + 1),
+    checkChunkMeta(chunk_meta_map.at(col_info->column_id),
                    col_type,
                    frag_rows,
                    frag_rows * sizeof(T),
@@ -298,7 +300,7 @@ void checkChunkData(ArrowStorage& storage,
                    date_min,
                    date_max);
   } else {
-    checkChunkMeta(chunk_meta_map.at(col_idx + 1),
+    checkChunkMeta(chunk_meta_map.at(col_info->column_id),
                    col_type,
                    frag_rows,
                    frag_rows * sizeof(T),
@@ -306,7 +308,7 @@ void checkChunkData(ArrowStorage& storage,
                    min,
                    max);
   }
-  checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_chunk);
+  checkFetchedData(storage, table_id, col_info->column_id, frag_idx + 1, expected_chunk);
 }
 
 void checkStringColumnData(ArrowStorage& storage,
@@ -314,7 +316,7 @@ void checkStringColumnData(ArrowStorage& storage,
                            int table_id,
                            size_t row_count,
                            size_t fragment_size,
-                           size_t col_idx,
+                           int col_id,
                            size_t frag_idx,
                            const std::vector<std::string>& vals) {
   size_t start_row = frag_idx * fragment_size;
@@ -324,8 +326,8 @@ void checkStringColumnData(ArrowStorage& storage,
   for (size_t i = start_row; i < end_row; ++i) {
     chunk_size += vals[i].size();
   }
-  checkChunkMeta(chunk_meta_map.at(col_idx + 1),
-                 storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1)->type,
+  checkChunkMeta(chunk_meta_map.at(col_id),
+                 storage.getColumnInfo(TEST_DB_ID, table_id, col_id)->type,
                  frag_rows,
                  chunk_size,
                  false);
@@ -338,8 +340,8 @@ void checkStringColumnData(ArrowStorage& storage,
     data_offset += vals[i].size();
   }
   expected_offset.back() = data_offset;
-  checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_offset, {2});
-  checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_data, {1});
+  checkFetchedData(storage, table_id, col_id, frag_idx + 1, expected_offset, {2});
+  checkFetchedData(storage, table_id, col_id, frag_idx + 1, expected_data, {1});
 }
 
 template <typename IndexType>
@@ -348,14 +350,14 @@ void checkStringDictColumnData(ArrowStorage& storage,
                                int table_id,
                                size_t row_count,
                                size_t fragment_size,
-                               size_t col_idx,
+                               int col_id,
                                size_t frag_idx,
                                const std::vector<std::string>& expected) {
   size_t start_row = frag_idx * fragment_size;
   size_t end_row = std::min(row_count, start_row + fragment_size);
   size_t frag_rows = end_row - start_row;
 
-  auto col_info = storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1);
+  auto col_info = storage.getColumnInfo(TEST_DB_ID, table_id, col_id);
   auto& dict = *storage.getDictMetadata(getDictId(col_info->type))->stringDict;
 
   std::vector<IndexType> expected_ids(frag_rows);
@@ -363,7 +365,7 @@ void checkStringDictColumnData(ArrowStorage& storage,
     expected_ids[i - start_row] = static_cast<IndexType>(dict.getIdOfString(expected[i]));
   }
 
-  checkChunkMeta(chunk_meta_map.at(col_idx + 1),
+  checkChunkMeta(chunk_meta_map.at(col_id),
                  col_info->type,
                  frag_rows,
                  frag_rows * sizeof(IndexType),
@@ -371,7 +373,7 @@ void checkStringDictColumnData(ArrowStorage& storage,
                  *std::min_element(expected_ids.begin(), expected_ids.end()),
                  *std::max_element(expected_ids.begin(), expected_ids.end()));
 
-  checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_ids);
+  checkFetchedData(storage, table_id, col_id, frag_idx + 1, expected_ids);
 }
 
 template <typename T>
@@ -384,7 +386,8 @@ void checkChunkData(ArrowStorage& storage,
                     size_t frag_idx,
                     const std::vector<std::vector<T>>& expected) {
   CHECK_EQ(row_count, expected.size());
-  auto col_info = storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1);
+  auto cols = storage.listColumns(TEST_DB_ID, table_id);
+  auto col_info = cols[col_idx];
 
   size_t start_row = frag_idx * fragment_size;
   size_t end_row = std::min(row_count, start_row + fragment_size);
@@ -408,8 +411,8 @@ void checkChunkData(ArrowStorage& storage,
     }
   }
   size_t chunk_size = chunk_elems * sizeof(T);
-  checkChunkMeta(chunk_meta_map.at(col_idx + 1),
-                 storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1)->type,
+  checkChunkMeta(chunk_meta_map.at(col_info->column_id),
+                 col_info->type,
                  frag_rows,
                  chunk_size,
                  has_nulls,
@@ -436,10 +439,12 @@ void checkChunkData(ArrowStorage& storage,
   expected_offset.back() =
       use_negative_offset ? -data_offset * sizeof(T) : data_offset * sizeof(T);
   if (col_info->type->isVarLenArray()) {
-    checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_offset, {2});
-    checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_data, {1});
+    checkFetchedData(
+        storage, table_id, col_info->column_id, frag_idx + 1, expected_offset, {2});
+    checkFetchedData(
+        storage, table_id, col_info->column_id, frag_idx + 1, expected_data, {1});
   } else {
-    checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_data);
+    checkFetchedData(storage, table_id, col_info->column_id, frag_idx + 1, expected_data);
   }
 }
 
@@ -453,7 +458,8 @@ void checkChunkData(ArrowStorage& storage,
                     size_t frag_idx,
                     const std::vector<std::vector<std::string>>& expected) {
   CHECK_EQ(row_count, expected.size());
-  auto col_info = storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1);
+  auto cols = storage.listColumns(TEST_DB_ID, table_id);
+  auto col_info = cols[col_idx];
   auto& dict = *storage.getDictMetadata(getDictId(col_info->type))->stringDict;
 
   size_t start_row = frag_idx * fragment_size;
@@ -491,15 +497,15 @@ void checkChunkData(ArrowStorage& storage,
   }
 
   size_t chunk_size = chunk_elems * sizeof(int32_t);
-  checkChunkMeta(chunk_meta_map.at(col_idx + 1),
-                 storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1)->type,
+  checkChunkMeta(chunk_meta_map.at(col_info->column_id),
+                 col_info->type,
                  frag_rows,
                  chunk_size,
                  has_nulls,
                  min,
                  max);
 
-  checkFetchedData(storage, table_id, col_idx + 1, frag_idx + 1, expected_ids);
+  checkFetchedData(storage, table_id, col_info->column_id, frag_idx + 1, expected_ids);
 }
 
 template <>
@@ -512,7 +518,8 @@ void checkChunkData(ArrowStorage& storage,
                     size_t frag_idx,
                     const std::vector<std::string>& expected) {
   CHECK_EQ(row_count, expected.size());
-  auto col_info = storage.getColumnInfo(TEST_DB_ID, table_id, col_idx + 1);
+  auto cols = storage.listColumns(TEST_DB_ID, table_id);
+  auto col_info = cols[col_idx];
   if (col_info->type->isExtDictionary()) {
     switch (col_info->type->size()) {
       case 1:
@@ -521,7 +528,7 @@ void checkChunkData(ArrowStorage& storage,
                                           table_id,
                                           row_count,
                                           fragment_size,
-                                          col_idx,
+                                          col_info->column_id,
                                           frag_idx,
                                           expected);
         break;
@@ -531,7 +538,7 @@ void checkChunkData(ArrowStorage& storage,
                                            table_id,
                                            row_count,
                                            fragment_size,
-                                           col_idx,
+                                           col_info->column_id,
                                            frag_idx,
                                            expected);
         break;
@@ -541,7 +548,7 @@ void checkChunkData(ArrowStorage& storage,
                                            table_id,
                                            row_count,
                                            fragment_size,
-                                           col_idx,
+                                           col_info->column_id,
                                            frag_idx,
                                            expected);
         break;
@@ -554,7 +561,7 @@ void checkChunkData(ArrowStorage& storage,
                           table_id,
                           row_count,
                           fragment_size,
-                          col_idx,
+                          col_info->column_id,
                           frag_idx,
                           expected);
   }
@@ -605,6 +612,7 @@ void checkData(ArrowStorage& storage,
                Ts... expected) {
   size_t frag_count = (row_count + fragment_size - 1) / fragment_size;
   auto meta = storage.getTableMetadata(TEST_DB_ID, table_id);
+  auto cols = storage.listColumns(TEST_DB_ID, table_id);
   CHECK_EQ(meta.getNumTuples(), row_count);
   CHECK_EQ(meta.getPhysicalNumTuples(), row_count);
   CHECK_EQ(meta.fragments.size(), frag_count);
@@ -620,7 +628,7 @@ void checkData(ArrowStorage& storage,
     auto chunk_meta_map = meta.fragments[frag_idx].getChunkMetadataMap();
     CHECK_EQ(chunk_meta_map.size(), sizeof...(Ts));
     for (int i = 0; i < static_cast<int>(chunk_meta_map.size()); ++i) {
-      CHECK_EQ(chunk_meta_map.count(i + 1), (size_t)1);
+      CHECK_EQ(chunk_meta_map.count(cols[i]->column_id), (size_t)1);
     }
     checkColumnData(storage,
                     chunk_meta_map,
@@ -651,11 +659,11 @@ TEST_F(ArrowStorageTest, CreateTable_OK) {
   checkTableInfo(tinfo, TEST_DB_ID, tinfo->table_id, "table1", 0);
   auto col_infos = storage.listColumns(*tinfo);
   CHECK_EQ(col_infos.size(), (size_t)4);
-  checkColumnInfo(col_infos[0], TEST_DB_ID, tinfo->table_id, 1, "col1", ctx.int32());
-  checkColumnInfo(col_infos[1], TEST_DB_ID, tinfo->table_id, 2, "col2", ctx.fp32());
-  checkColumnInfo(col_infos[2], TEST_DB_ID, tinfo->table_id, 3, "col3", ctx.fp64());
+  checkColumnInfo(col_infos[0], TEST_DB_ID, tinfo->table_id, 1000, "col1", ctx.int32());
+  checkColumnInfo(col_infos[1], TEST_DB_ID, tinfo->table_id, 1001, "col2", ctx.fp32());
+  checkColumnInfo(col_infos[2], TEST_DB_ID, tinfo->table_id, 1002, "col3", ctx.fp64());
   checkColumnInfo(
-      col_infos[3], TEST_DB_ID, tinfo->table_id, 4, "rowid", ctx.int64(), true);
+      col_infos[3], TEST_DB_ID, tinfo->table_id, 1003, "rowid", ctx.int64(), true);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_EmptyTableName) {

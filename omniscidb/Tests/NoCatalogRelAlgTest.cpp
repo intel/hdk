@@ -50,7 +50,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 2, "col_i", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 3, "col_f", ctx_.fp32(), false);
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 4, "col_d", ctx_.fp64(), false);
-    addRowidColumn(TEST_DB_ID, TEST1_TABLE_ID);
+    addRowidColumn(TEST_DB_ID, TEST1_TABLE_ID, 5);
 
     // Table test2
     addTableInfo(TEST_DB_ID,
@@ -63,7 +63,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 2, "col_i", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 3, "col_f", ctx_.fp32(), false);
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 4, "col_d", ctx_.fp64(), false);
-    addRowidColumn(TEST_DB_ID, TEST2_TABLE_ID);
+    addRowidColumn(TEST_DB_ID, TEST2_TABLE_ID, 5);
 
     // Table test2 in db2
     addTableInfo(TEST_DB2_ID,
@@ -74,7 +74,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
                  1);
     addColumnInfo(TEST_DB2_ID, TEST2_TABLE_ID, 1, "col_bi", ctx_.int64(), false);
     addColumnInfo(TEST_DB2_ID, TEST2_TABLE_ID, 2, "col_i", ctx_.int32(), false);
-    addRowidColumn(TEST_DB2_ID, TEST2_TABLE_ID);
+    addRowidColumn(TEST_DB2_ID, TEST2_TABLE_ID, 3);
 
     // Table test_agg
     addTableInfo(TEST_DB_ID,
@@ -85,7 +85,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
                  1);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 1, "id", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 2, "val", ctx_.int32(), false);
-    addRowidColumn(TEST_DB_ID, TEST_AGG_TABLE_ID);
+    addRowidColumn(TEST_DB_ID, TEST_AGG_TABLE_ID, 3);
   }
 
   ~TestSchemaProvider() override = default;
