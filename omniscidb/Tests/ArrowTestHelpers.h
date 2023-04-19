@@ -170,7 +170,7 @@ void compare_arrow_array_impl(const std::vector<std::string>& expected,
   }
 }
 
-template <typename T>
+template <typename T, typename ARROW_LIST_TYPE>
 void compare_arrow_array_list_impl(const std::vector<std::vector<T>>& expected,
                                    const std::shared_ptr<arrow::ChunkedArray>& actual) {
   using ArrowColType = arrow::NumericArray<typename arrow::CTypeTraits<T>::ArrowType>;
@@ -179,7 +179,7 @@ void compare_arrow_array_list_impl(const std::vector<std::vector<T>>& expected,
 
   for (int i = 0; i < actual->num_chunks(); i++) {
     auto chunk = chunks[i];
-    auto list_array = std::static_pointer_cast<arrow::ListArray>(chunk);
+    auto list_array = std::static_pointer_cast<ARROW_LIST_TYPE>(chunk);
     for (int64_t j = 0; j < chunk->length(); j++, compared++) {
       if (expected[compared].size() == (size_t)1 &&
           expected[compared][0] == inline_null_array_value<T>()) {
@@ -213,7 +213,9 @@ void compare_arrow_array_impl(const std::vector<std::vector<T>>& expected,
                               const std::shared_ptr<arrow::ChunkedArray>& actual) {
   ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
   if (actual->type()->id() == arrow::Type::LIST) {
-    compare_arrow_array_list_impl(expected, actual);
+    compare_arrow_array_list_impl<T, arrow::ListArray>(expected, actual);
+  } else if (actual->type()->id() == arrow::Type::FIXED_SIZE_LIST) {
+    compare_arrow_array_list_impl<T, arrow::FixedSizeListArray>(expected, actual);
   } else {
     CHECK(false);
   }

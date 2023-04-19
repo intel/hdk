@@ -826,6 +826,94 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::convertToArrowTable() con
   return getArrowTable(makeSchema());
 }
 
+namespace {
+
+template <typename T>
+void create_or_append_empty_values(std::shared_ptr<ValueArray>& values,
+                                   int num_values,
+                                   size_t max_size) {
+  if (!values) {
+    values = std::make_shared<ValueArray>(std::vector<T>());
+    boost::get<std::vector<T>>(*values).reserve(max_size);
+  }
+  auto values_p = boost::get<std::vector<T>>(values.get());
+  CHECK(values_p);
+  values_p->resize(values_p->size() + num_values);
+}
+
+void append_empty_values_and_validity(const hdk::ir::Type* type,
+                                      int num_values,
+                                      ExecutorDeviceType device_type,
+                                      std::shared_ptr<ValueArray>& values,
+                                      std::shared_ptr<std::vector<bool>>& null_bitmap,
+                                      size_t max_size) {
+  switch (type->id()) {
+    case hdk::ir::Type::kBoolean:
+      create_or_append_empty_values<bool>(values, num_values, max_size);
+      break;
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kExtDictionary:
+      switch (type->size()) {
+        case 1:
+          create_or_append_empty_values<int8_t>(values, num_values, max_size);
+          break;
+        case 2:
+          create_or_append_empty_values<int16_t>(values, num_values, max_size);
+          break;
+        case 4:
+          create_or_append_empty_values<int32_t>(values, num_values, max_size);
+          break;
+        case 8:
+          create_or_append_empty_values<int64_t>(values, num_values, max_size);
+          break;
+        default:
+          throw std::runtime_error(type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
+      break;
+    case hdk::ir::Type::kFloatingPoint:
+      switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          create_or_append_empty_values<float>(values, num_values, max_size);
+          break;
+        case hdk::ir::FloatingPointType::kDouble:
+          create_or_append_empty_values<double>(values, num_values, max_size);
+          break;
+        default:
+          throw std::runtime_error(type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
+      break;
+    case hdk::ir::Type::kTime:
+      create_or_append_empty_values<int32_t>(values, num_values, max_size);
+      break;
+    case hdk::ir::Type::kDate:
+      device_type == ExecutorDeviceType::GPU
+          ? create_or_append_empty_values<int64_t>(values, num_values, max_size)
+          : create_or_append_empty_values<int32_t>(values, num_values, max_size);
+      break;
+    case hdk::ir::Type::kText:
+    case hdk::ir::Type::kVarChar:
+      create_or_append_empty_values<std::string>(values, num_values, max_size);
+      break;
+    default:
+      throw std::runtime_error(type->toString() +
+                               " is not supported in Arrow result sets.");
+  }
+
+  if (!type->nullable()) {
+    CHECK(!null_bitmap);
+  } else {
+    if (!null_bitmap) {
+      null_bitmap = std::make_shared<std::vector<bool>>();
+      null_bitmap->reserve(max_size);
+    }
+    null_bitmap->resize(null_bitmap->size() + num_values, false);
+  }
+}
+
 void append_scalar_value_and_validity(const ScalarTargetValue& value,
                                       const hdk::ir::Type* type,
                                       ExecutorDeviceType device_type,
@@ -900,6 +988,8 @@ void append_scalar_value_and_validity(const ScalarTargetValue& value,
   }
 }
 
+}  // namespace
+
 size_t convert_rowwise(
     ResultSetPtr results,
     const std::vector<ArrowResultSetConverter::ColumnBuilder>& builders,
@@ -942,28 +1032,60 @@ size_t convert_rowwise(
       const auto& column = builders[j];
       auto array_value = boost::get<ArrayTargetValue>(&row[j]);
       if (array_value) {
-        auto elem_type = column.col_type->as<hdk::ir::VarLenArrayType>()->elemType();
+        auto elem_type = column.col_type->as<hdk::ir::ArrayBaseType>()->elemType();
+        auto num_elems =
+            column.col_type->isFixedLenArray()
+                ? column.col_type->as<hdk::ir::FixedLenArrayType>()->numElems()
+                : 0;
+        auto max_size =
+            column.col_type->isFixedLenArray()
+                ? local_entry_count *
+                      column.col_type->as<hdk::ir::FixedLenArrayType>()->numElems()
+                : local_entry_count;
         int32_t arr_size = 0;
         if (*array_value) {
           arr_size = static_cast<int32_t>((*array_value)->size());
-          for (auto& elem_value : **array_value) {
-            append_scalar_value_and_validity(elem_value,
-                                             elem_type,
+          // Fixed size array NULL value can be expressed as a zero-length vector.
+          // We should add a proper number of empty values for such case.
+          if (column.col_type->isFixedLenArray() && arr_size != num_elems) {
+            CHECK_EQ(arr_size, 0);
+            append_empty_values_and_validity(elem_type,
+                                             num_elems,
                                              device_type,
                                              value_seg[j],
                                              null_bitmap_seg[j],
-                                             local_entry_count);
+                                             max_size);
+          } else {
+            for (auto& elem_value : **array_value) {
+              append_scalar_value_and_validity(elem_value,
+                                               elem_type,
+                                               device_type,
+                                               value_seg[j],
+                                               null_bitmap_seg[j],
+                                               max_size);
+            }
           }
+        } else if (column.col_type->isFixedLenArray()) {
+          // Assume this is also a possible option for NULL fixed size array
+          // and handle appropriately.
+          append_empty_values_and_validity(elem_type,
+                                           num_elems,
+                                           device_type,
+                                           value_seg[j],
+                                           null_bitmap_seg[j],
+                                           max_size);
         }
 
-        auto& offsets = offset_seg[j];
-        if (!offsets) {
-          offsets = std::make_shared<ValueArray>(std::vector<int32_t>());
-          boost::get<std::vector<int32_t>>(*offsets).reserve(local_entry_count);
-          boost::get<std::vector<int32_t>>(*offsets).push_back(0);
+        if (column.col_type->isVarLenArray()) {
+          auto& offsets = offset_seg[j];
+          if (!offsets) {
+            offsets = std::make_shared<ValueArray>(std::vector<int32_t>());
+            boost::get<std::vector<int32_t>>(*offsets).reserve(local_entry_count + 1);
+            boost::get<std::vector<int32_t>>(*offsets).push_back(0);
+          }
+          auto& offset_values = boost::get<std::vector<int32_t>>(*offsets);
+          offset_values.push_back(offset_values.back() + arr_size);
         }
-        auto& offset_values = boost::get<std::vector<int32_t>>(*offsets);
-        offset_values.push_back(offset_values.back() + arr_size);
 
         if (column.col_type->nullable()) {
           auto& validity = offset_null_bitmap_seg[j];
@@ -971,7 +1093,9 @@ size_t convert_rowwise(
             validity = std::make_shared<std::vector<uint8_t>>();
             validity->reserve(local_entry_count);
           }
-          validity->push_back(!!*array_value);
+          int8_t is_valid =
+              *array_value && (!column.col_type->isFixedLenArray() || arr_size != 0);
+          validity->push_back(is_valid);
         }
       } else {
         auto scalar_value = boost::get<ScalarTargetValue>(&row[j]);
@@ -1267,6 +1391,10 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
         case hdk::ir::Type::kTime:
         case hdk::ir::Type::kDate:
         case hdk::ir::Type::kTimestamp:
+        case hdk::ir::Type::kText:
+        case hdk::ir::Type::kVarChar:
+        case hdk::ir::Type::kVarLenArray:
+        case hdk::ir::Type::kFixedLenArray:
           use_columnar_conversion = false;
           break;
         default:
@@ -1470,6 +1598,12 @@ std::shared_ptr<arrow::DataType> get_arrow_type(const hdk::ir::Type* type,
       auto elem_type = type->as<hdk::ir::VarLenArrayType>()->elemType();
       auto arrow_elem_type = get_arrow_type(elem_type, device_type);
       return arrow::list(arrow_elem_type);
+    }
+    case hdk::ir::Type::kFixedLenArray: {
+      auto elem_type = type->as<hdk::ir::FixedLenArrayType>()->elemType();
+      auto arrow_elem_type = get_arrow_type(elem_type, device_type);
+      int32_t list_size = type->as<hdk::ir::FixedLenArrayType>()->numElems();
+      return arrow::fixed_size_list(arrow_elem_type, list_size);
     }
     default:
       break;
@@ -1811,7 +1945,12 @@ void ArrowResultSetConverter::append(
   if (elem_type->isVarLenArray()) {
     elem_type = elem_type->as<hdk::ir::VarLenArrayType>()->elemType();
     elem_builder = dynamic_cast<arrow::ListBuilder*>(elem_builder)->value_builder();
+  } else if (elem_type->isFixedLenArray()) {
+    elem_type = elem_type->as<hdk::ir::FixedLenArrayType>()->elemType();
+    elem_builder =
+        dynamic_cast<arrow::FixedSizeListBuilder*>(elem_builder)->value_builder();
   }
+  int64_t old_length = elem_builder->length();
   if (column_builder.col_type->isExtDictionary()) {
     CHECK(column_builder.physical_type
               ->isInt32());  // assume all dicts use none-encoded type for now
@@ -1891,7 +2030,7 @@ void ArrowResultSetConverter::append(
       throw std::runtime_error(column_builder.col_type->toString() +
                                " is not supported in Arrow result sets.");
   }
-  // Append offset values
+  // Append offset values and/or validity data.
   if (type->isVarLenArray()) {
     CHECK(offset_values);
     auto& offsets = boost::get<std::vector<int32_t>>(*offset_values);
@@ -1901,6 +2040,19 @@ void ArrowResultSetConverter::append(
           offsets.data(), offsets.size() - 1, offset_is_valid->data()));
     } else {
       ARROW_THROW_NOT_OK(list_builder->AppendValues(offsets.data(), offsets.size() - 1));
+    }
+  } else if (type->isFixedLenArray()) {
+    auto num_value_elems = elem_builder->length() - old_length;
+    auto arr_length = type->as<hdk::ir::FixedLenArrayType>()->numElems();
+    CHECK_EQ(num_value_elems % arr_length, 0);
+    auto num_arr_elems = num_value_elems / arr_length;
+    auto* list_builder = dynamic_cast<arrow::FixedSizeListBuilder*>(arrow_builder);
+    if (offset_is_valid) {
+      CHECK_EQ(offset_is_valid->size(), static_cast<size_t>(num_arr_elems));
+      ARROW_THROW_NOT_OK(
+          list_builder->AppendValues(num_arr_elems, offset_is_valid->data()));
+    } else {
+      ARROW_THROW_NOT_OK(list_builder->AppendValues(num_arr_elems));
     }
   }
 }
