@@ -105,22 +105,41 @@ class JVM {
       args.version = JNI_VERSION_1_8;
       args.group = nullptr;
       args.name = nullptr;
+#if 1
       res = jvm_->AttachCurrentThread((void**)&env, &args);
+      // res = jvm_->AttachCurrentThreadAsDaemon((void**)&env, &args);
       if (res != JNI_OK) {
         LOG(FATAL) << "Cannot attach thread to JavaVM: error code " << res;
       }
+#endif
       need_detach = true;
     }
 
     return {this, env, need_detach};
   }
 
-  ~JVM() { jvm_->DestroyJavaVM(); }
+  ~JVM() {
+    CHECK(env_);
+    env_->PopLocalFrame(nullptr);
 
- private:
-  JVM(JavaVM* jvm) : jvm_(jvm) {}
+    CHECK(jvm_);
+#if 0
+    {
+      auto res = jvm_->DetachCurrentThread();
+      if (res != JNI_OK) {
+        std::cerr << "Cannot attach thread to JavaVM: error code " << res << std::endl;
+        std::terminate();
+      }
+    }
+#endif
+    auto res = jvm_->DestroyJavaVM();
+    if (res != JNI_OK) {
+      std::cerr << "Fatal error destroying the JavaVM: error code " << res;
+      std::terminate();
+    }
+  }
 
-  static std::shared_ptr<JVM> createJVM(size_t max_mem_mb) {
+  static std::unique_ptr<JVM> createJVM(size_t max_mem_mb) {
     auto root_abs_path = omnisci::get_root_abs_path();
     std::string class_path_arg = "-Djava.class.path=";
     if (std::filesystem::exists(root_abs_path +
@@ -152,13 +171,54 @@ class JVM {
       LOG(FATAL) << "Couldn't initialize JVM.";
     }
 
-    return std::shared_ptr<JVM>(new JVM(jvm));
+    return std::unique_ptr<JVM>(new JVM(jvm));
   }
 
-  // Detach current thread from JVM.
-  void detachThread() { jvm_->DetachCurrentThread(); }
+  // TODO: this probably does not do anything
+  void attachThread() noexcept {
+    auto env = getEnv();
+    JavaVMAttachArgs args;
+    args.version = JNI_VERSION_1_8;
+    args.group = nullptr;
+    args.name = nullptr;
+    auto res = jvm_->AttachCurrentThread((void**)&env, &args);
+    if (res != JNI_OK) {
+      std::cerr << "Cannot attach thread to JavaVM: error code " << std::endl;
+      std::terminate();
+    }
+  }
+
+  // Detach current thread from JVM. Noexcept to allow calling from destructor
+  void detachThread() noexcept {
+    auto res = jvm_->DetachCurrentThread();
+    if (res != JNI_OK) {
+      std::cerr << "Cannot attach thread to JavaVM: error code " << res << std::endl;
+      std::terminate();
+    }
+  }
+
+ private:
+  JVM(JavaVM* jvm) : jvm_(jvm) {
+    auto res = jvm_->GetEnv((void**)&env_, JNI_VERSION_1_8);
+    if (res != JNI_OK) {
+      if (res != JNI_EDETACHED) {
+        LOG(FATAL) << "Cannot get Java Env: error code " << res;
+      }
+
+      JavaVMAttachArgs args;
+      args.version = JNI_VERSION_1_8;
+      args.group = nullptr;
+      args.name = nullptr;
+      res = jvm_->AttachCurrentThread((void**)&env_, &args);
+      // res = jvm_->AttachCurrentThreadAsDaemon((void**)&env, &args);
+      if (res != JNI_OK) {
+        LOG(FATAL) << "Cannot attach thread to JavaVM: error code " << res;
+      }
+    }
+  }
 
   JavaVM* jvm_;
+  JNIEnv* env_;
 
   static std::once_flag instance_init_flag_;
   static std::shared_ptr<JVM> instance_;
@@ -169,38 +229,46 @@ std::shared_ptr<JVM> JVM::instance_;
 
 }  // namespace
 
+class CalciteMgr;
+
 class CalciteJNI {
  public:
   CalciteJNI(SchemaProviderPtr schema_provider,
              ConfigPtr config,
              const std::string& udf_filename,
-             size_t calcite_max_mem_mb)
-      : schema_provider_(schema_provider), config_(config) {
+             size_t calcite_max_mem_mb,
+             JVM* jvm)
+      : schema_provider_(schema_provider.get())
+      , config_(config.get())
+      , jvm_(jvm)
+      , env_(jvm_->getEnv()) {
+    CHECK(jvm_);
     // Initialize JVM.
-    jvm_ = JVM::getInstance(calcite_max_mem_mb);
-    auto env = jvm_->getEnv();
+    // jvm_ = JVM::createJVM(calcite_max_mem_mb);  //
+    // JVM::getInstance(calcite_max_mem_mb);
+    // env_ = jvm_->getEnv();
 
     // Create CalciteServerHandler object.
-    createCalciteServerHandler(env.get(), udf_filename);
+    createCalciteServerHandler(env_.get(), udf_filename);
 
     // Prepare references to some Java classes and methods we will use for processing.
-    findQueryParsingOption(env.get());
-    findOptimizationOption(env.get());
-    findPlanResult(env.get());
-    findExtArgumentType(env.get());
-    findExtensionFunction(env.get());
-    findInvalidParseRequest(env.get());
-    findArrayList(env.get());
-    findHashMap(env.get());
+    findQueryParsingOption(env_.get());
+    findOptimizationOption(env_.get());
+    findPlanResult(env_.get());
+    findExtArgumentType(env_.get());
+    findExtensionFunction(env_.get());
+    findInvalidParseRequest(env_.get());
+    findArrayList(env_.get());
+    findHashMap(env_.get());
   }
 
   ~CalciteJNI() {
-    auto env = jvm_->getEnv();
+    // auto env = jvm_->getEnv();
     for (auto obj : global_refs_) {
-      env->DeleteGlobalRef(obj);
+      env_->DeleteGlobalRef(obj);
     }
 
-    JVM::destroyInstance();
+    // JVM::destroyInstance();
   }
 
   std::string process(const std::string& db_name,
@@ -209,98 +277,99 @@ class CalciteJNI {
                       const bool legacy_syntax,
                       const bool is_explain,
                       const bool is_view_optimize) {
-    auto env = jvm_->getEnv();
-    jstring arg_catalog = env->NewStringUTF(db_name.c_str());
+    // auto env_ = jvm_->getEnv();
+    jstring arg_catalog = env_->NewStringUTF(db_name.c_str());
     std::string modified_sql = pg_shim(sql_string);
-    jstring arg_query = env->NewStringUTF(modified_sql.c_str());
-    jobject arg_parsing_options = env->NewObject(parsing_opts_cls_,
-                                                 parsing_opts_ctor_,
-                                                 (jboolean)legacy_syntax,
-                                                 (jboolean)is_explain,
-                                                 /*check_privileges=*/(jboolean)(false));
+    jstring arg_query = env_->NewStringUTF(modified_sql.c_str());
+    jobject arg_parsing_options = env_->NewObject(parsing_opts_cls_,
+                                                  parsing_opts_ctor_,
+                                                  (jboolean)legacy_syntax,
+                                                  (jboolean)is_explain,
+                                                  /*check_privileges=*/(jboolean)(false));
     if (!arg_parsing_options) {
       throw std::runtime_error("cannot create QueryParsingOption object");
     }
-    jobject arg_filter_push_down_info = env->NewObject(array_list_cls_, array_list_ctor_);
+    jobject arg_filter_push_down_info =
+        env_->NewObject(array_list_cls_, array_list_ctor_);
     if (!filter_push_down_info.empty()) {
       throw std::runtime_error(
           "Filter pushdown info is not yet implemented in Calcite JNI client.");
     }
     jobject arg_optimization_options =
-        env->NewObject(optimization_opts_cls_,
-                       optimization_opts_ctor_,
-                       (jboolean)is_view_optimize,
-                       (jboolean)config_->exec.watchdog.enable,
-                       arg_filter_push_down_info);
+        env_->NewObject(optimization_opts_cls_,
+                        optimization_opts_ctor_,
+                        (jboolean)is_view_optimize,
+                        (jboolean)config_->exec.watchdog.enable,
+                        arg_filter_push_down_info);
     jobject arg_restriction = nullptr;
     auto schema_json = schema_to_json(schema_provider_);
-    jstring arg_schema = env->NewStringUTF(schema_json.c_str());
+    jstring arg_schema = env_->NewStringUTF(schema_json.c_str());
 
-    jobject java_res = env->CallObjectMethod(handler_obj_,
-                                             handler_process_,
-                                             arg_catalog,
-                                             arg_query,
-                                             arg_parsing_options,
-                                             arg_optimization_options,
-                                             arg_restriction,
-                                             arg_schema);
+    jobject java_res = env_->CallObjectMethod(handler_obj_,
+                                              handler_process_,
+                                              arg_catalog,
+                                              arg_query,
+                                              arg_parsing_options,
+                                              arg_optimization_options,
+                                              arg_restriction,
+                                              arg_schema);
     if (!java_res) {
-      if (env->ExceptionCheck() == JNI_FALSE) {
+      if (env_->ExceptionCheck() == JNI_FALSE) {
         throw std::runtime_error(
             "CalciteServerHandler::process call failed for unknown reason\n  Query: " +
             sql_string + "\n  Schema: " + schema_json);
       } else {
-        jthrowable e = env->ExceptionOccurred();
+        jthrowable e = env_->ExceptionOccurred();
         CHECK(e);
         throw std::invalid_argument(
-            readStringField(env.get(), e, invalid_parse_req_msg_));
+            readStringField(env_.get(), e, invalid_parse_req_msg_));
       }
     }
 
-    return readStringField(env.get(), java_res, plan_result_plan_result_);
+    return readStringField(env_.get(), java_res, plan_result_plan_result_);
   }
 
   std::string getExtensionFunctionWhitelist() {
-    auto env = jvm_->getEnv();
+    // auto env_ = jvm_->getEnv();
     jstring java_res =
-        (jstring)env->CallObjectMethod(handler_obj_, handler_get_ext_fn_list_);
-    return convertJavaString(env.get(), java_res);
+        (jstring)env_->CallObjectMethod(handler_obj_, handler_get_ext_fn_list_);
+    return convertJavaString(env_.get(), java_res);
   }
 
   std::string getUserDefinedFunctionWhitelist() {
-    auto env = jvm_->getEnv();
+    // auto env_ = jvm_->getEnv();
     jstring java_res =
-        (jstring)env->CallObjectMethod(handler_obj_, handler_get_udf_list_);
-    return convertJavaString(env.get(), java_res);
+        (jstring)env_->CallObjectMethod(handler_obj_, handler_get_udf_list_);
+    return convertJavaString(env_.get(), java_res);
   }
 
   std::string getRuntimeExtensionFunctionWhitelist() {
-    auto env = jvm_->getEnv();
+    // auto env_ = jvm_->getEnv();
     jstring java_res =
-        (jstring)env->CallObjectMethod(handler_obj_, handlhandler_get_rt_fn_list_);
-    return convertJavaString(env.get(), java_res);
+        (jstring)env_->CallObjectMethod(handler_obj_, handlhandler_get_rt_fn_list_);
+    return convertJavaString(env_.get(), java_res);
   }
 
   void setRuntimeExtensionFunctions(const std::vector<ExtensionFunction>& udfs,
                                     bool is_runtime) {
-    auto env = jvm_->getEnv();
-    jobject udfs_list = env->NewObject(array_list_cls_, array_list_ctor_);
+    // auto env_ = jvm_->getEnv();
+    jobject udfs_list = env_->NewObject(array_list_cls_, array_list_ctor_);
     for (auto& udf : udfs) {
-      env->CallVoidMethod(
-          udfs_list, array_list_add_, convertExtensionFunction(env.get(), udf));
+      env_->CallVoidMethod(
+          udfs_list, array_list_add_, convertExtensionFunction(env_.get(), udf));
     }
 
-    env->CallVoidMethod(
+    env_->CallVoidMethod(
         handler_obj_, handler_set_rt_fns_, udfs_list, (jboolean)is_runtime);
-    if (env->ExceptionCheck() != JNI_FALSE) {
-      env->ExceptionDescribe();
+    if (env_->ExceptionCheck() != JNI_FALSE) {
+      env_->ExceptionDescribe();
       throw std::runtime_error("Failed Java call to setRuntimeExtensionFunctions");
     }
   }
 
  private:
   jobject addGlobalRef(JNIEnv* env, jobject obj) {
-    auto res = env->NewGlobalRef(obj);
+    auto res = env_->NewGlobalRef(obj);
     global_refs_.push_back(res);
     return res;
   }
@@ -523,6 +592,10 @@ class CalciteJNI {
   SchemaProviderPtr schema_provider_;
   ConfigPtr config_;
 
+  // std::shared_ptr<JVM> jvm_;
+  JVM* jvm_;
+  JVM::JNIEnvWrapper env_;  // this contains jvm_ ptr?
+
   // com.mapd.parser.server.CalciteServerHandler instance and methods.
   jobject handler_obj_;
   jmethodID handler_process_;
@@ -565,16 +638,40 @@ class CalciteJNI {
   jmethodID hash_map_put_;
 
   std::vector<jobject> global_refs_;
-  std::shared_ptr<JVM> jvm_;
+
+  friend class CalciteMgr;
 };
 
 CalciteMgr::~CalciteMgr() {
+  using namespace std::chrono_literals;
+
   {
-    std::lock_guard<decltype(queue_mutex_)> lock(queue_mutex_);
+    std::unique_lock<decltype(queue_mutex_)> lock(queue_mutex_);
+
+    while (!queue_.empty()) {
+      lock.unlock();
+      std::this_thread::sleep_for(10ms);
+      lock.lock();
+    }
+
+    std::cerr << "Setting exit flag" << std::endl;
+    // decltype(queue_) empty_queue;
+    // queue_.swap(empty_queue);
     should_exit_ = true;
+    std::cerr << "Set exit flag" << std::endl;
   }
   worker_cv_.notify_all();
   worker_.join();
+
+  std::cerr << "Got here " << std::endl;
+  // jvm_->detachThread();
+  // std::cerr << "Detatched thread " << std::endl;
+  // jvm_.release();
+}
+
+void CalciteMgr::shutdown() {
+  std::cerr << "Shutdown received!" << std::endl;
+  instance_.reset();
 }
 
 std::string CalciteMgr::process(
@@ -662,26 +759,41 @@ CalciteMgr::CalciteMgr(SchemaProviderPtr schema_provider,
                        ConfigPtr config,
                        const std::string& udf_filename,
                        size_t calcite_max_mem_mb) {
-  // todo: should register an exit handler for ctrl + c
+  // calcite_jni_ = std::make_unique<CalciteJNI>(
+  // schema_provider, config, udf_filename, calcite_max_mem_mb);
+  // TODO: make unique?
+  // std::shared_ptr<JVM> jvm = JVM::getInstance(calcite_max_mem_mb);
+  jvm_ = JVM::createJVM(calcite_max_mem_mb);
   worker_ = std::thread(&CalciteMgr::worker,
                         this,
                         schema_provider,
                         config,
                         udf_filename,
-                        calcite_max_mem_mb);
+                        calcite_max_mem_mb,
+                        jvm_.get());
 }
 
 void CalciteMgr::worker(SchemaProviderPtr schema_provider,
                         ConfigPtr config,
                         const std::string& udf_filename,
-                        size_t calcite_max_mem_mb) {
+                        size_t calcite_max_mem_mb,
+                        JVM* jvm) {
+  CHECK(jvm);
+
+  // create jni from jvm
   auto calcite_jni = std::make_unique<CalciteJNI>(
-      schema_provider, config, udf_filename, calcite_max_mem_mb);
+      schema_provider, config, udf_filename, calcite_max_mem_mb, jvm);
+
+  // CHECK(calcite_jni);
+  // calcite_jni->jvm_->attachThread();
 
   std::unique_lock<std::mutex> lock(queue_mutex_);
   while (true) {
     worker_cv_.wait(lock, [this] { return !queue_.empty() || should_exit_; });
     if (should_exit_) {
+      std::cerr << "Worker preparing to cleanup" << std::endl;
+      // calcite_jni->jvm_->detachThread();
+      std::cerr << "Thread exiting!" << std::endl;
       return;
     }
 

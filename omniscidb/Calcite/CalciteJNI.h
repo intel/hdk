@@ -30,6 +30,9 @@ struct FilterPushDownInfo {
 };
 
 class CalciteJNI;
+namespace {
+class JVM;
+}
 
 /**
  * Run CalciteJNI on a single thread.
@@ -50,9 +53,12 @@ class CalciteMgr {
     if (!instance_) {
       instance_ = std::unique_ptr<CalciteMgr>(
           new CalciteMgr(schema_provider, config, udf_filename, calcite_max_mem_mb));
+      // std::atexit(CalciteMgr::shutdown);
     }
     return instance_.get();
   }
+
+  static void shutdown();
 
   std::string process(const std::string& db_name,
                       const std::string& sql_string,
@@ -76,7 +82,8 @@ class CalciteMgr {
   void worker(SchemaProviderPtr schema_provider,
               ConfigPtr config,
               const std::string& udf_filename,
-              size_t calcite_max_mem_mb);
+              size_t calcite_max_mem_mb,
+              JVM* jvm);
 
   void submitTaskToQueue(Task&& task);
 
@@ -88,4 +95,7 @@ class CalciteMgr {
 
   bool should_exit_{false};
   static std::unique_ptr<CalciteMgr> instance_;
+
+  // std::unique_ptr<CalciteJNI> calcite_jni_;
+  std::unique_ptr<JVM> jvm_;
 };
