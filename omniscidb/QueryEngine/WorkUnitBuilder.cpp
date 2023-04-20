@@ -407,6 +407,20 @@ void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
     new_target_exprs.push_back(target_expr);
   }
 
+  if (co_.device_type == ExecutorDeviceType::GPU && executor_ &&
+      executor_->getDataMgr()->getGpuMgr() &&
+      executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+    for (auto& expr : agg->getAggs()) {
+      auto agg_expr = expr->as<ir::AggExpr>();
+      CHECK(agg_expr);
+      if (agg_expr->isDistinct()) {
+        LOG(WARNING)
+            << "L0 path does not support distinct clause yet. Falling back to CPU.";
+        throw QueryMustRunOnCpu();
+      }
+    }
+  }
+
   for (auto& expr : agg->getAggs()) {
     auto rewritten_expr = input_rewriter_.visit(expr.get());
     auto target_expr = translator.normalize(rewritten_expr.get());
