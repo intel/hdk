@@ -412,9 +412,9 @@ void GpuReductionTester::performReductionTest(
   DUMP_MODULE(module_, "gen.ll");
   prepare_generated_gpu_kernel(module_, context_, getWrapperKernel());
 
-  auto ext_module = executor_->getExtensionModuleContext()->getSpirvHelperFuncModule();
+  auto& ext_module = executor_->getExtensionModuleContext()->getSpirvHelperFuncModule();
 
-  for (auto& F : *(ext_module) {
+  for (auto& F : *ext_module) {
     compiler::insert_declaration(ext_module.get(), module_, F.getName().str());
   }
 
@@ -442,8 +442,6 @@ void GpuReductionTester::performReductionTest(
       }
     }
   }
-
-
 
   std::stringstream ss;
   llvm::raw_os_ostream os(ss);
@@ -475,8 +473,7 @@ void GpuReductionTester::performReductionTest(
   std::transform(d_input_buffers.begin(),
                  d_input_buffers.end(),
                  std::back_inserter(h_input_buffer_dptrs),
-                 [](int8_t* dptr) {
-    return reinterpret_cast<L0deviceptr>(dptr); });
+                 [](int8_t* dptr) { return reinterpret_cast<L0deviceptr>(dptr); });
 
   auto d_input_buffer_dptrs =
       l0_mgr_->allocateDeviceMem(num_buffers * sizeof(L0deviceptr), device_id);
@@ -509,8 +506,7 @@ void GpuReductionTester::performReductionTest(
   std::transform(h_kernel_params.begin(),
                  h_kernel_params.end(),
                  std::back_inserter(kernel_param_ptrs),
-                 [](L0deviceptr& param) {
-    return &param; });
+                 [](L0deviceptr& param) { return &param; });
 
   // launching a kernel:
   typedef void* L0function;
