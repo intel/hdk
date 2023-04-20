@@ -20,7 +20,7 @@
 #include "QueryEngine/Execute.h"
 #include "Shared/misc.h"
 
-#include "QueryEngine/Dispatchers/DefaultExecutionPolicy.h"
+#include "QueryEngine/CostModel/Dispatchers/DefaultExecutionPolicy.h"
 
 QueryFragmentDescriptor::QueryFragmentDescriptor(
     const RelAlgExecutionUnit& ra_exe_unit,

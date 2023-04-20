@@ -35,7 +35,7 @@
 #include "DataMgr/ChunkMetadata.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/CompilationOptions.h"
-#include "QueryEngine/Dispatchers/ExecutionPolicy.h"
+#include "QueryEngine/CostModel/Dispatchers/ExecutionPolicy.h"
 
 namespace Buffer_Namespace {
 struct MemoryInfo;

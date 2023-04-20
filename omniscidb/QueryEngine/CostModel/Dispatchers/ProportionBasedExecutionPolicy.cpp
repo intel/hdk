@@ -11,7 +11,7 @@
     limitations under the License.
 */
 
-#include "QueryEngine/Dispatchers/ProportionBasedExecutionPolicy.h"
+#include "ProportionBasedExecutionPolicy.h"
 #include "DataMgr/MemoryLevel.h"
 
 #include <numeric>
