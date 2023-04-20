@@ -144,7 +144,6 @@ void checkTableInfo(TableInfoPtr table_info,
   CHECK_EQ(table_info->name, name);
   CHECK_EQ(table_info->fragments, fragments);
   CHECK_EQ(table_info->is_view, false);
-  CHECK_EQ(table_info->persistence_level, Data_Namespace::MemoryLevel::CPU_LEVEL);
 }
 
 void checkColumnInfo(ColumnInfoPtr col_info,

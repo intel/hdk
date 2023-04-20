@@ -192,7 +192,6 @@ class QueryFragmentDescriptor {
   void buildFragmentPerKernelForTable(const TableFragments* fragments,
                                       const RelAlgExecutionUnit& ra_exe_unit,
                                       const InputDescriptor& table_desc,
-                                      const bool is_temporary_table,
                                       const std::vector<uint64_t>& frag_offsets,
                                       const policy::ExecutionPolicy* policy,
                                       const int device_count,

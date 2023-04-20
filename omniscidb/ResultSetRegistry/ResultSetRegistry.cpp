@@ -107,12 +107,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   auto table_id = next_table_id_++;
   auto table_name = std::string("__result_set_") + std::to_string(table_id);
   // Add schema information for the ResultSet.
-  auto tinfo = addTableInfo(db_id_,
-                            table_id,
-                            table_name,
-                            false,
-                            Data_Namespace::MemoryLevel::CPU_LEVEL,
-                            table.size());
+  auto tinfo = addTableInfo(db_id_, table_id, table_name, false, table.size());
   auto& first_rs = table.result(0);
   bool has_varlen = false;
   bool has_array = false;

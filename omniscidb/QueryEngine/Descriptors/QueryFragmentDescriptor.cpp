@@ -112,7 +112,6 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     const TableFragments* fragments,
     const RelAlgExecutionUnit& ra_exe_unit,
     const InputDescriptor& table_desc,
-    const bool is_temporary_table,
     const std::vector<uint64_t>& frag_offsets,
     const policy::ExecutionPolicy* policy,
     const int device_count,
@@ -120,20 +119,6 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     const std::optional<size_t> table_desc_offset,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
-  auto get_fragment_tuple_count =
-      [&is_temporary_table](const auto& fragment) -> std::optional<size_t> {
-    // returning std::nullopt disables execution dispatch optimizations based on tuple
-    // counts as it signals to the dispatch mechanism that a reliable tuple count cannot
-    // be obtained. This is the case for fragments which have deleted rows, temporary
-    // table fragments, or fragments in a UNION query.
-    if (is_temporary_table) {
-      // 31 Mar 2021 MAT TODO I think that the fragment Tuple count should be ok
-      // need to double check that at some later date
-      return std::nullopt;
-    }
-    return fragment.getNumTuples();
-  };
-
   for (size_t i = 0; i < fragments->size(); i++) {
     if (!allowed_outer_fragment_indices_.empty()) {
       if (std::find(allowed_outer_fragment_indices_.begin(),
@@ -166,7 +151,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     }
 
     ExecutionKernelDescriptor execution_kernel_desc{
-        device_id, {}, get_fragment_tuple_count(fragment)};
+        device_id, {}, fragment.getNumTuples()};
     if (table_desc_offset) {
       const auto frag_ids =
           executor->getTableFragmentIndices(ra_exe_unit,
@@ -226,21 +211,9 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
     auto table_ref = table_desc.getTableRef();
     TableFragments const* fragments = selected_tables_fragments_.at(table_ref);
 
-    bool is_temporary_table = false;
-    // Temporary tables will not have a table descriptor and not have deleted rows.
-    const auto table_info = schema_provider->getTableInfo(table_ref);
-    CHECK(table_info);
-    if (table_info->isTemporary()) {
-      // for temporary tables, we won't have delete column metadata available. However,
-      // we know the table fits in memory as it is a temporary table, so signal to the
-      // lower layers that we can disregard the early out select * optimization
-      is_temporary_table = true;
-    }
-
     buildFragmentPerKernelForTable(fragments,
                                    ra_exe_unit,
                                    table_desc,
-                                   is_temporary_table,
                                    frag_offsets,
                                    policy,
                                    device_count,
@@ -291,22 +264,9 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
   const auto outer_fragments = it->second;
   outer_fragments_size_ = outer_fragments->size();
 
-  bool is_temporary_table = false;
-  auto schema_provider = executor->getSchemaProvider();
-  auto table_info = schema_provider->getTableInfo(outer_table_ref);
-  CHECK(table_info);
-  // Temporary tables will not have a table descriptor and not have deleted rows.
-  if (table_info->isTemporary()) {
-    // for temporary tables, we won't have delete column metadata available. However, we
-    // know the table fits in memory as it is a temporary table, so signal to the lower
-    // layers that we can disregard the early out select * optimization
-    is_temporary_table = true;
-  }
-
   buildFragmentPerKernelForTable(outer_fragments,
                                  ra_exe_unit,
                                  outer_table_desc,
-                                 is_temporary_table,
                                  frag_offsets,
                                  policy,
                                  device_count,

@@ -30,7 +30,6 @@ cdef extern from "omniscidb/SchemaMgr/TableInfo.h":
   cdef cppclass CTableInfo "TableInfo"(CTableRef):
     string name
     bool is_view
-    MemoryLevel persistence_level
     size_t fragments
     bool is_stream
 

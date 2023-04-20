@@ -48,26 +48,19 @@ struct TableInfo : public TableRef {
             int table_id,
             const std::string name_,
             bool is_view_,
-            Data_Namespace::MemoryLevel persistence_level_,
             size_t fragments_,
             bool is_stream_ = false)
       : TableRef(db_id, table_id)
       , name(name_)
       , is_view(is_view_)
-      , persistence_level(persistence_level_)
       , fragments(fragments_)
       , is_stream(is_stream_) {}
 
   std::string name;
   bool is_view;
-  Data_Namespace::MemoryLevel persistence_level;
   // For add_window_function_pre_project in RelAlgDagBuilder.
   size_t fragments;
   bool is_stream;
-
-  bool isTemporary() const {
-    return persistence_level == Data_Namespace::MemoryLevel::CPU_LEVEL;
-  }
 
   std::string toString() const {
     return name + "(db_id=" + std::to_string(db_id) +
