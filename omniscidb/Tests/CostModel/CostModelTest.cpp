@@ -17,7 +17,6 @@
 #include <armadillo>
 #endif
 
-
 #include "QueryEngine/CostModel/DataSources/DataSource.h"
 #include "QueryEngine/CostModel/ExtrapolationModels/LinearExtrapolation.h"
 #include "QueryEngine/CostModel/ExtrapolationModels/LinearRegression.h"
