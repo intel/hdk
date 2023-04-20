@@ -33,7 +33,6 @@
 #include <numeric>
 #include <thread>
 
-#include "QueryEngine/CostModel/DummyCostModel.h"
 #include "CudaMgr/CudaMgr.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "DataProvider/DictDescriptor.h"
@@ -42,6 +41,7 @@
 #include "QueryEngine/AggregatedColRange.h"
 #include "QueryEngine/CodeGenerator.h"
 #include "QueryEngine/ColumnFetcher.h"
+#include "QueryEngine/CostModel/DummyCostModel.h"
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 #include "QueryEngine/Descriptors/QueryFragmentDescriptor.h"
 #include "QueryEngine/Dispatchers/DefaultExecutionPolicy.h"
