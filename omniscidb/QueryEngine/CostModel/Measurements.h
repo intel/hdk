@@ -34,12 +34,6 @@ struct Measurement {
   size_t milliseconds;
 };
 
-struct BytesOrder {
-  bool operator()(const Measurement& m1, const Measurement& m2) {
-    return m1.bytes < m2.bytes;
-  }
-};
-
 using TemplateMeasurements =
     std::unordered_map<AnalyticalTemplate, std::vector<Measurement>>;
 using DeviceMeasurements = std::unordered_map<ExecutorDeviceType, TemplateMeasurements>;

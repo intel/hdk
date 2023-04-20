@@ -22,7 +22,12 @@ size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) {
   Detail::Measurement tmp = {bytes, 0};
 
   auto iter = std::upper_bound(
-      measurement_.begin(), measurement_.end(), tmp, Detail::BytesOrder());
+      measurement_.begin(),
+      measurement_.end(),
+      tmp,
+      [](const Detail::Measurement& lhs, const Detail::Measurement& rhs) {
+        return lhs.bytes < rhs.bytes;
+      });
 
   if (iter == measurement_.begin()) {
     id1 = 0;
