@@ -651,13 +651,18 @@ void CalciteMgr::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
     calcite_jni->setRuntimeExtensionFunctions(udfs, is_runtime);
     return "";  // all tasks return strings
   });
+
+  auto result = task.get_future();
   submitTaskToQueue(std::move(task));
+
+  result.wait();
 }
 
 CalciteMgr::CalciteMgr(SchemaProviderPtr schema_provider,
                        ConfigPtr config,
                        const std::string& udf_filename,
                        size_t calcite_max_mem_mb) {
+  // todo: should register an exit handler for ctrl + c
   worker_ = std::thread(&CalciteMgr::worker,
                         this,
                         schema_provider,

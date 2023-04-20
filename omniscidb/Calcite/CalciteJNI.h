@@ -42,6 +42,7 @@ class CalciteMgr {
 
   ~CalciteMgr();
 
+  // TODO: not thread safe
   static CalciteMgr* get(SchemaProviderPtr schema_provider,
                          ConfigPtr config,
                          const std::string& udf_filename = "",
