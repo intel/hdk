@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: env=Docker build_type=${{ inputs.name }}
+    name: Docker - ${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
