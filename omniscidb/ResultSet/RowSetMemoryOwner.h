@@ -45,19 +45,25 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
                     const size_t arena_block_size,
                     const size_t num_kernel_threads = 0)
       : data_provider_(data_provider), arena_block_size_(arena_block_size) {
-    for (size_t i = 0; i < num_kernel_threads + 1; i++) {
-      allocators_.emplace_back(std::make_unique<Arena>(arena_block_size));
-    }
-    CHECK(!allocators_.empty());
+    // We used to allocate an Arena per each kernel thread. This was done to avoid
+    // small result set buffers allocated for different threads to be placed into
+    // the same cache line. Now we use a single Arena and round-up allocated memory
+    // size up to 256 bytes to avoid such cache conflicts. This allows to significantly
+    // reduce amount of allocated virtual memory which is important for ASAN runs.
+    allocator_ = std::make_unique<Arena>(arena_block_size);
   }
 
   enum class StringTranslationType { SOURCE_INTERSECTION, SOURCE_UNION };
 
   int8_t* allocate(const size_t num_bytes, const size_t thread_idx = 0) override {
-    CHECK_LT(thread_idx, allocators_.size());
-    auto allocator = allocators_[thread_idx].get();
     std::lock_guard<std::mutex> lock(state_mutex_);
-    return reinterpret_cast<int8_t*>(allocator->allocate(num_bytes));
+    // Here we assume we don't use RowSetMemoryOwner to allocate many small objects
+    // and allocate only one or several buffers per ResultSet. It shouldn't be used
+    // to allocate low-level objects like strings or varlen data buffers for each
+    // result set row. The code should be revised if we want to use RowSetMemoryOwner
+    // for such allocations.
+    return reinterpret_cast<int8_t*>(
+        allocator_->allocate(std::max(num_bytes, (size_t)256)));
   }
 
   int8_t* allocateCountDistinctBuffer(const size_t num_bytes,
@@ -253,7 +259,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
 
   DataProvider* data_provider_;  // for metadata lookups
   size_t arena_block_size_;      // for cloning
-  std::vector<std::unique_ptr<Arena>> allocators_;
+  std::unique_ptr<Arena> allocator_;
 
   mutable std::mutex state_mutex_;
 
