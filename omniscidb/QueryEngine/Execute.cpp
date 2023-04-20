@@ -2813,7 +2813,6 @@ FetchResult Executor::fetchChunks(
       if (!fragments->size()) {
         return {};
       }
-      CHECK_LT(frag_id, fragments->size());
       auto memory_level_for_column = memory_level;
       if (plan_state_->columns_to_fetch_.find(*col_id) ==
           plan_state_->columns_to_fetch_.end()) {

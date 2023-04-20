@@ -35,10 +35,6 @@ cdef class TableInfo:
     return self.c_table_info.get().is_view
 
   @property
-  def persistence_level(self):
-    return self.c_table_info.get().persistence_level
-
-  @property
   def fragments(self):
     return self.c_table_info.get().fragments
 
