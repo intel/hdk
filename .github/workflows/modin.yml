@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test (env=Conda build_type=cpu)
+    name: Build and Test (Conda - cpu)
     runs-on: ubuntu-latest
 
     env:
