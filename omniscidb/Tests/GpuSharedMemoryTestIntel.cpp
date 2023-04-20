@@ -17,6 +17,7 @@
 #include "GpuSharedMemoryTestIntel.h"
 #include <LLVMSPIRVLib/LLVMSPIRVLib.h>
 #include "QueryEngine/CompilationOptions.h"
+#include "QueryEngine/Compiler/HelperFunctions.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/OutputBufferInitialization.h"
 #include "QueryEngine/ResultSetReduction.h"
@@ -148,6 +149,8 @@ void GpuReductionTester::codegenWrapperKernel() {
 
   ir_builder.SetInsertPoint(bb_exit);
   ir_builder.CreateRet(nullptr);
+
+  wrapper_kernel_->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
 }
 
 namespace {
@@ -406,7 +409,41 @@ void GpuReductionTester::performReductionTest(
     const std::vector<std::unique_ptr<ResultSet>>& result_sets,
     const ResultSetStorage* gpu_result_storage,
     const size_t device_id) {
+  DUMP_MODULE(module_, "gen.ll");
   prepare_generated_gpu_kernel(module_, context_, getWrapperKernel());
+
+  auto ext_module = executor_->getExtensionModuleContext()->getSpirvHelperFuncModule();
+
+  for (auto& F : *(ext_module) {
+    compiler::insert_declaration(ext_module.get(), module_, F.getName().str());
+  }
+
+  for (auto& F : *ext_module) {
+    if (!F.isDeclaration()) {
+      compiler::replace_function(ext_module.get(), module_, F.getName().str());
+    }
+  }
+
+  DUMP_MODULE(module_, "after.linking.spirv.ll")
+
+  // set proper calling conv & mangle spirv built-ins
+  for (auto& Fn : *module_) {
+    Fn.setCallingConv(llvm::CallingConv::SPIR_FUNC);
+    if (Fn.getName().startswith("__spirv_")) {
+      CHECK(Fn.isDeclaration());
+      Fn.setName(compiler::mangle_spirv_builtin(Fn));
+    }
+  }
+
+  for (auto& Fn : *module_) {
+    for (auto I = llvm::inst_begin(Fn), E = llvm::inst_end(Fn); I != E; ++I) {
+      if (auto* CI = llvm::dyn_cast<llvm::CallInst>(&*I)) {
+        CI->setCallingConv(llvm::CallingConv::SPIR_FUNC);
+      }
+    }
+  }
+
+
 
   std::stringstream ss;
   llvm::raw_os_ostream os(ss);
@@ -438,7 +475,8 @@ void GpuReductionTester::performReductionTest(
   std::transform(d_input_buffers.begin(),
                  d_input_buffers.end(),
                  std::back_inserter(h_input_buffer_dptrs),
-                 [](int8_t* dptr) { return reinterpret_cast<L0deviceptr>(dptr); });
+                 [](int8_t* dptr) {
+    return reinterpret_cast<L0deviceptr>(dptr); });
 
   auto d_input_buffer_dptrs =
       l0_mgr_->allocateDeviceMem(num_buffers * sizeof(L0deviceptr), device_id);
@@ -471,7 +509,8 @@ void GpuReductionTester::performReductionTest(
   std::transform(h_kernel_params.begin(),
                  h_kernel_params.end(),
                  std::back_inserter(kernel_param_ptrs),
-                 [](L0deviceptr& param) { return &param; });
+                 [](L0deviceptr& param) {
+    return &param; });
 
   // launching a kernel:
   typedef void* L0function;

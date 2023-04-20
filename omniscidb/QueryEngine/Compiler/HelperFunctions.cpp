@@ -21,6 +21,8 @@
 #include <llvm/Transforms/InstCombine/InstCombine.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include "QueryEngine/Compiler/Exceptions.h"
 #include "QueryEngine/Optimization/AnnotateInternalFunctionsPass.h"
@@ -133,4 +135,55 @@ void optimize_ir(llvm::Function* query_func,
 
   eliminate_dead_self_recursive_funcs(*llvm_module, live_funcs);
 }
+
+void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string& fname) {
+  auto fn = from->getFunction(fname);
+  CHECK(fn);
+
+  llvm::Function::Create(
+      fn->getFunctionType(), llvm::GlobalValue::ExternalLinkage, fn->getName(), *to);
+}
+
+void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname) {
+  auto target_fn = to->getFunction(fname);
+  auto from_fn = from->getFunction(fname);
+  CHECK(target_fn);
+  CHECK(from_fn);
+  CHECK(!from_fn->isDeclaration());
+
+  target_fn->deleteBody();
+
+  llvm::ValueToValueMapTy vmap;
+  llvm::Function::arg_iterator pos_fn_arg_it = target_fn->arg_begin();
+  for (llvm::Function::const_arg_iterator j = from_fn->arg_begin();
+       j != from_fn->arg_end();
+       ++j) {
+    pos_fn_arg_it->setName(j->getName());
+    vmap[&*j] = &*pos_fn_arg_it++;
+  }
+  llvm::SmallVector<llvm::ReturnInst*, 8> returns;
+#if LLVM_VERSION_MAJOR > 12
+  llvm::CloneFunctionInto(
+      target_fn, from_fn, vmap, llvm::CloneFunctionChangeType::DifferentModule, returns);
+#else
+  llvm::CloneFunctionInto(target_fn, from_fn, vmap, true, returns);
+#endif
+
+  for (auto& BB : *target_fn) {
+    for (llvm::BasicBlock::iterator bbi = BB.begin(); bbi != BB.end();) {
+      llvm::Instruction* inst = &*bbi++;
+      if (auto* call = llvm::dyn_cast<llvm::CallInst>(&*inst)) {
+        auto local_callee = to->getFunction(call->getCalledFunction()->getName());
+        CHECK(local_callee);
+        std::vector<llvm::Value*> args;
+        std::copy(call->arg_begin(), call->arg_end(), std::back_inserter(args));
+
+        auto new_call = llvm::CallInst::Create(local_callee, args, call->getName());
+
+        llvm::ReplaceInstWithInst(call, new_call);
+      }
+    }
+  }
+}
+
 }  // namespace compiler

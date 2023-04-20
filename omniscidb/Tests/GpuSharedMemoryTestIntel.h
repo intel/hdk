@@ -67,14 +67,17 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
                      const std::vector<int64_t>& init_agg_values,
                      l0::L0Manager* l0_mgr,
                      Executor* executor)
-      : GpuSharedMemCodeBuilder(module,
-                                context,
-                                qmd,
-                                targets,
-                                init_agg_values,
-                                config,
-                                executor)
-      , l0_mgr_(l0_mgr) {
+      : GpuSharedMemCodeBuilder(
+            module,
+            context,
+            qmd,
+            targets,
+            init_agg_values,
+            config,
+            compiler::CodegenTraits::get(compiler::l0_cgen_traits_desc),
+            executor)
+      , l0_mgr_(l0_mgr)
+      , executor_(executor) {
     // CHECK(getReductionFunction());
   }
   void codegenWrapperKernel();
@@ -86,4 +89,5 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
  private:
   l0::L0Manager* l0_mgr_;
   llvm::Function* wrapper_kernel_;
+  Executor* executor_;
 };

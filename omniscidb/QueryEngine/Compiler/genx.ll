@@ -27,6 +27,11 @@ define void @write_back_non_grouped_agg(i64 addrspace(3)* %input_buffer, i64 add
     ret void
 }
 
+define noundef i64 addrspace(3)* @declare_dynamic_shared_memory() {
+    %res = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    ret i64 addrspace(3)* %res
+}
+
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
