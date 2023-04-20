@@ -29,3 +29,4 @@ endif()
 
 add_library(CostModel STATIC ${COST_MODEL_SOURCES})
 target_link_libraries(CostModel PRIVATE ${COST_MODEL_LIBS})
+target_compile_options(CostModel PRIVATE -fPIC)
