@@ -13,9 +13,9 @@
 
 #include "DummyCostModel.h"
 
-#include "QueryEngine/Dispatchers/DefaultExecutionPolicy.h"
-#include "QueryEngine/Dispatchers/ProportionBasedExecutionPolicy.h"
-#include "QueryEngine/Dispatchers/RRExecutionPolicy.h"
+#include "Dispatchers/DefaultExecutionPolicy.h"
+#include "Dispatchers/ProportionBasedExecutionPolicy.h"
+#include "Dispatchers/RRExecutionPolicy.h"
 
 namespace costmodel {
 

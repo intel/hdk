@@ -11,18 +11,20 @@
     limitations under the License.
 */
 
-#include "QueryEngine/Dispatchers/RRExecutionPolicy.h"
+#include "DefaultExecutionPolicy.h"
 #include "DataMgr/MemoryLevel.h"
 
 namespace policy {
-SchedulingAssignment RoundRobinExecutionPolicy::scheduleSingleFragment(
+SchedulingAssignment FragmentIDAssignmentExecutionPolicy::scheduleSingleFragment(
     const FragmentInfo& fragment,
     size_t frag_id,
     size_t frag_num) const {
-  auto device_type = frag_id % 2 ? ExecutorDeviceType::GPU : ExecutorDeviceType::CPU;
-  auto memory_level = device_type == ExecutorDeviceType::GPU ? Data_Namespace::GPU_LEVEL
-                                                             : Data_Namespace::CPU_LEVEL;
+  auto memory_level = dt_ == ExecutorDeviceType::GPU ? Data_Namespace::GPU_LEVEL
+                                                     : Data_Namespace::CPU_LEVEL;
   int device_id = fragment.deviceIds[static_cast<int>(memory_level)];
-  return {device_type, device_id};
+  return {dt_, device_id};
+}
+std::vector<ExecutorDeviceType> FragmentIDAssignmentExecutionPolicy::devices() const {
+  return {dt_};
 }
 }  // namespace policy

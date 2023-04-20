@@ -20,9 +20,9 @@
 #include "ExtrapolationModels/ExtrapolationModel.h"
 #include "Measurements.h"
 
+#include "Dispatchers/ExecutionPolicy.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
-#include "QueryEngine/Dispatchers/ExecutionPolicy.h"
 
 namespace costmodel {
 

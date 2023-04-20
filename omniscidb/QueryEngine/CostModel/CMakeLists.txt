@@ -4,8 +4,11 @@ set(COST_MODEL_SOURCES
         ExtrapolationModels/LinearExtrapolation.cpp 
         DummyCostModel.cpp 
         DataSources/DataSource.cpp 
-        Measurements.cpp)
-
+        Measurements.cpp
+        Dispatchers/DefaultExecutionPolicy.cpp
+        Dispatchers/RRExecutionPolicy.cpp
+        Dispatchers/ProportionBasedExecutionPolicy.cpp
+)
 
 set(COST_MODEL_LIBS Logger)
 
