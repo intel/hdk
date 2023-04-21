@@ -572,6 +572,14 @@ CalciteMgr::~CalciteMgr() {
   worker_.join();
 }
 
+CalciteMgr* CalciteMgr::get(const std::string& udf_filename, size_t calcite_max_mem_mb) {
+  std::call_once(instance_init_flag_, [=] {
+    instance_ =
+        std::unique_ptr<CalciteMgr>(new CalciteMgr(udf_filename, calcite_max_mem_mb));
+  });
+  return instance_.get();
+}
+
 std::string CalciteMgr::process(
     const std::string& db_name,
     const std::string& sql_string,
