@@ -926,7 +926,7 @@ ChunkStats ArrowStorage::computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
           chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * elem_type->size()),
           chunk->length(),
           true);
-    } else {
+    } else if (chunk->length() != 0) {
       encoder->updateStatsEncoded(
           chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * elem_type->size()),
           chunk->length());
