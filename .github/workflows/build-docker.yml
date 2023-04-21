@@ -59,14 +59,16 @@ jobs:
             rm -rf /tmp/.buildx-cache
             mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+      # We are separating docker and conda maven cache, due to 
+      # different maven(and plugins) version inside docker and tconda env.
       - name: Restore Maven cache
         id: maven-cache
         uses: actions/cache@v3
         with:
           path: |
             ~/.m2
-          key: maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-
+          key: Docker-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: Docker-maven-
 
       - name: Start the container
         run:  |
@@ -74,17 +76,27 @@ jobs:
           docker run -id --name build.${{ inputs.name }} --network host -v $(pwd):/_work build.${{ inputs.name }}:latest
 
       - name: Copy maven cache inside container
-        if: steps.maven-cache.cache-hit == 'true'
+        if: ${{ steps.maven-cache.outputs.cache-hit == 'true' }}
         run: |
           docker cp ~/.m2 build.${{ inputs.name }}:/home/ghrunner/.m2
           docker exec -u ghrunner -i build.${{ inputs.name }} chown -R ghrunner:ghrunner /home/ghrunner
+          docker exec -u ghrunner build.${{ inputs.name }} ls -la /home/ghrunner/.m2/repository
 
-      - name: Configure and build the project
+      - name: Debug packages info
         run: |
           docker exec -u ghrunner build.${{ inputs.name }} dpkg -l
+
+      - name: Configure and build (Docker - ${{ inputs.name }})
+        run: |
           docker exec -u ghrunner build.${{ inputs.name }} sh /_work/omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           docker exec -u ghrunner build.${{ inputs.name }} tar -zcf /tmp/build.tgz -C /_work .
           docker cp build.${{ inputs.name }}:/tmp/build.tgz .
+          
+      
+      - name: Store maven cache
+        if: ${{ steps.maven-cache.outputs.cache-hit != 'true' }}
+        run: |
+          docker cp build.${{ inputs.name }}:/home/ghrunner/.m2 ~/.m2
      
       - name: Upload build and src files
         uses: actions/upload-artifact@v3

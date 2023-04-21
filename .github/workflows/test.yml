@@ -31,11 +31,11 @@ jobs:
           tar -zxf build.tgz
 
       - name: Restore Conda env cache
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ inputs.cache-suffix }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
 
       - name: C++ style check
         if: inputs.test == 'style'

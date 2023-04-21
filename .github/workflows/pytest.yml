@@ -16,7 +16,7 @@ jobs:
       - name: Set env context
         run: |
           echo CONDA_PATH=$CONDA >>$GITHUB_ENV
-          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-cpu >>$GITHUB_ENV
           echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
 
       - name: Restore Conda env cache
@@ -25,23 +25,23 @@ jobs:
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-pytest-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
           restore-keys: |
-            ${{ env.RUN_STAMP }}-conda-pytest-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
+            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
 
       - name: Update Conda env
-        if: steps.conda-cache.cache-hit != 'true'
+        if: ${{ steps.restore-conda-cache.outputs.cache-hit != 'true' }}
         run: |
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
 
       - name: Save Conda env cache
-        id: save-conda-cache
+        if: ${{ steps.restore-conda-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v3
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-pytest-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
 
       - name: Restore Maven cache
         uses: actions/cache@v3
