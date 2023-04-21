@@ -183,7 +183,7 @@ int getCalciteScale(const hdk::ir::Type* type) {
 
 }  // namespace
 
-std::string schema_to_json(SchemaProviderPtr schema_provider) {
+std::string schema_to_json(SchemaProvider* schema_provider) {
   auto dbs = schema_provider->listDatabases();
   if (dbs.empty()) {
     return "{}";

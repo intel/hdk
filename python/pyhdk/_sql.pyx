@@ -40,7 +40,7 @@ cdef class Calcite:
     cdef bool legacy_syntax = kwargs.get("legacy_syntax", False)
     cdef bool is_explain = kwargs.get("is_explain", False)
     cdef bool is_view_optimize = kwargs.get("is_view_optimize", False)
-    return self.calcite.process(db_name, sql, self.schema_provider, self.config, filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
+    return self.calcite.process(db_name, sql, self.schema_provider.get(), self.config.get(), filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
 
 cdef class ExecutionResult:
   def row_count(self):

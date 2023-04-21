@@ -53,8 +53,8 @@ class CalciteMgr {
 
   std::string process(const std::string& db_name,
                       const std::string& sql_string,
-                      SchemaProviderPtr schema_provider,
-                      ConfigPtr config,
+                      SchemaProvider* schema_provider,
+                      Config* config,
                       const std::vector<FilterPushDownInfo>& filter_push_down_info = {},
                       const bool legacy_syntax = false,
                       const bool is_explain = false,
