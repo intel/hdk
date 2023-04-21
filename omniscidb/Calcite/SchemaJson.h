@@ -14,4 +14,4 @@
 
 #include "SchemaMgr/SchemaProvider.h"
 
-std::string schema_to_json(SchemaProviderPtr schema_provider);
+std::string schema_to_json(SchemaProvider* schema_provider);

@@ -61,7 +61,7 @@ std::string RelAlgCache::process(
 
   std::string schema_json;
   if (!use_cache_.empty() || !build_cache_.empty()) {
-    schema_json = schema_to_json(schema_provider_);
+    schema_json = schema_to_json(schema_provider_.get());
   }
 
   if (!use_cache_.empty()) {
@@ -89,8 +89,8 @@ std::string RelAlgCache::process(
 
   auto ra = calcite_->process(db_name,
                               sql_string,
-                              schema_provider_,
-                              config_,
+                              schema_provider_.get(),
+                              config_.get(),
                               filter_push_down_info,
                               legacy_syntax,
                               is_explain,

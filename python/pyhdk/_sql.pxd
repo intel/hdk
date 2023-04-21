@@ -9,7 +9,7 @@ from libcpp.string cimport string
 from libcpp.vector cimport vector
 
 from pyhdk._common cimport CConfig
-from pyhdk._storage cimport CSchemaProviderPtr, CDataProvider, CDataMgr, CBufferProvider
+from pyhdk._storage cimport CSchemaProvider, CSchemaProviderPtr, CDataProvider, CDataMgr, CBufferProvider
 from pyhdk._execute cimport CExecutor, CResultSetPtr, CCompilationOptions, CExecutionOptions, CTargetMetaInfo
 
 cdef extern from "omniscidb/QueryEngine/ExtensionFunctionsWhitelist.h":
@@ -33,7 +33,7 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
     @staticmethod
     CalciteMgr* get(const string&, size_t);
     
-    string process(const string&, const string&, CSchemaProviderPtr, shared_ptr[CConfig], const vector[FilterPushDownInfo]&, bool, bool, bool) except +
+    string process(const string&, const string&, CSchemaProvider*, CConfig*, const vector[FilterPushDownInfo]&, bool, bool, bool) except +
 
     string getExtensionFunctionWhitelist()
     string getUserDefinedFunctionWhitelist()

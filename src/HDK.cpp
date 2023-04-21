@@ -40,8 +40,8 @@ ExecutionResult HDK::query(const std::string& sql, const bool is_explain) {
   CHECK(internal_->calcite);
   auto ra = internal_->calcite->process(internal_->db_name,
                                         sql,
-                                        internal_->storage,
-                                        internal_->config,
+                                        internal_->storage.get(),
+                                        internal_->config.get(),
                                         {},
                                         /*legacy_syntax=*/true);
 
