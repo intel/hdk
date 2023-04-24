@@ -632,6 +632,18 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     frag.metadata.resize(at->columns().size());
   }
 
+  std::vector<bool> lazy_fetch_cols(at->columns().size(), false);
+  for (size_t col_idx = 0; col_idx < at->columns().size(); col_idx++) {
+    auto col_info = getColumnInfo(db_id_, table_id, col_idx + 1);
+    auto col_type = col_info->type;
+    auto col_arr = at->column(col_idx);
+    if (col_type->isExtDictionary() && col_arr->type()->id() == arrow::Type::STRING) {
+      table.lazy_fetch_col_ids.insert(col_idx);
+      lazy_fetch_cols[col_idx] = true;
+    }
+  }
+  // do some upfront processing of the columns to determine which can be lazy fetched
+
   mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   threading::parallel_for(
       threading::blocked_range(0, (int)at->columns().size()), [&](auto range) {
@@ -665,8 +677,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
           } else if (col_type->isExtDictionary()) {
             switch (col_arr->type()->id()) {
               case arrow::Type::STRING:
-                if (true) {  // enable lazy dictionary
-                  table.lazy_fetch_col_ids.insert(col_idx);
+                if (lazy_fetch_cols[col_idx]) {  // enable lazy dictionary
                   // grab col_arr from record batch
                   CHECK(table.record_batch);
                   auto array = table.record_batch->column(col_idx);
@@ -732,7 +743,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                       int32_t max = static_cast<int32_t>(
                           table.record_batch->column(col_idx)->length());
                       meta->fillChunkStats(
-                          min, max, /*has_nulls=*/false);  // TODO has nulls
+                          min, max, /*has_nulls=*/true);  // TODO has nulls set wide
                     } else {
                       meta->fillChunkStats(computeStats(
                           col_arr->Slice(frag.offset, frag.row_count * elems_count),
@@ -763,7 +774,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                 int32_t min = 0;
                 int32_t max =
                     static_cast<int32_t>(table.record_batch->column(col_idx)->length());
-                meta->fillChunkStats(min, max, /*has_nulls=*/false);  // TODO has nulls
+                meta->fillChunkStats(
+                    min, max, /*has_nulls=*/true);  // TODO has nulls set wide
                 CHECK(false) << "TODO: remove this and make sure we don't hit this path "
                                 "for lazy dictionary encoding";
               }
