@@ -73,58 +73,58 @@ llvm::Value* CodeGenerator::codegenCast(llvm::Value* operand_lv,
     return cgen_state_->ir_builder_.CreatePointerCast(operand_lv,
                                                       byte_array_type->getPointerTo());
   }
-  if (operand_lv->getType()->isIntegerTy()) {
-    if (operand_type->isString() || operand_type->isExtDictionary()) {
-      return codegenCastFromString(
-          operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
-    }
-    CHECK(operand_type->isInteger() || operand_type->isDecimal() ||
-          operand_type->isDateTime() || operand_type->isBoolean());
-    if (operand_type->isBoolean()) {
-      // cast boolean to int8
-      CHECK(operand_lv->getType()->isIntegerTy(1) ||
-            operand_lv->getType()->isIntegerTy(8));
-      if (operand_lv->getType()->isIntegerTy(1)) {
-        operand_lv = cgen_state_->castToTypeIn(operand_lv, 8);
-      }
-      if (type->isBoolean()) {
-        return operand_lv;
-      }
-    }
-    if (operand_type->isInteger() && operand_lv->getType()->isIntegerTy(8) &&
-        type->isBoolean()) {
-      // cast int8 to boolean
-      return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
-    }
-    if (operand_type->isTimestamp() && type->isDate()) {
-      // Maybe we should instead generate DateTruncExpr directly from RelAlgTranslator
-      // for this pattern. However, DateTruncExpr is supposed to return a timestamp,
-      // whereas this cast returns a date. The underlying type for both is still the same,
-      // but it still doesn't look like a good idea to misuse DateTruncExpr.
-      // Date will have default precision of day, but TIMESTAMP dimension would
-      // matter but while converting date through seconds
-      return codegenCastTimestampToDate(
-          operand_lv,
-          operand_type->as<hdk::ir::TimestampType>()->unit(),
-          type->nullable());
-    }
-    if ((operand_type->isTimestamp() || operand_type->isDate()) && type->isTimestamp()) {
-      const auto operand_unit = (operand_type->isTimestamp())
-                                    ? operand_type->as<hdk::ir::TimestampType>()->unit()
-                                    : hdk::ir::TimeUnit::kSecond;
-      if (operand_unit != type->as<hdk::ir::TimestampType>()->unit()) {
-        return codegenCastBetweenTimestamps(
-            operand_lv, operand_type, type, type->nullable());
-      }
-    }
-    if (type->isInteger() || type->isDecimal() || type->isDateTime()) {
-      return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
-    } else {
-      return codegenCastToFp(operand_lv, operand_type, type);
-    }
-  } else {
+  if (!operand_lv->getType()->isIntegerTy()) {
     return codegenCastFromFp(operand_lv, operand_type, type);
   }
+
+  if (operand_type->isString() || operand_type->isExtDictionary()) {
+    return codegenCastFromString(
+        operand_lv, operand_type, type, operand_is_const, is_dict_intersection, co);
+  }
+  CHECK(operand_type->isInteger() || operand_type->isDecimal() ||
+        operand_type->isDateTime() || operand_type->isBoolean());
+  if (operand_type->isBoolean()) {
+    // cast boolean to int8
+    CHECK(operand_lv->getType()->isIntegerTy(1) || operand_lv->getType()->isIntegerTy(8));
+    if (operand_lv->getType()->isIntegerTy(1)) {
+      operand_lv = cgen_state_->castToTypeIn(operand_lv, 8);
+    }
+    if (type->isBoolean()) {
+      return operand_lv;
+    }
+  }
+  if (operand_type->isInteger() && operand_lv->getType()->isIntegerTy(8) &&
+      type->isBoolean()) {
+    // cast int8 to boolean
+    return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
+  }
+  if (operand_type->isTimestamp() && type->isDate()) {
+    // Maybe we should instead generate DateTruncExpr directly from RelAlgTranslator
+    // for this pattern. However, DateTruncExpr is supposed to return a timestamp,
+    // whereas this cast returns a date. The underlying type for both is still the same,
+    // but it still doesn't look like a good idea to misuse DateTruncExpr.
+    // Date will have default precision of day, but TIMESTAMP dimension would
+    // matter but while converting date through seconds
+    return codegenCastTimestampToDate(
+        operand_lv, operand_type->as<hdk::ir::TimestampType>()->unit(), type->nullable());
+  }
+  if (operand_type->isTimestamp() && type->isTime()) {
+    return codegenCastTimestampToTime(operand_lv, operand_type, type);
+  }
+  if ((operand_type->isTimestamp() || operand_type->isDate()) && type->isTimestamp()) {
+    const auto operand_unit = (operand_type->isTimestamp())
+                                  ? operand_type->as<hdk::ir::TimestampType>()->unit()
+                                  : hdk::ir::TimeUnit::kSecond;
+    if (operand_unit != type->as<hdk::ir::TimestampType>()->unit()) {
+      return codegenCastBetweenTimestamps(operand_lv, operand_type, type);
+    }
+  }
+  if (type->isInteger() || type->isDecimal() || type->isDateTime()) {
+    return codegenCastBetweenIntTypes(operand_lv, operand_type, type);
+  } else {
+    return codegenCastToFp(operand_lv, operand_type, type);
+  }
+
   CHECK(false);
   return nullptr;
 }
@@ -159,11 +159,53 @@ llvm::Value* CodeGenerator::codegenCastTimestampToDate(llvm::Value* ts_lv,
   return ret;
 }
 
+llvm::Value* CodeGenerator::codegenCastTimestampToTime(llvm::Value* ts_lv,
+                                                       const hdk::ir::Type* operand_type,
+                                                       const hdk::ir::Type* target_type) {
+  AUTOMATIC_IR_METADATA(cgen_state_);
+  const auto operand_unit = operand_type->as<hdk::ir::TimestampType>()->unit();
+  const auto target_unit = target_type->as<hdk::ir::TimeType>()->unit();
+
+  CHECK(ts_lv->getType()->isIntegerTy(64));
+  if (operand_unit < target_unit) {
+    const auto target_sec_scale = hdk::ir::unitsPerSecond(target_unit);
+    const auto scale =
+        hdk::ir::unitsPerSecond(target_unit) / hdk::ir::unitsPerSecond(operand_unit);
+    if (!operand_type->nullable()) {
+      return cgen_state_->emitCall(
+          "TimestampToTimeUpscale",
+          {{ts_lv, cgen_state_->llInt(scale), cgen_state_->llInt(target_sec_scale)}});
+    }
+    // Timestamp, Time32. Time64 have int64 inline int value, but logically corect to pass
+    // target and source null values.
+    return cgen_state_->emitCall("TimestampToTimeUpscaleNullable",
+                                 {{ts_lv,
+                                   cgen_state_->llInt(scale),
+                                   cgen_state_->llInt(target_sec_scale),
+                                   cgen_state_->inlineIntNull(operand_type),
+                                   cgen_state_->inlineIntNull(target_type)}});
+  }
+  // On downscale we at first cut of date part, than cut of unused unit precision
+  const auto operand_sec_scale = hdk::ir::unitsPerSecond(operand_unit);
+  const auto scale =
+      hdk::ir::unitsPerSecond(operand_unit) / hdk::ir::unitsPerSecond(target_unit);
+  if (!operand_type->nullable()) {
+    return cgen_state_->emitCall(
+        "TimestampToTimeDownscale",
+        {{ts_lv, cgen_state_->llInt(scale), cgen_state_->llInt(operand_sec_scale)}});
+  }
+  return cgen_state_->emitCall("TimestampToTimeDownscaleNullable",
+                               {{ts_lv,
+                                 cgen_state_->llInt(scale),
+                                 cgen_state_->llInt(operand_sec_scale),
+                                 cgen_state_->inlineIntNull(operand_type),
+                                 cgen_state_->inlineIntNull(target_type)}});
+}
+
 llvm::Value* CodeGenerator::codegenCastBetweenTimestamps(
     llvm::Value* ts_lv,
     const hdk::ir::Type* operand_type,
-    const hdk::ir::Type* target_type,
-    const bool nullable) {
+    const hdk::ir::Type* target_type) {
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto operand_unit = operand_type->isTimestamp()
                                 ? operand_type->as<hdk::ir::TimestampType>()->unit()
@@ -179,7 +221,7 @@ llvm::Value* CodeGenerator::codegenCastBetweenTimestamps(
     const auto scale =
         hdk::ir::unitsPerSecond(target_unit) / hdk::ir::unitsPerSecond(operand_unit);
     codegenCastBetweenIntTypesOverflowChecks(ts_lv, operand_type, target_type, scale);
-    return nullable
+    return target_type->nullable()
                ? cgen_state_->emitCall("mul_int64_t_nullable_lhs",
                                        {ts_lv,
                                         cgen_state_->llInt(static_cast<int64_t>(scale)),
@@ -189,7 +231,7 @@ llvm::Value* CodeGenerator::codegenCastBetweenTimestamps(
   }
   const auto scale =
       hdk::ir::unitsPerSecond(operand_unit) / hdk::ir::unitsPerSecond(target_unit);
-  return nullable
+  return target_type->nullable()
              ? cgen_state_->emitCall("floor_div_nullable_lhs",
                                      {ts_lv,
                                       cgen_state_->llInt(static_cast<int64_t>(scale)),

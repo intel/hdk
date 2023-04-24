@@ -265,10 +265,13 @@ class CodeGenerator {
                                           const hdk::ir::TimeUnit unit,
                                           const bool nullable);
 
+  llvm::Value* codegenCastTimestampToTime(llvm::Value* ts_lv,
+                                          const hdk::ir::Type* operand_type,
+                                          const hdk::ir::Type* target_type);
+
   llvm::Value* codegenCastBetweenTimestamps(llvm::Value* ts_lv,
                                             const hdk::ir::Type* operand_type,
-                                            const hdk::ir::Type* target_type,
-                                            const bool nullable);
+                                            const hdk::ir::Type* target_type);
 
   llvm::Value* codegenCastFromString(llvm::Value* operand_lv,
                                      const hdk::ir::Type* operand_type,

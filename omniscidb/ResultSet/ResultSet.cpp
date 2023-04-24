@@ -256,7 +256,9 @@ std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar,
         if (col_type->isDate()) {
           oss << getStrDateFromSeconds(boost::get<int64_t>(current_scalar));
         } else if (col_type->isTime()) {
-          oss << getStrTimeFromSeconds(boost::get<int64_t>(current_scalar));
+          oss << getStrTimeFromSeconds(
+              boost::get<int64_t>(current_scalar) /
+              hdk::ir::unitsPerSecond(col_type->as<hdk::ir::TimeType>()->unit()));
         } else if (col_type->isTimestamp()) {
           oss << getStrTStamp(boost::get<int64_t>(current_scalar),
                               col_type->as<hdk::ir::DateTimeBaseType>()->unit());
