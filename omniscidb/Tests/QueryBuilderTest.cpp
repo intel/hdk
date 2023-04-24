@@ -346,6 +346,19 @@ class QueryBuilderTest : public TestSuite {
                  {"id": 3, "arr1":[1, null], "arr2" : [null, 5.0, null]}
                  {"id": 4, "arr1":[1, 2], "arr2" : [4.0, 5.0, 6.0]})___");
 
+    createTable("test_date",
+                {{"col_bi", ctx().int64()},
+                 {"col_i", ctx().int32()},
+                 {"col_f", ctx().fp32()},
+                 {"col_d", ctx().fp64()},
+                 {"col_dec", ctx().decimal64(10, 2)},
+                 {"col_b", ctx().boolean()},
+                 {"col_str", ctx().text()},
+                 {"col_date", ctx().date32(hdk::ir::TimeUnit::kDay)}});
+    insertCsvValues("test_date",
+                    "1,1,0.75,0.13444545,50.02,false,some_text,2000-01-01\n"
+                    "2,2,30.82,0.461,7.05,true,a_text,2015-03-18\n");
+
     createTable("sort",
                 {{"x", ctx().int32()}, {"y", ctx().int32()}, {"z", ctx().int32()}});
     insertCsvValues("sort",
@@ -368,6 +381,10 @@ class QueryBuilderTest : public TestSuite {
     dropTable("test1");
     dropTable("test2");
     dropTable("test3");
+    dropTable("test_str");
+    dropTable("test_varr");
+    dropTable("test_arr");
+    dropTable("test_date");
     dropTable("sort");
     dropTable("ambiguous");
     dropTable("join1");
@@ -516,6 +533,28 @@ TEST_F(QueryBuilderTest, Arithmetics) {
   dag = tinfo_a.proj(tinfo_a.ref("a").sub(tinfo_a.ref("a"))).finalize();
   res = runQuery(std::move(dag));
   compare_res_data(res, std::vector<int64_t>({0, NULL_BIGINT}));
+}
+
+TEST_F(QueryBuilderTest, DateToInt) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_a = builder.scan("test_date");
+
+  auto dag = tinfo_a.proj(tinfo_a.ref("col_date").cast("int32")).finalize();
+  auto res = runQuery(std::move(dag));
+  LOG(ERROR) << "res: " << res.toString();
+  LOG(ERROR) << "res: " << toArrow(res)->ToString();
+  compare_res_data(res, std::vector<int32_t>({946684800, 1426636800}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_date")).finalize();
+  res = runQuery(std::move(dag));
+  LOG(ERROR) << "res: " << res.toString();
+  LOG(ERROR) << "res: " << toArrow(res)->ToString();
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kDate>("2000-01-01", TimeUnit::kDay),
+           dateTimeParse<hdk::ir::Type::kDate>("2015-03-18", TimeUnit::kDay)}));
 }
 
 TEST_F(QueryBuilderTest, Arithmetics2) {
