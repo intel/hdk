@@ -48,20 +48,23 @@ void compare_arrow_array_decimal_impl(
   ASSERT_EQ(compared, expected.size());
 }
 
+template <typename ArrowColType>
 void compare_arrow_array_date_impl(const std::vector<int64_t>& expected,
                                    const std::shared_ptr<arrow::ChunkedArray>& actual) {
+  using value_type = typename ArrowColType::value_type;
   ASSERT_EQ(static_cast<size_t>(actual->length()), expected.size());
-  using ArrowColType = arrow::NumericArray<arrow::Date64Type>;
   const arrow::ArrayVector& chunks = actual->chunks();
 
-  int64_t null_val = inline_null_value<int64_t>();
+  // Time32/Time64/Timestamp all have int64_t canonical type. So we comparing with int64
+  // null value.
+  const int64_t null_val = inline_null_value<int64_t>();
   size_t compared = 0;
 
   for (int i = 0; i < actual->num_chunks(); i++) {
     auto chunk = chunks[i];
     auto arrow_row_array = std::static_pointer_cast<ArrowColType>(chunk);
 
-    const int64_t* chunk_data = arrow_row_array->raw_values();
+    const value_type* chunk_data = arrow_row_array->raw_values();
     for (int64_t j = 0; j < chunk->length(); j++, compared++) {
       if (expected[compared] == null_val) {
         ASSERT_TRUE(chunk->IsNull(j));
@@ -233,7 +236,13 @@ void compare_arrow_array<int64_t>(const std::vector<int64_t>& expected,
   if (actual->type()->id() == arrow::Type::DECIMAL) {
     compare_arrow_array_decimal_impl(expected, actual);
   } else if (actual->type()->id() == arrow::Type::DATE64) {
-    compare_arrow_array_date_impl(expected, actual);
+    compare_arrow_array_date_impl<arrow::Date64Array>(expected, actual);
+  } else if (actual->type()->id() == arrow::Type::TIME32) {
+    compare_arrow_array_date_impl<arrow::Time32Array>(expected, actual);
+  } else if (actual->type()->id() == arrow::Type::TIME64) {
+    compare_arrow_array_date_impl<arrow::Time64Array>(expected, actual);
+  } else if (actual->type()->id() == arrow::Type::TIMESTAMP) {
+    compare_arrow_array_date_impl<arrow::TimestampArray>(expected, actual);
   } else {
     compare_arrow_array_impl(expected, actual);
   }

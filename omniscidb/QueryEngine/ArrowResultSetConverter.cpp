@@ -967,8 +967,19 @@ void append_scalar_value_and_validity(const ScalarTargetValue& value,
       }
       break;
     case hdk::ir::Type::kTime:
-      create_or_append_value<int32_t, int64_t>(value, values, max_size);
-      create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+      switch (type->size()) {
+        case 4:
+          create_or_append_value<int32_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        case 8:
+          create_or_append_value<int64_t, int64_t>(value, values, max_size);
+          create_or_append_validity<int64_t>(value, type, null_bitmap, max_size);
+          break;
+        default:
+          throw std::runtime_error(type->toString() +
+                                   " is not supported in Arrow result sets.");
+      }
       break;
     case hdk::ir::Type::kDate:
       device_type == ExecutorDeviceType::GPU
@@ -1566,8 +1577,22 @@ std::shared_ptr<arrow::DataType> get_arrow_type(const hdk::ir::Type* type,
       CHECK_EQ(type->size(), 8);
       return arrow::decimal(std::min(type->as<hdk::ir::DecimalType>()->precision(), 38),
                             type->as<hdk::ir::DecimalType>()->scale());
-    case hdk::ir::Type::kTime:
-      return time32(arrow::TimeUnit::SECOND);
+    case hdk::ir::Type::kTime: {
+      auto unit = type->as<hdk::ir::TimeType>()->unit();
+      switch (unit) {
+        case hdk::ir::TimeUnit::kSecond:
+          return time32(arrow::TimeUnit::SECOND);
+        case hdk::ir::TimeUnit::kMilli:
+          return time32(arrow::TimeUnit::MILLI);
+        case hdk::ir::TimeUnit::kMicro:
+          return time64(arrow::TimeUnit::MICRO);
+        case hdk::ir::TimeUnit::kNano:
+          return time64(arrow::TimeUnit::NANO);
+        default:
+          throw std::runtime_error("Unsupported time precision for Arrow result sets: " +
+                                   toString(unit));
+      }
+    }
     case hdk::ir::Type::kDate: {
       // TODO(wamsi) : Remove date64() once date32() support is added in cuDF. date32()
       // Currently support for date32() is missing in cuDF.Hence, if client requests for
@@ -1840,6 +1865,25 @@ void appendToColumnBuilder(ArrowResultSetConverter::ColumnBuilder& column_builde
 }
 
 template <>
+void appendToColumnBuilder<arrow::Time32Builder, int64_t>(
+    ArrowResultSetConverter::ColumnBuilder& column_builder,
+    arrow::ArrayBuilder* arrow_builder,
+    const ValueArray& values,
+    const std::shared_ptr<std::vector<bool>>& is_valid) {
+  std::vector<int64_t> val_raw = boost::get<std::vector<int64_t>>(values);
+  std::vector<int32_t> vals(val_raw.begin(), val_raw.end());
+
+  auto typed_builder = dynamic_cast<arrow::Time32Builder*>(arrow_builder);
+  CHECK(typed_builder);
+  if (column_builder.field->nullable()) {
+    CHECK(is_valid.get());
+    ARROW_THROW_NOT_OK(typed_builder->AppendValues(vals, *is_valid));
+  } else {
+    ARROW_THROW_NOT_OK(typed_builder->AppendValues(vals));
+  }
+}
+
+template <>
 void appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
     ArrowResultSetConverter::ColumnBuilder& column_builder,
     arrow::ArrayBuilder* arrow_builder,
@@ -2005,10 +2049,25 @@ void ArrowResultSetConverter::append(
                                    " is not supported in Arrow result sets.");
       }
       break;
-    case hdk::ir::Type::kTime:
-      appendToColumnBuilder<arrow::Time32Builder, int32_t>(
-          column_builder, elem_builder, values, is_valid);
+    case hdk::ir::Type::kTime: {
+      auto unit = elem_type->as<hdk::ir::TimeType>()->unit();
+      switch (unit) {
+        case hdk::ir::TimeUnit::kSecond:
+        case hdk::ir::TimeUnit::kMilli:
+          appendToColumnBuilder<arrow::Time32Builder, int64_t>(
+              column_builder, elem_builder, values, is_valid);
+          break;
+        case hdk::ir::TimeUnit::kMicro:
+        case hdk::ir::TimeUnit::kNano:
+          appendToColumnBuilder<arrow::Time64Builder, int64_t>(
+              column_builder, elem_builder, values, is_valid);
+          break;
+        default:
+          throw std::runtime_error("Unsupported time precision for Arrow result sets: " +
+                                   toString(unit));
+      }
       break;
+    }
     case hdk::ir::Type::kTimestamp:
       appendToColumnBuilder<arrow::TimestampBuilder, int64_t>(
           column_builder, elem_builder, values, is_valid);

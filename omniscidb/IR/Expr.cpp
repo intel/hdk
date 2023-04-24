@@ -217,7 +217,9 @@ bool isCastAllowed(const Type* old_type, const Type* new_type) {
     // can cast from date to timestamp
   } else if (old_type->isDate() && new_type->isTimestamp()) {
     return true;
-  } else if (old_type->isTimestamp() && new_type->isDate()) {
+  } else if (old_type->isTimestamp() && (new_type->isDate() || new_type->isTime())) {
+    return true;
+  } else if (old_type->isTime() && new_type->isInteger()) {
     return true;
   } else if (old_type->isBoolean() && new_type->isNumber()) {
     return true;

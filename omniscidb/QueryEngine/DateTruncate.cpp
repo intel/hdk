@@ -331,6 +331,66 @@ DateTruncateHighPrecisionToDateNullable(const int64_t timeval,
 }
 
 namespace {
+// scale is 10^{3,6,9}
+inline DEVICE int64_t
+timestamp_to_time_truncation_upscale(const int64_t timeval,
+                                     const int64_t conversion_scale,
+                                     const int64_t target_sec_scale) {
+  return unsigned_mod(timeval * conversion_scale, target_sec_scale * kSecsPerDay);
+}
+
+// scale is 10^{3,6,9}
+inline DEVICE int64_t
+timestamp_to_time_truncation_downscale(const int64_t timeval,
+                                       const int64_t conversion_scale,
+                                       const int64_t target_sec_scale) {
+  return unsigned_mod(timeval, target_sec_scale * kSecsPerDay) / conversion_scale;
+}
+}  // namespace
+
+extern "C" DEVICE RUNTIME_EXPORT ALWAYS_INLINE int64_t
+TimestampToTimeUpscale(const int64_t timeval,
+                       const int64_t conversion_scale,
+                       const int64_t target_sec_scale) {
+  return timestamp_to_time_truncation_upscale(
+      timeval, conversion_scale, target_sec_scale);
+}
+
+extern "C" DEVICE RUNTIME_EXPORT ALWAYS_INLINE int64_t
+TimestampToTimeDownscale(const int64_t timeval,
+                         const int64_t conversion_scale,
+                         const int64_t target_sec_scale) {
+  return timestamp_to_time_truncation_downscale(
+      timeval, conversion_scale, target_sec_scale);
+}
+
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
+TimestampToTimeUpscaleNullable(const int64_t timeval,
+                               const int64_t conversion_scale,
+                               const int64_t target_sec_scale,
+                               const int64_t source_null_val,
+                               const int64_t target_null_val) {
+  if (timeval == source_null_val) {
+    return target_null_val;
+  }
+  return timestamp_to_time_truncation_upscale(
+      timeval, conversion_scale, target_sec_scale);
+}
+
+extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
+TimestampToTimeDownscaleNullable(const int64_t timeval,
+                                 const int64_t conversion_scale,
+                                 const int64_t target_sec_scale,
+                                 const int64_t source_null_val,
+                                 const int64_t target_null_val) {
+  if (timeval == source_null_val) {
+    return target_null_val;
+  }
+  return timestamp_to_time_truncation_downscale(
+      timeval, conversion_scale, target_sec_scale);
+}
+
+namespace {
 
 struct EraTime {
   int64_t const era;

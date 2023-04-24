@@ -20,6 +20,8 @@
 #include "Shared/DateTimeParser.h"
 
 #include <gtest/gtest.h>
+#include <boost/numeric/conversion/cast.hpp>
+#include <typeinfo>
 
 using namespace std::string_literals;
 using namespace ArrowTestHelpers;
@@ -37,6 +39,21 @@ namespace {
 
 std::string getFilePath(const std::string& file_name) {
   return TEST_SOURCE_PATH + "/ArrowStorageDataFiles/"s + file_name;
+}
+
+template <typename R, hdk::ir::Type::Id TYPE>
+R dateTimeParse(std::string_view const s, hdk::ir::TimeUnit unit) {
+  if (auto const time = dateTimeParseOptional<TYPE>(s, unit)) {
+    try {
+      return boost::numeric_cast<R>(*time);
+    } catch (const std::bad_cast& e) {
+      throw std::runtime_error(
+          cat("numeric_cast<", typeid(R).name(), ">() failed with ", e.what()));
+    }
+  } else {
+    throw std::runtime_error(cat(
+        "Invalid date/time (templated) (", std::to_string(TYPE), ") string (", s, ')'));
+  }
 }
 
 class TestSuite : public ::testing::Test {
@@ -394,17 +411,43 @@ class QueryBuilderTest : public TestSuite {
 
     createTable("withNull", {{"a", ctx().int64()}});
     insertCsvValues("withNull", "1\nNULL");
+
+    createTable("test_tmstmp",
+                {{"col_bi", ctx().int64()},
+                 {"col_tmstp", ctx().timestamp(hdk::ir::TimeUnit::kSecond, false)},
+                 {"col_tmstp_ms", ctx().timestamp(hdk::ir::TimeUnit::kMilli, false)},
+                 {"col_tmstp_ns", ctx().timestamp(hdk::ir::TimeUnit::kNano, false)}});
+    insertCsvValues(
+        "test_tmstmp",
+        "1,1990-01-01 12:03:17,1990-01-01 12:03:17.123,1990-01-01 12:03:17.001002003\n"
+        "2,1950-03-18 22:23:15,1950-03-18 22:23:15.456,1950-03-18 22:23:15.041052063\n");
+
+    createTable("test_tmstmp_nullable",
+                {{"col_bi", ctx().int64()},
+                 {"col_tmstp", ctx().timestamp(hdk::ir::TimeUnit::kSecond, true)},
+                 {"col_tmstp_ms", ctx().timestamp(hdk::ir::TimeUnit::kMilli, true)},
+                 {"col_tmstp_ns", ctx().timestamp(hdk::ir::TimeUnit::kNano, true)}});
+    insertCsvValues(
+        "test_tmstmp_nullable",
+        "1,1990-01-01 12:03:17,1990-01-01 12:03:17.123,1990-01-01 12:03:17.001002003\n"
+        "2,1950-03-18 22:23:15,1950-03-18 22:23:15.456,1950-03-18 22:23:15.041052063\n"
+        "3,NULL,NULL,NULL\n");
   }
 
   static void TearDownTestSuite() {
     dropTable("test1");
     dropTable("test2");
     dropTable("test3");
+    dropTable("test_str");
+    dropTable("test_varr");
+    dropTable("test_arr");
     dropTable("sort");
     dropTable("ambiguous");
     dropTable("join1");
     dropTable("join2");
     dropTable("withNull");
+    dropTable("test_tmstmp");
+    dropTable("test_tmstmp_nullable");
   }
 
   void compare_res_fields(const ExecutionResult& res,
@@ -548,6 +591,180 @@ TEST_F(QueryBuilderTest, Arithmetics) {
   dag = tinfo_a.proj(tinfo_a.ref("a").sub(tinfo_a.ref("a"))).finalize();
   res = runQuery(std::move(dag));
   compare_res_data(res, std::vector<int64_t>({0, NULL_BIGINT}));
+}
+
+TEST_F(QueryBuilderTest, TimestampToTime) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_a = builder.scan("test_tmstmp");
+
+  auto dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("int32")).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>({dateTimeParse<int32_t, hdk::ir::Type::kTimestamp>(
+                                "1990-01-01 12:03:17", TimeUnit::kSecond),
+                            dateTimeParse<int32_t, hdk::ir::Type::kTimestamp>(
+                                "1950-03-18 22:23:15", TimeUnit::kSecond)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time64[s]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kTime>("12:03:17", TimeUnit::kSecond),
+           dateTimeParse<hdk::ir::Type::kTime>("22:23:15", TimeUnit::kSecond)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time64[s]").cast("int64")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kTime>("12:03:17", TimeUnit::kSecond),
+           dateTimeParse<hdk::ir::Type::kTime>("22:23:15", TimeUnit::kSecond)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[s]").cast("int32")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>(
+          {dateTimeParse<int32_t, hdk::ir::Type::kTime>("12:03:17", TimeUnit::kSecond),
+           dateTimeParse<int32_t, hdk::ir::Type::kTime>("22:23:15", TimeUnit::kSecond)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[ms]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kTime>("12:03:17", TimeUnit::kMilli),
+           dateTimeParse<hdk::ir::Type::kTime>("22:23:15", TimeUnit::kMilli)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ms").cast("time64[ns]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kTime>("12:03:17.123000000", TimeUnit::kNano),
+           dateTimeParse<hdk::ir::Type::kTime>("22:23:15.456000000", TimeUnit::kNano)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ms").cast("time64[ns]").cast("int64"))
+            .finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int64_t>({dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "12:03:17.123000000", TimeUnit::kNano),
+                                         dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "22:23:15.456000000", TimeUnit::kNano)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ns").cast("time64[ms]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<hdk::ir::Type::kTime>("12:03:17.001", TimeUnit::kMilli),
+           dateTimeParse<hdk::ir::Type::kTime>("22:23:15.041", TimeUnit::kMilli)}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ns").cast("time64[ms]").cast("int64"))
+            .finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<int64_t, hdk::ir::Type::kTime>("12:03:17.001", TimeUnit::kMilli),
+           dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+               "22:23:15.041", TimeUnit::kMilli)}));  // 22:23:15.041
+
+  dag =
+      tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[ms]").cast("int32")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int32_t>({dateTimeParse<int32_t, hdk::ir::Type::kTime>(
+                                             "12:03:17.000", TimeUnit::kMilli),
+                                         dateTimeParse<int32_t, hdk::ir::Type::kTime>(
+                                             "22:23:15.000", TimeUnit::kMilli)}));
+}
+
+TEST_F(QueryBuilderTest, TimestampToTimeNullable) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_a = builder.scan("test_tmstmp_nullable");
+
+  auto dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("int32")).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>({dateTimeParse<int32_t, hdk::ir::Type::kTimestamp>(
+                                "1990-01-01 12:03:17", TimeUnit::kSecond),
+                            dateTimeParse<int32_t, hdk::ir::Type::kTimestamp>(
+                                "1950-03-18 22:23:15", TimeUnit::kSecond),
+                            NULL_INT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[s]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<int64_t, hdk::ir::Type::kTime>("12:03:17", TimeUnit::kSecond),
+           dateTimeParse<int64_t, hdk::ir::Type::kTime>("22:23:15", TimeUnit::kSecond),
+           NULL_BIGINT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[s]").cast("int32")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>(
+          {dateTimeParse<int32_t, hdk::ir::Type::kTime>("12:03:17", TimeUnit::kSecond),
+           dateTimeParse<int32_t, hdk::ir::Type::kTime>("22:23:15", TimeUnit::kSecond),
+           NULL_INT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ms").cast("time64[ns]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int64_t>({dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "12:03:17.123000000", TimeUnit::kNano),
+                                         dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "22:23:15.456000000", TimeUnit::kNano),
+                                         NULL_BIGINT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ms").cast("time64[ns]").cast("int64"))
+            .finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int64_t>({dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "12:03:17.123000000", TimeUnit::kNano),
+                                         dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+                                             "22:23:15.456000000", TimeUnit::kNano),
+                                         NULL_BIGINT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp_ns").cast("time64[ms]").cast("int64"))
+            .finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<int64_t, hdk::ir::Type::kTime>("12:03:17.001", TimeUnit::kMilli),
+           dateTimeParse<int64_t, hdk::ir::Type::kTime>(
+               "22:23:15.041", TimeUnit::kMilli),  // 22:23:15.041
+           NULL_BIGINT}));
+
+  dag = tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[ms]")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int64_t>(
+          {dateTimeParse<int64_t, hdk::ir::Type::kTime>("12:03:17.000", TimeUnit::kMilli),
+           dateTimeParse<int64_t, hdk::ir::Type::kTime>("22:23:15.000", TimeUnit::kMilli),
+           NULL_BIGINT}));
+
+  dag =
+      tinfo_a.proj(tinfo_a.ref("col_tmstp").cast("time32[ms]").cast("int32")).finalize();
+  res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>(
+          {dateTimeParse<int32_t, hdk::ir::Type::kTime>("12:03:17.000", TimeUnit::kMilli),
+           dateTimeParse<int32_t, hdk::ir::Type::kTime>("22:23:15.000", TimeUnit::kMilli),
+           NULL_INT}));
 }
 
 TEST_F(QueryBuilderTest, Arithmetics2) {
@@ -1999,10 +2216,10 @@ TEST_F(QueryBuilderTest, CastDateExpr) {
 TEST_F(QueryBuilderTest, CastTimeExpr) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   auto scan = builder.scan("test3");
-  EXPECT_THROW(scan.ref("col_time").cast("int8"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_time").cast("int16"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_time").cast("int32"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_time").cast("int64"), InvalidQueryError);
+  checkCast(scan.ref("col_time").cast("int8"), ctx().int8());
+  checkCast(scan.ref("col_time").cast("int16"), ctx().int16());
+  checkCast(scan.ref("col_time").cast("int32"), ctx().int32());
+  checkCast(scan.ref("col_time").cast("int64"), ctx().int64());
   EXPECT_THROW(scan.ref("col_time").cast("fp32"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_time").cast("fp64"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_time").cast("dec(10,2)"), InvalidQueryError);
@@ -2039,17 +2256,19 @@ TEST_F(QueryBuilderTest, CastTimestampExpr) {
   checkCast(scan.ref("col_timestamp").cast("int16"), ctx().int16());
   checkCast(scan.ref("col_timestamp").cast("int32"), ctx().int32());
   checkCast(scan.ref("col_timestamp").cast("int64"), ctx().int64());
-  checkCast(scan.ref("col_timestamp").cast("fp32"), ctx().fp32());
-  checkCast(scan.ref("col_timestamp").cast("fp64"), ctx().fp64());
-  checkCast(scan.ref("col_timestamp").cast("dec(10,2)"), ctx().decimal(8, 10, 2));
+  EXPECT_THROW(scan.ref("col_timestamp").cast("fp32"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("fp64"), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").cast("dec(10,2)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("bool"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("text"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("varchar(10)"), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_timestamp").cast("dict(text)"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_timestamp").cast("time[s]"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_timestamp").cast("time[ms]"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_timestamp").cast("time[us]"), InvalidQueryError);
-  EXPECT_THROW(scan.ref("col_timestamp").cast("time[ns]"), InvalidQueryError);
+  checkCast(scan.ref("col_timestamp").cast("time32[s]"), ctx().time32(TimeUnit::kSecond));
+  checkCast(scan.ref("col_timestamp").cast("time32[ms]"), ctx().time32(TimeUnit::kMilli));
+  checkCast(scan.ref("col_timestamp").cast("time[s]"), ctx().time64(TimeUnit::kSecond));
+  checkCast(scan.ref("col_timestamp").cast("time[ms]"), ctx().time64(TimeUnit::kMilli));
+  checkCast(scan.ref("col_timestamp").cast("time[us]"), ctx().time64(TimeUnit::kMicro));
+  checkCast(scan.ref("col_timestamp").cast("time[ns]"), ctx().time64(TimeUnit::kNano));
   checkCast(scan.ref("col_timestamp").cast("date32[d]"), ctx().date32(TimeUnit::kDay));
   checkCast(scan.ref("col_timestamp").cast("date32[s]"), ctx().date32(TimeUnit::kSecond));
   checkCast(scan.ref("col_timestamp").cast("date64[ms]"), ctx().date64(TimeUnit::kMilli));
