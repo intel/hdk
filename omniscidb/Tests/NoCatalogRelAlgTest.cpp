@@ -40,7 +40,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
   TestSchemaProvider()
       : SimpleSchemaProvider(hdk::ir::Context::defaultCtx(), TEST_SCHEMA_ID, "test") {
     // Table test1
-    addTableInfo(TEST_DB_ID, TEST1_TABLE_ID, "test1", false, 1);
+    addTableInfo(TEST_DB_ID, TEST1_TABLE_ID, "test1", false, 1, 5);
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 1, "col_bi", ctx_.int64(), false);
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 2, "col_i", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST1_TABLE_ID, 3, "col_f", ctx_.fp32(), false);
@@ -48,7 +48,7 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addRowidColumn(TEST_DB_ID, TEST1_TABLE_ID, 5);
 
     // Table test2
-    addTableInfo(TEST_DB_ID, TEST2_TABLE_ID, "test2", false, 1);
+    addTableInfo(TEST_DB_ID, TEST2_TABLE_ID, "test2", false, 3, 9);
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 1, "col_bi", ctx_.int64(), false);
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 2, "col_i", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST2_TABLE_ID, 3, "col_f", ctx_.fp32(), false);
@@ -56,13 +56,13 @@ class TestSchemaProvider : public SimpleSchemaProvider {
     addRowidColumn(TEST_DB_ID, TEST2_TABLE_ID, 5);
 
     // Table test2 in db2
-    addTableInfo(TEST_DB2_ID, TEST2_TABLE_ID, "db2.test2", false, 1);
+    addTableInfo(TEST_DB2_ID, TEST2_TABLE_ID, "db2.test2", false, 2, 3);
     addColumnInfo(TEST_DB2_ID, TEST2_TABLE_ID, 1, "col_bi", ctx_.int64(), false);
     addColumnInfo(TEST_DB2_ID, TEST2_TABLE_ID, 2, "col_i", ctx_.int32(), false);
     addRowidColumn(TEST_DB2_ID, TEST2_TABLE_ID, 3);
 
     // Table test_agg
-    addTableInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, "test_agg", false, 1);
+    addTableInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, "test_agg", false, 2, 10);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 1, "id", ctx_.int32(), false);
     addColumnInfo(TEST_DB_ID, TEST_AGG_TABLE_ID, 2, "val", ctx_.int32(), false);
     addRowidColumn(TEST_DB_ID, TEST_AGG_TABLE_ID, 3);

@@ -107,7 +107,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   auto table_id = next_table_id_++;
   auto table_name = std::string("__result_set_") + std::to_string(table_id);
   // Add schema information for the ResultSet.
-  auto tinfo = addTableInfo(db_id_, table_id, table_name, false, table.size());
+  auto tinfo = addTableInfo(db_id_, table_id, table_name, false, table.size(), 0);
   auto& first_rs = table.result(0);
   bool has_varlen = false;
   bool has_array = false;
@@ -137,6 +137,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
     row_count += frag.row_count;
     table_data->fragments.emplace_back(std::move(frag));
   }
+  tinfo->row_count = row_count;
   table_data->row_count = row_count;
   table_data->has_varlen_col = has_varlen;
   // We use ColumnarResults for all cases except those when can use

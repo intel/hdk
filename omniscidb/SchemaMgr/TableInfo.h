@@ -49,17 +49,20 @@ struct TableInfo : public TableRef {
             const std::string name_,
             bool is_view_,
             size_t fragments_,
+            size_t row_count_,
             bool is_stream_ = false)
       : TableRef(db_id, table_id)
       , name(name_)
       , is_view(is_view_)
       , fragments(fragments_)
+      , row_count(row_count_)
       , is_stream(is_stream_) {}
 
   std::string name;
   bool is_view;
   // For add_window_function_pre_project in RelAlgDagBuilder.
   size_t fragments;
+  size_t row_count;
   bool is_stream;
 
   std::string toString() const {
