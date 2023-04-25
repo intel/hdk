@@ -31,9 +31,6 @@
 
 extern bool g_enable_stringdict_parallel;
 
-class StringDictionaryClient;
-class LeafHostInfo;
-
 class DictPayloadUnavailable : public std::runtime_error {
  public:
   DictPayloadUnavailable() : std::runtime_error("DictPayloadUnavailable") {}
@@ -53,7 +50,6 @@ class StringDictionary {
                    const bool recover,
                    const bool materializeHashes = false,
                    size_t initial_capacity = 256);
-  StringDictionary(const LeafHostInfo& host, const DictRef dict_ref);
   ~StringDictionary() noexcept;
 
   int32_t getDbId() const noexcept;
@@ -70,7 +66,6 @@ class StringDictionary {
   // Each std::string const& (if isClient()) or std::string_view (if !isClient())
   // plus string_id is passed to the callback functor.
   void eachStringSerially(int64_t const generation, StringCallback&) const;
-  std::function<int32_t(std::string const&)> makeLambdaStringToId() const;
   friend class StringLocalCallback;
 
   int32_t getOrAdd(const std::string_view& str) noexcept;
@@ -125,8 +120,6 @@ class StringDictionary {
       StringLookupCallback const& dest_transient_lookup_callback) const;
 
   bool checkpoint() noexcept;
-
-  bool isClient() const noexcept;
 
   /**
    * @brief Populates provided \p dest_ids vector with string ids corresponding to given
@@ -196,7 +189,6 @@ class StringDictionary {
       const std::vector<String>& input_strings,
       const std::vector<size_t>& string_memory_ids,
       const std::vector<string_dict_hash_t>& input_strings_hashes) noexcept;
-  int32_t getOrAddImpl(const std::string_view& str) noexcept;
   template <class String>
   void hashStrings(const std::vector<String>& string_vec,
                    std::vector<string_dict_hash_t>& hashes) const noexcept;
@@ -272,20 +264,11 @@ class StringDictionary {
   mutable std::map<std::string, int32_t> equal_cache_;
   mutable DictionaryCache<std::string, compare_cache_value_t> compare_cache_;
   mutable std::shared_ptr<std::vector<std::string>> strings_cache_;
-  mutable std::unique_ptr<StringDictionaryClient> client_;
-  mutable std::unique_ptr<StringDictionaryClient> client_no_timeout_;
 
   char* CANARY_BUFFER{nullptr};
   size_t canary_buffer_size = 0;
 };
 
 int32_t truncate_to_generation(const int32_t id, const size_t generation);
-
-void translate_string_ids(std::vector<int32_t>& dest_ids,
-                          const LeafHostInfo& dict_server_host,
-                          const DictRef dest_dict_ref,
-                          const std::vector<int32_t>& source_ids,
-                          const DictRef source_dict_ref,
-                          const int32_t dest_generation);
 
 #endif  // STRINGDICTIONARY_STRINGDICTIONARY_H
