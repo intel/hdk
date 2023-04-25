@@ -258,7 +258,6 @@ class StringDictionaryProxy {
   int32_t getOrAddTransientUnlocked(String const&);
 
   friend class StringLocalCallback;
-  friend class StringNetworkCallback;
 };
 
 class StringDictionaryProxyProvider {
