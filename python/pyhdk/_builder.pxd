@@ -85,6 +85,7 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     int size() const
     CColumnInfoPtr columnInfoByIndex "columnInfo"(int) except +
     CColumnInfoPtr columnInfoByName "columnInfo"(const string&) except +
+    size_t rowCount() except +
 
     CBuilderExpr refByIndex "ref"(int) except +
     CBuilderExpr refByName "ref"(const string&) except +

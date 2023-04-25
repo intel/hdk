@@ -935,6 +935,22 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_shape(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
+        assert ht.shape == (5, 2)
+        hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]}, ht)
+        assert ht.shape == (10, 2)
+
+        res1 = ht.filter(ht["a"] > 3).run()
+        assert res1.shape == (4, 2)
+
+        res2 = res1.proj("a").run()
+        assert res2.shape == (4, 1)
+
+        with pytest.raises(RuntimeError):
+            res2.proj(0).shape
+
 
 class TestSql(BaseTest):
     def test_no_alias(self):

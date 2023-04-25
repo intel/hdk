@@ -576,6 +576,12 @@ cdef class QueryNode:
       res = res - 1
     return res
 
+  @property
+  def shape(self):
+    if not self.is_scan:
+      raise RuntimeError("Only scan nodes provide shape.")
+    return (self.c_node.rowCount(), self.size)
+
   def column_info(self, col):
     cdef CExpr *c_expr
     if isinstance(col, QueryExpr) and col.is_ref:

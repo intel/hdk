@@ -351,7 +351,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
     mapd_unique_lock<mapd_shared_mutex> schema_lock(schema_mutex_);
     table_id = next_table_id_++;
     checkNewTableParams(table_name, columns, options);
-    res = addTableInfo(db_id_, table_id, table_name, false, 0);
+    res = addTableInfo(db_id_, table_id, table_name, false, 0, 0);
     std::unordered_map<int, int> dict_ids;
     for (auto& col : columns) {
       auto type = col.type;
@@ -646,7 +646,9 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     table.row_count = at->num_rows();
   }
 
-  getTableInfo(db_id_, table_id)->fragments = table.fragments.size();
+  auto table_info = getTableInfo(db_id_, table_id);
+  table_info->fragments = table.fragments.size();
+  table_info->row_count = table.row_count;
 }
 
 TableInfoPtr ArrowStorage::importCsvFile(const std::string& file_name,

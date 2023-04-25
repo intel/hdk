@@ -31,9 +31,10 @@ cdef extern from "omniscidb/SchemaMgr/TableInfo.h":
     string name
     bool is_view
     size_t fragments
+    size_t row_count
     bool is_stream
 
-    CTableInfo(int, int, string, bool, MemoryLevel, size_t, bool);
+    CTableInfo(int, int, string, bool, size_t, size_t, bool);
     string toString()
 
 ctypedef shared_ptr[CTableInfo] CTableInfoPtr

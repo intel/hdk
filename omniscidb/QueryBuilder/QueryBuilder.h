@@ -476,6 +476,7 @@ class BuilderNode {
   int size() const { return node_->size(); }
   ColumnInfoPtr columnInfo(int col_index) const;
   ColumnInfoPtr columnInfo(const std::string& col_name) const;
+  size_t rowCount() const;
 
  protected:
   friend class QueryBuilder;

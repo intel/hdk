@@ -2501,6 +2501,13 @@ ColumnInfoPtr BuilderNode::columnInfo(const std::string& col_name) const {
                                       false);
 }
 
+size_t BuilderNode::rowCount() const {
+  if (auto scan = node_->as<hdk::ir::Scan>()) {
+    return scan->getTableInfo()->row_count;
+  }
+  throw InvalidQueryError("Row count is available for scan nodes only.");
+}
+
 QueryBuilder::QueryBuilder(Context& ctx,
                            SchemaProviderPtr schema_provider,
                            ConfigPtr config)
