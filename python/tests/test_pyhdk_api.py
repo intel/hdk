@@ -899,6 +899,31 @@ class TestBuilder(BaseTest):
             res7, {"rowid": [0, 1, 2, 3], "a": [2, 3, 4, 5], "count": [1, 1, 1, 1]}
         )
 
+    def test_row(self):
+        hdk = pyhdk.init()
+        ht = hdk.create_table(
+            "test1", [("a", "int"), ("b", "fp64"), ("c", "text"), ("d", "array(int)")]
+        )
+        hdk.import_pydict(
+            {
+                "a": [1, 2, None],
+                "b": [1.1, 2.2, None],
+                "c": ["str1", None, "str3"],
+                "d": [[1, None, 3], None, []],
+            },
+            ht,
+        )
+
+        res = ht.proj("d", "c", "b", "a").run()
+        row1 = res.row(0)
+        assert row1 == [[1, None, 3], "str1", 1.1, 1]
+        row2 = res.row(1)
+        assert row2 == [None, None, 2.2, 2]
+        row3 = res.row(2)
+        assert row3 == [[], "str3", None, None]
+
+        hdk.drop_table(ht)
+
 
 class TestSql(BaseTest):
     def test_no_alias(self):

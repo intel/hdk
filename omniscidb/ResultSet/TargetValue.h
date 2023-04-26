@@ -34,6 +34,10 @@
 #include <string>
 #include <vector>
 
+namespace hdk::ir {
+class Type;
+}
+
 struct InternalTargetValue {
   int64_t i1;
   int64_t i2;
@@ -99,3 +103,42 @@ using NullableString = boost::variant<std::string, void*>;
 using ScalarTargetValue = boost::variant<int64_t, double, float, NullableString>;
 using ArrayTargetValue = boost::optional<std::vector<ScalarTargetValue>>;
 using TargetValue = boost::variant<ScalarTargetValue, ArrayTargetValue>;
+
+// Helper functions for ScalarTargetValue to simplify Cython code.
+bool isNull(const ScalarTargetValue& val, const hdk::ir::Type* type);
+
+inline bool isFloat(const ScalarTargetValue& val) {
+  return boost::get<float>(&val);
+}
+
+inline float getFloat(const ScalarTargetValue& val) {
+  return boost::get<float>(val);
+}
+
+inline bool isDouble(const ScalarTargetValue& val) {
+  return boost::get<double>(&val);
+}
+
+inline double getDouble(const ScalarTargetValue& val) {
+  return boost::get<double>(val);
+}
+
+inline bool isInt(const ScalarTargetValue& val) {
+  return boost::get<int64_t>(&val);
+}
+
+inline int64_t getInt(const ScalarTargetValue& val) {
+  return boost::get<int64_t>(val);
+}
+
+inline bool isString(const ScalarTargetValue& val) {
+  return boost::get<NullableString>(&val);
+}
+
+inline std::string getString(const ScalarTargetValue& val) {
+  auto& str = boost::get<NullableString>(val);
+  if (str.type() == typeid(void*)) {
+    return "";
+  }
+  return boost::get<std::string>(str);
+}

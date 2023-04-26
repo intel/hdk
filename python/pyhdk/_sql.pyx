@@ -3,16 +3,19 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from libc.stdint cimport int64_t
 from libcpp.memory cimport make_shared, make_unique
 from libcpp.utility cimport move
-from cython.operator cimport dereference, preincrement
+from cython.operator cimport dereference, preincrement, address
 
 from pyarrow.lib cimport pyarrow_wrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
-from pyhdk._common cimport CConfig, Config
+from pyhdk._common cimport CConfig, Config, boost_get, CType, CArrayBaseType
 from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
 from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter, CResultSet
+from pyhdk._execute cimport CNullableString, CScalarTargetValue, CArrayTargetValue, CTargetValue, isNull
+from pyhdk._execute cimport isNull, isInt, getInt, isFloat, getFloat, isDouble, getDouble, isString, getString
 
 cdef class Calcite:
   cdef CalciteMgr* calcite
@@ -41,6 +44,33 @@ cdef class Calcite:
     cdef bool is_explain = kwargs.get("is_explain", False)
     cdef bool is_view_optimize = kwargs.get("is_view_optimize", False)
     return self.calcite.process(db_name, sql, self.schema_provider.get(), self.config.get(), filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
+
+cdef extract_scalar_value(const CScalarTargetValue &scalar, const CType *c_type):
+  if isNull(scalar, c_type):
+    return None
+  if isInt(scalar):
+    return getInt(scalar)
+  if isFloat(scalar):
+    return getFloat(scalar)
+  if isDouble(scalar):
+    return getDouble(scalar)
+  if isString(scalar):
+    return getString(scalar)
+  return None
+
+cdef extract_array_value(const CArrayTargetValue *array, const CType *c_type):
+  cdef vector[CScalarTargetValue].const_iterator it
+  cdef const CType* elem_type = c_type.asType[CArrayBaseType]().elemType()
+
+  if dereference(array):
+    res = []
+    it = dereference(dereference(array)).const_begin()
+    while it != dereference(dereference(array)).const_end():
+      res.append(extract_scalar_value(dereference(it), elem_type))
+      preincrement(it)
+    return res
+
+  return None
 
 cdef class ExecutionResult:
   def row_count(self):
@@ -82,6 +112,32 @@ cdef class ExecutionResult:
   @scan.setter
   def scan(self, val):
     self._scan = val
+
+  def row(self, row_id):
+    res = []
+    cdef vector[CTargetValue] vals = self.c_result.getRows().get().getRowAt(row_id, True, True)
+    cdef vector[CTargetValue].const_iterator it = vals.const_begin()
+    cdef const CScalarTargetValue *scalar
+    cdef const CArrayTargetValue *array
+    cdef size_t col_idx = 0
+    cdef const CType *col_type
+
+    while col_idx < self.c_result.getTargetsMeta().size():
+      col_type = self.c_result.getTargetsMeta().at(col_idx).type()
+
+      scalar = boost_get[CScalarTargetValue](address(vals.at(col_idx)))
+      if scalar != NULL:
+        res.append(extract_scalar_value(dereference(scalar), col_type))
+      else:
+        array = boost_get[CArrayTargetValue](address(vals.at(col_idx)))
+        if array != NULL:
+          res.append(extract_array_value(array, col_type))
+        else:
+          res.append(None);
+
+      col_idx += 1
+
+    return res
 
   def __str__(self):
     res = "Schema:\n"

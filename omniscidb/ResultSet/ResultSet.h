@@ -251,10 +251,16 @@ class ResultSet {
 
   std::vector<TargetValue> getRowAt(const size_t index) const;
 
+  // TODO: among multiple rowAt versions only the following two accept actual row
+  // index. Other versions accept entry index and should probably be renamed and/or
+  // made private.
+  std::vector<TargetValue> getRowAt(const size_t row_idx,
+                                    const bool translate_strings,
+                                    const bool decimal_to_double) const;
   TargetValue getRowAt(const size_t row_idx,
                        const size_t col_idx,
                        const bool translate_strings,
-                       const bool decimal_to_double = true) const;
+                       const bool decimal_to_double) const;
 
   // Specialized random access getter for result sets with a single column to
   // avoid the overhead of building a std::vector<TargetValue> result with only
@@ -633,7 +639,7 @@ class ResultSet {
                                     const bool translate_strings,
                                     const bool decimal_to_double,
                                     const bool fixup_count_distinct_pointers,
-                                    const std::vector<bool>& targets_to_skip = {}) const;
+                                    const std::vector<bool>& targets_to_skip) const;
 
   // NOTE: just for direct columnarization use at the moment
   template <typename ENTRY_TYPE>
@@ -811,7 +817,7 @@ ResultSetRowIterator::value_type ResultSetRowIterator::operator*() const {
   }
 
   return result_set_->getRowAt(
-      global_entry_idx_, translate_strings_, decimal_to_double_, false);
+      global_entry_idx_, translate_strings_, decimal_to_double_, false, {});
 }
 
 inline ResultSetRowIterator& ResultSetRowIterator::operator++(void) {
