@@ -35,6 +35,10 @@ jobs:
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
 
+      - name: Look for HDK Libraries
+        run: |
+          ls ${{ env.CONDA_ENV_PATH }}/lib
+
       - name: Restore Maven cache
         uses: actions/cache@v3
         with:
