@@ -17,6 +17,13 @@ jobs:
     name: Build
     uses: ./.github/workflows/build.yml
 
+  windows-build:
+    name: Build on Windows
+    uses: ./.github/workflows/windows-build.yml
+    with:
+      name: release
+      options: -DCMAKE_BUILD_TYPE=Release -DENABLE_FOLLY=off -G "Visual Studio 17 2022"
+
   build-cuda:
     name: Build
     uses: ./.github/workflows/build.yml
