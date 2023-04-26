@@ -1,0 +1,91 @@
+name: Reusable build action on windows
+on:
+  workflow_call:
+    inputs:
+      name:
+        type: string
+        default: cpu
+      options:
+        type: string
+        default:
+      cuda_compiler_version:
+        type: string
+
+
+    outputs:
+      cache-suffix:
+        value: ${{ jobs.build.outputs.cache-suffix }}
+
+jobs:
+  build:
+    name: Conda - ${{ inputs.name }}
+    runs-on: windows-latest
+
+    outputs:
+      cache-suffix: ${{ env.DATE }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set env context
+        run: |
+          echo RUN_STAMP=${{ runner.os }}-${{ inputs.name }} >> $env:GITHUB_ENV
+          echo CONDA_ENV_PATH=$env:CONDA/envs/omnisci-dev >> $env:GITHUB_ENV
+          echo "DATE=$(date +'%Y%m%d')" >> $env:GITHUB_ENV
+          echo TMP=$env:TMP >> $env:GITHUB_ENV
+
+      - name: Get env
+        run: |
+          Get-ChildItem env:
+
+      - name: Get disk space
+        run: |
+          Get-PSDrive
+
+      - name: Restore Conda env cache
+        id: conda-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-${{ env.DATE }}
+          restore-keys: |
+            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-
+
+      - name: Update Conda env
+        if: steps.conda-cache.cache-hit != 'true'
+        run: |
+          & $env:CONDA\condabin\conda.bat update conda
+          & $env:CONDA\condabin\conda.bat env update -f omniscidb/scripts/mapd-deps-conda-windows-env.yml
+
+      - name: Restore Maven cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2
+          key: maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-
+
+      - name: Conda - ${{ inputs.name }}
+        run: |
+          & $env:CONDA\condabin\conda.bat info
+          & $env:CONDA\condabin\conda.bat list -n omnisci-dev
+          & $env:CONDA\condabin\conda.bat run --no-capture-output -n omnisci-dev omniscidb\scripts\conda\build.bat ${{ inputs.options }}
+          Compress-Archive -Path . -DestinationPath $env:TMP\build.zip
+
+      - name: Upload build and src files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.RUN_STAMP }}-build
+          path: ${{ env.TMP }}/build.zip
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.RUN_STAMP }}-logs
+          path: |
+            build/*.log
+            build/CMakeCache.txt
+            build/CMakeFiles/*.log
+
