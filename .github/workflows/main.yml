@@ -77,7 +77,7 @@ jobs:
     uses: ./.github/workflows/build-docker.yml
     with:
       name: cuda
-      options: -DENABLE_PYTHON=off 
+      options: -DENABLE_PYTHON=off -DENABLE_CUDA=on
 
   test-cuda-docker:
     name: Sanity test (Gtests)
