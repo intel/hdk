@@ -98,7 +98,7 @@ execute = Extension(
     include_dirs=gen_include_dirs(),
     library_dirs=gen_lib_dirs(),
     runtime_library_dirs=gen_rt_libs(),
-    libraries=[*(pa.get_libraries()), "QueryEngine"],
+    libraries=[*(pa.get_libraries()), "QueryEngine", "ResultSet", "ResultSetRegistry"],
     extra_compile_args=gen_compile_flags(),
 )
 
