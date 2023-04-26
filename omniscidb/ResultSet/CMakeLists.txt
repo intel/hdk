@@ -6,6 +6,7 @@ set(result_set_source_files
     ResultSetStorage.cpp
     RowSetMemoryOwner.cpp
     StreamingTopN.cpp
+    TargetValue.cpp
 )
 
 add_library(ResultSet ${result_set_source_files})

@@ -3880,51 +3880,51 @@ TEST_F(Select, ApproxMedianSort) {
       switch (t) {
         case 0:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), int64_t(i) + 10)
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) + 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), int64_t(i) - 10)
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) - 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), double(i) - 10)
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), double(i) - 10)
                 << query << "i=" << i;
           }
           break;
         case 1:
-          EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), int64_t(i))
+          EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i))
               << query << "i=" << i;
           if (i < 10) {
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), double(i))
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), double(i))
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
                 << query << "i=" << i;
           }
           break;
         case 2:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), int64_t(i) + 10)
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) + 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), 19 - int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), 19 - int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), 19 - double(i))
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), 19 - double(i))
                 << query << "i=" << i;
           }
           break;
         case 3:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), 9 - int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), 9 - int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), 9 - double(i))
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), 9 - double(i))
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true)), int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
                 << query << "i=" << i;
           }
           break;
@@ -4065,12 +4065,12 @@ TEST_F(Select, OrderBy) {
     CHECK_EQ(rows->rowCount(), std::min(size_t(5), static_cast<size_t>(g_num_rows)) + 0);
     CHECK_EQ(rows->colCount(), size_t(4));
     for (size_t row_idx = 0; row_idx < rows->rowCount(); ++row_idx) {
-      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 0, true)) == 8 ||
-                  v<int64_t>(rows->getRowAt(row_idx, 0, true)) == 7);
-      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 1, true)), 43);
-      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 2, true)), 1104);
-      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 3, true)) == 344 ||
-                  v<int64_t>(rows->getRowAt(row_idx, 3, true)) == 301);
+      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 0, true, true)) == 8 ||
+                  v<int64_t>(rows->getRowAt(row_idx, 0, true, true)) == 7);
+      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 1, true, true)), 43);
+      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 2, true, true)), 1104);
+      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 3, true, true)) == 344 ||
+                  v<int64_t>(rows->getRowAt(row_idx, 3, true, true)) == 301);
     }
     c("SELECT x, COUNT(distinct y) AS n FROM test GROUP BY x ORDER BY n DESC;", dt);
     c("SELECT x x1, x, COUNT(*) AS val FROM test GROUP BY x HAVING val > 5 ORDER BY val "
@@ -8332,12 +8332,14 @@ TEST_F(Select, ArrayUnnest) {
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count + 2) * power10,
-                v<int64_t>(result_rows->getRowAt(0, 1, true)));
-      ASSERT_EQ(1,
-                v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true)));
-      ASSERT_EQ(power10,
-                v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 1, true)));
+                v<int64_t>(result_rows->getRowAt(0, 1, true, true)));
+      ASSERT_EQ(
+          1,
+          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
+      ASSERT_EQ(
+          power10,
+          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 1, true, true)));
 
       auto fixed_result_rows =
           run_multiple_agg("SELECT COUNT(*), UNNEST(arr3_i" + std::to_string(int_width) +
@@ -8345,14 +8347,14 @@ TEST_F(Select, ArrayUnnest) {
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, fixed_result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count + 2) * power10,
-                v<int64_t>(fixed_result_rows->getRowAt(0, 1, true)));
-      ASSERT_EQ(
-          1,
-          v<int64_t>(fixed_result_rows->getRowAt(g_array_test_row_count + 1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true)));
-      ASSERT_EQ(
-          power10,
-          v<int64_t>(fixed_result_rows->getRowAt(g_array_test_row_count + 1, 1, true)));
+                v<int64_t>(fixed_result_rows->getRowAt(0, 1, true, true)));
+      ASSERT_EQ(1,
+                v<int64_t>(fixed_result_rows->getRowAt(
+                    g_array_test_row_count + 1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
+      ASSERT_EQ(power10,
+                v<int64_t>(fixed_result_rows->getRowAt(
+                    g_array_test_row_count + 1, 1, true, true)));
 
       power10 *= 10;
     }
@@ -8362,19 +8364,20 @@ TEST_F(Select, ArrayUnnest) {
                                ") AS a FROM array_test GROUP BY a ORDER BY a DESC;",
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
-      ASSERT_EQ(1,
-                v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true)));
+      ASSERT_EQ(
+          1,
+          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
 
       auto fixed_result_rows =
           run_multiple_agg("SELECT COUNT(*), UNNEST(arr3_" + float_type +
                                ") AS a FROM array_test GROUP BY a ORDER BY a DESC;",
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, fixed_result_rows->rowCount());
-      ASSERT_EQ(
-          1,
-          v<int64_t>(fixed_result_rows->getRowAt(g_array_test_row_count + 1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true)));
+      ASSERT_EQ(1,
+                v<int64_t>(fixed_result_rows->getRowAt(
+                    g_array_test_row_count + 1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
     }
     {
       auto result_rows = run_multiple_agg(
@@ -8382,9 +8385,10 @@ TEST_F(Select, ArrayUnnest) {
           "DESC;",
           dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
-      ASSERT_EQ(1,
-                v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true)));
+      ASSERT_EQ(
+          1,
+          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
     }
     {
       auto result_rows = run_multiple_agg(
@@ -8393,11 +8397,11 @@ TEST_F(Select, ArrayUnnest) {
           dt);
       ASSERT_EQ(size_t(2), result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(result_rows->getRowAt(0, 0, true)));
+                v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(result_rows->getRowAt(1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 1, true)));
-      ASSERT_EQ(0, v<int64_t>(result_rows->getRowAt(1, 1, true)));
+                v<int64_t>(result_rows->getRowAt(1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 1, true, true)));
+      ASSERT_EQ(0, v<int64_t>(result_rows->getRowAt(1, 1, true, true)));
 
       auto fixed_result_rows = run_multiple_agg(
           "SELECT COUNT(*), UNNEST(arr6_bool) AS a FROM array_test GROUP BY a ORDER BY a "
@@ -8405,11 +8409,11 @@ TEST_F(Select, ArrayUnnest) {
           dt);
       ASSERT_EQ(size_t(2), fixed_result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(fixed_result_rows->getRowAt(0, 0, true)));
+                v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(fixed_result_rows->getRowAt(1, 0, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 1, true)));
-      ASSERT_EQ(0, v<int64_t>(fixed_result_rows->getRowAt(1, 1, true)));
+                v<int64_t>(fixed_result_rows->getRowAt(1, 0, true, true)));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 1, true, true)));
+      ASSERT_EQ(0, v<int64_t>(fixed_result_rows->getRowAt(1, 1, true, true)));
     }
 
     // unnest groupby, force estimator run
@@ -8502,7 +8506,7 @@ TEST_F(Select, ArrayCountDistinct) {
                            dt);
       ASSERT_EQ(g_array_test_row_count, result_rows->rowCount());
       for (size_t row_idx = 0; row_idx < g_array_test_row_count; ++row_idx) {
-        ASSERT_EQ(3, v<int64_t>(result_rows->getRowAt(row_idx, 0, true)));
+        ASSERT_EQ(3, v<int64_t>(result_rows->getRowAt(row_idx, 0, true, true)));
       }
 
       ASSERT_EQ(
@@ -8516,7 +8520,7 @@ TEST_F(Select, ArrayCountDistinct) {
                            dt);
       ASSERT_EQ(g_array_test_row_count, fixed_result_rows->rowCount());
       for (size_t row_idx = 0; row_idx < g_array_test_row_count; ++row_idx) {
-        ASSERT_EQ(3, v<int64_t>(fixed_result_rows->getRowAt(row_idx, 0, true)));
+        ASSERT_EQ(3, v<int64_t>(fixed_result_rows->getRowAt(row_idx, 0, true, true)));
       }
     }
     for (const std::string float_type : {"float", "double"}) {

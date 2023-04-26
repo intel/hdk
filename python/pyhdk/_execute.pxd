@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from libcpp cimport bool
+from libc.stdint cimport int64_t
 from libcpp.memory cimport shared_ptr, make_shared, unique_ptr, make_unique
 from libcpp.string cimport string
 from libcpp.vector cimport vector
@@ -91,6 +92,30 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     @staticmethod
     CExecutionOptions fromConfig(const CConfig)
 
+cdef extern from "omniscidb/ResultSet/TargetValue.h":
+  cdef cppclass CNullableString "NullableString":
+    pass
+
+  cdef cppclass CScalarTargetValue "ScalarTargetValue":
+    pass
+
+  cdef cppclass CArrayTargetValue "ArrayTargetValue":
+    bool operator bool()
+    vector[CScalarTargetValue] &operator *()
+
+  cdef cppclass CTargetValue "TargetValue":
+    pass
+
+  bool isNull(const CScalarTargetValue&, const CType*)
+  bool isFloat(const CScalarTargetValue&)
+  float getFloat(const CScalarTargetValue&)
+  bool isDouble(const CScalarTargetValue&)
+  double getDouble(const CScalarTargetValue&)
+  bool isInt(const CScalarTargetValue&)
+  int64_t getInt(const CScalarTargetValue&)
+  bool isString(const CScalarTargetValue&)
+  string getString(const CScalarTargetValue&)
+
 cdef extern from "omniscidb/ResultSet/ResultSet.h":
   cdef cppclass CResultSet "ResultSet":
     size_t rowCount()
@@ -98,6 +123,8 @@ cdef extern from "omniscidb/ResultSet/ResultSet.h":
     string toString() const
     string contentToString(bool) const
     string summaryToString() const
+
+    vector[CTargetValue] getRowAt(size_t, bool, bool) except +
 
 ctypedef shared_ptr[CResultSet] CResultSetPtr
 

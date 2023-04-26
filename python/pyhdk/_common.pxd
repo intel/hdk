@@ -70,6 +70,8 @@ cdef extern from "omniscidb/IR/Type.h":
 
     void print()
 
+    const T* asType "as"[T]() const
+
   cdef cppclass CArrayBaseType "hdk::ir::ArrayBaseType"(CType):
     const CType* elemType() const
 
@@ -257,3 +259,6 @@ cdef extern from "omniscidb/ConfigBuilder/ConfigBuilder.h":
 
     bool parseCommandLineArgs(const string&, const string&, bool) except +
     CConfigPtr config()
+
+cdef extern from "boost/variant.hpp":
+  T *boost_get "boost::get"[T](void *)

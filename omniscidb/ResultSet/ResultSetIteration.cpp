@@ -183,10 +183,9 @@ std::vector<TargetValue> ResultSet::getRowAt(
   return row;
 }
 
-TargetValue ResultSet::getRowAt(const size_t row_idx,
-                                const size_t col_idx,
-                                const bool translate_strings,
-                                const bool decimal_to_double /* = true */) const {
+std::vector<TargetValue> ResultSet::getRowAt(const size_t row_idx,
+                                             const bool translate_strings,
+                                             const bool decimal_to_double) const {
   std::lock_guard<std::mutex> lock(row_iteration_mutex_);
   moveToBegin();
   for (size_t i = 0; i < row_idx; ++i) {
@@ -195,7 +194,14 @@ TargetValue ResultSet::getRowAt(const size_t row_idx,
   }
   auto crt_row = getNextRowUnlocked(translate_strings, decimal_to_double);
   CHECK(!crt_row.empty());
-  return crt_row[col_idx];
+  return crt_row;
+}
+
+TargetValue ResultSet::getRowAt(const size_t row_idx,
+                                const size_t col_idx,
+                                const bool translate_strings,
+                                const bool decimal_to_double) const {
+  return getRowAt(row_idx, translate_strings, decimal_to_double)[col_idx];
 }
 
 OneIntegerColumnRow ResultSet::getOneColRow(const size_t global_entry_idx) const {
@@ -234,7 +240,7 @@ std::vector<TargetValue> ResultSet::getRowAt(const size_t logical_index) const {
   }
   const auto entry_idx =
       permutation_.empty() ? logical_index : permutation_[logical_index];
-  return getRowAt(entry_idx, true, false, false);
+  return getRowAt(entry_idx, true, false, false, {});
 }
 
 std::vector<TargetValue> ResultSet::getRowAtNoTranslations(
@@ -301,7 +307,7 @@ std::vector<TargetValue> ResultSet::getNextRowImpl(const bool translate_strings,
 
   } while (drop_first_ && fetched_so_far_ <= drop_first_);
 
-  auto row = getRowAt(entry_buff_idx, translate_strings, decimal_to_double, false);
+  auto row = getRowAt(entry_buff_idx, translate_strings, decimal_to_double, false, {});
   CHECK(!row.empty());
 
   return row;
