@@ -23,8 +23,8 @@ StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
   CHECK_EQ(dict_id, DictRef::literalsDictId);
   if (!lit_str_dict_proxy_) {
     DictRef literal_dict_ref(DictRef::invalidDbId, DictRef::literalsDictId);
-    std::shared_ptr<StringDictionary> tsd = std::make_shared<StringDictionary>(
-        literal_dict_ref, "", false, true, g_cache_string_hash);
+    std::shared_ptr<StringDictionary> tsd =
+        std::make_shared<StringDictionary>(literal_dict_ref, g_cache_string_hash);
     lit_str_dict_proxy_ =
         std::make_shared<StringDictionaryProxy>(tsd, literal_dict_ref.dictId, 0);
   }

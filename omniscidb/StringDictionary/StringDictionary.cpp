@@ -50,17 +50,6 @@ namespace {
 
 const int SYSTEM_PAGE_SIZE = omnisci::get_page_size();
 
-int checked_open(const char* path, const bool recover) {
-  auto fd = omnisci::open(path, O_RDWR | O_CREAT | (recover ? O_APPEND : O_TRUNC), 0644);
-  if (fd > 0) {
-    return fd;
-  }
-  auto err = std::string("Dictionary path ") + std::string(path) +
-             std::string(" does not exist.");
-  LOG(ERROR) << err;
-  throw DictPayloadUnavailable(err);
-}
-
 const uint64_t round_up_p2(const uint64_t num) {
   uint64_t in = num;
   in--;
@@ -111,124 +100,21 @@ constexpr size_t StringDictionary::MAX_STRLEN;
 constexpr size_t StringDictionary::MAX_STRCOUNT;
 
 StringDictionary::StringDictionary(const DictRef& dict_ref,
-                                   const std::string& folder,
-                                   const bool isTemp,
-                                   const bool recover,
                                    const bool materializeHashes,
                                    size_t initial_capacity)
     : dict_ref_(dict_ref)
-    , folder_(folder)
     , str_count_(0)
     , string_id_string_dict_hash_table_(initial_capacity, INVALID_STR_ID)
     , hash_cache_(initial_capacity)
-    , isTemp_(isTemp)
     , materialize_hashes_(materializeHashes)
-    , payload_fd_(-1)
-    , offset_fd_(-1)
     , offset_map_(nullptr)
     , payload_map_(nullptr)
     , offset_file_size_(0)
     , payload_file_size_(0)
     , payload_file_off_(0)
     , strings_cache_(nullptr) {
-  if (!isTemp && folder.empty()) {
-    return;
-  }
-
   // initial capacity must be a power of two for efficient bucket computation
   CHECK_EQ(size_t(0), (initial_capacity & (initial_capacity - 1)));
-  if (!isTemp_) {
-    boost::filesystem::path storage_path(folder);
-    offsets_path_ = (storage_path / boost::filesystem::path("DictOffsets")).string();
-    const auto payload_path =
-        (storage_path / boost::filesystem::path("DictPayload")).string();
-    payload_fd_ = checked_open(payload_path.c_str(), recover);
-    offset_fd_ = checked_open(offsets_path_.c_str(), recover);
-    payload_file_size_ = omnisci::file_size(payload_fd_);
-    offset_file_size_ = omnisci::file_size(offset_fd_);
-  }
-  bool storage_is_empty = false;
-  if (payload_file_size_ == 0) {
-    storage_is_empty = true;
-    addPayloadCapacity();
-  }
-  if (offset_file_size_ == 0) {
-    addOffsetCapacity();
-  }
-  if (!isTemp_) {  // we never mmap or recover temp dictionaries
-    payload_map_ =
-        reinterpret_cast<char*>(omnisci::checked_mmap(payload_fd_, payload_file_size_));
-    offset_map_ = reinterpret_cast<StringIdxEntry*>(
-        omnisci::checked_mmap(offset_fd_, offset_file_size_));
-    if (recover) {
-      const size_t bytes = omnisci::file_size(offset_fd_);
-      if (bytes % sizeof(StringIdxEntry) != 0) {
-        LOG(WARNING) << "Offsets " << offsets_path_ << " file is truncated";
-      }
-      const uint64_t str_count =
-          storage_is_empty ? 0 : getNumStringsFromStorage(bytes / sizeof(StringIdxEntry));
-      collisions_ = 0;
-      // at this point we know the size of the StringDict we need to load
-      // so lets reallocate the vector to the correct size
-      const uint64_t max_entries =
-          std::max(round_up_p2(str_count * 2 + 1),
-                   round_up_p2(std::max(initial_capacity, static_cast<size_t>(1))));
-      std::vector<int32_t> new_str_ids(max_entries, INVALID_STR_ID);
-      string_id_string_dict_hash_table_.swap(new_str_ids);
-      if (materialize_hashes_) {
-        std::vector<string_dict_hash_t> new_hash_cache(max_entries / 2);
-        hash_cache_.swap(new_hash_cache);
-      }
-      // Bail early if we know we don't have strings to add (i.e. a new or empty
-      // dictionary)
-      if (str_count == 0) {
-        return;
-      }
-
-      unsigned string_id = 0;
-      mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
-
-      uint32_t thread_inits = 0;
-      const auto thread_count = std::thread::hardware_concurrency();
-      const uint32_t items_per_thread = std::max<uint32_t>(
-          2000, std::min<uint32_t>(200000, (str_count / thread_count) + 1));
-      std::vector<std::future<std::vector<std::pair<string_dict_hash_t, unsigned int>>>>
-          dictionary_futures;
-      for (string_id = 0; string_id < str_count; string_id += items_per_thread) {
-        dictionary_futures.emplace_back(std::async(
-            std::launch::async, [string_id, str_count, items_per_thread, this] {
-              std::vector<std::pair<string_dict_hash_t, unsigned int>> hashVec;
-              for (uint32_t curr_id = string_id;
-                   curr_id < string_id + items_per_thread && curr_id < str_count;
-                   curr_id++) {
-                const auto recovered = getStringFromStorage(curr_id);
-                if (recovered.canary) {
-                  // hit the canary, recovery finished
-                  break;
-                } else {
-                  std::string_view temp(recovered.c_str_ptr, recovered.size);
-                  hashVec.emplace_back(std::make_pair(hash_string(temp), temp.size()));
-                }
-              }
-              return hashVec;
-            }));
-        thread_inits++;
-        if (thread_inits % thread_count == 0) {
-          processDictionaryFutures(dictionary_futures);
-        }
-      }
-      // gather last few threads
-      if (dictionary_futures.size() != 0) {
-        processDictionaryFutures(dictionary_futures);
-      }
-      VLOG(1) << "Opened string dictionary " << folder << " # Strings: " << str_count_
-              << " Hash table size: " << string_id_string_dict_hash_table_.size()
-              << " Fill rate: "
-              << static_cast<double>(str_count_) * 100.0 /
-                     string_id_string_dict_hash_table_.size()
-              << "% Collisions: " << collisions_;
-    }
-  }
 }
 
 namespace {
@@ -319,19 +205,9 @@ size_t StringDictionary::getNumStringsFromStorage(
 StringDictionary::~StringDictionary() noexcept {
   free(CANARY_BUFFER);
   if (payload_map_) {
-    if (!isTemp_) {
-      CHECK(offset_map_);
-      omnisci::checked_munmap(payload_map_, payload_file_size_);
-      omnisci::checked_munmap(offset_map_, offset_file_size_);
-      CHECK_GE(payload_fd_, 0);
-      omnisci::close(payload_fd_);
-      CHECK_GE(offset_fd_, 0);
-      omnisci::close(offset_fd_);
-    } else {
-      CHECK(offset_map_);
-      free(payload_map_);
-      free(offset_map_);
-    }
+    CHECK(offset_map_);
+    free(payload_map_);
+    free(offset_map_);
   }
 }
 
@@ -1318,17 +1194,8 @@ void StringDictionary::checkAndConditionallyIncreasePayloadCapacity(
   if (payload_file_off_ + write_length > payload_file_size_) {
     const size_t min_capacity_needed =
         write_length - (payload_file_size_ - payload_file_off_);
-    if (!isTemp_) {
-      CHECK_GE(payload_fd_, 0);
-      omnisci::checked_munmap(payload_map_, payload_file_size_);
-      addPayloadCapacity(min_capacity_needed);
-      CHECK(payload_file_off_ + write_length <= payload_file_size_);
-      payload_map_ =
-          reinterpret_cast<char*>(omnisci::checked_mmap(payload_fd_, payload_file_size_));
-    } else {
-      addPayloadCapacity(min_capacity_needed);
-      CHECK(payload_file_off_ + write_length <= payload_file_size_);
-    }
+    addPayloadCapacity(min_capacity_needed);
+    CHECK(payload_file_off_ + write_length <= payload_file_size_);
   }
 }
 
@@ -1338,17 +1205,8 @@ void StringDictionary::checkAndConditionallyIncreaseOffsetCapacity(
   if (offset_file_off + write_length >= offset_file_size_) {
     const size_t min_capacity_needed =
         write_length - (offset_file_size_ - offset_file_off);
-    if (!isTemp_) {
-      CHECK_GE(offset_fd_, 0);
-      omnisci::checked_munmap(offset_map_, offset_file_size_);
-      addOffsetCapacity(min_capacity_needed);
-      CHECK(offset_file_off + write_length <= offset_file_size_);
-      offset_map_ = reinterpret_cast<StringIdxEntry*>(
-          omnisci::checked_mmap(offset_fd_, offset_file_size_));
-    } else {
-      addOffsetCapacity(min_capacity_needed);
-      CHECK(offset_file_off + write_length <= offset_file_size_);
-    }
+    addOffsetCapacity(min_capacity_needed);
+    CHECK(offset_file_off + write_length <= offset_file_size_);
   }
 }
 
@@ -1395,10 +1253,6 @@ std::string_view StringDictionary::getStringFromStorageFast(
 
 StringDictionary::PayloadString StringDictionary::getStringFromStorage(
     const int string_id) const noexcept {
-  if (!isTemp_) {
-    CHECK_GE(payload_fd_, 0);
-    CHECK_GE(offset_fd_, 0);
-  }
   CHECK_GE(string_id, 0);
   const StringIdxEntry* str_meta = offset_map_ + string_id;
   if (str_meta->size == 0xffff) {
@@ -1409,42 +1263,13 @@ StringDictionary::PayloadString StringDictionary::getStringFromStorage(
 }
 
 void StringDictionary::addPayloadCapacity(const size_t min_capacity_requested) noexcept {
-  if (!isTemp_) {
-    payload_file_size_ += addStorageCapacity(payload_fd_, min_capacity_requested);
-  } else {
-    payload_map_ = static_cast<char*>(
-        addMemoryCapacity(payload_map_, payload_file_size_, min_capacity_requested));
-  }
+  payload_map_ = static_cast<char*>(
+      addMemoryCapacity(payload_map_, payload_file_size_, min_capacity_requested));
 }
 
 void StringDictionary::addOffsetCapacity(const size_t min_capacity_requested) noexcept {
-  if (!isTemp_) {
-    offset_file_size_ += addStorageCapacity(offset_fd_, min_capacity_requested);
-  } else {
-    offset_map_ = static_cast<StringIdxEntry*>(
-        addMemoryCapacity(offset_map_, offset_file_size_, min_capacity_requested));
-  }
-}
-
-size_t StringDictionary::addStorageCapacity(
-    int fd,
-    const size_t min_capacity_requested) noexcept {
-  const size_t canary_buff_size_to_add =
-      std::max(static_cast<size_t>(1024 * SYSTEM_PAGE_SIZE),
-               (min_capacity_requested / SYSTEM_PAGE_SIZE + 1) * SYSTEM_PAGE_SIZE);
-
-  if (canary_buffer_size < canary_buff_size_to_add) {
-    CANARY_BUFFER = static_cast<char*>(realloc(CANARY_BUFFER, canary_buff_size_to_add));
-    canary_buffer_size = canary_buff_size_to_add;
-    CHECK(CANARY_BUFFER);
-    memset(CANARY_BUFFER, 0xff, canary_buff_size_to_add);
-  }
-
-  CHECK_NE(lseek(fd, 0, SEEK_END), -1);
-  const auto write_return = write(fd, CANARY_BUFFER, canary_buff_size_to_add);
-  CHECK(write_return > 0 &&
-        (static_cast<size_t>(write_return) == canary_buff_size_to_add));
-  return canary_buff_size_to_add;
+  offset_map_ = static_cast<StringIdxEntry*>(
+      addMemoryCapacity(offset_map_, offset_file_size_, min_capacity_requested));
 }
 
 void* StringDictionary::addMemoryCapacity(void* addr,
@@ -1479,22 +1304,6 @@ void StringDictionary::invalidateInvertedIndex() noexcept {
     decltype(equal_cache_)().swap(equal_cache_);
   }
   compare_cache_.invalidateInvertedIndex();
-}
-
-// TODO 5 Mar 2021 Nothing will undo the writes to dictionary currently on a failed
-// load.  The next write to the dictionary that does checkpoint will make the
-// uncheckpointed data be written to disk. Only option is a table truncate, and thats
-// assuming not replicated dictionary
-bool StringDictionary::checkpoint() noexcept {
-  CHECK(!isTemp_);
-  bool ret = true;
-  ret = ret &&
-        (omnisci::msync((void*)offset_map_, offset_file_size_, /*async=*/false) == 0);
-  ret = ret &&
-        (omnisci::msync((void*)payload_map_, payload_file_size_, /*async=*/false) == 0);
-  ret = ret && (omnisci::fsync(offset_fd_) == 0);
-  ret = ret && (omnisci::fsync(payload_fd_) == 0);
-  return ret;
 }
 
 void StringDictionary::buildSortedCache() {
@@ -1702,9 +1511,6 @@ size_t StringDictionary::buildDictionaryTranslationMap(
   if (num_source_strings == 0L) {
     return 0;
   }
-
-  // Sort this/source dict and dest dict on folder_ so we can enforce
-  // lock ordering and avoid deadlocks
 
   const int32_t dest_db_id = dest_dict->getDbId();
   const int32_t dest_dict_id = dest_dict->getDictId();

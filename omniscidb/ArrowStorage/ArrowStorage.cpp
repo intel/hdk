@@ -360,8 +360,8 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
           int dict_id = addSchemaIdChecked(next_dict_id_++, schema_id_);
           auto dict_desc = std::make_unique<DictDescriptor>(
               db_id_, dict_id, col.name, 32, true, 1, table_name, true);
-          dict_desc->stringDict = std::make_shared<StringDictionary>(
-              DictRef{db_id_, dict_id}, table_name + "."s + col.name, true, false);
+          dict_desc->stringDict =
+              std::make_shared<StringDictionary>(DictRef{db_id_, dict_id});
           if (sharing_id < 0) {
             dict_ids.emplace(sharing_id, dict_id);
           }
