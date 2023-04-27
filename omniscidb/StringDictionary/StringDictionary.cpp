@@ -144,62 +144,12 @@ void StringDictionary::eachStringSerially(int64_t const generation,
   }
 }
 
-void StringDictionary::processDictionaryFutures(
-    std::vector<std::future<std::vector<std::pair<string_dict_hash_t, unsigned int>>>>&
-        dictionary_futures) {
-  for (auto& dictionary_future : dictionary_futures) {
-    dictionary_future.wait();
-    const auto hashVec = dictionary_future.get();
-    for (const auto& hash : hashVec) {
-      const uint32_t bucket =
-          computeUniqueBucketWithHash(hash.first, string_id_string_dict_hash_table_);
-      payload_file_off_ += hash.second;
-      string_id_string_dict_hash_table_[bucket] = static_cast<int32_t>(str_count_);
-      if (materialize_hashes_) {
-        hash_cache_[str_count_] = hash.first;
-      }
-      ++str_count_;
-    }
-  }
-  dictionary_futures.clear();
-}
-
 int32_t StringDictionary::getDbId() const noexcept {
   return dict_ref_.dbId;
 }
 
 int32_t StringDictionary::getDictId() const noexcept {
   return dict_ref_.dictId;
-}
-
-/**
- * Method to retrieve number of strings in storage via a binary search for the first
- * canary
- * @param storage_slots number of storage entries we should search to find the minimum
- * canary
- * @return number of strings in storage
- */
-size_t StringDictionary::getNumStringsFromStorage(
-    const size_t storage_slots) const noexcept {
-  if (storage_slots == 0) {
-    return 0;
-  }
-  // Must use signed integers since final binary search step can wrap to max size_t value
-  // if dictionary is empty
-  int64_t min_bound = 0;
-  int64_t max_bound = storage_slots - 1;
-  int64_t guess{0};
-  while (min_bound <= max_bound) {
-    guess = (max_bound + min_bound) / 2;
-    CHECK_GE(guess, 0);
-    if (getStringFromStorage(guess).canary) {
-      max_bound = guess - 1;
-    } else {
-      min_bound = guess + 1;
-    }
-  }
-  CHECK_GE(guess + (min_bound > guess ? 1 : 0), 0);
-  return guess + (min_bound > guess ? 1 : 0);
 }
 
 StringDictionary::~StringDictionary() noexcept {
@@ -236,9 +186,7 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
   if (string_id_string_dict_hash_table_[bucket] == INVALID_STR_ID) {
     CHECK_LT(str_count_, MAX_STRCOUNT)
         << "Maximum number (" << str_count_
-        << ") of Dictionary encoded Strings reached for this column, offset path "
-           "for column is  "
-        << offsets_path_;
+        << ") of Dictionary encoded Strings reached for this column";
     appendToStorage(str);
     string_id_string_dict_hash_table_[bucket] = static_cast<int32_t>(str_count_);
     if (materialize_hashes_) {
@@ -473,8 +421,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
     CHECK_LT(str_count_, MAX_STRCOUNT)
         << "Maximum number (" << str_count_
         << ") of Dictionary encoded Strings reached for this column, offset path "
-           "for column is  "
-        << offsets_path_;
+           "for column is";
     if (fillRateIsHigh(str_count_)) {
       // resize when more than 50% is full
       increaseHashTableCapacity();
@@ -557,9 +504,7 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
     CHECK_LT(shadow_str_count, MAX_STRCOUNT)
         << "Maximum number (" << shadow_str_count
         << ") of Dictionary encoded Strings reached for this column, offset path "
-           "for column is  "
-        << offsets_path_;
-
+           "for column is  ";
     string_memory_ids.push_back(input_string_idx);
     sum_new_string_lengths += input_string.size();
     string_id_string_dict_hash_table_[hash_bucket] =
@@ -1352,71 +1297,6 @@ void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache)
     updated_cache[idx++] = sorted_cache[s_idx++];
   }
   sorted_cache.swap(updated_cache);
-}
-
-void StringDictionary::populate_string_ids(
-    std::vector<int32_t>& dest_ids,
-    StringDictionary* dest_dict,
-    const std::vector<int32_t>& source_ids,
-    const StringDictionary* source_dict,
-    const std::vector<std::string const*>& transient_string_vec) {
-  std::vector<std::string> strings;
-
-  for (const int32_t source_id : source_ids) {
-    if (source_id == std::numeric_limits<int32_t>::min()) {
-      strings.emplace_back("");
-    } else if (source_id < 0) {
-      unsigned const string_index = StringDictionaryProxy::transientIdToIndex(source_id);
-      CHECK_LT(string_index, transient_string_vec.size()) << "source_id=" << source_id;
-      strings.emplace_back(*transient_string_vec[string_index]);
-    } else {
-      strings.push_back(source_dict->getString(source_id));
-    }
-  }
-
-  dest_ids.resize(strings.size());
-  dest_dict->getOrAddBulk(strings, &dest_ids[0]);
-}
-
-void StringDictionary::populate_string_array_ids(
-    std::vector<std::vector<int32_t>>& dest_array_ids,
-    StringDictionary* dest_dict,
-    const std::vector<std::vector<int32_t>>& source_array_ids,
-    const StringDictionary* source_dict) {
-  dest_array_ids.resize(source_array_ids.size());
-
-  std::atomic<size_t> row_idx{0};
-  auto processor = [&row_idx, &dest_array_ids, dest_dict, &source_array_ids, source_dict](
-                       int thread_id) {
-    for (;;) {
-      auto row = row_idx.fetch_add(1);
-
-      if (row >= dest_array_ids.size()) {
-        return;
-      }
-      const auto& source_ids = source_array_ids[row];
-      auto& dest_ids = dest_array_ids[row];
-      populate_string_ids(dest_ids, dest_dict, source_ids, source_dict);
-    }
-  };
-
-  const int num_worker_threads = std::thread::hardware_concurrency();
-
-  if (source_array_ids.size() / num_worker_threads > 10) {
-    std::vector<std::future<void>> worker_threads;
-    for (int i = 0; i < num_worker_threads; ++i) {
-      worker_threads.push_back(std::async(std::launch::async, processor, i));
-    }
-
-    for (auto& child : worker_threads) {
-      child.wait();
-    }
-    for (auto& child : worker_threads) {
-      child.get();
-    }
-  } else {
-    processor(0);
-  }
 }
 
 std::vector<std::string_view> StringDictionary::getStringViews(

@@ -31,13 +31,6 @@
 
 extern bool g_enable_stringdict_parallel;
 
-class DictPayloadUnavailable : public std::runtime_error {
- public:
-  DictPayloadUnavailable() : std::runtime_error("DictPayloadUnavailable") {}
-
-  DictPayloadUnavailable(const std::string& err) : std::runtime_error(err) {}
-};
-
 using string_dict_hash_t = uint32_t;
 
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
@@ -116,36 +109,6 @@ class StringDictionary {
       const bool dest_has_transients,
       StringLookupCallback const& dest_transient_lookup_callback) const;
 
-  /**
-   * @brief Populates provided \p dest_ids vector with string ids corresponding to given
-   * source strings
-   *
-   * Given a vector of source string ids and corresponding source dictionary, this method
-   * populates a vector of destination string ids by either returning the string id of
-   * matching strings in the destination dictionary or creating new entries in the
-   * dictionary. Source string ids can also be transient if they were created by a
-   * function (e.g LOWER/UPPER functions). A map of transient string ids to string values
-   * is provided in order to handle this use case.
-   *
-   * @param dest_ids - vector of destination string ids to be populated
-   * @param dest_dict - destination dictionary
-   * @param source_ids - vector of source string ids for which destination ids are needed
-   * @param source_dict - source dictionary
-   * @param transient_string_vec - ordered vector of string value pointers
-   */
-  static void populate_string_ids(
-      std::vector<int32_t>& dest_ids,
-      StringDictionary* dest_dict,
-      const std::vector<int32_t>& source_ids,
-      const StringDictionary* source_dict,
-      const std::vector<std::string const*>& transient_string_vec = {});
-
-  static void populate_string_array_ids(
-      std::vector<std::vector<int32_t>>& dest_array_ids,
-      StringDictionary* dest_dict,
-      const std::vector<std::vector<int32_t>>& source_array_ids,
-      const StringDictionary* source_dict);
-
   static constexpr int32_t INVALID_STR_ID = -1;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
   static constexpr size_t MAX_STRCOUNT = (1U << 31) - 1;
@@ -171,10 +134,6 @@ class StringDictionary {
     bool canary;
   };
 
-  void processDictionaryFutures(
-      std::vector<std::future<std::vector<std::pair<string_dict_hash_t, unsigned int>>>>&
-          dictionary_futures);
-  size_t getNumStringsFromStorage(const size_t storage_slots) const noexcept;
   bool fillRateIsHigh(const size_t num_strings) const noexcept;
   void increaseHashTableCapacity() noexcept;
   template <class String>
@@ -229,10 +188,8 @@ class StringDictionary {
                                  std::string comp_operator,
                                  size_t generation);
   void buildSortedCache();
-  void insertInSortedCache(std::string str, int32_t str_id);
   void sortCache(std::vector<int32_t>& cache);
   void mergeSortedCache(std::vector<int32_t>& temp_sorted_cache);
-  compare_cache_value_t* binary_search_cache(const std::string& pattern) const;
 
   const DictRef dict_ref_;
   size_t str_count_;
@@ -240,9 +197,7 @@ class StringDictionary {
   std::vector<int32_t> string_id_string_dict_hash_table_;
   std::vector<string_dict_hash_t> hash_cache_;
   std::vector<int32_t> sorted_cache;
-  bool isTemp_;
   bool materialize_hashes_;
-  std::string offsets_path_;
   StringIdxEntry* offset_map_;
   char* payload_map_;
   size_t offset_file_size_;
