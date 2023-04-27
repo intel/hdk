@@ -24,19 +24,9 @@ namespace omnisci {
 
 size_t file_size(const int fd);
 
-void* checked_mmap(const int fd, const size_t sz);
-
-void checked_munmap(void* addr, size_t length);
-
-int msync(void* addr, size_t length, bool async);
-
-int fsync(int fd);
-
 int open(const char* path, int flags, int mode);
 
 void close(const int fd);
-
-::FILE* fopen(const char* filename, const char* mode);
 
 ::FILE* popen(const char* command, const char* type);
 
