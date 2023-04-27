@@ -45,9 +45,6 @@ using StringLookupCallback = std::function<bool(std::string_view, int32_t string
 class StringDictionary {
  public:
   StringDictionary(const DictRef& dict_ref,
-                   const std::string& folder,
-                   const bool isTemp,
-                   const bool recover,
                    const bool materializeHashes = false,
                    size_t initial_capacity = 256);
   ~StringDictionary() noexcept;
@@ -118,8 +115,6 @@ class StringDictionary {
       const int64_t dest_generation,
       const bool dest_has_transients,
       StringLookupCallback const& dest_transient_lookup_callback) const;
-
-  bool checkpoint() noexcept;
 
   /**
    * @brief Populates provided \p dest_ids vector with string ids corresponding to given
@@ -226,7 +221,6 @@ class StringDictionary {
   std::string_view getStringFromStorageFast(const int string_id) const noexcept;
   void addPayloadCapacity(const size_t min_capacity_requested = 0) noexcept;
   void addOffsetCapacity(const size_t min_capacity_requested = 0) noexcept;
-  size_t addStorageCapacity(int fd, const size_t min_capacity_requested = 0) noexcept;
   void* addMemoryCapacity(void* addr,
                           size_t& mem_size,
                           const size_t min_capacity_requested = 0) noexcept;
@@ -241,7 +235,6 @@ class StringDictionary {
   compare_cache_value_t* binary_search_cache(const std::string& pattern) const;
 
   const DictRef dict_ref_;
-  const std::string folder_;
   size_t str_count_;
   size_t collisions_;
   std::vector<int32_t> string_id_string_dict_hash_table_;
@@ -250,8 +243,6 @@ class StringDictionary {
   bool isTemp_;
   bool materialize_hashes_;
   std::string offsets_path_;
-  int payload_fd_;
-  int offset_fd_;
   StringIdxEntry* offset_map_;
   char* payload_map_;
   size_t offset_file_size_;

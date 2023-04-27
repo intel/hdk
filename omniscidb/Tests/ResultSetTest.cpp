@@ -879,8 +879,7 @@ bool approx_eq(const double v, const double target, const double eps = EPS) {
   return target - eps < v && v < target + eps;
 }
 
-std::shared_ptr<StringDictionary> g_sd =
-    std::make_shared<StringDictionary>(DictRef(), "", false, true);
+std::shared_ptr<StringDictionary> g_sd = std::make_shared<StringDictionary>(DictRef());
 
 void test_iterate(const std::vector<TargetInfo>& target_infos,
                   const QueryMemoryDescriptor& query_mem_desc) {

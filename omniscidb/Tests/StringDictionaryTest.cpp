@@ -18,11 +18,8 @@
 
 #include "StringDictionary/StringDictionaryProxy.h"
 
-#include <boost/filesystem.hpp>
-
 #include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <limits>
@@ -32,28 +29,11 @@
 
 using namespace std::string_literals;
 
-static const std::string BASE_PATH1 =
-    BASE_PATH + "/"s + boost::filesystem::unique_path().string();
-static const std::string BASE_PATH2 =
-    BASE_PATH + "/"s + boost::filesystem::unique_path().string();
-
 EXTERN extern bool g_cache_string_hash;
-
-namespace {
-
-void create_directory_if_not_exists(const std::string& path) {
-  // Up to caller to catch any exceptions
-  std::filesystem::path fs_path(path);
-  if (!(std::filesystem::exists(path))) {
-    std::filesystem::create_directories(path);
-  }
-}
-
-}  // namespace
 
 TEST(StringDictionary, AddAndGet) {
   const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  StringDictionary string_dict(dict_ref, g_cache_string_hash);
   auto id1 = string_dict.getOrAdd("foo bar");
   auto id2 = string_dict.getOrAdd("foo bar");
   ASSERT_EQ(id1, id2);
@@ -68,25 +48,9 @@ TEST(StringDictionary, AddAndGet) {
   ASSERT_EQ("foo bar", string_dict.getString(id5));
 }
 
-TEST(StringDictionary, Recover) {
-  const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
-  auto id1 = string_dict.getOrAdd("baz");
-  ASSERT_EQ(1, id1);
-  auto id2 = string_dict.getOrAdd("baz");
-  ASSERT_EQ(1, id2);
-  auto id3 = string_dict.getOrAdd("foo bar");
-  ASSERT_EQ(0, id3);
-  auto id4 = string_dict.getOrAdd("fizzbuzz");
-  ASSERT_EQ(2, id4);
-  ASSERT_EQ("baz", string_dict.getString(id2));
-  ASSERT_EQ("foo bar", string_dict.getString(id3));
-  ASSERT_EQ("fizzbuzz", string_dict.getString(id4));
-}
-
 TEST(StringDictionary, HandleEmpty) {
   const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  StringDictionary string_dict(dict_ref, g_cache_string_hash);
   auto id1 = string_dict.getOrAdd("");
   auto id2 = string_dict.getOrAdd("");
   ASSERT_EQ(id1, id2);
@@ -96,11 +60,11 @@ TEST(StringDictionary, HandleEmpty) {
 TEST(StringDictionary, RecoverZero) {
   const DictRef dict_ref(-1, 1);
   {
-    StringDictionary string_dict(dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+    StringDictionary string_dict(dict_ref, g_cache_string_hash);
     size_t num_strings = string_dict.storageEntryCount();
     ASSERT_EQ(static_cast<size_t>(0), num_strings);
   }
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
+  StringDictionary string_dict(dict_ref, g_cache_string_hash);
   size_t num_strings = string_dict.storageEntryCount();
   ASSERT_EQ(static_cast<size_t>(0), num_strings);
 }
@@ -109,23 +73,10 @@ const int g_op_count{250000};
 
 TEST(StringDictionary, ManyAddsAndGets) {
   const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  StringDictionary string_dict(dict_ref, g_cache_string_hash);
   for (int i = 0; i < g_op_count; ++i) {
     CHECK_EQ(i, string_dict.getOrAdd(std::to_string(i)));
   }
-  for (int i = 0; i < g_op_count; ++i) {
-    CHECK_EQ(i, string_dict.getOrAdd(std::to_string(i)));
-  }
-  for (int i = 0; i < g_op_count; ++i) {
-    CHECK_EQ(std::to_string(i), string_dict.getString(i));
-  }
-}
-
-TEST(StringDictionary, RecoverMany) {
-  const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
-  size_t num_strings = string_dict.storageEntryCount();
-  ASSERT_EQ(static_cast<size_t>(g_op_count), num_strings);
   for (int i = 0; i < g_op_count; ++i) {
     CHECK_EQ(i, string_dict.getOrAdd(std::to_string(i)));
   }
@@ -136,8 +87,8 @@ TEST(StringDictionary, RecoverMany) {
 
 TEST(StringDictionary, GetStringViews) {
   const DictRef dict_ref(-1, 1);
-  std::shared_ptr<StringDictionary> string_dict = std::make_shared<StringDictionary>(
-      dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> string_dict =
+      std::make_shared<StringDictionary>(dict_ref, g_cache_string_hash);
   std::vector<std::string> strings;
   std::vector<int32_t> string_ids(g_op_count);
   for (int i = 0; i < g_op_count; ++i) {
@@ -154,7 +105,7 @@ TEST(StringDictionary, GetStringViews) {
 
 TEST(StringDictionary, GetOrAddBulk) {
   const DictRef dict_ref(-1, 1);
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  StringDictionary string_dict(dict_ref, g_cache_string_hash);
   {
     // First insert all new strings
     std::vector<int32_t> string_ids(g_op_count);
@@ -204,12 +155,8 @@ TEST(StringDictionary, GetOrAddBulk) {
       }
     }
   }
-}
 
-TEST(StringDictionary, GetBulk) {
-  const DictRef dict_ref(-1, 1);
-  // Use existing dictionary from GetOrAddBulk
-  StringDictionary string_dict(dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
+  // test GetBulk
   {
     // First iteration is identical to first of GetOrAddBulk, and results should be the
     // same
@@ -262,10 +209,9 @@ TEST(StringDictionary, BuildTranslationMap) {
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
   std::shared_ptr<StringDictionary> source_string_dict =
-      std::make_shared<StringDictionary>(
-          dict_ref1, BASE_PATH1, false, false, g_cache_string_hash);
-  std::shared_ptr<StringDictionary> dest_string_dict = std::make_shared<StringDictionary>(
-      dict_ref2, BASE_PATH2, false, false, g_cache_string_hash);
+      std::make_shared<StringDictionary>(dict_ref1, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> dest_string_dict =
+      std::make_shared<StringDictionary>(dict_ref2, g_cache_string_hash);
 
   // Prep: insert g_op_count strings into source_string_dict
   std::vector<int32_t> string_ids(g_op_count);
@@ -323,8 +269,8 @@ TEST(StringDictionary, BuildTranslationMap) {
 
 TEST(StringDictionaryProxy, GetOrAddTransient) {
   const DictRef dict_ref(-1, 1);
-  std::shared_ptr<StringDictionary> string_dict = std::make_shared<StringDictionary>(
-      dict_ref, BASE_PATH1, false, false, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> string_dict =
+      std::make_shared<StringDictionary>(dict_ref, g_cache_string_hash);
 
   // Prep underlying dictionary data
   std::vector<int32_t> string_ids(g_op_count);
@@ -398,11 +344,30 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
   }
 }
 
-TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
-  // Use existing dictionary from GetBulk
+static std::shared_ptr<StringDictionary> create_and_fill_dictionary() {
   const DictRef dict_ref(-1, 1);
-  std::shared_ptr<StringDictionary> string_dict = std::make_shared<StringDictionary>(
-      dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> string_dict =
+      std::make_shared<StringDictionary>(dict_ref, g_cache_string_hash);
+
+  // fill the dictionary
+  std::vector<int32_t> string_ids(g_op_count);
+  std::vector<std::string> strings;
+  strings.reserve(g_op_count);
+  for (int i = 0; i < g_op_count; ++i) {
+    if (i % 2 == 0) {
+      strings.emplace_back(std::to_string(i));
+    } else {
+      strings.emplace_back(std::to_string(i * -1));
+    }
+  }
+  string_dict->getOrAddBulk(strings, string_ids.data());
+
+  return string_dict;
+}
+
+TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
+  auto string_dict = create_and_fill_dictionary();
+
   StringDictionaryProxy string_dict_proxy(
       string_dict, 1 /* string_dict_id */, string_dict->storageEntryCount());
   {
@@ -454,10 +419,8 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
 }
 
 TEST(StringDictionaryProxy, GetTransientBulk) {
-  // Use existing dictionary from GetBulk
-  const DictRef dict_ref(-1, 1);
-  std::shared_ptr<StringDictionary> string_dict = std::make_shared<StringDictionary>(
-      dict_ref, BASE_PATH1, false, true, g_cache_string_hash);
+  auto string_dict = create_and_fill_dictionary();
+
   StringDictionaryProxy string_dict_proxy(
       string_dict, 1 /* string_dict_id */, string_dict->storageEntryCount());
   {
@@ -512,10 +475,9 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
   std::shared_ptr<StringDictionary> source_string_dict =
-      std::make_shared<StringDictionary>(
-          dict_ref1, BASE_PATH1, false, false, g_cache_string_hash);
-  std::shared_ptr<StringDictionary> dest_string_dict = std::make_shared<StringDictionary>(
-      dict_ref2, BASE_PATH2, false, false, g_cache_string_hash);
+      std::make_shared<StringDictionary>(dict_ref1, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> dest_string_dict =
+      std::make_shared<StringDictionary>(dict_ref2, g_cache_string_hash);
 
   // Prep: insert g_op_count strings into source_string_dict
   std::vector<int32_t> string_ids(g_op_count);
@@ -626,10 +588,9 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
   std::shared_ptr<StringDictionary> source_string_dict =
-      std::make_shared<StringDictionary>(
-          dict_ref1, BASE_PATH1, false, false, g_cache_string_hash);
-  std::shared_ptr<StringDictionary> dest_string_dict = std::make_shared<StringDictionary>(
-      dict_ref2, BASE_PATH2, false, false, g_cache_string_hash);
+      std::make_shared<StringDictionary>(dict_ref1, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> dest_string_dict =
+      std::make_shared<StringDictionary>(dict_ref2, g_cache_string_hash);
 
   // Prep: insert g_op_count strings into source_string_dict
   std::vector<int32_t> string_ids(g_op_count);
@@ -686,7 +647,6 @@ std::vector<std::string> add_strings_numeric_range(std::shared_ptr<StringDiction
   }
   std::vector<int32_t> string_ids(num_vals);
   sd->getOrAddBulk(strings, string_ids.data());
-  sd->checkpoint();
   return strings;
 }
 
@@ -757,10 +717,10 @@ void verify_translation(const StringDictionaryProxy& source_proxy,
 TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
-  std::shared_ptr<StringDictionary> source_sd = std::make_shared<StringDictionary>(
-      dict_ref1, BASE_PATH1, false, false, g_cache_string_hash);
-  std::shared_ptr<StringDictionary> dest_sd = std::make_shared<StringDictionary>(
-      dict_ref2, BASE_PATH2, false, false, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> source_sd =
+      std::make_shared<StringDictionary>(dict_ref1, g_cache_string_hash);
+  std::shared_ptr<StringDictionary> dest_sd =
+      std::make_shared<StringDictionary>(dict_ref2, g_cache_string_hash);
 
   constexpr size_t num_source_persisted_entries{10};
   constexpr size_t num_dest_persisted_entries{5};
@@ -823,19 +783,8 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
 }
 
 TEST(StringDictionary, TransientUnion) {
-  std::string const sd_lhs_path = std::string(BASE_PATH) + "/sd_lhs";
-  std::string const sd_rhs_path = std::string(BASE_PATH) + "/sd_rhs";
-#ifdef _WIN32
-  mkdir(sd_lhs_path.c_str());
-  mkdir(sd_rhs_path.c_str());
-#else
-  create_directory_if_not_exists(sd_lhs_path);
-  create_directory_if_not_exists(sd_rhs_path);
-#endif
-
   dict_ref_t const dict_ref_lhs(100, 10);
-  auto sd_lhs = std::make_shared<StringDictionary>(
-      dict_ref_lhs, sd_lhs_path, false, true, g_cache_string_hash);
+  auto sd_lhs = std::make_shared<StringDictionary>(dict_ref_lhs, g_cache_string_hash);
   sd_lhs->getOrAdd("a");  // id = 0
   sd_lhs->getOrAdd("b");  // id = 1
   sd_lhs->getOrAdd("c");  // id = 2
@@ -843,8 +792,7 @@ TEST(StringDictionary, TransientUnion) {
   sd_lhs->getOrAdd("e");  // id = 4
 
   dict_ref_t const dict_ref_rhs(100, 20);
-  auto sd_rhs = std::make_shared<StringDictionary>(
-      dict_ref_rhs, sd_rhs_path, false, true, g_cache_string_hash);
+  auto sd_rhs = std::make_shared<StringDictionary>(dict_ref_rhs, g_cache_string_hash);
   sd_rhs->getOrAdd("c");  // id = 0
   sd_rhs->getOrAdd("d");  // id = 1
   sd_rhs->getOrAdd("e");  // id = 2
@@ -953,13 +901,6 @@ int main(int argc, char** argv) {
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
   po::notify(vm);
-
-  try {
-    create_directory_if_not_exists(BASE_PATH1);
-    create_directory_if_not_exists(BASE_PATH2);
-  } catch (std::exception& error) {
-    LOG(FATAL) << "Could not create string dictionary directories.";
-  }
 
   int err{0};
   try {
