@@ -42,6 +42,7 @@
 #include "ResultSetRegistry/ResultSetRegistry.h"
 #include "SchemaMgr/SchemaMgr.h"
 #include "SessionInfo.h"
+#include "Shared/funcannotations.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
 
@@ -59,7 +60,7 @@ size_t g_estimator_failure_max_groupby_size{256000000};
 bool g_columnar_large_projections{true};
 size_t g_columnar_large_projections_threshold{1000000};
 
-extern bool g_enable_table_functions;
+EXTERN extern bool g_enable_table_functions;
 
 namespace {
 

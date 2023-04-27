@@ -387,8 +387,16 @@ void ResultSet::append(ResultSet& that) {
   }
 }
 
-const ResultSetStorage* ResultSet::getStorage() const {
-  return storage_.get();
+const ResultSetStorage* ResultSet::getStorage(size_t idx) const {
+  if (!idx) {
+    return storage_.get();
+  }
+  CHECK_LE(idx, appended_storage_.size());
+  return appended_storage_[idx - 1].get();
+}
+
+size_t ResultSet::getStorageCount() const {
+  return storage_.get() ? 1 + appended_storage_.size() : 0;
 }
 
 size_t ResultSet::colCount() const {

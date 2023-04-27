@@ -11,15 +11,10 @@ import pytest
 import pyhdk
 import numpy as np
 
+from helpers import check_schema, check_res
+
 
 class BaseTest:
-    @staticmethod
-    def check_schema(schema, expected):
-        assert len(schema) == len(expected)
-        assert schema.keys() == expected.keys()
-        for key in schema.keys():
-            assert str(schema[key].type) == expected[key]
-
     @staticmethod
     def check_cst(cst, val, type):
         assert str(cst) == f"(Const {val})"
@@ -30,34 +25,19 @@ class BaseTest:
         assert ref.is_ref
         assert ref.index == idx
 
-    @staticmethod
-    def check_res(res, expected):
-        df = res.to_arrow().to_pandas()
-        expected_cols = list(expected.keys())
-        actual_cols = df.columns.to_list()
-        assert actual_cols == expected_cols
-        for col in actual_cols:
-            vals = df[col].fillna("null").to_list()
-            assert len(vals) == len(expected[col])
-            for expected_val, actual_val in zip(expected[col], vals):
-                if type(expected_val) is float:
-                    assert abs(expected_val - actual_val) < 0.0001
-                else:
-                    assert expected_val == actual_val
-
 
 class TestImport(BaseTest):
     def test_create_table(self):
         hdk = pyhdk.init()
 
         ht = hdk.create_table("test1", [("a", "int"), ("b", hdk.type("fp"))])
-        self.check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
+        check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
         hdk.drop_table(ht)
 
         ht = hdk.create_table(
             "test2", {"a": "int", "b": hdk.type("fp")}, fragment_size=4
         )
-        self.check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
+        check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
         hdk.drop_table(ht)
 
         with pytest.raises(TypeError) as e:
@@ -82,7 +62,7 @@ class TestImport(BaseTest):
         assert ht.is_scan
         assert ht.table_name == table_name
         assert ht.size == 2
-        self.check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
+        check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
         hdk.drop_table(table_name)
 
     @pytest.mark.parametrize("header", [True, False])
@@ -131,8 +111,8 @@ class TestImport(BaseTest):
             file_name, table_name, schema=schema, header=header, skip_rows=skip_rows
         )
 
-        self.check_schema(ht.schema, real_schema)
-        self.check_res(ht.proj(0, 1).run(), ref_data)
+        check_schema(ht.schema, real_schema)
+        check_res(ht.proj(0, 1).run(), ref_data)
 
         hdk.drop_table(table_name)
 
@@ -165,8 +145,8 @@ class TestImport(BaseTest):
             ref_data = {"a": [*range(1, 6)], "b": [1.1, 2.2, 3.3, 4.4, 5.5]}
 
         ht = hdk.import_parquet(file_name, table_name)
-        self.check_schema(ht.schema, real_schema)
-        self.check_res(ht.proj(0, 1).run(), ref_data)
+        check_schema(ht.schema, real_schema)
+        check_res(ht.proj(0, 1).run(), ref_data)
 
         hdk.drop_table(table_name)
 
@@ -303,7 +283,7 @@ class TestBuilder(BaseTest):
             h="b",
             a=ht.ref("b"),
         )
-        self.check_res(
+        check_res(
             proj.run(),
             {
                 "a_1": [1, 2, 3],
@@ -331,7 +311,7 @@ class TestBuilder(BaseTest):
             }
         )
 
-        self.check_res(
+        check_res(
             ht.sort("a", -1).run(),
             {
                 "a": [1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, "null"],
@@ -339,7 +319,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.sort(("a", "desc"), (ht.ref("b"), "asc")).run(),
             {
                 "a": [2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, "null"],
@@ -347,7 +327,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.sort(("a", "desc", "first"), ht.ref("b")).run(),
             {
                 "a": ["null", 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0],
@@ -355,7 +335,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.sort(("a", "desc"), fields={"b": "asc"}).run(),
             {
                 "a": [2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, "null"],
@@ -363,7 +343,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.sort(fields={"b": ("asc", "first")}, a="desc").run(),
             {
                 "a": [1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, "null"],
@@ -371,7 +351,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.sort(b=("asc", "first"), a=("desc", "first")).run(),
             {
                 "a": [1.0, 2.0, 2.0, 1.0, 1.0, "null", 2.0, 2.0, 1.0, 1.0],
@@ -381,7 +361,7 @@ class TestBuilder(BaseTest):
 
         # TODO: test offset when result set conversion to arrow is fixed
         # and respects offset option.
-        self.check_res(
+        check_res(
             ht.sort("a", "b", limit=5, offset=0).run(),
             {"a": [1, 1, 1, 1, 1], "b": [1.0, 1.0, 2.0, 2.0, "null"]},
         )
@@ -453,7 +433,7 @@ class TestBuilder(BaseTest):
             }
         )
 
-        self.check_res(
+        check_res(
             ht.agg(["a", -2], "sum(c)", ht.ref("c").min(), hdk.count())
             .sort("a", "b")
             .run(),
@@ -466,7 +446,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.agg(
                 ht.ref("a"),
                 aggs={"bc": "count(b)", "cmx": ht.ref("c").max()},
@@ -484,12 +464,12 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.agg(ht.ref("b"), cd=ht.ref("a").count(True)).sort("b").run(),
             {"b": [1, 2], "cd": [2, 2]},
         )
 
-        self.check_res(
+        check_res(
             ht.agg(
                 ht.ref("b"),
                 a1=ht.ref("c").approx_quantile(0),
@@ -501,7 +481,7 @@ class TestBuilder(BaseTest):
             {"b": [1, 2], "a1": [1, 6], "a2": [3, 8], "a3": [5, 10]},
         )
 
-        self.check_res(
+        check_res(
             ht.agg("b", s1="stddev(a)", s2=ht["c"].stddev()).sort("b").run(),
             {"b": [1, 2], "s1": [0.547723, 0.547723], "s2": [1.581139, 1.581139]},
         )
@@ -535,18 +515,18 @@ class TestBuilder(BaseTest):
             {"a": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "b": [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]}
         )
 
-        self.check_res(
+        check_res(
             ht.filter(ht["a"] > 5).run(), {"a": [6, 7, 8, 9, 10], "b": [5, 4, 3, 2, 1]}
         )
 
-        self.check_res(ht.filter(ht["a"] >= 6, ht["b"] > 4).run(), {"a": [6], "b": [5]})
+        check_res(ht.filter(ht["a"] >= 6, ht["b"] > 4).run(), {"a": [6], "b": [5]})
 
-        self.check_res(
+        check_res(
             ht.filter((ht["a"] < 2).logical_or(ht["b"] <= 2)).run(),
             {"a": [1, 9, 10], "b": [10, 2, 1]},
         )
 
-        self.check_res(
+        check_res(
             ht.filter(
                 (ht["a"] == 2).logical_or(ht["a"] == 3).logical_and(ht["b"] != 9)
             ).run(),
@@ -557,11 +537,9 @@ class TestBuilder(BaseTest):
 
         ht = hdk.import_pydict({"a": [1, 2, None, None, 5], "b": [10, 9, 8, 7, 6]})
 
-        self.check_res(ht.filter(ht["a"].is_null()).proj("b").run(), {"b": [8, 7]})
+        check_res(ht.filter(ht["a"].is_null()).proj("b").run(), {"b": [8, 7]})
 
-        self.check_res(
-            ht.filter(ht["a"].is_not_null()).proj("b").run(), {"b": [10, 9, 6]}
-        )
+        check_res(ht.filter(ht["a"].is_not_null()).proj("b").run(), {"b": [10, 9, 6]})
 
         with pytest.raises(TypeError):
             ht.filter("a")
@@ -579,11 +557,9 @@ class TestBuilder(BaseTest):
             {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5], "y": [5.5, 4.4, 3.3, 2.2, 1.1]}
         )
 
-        self.check_res(
-            ht1.join(ht2).run(), {"a": [3], "b": [3], "x": [3.3], "y": [3.3]}
-        )
+        check_res(ht1.join(ht2).run(), {"a": [3], "b": [3], "x": [3.3], "y": [3.3]})
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, how="left").run(),
             {
                 "a": [1, 2, 3, 4, 5],
@@ -593,7 +569,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, "a").run(),
             {
                 "a": [1, 2, 3, 4, 5],
@@ -604,12 +580,12 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, ["a", "b"]).run(),
             {"a": [3], "b": [3], "x": [3.3], "y": [3.3]},
         )
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, "a", "b").run(),
             {
                 "a": [1, 2, 3, 4, 5],
@@ -620,12 +596,12 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, ["a", "b"], ["b", "a"]).run(),
             {"a": [3], "b": [3], "x": [3.3], "y": [3.3]},
         )
 
-        self.check_res(
+        check_res(
             ht1.join(ht2, cond=ht1["a"].eq(ht2["b"])).run(),
             {
                 "a": [1, 2, 3, 4, 5],
@@ -663,13 +639,11 @@ class TestBuilder(BaseTest):
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
         )
 
-        self.check_res(
-            ht.proj(ht["a"].uminus()).run(), {"expr_1": [-1, -2, -3, -4, -5]}
-        )
+        check_res(ht.proj(ht["a"].uminus()).run(), {"expr_1": [-1, -2, -3, -4, -5]})
 
-        self.check_res(ht.proj(-ht["a"]).run(), {"expr_1": [-1, -2, -3, -4, -5]})
+        check_res(ht.proj(-ht["a"]).run(), {"expr_1": [-1, -2, -3, -4, -5]})
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] + ht["b"], a2=ht["a"] + 1, a3=ht["a"] + 1.5).run(),
             {
                 "a1": [6, 6, 6, 6, 6],
@@ -678,7 +652,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] - ht["b"], a2=ht["a"] - 1, a3=ht["a"] - 1.5).run(),
             {
                 "a1": [-4, -2, 0, 2, 4],
@@ -687,7 +661,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] * ht["b"], a2=ht["a"] * 2, a3=ht["a"] * 1.5).run(),
             {
                 "a1": [5, 8, 9, 8, 5],
@@ -696,7 +670,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] / ht["b"], a2=ht["a"] / 2, a3=ht["a"] / 2.0).run(),
             {
                 "a1": [0.2, 0.5, 1.0, 2.0, 5.0],
@@ -705,7 +679,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] // ht["b"], a2=ht["a"] // 2, a3=ht["x"] // 2.0).run(),
             {
                 "a1": [0, 0, 1, 2, 5],
@@ -714,7 +688,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(
                 a1=ht["a"].div(ht["b"]),
                 a2=ht["a"].div(2),
@@ -729,7 +703,7 @@ class TestBuilder(BaseTest):
             },
         )
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"] % ht["b"], a2=ht["a"] % 2).run(),
             {"a1": [1, 2, 0, 0, 0], "a2": [1, 0, 1, 0, 1]},
         )
@@ -740,12 +714,12 @@ class TestBuilder(BaseTest):
         hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1.1, 2.2, 3.3, 4.4, 5.5]})
 
-        self.check_res(
+        check_res(
             ht.proj(c1=ht["a"].cast("fp64"), c2=ht["b"].cast("int")).run(),
             {"c1": [1.0, 2.0, 3.0, 4.0, 5.0], "c2": [1, 2, 3, 4, 6]},
         )
 
-        self.check_res(
+        check_res(
             ht.proj(
                 c1=hdk.cst("1970-01-01 01:00:00").cast("timestamp[ms]").cast("int")
             ).run(),
@@ -764,7 +738,7 @@ class TestBuilder(BaseTest):
             }
         )
 
-        self.check_res(
+        check_res(
             ht.proj(
                 r1=ht["a"].extract("year"),
                 r2=ht["a"].extract("month"),
@@ -789,7 +763,7 @@ class TestBuilder(BaseTest):
             }
         )
 
-        self.check_res(
+        check_res(
             ht.proj(
                 d1=ht["a"].add(ht["b"], "year"),
                 d2=ht["a"].add(1, "month"),
@@ -840,7 +814,7 @@ class TestBuilder(BaseTest):
         ht = hdk.create_table("test1", [("a", "array(int)")])
         hdk.import_pydict({"a": [[1, 2], [1, 2, 3, 4]]}, ht)
 
-        self.check_res(
+        check_res(
             ht.proj(a=ht["a"].unnest()).agg(["a"], "count").sort("a").run(),
             {"a": [1, 2, 3, 4], "count": [2, 2, 1, 1]},
         )
@@ -851,7 +825,7 @@ class TestBuilder(BaseTest):
         hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1.0, 2.0, 3.0, 4.0, 5.0]})
 
-        self.check_res(
+        check_res(
             ht.proj(
                 a1=ht["a"].pow(2), a2=ht["a"].pow(ht["b"]), b=ht["b"].pow(2.0)
             ).run(),
@@ -869,7 +843,7 @@ class TestBuilder(BaseTest):
         ht = hdk.create_table("test1", [("a", "array(int)"), ("b", "int")])
         hdk.import_pydict({"a": [[1, 2], [2, 3, 4]], "b": [2, 3]}, ht)
 
-        self.check_res(
+        check_res(
             ht.proj(a1=ht["a"].at(1), a2=ht["a"][ht["b"]], a3=ht["a"].at(-1)).run(),
             {"a1": [1, 2], "a2": [2, 4], "a3": ["null", "null"]},
         )
@@ -881,32 +855,32 @@ class TestBuilder(BaseTest):
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
 
         res1 = ht.proj("b", "a").run()
-        self.check_res(res1, {"b": [10, 20, 30, 40, 50], "a": [1, 2, 3, 4, 5]})
+        check_res(res1, {"b": [10, 20, 30, 40, 50], "a": [1, 2, 3, 4, 5]})
 
         res2 = res1.agg(["a"], "count").run()
-        self.check_res(res2, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
+        check_res(res2, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
 
         res3 = res2.join(res1, "count", "a").run()
-        self.check_res(
+        check_res(
             res3,
             {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1], "b": [10, 10, 10, 10, 10]},
         )
 
         res4 = res2.run()
-        self.check_res(res4, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
+        check_res(res4, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
 
         res5 = res4.filter(res4.ref("a") > res4["count"]).run()
-        self.check_res(res5, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
+        check_res(res5, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
 
         res6 = res5.run()
-        self.check_res(res6, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
+        check_res(res6, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
 
         assert res6.is_scan
         assert res6.size == 2
-        self.check_schema(res6.schema, {"a": "INT64", "count": "INT32[NN]"})
+        check_schema(res6.schema, {"a": "INT64", "count": "INT32[NN]"})
 
         res7 = res6.proj("rowid", "a", "count").run()
-        self.check_res(
+        check_res(
             res7, {"rowid": [0, 1, 2, 3], "a": [2, 3, 4, 5], "count": [1, 1, 1, 1]}
         )
 
@@ -941,7 +915,7 @@ class TestSql(BaseTest):
         hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
 
-        self.check_res(
+        check_res(
             hdk.sql(f"SELECT a, b FROM {ht.table_name};"),
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]},
         )
@@ -955,16 +929,16 @@ class TestSql(BaseTest):
             {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5], "y": [5.5, 4.4, 3.3, 2.2, 1.1]}
         )
 
-        self.check_res(
+        check_res(
             hdk.sql("SELECT a, b FROM t1;", t1=ht1),
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]},
         )
-        self.check_res(
+        check_res(
             hdk.sql("SELECT a, b FROM t1;", t1=ht2),
             {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5]},
         )
 
-        self.check_res(
+        check_res(
             hdk.sql(
                 "SELECT t1.a, t1.b, t1.x, t2.y FROM t1, t2 WHERE t1.b = t2.a ORDER BY t1.a;",
                 t1=ht1,
@@ -985,13 +959,13 @@ class TestSql(BaseTest):
         )
 
         res1 = hdk.sql("SELECT a, b FROM t1;", t1=ht1)
-        self.check_res(res1, {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
+        check_res(res1, {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
 
         res2 = hdk.sql("SELECT b + 1 as b, a - 1 as a FROM t1;", t1=res1)
-        self.check_res(res2, {"b": [6, 5, 4, 3, 2], "a": [0, 1, 2, 3, 4]})
+        check_res(res2, {"b": [6, 5, 4, 3, 2], "a": [0, 1, 2, 3, 4]})
 
         res3 = hdk.sql(f"SELECT b - 1 as b, a + 1 as a FROM {res1.table_name};")
-        self.check_res(res3, {"b": [4, 3, 2, 1, 0], "a": [2, 3, 4, 5, 6]})
+        check_res(res3, {"b": [4, 3, 2, 1, 0], "a": [2, 3, 4, 5, 6]})
 
 
 class BaseTaxiTest:

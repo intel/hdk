@@ -108,6 +108,8 @@ class ResultSetStorage {
 
   size_t getEntryCount() const { return query_mem_desc_.getEntryCount(); }
 
+  size_t binSearchRowCount() const;
+
   const QueryMemoryDescriptor& getQueryMemDesc() const { return query_mem_desc_; }
 
   const std::vector<TargetInfo>& getTargets() const { return targets_; }
@@ -150,8 +152,6 @@ class ResultSetStorage {
   void addCountDistinctSetPointerMapping(const int64_t remote_ptr, const int64_t ptr);
 
   int64_t mappedPtr(const int64_t) const;
-
-  size_t binSearchRowCount() const;
 
   const std::vector<TargetInfo> targets_;
   QueryMemoryDescriptor query_mem_desc_;
