@@ -37,56 +37,12 @@ size_t file_size(const int fd) {
   return buf.st_size;
 }
 
-void* checked_mmap(const int fd, const size_t sz) {
-  auto handle = _get_osfhandle(fd);
-  HANDLE map_handle =
-      CreateFileMapping(reinterpret_cast<HANDLE>(handle), NULL, PAGE_READWRITE, 0, 0, 0);
-  CHECK(map_handle);
-  auto map_ptr = MapViewOfFile(map_handle, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, sz);
-  CHECK(map_ptr);
-  CHECK(CloseHandle(map_handle) != 0);
-  return map_ptr;
-}
-
-void checked_munmap(void* addr, size_t length) {
-  CHECK(UnmapViewOfFile(addr) != 0);
-}
-
-int msync(void* addr, size_t length, bool async) {
-  auto err = FlushViewOfFile(addr, length);
-  return err != 0 ? 0 : -1;
-}
-
-int fsync(int fd) {
-  // TODO: FlushFileBuffers
-  auto file = _fdopen(fd, "a+");
-  return fflush(file);
-}
-
 int open(const char* path, int flags, int mode) {
   return _open(path, flags, mode);
 }
 
 void close(const int fd) {
   _close(fd);
-}
-
-::FILE* fopen(const char* filename, const char* mode) {
-  FILE* f;
-  auto err = fopen_s(&f, filename, mode);
-  // Handle 'too many open files' error
-  if (err == EMFILE) {
-    auto max_handles = _getmaxstdio();
-    if (max_handles < 8192) {
-      auto res = _setmaxstdio(8192);
-      if (res < 0) {
-        LOG(FATAL) << "Cannot increase maximum number of open files";
-      }
-      err = fopen_s(&f, filename, mode);
-    }
-  }
-  CHECK(!err) << "ERROR [" << filename << ":" << mode << "[" << err << "]";
-  return f;
 }
 
 ::FILE* popen(const char* command, const char* type) {

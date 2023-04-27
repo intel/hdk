@@ -35,42 +35,12 @@ size_t file_size(const int fd) {
   return buf.st_size;
 }
 
-void* checked_mmap(const int fd, const size_t sz) {
-  auto ptr = mmap(nullptr, sz, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-  CHECK(ptr != reinterpret_cast<void*>(-1));
-#ifdef __linux__
-#ifdef MADV_HUGEPAGE
-  madvise(ptr, sz, MADV_RANDOM | MADV_WILLNEED | MADV_HUGEPAGE);
-#else
-  madvise(ptr, sz, MADV_RANDOM | MADV_WILLNEED);
-#endif
-#endif
-  return ptr;
-}
-
-void checked_munmap(void* addr, size_t length) {
-  CHECK_EQ(0, munmap(addr, length));
-}
-
-int msync(void* addr, size_t length, bool async) {
-  // TODO: support MS_INVALIDATE?
-  return ::msync(addr, length, async ? MS_ASYNC : MS_SYNC);
-}
-
-int fsync(int fd) {
-  return ::fsync(fd);
-}
-
 int open(const char* path, int flags, int mode) {
   return ::open(path, flags, mode);
 }
 
 void close(const int fd) {
   ::close(fd);
-}
-
-::FILE* fopen(const char* filename, const char* mode) {
-  return ::fopen(filename, mode);
 }
 
 ::FILE* popen(const char* command, const char* type) {
