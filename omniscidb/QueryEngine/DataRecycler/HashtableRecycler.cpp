@@ -16,8 +16,9 @@
 
 #include "HashtableRecycler.h"
 #include "QueryEngine/Execute.h"
+#include "Shared/funcannotations.h"
 
-extern bool g_is_test_env;
+EXTERN extern bool g_is_test_env;
 
 bool HashtableRecycler::hasItemInCache(
     QueryPlanHash key,

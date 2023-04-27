@@ -18,14 +18,22 @@
 
 #include "ResultSet/RowSetMemoryOwner.h"
 #include "Shared/Intervals.h"
+#include "Shared/funcannotations.h"
 #include "Shared/likely.h"
 #include "Shared/thread_count.h"
+
+#include <tbb/parallel_for.h>
 
 #include <atomic>
 #include <future>
 #include <numeric>
 
+EXTERN extern bool g_is_test_env;
+
 namespace {
+
+constexpr size_t parallel_fetch_threshold = 10'000;
+constexpr size_t parallel_fetch_min_task = 1000;
 
 inline int64_t fixed_encoding_nullable_val(const int64_t val, const hdk::ir::Type* type) {
   auto logical_type = type->canonicalize();
@@ -33,6 +41,24 @@ inline int64_t fixed_encoding_nullable_val(const int64_t val, const hdk::ir::Typ
     return inline_fixed_encoding_null_value(type);
   }
   return val;
+}
+
+bool useParallelFetch(const ResultSet& rows) {
+  if (rows.isTruncated() &&
+      rows.getQueryDescriptionType() != QueryDescriptionType::Projection) {
+    return false;
+  }
+
+  // In test mode ignore performance thresholds and use parallel fetch whenever we can.
+  if (g_is_test_env) {
+    return true;
+  }
+
+  return rows.entryCount() >= parallel_fetch_threshold;
+}
+
+size_t minFetchTaskSize() {
+  return g_is_test_env ? 1 : parallel_fetch_min_task;
 }
 
 }  // namespace
@@ -45,14 +71,11 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
                                  const Config& config,
                                  const bool is_parallel_execution_enforced)
     : column_buffers_(num_columns)
-    , num_rows_(result_set::use_parallel_algorithms(rows) ||
-                        rows.isDirectColumnarConversionPossible()
+    , num_rows_(useParallelFetch(rows) || rows.isDirectColumnarConversionPossible()
                     ? rows.entryCount()
                     : rows.rowCount())
     , target_types_(target_types)
-    , parallel_conversion_(is_parallel_execution_enforced
-                               ? true
-                               : result_set::use_parallel_algorithms(rows))
+    , parallel_conversion_(is_parallel_execution_enforced ? true : useParallelFetch(rows))
     , direct_columnar_conversion_(config.rs.enable_direct_columnarization &&
                                   rows.isDirectColumnarConversionPossible())
     , thread_idx_(thread_idx) {
@@ -149,67 +172,148 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
   return merged_results;
 }
 
+void ColumnarResults::materializeAllGroupbyColumnsThroughIteration(
+    const ResultSet& rows,
+    const size_t num_columns) {
+  std::atomic<size_t> row_idx{0};
+  CHECK(isParallelConversion());
+  CHECK(rows.isPermutationBufferEmpty());
+  const size_t worker_count = cpu_threads();
+  std::vector<std::future<void>> conversion_threads;
+  const auto do_work = [num_columns, &rows, &row_idx, this](const size_t i) {
+    const auto crt_row = rows.getRowAtNoTranslations(i);
+    if (!crt_row.empty()) {
+      auto cur_row_idx = row_idx.fetch_add(1);
+      for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
+        writeBackCell(crt_row[col_idx], cur_row_idx, col_idx);
+      }
+    }
+  };
+  for (auto interval : makeIntervals(size_t(0), rows.entryCount(), worker_count)) {
+    conversion_threads.push_back(std::async(
+        std::launch::async,
+        [&do_work, this](const size_t start, const size_t end) {
+          for (size_t i = start; i < end; ++i) {
+            do_work(i);
+          }
+        },
+        interval.begin,
+        interval.end));
+  }
+
+  try {
+    for (auto& child : conversion_threads) {
+      child.wait();
+    }
+  } catch (...) {
+    throw;
+  }
+
+  num_rows_ = row_idx;
+  rows.setCachedRowCount(num_rows_);
+}
+
+void ColumnarResults::materializeAllProjectionColumnsThroughIteration(
+    const ResultSet& rows,
+    const size_t num_columns) {
+  CHECK(isParallelConversion());
+  size_t offset = rows.getOffset();
+  size_t limit = rows.getLimit() ? rows.getLimit() : rows.entryCount();
+  // Fill chunks vector with segments of global entries to fetch. For projections
+  // empty entries may go only at the end of each storage and computing the row count
+  // is cheap enough. Also, take into account used limit and offset.
+  // Each tuple holds (begin entry index, end entry index, begin row index).
+  std::vector<std::tuple<size_t, size_t, size_t>> chunks;
+  if (rows.isPermutationBufferEmpty()) {
+    size_t cur_entry_idx = 0;
+    size_t cur_row_idx = 0;
+    for (size_t i = 0; i < rows.getStorageCount() && limit; ++i) {
+      auto storage = rows.getStorage(i);
+      auto cur_entry_count = storage->getEntryCount();
+      auto cur_row_count = storage->binSearchRowCount();
+      if (cur_row_count > offset) {
+        size_t seg_begin = cur_entry_idx + offset;
+        size_t seg_end = cur_entry_idx + cur_row_count;
+        if (seg_end - seg_begin > limit) {
+          seg_end = seg_begin + limit;
+          limit = 0;
+        } else {
+          limit -= seg_end - seg_begin;
+        }
+        chunks.push_back(std::make_tuple(seg_begin, seg_end, cur_row_idx));
+        cur_row_idx += seg_end - seg_begin;
+        offset = 0;
+      } else {
+        offset -= cur_row_count;
+      }
+      cur_entry_idx += cur_entry_count;
+    }
+  } else {
+    // In case of sorted result, global entry index is an index to the permutation
+    // buffer, so there is always a single chunk.
+    size_t row_count = rows.rowCount();
+    size_t seg_begin = std::min(offset, row_count);
+    size_t seg_end = limit ? std::min(offset + limit, row_count) : row_count;
+    chunks.push_back(std::make_tuple(seg_begin, seg_end, (size_t)0));
+  }
+  auto process_chunk = [&](std::tuple<size_t, size_t, size_t> chunk) {
+    // Diff between global entry index and fetched row index for this chunk.
+    size_t row_offs = std::get<0>(chunk) - std::get<2>(chunk);
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          std::get<0>(chunk), std::get<1>(chunk), minFetchTaskSize()),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (size_t entry_idx = r.begin(); entry_idx != r.end();
+                             ++entry_idx) {
+                          const auto crt_row = rows.getRowAtNoTranslations(entry_idx);
+                          CHECK(!crt_row.empty());
+                          size_t row_idx = entry_idx - row_offs;
+                          for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
+                            writeBackCell(crt_row[col_idx], row_idx, col_idx);
+                          }
+                        }
+                      });
+  };
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()),
+                    [&](const tbb::blocked_range<size_t>& r) {
+                      for (size_t chunk_idx = r.begin(); chunk_idx != r.end();
+                           ++chunk_idx) {
+                        process_chunk(chunks[chunk_idx]);
+                      }
+                    });
+}
+
 /**
  * This function iterates through the result set (using the getRowAtNoTranslation and
- * getNextRow family of functions) and writes back the results into output column buffers.
+ * getNextRow family of functions) and writes back the results into output column
+ * buffers.
  */
 void ColumnarResults::materializeAllColumnsThroughIteration(const ResultSet& rows,
                                                             const size_t num_columns) {
-  std::atomic<size_t> row_idx{0};
-  // For varlen data we should follow the original rows order to match computed offsets.
-  if (isParallelConversion() && offset_buffers_.empty()) {
-    const size_t worker_count = cpu_threads();
-    std::vector<std::future<void>> conversion_threads;
-    const auto do_work = [num_columns, &rows, &row_idx, this](const size_t i) {
-      const auto crt_row = rows.getRowAtNoTranslations(i);
-      if (!crt_row.empty()) {
-        auto cur_row_idx = row_idx.fetch_add(1);
-        for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
-          writeBackCell(crt_row[col_idx], cur_row_idx, col_idx);
-        }
-      }
-    };
-    for (auto interval : makeIntervals(size_t(0), rows.entryCount(), worker_count)) {
-      conversion_threads.push_back(std::async(
-          std::launch::async,
-          [&do_work, this](const size_t start, const size_t end) {
-            for (size_t i = start; i < end; ++i) {
-              do_work(i);
-            }
-          },
-          interval.begin,
-          interval.end));
-    }
-
-    try {
-      for (auto& child : conversion_threads) {
-        child.wait();
-      }
-    } catch (...) {
-      throw;
-    }
-
-    num_rows_ = row_idx;
-    rows.setCachedRowCount(num_rows_);
-    return;
-  }
-  bool done = false;
-  rows.moveToBegin();
-  const auto do_work = [num_columns, &row_idx, &rows, &done, this]() {
-    const auto crt_row = rows.getNextRow(false, false);
-    if (crt_row.empty()) {
-      done = true;
+  if (isParallelConversion()) {
+    if (rows.getQueryDescriptionType() == QueryDescriptionType::Projection) {
+      materializeAllProjectionColumnsThroughIteration(rows, num_columns);
       return;
     }
+
+    // Parallel fetch for GroupBy buffer doesn't respect rows order, so don't use
+    // it for sorted results and varlen data (offsets are pre-computed for the
+    // original rows order in the groupby buffer).
+    if (rows.isPermutationBufferEmpty() && offset_buffers_.empty()) {
+      materializeAllGroupbyColumnsThroughIteration(rows, num_columns);
+      return;
+    }
+  }
+
+  size_t row_idx{0};
+  rows.moveToBegin();
+  auto crt_row = rows.getNextRow(false, false);
+  while (!crt_row.empty()) {
     for (size_t i = 0; i < num_columns; ++i) {
       writeBackCell(crt_row[i], row_idx, i);
     }
     ++row_idx;
-  };
-  while (!done) {
-    do_work();
+    crt_row = rows.getNextRow(false, false);
   }
-
   rows.moveToBegin();
 }
 
@@ -396,9 +500,9 @@ void ColumnarResults::writeBackCellDirect<double>(
 }
 
 /**
- * This function materializes all columns from the main storage and all appended storages
- * and form a single continguous column for each output column. Depending on whether the
- * column is lazily fetched or not, it will treat them differently.
+ * This function materializes all columns from the main storage and all appended
+ * storages and form a single continguous column for each output column. Depending on
+ * whether the column is lazily fetched or not, it will treat them differently.
  *
  * NOTE: this function should
  * only be used when the result set is columnar and completely compacted (e.g., in
@@ -424,7 +528,8 @@ void ColumnarResults::materializeAllColumnsDirectly(const ResultSet& rows,
 }
 
 /**
- * This function handles materialization for two types of columns in columnar projections:
+ * This function handles materialization for two types of columns in columnar
+ * projections:
  * 1. for all non-lazy columns, it directly copies the results from the result set's
  * storage into the output column buffers
  * 2. for all lazy fetched columns, it uses result set's iterators to decode the proper
@@ -501,8 +606,8 @@ void ColumnarResults::copyAllNonLazyColumns(
  *
  * This function is parallelized through dividing total rows among all existing threads.
  * Since there's no invalid element in the result set (e.g., columnar projections), the
- * output buffer will have as many rows as there are in the result set, removing the need
- * for atomicly incrementing the output buffer position.
+ * output buffer will have as many rows as there are in the result set, removing the
+ * need for atomicly incrementing the output buffer position.
  */
 void ColumnarResults::materializeAllLazyColumns(
     const std::vector<ColumnLazyFetchInfo>& lazy_fetch_info,
@@ -571,8 +676,8 @@ void ColumnarResults::materializeAllLazyColumns(
 /**
  * This function is to directly columnarize a result set for group by queries.
  * Its main difference with the traditional alternative is that it directly reads
- * non-empty entries from the result set, and then writes them into output column buffers,
- * rather than using the result set's iterators.
+ * non-empty entries from the result set, and then writes them into output column
+ * buffers, rather than using the result set's iterators.
  */
 void ColumnarResults::materializeAllColumnsGroupBy(const ResultSet& rows,
                                                    const size_t num_columns) {
@@ -662,9 +767,9 @@ void ColumnarResults::locateAndCountEntries(const ResultSet& rows,
 }
 
 /**
- * This function goes through all non-empty elements marked in the bitmap data structure,
- * and store them back into output column buffers. The output column buffers are compacted
- * without any holes in it.
+ * This function goes through all non-empty elements marked in the bitmap data
+ * structure, and store them back into output column buffers. The output column buffers
+ * are compacted without any holes in it.
  *
  * TODO(Saman): if necessary, we can look into the distribution of non-empty entries
  * and choose a different load-balanced strategy (assigning equal number of non-empties
@@ -906,8 +1011,8 @@ void ColumnarResults::compactAndCopyEntriesWithoutTargetSkipping(
 
 /**
  * Initialize a set of write functions per target (i.e., column). Target types' logical
- * size are used to categorize the correct write function per target. These functions are
- * then used for every row in the result set.
+ * size are used to categorize the correct write function per target. These functions
+ * are then used for every row in the result set.
  */
 std::vector<ColumnarResults::WriteFunction> ColumnarResults::initWriteFunctions(
     const ResultSet& rows,
@@ -1091,10 +1196,10 @@ int64_t read_double_func(const ResultSet& rows,
 }  // namespace
 
 /**
- * Initializes a set of read funtions to properly access the contents of the result set's
- * storage buffer. Each particular read function is chosen based on the data type and data
- * size used to store that target in the result set's storage buffer. These functions are
- * then used for each row in the result set.
+ * Initializes a set of read funtions to properly access the contents of the result
+ * set's storage buffer. Each particular read function is chosen based on the data type
+ * and data size used to store that target in the result set's storage buffer. These
+ * functions are then used for each row in the result set.
  */
 template <QueryDescriptionType QUERY_TYPE, bool COLUMNAR_OUTPUT>
 std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
@@ -1132,8 +1237,8 @@ std::vector<ColumnarResults::ReadFunction> ColumnarResults::initReadFunctions(
               read_functions.emplace_back(read_double_func<QUERY_TYPE, COLUMNAR_OUTPUT>);
               break;
             default:
-              UNREACHABLE()
-                  << "Invalid data type encountered (BaselineHash, floating point key).";
+              UNREACHABLE() << "Invalid data type encountered (BaselineHash, floating "
+                               "point key).";
               break;
           }
         } else {

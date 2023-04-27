@@ -279,7 +279,8 @@ class ResultSet {
 
   void append(ResultSet& that);
 
-  const ResultSetStorage* getStorage() const;
+  const ResultSetStorage* getStorage(size_t idx = 0) const;
+  size_t getStorageCount() const;
 
   size_t colCount() const;
 

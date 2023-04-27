@@ -18,6 +18,7 @@
 #include "IR/ExprCollector.h"
 #include "IR/ExprRewriter.h"
 #include "Logger/Logger.h"
+#include "Shared/funcannotations.h"
 #include "Visitors/SubQueryCollector.h"
 
 #include <boost/make_unique.hpp>
@@ -25,7 +26,7 @@
 #include <string>
 #include <unordered_map>
 
-extern size_t g_max_log_length;
+EXTERN extern size_t g_max_log_length;
 
 namespace {
 

@@ -71,6 +71,7 @@
 #include "QueryEngine/StringDictionaryGenerations.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
 #include "Shared/checked_alloc.h"
+#include "Shared/funcannotations.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
 #include "Shared/scope.h"
@@ -81,16 +82,9 @@ using namespace std::string_literals;
 
 extern std::unique_ptr<llvm::Module> udf_gpu_module;
 extern std::unique_ptr<llvm::Module> udf_cpu_module;
-bool g_enable_table_functions{false};
-unsigned g_pending_query_interrupt_freq{1000};
-bool g_is_test_env{false};  // operating under a unit test environment. Currently only
-                            // limits the allocation for the output buffer arena
-                            // and data recycler test
-
-size_t g_approx_quantile_buffer{1000};
-size_t g_approx_quantile_centroids{300};
-
-size_t g_max_log_length{500};
+EXTERN extern bool g_is_test_env;
+EXTERN extern size_t g_approx_quantile_buffer;
+EXTERN extern size_t g_approx_quantile_centroids;
 
 int const Executor::max_gpu_count;
 

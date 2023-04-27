@@ -119,6 +119,10 @@ class ColumnarResults {
                             const size_t row_idx,
                             const size_t column_idx);
   void materializeAllColumnsDirectly(const ResultSet& rows, const size_t num_columns);
+  void materializeAllGroupbyColumnsThroughIteration(const ResultSet& rows,
+                                                    const size_t num_columns);
+  void materializeAllProjectionColumnsThroughIteration(const ResultSet& rows,
+                                                       const size_t num_columns);
   void materializeAllColumnsThroughIteration(const ResultSet& rows,
                                              const size_t num_columns);
 

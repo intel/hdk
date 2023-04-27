@@ -7,7 +7,8 @@ set(shared_source_files
     thread_count.cpp
     threading.cpp
     MathUtils.cpp
-    file_path_util.cpp)
+    file_path_util.cpp
+    globals.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR})
 if("${MAPD_EDITION_LOWER}" STREQUAL "ee")
