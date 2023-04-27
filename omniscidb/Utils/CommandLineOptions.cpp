@@ -315,38 +315,6 @@ void CommandLineOptions::validate() {
                              "'");
   }
 
-  {
-    const auto lock_file = boost::filesystem::path(base_path) / "omnisci_server_pid.lck";
-    auto pid = std::to_string(getpid());
-
-    int pid_fd = omnisci::open(lock_file.string().c_str(), O_RDWR | O_CREAT, 0644);
-    if (pid_fd == -1) {
-      auto err = std::string("Failed to open PID file ") + lock_file.string().c_str() +
-                 ". " + strerror(errno) + ".";
-      throw std::runtime_error(err);
-    }
-// TODO: support lock on Windows
-#ifndef _WIN32
-    if (lockf(pid_fd, F_TLOCK, 0) == -1) {
-      omnisci::close(pid_fd);
-      auto err = std::string("Another OmniSci Server is using data directory ") +
-                 base_path + ".";
-      throw std::runtime_error(err);
-    }
-#endif
-    if (omnisci::ftruncate(pid_fd, 0) == -1) {
-      omnisci::close(pid_fd);
-      auto err = std::string("Failed to truncate PID file ") +
-                 lock_file.string().c_str() + ". " + strerror(errno) + ".";
-      throw std::runtime_error(err);
-    }
-    if (write(pid_fd, pid.c_str(), pid.length()) == -1) {
-      omnisci::close(pid_fd);
-      auto err = std::string("Failed to write PID file ") + lock_file.string().c_str() +
-                 ". " + strerror(errno) + ".";
-      throw std::runtime_error(err);
-    }
-  }
   boost::algorithm::trim_if(db_query_file, boost::is_any_of("\"'"));
   if (db_query_file.length() > 0 && !boost::filesystem::exists(db_query_file)) {
     throw std::runtime_error("File containing DB queries " + db_query_file +
