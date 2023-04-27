@@ -30,21 +30,6 @@
 
 namespace omnisci {
 
-size_t file_size(const int fd) {
-  struct _stat64i32 buf;
-  const auto err = _fstat64i32(fd, &buf);
-  CHECK_EQ(0, err);
-  return buf.st_size;
-}
-
-int open(const char* path, int flags, int mode) {
-  return _open(path, flags, mode);
-}
-
-void close(const int fd) {
-  _close(fd);
-}
-
 ::FILE* popen(const char* command, const char* type) {
   return _popen(command, type);
 }
@@ -57,7 +42,4 @@ int get_page_size() {
   return 4096;  // TODO: reasonable guess for now
 }
 
-int32_t ftruncate(const int32_t fd, int64_t length) {
-  return _chsize_s(fd, length);
-}
 }  // namespace omnisci

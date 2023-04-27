@@ -28,31 +28,12 @@ int get_page_size() {
   return getpagesize();
 }
 
-size_t file_size(const int fd) {
-  struct stat buf;
-  int err = fstat(fd, &buf);
-  CHECK_EQ(0, err);
-  return buf.st_size;
-}
-
-int open(const char* path, int flags, int mode) {
-  return ::open(path, flags, mode);
-}
-
-void close(const int fd) {
-  ::close(fd);
-}
-
 ::FILE* popen(const char* command, const char* type) {
   return ::popen(command, type);
 }
 
 int32_t pclose(::FILE* fh) {
   return ::pclose(fh);
-}
-
-int32_t ftruncate(const int32_t fd, int64_t length) {
-  return ::ftruncate(fd, length);
 }
 
 }  // namespace omnisci
