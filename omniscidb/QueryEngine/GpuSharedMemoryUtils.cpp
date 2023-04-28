@@ -63,13 +63,17 @@ void GpuSharedMemCodeBuilder::codegen(const CompilationOptions& co) {
   // codegen the init function
   init_func_ = createInitFunction(co);
   CHECK(init_func_);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.before.codegenInitialization")
   codegenInitialization();
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.codegenInitialization")
   compiler::verify_function_ir(init_func_);
 
   // codegen the reduction function:
   reduction_func_ = createReductionFunction(co);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.createReductionFunction")
   CHECK(reduction_func_);
   codegenReduction(co);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.codegenReduction")
   compiler::verify_function_ir(reduction_func_);
 }
 
@@ -265,13 +269,14 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
     return traits.smemPointerType(llvm::Type::getInt32Ty(context));
   };
 
+  auto gep = ir_builder.CreateGEP(
+      dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
+      dest_byte_stream,
+      byte_offset);
+
   const auto casted_dest_slot_address = ir_builder.CreatePointerCast(
-      ir_builder.CreateGEP(
-          dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
-          dest_byte_stream,
-          byte_offset),
-      ptr_type(slot_bytes, type),
-      "dest_slot_adr_" + std::to_string(slot_idx));
+      gep, ptr_type(slot_bytes, type), "dest_slot_adr_" + std::to_string(slot_idx));
+
   return casted_dest_slot_address;
 }
 }  // namespace
@@ -367,7 +372,11 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
   // synchronize all threads within a threadblock:
   const auto sync_threadblock = getFunction("sync_threadblock");
   ir_builder.CreateCall(sync_threadblock, {});
-  ir_builder.CreateRet(shared_mem_buffer);
+
+  const unsigned address_space = 4;
+  auto cast_shared_mem_buffer = ir_builder.CreatePointerCast(
+      shared_mem_buffer, llvm::Type::getInt64PtrTy(context_, address_space));
+  ir_builder.CreateRet(cast_shared_mem_buffer);
 }
 
 llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction(

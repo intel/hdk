@@ -345,7 +345,7 @@ void perform_test_and_verify_results(TestInputData input) {
   auto cgen_state = std::unique_ptr<CgenState>(
       new CgenState({}, false, false, executor->getExtensionModuleContext(), context));
   cgen_state->set_module_shallow_copy(
-      executor->getExtensionModuleContext()->getRTModule(/*is_l0=*/false));
+      executor->getExtensionModuleContext()->getRTModule(/*is_l0=*/true));
   auto module = cgen_state->module_;
   module->setDataLayout(
       "e-p:64:64:64-i1:8:8-i8:8:8-"
@@ -388,7 +388,7 @@ void perform_test_and_verify_results(TestInputData input) {
                                      executor.get());
   gpu_smem_tester.codegen(CompilationOptions::defaults(
       ExecutorDeviceType::GPU,
-      false));  // generate code for gpu reduciton and initialization
+      true));  // generate code for gpu reduciton and initialization
   gpu_smem_tester.codegenWrapperKernel();
   gpu_smem_tester.performReductionTest(
       input_result_sets, gpu_result_set->getStorage(), input.device_id);
@@ -414,9 +414,13 @@ void GpuReductionTester::performReductionTest(
 
   auto& ext_module = executor_->getExtensionModuleContext()->getSpirvHelperFuncModule();
 
+  DUMP_MODULE(module_, "after.linking.before.insert_declaration.spirv.ll")
+
   for (auto& F : *ext_module) {
     compiler::insert_declaration(ext_module.get(), module_, F.getName().str());
   }
+
+  DUMP_MODULE(module_, "after.linking.before.replace_function.spirv.ll")
 
   for (auto& F : *ext_module) {
     if (!F.isDeclaration()) {

@@ -1084,7 +1084,7 @@ extern "C" GPU_RT_STUB int64_t get_thread_index() {
   return 0;
 }
 
-extern "C" GPU_RT_STUB GENERIC_ADDR_SPACE int64_t* declare_dynamic_shared_memory() {
+extern "C" GPU_RT_STUB SHARED_ADDR_SPACE int64_t* declare_dynamic_shared_memory() {
   return nullptr;
 }
 
