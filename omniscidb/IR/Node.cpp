@@ -6,54 +6,13 @@
  */
 
 #include "Node.h"
-#include "ExprRewriter.h"
+#include "InputRewriter.h"
 
 namespace hdk::ir {
 
 namespace {
 
 const unsigned FIRST_NODE_ID = 1;
-
-class RebindInputsVisitor : public ExprRewriter {
- public:
-  RebindInputsVisitor(const Node* old_input, const Node* new_input)
-      : old_input_(old_input), new_input_(new_input) {}
-
-  ExprPtr visitColumnRef(const ColumnRef* col_ref) override {
-    if (col_ref->node() == old_input_) {
-      return makeExpr<ColumnRef>(col_ref->type(), new_input_, col_ref->index());
-    }
-    return ExprRewriter::visitColumnRef(col_ref);
-  }
-
- protected:
-  const Node* old_input_;
-  const Node* new_input_;
-};
-
-class RebindReindexInputsVisitor : public RebindInputsVisitor {
- public:
-  RebindReindexInputsVisitor(
-      const Node* old_input,
-      const Node* new_input,
-      const std::optional<std::unordered_map<unsigned, unsigned>>& old_to_new_index_map)
-      : RebindInputsVisitor(old_input, new_input), mapping_(old_to_new_index_map) {}
-
-  ExprPtr visitColumnRef(const ColumnRef* col_ref) override {
-    auto res = RebindInputsVisitor::visitColumnRef(col_ref);
-    if (mapping_) {
-      auto new_col_ref = dynamic_cast<const ColumnRef*>(res.get());
-      CHECK(new_col_ref);
-      auto it = mapping_->find(new_col_ref->index());
-      CHECK(it != mapping_->end());
-      return makeExpr<ColumnRef>(new_col_ref->type(), new_col_ref->node(), it->second);
-    }
-    return res;
-  }
-
- protected:
-  const std::optional<std::unordered_map<unsigned, unsigned>>& mapping_;
-};
 
 std::set<std::pair<const hdk::ir::Node*, int>> getEquivCols(const hdk::ir::Node* node,
                                                             const size_t which_col) {
@@ -149,6 +108,34 @@ Node::Node(NodeInputs inputs)
     , context_data_(nullptr)
     , is_nop_(false) {}
 
+void Node::replaceInput(
+    std::shared_ptr<const Node> old_input,
+    std::shared_ptr<const Node> input,
+    std::optional<std::unordered_map<unsigned, unsigned>> old_to_new_index_map) {
+  InputRewriter rewriter;
+  if (old_to_new_index_map) {
+    rewriter.addNodeMapping(old_input.get(), input.get(), *old_to_new_index_map);
+  } else {
+    rewriter.addNodeMapping(old_input.get(), input.get());
+  }
+  replaceInput(old_input, input, rewriter);
+}
+
+void Node::replaceInput(std::shared_ptr<const Node> old_input,
+                        std::shared_ptr<const Node> input,
+                        hdk::ir::ExprRewriter& input_redirector) {
+  bool replaced = false;
+  for (auto& input_ptr : inputs_) {
+    if (input_ptr == old_input) {
+      input_ptr = input;
+      replaced = true;
+    }
+  }
+  if (replaced) {
+    rewriteExprs(input_redirector);
+  }
+}
+
 void Node::resetRelAlgFirstId() noexcept {
   crt_id_ = FIRST_NODE_ID;
 }
@@ -160,14 +147,9 @@ void Node::print() const {
 Project::Project(Project const& rhs)
     : Node(rhs), exprs_(rhs.exprs_), fields_(rhs.fields_) {}
 
-void Project::replaceInput(
-    std::shared_ptr<const Node> old_input,
-    std::shared_ptr<const Node> input,
-    std::optional<std::unordered_map<unsigned, unsigned>> old_to_new_index_map) {
-  Node::replaceInput(old_input, input);
-  RebindReindexInputsVisitor visitor(old_input.get(), input.get(), old_to_new_index_map);
+void Project::rewriteExprs(hdk::ir::ExprRewriter& rewriter) {
   for (size_t i = 0; i < exprs_.size(); ++i) {
-    exprs_[i] = visitor.visit(exprs_[i].get());
+    exprs_[i] = rewriter.visit(exprs_[i].get());
   }
 }
 
@@ -225,34 +207,25 @@ Aggregate::Aggregate(Aggregate const& rhs)
     , aggs_(rhs.aggs_)
     , fields_(rhs.fields_) {}
 
-void Aggregate::replaceInput(std::shared_ptr<const Node> old_input,
-                             std::shared_ptr<const Node> input) {
-  Node::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
+void Aggregate::rewriteExprs(hdk::ir::ExprRewriter& rewriter) {
   for (size_t i = 0; i < aggs_.size(); ++i) {
-    aggs_[i] = visitor.visit(aggs_[i].get());
+    aggs_[i] = rewriter.visit(aggs_[i].get());
   }
 }
 
 Join::Join(Join const& rhs)
     : Node(rhs), condition_(rhs.condition_), join_type_(rhs.join_type_) {}
 
-void Join::replaceInput(std::shared_ptr<const Node> old_input,
-                        std::shared_ptr<const Node> input) {
-  Node::replaceInput(old_input, input);
+void Join::rewriteExprs(hdk::ir::ExprRewriter& rewriter) {
   if (condition_) {
-    RebindInputsVisitor visitor(old_input.get(), input.get());
-    condition_ = visitor.visit(condition_.get());
+    condition_ = rewriter.visit(condition_.get());
   }
 }
 
 Filter::Filter(Filter const& rhs) : Node(rhs), condition_(rhs.condition_) {}
 
-void Filter::replaceInput(std::shared_ptr<const Node> old_input,
-                          std::shared_ptr<const Node> input) {
-  Node::replaceInput(old_input, input);
-  RebindInputsVisitor visitor(old_input.get(), input.get());
-  condition_ = visitor.visit(condition_.get());
+void Filter::rewriteExprs(hdk::ir::ExprRewriter& rewriter) {
+  condition_ = rewriter.visit(condition_.get());
 }
 
 bool Sort::hasEquivCollationOf(const Sort& that) const {
