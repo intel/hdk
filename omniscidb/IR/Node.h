@@ -8,6 +8,7 @@
 #pragma once
 
 #include "Expr.h"
+#include "ExprRewriter.h"
 
 #include "QueryEngine/TargetMetaInfo.h"
 #include "SchemaMgr/TableInfo.h"
@@ -131,15 +132,15 @@ class Node {
     return false;
   }
 
-  virtual void replaceInput(std::shared_ptr<const Node> old_input,
-                            std::shared_ptr<const Node> input) {
-    for (auto& input_ptr : inputs_) {
-      if (input_ptr == old_input) {
-        input_ptr = input;
-        break;
-      }
-    }
-  }
+  virtual void rewriteExprs(hdk::ir::ExprRewriter& rewriter) {}
+
+  void replaceInput(std::shared_ptr<const Node> old_input,
+                    std::shared_ptr<const Node> input,
+                    std::optional<std::unordered_map<unsigned, unsigned>>
+                        old_to_new_index_map = std::nullopt);
+  void replaceInput(std::shared_ptr<const Node> old_input,
+                    std::shared_ptr<const Node> input,
+                    hdk::ir::ExprRewriter& input_redirector);
 
   // to keep an assigned DAG node id for data recycler
   void setRelNodeDagId(const size_t id) const { dag_node_id_ = id; }
@@ -323,15 +324,7 @@ class Project : public Node {
     return fields_[i];
   }
 
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input) override {
-    replaceInput(old_input, input, std::nullopt);
-  }
-
-  void replaceInput(
-      std::shared_ptr<const Node> old_input,
-      std::shared_ptr<const Node> input,
-      std::optional<std::unordered_map<unsigned, unsigned>> old_to_new_index_map);
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
 
   void appendInput(std::string new_field_name, ExprPtr expr);
 
@@ -403,8 +396,7 @@ class Aggregate : public Node {
 
   void setAggExprs(ExprPtrVector new_aggs) { aggs_ = std::move(new_aggs); }
 
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input) override;
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
 
   std::string toString() const override {
     return cat(::typeName(this),
@@ -465,8 +457,7 @@ class Join : public Node {
 
   void setCondition(ExprPtr new_condition) { condition_ = std::move(new_condition); }
 
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input) override;
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
 
   std::string toString() const override {
     return cat(::typeName(this),
@@ -583,10 +574,7 @@ class TranslatedJoin : public Node {
   std::string getOpTypeInfo() const { return op_typeinfo_; }
   size_t size() const override { return 0; }
   JoinType getJoinType() const { return join_type_; }
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input) override {
-    CHECK(false);
-  }
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override { CHECK(false); }
   std::shared_ptr<Node> deepCopy() const override {
     CHECK(false);
     return nullptr;
@@ -640,8 +628,7 @@ class Filter : public Node {
     return inputs_[0]->size();
   }
 
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input) override;
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
 
   std::string toString() const override {
     return cat(::typeName(this),
@@ -880,9 +867,6 @@ class QueryDag {
     return subqueries_;
   }
 
-  /**
-   * Gets all registered subqueries. Only the root DAG can contain subqueries.
-   */
   void resetQueryExecutionState();
 
   time_t now() const { return now_; }

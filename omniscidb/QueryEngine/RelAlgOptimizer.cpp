@@ -318,13 +318,8 @@ void redirect_inputs_of(
     return;
   }
   if (auto project = std::dynamic_pointer_cast<hdk::ir::Project>(node)) {
-    project->hdk::ir::Node::replaceInput(src_project, src_project->getAndOwnInput(0));
     ProjectInputRedirector visitor(projects);
-    hdk::ir::ExprPtrVector new_exprs;
-    for (auto& expr : project->getExprs()) {
-      new_exprs.push_back(visitor.visit(expr.get()));
-    }
-    project->setExpressions(std::move(new_exprs));
+    project->replaceInput(src_project, src_project->getAndOwnInput(0), visitor);
     return;
   }
   if (auto filter = std::dynamic_pointer_cast<hdk::ir::Filter>(node)) {
@@ -334,10 +329,8 @@ void redirect_inputs_of(
       if (is_permutating_proj) {
         propagate_rex_input_renumber(filter.get(), du_web);
       }
-      filter->hdk::ir::Node::replaceInput(src_project, src_project->getAndOwnInput(0));
       ProjectInputRedirector visitor(projects);
-      auto new_condition_expr = visitor.visit(filter->getConditionExpr());
-      filter->setCondition(new_condition_expr);
+      filter->replaceInput(src_project, src_project->getAndOwnInput(0), visitor);
     } else {
       filter->replaceInput(src_project, src_project->getAndOwnInput(0));
     }
