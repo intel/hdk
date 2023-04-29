@@ -420,8 +420,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
     }
     CHECK_LT(str_count_, MAX_STRCOUNT)
         << "Maximum number (" << str_count_
-        << ") of Dictionary encoded Strings reached for this column, offset path "
-           "for column is";
+        << ") of Dictionary encoded Strings reached for this column";
     if (fillRateIsHigh(str_count_)) {
       // resize when more than 50% is full
       increaseHashTableCapacity();
@@ -503,8 +502,7 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
     }
     CHECK_LT(shadow_str_count, MAX_STRCOUNT)
         << "Maximum number (" << shadow_str_count
-        << ") of Dictionary encoded Strings reached for this column, offset path "
-           "for column is  ";
+        << ") of Dictionary encoded Strings reached for this column";
     string_memory_ids.push_back(input_string_idx);
     sum_new_string_lengths += input_string.size();
     string_id_string_dict_hash_table_[hash_bucket] =
