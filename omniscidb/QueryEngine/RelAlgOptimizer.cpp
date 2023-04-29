@@ -204,19 +204,14 @@ void propagate_rex_input_renumber(
     work_set.pop_back();
     auto modified_node = const_cast<hdk::ir::Node*>(node);
     if (auto filter = dynamic_cast<hdk::ir::Filter*>(modified_node)) {
-      auto new_condition_expr = visitor.visit(filter->getConditionExpr());
-      filter->setCondition(std::move(new_condition_expr));
+      filter->rewriteExprs(visitor);
       auto usrs_it = du_web.find(filter);
       CHECK(usrs_it != du_web.end() && usrs_it->second.size() == 1);
       work_set.push_back(*usrs_it->second.begin());
       continue;
     }
     if (auto project = dynamic_cast<hdk::ir::Project*>(modified_node)) {
-      hdk::ir::ExprPtrVector new_exprs;
-      for (size_t i = 0; i < project->size(); ++i) {
-        new_exprs.push_back(visitor.visit(project->getExpr(i).get()));
-      }
-      project->setExpressions(std::move(new_exprs));
+      project->rewriteExprs(visitor);
       continue;
     }
     CHECK(false);
@@ -1057,13 +1052,9 @@ void propagate_input_renumbering(
     work_set.pop_front();
     CHECK(!dynamic_cast<const hdk::ir::Scan*>(walker));
     auto node = const_cast<hdk::ir::Node*>(walker);
-    if (auto project = dynamic_cast<hdk::ir::Project*>(node)) {
-      hdk::ir::ExprPtrVector new_exprs;
-      new_exprs.reserve(project->size());
-      for (auto& expr : project->getExprs()) {
-        new_exprs.emplace_back(visitor.visit(expr.get()));
-      }
-      project->setExpressions(std::move(new_exprs));
+    if (node->is<hdk::ir::Project>() || node->is<hdk::ir::Join>() ||
+        node->is<hdk::ir::Filter>()) {
+      node->rewriteExprs(visitor);
     } else if (auto aggregate = dynamic_cast<hdk::ir::Aggregate*>(node)) {
       auto src_it = liveout_renumbering.find(node->getInput(0));
       CHECK(src_it != liveout_renumbering.end());
@@ -1074,12 +1065,6 @@ void propagate_input_renumbering(
         new_exprs.emplace_back(visitor.visit(expr.get()));
       }
       aggregate->setAggExprs(std::move(new_exprs));
-    } else if (auto join = dynamic_cast<hdk::ir::Join*>(node)) {
-      auto new_condition = visitor.visit(join->getCondition());
-      join->setCondition(std::move(new_condition));
-    } else if (auto filter = dynamic_cast<hdk::ir::Filter*>(node)) {
-      auto new_condition_expr = visitor.visit(filter->getConditionExpr());
-      filter->setCondition(new_condition_expr);
     } else if (auto sort = dynamic_cast<hdk::ir::Sort*>(node)) {
       auto src_it = liveout_renumbering.find(node->getInput(0));
       CHECK(src_it != liveout_renumbering.end());
@@ -1329,8 +1314,7 @@ void sink_projected_boolean_expr_to_join(
     project->setExpressions(std::move(new_proj_exprs));
 
     ConditionReplacer replacer(in_idx_to_new_subcond);
-    auto new_condition = replacer.visit(join->getCondition());
-    join->setCondition(std::move(new_condition));
+    join->rewriteExprs(replacer);
   }
 }
 
