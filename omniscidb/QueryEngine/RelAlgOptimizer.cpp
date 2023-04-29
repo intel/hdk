@@ -79,55 +79,6 @@ class InputSimpleRenumberVisitor : public hdk::ir::ExprRewriter {
   const std::unordered_map<size_t, size_t>& old_to_new_idx_;
 };
 
-class RebindInputsVisitor : public hdk::ir::ExprRewriter {
- public:
-  RebindInputsVisitor(const hdk::ir::Node* old_input, const hdk::ir::Node* new_input)
-      : old_input_(old_input), new_input_(new_input) {}
-
-  hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    if (col_ref->node() == old_input_) {
-      return hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          col_ref->type(), new_input_, col_ref->index());
-    }
-    return ExprRewriter::visitColumnRef(col_ref);
-  }
-
-  void visitNode(const hdk::ir::Node* node) {
-    if (dynamic_cast<const hdk::ir::Aggregate*>(node) ||
-        dynamic_cast<const hdk::ir::Sort*>(node)) {
-      return;
-    }
-    if (auto join =
-            const_cast<hdk::ir::Join*>(dynamic_cast<const hdk::ir::Join*>(node))) {
-      if (join->getCondition()) {
-        auto cond = ExprRewriter::visit(join->getCondition());
-        join->setCondition(std::move(cond));
-      }
-      return;
-    }
-    if (auto project =
-            const_cast<hdk::ir::Project*>(dynamic_cast<const hdk::ir::Project*>(node))) {
-      hdk::ir::ExprPtrVector new_exprs;
-      for (auto& expr : project->getExprs()) {
-        new_exprs.push_back(ExprRewriter::visit(expr.get()));
-      }
-      project->setExpressions(std::move(new_exprs));
-      return;
-    }
-    if (auto filter =
-            const_cast<hdk::ir::Filter*>(dynamic_cast<const hdk::ir::Filter*>(node))) {
-      auto cond = ExprRewriter::visit(filter->getConditionExpr());
-      filter->setCondition(std::move(cond));
-      return;
-    }
-    CHECK(false);
-  }
-
- private:
-  const hdk::ir::Node* old_input_;
-  const hdk::ir::Node* new_input_;
-};
-
 size_t get_actual_source_size(
     const hdk::ir::Project* curr_project,
     const std::unordered_set<const hdk::ir::Project*>& projects_to_remove) {
@@ -301,19 +252,14 @@ void redirect_inputs_of(
             ? std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(1))
             : std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(0));
     join->replaceInput(src_project, src_project->getAndOwnInput(0));
-    RebindInputsVisitor rebinder(src_project.get(), src_project->getInput(0));
-    auto usrs_it = du_web.find(join.get());
-    CHECK(usrs_it != du_web.end());
-    for (auto usr : usrs_it->second) {
-      rebinder.visitNode(usr);
-    }
+    // Case when join users have to be adjusted is not expected.
+    CHECK(src_project != node->getAndOwnInput(0) ||
+          src_project->size() == src_project->getAndOwnInput(0)->size());
 
     if (other_project && projects.count(other_project.get())) {
       join->replaceInput(other_project, other_project->getAndOwnInput(0));
-      RebindInputsVisitor other_rebinder(other_project.get(), other_project->getInput(0));
-      for (auto usr : usrs_it->second) {
-        other_rebinder.visitNode(usr);
-      }
+      CHECK(other_project != node->getAndOwnInput(0) ||
+            other_project->size() == other_project->getAndOwnInput(0)->size());
     }
     return;
   }
@@ -1015,12 +961,6 @@ void try_insert_coalesceable_proj(
     auto project = project_owner.get();
 
     only_usr->replaceInput(node, project_owner);
-    if (dynamic_cast<const hdk::ir::Join*>(only_usr)) {
-      RebindInputsVisitor visitor(filter, project);
-      for (auto usr : du_web[only_usr]) {
-        visitor.visitNode(usr);
-      }
-    }
 
     liveouts.insert(std::make_pair(project, outs));
 
