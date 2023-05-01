@@ -156,7 +156,7 @@ setup(
     name="pyhdk",
     version="@HDK_VERSION_RAW@",
     packages=["pyhdk"],
-    package_dir={"pyhdk": "@CMAKE_CURRENT_SOURCE_DIR@/pyhdk"},
+    package_dir={"pyhdk": os.path.join("@NATIVE_CMAKE_CURRENT_SOURCE_DIR@", "pyhdk")},
     ext_modules=cythonize(
         [common, execute, sql, storage, ir, builder],
         compiler_directives={
