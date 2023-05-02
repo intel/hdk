@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Docker - ${{ inputs.name }}
+    name: Linux - Docker - ${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -79,7 +79,7 @@ jobs:
           docker cp ~/.m2 build.${{ inputs.name }}:/home/ghrunner/.m2
           docker exec -u ghrunner -i build.${{ inputs.name }} chown -R ghrunner:ghrunner /home/ghrunner
 
-      - name: Configure and build the project
+      - name: Configure and build
         run: |
           docker exec -u ghrunner build.${{ inputs.name }} dpkg -l
           docker exec -u ghrunner build.${{ inputs.name }} sh /_work/omniscidb/scripts/conda/build.sh ${{ inputs.options }}

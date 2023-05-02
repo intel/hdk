@@ -4,7 +4,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test (Conda - cpu)
+    name: Build and Test (Linux - Conda - cpu)
     runs-on: ubuntu-latest
 
     env:
