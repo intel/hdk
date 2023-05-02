@@ -305,6 +305,7 @@ set(QUERY_ENGINE_LIBS
         StringDictionary
         Utils
         Logger
+        QueryOptimizer
         ResultSet
         ResultSetRegistry
         Shared

@@ -414,6 +414,7 @@ add_subdirectory(omniscidb/IR)
 add_subdirectory(omniscidb/SqliteConnector)
 add_subdirectory(omniscidb/QueryBuilder)
 add_subdirectory(omniscidb/QueryEngine)
+add_subdirectory(omniscidb/QueryOptimizer)
 add_subdirectory(omniscidb/ResultSet)
 add_subdirectory(omniscidb/ResultSetRegistry)
 
@@ -424,7 +425,28 @@ if(BUILD_SHARED_LIBS AND ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-install(TARGETS OSDependent Logger Shared Utils Calcite ArrowStorage StringDictionary DataMgr CudaMgr SchemaMgr L0Mgr QueryBuilder QueryEngine Analyzer IR ConfigBuilder SqliteConnector ResultSet ResultSetRegistry RUNTIME)
+install(TARGETS
+  OSDependent
+  Logger
+  Shared
+  Utils
+  Calcite
+  ArrowStorage
+  StringDictionary
+  DataMgr
+  CudaMgr
+  SchemaMgr
+  L0Mgr
+  QueryBuilder
+  QueryEngine
+  QueryOptimizer
+  Analyzer
+  IR
+  ConfigBuilder
+  SqliteConnector
+  ResultSet
+  ResultSetRegistry
+  RUNTIME)
 if(ENABLE_CUDA)
   install(FILES ${CMAKE_BINARY_DIR}/omniscidb/QueryEngine/cuda_mapd_rt.fatbin DESTINATION QueryEngine COMPONENT "exe")
 endif()

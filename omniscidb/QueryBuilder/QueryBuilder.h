@@ -28,6 +28,10 @@ class BuilderExpr {
   BuilderExpr();
   BuilderExpr(const BuilderExpr& other) = default;
   BuilderExpr(BuilderExpr&& other) = default;
+  BuilderExpr(const QueryBuilder* builder,
+              ExprPtr expr,
+              const std::string& name = "",
+              bool auto_name = true);
 
   BuilderExpr& operator=(const BuilderExpr& other) = default;
   BuilderExpr& operator=(BuilderExpr&& other) = default;
@@ -48,6 +52,7 @@ class BuilderExpr {
   BuilderExpr approxQuantile(double val) const;
   BuilderExpr sample() const;
   BuilderExpr singleValue() const;
+  BuilderExpr stdDev() const;
 
   BuilderExpr agg(const std::string& agg_str, double val = HUGE_VAL) const;
   BuilderExpr agg(AggType agg_kind, double val) const;
@@ -178,11 +183,6 @@ class BuilderExpr {
  protected:
   friend class QueryBuilder;
   friend class BuilderNode;
-
-  BuilderExpr(const QueryBuilder* builder,
-              ExprPtr expr,
-              const std::string& name = "",
-              bool auto_name = true);
 
   const QueryBuilder* builder_;
   ExprPtr expr_;
@@ -540,6 +540,10 @@ class QueryBuilder {
   BuilderExpr date(const std::string& val) const;
   BuilderExpr time(const std::string& val) const;
   BuilderExpr timestamp(const std::string& val) const;
+
+  BuilderExpr ifThenElse(const BuilderExpr& cond,
+                         const BuilderExpr& if_val,
+                         const BuilderExpr& else_val);
 
  protected:
   friend class BuilderExpr;

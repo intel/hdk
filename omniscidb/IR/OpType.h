@@ -77,7 +77,9 @@ enum class AggType {
   kApproxCountDistinct,
   kApproxQuantile,
   kSample,
-  kSingleValue
+  kSingleValue,
+  // Compound aggregates
+  kStdDevSamp,
 };
 
 enum class WindowFunctionKind {
@@ -185,6 +187,8 @@ inline std::string toString(hdk::ir::AggType agg) {
       return "SAMPLE";
     case hdk::ir::AggType::kSingleValue:
       return "SINGLE_VALUE";
+    case hdk::ir::AggType::kStdDevSamp:
+      return "STDDEV";
   }
   LOG(FATAL) << "Invalid aggregate kind: " << (int)agg;
   return "";

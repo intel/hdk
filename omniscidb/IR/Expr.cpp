@@ -1615,6 +1615,9 @@ std::string AggExpr::toString() const {
     case AggType::kSample:
       agg = "SAMPLE";
       break;
+    case AggType::kStdDevSamp:
+      agg = "STDDEV_SAMP";
+      break;
   }
   std::string str{"(" + agg};
   if (is_distinct_) {
