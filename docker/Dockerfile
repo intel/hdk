@@ -85,10 +85,10 @@ RUN apt-get update && apt-get install -y \
 RUN wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
     apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
     apt-get update && apt-get install -y -V \
-        libarrow-dev \
-        libparquet-dev \
-        libarrow-dataset-dev \
-        libarrow-flight-dev \
+        libarrow-dev=11* \
+        libparquet-dev=11* \
+        libarrow-dataset-dev=11* \
+        libarrow-flight-dev=11* \
         --
 
 RUN apt-get update && \
