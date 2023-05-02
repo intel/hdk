@@ -3952,6 +3952,34 @@ TEST_F(QueryBuilderTest, Floor) {
   EXPECT_THROW(scan.ref("col_arr_i32").floor(), InvalidQueryError);
 }
 
+TEST_F(QueryBuilderTest, Pow) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkFunctionOper(scan.ref("col_bi").pow(2), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_i").pow((int64_t)3), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_f").pow(2.3f), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_d").pow(2.0), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_dec").pow(scan.ref("col_d")), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_d").pow(scan.ref("col_bi")), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_d").pow(scan.ref("col_i")), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_d").pow(scan.ref("col_f")), "POWER", 2, ctx().fp64());
+  checkFunctionOper(scan.ref("col_d").pow(scan.ref("col_dec")), "POWER", 2, ctx().fp64());
+  EXPECT_THROW(scan.ref("col_b").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_timestamp").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_arr_i32").pow(2), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_timestamp")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_arr_i32")), InvalidQueryError);
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));

@@ -1153,6 +1153,36 @@ BuilderExpr BuilderExpr::floor() const {
                             << expr_->type()->toString();
 }
 
+BuilderExpr BuilderExpr::pow(const BuilderExpr& rhs) const {
+  if (!expr_->type()->isNumber() || !rhs.type()->isNumber()) {
+    throw InvalidQueryError() << "Cannot apply POW operation for operand types: "
+                              << type()->toString() << " and " << rhs.type()->toString();
+  }
+  ExprPtrVector args;
+  args.push_back(cast(ctx().fp64(type()->nullable())).expr());
+  args.push_back(rhs.cast(ctx().fp64(rhs.type()->nullable())).expr());
+  auto res_type = ctx().fp64(type()->nullable() || rhs.type()->nullable());
+  auto pow_expr =
+      hdk::ir::makeExpr<hdk::ir::FunctionOper>(res_type, "POWER", std::move(args));
+  return {builder_, pow_expr, "", true};
+}
+
+BuilderExpr BuilderExpr::pow(int val) const {
+  return pow(builder_->cst(val, builder_->ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::pow(int64_t val) const {
+  return pow(builder_->cst(val, builder_->ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::pow(float val) const {
+  return pow(builder_->cst(val, builder_->ctx_.fp32(false)));
+}
+
+BuilderExpr BuilderExpr::pow(double val) const {
+  return pow(builder_->cst(val, builder_->ctx_.fp64(false)));
+}
+
 BuilderExpr BuilderExpr::logicalAnd(const BuilderExpr& rhs) const {
   try {
     auto bin_oper = Analyzer::normalizeOperExpr(

@@ -836,6 +836,23 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_pow(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1.0, 2.0, 3.0, 4.0, 5.0]})
+
+        self.check_res(
+            ht.proj(
+                a1=ht["a"].pow(2), a2=ht["a"].pow(ht["b"]), b=ht["b"].pow(2.0)
+            ).run(),
+            {
+                "a1": [1.0, 4.0, 9.0, 16.0, 25.0],
+                "a2": [1.0, 4.0, 27.0, 256.0, 3125.0],
+                "b": [1.0, 4.0, 9.0, 16.0, 25.0],
+            },
+        )
+
+        hdk.drop_table(ht)
+
     def test_at(self):
         hdk = pyhdk.init()
         ht = hdk.create_table("test1", [("a", "array(int)"), ("b", "int")])

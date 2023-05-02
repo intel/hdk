@@ -50,6 +50,8 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr ceil() except +
     CBuilderExpr floor() except +
 
+    CBuilderExpr pow(const CBuilderExpr&) except +
+
     CBuilderExpr add(const CBuilderExpr&) except +
     CBuilderExpr sub(const CBuilderExpr&) except +
     CBuilderExpr mul(const CBuilderExpr&) except +
