@@ -851,7 +851,10 @@ class QueryDag {
     return root_.get();
   }
 
-  std::shared_ptr<const Node> getRootNodeShPtr() const { return root_; }
+  NodePtr getRootNodeShPtr() const { return root_; }
+
+  const std::vector<NodePtr>& getNodes() const { return nodes_; }
+  void setNodes(std::vector<NodePtr> nodes) { nodes_ = std::move(nodes); }
 
   /**
    * Registers a subquery with a root DAG builder. Should only be called during DAG
@@ -871,6 +874,8 @@ class QueryDag {
   void resetQueryExecutionState();
 
   time_t now() const { return now_; }
+
+  ConfigPtr config() const { return config_; }
 
  protected:
   ConfigPtr config_;

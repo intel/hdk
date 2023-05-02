@@ -96,6 +96,11 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.singleValue()
     return res
 
+  def stddev(self):
+    res = QueryExpr();
+    res.c_expr = self.c_expr.stdDev()
+    return res
+
   def logical_and(self, value):
     value = self._process_op_expr(value)
     res = QueryExpr()

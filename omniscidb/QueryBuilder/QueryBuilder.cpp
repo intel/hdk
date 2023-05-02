@@ -489,6 +489,26 @@ JoinType parseJoinType(const std::string& join_type) {
   return join_types.at(canonical);
 }
 
+void collectNodes(NodePtr node,
+                  std::vector<NodePtr>& nodes,
+                  std::unordered_set<const Node*>& visited) {
+  for (size_t i = 0; i < node->inputCount(); ++i) {
+    collectNodes(node->getAndOwnInput(i), nodes, visited);
+  }
+
+  if (!visited.count(node.get())) {
+    nodes.push_back(node);
+    visited.insert(node.get());
+  }
+}
+
+std::vector<NodePtr> collectNodes(NodePtr node) {
+  std::vector<NodePtr> nodes;
+  std::unordered_set<const Node*> visited;
+  collectNodes(node, nodes, visited);
+  return nodes;
+}
+
 }  // namespace
 
 BuilderExpr::BuilderExpr() : builder_(nullptr) {}
@@ -615,6 +635,17 @@ BuilderExpr BuilderExpr::singleValue() const {
   return {builder_, agg, name, true};
 }
 
+BuilderExpr BuilderExpr::stdDev() const {
+  if (!expr_->type()->isNumber()) {
+    throw InvalidQueryError() << "Non-numeric type " << expr_->type()->toString()
+                              << " is not allowed for STDDEV aggregate.";
+  }
+  auto agg = makeExpr<AggExpr>(
+      builder_->ctx_.fp64(), AggType::kStdDevSamp, expr_, false, nullptr);
+  auto name = name_.empty() ? "stddev" : name_ + "_stddev";
+  return {builder_, agg, name, true};
+}
+
 BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
   static const std::unordered_map<std::string, AggType> agg_names = {
       {"count", AggType::kCount},
@@ -634,7 +665,10 @@ BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
       {"approx quantile", AggType::kApproxQuantile},
       {"sample", AggType::kSample},
       {"single_value", AggType::kSingleValue},
-      {"single value", AggType::kSingleValue}};
+      {"single value", AggType::kSingleValue},
+      {"stddev", AggType::kStdDevSamp},
+      {"stddev_samp", AggType::kStdDevSamp},
+      {"stddev samp", AggType::kStdDevSamp}};
   static const std::unordered_set<std::string> distinct_names = {
       "count_dist", "count_distinct", "count dist", "count distinct"};
   auto agg_str_lower = boost::algorithm::to_lower_copy(agg_str);
@@ -685,6 +719,8 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind, bool is_distinct, double val) con
       return sample();
     case AggType::kSingleValue:
       return singleValue();
+    case AggType::kStdDevSamp:
+      return stdDev();
     default:
       break;
   }
@@ -2432,7 +2468,9 @@ std::unique_ptr<QueryDag> BuilderNode::finalize() const {
     return proj(cols).finalize();
   }
 
-  return std::make_unique<QueryDag>(builder_->config_, node_);
+  auto res = std::make_unique<QueryDag>(builder_->config_, node_);
+  res->setNodes(collectNodes(node_));
+  return res;
 }
 
 ColumnInfoPtr BuilderNode::columnInfo(int col_index) const {
@@ -2759,6 +2797,25 @@ BuilderExpr QueryBuilder::cst(const std::vector<BuilderExpr>& vals,
 BuilderExpr QueryBuilder::cst(const std::vector<BuilderExpr>& vals,
                               const std::string& type) const {
   return cst(vals, ctx_.typeFromString(type));
+}
+
+BuilderExpr QueryBuilder::ifThenElse(const BuilderExpr& cond,
+                                     const BuilderExpr& if_val,
+                                     const BuilderExpr& else_val) {
+  bool nullable = if_val.type()->nullable() || else_val.type()->nullable();
+  bool has_agg = cond.expr()->containsAgg() || if_val.expr()->containsAgg() ||
+                 else_val.expr()->containsAgg();
+  auto res_type = if_val.type()->withNullable(nullable);
+  if (!res_type->equal(else_val.type()->withNullable(nullable))) {
+    throw InvalidQueryError() << "Mismatched type for if-then-else values: "
+                              << if_val.type()->toString() << " and "
+                              << else_val.type()->toString();
+  }
+  std::list<std::pair<ExprPtr, ExprPtr>> expr_pairs;
+  expr_pairs.emplace_back(std::make_pair(cond.expr(), if_val.expr()));
+  auto case_expr =
+      std::make_shared<CaseExpr>(res_type, has_agg, expr_pairs, else_val.expr());
+  return {this, case_expr};
 }
 
 hdk::ir::BuilderExpr operator+(const hdk::ir::BuilderExpr& lhs,

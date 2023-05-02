@@ -972,6 +972,20 @@ TEST_F(QueryBuilderTest, AggExpr) {
            "col_arr_i32x3_single_value");
   EXPECT_THROW(ref_str.singleValue(), InvalidQueryError);
   EXPECT_THROW(ref_arr.singleValue(), InvalidQueryError);
+  // STDDEV_SAMP
+  checkAgg(ref_i32.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_i_stddev");
+  checkAgg(ref_i64.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_bi_stddev");
+  checkAgg(ref_f32.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_f_stddev");
+  checkAgg(ref_f64.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_d_stddev");
+  checkAgg(ref_dec.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_dec_stddev");
+  EXPECT_THROW(ref_b.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_str.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_dict.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_date.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_time.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_timestamp.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_arr.stdDev(), InvalidQueryError);
+  EXPECT_THROW(ref_arr_3.stdDev(), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, ParseAgg) {
@@ -1138,6 +1152,25 @@ TEST_F(QueryBuilderTest, ParseAgg) {
   EXPECT_THROW(node.parseAgg("single_value"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("single_value(1)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("single_value(col_i, 0.5)"), InvalidQueryError);
+  // STDDEV_SAMP
+  checkAgg(node.parseAgg("stddev(col_i)"),
+           ctx().fp64(),
+           AggType::kStdDevSamp,
+           false,
+           "col_i_stddev");
+  checkAgg(node.parseAgg("stddev SAMP( col_f)"),
+           ctx().fp64(),
+           AggType::kStdDevSamp,
+           false,
+           "col_f_stddev");
+  checkAgg(node.parseAgg("stddev_samp( col_d)"),
+           ctx().fp64(),
+           AggType::kStdDevSamp,
+           false,
+           "col_d_stddev");
+  EXPECT_THROW(node.parseAgg("stddev"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("stddev(1)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("stddev(col_i, 1)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, ExtractExpr) {
@@ -4258,6 +4291,10 @@ TEST_F(QueryBuilderTest, Aggregate) {
                     {"val2"},
                     {"SINGLE_VALUE(id1)"},
                     {"val2", "id1_single_value"});
+  compare_test2_agg(builder.scan("test2").agg("id1", {"stddev(val1)", "stddev(val2)"}),
+                    {"id1"},
+                    {"STDDEV_SAMP(val1)", "STDDEV_SAMP(val2)"},
+                    {"id1", "val1_stddev", "val2_stddev"});
   compare_test2_agg(scan.agg(0, ""), {"id1"}, {}, {"id1"});
   compare_test2_agg(scan.agg({0}, ""), {"id1"}, {}, {"id1"});
   compare_test2_agg(scan.agg("id1", ""), {"id1"}, {}, {"id1"});
