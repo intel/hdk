@@ -31,12 +31,12 @@ namespace {
 
 class ProjectInputRedirector : public hdk::ir::ExprRewriter {
  public:
-  ProjectInputRedirector(const std::unordered_set<const hdk::ir::Project*>& crt_inputs)
+  ProjectInputRedirector(const std::unordered_set<hdk::ir::Project*>& crt_inputs)
       : crt_projects_(crt_inputs) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto source = dynamic_cast<const hdk::ir::Project*>(col_ref->node());
-    if (source && crt_projects_.count(source)) {
+    if (source && crt_projects_.count(const_cast<hdk::ir::Project*>(source))) {
       auto new_source = source->getInput(0);
       auto new_col_ref = dynamic_cast<const hdk::ir::ColumnRef*>(
           source->getExpr(col_ref->index()).get());
@@ -49,7 +49,7 @@ class ProjectInputRedirector : public hdk::ir::ExprRewriter {
   }
 
  private:
-  const std::unordered_set<const hdk::ir::Project*>& crt_projects_;
+  const std::unordered_set<hdk::ir::Project*>& crt_projects_;
 };
 
 // TODO: use more generic InputRenumberVisitor instead.
@@ -81,13 +81,13 @@ class InputSimpleRenumberVisitor : public hdk::ir::ExprRewriter {
 
 size_t get_actual_source_size(
     const hdk::ir::Project* curr_project,
-    const std::unordered_set<const hdk::ir::Project*>& projects_to_remove) {
+    const std::unordered_set<hdk::ir::Project*>& projects_to_remove) {
   auto source = curr_project->getInput(0);
   while (auto filter = dynamic_cast<const hdk::ir::Filter*>(source)) {
     source = filter->getInput(0);
   }
   if (auto src_project = dynamic_cast<const hdk::ir::Project*>(source)) {
-    if (projects_to_remove.count(src_project)) {
+    if (projects_to_remove.count(const_cast<hdk::ir::Project*>(src_project))) {
       return get_actual_source_size(src_project, projects_to_remove);
     }
   }
@@ -113,11 +113,11 @@ bool safe_to_redirect(
 }
 
 bool is_identical_copy(
-    const hdk::ir::Project* project,
+    hdk::ir::Project* project,
     const std::unordered_map<const hdk::ir::Node*,
                              std::unordered_set<const hdk::ir::Node*>>& du_web,
-    const std::unordered_set<const hdk::ir::Project*>& projects_to_remove,
-    std::unordered_set<const hdk::ir::Project*>& permutating_projects) {
+    const std::unordered_set<hdk::ir::Project*>& projects_to_remove,
+    std::unordered_set<hdk::ir::Project*>& permutating_projects) {
   auto source_size = get_actual_source_size(project, projects_to_remove);
   if (project->size() > source_size) {
     return false;
@@ -221,17 +221,17 @@ void propagate_rex_input_renumber(
 // This function appears to redirect/remove redundant Projection input nodes(?)
 void redirect_inputs_of(
     std::shared_ptr<hdk::ir::Node> node,
-    const std::unordered_set<const hdk::ir::Project*>& projects,
-    const std::unordered_set<const hdk::ir::Project*>& permutating_projects,
+    const std::unordered_set<hdk::ir::Project*>& projects,
+    const std::unordered_set<hdk::ir::Project*>& permutating_projects,
     const std::unordered_map<const hdk::ir::Node*,
                              std::unordered_set<const hdk::ir::Node*>>& du_web) {
   if (dynamic_cast<hdk::ir::LogicalUnion*>(node.get())) {
     return;  // UNION keeps all Projection inputs.
   }
-  std::shared_ptr<const hdk::ir::Project> src_project = nullptr;
+  std::shared_ptr<hdk::ir::Project> src_project = nullptr;
   for (size_t i = 0; i < node->inputCount(); ++i) {
     if (auto project =
-            std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(i))) {
+            std::dynamic_pointer_cast<hdk::ir::Project>(node->getAndOwnInput(i))) {
       if (projects.count(project.get())) {
         src_project = project;
         break;
@@ -244,8 +244,8 @@ void redirect_inputs_of(
   if (auto join = std::dynamic_pointer_cast<hdk::ir::Join>(node)) {
     auto other_project =
         src_project == node->getAndOwnInput(0)
-            ? std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(1))
-            : std::dynamic_pointer_cast<const hdk::ir::Project>(node->getAndOwnInput(0));
+            ? std::dynamic_pointer_cast<hdk::ir::Project>(node->getAndOwnInput(1))
+            : std::dynamic_pointer_cast<hdk::ir::Project>(node->getAndOwnInput(0));
     join->replaceInput(src_project, src_project->getAndOwnInput(0));
     // Case when join users have to be adjusted is not expected.
     CHECK(src_project != node->getAndOwnInput(0) ||
@@ -459,16 +459,16 @@ bool project_separates_sort(const hdk::ir::Project* project,
 // TODO(miyu): allow more chance if proved safe
 void eliminate_identical_copy(
     std::vector<std::shared_ptr<hdk::ir::Node>>& nodes) noexcept {
-  std::unordered_set<std::shared_ptr<const hdk::ir::Node>> copies;
+  std::unordered_set<hdk::ir::NodePtr> copies;
   auto sink = nodes.back();
   for (auto node : nodes) {
-    auto aggregate = std::dynamic_pointer_cast<const hdk::ir::Aggregate>(node);
+    auto aggregate = std::dynamic_pointer_cast<hdk::ir::Aggregate>(node);
     if (!aggregate || aggregate == sink ||
         !(aggregate->getGroupByCount() == 1 && aggregate->getAggsCount() == 0)) {
       continue;
     }
     auto project =
-        std::dynamic_pointer_cast<const hdk::ir::Project>(aggregate->getAndOwnInput(0));
+        std::dynamic_pointer_cast<hdk::ir::Project>(aggregate->getAndOwnInput(0));
     if (project && project->size() == aggregate->size() &&
         project->getFields() == aggregate->getFields()) {
       CHECK_EQ(size_t(0), copies.count(aggregate));
@@ -483,21 +483,20 @@ void eliminate_identical_copy(
     if (!copies.count(last_source)) {
       continue;
     }
-    auto aggregate = std::dynamic_pointer_cast<const hdk::ir::Aggregate>(last_source);
+    auto aggregate = std::dynamic_pointer_cast<hdk::ir::Aggregate>(last_source);
     CHECK(aggregate);
-    if (!std::dynamic_pointer_cast<const hdk::ir::Join>(node) || aggregate->size() != 1) {
+    if (!std::dynamic_pointer_cast<hdk::ir::Join>(node) || aggregate->size() != 1) {
       continue;
     }
     auto project =
-        std::dynamic_pointer_cast<const hdk::ir::Project>(aggregate->getAndOwnInput(0));
+        std::dynamic_pointer_cast<hdk::ir::Project>(aggregate->getAndOwnInput(0));
     CHECK(project);
     CHECK_EQ(size_t(1), project->size());
     if (!is_distinct(size_t(0), project.get())) {
       continue;
     }
     auto new_source = project->getAndOwnInput(0);
-    if (std::dynamic_pointer_cast<const hdk::ir::Sort>(new_source) ||
-        std::dynamic_pointer_cast<const hdk::ir::Scan>(new_source)) {
+    if (new_source->is<hdk::ir::Sort>() || new_source->is<hdk::ir::Scan>()) {
       node->replaceInput(last_source, new_source);
     }
   }
@@ -505,8 +504,8 @@ void eliminate_identical_copy(
 
   auto web = build_du_web(nodes);
 
-  std::unordered_set<const hdk::ir::Project*> projects;
-  std::unordered_set<const hdk::ir::Project*> permutating_projects;
+  std::unordered_set<hdk::ir::Project*> projects;
+  std::unordered_set<hdk::ir::Project*> permutating_projects;
   auto const visible_projs = get_visible_projects(nodes.back().get());
   for (auto node_it = nodes.begin(); node_it != nodes.end(); node_it++) {
     auto node = *node_it;
@@ -1350,8 +1349,8 @@ class InputRedirector : public hdk::ir::ExprRewriter {
 };
 
 void replace_all_usages(
-    std::shared_ptr<const hdk::ir::Node> old_def_node,
-    std::shared_ptr<const hdk::ir::Node> new_def_node,
+    hdk::ir::NodePtr old_def_node,
+    hdk::ir::NodePtr new_def_node,
     std::unordered_map<const hdk::ir::Node*, std::shared_ptr<hdk::ir::Node>>&
         deconst_mapping,
     std::unordered_map<const hdk::ir::Node*, std::unordered_set<const hdk::ir::Node*>>&

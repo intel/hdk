@@ -2382,7 +2382,7 @@ class RelAlgDispatcher {
     return {key, val};
   }
 
-  std::shared_ptr<const hdk::ir::Node> prev(const rapidjson::Value& crt_node) {
+  hdk::ir::NodePtr prev(const rapidjson::Value& crt_node) {
     const auto id = node_id(crt_node);
     CHECK(id);
     CHECK_EQ(static_cast<size_t>(id), nodes_.size());
@@ -2432,7 +2432,6 @@ RelAlgDagBuilder::RelAlgDagBuilder(const std::string& query_ra,
         "Failed to parse relational algebra tree. Possible query syntax error.");
   }
   CHECK(query_ast.IsObject());
-  hdk::ir::Node::resetRelAlgFirstId();
   build(query_ast, *this);
 }
 
