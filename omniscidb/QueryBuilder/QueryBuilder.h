@@ -37,6 +37,7 @@ class BuilderExpr {
   bool isAutoNamed() const { return auto_name_; }
 
   ExprPtr expr() const { return expr_; }
+  const Type* type() const { return expr_->type(); }
 
   BuilderExpr avg() const;
   BuilderExpr min() const;
@@ -107,6 +108,12 @@ class BuilderExpr {
 
   BuilderExpr ceil() const;
   BuilderExpr floor() const;
+
+  BuilderExpr pow(const BuilderExpr& rhs) const;
+  BuilderExpr pow(int val) const;
+  BuilderExpr pow(int64_t val) const;
+  BuilderExpr pow(float val) const;
+  BuilderExpr pow(double val) const;
 
   BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
   BuilderExpr logicalOr(const BuilderExpr& rhs) const;
