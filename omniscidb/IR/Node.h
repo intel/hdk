@@ -65,7 +65,8 @@ class SortField {
   const NullSortedPosition nulls_pos_;
 };
 
-using NodeInputs = std::vector<std::shared_ptr<const Node>>;
+using NodePtr = std::shared_ptr<Node>;
+using NodeInputs = std::vector<NodePtr>;
 
 class Node {
  public:
@@ -116,12 +117,22 @@ class Node {
     return inputs_[idx].get();
   }
 
+  Node* getInput(const size_t idx) {
+    CHECK_LT(idx, inputs_.size());
+    return inputs_[idx].get();
+  }
+
   std::shared_ptr<const Node> getAndOwnInput(const size_t idx) const {
     CHECK_LT(idx, inputs_.size());
     return inputs_[idx];
   }
 
-  void addManagedInput(std::shared_ptr<const Node> input) { inputs_.push_back(input); }
+  NodePtr getAndOwnInput(const size_t idx) {
+    CHECK_LT(idx, inputs_.size());
+    return inputs_[idx];
+  }
+
+  void addManagedInput(NodePtr input) { inputs_.push_back(input); }
 
   bool hasInput(const Node* needle) const {
     for (auto& input_ptr : inputs_) {
@@ -134,12 +145,12 @@ class Node {
 
   virtual void rewriteExprs(hdk::ir::ExprRewriter& rewriter) {}
 
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input,
+  void replaceInput(NodePtr old_input,
+                    NodePtr input,
                     std::optional<std::unordered_map<unsigned, unsigned>>
                         old_to_new_index_map = std::nullopt);
-  void replaceInput(std::shared_ptr<const Node> old_input,
-                    std::shared_ptr<const Node> input,
+  void replaceInput(NodePtr old_input,
+                    NodePtr input,
                     hdk::ir::ExprRewriter& input_redirector);
 
   // to keep an assigned DAG node id for data recycler
@@ -162,8 +173,6 @@ class Node {
 
   virtual std::shared_ptr<Node> deepCopy() const = 0;
 
-  static void resetRelAlgFirstId() noexcept;
-
   /**
    * Clears the ptr to the result for this descriptor. Is only used for overriding step
    * results in distributed mode.
@@ -185,7 +194,7 @@ class Node {
   mutable const RaExecutionDesc* context_data_;
   bool is_nop_;
   mutable std::vector<TargetMetaInfo> targets_metainfo_;
-  static thread_local unsigned crt_id_;
+  static std::atomic<unsigned> crt_id_;
   mutable size_t dag_node_id_;
   mutable std::shared_ptr<const ExecutionResult> result_;
 };
@@ -202,8 +211,6 @@ inline std::string inputsToString(const NodeInputs& inputs) {
   ss << "]";
   return ss.str();
 }
-
-using NodePtr = std::shared_ptr<Node>;
 
 class Scan : public Node {
  public:
@@ -280,9 +287,7 @@ class Scan : public Node {
 class Project : public Node {
  public:
   // Takes memory ownership of the expressions.
-  Project(ExprPtrVector exprs,
-          std::vector<std::string> fields,
-          std::shared_ptr<const Node> input)
+  Project(ExprPtrVector exprs, std::vector<std::string> fields, NodePtr input)
       : exprs_(std::move(exprs)), fields_(std::move(fields)) {
     inputs_.push_back(input);
   }
@@ -364,7 +369,7 @@ class Aggregate : public Node {
   Aggregate(const size_t groupby_count,
             ExprPtrVector aggs,
             std::vector<std::string> fields,
-            std::shared_ptr<const Node> input)
+            NodePtr input)
       : groupby_count_(groupby_count)
       , aggs_(std::move(aggs))
       , fields_(std::move(fields)) {
@@ -439,10 +444,7 @@ class Aggregate : public Node {
 
 class Join : public Node {
  public:
-  Join(std::shared_ptr<const Node> lhs,
-       std::shared_ptr<const Node> rhs,
-       ExprPtr condition,
-       const JoinType join_type)
+  Join(NodePtr lhs, NodePtr rhs, ExprPtr condition, const JoinType join_type)
       : condition_(std::move(condition)), join_type_(join_type) {
     inputs_.emplace_back(std::move(lhs));
     inputs_.emplace_back(std::move(rhs));
@@ -604,8 +606,7 @@ class TranslatedJoin : public Node {
 
 class Filter : public Node {
  public:
-  Filter(ExprPtr condition, std::shared_ptr<const Node> input)
-      : condition_(std::move(condition)) {
+  Filter(ExprPtr condition, NodePtr input) : condition_(std::move(condition)) {
     CHECK(condition_);
     inputs_.emplace_back(std::move(input));
   }
@@ -663,7 +664,7 @@ class Sort : public Node {
   Sort(std::vector<SortField> collation,
        const size_t limit,
        const size_t offset,
-       std::shared_ptr<const Node> input)
+       NodePtr input)
       : collation_(std::move(collation))
       , limit_(limit)
       , offset_(offset)

@@ -100,17 +100,17 @@ bool isRenamedInput(const Node* node, const size_t index, const std::string& new
 
 }  // namespace
 
-thread_local unsigned Node::crt_id_ = FIRST_NODE_ID;
+std::atomic<unsigned> Node::crt_id_ = FIRST_NODE_ID;
 
 Node::Node(NodeInputs inputs)
     : inputs_(std::move(inputs))
-    , id_(crt_id_++)
+    , id_(crt_id_.fetch_add(1))
     , context_data_(nullptr)
     , is_nop_(false) {}
 
 void Node::replaceInput(
-    std::shared_ptr<const Node> old_input,
-    std::shared_ptr<const Node> input,
+    NodePtr old_input,
+    NodePtr input,
     std::optional<std::unordered_map<unsigned, unsigned>> old_to_new_index_map) {
   InputRewriter rewriter;
   if (old_to_new_index_map) {
@@ -121,8 +121,8 @@ void Node::replaceInput(
   replaceInput(old_input, input, rewriter);
 }
 
-void Node::replaceInput(std::shared_ptr<const Node> old_input,
-                        std::shared_ptr<const Node> input,
+void Node::replaceInput(NodePtr old_input,
+                        NodePtr input,
                         hdk::ir::ExprRewriter& input_redirector) {
   bool replaced = false;
   for (auto& input_ptr : inputs_) {
@@ -134,10 +134,6 @@ void Node::replaceInput(std::shared_ptr<const Node> old_input,
   if (replaced) {
     rewriteExprs(input_redirector);
   }
-}
-
-void Node::resetRelAlgFirstId() noexcept {
-  crt_id_ = FIRST_NODE_ID;
 }
 
 void Node::print() const {
