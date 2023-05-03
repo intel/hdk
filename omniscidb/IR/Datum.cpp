@@ -433,7 +433,6 @@ std::string DatumToString(Datum d, const hdk::ir::Type* type) {
       return "f";
     case hdk::ir::Type::kDecimal: {
       CHECK_EQ(type->size(), 8);
-      auto precision = type->as<hdk::ir::DecimalType>()->precision();
       auto scale = type->as<hdk::ir::DecimalType>()->scale();
       double v = (double)d.bigintval / pow(10, scale);
       int size = snprintf(buf, buf_size, "%.*f", scale, v);

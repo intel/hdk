@@ -50,24 +50,6 @@ namespace {
 
 const int SYSTEM_PAGE_SIZE = omnisci::get_page_size();
 
-const uint64_t round_up_p2(const uint64_t num) {
-  uint64_t in = num;
-  in--;
-  in |= in >> 1;
-  in |= in >> 2;
-  in |= in >> 4;
-  in |= in >> 8;
-  in |= in >> 16;
-  in++;
-  // TODO MAT deal with case where filesize has been increased but reality is
-  // we are constrained to 2^31.
-  // In that situation this calculation will wrap to zero
-  if (in == 0 || (in > (UINT32_MAX))) {
-    in = UINT32_MAX;
-  }
-  return in;
-}
-
 string_dict_hash_t hash_string(const std::string_view& str) {
   string_dict_hash_t str_hash = 1;
   // rely on fact that unsigned overflow is defined and wraps
@@ -759,7 +741,7 @@ std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
 
   // since we have a cache in form of vector of ints which is sorted according to
   // corresponding strings in the dictionary all we need is the index of the element
-  // which equal to the pattern that we are trying to match or the index of “biggest”
+  // which equal to the pattern that we are trying to match or the index of "biggest"
   // element smaller than the pattern, to perform all the comparison operators over
   // string. The search function guarantees we have such index so now it is just the
   // matter to include all the elements in the result vector.
@@ -816,7 +798,7 @@ std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
     // For >= operator when the indexed element that we have points to element which is
     // equal to the pattern we are searching for we want to include that in the result
     // vector. If the index that we have does not point to the string which is equal to
-    // the pattern we are searching we don’t want to include that id into the result
+    // the pattern we are searching we don't want to include that id into the result
     // vector except when the index is 0.
 
   } else if (comp_operator == ">=") {

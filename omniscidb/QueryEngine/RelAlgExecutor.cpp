@@ -1239,7 +1239,6 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
   if (ra_exe_unit.input_descs.size() != 1) {
     return false;
   }
-  const auto& table_desc = ra_exe_unit.input_descs.front();
   for (const auto& simple_qual : ra_exe_unit.simple_quals) {
     const auto comp_expr = std::dynamic_pointer_cast<const hdk::ir::BinOper>(simple_qual);
     if (!comp_expr || !comp_expr->isEq()) {
