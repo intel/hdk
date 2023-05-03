@@ -567,146 +567,146 @@ TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
   }
 }
 
-// TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
-//   for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
-//     TestInputData input;
-//     input.setDeviceId(0)
-//         .setNumInputBuffers(4)
-//         .setTargetInfos(generate_custom_agg_target_infos(
-//             {8}, {hdk::ir::AggType::kCount}, {int64_type}, {int64_type}))
-//         .setAggWidth(8)
-//         .setMinEntry(0)
-//         .setMaxEntry(num_entries)
-//         .setStepSize(2)
-//         .setKeylessHash(true)
-//         .setTargetIndexForKey(0);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
+  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {8}, {hdk::ir::AggType::kCount}, {int64_type}, {int64_type}))
+        .setAggWidth(8)
+        .setMinEntry(0)
+        .setMaxEntry(num_entries)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
 
-// TEST(SingleColumn, VariableSteps_FixedEntries_1) {
-//   TestInputData input;
-//   input.setDeviceId(0)
-//       .setNumInputBuffers(4)
-//       .setAggWidth(8)
-//       .setMinEntry(0)
-//       .setMaxEntry(126)
-//       .setKeylessHash(true)
-//       .setTargetIndexForKey(0)
-//       .setTargetInfos(generate_custom_agg_target_infos(
-//           {8},
-//           {hdk::ir::AggType::kCount,
-//            hdk::ir::AggType::kMax,
-//            hdk::ir::AggType::kMin,
-//            hdk::ir::AggType::kSum,
-//            hdk::ir::AggType::kAvg},
-//           {int64_type, int64_type, int64_type, int64_type, double_type},
-//           {int32_type, int32_type, int32_type, int32_type, int32_type}));
+TEST(SingleColumn, VariableSteps_FixedEntries_1) {
+  TestInputData input;
+  input.setDeviceId(0)
+      .setNumInputBuffers(4)
+      .setAggWidth(8)
+      .setMinEntry(0)
+      .setMaxEntry(126)
+      .setKeylessHash(true)
+      .setTargetIndexForKey(0)
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kMin,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kAvg},
+          {int64_type, int64_type, int64_type, int64_type, double_type},
+          {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
-//   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
-//     input.setStepSize(step_size);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+  for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
+    input.setStepSize(step_size);
+    perform_test_and_verify_results(input);
+  }
+}
 
-// TEST(SingleColumn, VariableSteps_FixedEntries_2) {
-//   TestInputData input;
-//   input.setDeviceId(0)
-//       .setNumInputBuffers(4)
-//       .setAggWidth(8)
-//       .setMinEntry(0)
-//       .setMaxEntry(126)
-//       .setKeylessHash(true)
-//       .setTargetIndexForKey(0)
-//       .setTargetInfos(generate_custom_agg_target_infos(
-//           {8},
-//           {hdk::ir::AggType::kCount,
-//            hdk::ir::AggType::kAvg,
-//            hdk::ir::AggType::kMax,
-//            hdk::ir::AggType::kSum,
-//            hdk::ir::AggType::kMin},
-//           {int64_type, double_type, int64_type, int64_type, int64_type},
-//           {int32_type, int32_type, int32_type, int32_type, int32_type}));
+TEST(SingleColumn, VariableSteps_FixedEntries_2) {
+  TestInputData input;
+  input.setDeviceId(0)
+      .setNumInputBuffers(4)
+      .setAggWidth(8)
+      .setMinEntry(0)
+      .setMaxEntry(126)
+      .setKeylessHash(true)
+      .setTargetIndexForKey(0)
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMin},
+          {int64_type, double_type, int64_type, int64_type, int64_type},
+          {int32_type, int32_type, int32_type, int32_type, int32_type}));
 
-//   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
-//     input.setStepSize(step_size);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+  for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
+    input.setStepSize(step_size);
+    perform_test_and_verify_results(input);
+  }
+}
 
-// TEST(SingleColumn, VariableSteps_FixedEntries_3) {
-//   TestInputData input;
-//   input.setDeviceId(0)
-//       .setNumInputBuffers(4)
-//       .setAggWidth(8)
-//       .setMinEntry(0)
-//       .setMaxEntry(367)
-//       .setKeylessHash(true)
-//       .setTargetIndexForKey(0)
-//       .setTargetInfos(generate_custom_agg_target_infos(
-//           {8},
-//           {hdk::ir::AggType::kCount,
-//            hdk::ir::AggType::kMax,
-//            hdk::ir::AggType::kAvg,
-//            hdk::ir::AggType::kSum,
-//            hdk::ir::AggType::kMin},
-//           {int64_type, double_type, double_type, double_type, double_type},
-//           {int32_type, double_type, double_type, double_type, double_type}));
+TEST(SingleColumn, VariableSteps_FixedEntries_3) {
+  TestInputData input;
+  input.setDeviceId(0)
+      .setNumInputBuffers(4)
+      .setAggWidth(8)
+      .setMinEntry(0)
+      .setMaxEntry(367)
+      .setKeylessHash(true)
+      .setTargetIndexForKey(0)
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMin},
+          {int64_type, double_type, double_type, double_type, double_type},
+          {int32_type, double_type, double_type, double_type, double_type}));
 
-//   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
-//     input.setStepSize(step_size);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+  for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
+    input.setStepSize(step_size);
+    perform_test_and_verify_results(input);
+  }
+}
 
-// TEST(SingleColumn, VariableSteps_FixedEntries_4) {
-//   TestInputData input;
-//   input.setDeviceId(0)
-//       .setNumInputBuffers(4)
-//       .setAggWidth(8)
-//       .setMinEntry(0)
-//       .setMaxEntry(517)
-//       .setKeylessHash(true)
-//       .setTargetIndexForKey(0)
-//       .setTargetInfos(generate_custom_agg_target_infos(
-//           {8},
-//           {hdk::ir::AggType::kCount,
-//            hdk::ir::AggType::kSum,
-//            hdk::ir::AggType::kMax,
-//            hdk::ir::AggType::kAvg,
-//            hdk::ir::AggType::kMin},
-//           {int64_type, float_type, float_type, float_type, float_type},
-//           {int16_type, float_type, float_type, float_type, float_type}));
+TEST(SingleColumn, VariableSteps_FixedEntries_4) {
+  TestInputData input;
+  input.setDeviceId(0)
+      .setNumInputBuffers(4)
+      .setAggWidth(8)
+      .setMinEntry(0)
+      .setMaxEntry(517)
+      .setKeylessHash(true)
+      .setTargetIndexForKey(0)
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMin},
+          {int64_type, float_type, float_type, float_type, float_type},
+          {int16_type, float_type, float_type, float_type, float_type}));
 
-//   for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
-//     input.setStepSize(step_size);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+  for (auto& step_size : {2, 3, 5, 7, 11, 13}) {
+    input.setStepSize(step_size);
+    perform_test_and_verify_results(input);
+  }
+}
 
-// TEST(SingleColumn, VariableNumBuffers) {
-//   TestInputData input;
-//   input.setDeviceId(0)
-//       .setAggWidth(8)
-//       .setMinEntry(0)
-//       .setMaxEntry(266)
-//       .setKeylessHash(true)
-//       .setTargetIndexForKey(0)
-//       .setTargetInfos(generate_custom_agg_target_infos(
-//           {8},
-//           {hdk::ir::AggType::kCount,
-//            hdk::ir::AggType::kSum,
-//            hdk::ir::AggType::kAvg,
-//            hdk::ir::AggType::kMax,
-//            hdk::ir::AggType::kMin},
-//           {int32_type, int64_type, double_type, float_type, double_type},
-//           {int8_type, int8_type, int16_type, float_type, double_type}));
+TEST(SingleColumn, VariableNumBuffers) {
+  TestInputData input;
+  input.setDeviceId(0)
+      .setAggWidth(8)
+      .setMinEntry(0)
+      .setMaxEntry(266)
+      .setKeylessHash(true)
+      .setTargetIndexForKey(0)
+      .setTargetInfos(generate_custom_agg_target_infos(
+          {8},
+          {hdk::ir::AggType::kCount,
+           hdk::ir::AggType::kSum,
+           hdk::ir::AggType::kAvg,
+           hdk::ir::AggType::kMax,
+           hdk::ir::AggType::kMin},
+          {int32_type, int64_type, double_type, float_type, double_type},
+          {int8_type, int8_type, int16_type, float_type, double_type}));
 
-//   for (auto& num_buffers : {2, 3, 4, 5, 6, 7, 8, 16, 32, 64, 128}) {
-//     input.setNumInputBuffers(num_buffers);
-//     perform_test_and_verify_results(input);
-//   }
-// }
+  for (auto& num_buffers : {2, 3, 4, 5, 6, 7, 8, 16, 32, 64, 128}) {
+    input.setNumInputBuffers(num_buffers);
+    perform_test_and_verify_results(input);
+  }
+}
 
 int main(int argc, char** argv) {
   g_is_test_env = true;
