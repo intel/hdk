@@ -260,10 +260,12 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
   auto ptr_type = [&context, &traits](const size_t slot_bytes,
                                       const hdk::ir::Type* type) {
     if (slot_bytes == sizeof(int32_t)) {
-      return traits.smemPointerType(llvm::Type::getInt32Ty(context));
+      // return traits.smemPointerType(llvm::Type::getInt32Ty(context));
+      return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
     } else {
       CHECK(slot_bytes == sizeof(int64_t));
-      return traits.smemPointerType(llvm::Type::getInt64Ty(context));
+      // return traits.smemPointerType(llvm::Type::getInt64Ty(context));
+      return llvm::Type::getInt64PtrTy(context, /*address_space=*/3);
     }
     UNREACHABLE() << "Invalid slot size encountered: " << std::to_string(slot_bytes);
     return traits.smemPointerType(llvm::Type::getInt32Ty(context));
