@@ -395,8 +395,7 @@ hdk::ir::ExprPtr parseLiteral(const rapidjson::Value& expr) {
     case hdk::ir::Type::kTime:
     case hdk::ir::Type::kTimestamp: {
       Datum d;
-      d.bigintval = lit_type->isTimestamp() && precision > 0 ? json_i64(literal)
-                                                             : json_i64(literal) / 1000;
+      d.bigintval = json_i64(literal);
       return hdk::ir::makeExpr<hdk::ir::Constant>(lit_type, false, d);
     }
     case hdk::ir::Type::kDate: {

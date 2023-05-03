@@ -16,15 +16,12 @@
 
 package org.apache.calcite.rel.externalize;
 
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.mapd.calcite.parser.MapDSqlOperatorTable;
 
-import org.apache.calcite.avatica.AvaticaUtils;
 import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationImpl;
 import org.apache.calcite.rel.RelCollations;
@@ -54,24 +51,27 @@ import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.sql.JoinType;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.JsonBuilder;
+import org.apache.calcite.util.TimestampString;
 import org.apache.calcite.util.Util;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static java.lang.Integer.parseUnsignedInt;
 
 /**
  * Utilities for converting {@link org.apache.calcite.rel.RelNode} into JSON
@@ -340,8 +340,16 @@ public class MapDRelJson {
         return map;
       case LITERAL:
         final RexLiteral literal = (RexLiteral) node;
-        final Object value2 = literal.getValue2();
+        final Object value2;
         map = jsonBuilder.map();
+
+        if (literal.getTypeName() == SqlTypeName.TIMESTAMP) {
+          value2 = timestampStringToLong(literal.getValueAs(TimestampString.class),
+                  literal.getType().getPrecision());
+        } else {
+          value2 = literal.getValue2();
+        }
+
         if (value2 instanceof TimeUnitRange) {
           map.put("literal", value2.toString());
         } else {
@@ -479,16 +487,23 @@ public class MapDRelJson {
         if (literal instanceof Number) {
           final SqlTypeName targetTypeName =
                   Util.enumVal(SqlTypeName.class, (String) map.get("target_type"));
-          final long scale = ((Number) map.get("scale")).longValue();
-          final long precision = ((Number) map.get("precision")).longValue();
-          final long typeScale = ((Number) map.get("type_scale")).longValue();
-          final long typePrecision = ((Number) map.get("type_precision")).longValue();
-          RelDataTypeFactory typeFactory = cluster.getTypeFactory();
+          final RelDataTypeFactory typeFactory = cluster.getTypeFactory();
 
-          BigDecimal value =
+          if (targetTypeName == SqlTypeName.TIMESTAMP) {
+            final long value = ((Number) literal).longValue();
+            final int precision = ((Number) map.get("precision")).intValue();
+            final TimestampString ts = longToTimestampString(value, precision);
+            return rexBuilder.makeLiteral(ts,
+                    typeFactory.createSqlType(targetTypeName, precision), false);
+          }
+
+          final long scale = ((Number) map.get("scale")).longValue();
+          final long typeScale = ((Number) map.get("type_scale")).longValue();
+          final BigDecimal value =
                   BigDecimal.valueOf(((Number) literal).longValue(), (int) scale);
 
           if (typeScale != 0 && typeScale != -2147483648) {
+            final long typePrecision = ((Number) map.get("type_precision")).longValue();
             return rexBuilder.makeLiteral(value,
                     typeFactory.createSqlType(
                             SqlTypeName.DECIMAL, (int) typePrecision, (int) typeScale),
@@ -516,6 +531,73 @@ public class MapDRelJson {
     } else {
       throw new UnsupportedOperationException("cannot convert to rex " + o);
     }
+  }
+
+  static TimestampString longToTimestampString(long value, int precision) {
+    assert (precision == 0) || (precision == 3) || (precision == 6) || (precision == 9);
+
+    long pow = (long) Math.pow(10, precision);
+    long seconds = value / pow;
+    LocalDateTime dt = LocalDateTime.ofEpochSecond(seconds, 0, ZoneOffset.UTC);
+    int year = dt.getYear();
+    assert year < 10000;
+    int month = dt.getMonthValue();
+    int day = dt.getDayOfMonth();
+    int hour = dt.getHour();
+    int minute = dt.getMinute();
+    int second = dt.getSecond();
+
+    long fraction = value - (seconds * pow);
+    for (; (precision > 0) && ((fraction % 10) == 0); precision--, fraction /= 10) ; // Cut trailing zeros
+
+    char[] ts = new char[precision == 0 ? 19 : 20 + precision];
+    ts[0] = (char) ('0' + (year / 1000));
+    ts[1] = (char) ('0' + ((year / 100) % 10));
+    ts[2] = (char) ('0' + ((year / 10) % 10));
+    ts[3] = (char) ('0' + (year % 10));
+    ts[4] = '-';
+    ts[5] = (char) ('0' + (month / 10));
+    ts[6] = (char) ('0' + (month % 10));
+    ts[7] = '-';
+    ts[8] = (char) ('0' + (day / 10));
+    ts[9] = (char) ('0' + (day % 10));
+    ts[10] = ' ';
+    ts[11] = (char) ('0' + (hour / 10));
+    ts[12] = (char) ('0' + (hour % 10));
+    ts[13] = ':';
+    ts[14] = (char) ('0' + (minute / 10));
+    ts[15] = (char) ('0' + (minute % 10));
+    ts[16] = ':';
+    ts[17] = (char) ('0' + (second / 10));
+    ts[18] = (char) ('0' + (second % 10));
+
+    if (precision > 0) {
+      ts[19] = '.';
+      do {
+        ts[19 + precision] = (char) ('0' + (fraction % 10));
+        precision--;
+        fraction /= 10;
+      } while (precision > 0);
+    }
+
+    return new TimestampString(new String(ts));
+  }
+
+  static long timestampStringToLong(TimestampString ts, int precision) {
+    String v = ts.toString();
+    int year = parseUnsignedInt(v, 0, 4, 10);
+    int month = parseUnsignedInt(v, 5, 7, 10);
+    int day = parseUnsignedInt(v, 8, 10, 10);
+    int hour = parseUnsignedInt(v, 11, 13, 10);
+    int minute = parseUnsignedInt(v, 14, 16, 10);
+    int second = parseUnsignedInt(v, 17, 19, 10);
+    long seconds = LocalDateTime.of(year, month, day, hour, minute, second)
+            .toInstant(ZoneOffset.UTC).getEpochSecond();
+    int pow = (int) Math.pow(10, precision);
+    int len = v.length();
+    if (len == 19) return seconds * pow;
+    int fraction = parseUnsignedInt(v, 20, len, 10);
+    return seconds * pow + fraction * (pow / ((int) Math.pow(10, len - 20)));
   }
 
   private List<RexNode> toRexList(RelInput relInput, List operands) {
