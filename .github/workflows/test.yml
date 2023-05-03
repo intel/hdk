@@ -35,7 +35,7 @@ jobs:
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ inputs.cache-suffix }}
+          key: ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ inputs.cache-suffix }}
 
       - name: C++ style check
         if: inputs.test == 'style'

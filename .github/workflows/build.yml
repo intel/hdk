@@ -44,20 +44,28 @@ jobs:
           echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
       - name: Restore Conda env cache
-        id: conda-cache
-        uses: actions/cache@v3
+        id: restore-conda-cache
+        uses: actions/cache/restore@v3
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+          key: ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
           restore-keys: |
-            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
+            ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-
 
       - name: Update Conda env
-        if: steps.conda-cache.cache-hit != 'true'
+        if: steps.restore-conda-cacheoutputs.cache-hit != 'true'
         run: |
           conda update conda
           conda env update -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
+
+      - name: Save Conda env cache
+        if: steps.restore-conda-cacheoutputs.cache-hit != 'true'
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
 
       - name: Install cuda
         if: inputs.name == 'cuda' || inputs.name == 'all-gpus'

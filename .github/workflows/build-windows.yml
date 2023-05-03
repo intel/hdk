@@ -43,20 +43,29 @@ jobs:
           Get-PSDrive
 
       - name: Restore Conda env cache
-        id: conda-cache
-        uses: actions/cache@v3
+        id: restore-conda-cache
+        uses: actions/cache/restore@v3
         with:
           path: |
             ${{ env.CONDA_ENV_PATH }}
-          key: ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-${{ env.DATE }}
+          key: ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-${{ env.DATE }}
           restore-keys: |
-            ${{ env.RUN_STAMP }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-
+            ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-windows-env.yml') }}-
 
       - name: Update Conda env
-        if: steps.conda-cache.cache-hit != 'true'
+        if: steps.restore-conda-cache.outputs.cache-hit != 'true'
         run: |
           & $env:CONDA\condabin\conda.bat update conda
           & $env:CONDA\condabin\conda.bat env update -f omniscidb/scripts/mapd-deps-conda-windows-env.yml
+
+      - name: Save Conda env cache
+        if: steps.restore-conda-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ env.CONDA_ENV_PATH }}
+          key: ${{ runner.os }}-conda-${{ hashFiles('omniscidb/scripts/mapd-deps-conda-dev-env.yml') }}-${{ env.DATE }}
+
 
       - name: Restore Maven cache
         uses: actions/cache@v3
