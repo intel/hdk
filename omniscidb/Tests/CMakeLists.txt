@@ -180,6 +180,8 @@ endif()
 if(ENABLE_L0)
   add_test(NAME PuntToCpu COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.Punt*" ${TEST_ARGS})
   set_tests_properties(PuntToCpu PROPERTIES LABELS "enabling")
+  add_test(NAME StreamingTopNFallback COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.TopKHeap:Select.TimeInterval:Select.OverflowAndUnderFlow" ${TEST_ARGS})
+  set_tests_properties(StreamingTopNFallback PROPERTIES LABELS "enabling")
 endif()
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
