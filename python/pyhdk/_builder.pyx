@@ -241,12 +241,6 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.unnest()
     return res
 
-  def pow(self, value):
-    value = self._process_op_expr(value)
-    res = QueryExpr()
-    res.c_expr = self.c_expr.pow((<QueryExpr>value).c_expr)
-    return res
-
   def at(self, value):
     value = self._process_op_expr(value)
     res = QueryExpr()
