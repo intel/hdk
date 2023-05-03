@@ -62,7 +62,7 @@ class NestLevelRewriter : public ir::ExprRewriter {
 
   ir::ExprPtr visitColumnVar(const ir::ColumnVar* col_var) override {
     int old_rte_idx = col_var->rteIdx();
-    if (old_rte_idx < permutation_.size()) {
+    if (old_rte_idx < static_cast<int>(permutation_.size())) {
       int new_rte_idx = static_cast<int>(permutation_.at(old_rte_idx));
       if (new_rte_idx != old_rte_idx) {
         return ir::makeExpr<ir::ColumnVar>(col_var->columnInfo(), new_rte_idx);
@@ -73,7 +73,7 @@ class NestLevelRewriter : public ir::ExprRewriter {
 
   ir::ExprPtr visitVar(const ir::Var* var) override {
     int old_rte_idx = var->rteIdx();
-    if (old_rte_idx < permutation_.size()) {
+    if (old_rte_idx < static_cast<int>(permutation_.size())) {
       int new_rte_idx = static_cast<int>(permutation_.at(old_rte_idx));
       if (new_rte_idx != old_rte_idx) {
         return ir::makeExpr<ir::Var>(

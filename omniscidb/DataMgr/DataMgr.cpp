@@ -352,7 +352,7 @@ std::vector<Buffer_Namespace::MemoryInfo> DataMgr::getMemoryInfo(
     mem_info.push_back(cpu_buffer->getMemoryInfo());
   } else if (has_gpus_) {
     int num_gpus = getGpuMgr()->getDeviceCount();
-    CHECK_EQ(num_gpus, bufferMgrs_[MemoryLevel::GPU_LEVEL].size());
+    CHECK_EQ(static_cast<size_t>(num_gpus), bufferMgrs_[MemoryLevel::GPU_LEVEL].size());
     for (int gpu_num = 0; gpu_num < num_gpus; ++gpu_num) {
       Buffer_Namespace::BufferMgr* gpu_buffer =
           dynamic_cast<Buffer_Namespace::BufferMgr*>(

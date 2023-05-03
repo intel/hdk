@@ -38,7 +38,7 @@ inline llvm::Type* get_pointer_element_type(llvm::Value* value) {
   CHECK(type && type->isPointerTy());
   auto pointer_type = llvm::dyn_cast<llvm::PointerType>(type);
   CHECK(pointer_type);
-  return pointer_type->getElementType();
+  return pointer_type->getPointerElementType();
 }
 
 template <class Attributes>
@@ -614,7 +614,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
       // make the varlen buffer the _first_ 8 byte value in the group by buffers double
       // ptr, and offset the group by buffers index by 8 bytes
       auto varlen_output_buffer_gep = llvm::GetElementPtrInst::Create(
-          Ty->getElementType(),
+          Ty->getPointerElementType(),
           output_buffers,
           llvm::ConstantInt::get(llvm::Type::getInt32Ty(mod->getContext()), 0),
           "",
@@ -641,7 +641,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     CHECK(!pos_start_i64);
     pos_start_i64 = new llvm::SExtInst(pos_start, i64_type, "pos_start_i64", bb_entry);
     llvm::GetElementPtrInst* group_by_buffers_gep = llvm::GetElementPtrInst::Create(
-        Ty->getElementType(), output_buffers, group_buff_idx, "", bb_entry);
+        Ty->getPointerElementType(), output_buffers, group_buff_idx, "", bb_entry);
     col_buffer = new llvm::LoadInst(get_pointer_element_type(group_by_buffers_gep),
                                     group_by_buffers_gep,
                                     "col_buffer",

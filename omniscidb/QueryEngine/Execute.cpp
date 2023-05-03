@@ -2802,7 +2802,6 @@ FetchResult Executor::fetchChunks(
       if (col_id->isVirtual()) {
         continue;
       }
-      const int table_id = col_id->getTableId();
       const auto fragments_it = all_tables_fragments.find(col_id->getTableRef());
       CHECK(fragments_it != all_tables_fragments.end());
       const auto fragments = fragments_it->second;
@@ -3604,7 +3603,7 @@ llvm::Value* Executor::castToIntPtrTyIn(llvm::Value* val, const size_t bitWidth)
   CHECK(val->getType()->isPointerTy());
 
   const auto val_ptr_type = static_cast<llvm::PointerType*>(val->getType());
-  const auto val_type = val_ptr_type->getElementType();
+  const auto val_type = val_ptr_type->getPointerElementType();
   size_t val_width = 0;
   if (val_type->isIntegerTy()) {
     val_width = val_type->getIntegerBitWidth();

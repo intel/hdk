@@ -27,6 +27,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/any.hpp>
 #include <boost/config/pragma_message.hpp>
+#include <boost/core/ignore_unused.hpp>
 #include <boost/crc.hpp>
 #include <boost/program_options.hpp>
 
@@ -9552,6 +9553,8 @@ TEST_F(Select, Joins_FilterPushDown) {
 #if 0
       config().opts.filter_pushdown.enable = fpd.first;
       config().opts.filter_pushdown.low_frac = fpd.second;
+#else
+      boost::ignore_unused(fpd);
 #endif
       c("SELECT COUNT(*) FROM coalesce_cols_test_2 AS R, coalesce_cols_test_0 AS S "
         "WHERE R.y = S.y AND R.x > 2 AND (S.x > 1 OR S.y < 18);",
