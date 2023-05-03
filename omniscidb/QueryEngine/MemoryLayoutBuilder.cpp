@@ -907,10 +907,15 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
     case QueryDescriptionType::Projection: {
       CHECK(!must_use_baseline_sort);
 
+      bool streaming_top_n_supported_by_platform =
+          device_type == ExecutorDeviceType::CPU ||
+          (executor->getDataMgr() && executor->getDataMgr()->getGpuMgr() &&
+           executor->getDataMgr()->getGpuMgr()->getPlatform() != GpuMgrPlatform::L0);
       if (streaming_top_n_hint &&
           use_streaming_top_n(ra_exe_unit,
                               output_columnar,
-                              executor->getConfig().exec.streaming_topn_max)) {
+                              executor->getConfig().exec.streaming_topn_max) &&
+          streaming_top_n_supported_by_platform) {
         streaming_top_n = true;
         entry_count = ra_exe_unit.sort_info.offset + ra_exe_unit.sort_info.limit;
       } else {
