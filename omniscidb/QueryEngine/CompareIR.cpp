@@ -133,10 +133,13 @@ std::shared_ptr<const hdk::ir::BinOper> lower_bw_eq(const hdk::ir::BinOper* bw_e
   const auto rhs_is_null = std::make_shared<hdk::ir::UOper>(
       ctx.boolean(false), hdk::ir::OpType::kIsNull, bw_eq->rightOperandShared());
   const auto both_are_null = Analyzer::normalizeOperExpr(
-      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, lhs_is_null, rhs_is_null);
-  const auto bw_eq_oper =
-      std::dynamic_pointer_cast<const hdk::ir::BinOper>(Analyzer::normalizeOperExpr(
-          hdk::ir::OpType::kOr, hdk::ir::Qualifier::kOne, eq_oper, both_are_null));
+      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, lhs_is_null, rhs_is_null, nullptr);
+  const auto bw_eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
+      Analyzer::normalizeOperExpr(hdk::ir::OpType::kOr,
+                                  hdk::ir::Qualifier::kOne,
+                                  eq_oper,
+                                  both_are_null,
+                                  nullptr));
   CHECK(bw_eq_oper);
   return bw_eq_oper;
 }
@@ -148,7 +151,7 @@ std::shared_ptr<const hdk::ir::BinOper> make_eq(const hdk::ir::ExprPtr& lhs,
   // Sides of a tuple equality are stripped of cast operators to simplify the logic
   // in the hash table construction algorithm. Add them back here.
   auto eq_oper = std::dynamic_pointer_cast<const hdk::ir::BinOper>(
-      Analyzer::normalizeOperExpr(optype, hdk::ir::Qualifier::kOne, lhs, rhs));
+      Analyzer::normalizeOperExpr(optype, hdk::ir::Qualifier::kOne, lhs, rhs, nullptr));
   CHECK(eq_oper);
   return optype == hdk::ir::OpType::kBwEq ? lower_bw_eq(eq_oper.get()) : eq_oper;
 }

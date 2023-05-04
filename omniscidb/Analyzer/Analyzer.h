@@ -22,6 +22,7 @@
 #ifndef ANALYZER_H
 #define ANALYZER_H
 
+#include "DataProvider/DataProvider.h"
 #include "IR/Expr.h"
 #include "Logger/Logger.h"
 #include "SchemaMgr/ColumnInfo.h"
@@ -54,17 +55,16 @@ hdk::ir::ExprPtr analyzeFixedPtValue(const int64_t numericval,
 
 hdk::ir::ExprPtr analyzeStringValue(const std::string& stringval);
 
-hdk::ir::ExprPtr normalizeOperExpr(
-    hdk::ir::OpType optype,
-    hdk::ir::Qualifier qual,
-    hdk::ir::ExprPtr left_expr,
-    hdk::ir::ExprPtr right_expr,
-    const StringDictionaryProxyProvider* executor = nullptr);
+hdk::ir::ExprPtr normalizeOperExpr(hdk::ir::OpType optype,
+                                   hdk::ir::Qualifier qual,
+                                   hdk::ir::ExprPtr left_expr,
+                                   hdk::ir::ExprPtr right_expr,
+                                   const DataProvider* data_provider);
 
 hdk::ir::ExprPtr normalizeCaseExpr(
     const std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>>&,
     const hdk::ir::ExprPtr,
-    const StringDictionaryProxyProvider* executor = nullptr);
+    const DataProvider* data_provider);
 
 hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
                              hdk::ir::ExprPtr like_expr,

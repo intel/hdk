@@ -23,7 +23,6 @@
  **/
 
 #include "Analyzer/Analyzer.h"
-#include "DataProvider/DataProvider.h"
 #include "IR/ExprCollector.h"
 #include "IR/TypeUtils.h"
 #include "QueryEngine/DateTimeUtils.h"
@@ -482,12 +481,18 @@ bool exprs_share_one_and_same_rte_idx(const hdk::ir::ExprPtr& lhs_expr,
   return collector.result().size() == 1ULL;
 }
 
-const hdk::ir::Type* get_str_dict_cast_type(
-    const hdk::ir::Type* lhs_type,
-    const hdk::ir::Type* rhs_type,
-    const StringDictionaryProxyProvider* executor) {
+const hdk::ir::Type* get_str_dict_cast_type(const hdk::ir::Type* lhs_type,
+                                            const hdk::ir::Type* rhs_type,
+                                            const DataProvider* data_provider) {
   CHECK(lhs_type->isExtDictionary());
   CHECK(rhs_type->isExtDictionary());
+
+  // When translator is used from DAG builder, executor is not available.
+  // In this case, simply choose LHS and revise the decision later.
+  if (!data_provider) {
+    return lhs_type;
+  }
+
   const auto lhs_dict_id = lhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   const auto rhs_dict_id = rhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   CHECK_NE(lhs_dict_id, rhs_dict_id);
@@ -497,21 +502,28 @@ const hdk::ir::Type* get_str_dict_cast_type(
   if (rhs_dict_id == TRANSIENT_DICT_ID) {
     return lhs_type;
   }
-  // When translator is used from DAG builder, executor is not available.
-  // In this case, simply choose LHS and revise the decision later.
-  if (!executor) {
-    return lhs_type;
-  }
   // If here then neither lhs or rhs type was transient, we should see which
   // type has the largest dictionary and make that the destination type
-  const auto lhs_sdp = executor->getStringDictionaryProxy(lhs_dict_id, true);
-  const auto rhs_sdp = executor->getStringDictionaryProxy(rhs_dict_id, true);
-  return lhs_sdp->entryCount() >= rhs_sdp->entryCount() ? lhs_type : rhs_type;
+
+  const auto lhs_dictionary_desc =
+      data_provider->getDictMetadata(lhs_dict_id, /*load_dict=*/true);
+  CHECK(lhs_dictionary_desc && lhs_dictionary_desc->stringDict);
+  const auto* lhs_dictionary = lhs_dictionary_desc->stringDict.get();
+  const auto rhs_dictionary_desc =
+      data_provider->getDictMetadata(rhs_dict_id, /*load_dict=*/true);
+  CHECK(rhs_dictionary_desc && rhs_dictionary_desc->stringDict);
+  const auto* rhs_dictionary = rhs_dictionary_desc->stringDict.get();
+
+  // TODO: we should consider returning a new type signfiying we're doing dictionary
+  // translation
+  return lhs_dictionary->storageEntryCount() >= rhs_dictionary->storageEntryCount()
+             ? lhs_type
+             : rhs_type;
 }
 
 const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
                                         const hdk::ir::Type* type2,
-                                        const StringDictionaryProxyProvider* executor) {
+                                        const DataProvider* data_provider) {
   auto& ctx = type1->ctx();
   const hdk::ir::Type* common_type;
   auto nullable = type1->nullable() || type2->nullable();
@@ -525,7 +537,7 @@ const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
     if (dict_id1 == dict_id2 || dict_id1 == TRANSIENT_DICT(dict_id2)) {
       common_type = ctx.extDict(ctx.text(nullable), std::min(dict_id1, dict_id2), 4);
     } else {
-      common_type = get_str_dict_cast_type(type1, type2, executor);
+      common_type = get_str_dict_cast_type(type1, type2, data_provider);
     }
   } else if (type1->isVarChar() && type2->isVarChar()) {
     auto length = std::max(type1->as<hdk::ir::VarCharType>()->maxLength(),
@@ -542,7 +554,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
                                    hdk::ir::Qualifier qual,
                                    hdk::ir::ExprPtr left_expr,
                                    hdk::ir::ExprPtr right_expr,
-                                   const StringDictionaryProxyProvider* executor) {
+                                   const DataProvider* data_provider) {
   if ((left_expr->type()->isDate() &&
        left_expr->type()->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) ||
       (right_expr->type()->isDate() &&
@@ -573,12 +585,12 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
     return hdk::ir::makeExpr<hdk::ir::BinOper>(
         result_type, false, optype, qual, left_expr, right_expr);
   }
-  // No executor means we build an expression for further normalization.
+  // No data provider means we build an expression for further normalization.
   // Required casts will be added at normalization. Double normalization
   // with casts may cause a change in the resulting type. E.g. it would
   // increase dimension for decimals on each normalization for arithmetic
   // operations.
-  if (executor) {
+  if (data_provider) {
     if (!left_type->equal(new_left_type)) {
       left_expr = left_expr->cast(new_left_type);
     }
@@ -592,9 +604,9 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
     }
   }
 
-  // No executor means we are building DAG. Skip normalization at this
+  // No data provider means we are building DAG. Skip normalization at this
   // step and perform it later on execution unit build.
-  if (hdk::ir::isComparison(optype) && executor) {
+  if (hdk::ir::isComparison(optype) && data_provider) {
     if (new_left_type->isExtDictionary() && new_right_type->isExtDictionary()) {
       if (new_left_type->as<hdk::ir::ExtDictionaryType>()->dictId() !=
           new_right_type->as<hdk::ir::ExtDictionaryType>()->dictId()) {
@@ -607,10 +619,10 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
             exprs_share_one_and_same_rte_idx(left_expr, right_expr);
         if (should_translate_strings &&
             (optype == hdk::ir::OpType::kEq || optype == hdk::ir::OpType::kNe)) {
-          CHECK(executor);
           // Make the type we're casting to the transient dictionary, if it exists,
           // otherwise the largest dictionary in terms of number of entries
-          auto type = get_str_dict_cast_type(new_left_type, new_right_type, executor);
+          auto type =
+              get_str_dict_cast_type(new_left_type, new_right_type, data_provider);
           auto& expr_to_cast = type->equal(new_left_type) ? right_expr : left_expr;
           expr_to_cast = expr_to_cast->cast(type, true);
         } else {  // Ordered comparison operator
@@ -655,10 +667,11 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
       result_type, has_agg, optype, qual, left_expr, right_expr);
 }
 
+// TODO: can we do the translation map here?
 hdk::ir::ExprPtr normalizeCaseExpr(
     const std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>>& expr_pair_list,
     const hdk::ir::ExprPtr else_e_in,
-    const StringDictionaryProxyProvider* executor) {
+    const DataProvider* data_provider) {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> cast_expr_pair_list =
       expr_pair_list;
   const hdk::ir::Type* type = nullptr;
@@ -684,7 +697,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
     if (e2_type->isString() && !std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(e2)) {
       none_encoded_literal_type =
           none_encoded_literal_type
-              ? common_string_type(none_encoded_literal_type, e2_type, executor)
+              ? common_string_type(none_encoded_literal_type, e2_type, data_provider)
               : e2_type;
       continue;
     }
@@ -697,9 +710,9 @@ hdk::ir::ExprPtr normalizeCaseExpr(
     } else if (!type->equal(e2_type)) {
       if ((type->isString() || type->isExtDictionary()) &&
           (e2_type->isString() || e2_type->isExtDictionary())) {
-        // Executor is needed to determine which dictionary is the largest
+        // Data Provider is needed to determine which dictionary is the largest
         // in case of two dictionary types with different encodings
-        type = common_string_type(type, e2_type, executor);
+        type = common_string_type(type, e2_type, data_provider);
       } else if (type->isNumber() && e2_type->isNumber()) {
         type = common_numeric_type(type, e2_type);
       } else if (type->isBoolean() && e2_type->isBoolean()) {
@@ -720,7 +733,7 @@ hdk::ir::ExprPtr normalizeCaseExpr(
         !std::dynamic_pointer_cast<const hdk::ir::ColumnVar>(else_e)) {
       none_encoded_literal_type =
           none_encoded_literal_type
-              ? common_string_type(none_encoded_literal_type, else_type, executor)
+              ? common_string_type(none_encoded_literal_type, else_type, data_provider)
               : else_type;
     } else {
       if (type == nullptr) {
@@ -732,9 +745,9 @@ hdk::ir::ExprPtr normalizeCaseExpr(
         type = type->withNullable(true);
         if ((type->isString() || type->isExtDictionary()) &&
             (else_type->isString() || else_type->isExtDictionary())) {
-          // Executor is needed to determine which dictionary is the largest
+          // Data Provider is needed to determine which dictionary is the largest
           // in case of two dictionary types with different encodings
-          type = common_string_type(type, else_type, executor);
+          type = common_string_type(type, else_type, data_provider);
         } else if (type->isNumber() && else_type->isNumber()) {
           type = common_numeric_type(type, else_type);
         } else if (type->isBoolean() && else_type->isBoolean()) {
@@ -763,13 +776,13 @@ hdk::ir::ExprPtr normalizeCaseExpr(
         "Cannot deduce the type for case expressions, all branches null");
   }
 
-  if (executor) {
+  if (data_provider) {
     for (auto& p : cast_expr_pair_list) {
       p.second = p.second->cast(type);
     }
   }
   if (else_e != nullptr) {
-    else_e = executor ? else_e->cast(type) : else_e;
+    else_e = data_provider ? else_e->cast(type) : else_e;
   } else {
     Datum d;
     // always create an else expr so that executor doesn't need to worry about it

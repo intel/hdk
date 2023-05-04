@@ -28,6 +28,7 @@ class WorkUnitBuilder {
                   const ir::QueryDag* dag,
                   Executor* executor,
                   SchemaProviderPtr schema_provider,
+                  DataProvider* data_provider,
                   TemporaryTables& temporary_tables,
                   const ExecutionOptions& eo,
                   const CompilationOptions& co,
@@ -103,6 +104,7 @@ class WorkUnitBuilder {
   const ir::QueryDag* dag_;
   Executor* executor_;
   SchemaProviderPtr schema_provider_;
+  DataProvider* data_provider_;
   TemporaryTables& temporary_tables_;
   const ExecutionOptions& eo_;
   const CompilationOptions& co_;

@@ -35,6 +35,7 @@ class RelAlgTranslator {
  public:
   RelAlgTranslator(
       const Executor* executor,
+      const DataProvider* data_provider,
       const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
       const std::vector<JoinType>& join_types,
       const time_t now,
@@ -51,6 +52,7 @@ class RelAlgTranslator {
   hdk::ir::ExprPtr getInIntegerSetExpr(hdk::ir::ExprPtr arg,
                                        const ResultSet& val_set) const;
   const Executor* executor_;
+  const DataProvider* data_provider_;
   const Config& config_;
   const std::unordered_map<const hdk::ir::Node*, int> input_to_nest_level_;
   const std::vector<JoinType> join_types_;

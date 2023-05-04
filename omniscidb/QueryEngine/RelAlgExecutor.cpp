@@ -1469,6 +1469,7 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* nod
                                query_dag_.get(),
                                executor_,
                                schema_provider_,
+                               data_provider_,
                                temporary_tables_,
                                eo,
                                co,
@@ -1481,8 +1482,12 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* nod
   auto rewritten_exe_unit = query_rewriter->rewrite(exe_unit);
   const auto targets_meta = get_targets_meta(node, rewritten_exe_unit.target_exprs);
   node->setOutputMetainfo(targets_meta);
-  RelAlgTranslator translator(
-      executor_, builder.nestLevels(), builder.joinTypes(), now_, eo.just_explain);
+  RelAlgTranslator translator(executor_,
+                              data_provider_,
+                              builder.nestLevels(),
+                              builder.joinTypes(),
+                              now_,
+                              eo.just_explain);
   auto& left_deep_trees_info = getLeftDeepJoinTreesInfo();
   std::optional<unsigned> left_deep_tree_id = builder.leftDeepTreeId();
   if (left_deep_tree_id && left_deep_tree_id.has_value()) {
@@ -1536,7 +1541,7 @@ std::shared_ptr<RelAlgTranslator> RelAlgExecutor::getRelAlgTranslator(
   auto input_to_nest_level = get_input_nest_levels(node, {});
   const auto join_types = std::vector<JoinType>{get_join_type(node)};
   return std::make_shared<RelAlgTranslator>(
-      executor_, input_to_nest_level, join_types, now_, false);
+      executor_, data_provider_, input_to_nest_level, join_types, now_, false);
 }
 
 SpeculativeTopNBlacklist RelAlgExecutor::speculative_topn_blacklist_;

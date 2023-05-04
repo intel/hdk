@@ -184,11 +184,13 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
       const RelAlgTranslator& translator,
       const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
       const std::vector<JoinType>& join_types,
-      const Executor* executor)
+      const Executor* executor,
+      const DataProvider* data_provider)
       : translator_(translator)
       , input_to_nest_level_(input_to_nest_level)
       , join_types_(join_types)
-      , executor_(executor) {}
+      , executor_(executor)
+      , data_provider_(data_provider) {}
 
   hdk::ir::ExprPtr visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
     auto source = col_ref->node();
@@ -254,7 +256,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
                                        bin_oper->qualifier(),
                                        std::move(lhs),
                                        std::move(rhs),
-                                       executor_);
+                                       data_provider_);
   }
 
   hdk::ir::ExprPtr visitUOper(const hdk::ir::UOper* uoper) override {
@@ -276,7 +278,7 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
       expr_list.emplace_back(visit(pr.first.get()), visit(pr.second.get()));
     }
     auto else_expr = visit(case_expr->elseExpr());
-    return Analyzer::normalizeCaseExpr(expr_list, else_expr, executor_);
+    return Analyzer::normalizeCaseExpr(expr_list, else_expr, data_provider_);
   }
 
   hdk::ir::ExprPtr visitScalarSubquery(const hdk::ir::ScalarSubquery* subquery) override {
@@ -293,17 +295,20 @@ class NormalizerVisitor : public hdk::ir::ExprRewriter {
   const std::unordered_map<const hdk::ir::Node*, int> input_to_nest_level_;
   const std::vector<JoinType> join_types_;
   const Executor* executor_;
+  const DataProvider* data_provider_;
 };
 
 }  // namespace
 
 RelAlgTranslator::RelAlgTranslator(
     const Executor* executor,
+    const DataProvider* data_provider,
     const std::unordered_map<const hdk::ir::Node*, int>& input_to_nest_level,
     const std::vector<JoinType>& join_types,
     const time_t now,
     const bool just_explain)
     : executor_(executor)
+    , data_provider_(data_provider)
     , config_(executor->getConfig())
     , input_to_nest_level_(input_to_nest_level)
     , join_types_(join_types)
@@ -321,7 +326,8 @@ RelAlgTranslator::RelAlgTranslator(const Config& config,
     , for_dag_builder_(true) {}
 
 hdk::ir::ExprPtr RelAlgTranslator::normalize(const hdk::ir::Expr* expr) const {
-  NormalizerVisitor visitor(*this, input_to_nest_level_, join_types_, executor_);
+  NormalizerVisitor visitor(
+      *this, input_to_nest_level_, join_types_, executor_, data_provider_);
   return visitor.visit(expr);
 }
 
@@ -543,6 +549,7 @@ hdk::ir::ExprPtr RelAlgTranslator::getInIntegerSetExpr(hdk::ir::ExprPtr arg,
       auto dest_dict_id = arg_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       CHECK(col_type->isExtDictionary());
       auto source_dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+      CHECK(executor_);
       const auto dd = executor_->getStringDictionaryProxy(
           dest_dict_id, val_set.getRowSetMemOwner(), true);
       const auto sd = executor_->getStringDictionaryProxy(

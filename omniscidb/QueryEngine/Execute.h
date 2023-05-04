@@ -226,7 +226,7 @@ struct StreamExecutionContext {
       : ra_exe_unit(ra_exe_unit), co(co), eo(eo) {}
 };
 
-class Executor : public StringDictionaryProxyProvider {
+class Executor {
   static_assert(sizeof(float) == 4 && sizeof(double) == 8,
                 "Host hardware not supported, unexpected size of float / double.");
   static_assert(sizeof(time_t) == 8,

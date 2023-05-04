@@ -105,7 +105,8 @@ hdk::ir::ExprPtr build_logical_expression(const std::vector<hdk::ir::ExprPtr>& f
   CHECK(!factors.empty());
   auto acc = factors.front();
   for (size_t i = 1; i < factors.size(); ++i) {
-    acc = Analyzer::normalizeOperExpr(sql_op, hdk::ir::Qualifier::kOne, acc, factors[i]);
+    acc = Analyzer::normalizeOperExpr(
+        sql_op, hdk::ir::Qualifier::kOne, acc, factors[i], nullptr);
   }
   return acc;
 }
@@ -256,8 +257,11 @@ hdk::ir::ExprPtr reverse_logical_distribution(const hdk::ir::ExprPtr& expr) {
   }
   const auto remaining_expr =
       build_logical_expression(remaining_terms, hdk::ir::OpType::kOr);
-  return Analyzer::normalizeOperExpr(
-      hdk::ir::OpType::kAnd, hdk::ir::Qualifier::kOne, common_expr, remaining_expr);
+  return Analyzer::normalizeOperExpr(hdk::ir::OpType::kAnd,
+                                     hdk::ir::Qualifier::kOne,
+                                     common_expr,
+                                     remaining_expr,
+                                     nullptr);
 }
 
 }  // namespace
@@ -266,6 +270,7 @@ WorkUnitBuilder::WorkUnitBuilder(const ir::Node* root,
                                  const ir::QueryDag* dag,
                                  Executor* executor,
                                  SchemaProviderPtr schema_provider,
+                                 DataProvider* data_provider,
                                  TemporaryTables& temporary_tables,
                                  const ExecutionOptions& eo,
                                  const CompilationOptions& co,
@@ -276,6 +281,7 @@ WorkUnitBuilder::WorkUnitBuilder(const ir::Node* root,
     , dag_(dag)
     , executor_(executor)
     , schema_provider_(schema_provider)
+    , data_provider_(data_provider)
     , temporary_tables_(temporary_tables)
     , eo_(eo)
     , co_(co)
@@ -391,7 +397,7 @@ void WorkUnitBuilder::process(const ir::Node* node) {
 
 void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
   RelAlgTranslator translator(
-      executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
+      executor_, data_provider_, input_nest_levels_, join_types_, now_, eo_.just_explain);
   auto rte_idx = all_nest_levels_.at(agg);
   // We don't expect multiple aggregations in a single execution unit.
   if (!groupby_exprs_.empty()) {
@@ -423,7 +429,7 @@ void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
 
 void WorkUnitBuilder::processProject(const ir::Project* proj) {
   RelAlgTranslator translator(
-      executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
+      executor_, data_provider_, input_nest_levels_, join_types_, now_, eo_.just_explain);
   auto rte_idx = all_nest_levels_.at(proj);
   ir::ExprPtrVector new_target_exprs;
   for (auto& expr : proj->getExprs()) {
@@ -443,7 +449,7 @@ void WorkUnitBuilder::processProject(const ir::Project* proj) {
 
 void WorkUnitBuilder::processFilter(const ir::Filter* filter) {
   RelAlgTranslator translator(
-      executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
+      executor_, data_provider_, input_nest_levels_, join_types_, now_, eo_.just_explain);
   auto rte_idx = all_nest_levels_.at(filter);
 
   if (co_.device_type == ExecutorDeviceType::GPU && executor_ &&
@@ -591,7 +597,7 @@ void WorkUnitBuilder::processJoin(const ir::Join* join) {
 std::list<hdk::ir::ExprPtr> WorkUnitBuilder::makeJoinQuals(
     const hdk::ir::Expr* join_condition) {
   RelAlgTranslator translator(
-      executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
+      executor_, data_provider_, input_nest_levels_, join_types_, now_, eo_.just_explain);
 
   std::list<hdk::ir::ExprPtr> join_condition_quals;
   auto rewritten_condition = input_rewriter_.visit(join_condition);

@@ -1028,7 +1028,7 @@ hdk::ir::ExprPtr parseAbs(const hdk::ir::ExprPtrVector& operands) {
   CHECK(arg_type->isNumber());
   auto zero = hdk::ir::Constant::make(arg_type, 0);
   auto lt_zero = Analyzer::normalizeOperExpr(
-      hdk::ir::OpType::kLt, hdk::ir::Qualifier::kOne, arg, zero);
+      hdk::ir::OpType::kLt, hdk::ir::Qualifier::kOne, arg, zero, nullptr);
   auto uminus_operand =
       hdk::ir::makeExpr<hdk::ir::UOper>(arg_type, false, hdk::ir::OpType::kUMinus, arg);
   expr_list.emplace_back(lt_zero, uminus_operand);
@@ -1238,8 +1238,11 @@ hdk::ir::ExprPtr parseFunctionOperator(const std::string& fn_name,
   }
   if (fn_name == "/INT"sv) {
     CHECK_EQ(operands.size(), size_t(2));
-    return Analyzer::normalizeOperExpr(
-        hdk::ir::OpType::kDiv, hdk::ir::Qualifier::kOne, operands[0], operands[1]);
+    return Analyzer::normalizeOperExpr(hdk::ir::OpType::kDiv,
+                                       hdk::ir::Qualifier::kOne,
+                                       operands[0],
+                                       operands[1],
+                                       nullptr);
   }
   if (fn_name == "Reinterpret"sv) {
     CHECK_EQ(operands.size(), size_t(1));
