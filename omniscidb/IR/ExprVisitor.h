@@ -288,7 +288,10 @@ class ExprVisitor {
 
   virtual T visitAggExpr(const hdk::ir::AggExpr* agg) {
     if (agg->arg()) {
-      return visit(agg->arg());
+      visit(agg->arg());
+    }
+    if (agg->arg1()) {
+      visit(agg->arg1());
     }
     return defaultResult(agg);
   }

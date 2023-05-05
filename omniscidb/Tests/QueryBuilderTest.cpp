@@ -75,7 +75,7 @@ void checkAgg(const BuilderExpr& expr,
   ASSERT_EQ(expr.name(), name);
   if (val != HUGE_VAL) {
     ASSERT_TRUE(agg->arg1());
-    ASSERT_NEAR(agg->arg1()->fpVal(), val, 0.001);
+    ASSERT_NEAR(agg->arg1()->as<hdk::ir::Constant>()->fpVal(), val, 0.001);
   }
 }
 
@@ -986,6 +986,31 @@ TEST_F(QueryBuilderTest, AggExpr) {
   EXPECT_THROW(ref_timestamp.stdDev(), InvalidQueryError);
   EXPECT_THROW(ref_arr.stdDev(), InvalidQueryError);
   EXPECT_THROW(ref_arr_3.stdDev(), InvalidQueryError);
+  // CORR
+  checkAgg(
+      ref_i32.corr(ref_i64), ctx().fp64(), AggType::kCorr, false, "col_i_corr_col_bi");
+  checkAgg(
+      ref_f32.corr(ref_f64), ctx().fp64(), AggType::kCorr, false, "col_f_corr_col_d");
+  checkAgg(
+      ref_dec.corr(ref_f64), ctx().fp64(), AggType::kCorr, false, "col_dec_corr_col_d");
+  EXPECT_THROW(ref_b.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_str.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_dict.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_date.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_time.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_timestamp.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_arr.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_arr_3.corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(builder.cst(4.5).corr(ref_f64), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_b), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_str), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_dict), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_date), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_time), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_timestamp), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_arr), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(ref_arr_3), InvalidQueryError);
+  EXPECT_THROW(ref_f64.corr(builder.cst(3.5)), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, ParseAgg) {
@@ -1120,6 +1145,7 @@ TEST_F(QueryBuilderTest, ParseAgg) {
            0.5);
   EXPECT_THROW(node.parseAgg("approx_quantile"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("approx_quantile(col_i, col_f)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, -0.5)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, 1.5)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, 1..5)"), InvalidQueryError);
@@ -1171,6 +1197,21 @@ TEST_F(QueryBuilderTest, ParseAgg) {
   EXPECT_THROW(node.parseAgg("stddev"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("stddev(1)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("stddev(col_i, 1)"), InvalidQueryError);
+  // CORR
+  checkAgg(node.parseAgg("corr(col_i, col_bi)"),
+           ctx().fp64(),
+           AggType::kCorr,
+           false,
+           "col_i_corr_col_bi");
+  checkAgg(node.parseAgg("corr(col_d, col_f)"),
+           ctx().fp64(),
+           AggType::kCorr,
+           false,
+           "col_d_corr_col_f");
+  EXPECT_THROW(node.parseAgg("corr"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("corr(1)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("corr(col_f)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("corr(col_f, 1)"), InvalidQueryError);
 }
 
 TEST_F(QueryBuilderTest, ExtractExpr) {
@@ -4295,6 +4336,11 @@ TEST_F(QueryBuilderTest, Aggregate) {
                     {"id1"},
                     {"STDDEV_SAMP(val1)", "STDDEV_SAMP(val2)"},
                     {"id1", "val1_stddev", "val2_stddev"});
+  compare_test2_agg(
+      builder.scan("test2").agg("id1", {"stddev(val1)", "corr(val1, val2)"}),
+      {"id1"},
+      {"STDDEV_SAMP(val1)", "CORR(val1, val2)"},
+      {"id1", "val1_stddev", "val1_corr_val2"});
   compare_test2_agg(scan.agg(0, ""), {"id1"}, {}, {"id1"});
   compare_test2_agg(scan.agg({0}, ""), {"id1"}, {}, {"id1"});
   compare_test2_agg(scan.agg("id1", ""), {"id1"}, {}, {"id1"});

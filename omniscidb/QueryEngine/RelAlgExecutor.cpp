@@ -617,7 +617,7 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
       if (agg->arg()) {
         auto new_arg = set_transient_dict_maybe(agg->argShared());
         res = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->arg1());
+            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->arg1Shared());
       }
     } else {
       res = set_transient_dict_maybe(res);
@@ -1011,7 +1011,8 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     const auto sub_bitmap_count =
         get_count_distinct_sub_bitmap_count(bitmap_sz_bits, ra_exe_unit, device_type);
     int64_t approx_bitmap_sz_bits{0};
-    const auto error_rate = target_expr->as<hdk::ir::AggExpr>()->arg1();
+    const auto error_rate =
+        target_expr->as<hdk::ir::AggExpr>()->arg1()->as<hdk::ir::Constant>();
     if (error_rate) {
       CHECK(error_rate->type()->isInt32());
       CHECK_GE(error_rate->value().intval, 1);
