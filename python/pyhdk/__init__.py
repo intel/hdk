@@ -13,6 +13,12 @@ import os
 if sys.platform == "linux":
     prev = sys.getdlopenflags()
     sys.setdlopenflags(os.RTLD_LAZY | os.RTLD_GLOBAL)
+elif sys.platform == "win32":
+    if "JAVA_HOME" not in os.environ:
+        raise RuntimeError(
+            "HDK engine requires JAVA_HOME environment variable to point to Java runtime location."
+        )
+    os.add_dll_directory(os.path.join(os.environ["JAVA_HOME"], "bin", "server"))
 
 from pyhdk._common import TypeInfo, buildConfig, initLogger
 from pyhdk._execute import Executor
