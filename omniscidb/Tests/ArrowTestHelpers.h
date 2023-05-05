@@ -285,7 +285,8 @@ void compareArrowTables(std::shared_ptr<arrow::Table> expected,
     for (int64_t row_idx = 0; row_idx < expected->num_rows(); ++row_idx) {
       auto expected_val = expected_col->GetScalar(row_idx);
       auto actual_val = actual_col->GetScalar(row_idx);
-      ASSERT_TRUE(expected_val.ValueOrDie()->Equals(actual_val.ValueOrDie()));
+
+      ASSERT_TRUE(expected_val.ValueOrDie()->ApproxEquals(*actual_val.ValueOrDie()));
     }
   }
 }

@@ -1586,49 +1586,18 @@ std::string LikelihoodExpr::toString() const {
 }
 
 std::string AggExpr::toString() const {
-  std::string agg;
-  switch (agg_type_) {
-    case AggType::kAvg:
-      agg = "AVG ";
-      break;
-    case AggType::kMin:
-      agg = "MIN ";
-      break;
-    case AggType::kMax:
-      agg = "MAX ";
-      break;
-    case AggType::kSum:
-      agg = "SUM ";
-      break;
-    case AggType::kCount:
-      agg = "COUNT ";
-      break;
-    case AggType::kApproxCountDistinct:
-      agg = "APPROX_COUNT_DISTINCT";
-      break;
-    case AggType::kApproxQuantile:
-      agg = "APPROX_PERCENTILE";
-      break;
-    case AggType::kSingleValue:
-      agg = "SINGLE_VALUE";
-      break;
-    case AggType::kSample:
-      agg = "SAMPLE";
-      break;
-    case AggType::kStdDevSamp:
-      agg = "STDDEV_SAMP";
-      break;
-  }
-  std::string str{"(" + agg};
-  if (is_distinct_) {
-    str += "DISTINCT ";
-  }
+  std::stringstream ss;
+  ss << agg_type_ << (is_distinct_ ? "_DISTINCT(" : "(");
   if (arg_) {
-    str += arg_->toString();
+    ss << arg_->toString();
   } else {
-    str += "*";
+    ss << "*";
   }
-  return str + ") ";
+  if (arg1_) {
+    ss << arg1_->toString();
+  }
+  ss << ")";
+  return ss.str();
 }
 
 std::string CaseExpr::toString() const {

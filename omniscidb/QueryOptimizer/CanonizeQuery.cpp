@@ -19,7 +19,7 @@ namespace hdk::ir {
 namespace {
 
 bool isCompoundAggregate(const AggExpr* agg) {
-  return agg->aggType() == AggType::kStdDevSamp;
+  return agg->aggType() == AggType::kStdDevSamp || agg->aggType() == AggType::kCorr;
 }
 
 /**
@@ -124,12 +124,116 @@ class StdDevAggregate final : public CompoundAggregate {
   ExprPtr quad_sum_ref_;
 };
 
+/**
+ * corr(x, y) = (avg(x * y) * cnt(x) * cnt(y) - sum(x) * sum(y)) /
+ * (sqrt(cnt(x) * sum(x * x) - sum(x) * sum(x)) *
+ *  sqrt(cnt(y) * sum(y * y) - sum(y) * sum(y)))
+ */
+class CorrAggregate final : public CompoundAggregate {
+ public:
+  CorrAggregate(Aggregate* node, const AggExpr* agg, std::string field, ConfigPtr config)
+      : CompoundAggregate(node, agg, field, config) {}
+
+  void addInputExprs(ExprPtrVector& exprs, std::vector<std::string>& fields) override {
+    // Add x * x, y * y, x * y columns
+    BuilderExpr x_arg(&builder_, agg_->argShared());
+    BuilderExpr y_arg(&builder_, agg_->arg1Shared());
+    first_mul_arg_index_ = static_cast<unsigned>(exprs.size());
+    fields.emplace_back(field_ + "__corr_x_mul_x_" + std::to_string(exprs.size()));
+    exprs.emplace_back(x_arg.mul(x_arg).expr());
+    fields.emplace_back(field_ + "__corr_y_mul_y_" + std::to_string(exprs.size()));
+    exprs.emplace_back(y_arg.mul(y_arg).expr());
+    fields.emplace_back(field_ + "__corr_x_mul_y_" + std::to_string(exprs.size()));
+    exprs.emplace_back(x_arg.mul(y_arg).expr());
+  }
+
+  void addAggregates(const Project* input,
+                     ExprPtrVector& new_aggs,
+                     std::vector<std::string>& new_agg_fields) override {
+    // Create count(x), count(y), sum(x), sum(y), sum(x * x), sum(y * y), avg(x * y)
+    BuilderExpr x_arg(&builder_, agg_->argShared());
+    BuilderExpr y_arg(&builder_, agg_->arg1Shared());
+    BuilderExpr quad_x(&builder_, getNodeColumnRef(input, first_mul_arg_index_));
+    BuilderExpr quad_y(&builder_, getNodeColumnRef(input, first_mul_arg_index_ + 1));
+    BuilderExpr x_mul_y(&builder_, getNodeColumnRef(input, first_mul_arg_index_ + 2));
+    auto x_cnt = x_arg.count();
+    auto y_cnt = y_arg.count();
+    auto sum_x = x_arg.sum();
+    auto sum_y = y_arg.sum();
+    auto sum_quad_x = quad_x.sum();
+    auto sum_quad_y = quad_y.sum();
+    auto avg_x_mul_y = x_mul_y.avg();
+
+    // Add created aggregates
+    auto new_col_idx = static_cast<unsigned>(new_aggs.size() + node_->getGroupByCount());
+    new_aggs.emplace_back(x_cnt.expr());
+    new_agg_fields.emplace_back(field_ + "_x_cnt");
+    new_aggs.emplace_back(y_cnt.expr());
+    new_agg_fields.emplace_back(field_ + "_y_cnt");
+    new_aggs.emplace_back(sum_x.expr());
+    new_agg_fields.emplace_back(field_ + "_sum_x");
+    new_aggs.emplace_back(sum_y.expr());
+    new_agg_fields.emplace_back(field_ + "_sum_y");
+    new_aggs.emplace_back(sum_quad_x.expr());
+    new_agg_fields.emplace_back(field_ + "_sum_quad_x");
+    new_aggs.emplace_back(sum_quad_y.expr());
+    new_agg_fields.emplace_back(field_ + "_sum_quad_y");
+    new_aggs.emplace_back(avg_x_mul_y.expr());
+    new_agg_fields.emplace_back(field_ + "_avg_x_mul_y");
+
+    // Create references to new aggregates for the later use (cannot use builder
+    // because new aggregates are not in the node yet).
+    x_cnt_ref_ = makeExpr<ir::ColumnRef>(x_cnt.type(), node_, new_col_idx);
+    y_cnt_ref_ = makeExpr<ir::ColumnRef>(y_cnt.type(), node_, new_col_idx + 1);
+    sum_x_ref_ = makeExpr<ir::ColumnRef>(sum_x.type(), node_, new_col_idx + 2);
+    sum_y_ref_ = makeExpr<ir::ColumnRef>(sum_y.type(), node_, new_col_idx + 3);
+    sum_quad_x_ref_ = makeExpr<ir::ColumnRef>(sum_quad_x.type(), node_, new_col_idx + 4);
+    sum_quad_y_ref_ = makeExpr<ir::ColumnRef>(sum_quad_y.type(), node_, new_col_idx + 5);
+    avg_x_mul_y_ref_ =
+        makeExpr<ir::ColumnRef>(avg_x_mul_y.type(), node_, new_col_idx + 6);
+  }
+
+  void addResult(ExprPtrVector& reduce_proj_exprs) override {
+    BuilderExpr x_cnt(&builder_, x_cnt_ref_);
+    BuilderExpr y_cnt(&builder_, y_cnt_ref_);
+    BuilderExpr sum_x(&builder_, sum_x_ref_);
+    BuilderExpr sum_y(&builder_, sum_y_ref_);
+    BuilderExpr sum_quad_x(&builder_, sum_quad_x_ref_);
+    BuilderExpr sum_quad_y(&builder_, sum_quad_y_ref_);
+    BuilderExpr avg_x_mul_y(&builder_, avg_x_mul_y_ref_);
+
+    auto x_cnt_or_null =
+        builder_.ifThenElse(x_cnt.eq(0), builder_.nullCst(x_cnt.type()), x_cnt);
+    auto y_cnt_or_null =
+        builder_.ifThenElse(y_cnt.eq(0), builder_.nullCst(y_cnt.type()), y_cnt);
+
+    auto den1 = x_cnt_or_null * sum_quad_x - sum_x * sum_x;
+    auto den2 = y_cnt_or_null * sum_quad_y - sum_y * sum_y;
+    auto den = den1.mul(den2).pow(0.5);
+    auto corr = (avg_x_mul_y * x_cnt_or_null * y_cnt_or_null - sum_x * sum_y) / den;
+
+    reduce_proj_exprs.emplace_back(corr.expr());
+  }
+
+ private:
+  unsigned first_mul_arg_index_ = 0;
+  ExprPtr x_cnt_ref_;
+  ExprPtr y_cnt_ref_;
+  ExprPtr sum_x_ref_;
+  ExprPtr sum_y_ref_;
+  ExprPtr sum_quad_x_ref_;
+  ExprPtr sum_quad_y_ref_;
+  ExprPtr avg_x_mul_y_ref_;
+};
+
 std::unique_ptr<CompoundAggregate> createHandler(Aggregate* node,
                                                  const AggExpr* agg,
                                                  std::string field,
                                                  ConfigPtr config) {
   if (agg->aggType() == AggType::kStdDevSamp) {
     return std::make_unique<StdDevAggregate>(node, agg, field, config);
+  } else if (agg->aggType() == AggType::kCorr) {
+    return std::make_unique<CorrAggregate>(node, agg, field, config);
   }
   CHECK(false) << "Unsupported compound aggregate: " << agg->toString();
   return nullptr;

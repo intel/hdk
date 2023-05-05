@@ -53,9 +53,13 @@ class BuilderExpr {
   BuilderExpr sample() const;
   BuilderExpr singleValue() const;
   BuilderExpr stdDev() const;
+  BuilderExpr corr(const BuilderExpr& arg) const;
 
+  BuilderExpr agg(const std::string& agg_str, const BuilderExpr& arg) const;
   BuilderExpr agg(const std::string& agg_str, double val = HUGE_VAL) const;
+  BuilderExpr agg(AggType agg_kind, const BuilderExpr& arg) const;
   BuilderExpr agg(AggType agg_kind, double val) const;
+  BuilderExpr agg(AggType agg_kind, bool is_dinstinct, const BuilderExpr& arg) const;
   BuilderExpr agg(AggType agg_kind,
                   bool is_dinstinct = false,
                   double val = HUGE_VAL) const;

@@ -780,17 +780,23 @@ class LikelihoodExpr : public Expr {
  */
 class AggExpr : public Expr {
  public:
-  AggExpr(const Type* type,
-          AggType a,
-          ExprPtr g,
-          bool d,
-          std::shared_ptr<const Constant> e)
-      : Expr(type, true), agg_type_(a), arg_(g), is_distinct_(d), arg1_(e) {}
+  AggExpr(const Type* type, AggType a, ExprPtr arg, bool d, ExprPtr arg1)
+      : Expr(type, true), agg_type_(a), arg_(arg), is_distinct_(d), arg1_(arg1) {
+    if (arg1) {
+      if (agg_type_ == AggType::kApproxCountDistinct ||
+          agg_type_ == AggType::kApproxQuantile) {
+        CHECK(arg1_->is<Constant>());
+      } else {
+        CHECK(agg_type_ == AggType::kCorr);
+      }
+    }
+  }
   AggType aggType() const { return agg_type_; }
   const Expr* arg() const { return arg_.get(); }
   ExprPtr argShared() const { return arg_; }
   bool isDistinct() const { return is_distinct_; }
-  std::shared_ptr<const Constant> arg1() const { return arg1_; }
+  const Expr* arg1() const { return arg1_.get(); }
+  ExprPtr arg1Shared() const { return arg1_; }
   ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -801,8 +807,9 @@ class AggExpr : public Expr {
   AggType agg_type_;  // aggregate type: kAvg, kMin, kMax, kSum, kCount
   ExprPtr arg_;       // argument to aggregate
   bool is_distinct_;  // true only if it is for COUNT(DISTINCT x)
-  // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile
-  std::shared_ptr<const Constant> arg1_;
+  // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile,
+  // CORR second arg
+  ExprPtr arg1_;
 };
 
 /*

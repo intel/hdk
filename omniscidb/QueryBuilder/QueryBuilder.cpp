@@ -646,7 +646,27 @@ BuilderExpr BuilderExpr::stdDev() const {
   return {builder_, agg, name, true};
 }
 
-BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
+BuilderExpr BuilderExpr::corr(const BuilderExpr& arg) const {
+  if (!type()->isNumber() || !arg.type()->isNumber()) {
+    throw InvalidQueryError()
+        << "Cannot apply CORR aggregate to non-numeric types. Provided: "
+        << type()->toString() << " and " << arg.type()->toString();
+  }
+  if (expr()->is<Constant>() || arg.expr()->is<Constant>()) {
+    throw InvalidQueryError()
+        << "Literals are not allowed in CORR aggregate. Provided arguments: "
+        << expr_->toString() << " and " << arg.expr()->toString();
+  }
+  auto agg =
+      makeExpr<AggExpr>(builder_->ctx_.fp64(), AggType::kCorr, expr_, false, arg.expr());
+  auto name = name_.empty() ? "corr" : name_ + "_corr";
+  if (!arg.name_.empty()) {
+    name += "_" + arg.name_;
+  }
+  return {builder_, agg, name, true};
+}
+
+BuilderExpr BuilderExpr::agg(const std::string& agg_str, const BuilderExpr& arg) const {
   static const std::unordered_map<std::string, AggType> agg_names = {
       {"count", AggType::kCount},
       {"count_dist", AggType::kCount},
@@ -668,7 +688,8 @@ BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
       {"single value", AggType::kSingleValue},
       {"stddev", AggType::kStdDevSamp},
       {"stddev_samp", AggType::kStdDevSamp},
-      {"stddev samp", AggType::kStdDevSamp}};
+      {"stddev samp", AggType::kStdDevSamp},
+      {"corr", AggType::kCorr}};
   static const std::unordered_set<std::string> distinct_names = {
       "count_dist", "count_distinct", "count dist", "count distinct"};
   auto agg_str_lower = boost::algorithm::to_lower_copy(agg_str);
@@ -677,27 +698,51 @@ BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
   }
 
   auto kind = agg_names.at(agg_str_lower);
-  if (kind == AggType::kApproxQuantile && val == HUGE_VAL) {
+  if (kind == AggType::kApproxQuantile && !arg.expr()) {
     throw InvalidQueryError("Missing argument for approximate quantile aggregate.");
+  }
+  if (kind == AggType::kCorr && !arg.expr()) {
+    throw InvalidQueryError("Missing argument for corr aggregate.");
   }
 
   auto is_distinct = distinct_names.count(agg_str_lower);
-  return agg(kind, is_distinct, val);
+  return agg(kind, is_distinct, arg);
+}
+
+BuilderExpr BuilderExpr::agg(const std::string& agg_str, double val) const {
+  BuilderExpr arg;
+  if (val != HUGE_VAL) {
+    arg = builder_->cst(val);
+  }
+  return agg(agg_str, arg);
+}
+
+BuilderExpr BuilderExpr::agg(AggType agg_kind, const BuilderExpr& arg) const {
+  return agg(agg_kind, false, arg);
 }
 
 BuilderExpr BuilderExpr::agg(AggType agg_kind, double val) const {
   return agg(agg_kind, false, val);
 }
 
-BuilderExpr BuilderExpr::agg(AggType agg_kind, bool is_distinct, double val) const {
+BuilderExpr BuilderExpr::agg(AggType agg_kind,
+                             bool is_distinct,
+                             const BuilderExpr& arg) const {
   if (is_distinct && agg_kind != AggType::kCount) {
     throw InvalidQueryError() << "Distinct property cannot be set to true for "
                               << agg_kind << " aggregate.";
   }
-  if (val != HUGE_VAL && agg_kind != AggType::kApproxQuantile) {
+  if (arg.expr() && agg_kind != AggType::kApproxQuantile && agg_kind != AggType::kCorr) {
     throw InvalidQueryError() << "Aggregate argument is supported for approximate "
-                                 "quantile only but provided for "
+                                 "quantile and corr only but provided for "
                               << agg_kind;
+  }
+  if (agg_kind == AggType::kApproxQuantile) {
+    if (!arg.expr()->is<Constant>() || !arg.type()->isFloatingPoint()) {
+      throw InvalidQueryError() << "Expected fp constant argumnt for approximate "
+                                   "quantile. Provided: "
+                                << arg.expr()->toString();
+    }
   }
 
   switch (agg_kind) {
@@ -714,17 +759,27 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind, bool is_distinct, double val) con
     case AggType::kApproxCountDistinct:
       return approxCountDist();
     case AggType::kApproxQuantile:
-      return approxQuantile(val);
+      return approxQuantile(arg.expr()->as<Constant>()->fpVal());
     case AggType::kSample:
       return sample();
     case AggType::kSingleValue:
       return singleValue();
     case AggType::kStdDevSamp:
       return stdDev();
+    case AggType::kCorr:
+      return corr(arg);
     default:
       break;
   }
   throw InvalidQueryError() << "Unsupported aggregate type: " << agg_kind;
+}
+
+BuilderExpr BuilderExpr::agg(AggType agg_kind, bool is_distinct, double val) const {
+  BuilderExpr arg;
+  if (val != HUGE_VAL) {
+    arg = builder_->cst(val);
+  }
+  return agg(agg_kind, is_distinct, arg);
 }
 
 BuilderExpr BuilderExpr::extract(DateExtractField field) const {
@@ -1580,8 +1635,7 @@ BuilderExpr BuilderNode::ref(int col_idx) const {
 
 BuilderExpr BuilderNode::ref(const std::string& col_name) const {
   auto expr = getRefByName(node_.get(), col_name);
-  auto name = getFieldName(node_.get(), expr->as<ColumnRef>()->index());
-  return {builder_, expr, name};
+  return {builder_, expr, col_name};
 }
 
 std::vector<BuilderExpr> BuilderNode::ref(std::initializer_list<int> col_indices) const {
@@ -1761,23 +1815,31 @@ BuilderExpr BuilderNode::parseAggString(const std::string& agg_str) const {
       return count();
     }
 
-    double val = HUGE_VAL;
+    BuilderExpr arg;
     auto comma_pos = col_name.find(',');
     if (comma_pos != std::string::npos) {
       auto val_str = boost::trim_copy(
           col_name.substr(comma_pos + 1, col_name.size() - comma_pos - 1));
       char* end = nullptr;
-      val = std::strtod(val_str.c_str(), &end);
+      auto val = std::strtod(val_str.c_str(), &end);
       // Require value string to be fully interpreted to avoid silent errors like
       // 1..1 interpreted as 1.
       if (val == HUGE_VAL || end == val_str.c_str() ||
           end != (val_str.c_str() + val_str.size())) {
-        throw InvalidQueryError()
-            << "Cannot parse aggregate parameter (decimal expected): " << val_str;
+        // If value is not decimal then assume it is a column name (for corr aggregate).
+        auto ref = getRefByName(node_.get(), val_str, true);
+        if (!ref) {
+          throw InvalidQueryError()
+              << "Cannot parse aggregate parameter (decimal or column name expected): "
+              << val_str;
+        }
+        arg = BuilderExpr(builder_, ref, val_str);
+      } else {
+        arg = builder_->cst(val);
       }
       col_name = boost::trim_copy(col_name.substr(0, comma_pos));
     }
-    return ref(col_name).agg(agg_name, val);
+    return ref(col_name).agg(agg_name, arg);
   }
 
   throw InvalidQueryError() << "Cannot parse aggregate string: '" << agg_str << "'";
