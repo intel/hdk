@@ -17,6 +17,7 @@
 #include "OSDependent/omnisci_path.h"
 
 #include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 #include "Logger/Logger.h"
 
@@ -31,10 +32,23 @@ std::string get_root_abs_path() {
   CHECK_LT(static_cast<size_t>(path_len), sizeof(abs_exe_path));
   boost::filesystem::path abs_exe_dir(std::string(abs_exe_path, path_len));
   abs_exe_dir.remove_filename();
-  // account for build type dir (e.g. Release)
-  const auto mapd_root = abs_exe_dir.parent_path().parent_path();
+  // When installed in conda env the path points python.exe that is located
+  // in the root of conda environment.
+  // When running tests in built repo the path points to omniscidb\Tests\{Debug|Release}\
+  // which is three levels below "bin" directory with calcite jar file.
+  // Because of this disbalance we try to look up QueryEngine/RuntimeFunctions.bc file.
+  // QueryEngine is located either one level below "bin" or on the same level. When it is
+  // below "bin" then this one more up level is done in CalciteJNI.
+  const int UP_PATH_LEVELS = 2;
+  for (int up_levels = 0; up_levels <= UP_PATH_LEVELS; up_levels++) {
+    std::string target_path = abs_exe_dir.string() + "/QueryEngine/RuntimeFunctions.bc";
+    if (std::filesystem::exists(target_path)) {
+      break;
+    }
+    abs_exe_dir = abs_exe_dir.parent_path();
+  }
 
-  return mapd_root.string();
+  return abs_exe_dir.string();
 }
 
 }  // namespace omnisci
