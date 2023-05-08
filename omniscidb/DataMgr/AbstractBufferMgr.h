@@ -101,6 +101,8 @@ class AbstractBufferMgr {
 
   virtual const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) = 0;
 
+  virtual void materializeDictionary(const int dict_id) = 0;
+
   virtual TableFragmentsInfo getTableMetadata(int db_id, int table_id) const = 0;
 
   // Buffer API

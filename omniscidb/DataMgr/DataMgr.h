@@ -233,6 +233,8 @@ class DataMgr {
 
   DataProvider* getDataProvider() const { return data_provider_.get(); }
 
+  void materializeDictionary(const int dictionary_id);
+
  private:
   void populateDeviceMgrs(const Config& config);
   void populateMgrs(const Config& config, const size_t userSpecifiedNumReaderThreads);

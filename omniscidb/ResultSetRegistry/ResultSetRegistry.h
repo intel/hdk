@@ -52,6 +52,10 @@ class ResultSetRegistry : public SimpleSchemaProvider,
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
 
+  void materializeDictionary(const int dict_id) override {
+    // noop, assume dictionary is already materialized
+  }
+
  private:
   bool useColumnarResults(const ResultSet& rs) const;
 

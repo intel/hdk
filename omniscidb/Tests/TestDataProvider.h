@@ -134,6 +134,10 @@ class TestDataProvider : public AbstractDataProvider {
     tables_.at(table_id).addColFragment<T>(col_id, vals);
   }
 
+  void materializeDictionary(const int dict_id) override {
+    // noop
+  }
+
  protected:
   int db_id_;
   SchemaProviderPtr schema_provider_;

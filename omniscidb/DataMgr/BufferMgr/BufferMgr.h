@@ -177,6 +177,8 @@ class BufferMgr : public AbstractBufferMgr {  // implements
     return nullptr;
   }
 
+  void materializeDictionary(const int dict_id) { UNREACHABLE(); }
+
   TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override {
     UNREACHABLE();
     return TableFragmentsInfo{};

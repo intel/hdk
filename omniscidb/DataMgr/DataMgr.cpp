@@ -546,4 +546,9 @@ TableFragmentsInfo DataMgr::getTableMetadata(int db_id, int table_id) const {
   return getPersistentStorageMgr()->getTableMetadata(db_id, table_id);
 }
 
+void DataMgr::materializeDictionary(const int dict_id) {
+  // TODO: we could re-purpose load_dict from above?
+  getPersistentStorageMgr()->materializeDictionary(dict_id);
+}
+
 }  // namespace Data_Namespace

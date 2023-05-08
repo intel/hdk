@@ -128,6 +128,12 @@ const DictDescriptor* PersistentStorageMgr::getDictMetadata(int dict_id, bool lo
   return nullptr;
 }
 
+void PersistentStorageMgr::materializeDictionary(const int dict_id) {
+  if (hasStorageMgr(dict_id)) {
+    return getStorageMgr(dict_id)->materializeDictionary(dict_id);
+  }
+}
+
 TableFragmentsInfo PersistentStorageMgr::getTableMetadata(int db_id, int table_id) const {
   return getStorageMgrForTableKey({db_id, table_id})->getTableMetadata(db_id, table_id);
 }
