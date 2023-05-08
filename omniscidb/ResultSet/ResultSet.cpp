@@ -133,8 +133,8 @@ ResultSet::ResultSet(const std::shared_ptr<const hdk::ir::Estimator> estimator,
                                        estimator_->getBufferSize(),
                                        device_id_);
   } else {
-    host_estimator_buffer_ =
-        static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1));
+    host_estimator_buffer_.reset(
+        static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1)), free);
   }
 }
 
@@ -160,6 +160,49 @@ ResultSet::ResultSet(int64_t queue_time_ms,
     , for_validation_only_(false)
     , cached_row_count_(uninitialized_cached_row_count) {}
 
+ResultSet::ResultSet(const ResultSet& other)
+    : targets_(other.targets_)
+    , device_type_(other.device_type_)
+    , fields_(other.fields_)
+    , device_id_(other.device_id_)
+    , query_mem_desc_(other.query_mem_desc_)
+    , storage_(other.storage_)
+    , appended_storage_(other.appended_storage_)
+    , crt_row_buff_idx_(0)
+    , fetched_so_far_(0)
+    , drop_first_(other.drop_first_)
+    , keep_first_(other.keep_first_)
+    , row_set_mem_owner_(other.row_set_mem_owner_)
+    , permutation_(other.permutation_)
+    , block_size_(other.block_size_)
+    , grid_size_(other.grid_size_)
+    , timings_(other.timings_)
+    , outer_table_id_(other.outer_table_id_)
+    , chunks_(other.chunks_)
+    , chunk_iters_(other.chunk_iters_)
+    , literal_buffers_(other.literal_buffers_)
+    , lazy_fetch_info_(other.lazy_fetch_info_)
+    , col_buffers_(other.col_buffers_)
+    , frag_offsets_(other.frag_offsets_)
+    , consistent_frag_sizes_(other.consistent_frag_sizes_)
+    , estimator_(other.estimator_)
+    , device_estimator_buffer_(other.device_estimator_buffer_)
+    , host_estimator_buffer_(other.host_estimator_buffer_)
+    , data_mgr_(other.data_mgr_)
+    , serialized_varlen_buffer_(other.serialized_varlen_buffer_)
+    , separate_varlen_storage_valid_(other.separate_varlen_storage_valid_)
+    , explanation_(other.explanation_)
+    , just_explain_(other.just_explain_)
+    , for_validation_only_(other.for_validation_only_)
+    , cached_row_count_(other.cached_row_count_.load()) {
+  // Instead of sharing device estimator buffer, we simply use the host one
+  if (device_estimator_buffer_) {
+    CHECK(host_estimator_buffer_);
+    device_estimator_buffer_ = nullptr;
+    device_type_ = ExecutorDeviceType::CPU;
+  }
+}
+
 ResultSet::~ResultSet() {
   if (storage_) {
     if (!storage_->buff_is_provided_) {
@@ -171,10 +214,6 @@ ResultSet::~ResultSet() {
     if (storage && !storage->buff_is_provided_) {
       free(storage->getUnderlyingBuffer());
     }
-  }
-  if (host_estimator_buffer_) {
-    CHECK(device_type_ == ExecutorDeviceType::CPU || device_estimator_buffer_);
-    free(host_estimator_buffer_);
   }
   if (device_estimator_buffer_) {
     CHECK(data_mgr_);
@@ -695,19 +734,21 @@ int8_t* ResultSet::getDeviceEstimatorBuffer() const {
 }
 
 int8_t* ResultSet::getHostEstimatorBuffer() const {
-  return host_estimator_buffer_;
+  return host_estimator_buffer_.get();
 }
 
 void ResultSet::syncEstimatorBuffer() const {
   CHECK(device_type_ == ExecutorDeviceType::GPU);
   CHECK(!host_estimator_buffer_);
   CHECK_EQ(size_t(0), estimator_->getBufferSize() % sizeof(int64_t));
-  host_estimator_buffer_ =
-      static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1));
+  host_estimator_buffer_.reset(
+      static_cast<int8_t*>(checked_calloc(estimator_->getBufferSize(), 1)), free);
   CHECK(device_estimator_buffer_);
   auto device_buffer_ptr = device_estimator_buffer_->getMemoryPtr();
-  getBufferProvider()->copyFromDevice(
-      host_estimator_buffer_, device_buffer_ptr, estimator_->getBufferSize(), device_id_);
+  getBufferProvider()->copyFromDevice(host_estimator_buffer_.get(),
+                                      device_buffer_ptr,
+                                      estimator_->getBufferSize(),
+                                      device_id_);
 }
 
 void ResultSet::setQueueTime(const int64_t queue_time) {
@@ -812,6 +853,11 @@ ResultSet::StorageLookupResult ResultSet::findStorage(const size_t entry_idx) co
   return {stg_idx ? appended_storage_[stg_idx - 1].get() : storage_.get(),
           fixedup_entry_idx,
           stg_idx};
+}
+
+ResultSetPtr ResultSet::shallowCopy() const {
+  ResultSetPtr res(new ResultSet(*this));
+  return res;
 }
 
 double ResultSet::calculateQuantile(quantile::TDigest* const t_digest) {
@@ -1151,7 +1197,8 @@ std::vector<size_t> ResultSet::getSlotIndicesForTargetIndices() const {
 size_t ResultSet::getNDVEstimator() const {
   CHECK(dynamic_cast<const hdk::ir::NDVEstimator*>(estimator_.get()));
   CHECK(host_estimator_buffer_);
-  auto bits_set = bitmap_set_size(host_estimator_buffer_, estimator_->getBufferSize());
+  auto bits_set =
+      bitmap_set_size(host_estimator_buffer_.get(), estimator_->getBufferSize());
   if (bits_set == 0) {
     // empty result set, return 1 for a groups buffer size of 1
     return 1;

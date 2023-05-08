@@ -153,10 +153,11 @@ class ResultSetRowIterator {
 class TSerializedRows;
 class ResultSetBuilder;
 
-using AppendedStorage = std::vector<std::unique_ptr<ResultSetStorage>>;
+using AppendedStorage = std::vector<std::shared_ptr<ResultSetStorage>>;
 using PermutationIdx = uint32_t;
 using Permutation = std::vector<PermutationIdx>;
 using PermutationView = VectorView<PermutationIdx>;
+using ResultSetPtr = std::shared_ptr<ResultSet>;
 
 class ResultSet {
  public:
@@ -627,7 +628,11 @@ class ResultSet {
     return serialized_varlen_buffer_;
   }
 
+  ResultSetPtr shallowCopy() const;
+
  private:
+  ResultSet(const ResultSet& other);
+
   void advanceCursorToNextEntry(ResultSetRowIterator& iter) const;
 
   std::vector<TargetValue> getNextRowImpl(const bool translate_strings,
@@ -760,11 +765,11 @@ class ResultSet {
                                                 const TargetInfo& target_info) const;
 
   const std::vector<TargetInfo> targets_;
-  const ExecutorDeviceType device_type_;
+  ExecutorDeviceType device_type_;
   std::vector<std::string> fields_;
   const int device_id_;
   QueryMemoryDescriptor query_mem_desc_;
-  mutable std::unique_ptr<ResultSetStorage> storage_;
+  mutable std::shared_ptr<ResultSetStorage> storage_;
   AppendedStorage appended_storage_;
   mutable size_t crt_row_buff_idx_;
   mutable size_t fetched_so_far_;
@@ -791,7 +796,7 @@ class ResultSet {
 
   const std::shared_ptr<const hdk::ir::Estimator> estimator_;
   Data_Namespace::AbstractBuffer* device_estimator_buffer_{nullptr};
-  mutable int8_t* host_estimator_buffer_{nullptr};
+  mutable std::shared_ptr<int8_t> host_estimator_buffer_{nullptr};
   Data_Namespace::DataMgr* data_mgr_{nullptr};
 
   std::vector<SerializedVarlenBufferStorage> serialized_varlen_buffer_;
@@ -805,8 +810,6 @@ class ResultSet {
   friend class ResultSetRowIterator;
   friend class ColumnarResults;
 };
-
-using ResultSetPtr = std::shared_ptr<ResultSet>;
 
 ResultSetRowIterator::value_type ResultSetRowIterator::operator*() const {
   if (!global_entry_idx_valid_) {
