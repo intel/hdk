@@ -14,8 +14,11 @@
 namespace hdk {
 
 class ResultSetRegistry;
+class ResultSetTableToken;
 
-class ResultSetTableToken {
+using ResultSetTableTokenPtr = std::shared_ptr<const ResultSetTableToken>;
+
+class ResultSetTableToken : public std::enable_shared_from_this<ResultSetTableToken> {
  public:
   ResultSetTableToken() = default;
   ResultSetTableToken(TableInfoPtr tinfo,
@@ -49,6 +52,9 @@ class ResultSetTableToken {
 
   const std::string& tableName() const { return tinfo_->name; }
 
+  ResultSetTableTokenPtr head(size_t n) const;
+  ResultSetTableTokenPtr tail(size_t n) const;
+
   std::string toString() const {
     return "ResultSetTableToken(" + std::to_string(dbId()) + ":" +
            std::to_string(tableId()) + ")";
@@ -61,7 +67,5 @@ class ResultSetTableToken {
   size_t row_count_;
   std::shared_ptr<ResultSetRegistry> registry_;
 };
-
-using ResultSetTableTokenPtr = std::shared_ptr<const ResultSetTableToken>;
 
 }  // namespace hdk

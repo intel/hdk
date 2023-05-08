@@ -35,4 +35,12 @@ void ResultSetTableToken::reset() {
   }
 }
 
+ResultSetTableTokenPtr ResultSetTableToken::head(size_t n) const {
+  return registry_->head(*this, n);
+}
+
+ResultSetTableTokenPtr ResultSetTableToken::tail(size_t n) const {
+  return registry_->tail(*this, n);
+}
+
 }  // namespace hdk

@@ -61,6 +61,9 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
     string getExplanation()
     const string& tableName()
 
+    CExecutionResult head(size_t) except +
+    CExecutionResult tail(size_t) except +
+
 cdef class ExecutionResult:
   cdef CExecutionResult c_result
   # DataMgr has to outlive ResultSet objects to avoid use-after-free errors.

@@ -1007,7 +1007,7 @@ size_t convert_rowwise(
   CHECK_EQ(null_bitmap_seg.size(), col_count);
   const auto local_entry_count = end_entry - start_entry;
   size_t seg_row_count = 0;
-  size_t limit = results->getLimit();
+  size_t limit = results->getLimit() ? results->getLimit() : results->entryCount();
   size_t offset = results->getOffset();
   for (size_t i = start_entry; i < end_entry; ++i) {
     if (is_truncated && seg_row_count >= offset + limit) {

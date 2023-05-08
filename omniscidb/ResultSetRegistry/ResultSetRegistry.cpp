@@ -176,6 +176,92 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
   SimpleSchemaProvider::dropTable(token.dbId(), token.tableId());
 }
 
+ResultSetTableTokenPtr ResultSetRegistry::head(const ResultSetTableToken& token,
+                                               size_t n) {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK(tables_.count(token.tableId()));
+  auto* table = tables_.at(token.tableId()).get();
+  mapd_shared_lock<mapd_shared_mutex> table_lock(table->mutex);
+
+  if (table->row_count <= n) {
+    return token.shared_from_this();
+  }
+
+  std::vector<ResultSetPtr> new_results;
+  if (!n) {
+    auto* first_rs = table->fragments.front().rs.get();
+    new_results.emplace_back(new ResultSet(first_rs->getTargetInfos(),
+                                           ExecutorDeviceType::CPU,
+                                           first_rs->getQueryMemDesc(),
+                                           first_rs->getRowSetMemOwner(),
+                                           first_rs->getDataManager(),
+                                           0,
+                                           0));
+  } else {
+    size_t remained_rows = n;
+    for (auto& frag : table->fragments) {
+      if (frag.row_count < remained_rows) {
+        new_results.push_back(frag.rs);
+        remained_rows -= frag.row_count;
+      } else {
+        auto copy = frag.rs->shallowCopy();
+        copy->keepFirstN(remained_rows);
+        new_results.push_back(copy);
+        break;
+      }
+    }
+  }
+
+  data_lock.unlock();
+  table_lock.unlock();
+
+  return put({std::move(new_results)});
+}
+
+ResultSetTableTokenPtr ResultSetRegistry::tail(const ResultSetTableToken& token,
+                                               size_t n) {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK(tables_.count(token.tableId()));
+  auto* table = tables_.at(token.tableId()).get();
+  mapd_shared_lock<mapd_shared_mutex> table_lock(table->mutex);
+
+  if (table->row_count <= n) {
+    return token.shared_from_this();
+  }
+
+  std::vector<ResultSetPtr> new_results;
+  if (!n) {
+    auto* first_rs = table->fragments.front().rs.get();
+    new_results.emplace_back(new ResultSet(first_rs->getTargetInfos(),
+                                           ExecutorDeviceType::CPU,
+                                           first_rs->getQueryMemDesc(),
+                                           first_rs->getRowSetMemOwner(),
+                                           first_rs->getDataManager(),
+                                           0,
+                                           0));
+  } else {
+    size_t remained_rows = n;
+    for (auto frag_it = table->fragments.rbegin(); frag_it != table->fragments.rend();
+         ++frag_it) {
+      if (frag_it->row_count < remained_rows) {
+        new_results.push_back(frag_it->rs);
+        remained_rows -= frag_it->row_count;
+      } else {
+        auto copy = frag_it->rs->shallowCopy();
+        copy->dropFirstN(frag_it->row_count - remained_rows + copy->getOffset());
+        copy->keepFirstN(remained_rows);
+        new_results.push_back(copy);
+        break;
+      }
+    }
+  }
+
+  data_lock.unlock();
+  table_lock.unlock();
+
+  return put({std::move(new_results)});
+}
+
 ChunkStats ResultSetRegistry::getChunkStats(int table_id,
                                             size_t frag_idx,
                                             size_t col_idx) const {

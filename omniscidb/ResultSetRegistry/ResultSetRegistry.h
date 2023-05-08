@@ -39,6 +39,9 @@ class ResultSetRegistry : public SimpleSchemaProvider,
   ResultSetPtr get(const ResultSetTableToken& token, size_t frag_id) const;
   void drop(const ResultSetTableToken& token);
 
+  ResultSetTableTokenPtr head(const ResultSetTableToken& token, size_t n);
+  ResultSetTableTokenPtr tail(const ResultSetTableToken& token, size_t n);
+
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
                    const size_t num_bytes = 0) override;
