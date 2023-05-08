@@ -56,6 +56,16 @@ class ExecutionResult {
     return result_token_->tableName();
   }
 
+  ExecutionResult head(size_t n) {
+    CHECK(result_token_);
+    return {result_token_->head(n), targets_meta_};
+  }
+
+  ExecutionResult tail(size_t n) {
+    CHECK(result_token_);
+    return {result_token_->tail(n), targets_meta_};
+  }
+
   const std::vector<TargetMetaInfo>& getTargetsMeta() const { return targets_meta_; }
 
   const std::vector<PushedDownFilterInfo>& getPushedDownFilterInfo() const;

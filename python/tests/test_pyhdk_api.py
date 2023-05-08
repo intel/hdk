@@ -925,6 +925,34 @@ class TestBuilder(BaseTest):
         with pytest.raises(RuntimeError):
             res2.proj(0).shape
 
+    def test_head(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+
+        res = ht.run()
+        res1 = res.head(10)
+        check_res(res1, {"a": [1, 2, 3, 4, 5]})
+        res2 = res.head(3)
+        check_res(res2, {"a": [1, 2, 3]})
+        res3 = res.head(0)
+        check_res(res3, {"a": []})
+
+        hdk.drop_table(ht)
+
+    def test_tail(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+
+        res = ht.run()
+        res1 = res.tail(10)
+        check_res(res1, {"a": [1, 2, 3, 4, 5]})
+        res2 = res.tail(3)
+        check_res(res2, {"a": [3, 4, 5]})
+        res3 = res.tail(0)
+        check_res(res3, {"a": []})
+
+        hdk.drop_table(ht)
+
 
 class TestSql(BaseTest):
     def test_no_alias(self):

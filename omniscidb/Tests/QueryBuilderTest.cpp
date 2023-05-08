@@ -5070,6 +5070,84 @@ TEST_F(QueryBuilderTest, FixedArrayInRes) {
   }
 }
 
+TEST_F(QueryBuilderTest, Head) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  {
+    auto dag = builder.scan("test1").proj({0, 1}).finalize();
+    auto res = runQuery(std::move(dag));
+
+    auto res1 = res.head(10);
+    compare_res_data(res1,
+                     std::vector<int64_t>({1, 2, 3, 4, 5}),
+                     std::vector<int32_t>({11, 22, 33, 44, 55}));
+
+    auto res2 = res.head(3);
+    compare_res_data(
+        res2, std::vector<int64_t>({1, 2, 3}), std::vector<int32_t>({11, 22, 33}));
+
+    auto res3 = res.head(0);
+    compare_res_data(res3, std::vector<int64_t>({}), std::vector<int32_t>({}));
+  }
+
+  {
+    auto dag = builder.scan("test1")
+                   .proj({0, 1})
+                   .sort(std::vector<BuilderSortField>(), 3, 1)
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+
+    auto res1 = res.head(10);
+    compare_res_data(
+        res1, std::vector<int64_t>({2, 3, 4}), std::vector<int32_t>({22, 33, 44}));
+
+    auto res2 = res.head(2);
+    compare_res_data(res2, std::vector<int64_t>({2, 3}), std::vector<int32_t>({22, 33}));
+
+    auto res3 = res.head(0);
+    compare_res_data(res3, std::vector<int64_t>({}), std::vector<int32_t>({}));
+  }
+}
+
+TEST_F(QueryBuilderTest, Tail) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  {
+    auto dag = builder.scan("test1").proj({0, 1}).finalize();
+    auto res = runQuery(std::move(dag));
+
+    auto res1 = res.tail(10);
+    compare_res_data(res1,
+                     std::vector<int64_t>({1, 2, 3, 4, 5}),
+                     std::vector<int32_t>({11, 22, 33, 44, 55}));
+
+    auto res2 = res.tail(3);
+    compare_res_data(
+        res2, std::vector<int64_t>({3, 4, 5}), std::vector<int32_t>({33, 44, 55}));
+
+    auto res3 = res.tail(0);
+    compare_res_data(res3, std::vector<int64_t>({}), std::vector<int32_t>({}));
+  }
+
+  {
+    auto dag = builder.scan("test1")
+                   .proj({0, 1})
+                   .sort(std::vector<BuilderSortField>(), 3, 1)
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+
+    auto res1 = res.tail(10);
+    compare_res_data(
+        res1, std::vector<int64_t>({2, 3, 4}), std::vector<int32_t>({22, 33, 44}));
+
+    auto res2 = res.tail(2);
+    compare_res_data(res2, std::vector<int64_t>({3, 4}), std::vector<int32_t>({33, 44}));
+
+    auto res3 = res.tail(0);
+    compare_res_data(res3, std::vector<int64_t>({}), std::vector<int32_t>({}));
+  }
+}
+
 class Taxi : public TestSuite {
  protected:
   static void SetUpTestSuite() {

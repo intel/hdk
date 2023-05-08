@@ -633,6 +633,10 @@ cdef class QueryNode:
     dag.c_dag.reset(c_dag)
     return dag
 
+  @property
+  def hdk(self):
+    return self._hdk
+
   def __repr__(self):
     return self.c_node.node().get().toString()
 

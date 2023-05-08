@@ -139,6 +139,22 @@ cdef class ExecutionResult:
 
     return res
 
+  def head(self, n):
+    res = ExecutionResult()
+    res.c_result = self.c_result.head(n)
+    res.c_data_mgr = self.c_data_mgr
+    if self._scan is not None:
+      res._scan = self._scan.hdk.scan(res.table_name)
+    return res
+
+  def tail(self, n):
+    res = ExecutionResult()
+    res.c_result = self.c_result.tail(n)
+    res.c_data_mgr = self.c_data_mgr
+    if self._scan is not None:
+      res._scan = self._scan.hdk.scan(res.table_name)
+    return res
+
   def __str__(self):
     res = "Schema:\n"
     for key, type_str in self.schema.items():
