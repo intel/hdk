@@ -165,6 +165,7 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
     auto dict =
         dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
             ->stringDict.get();
+    CHECK(dict);
 
     // dictionary conversion
     std::vector<std::string_view> bulk(bulk_size);
@@ -234,6 +235,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
     const int8_t* ptr =
         chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * elem_size);
     size_t chunk_size = chunk->length() * elem_size;
+    LOG(INFO) << "Completed dictionary conversion for chunk " << chunk->ToString();
+    // TODO: let's store this somewhere convenient for fetching later
     return std::make_unique<ArrowChunkDataToken>(std::move(chunk), ptr, chunk_size);
   }
 
@@ -424,6 +427,61 @@ const DictDescriptor* ArrowStorage::getDictMetadata(int dict_id, bool /*load_dic
     return dicts_.at(dict_id).get();
   }
   return nullptr;
+}
+
+void ArrowStorage::materializeDictionary(const int dict_id) {
+  mapd_unique_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
+
+  if (dicts_.count(dict_id)) {
+    // TODO: this is not really a chunk, more like a table/column mapping
+    const auto chunks_itr = dict_mapping_.find(dict_id);
+    CHECK(chunks_itr != dict_mapping_.end());
+    const auto& chunks = chunks_itr->second;
+    CHECK_EQ(chunks.size(), size_t(1));  // don't support shared dict yet
+    const auto& chunk_itr = chunks.cbegin();
+    const auto& chunk_key = *chunk_itr;
+    CHECK_EQ(chunk_key.size(), size_t(3));
+    const auto table_id = chunk_key[1];
+    const auto col_id = chunk_key[2];
+
+    const auto& table_itr = tables_.find(table_id);
+    CHECK(table_itr != tables_.end());
+    const auto* table = table_itr->second.get();
+
+    // TODO: for now let's just try putting all the strings from the record batch into the
+    // dictionary
+    auto arrow_col_data = table->record_batch->column(col_id);
+
+    CHECK(arrow_col_data);
+    CHECK_EQ(arrow_col_data->type(), arrow::utf8()) << arrow_col_data->type()->ToString();
+
+    auto crt_frag_strings =
+        std::static_pointer_cast<arrow::StringArray>(arrow_col_data->Slice(0));
+    CHECK(crt_frag_strings);
+
+    const size_t bulk_size = static_cast<size_t>(crt_frag_strings->length());
+
+    auto dict = dicts_.at(dict_id)->stringDict.get();
+    CHECK(dict);
+
+    // dictionary conversion
+    std::vector<std::string_view> bulk(bulk_size);
+    for (size_t j = 0; j < bulk_size; j++) {
+      if (!crt_frag_strings->IsNull(j)) {
+        auto view = crt_frag_strings->GetView(j);
+        bulk[j] = std::string_view(view.data(), view.length());
+      }
+    }
+
+    // TODO: throwing away all the converted indices is bad, we will have to reconvert
+    // later when this data is accessed. but, if we actually kept the indices we would
+    // need the column element size
+    std::vector<int32_t> indices_buffer(bulk_size);
+    dict->getOrAddBulk(bulk, indices_buffer.data());
+  } else {
+    throw std::runtime_error("Request to materialize dictionary " +
+                             std::to_string(dict_id) + " which does not exist.");
+  }
 }
 
 TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
@@ -640,6 +698,9 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     if (col_type->isExtDictionary() && col_arr->type()->id() == arrow::Type::STRING) {
       table.lazy_fetch_col_ids.insert(col_idx);
       lazy_fetch_cols[col_idx] = true;
+      const auto dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+      auto& chunks_for_dict = dict_mapping_[dict_id];
+      chunks_for_dict.insert(ChunkKey{db_id_, table_id, col_idx});
     }
   }
   // do some upfront processing of the columns to determine which can be lazy fetched

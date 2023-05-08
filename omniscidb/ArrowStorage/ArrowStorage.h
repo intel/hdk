@@ -72,6 +72,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
 
+  void materializeDictionary(const int dict_id) override;
+
   TableInfoPtr createTable(const std::string& table_name,
                            const std::vector<ColumnDescription>& columns,
                            const TableOptions& options = TableOptions());
@@ -227,6 +229,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   int next_dict_id_ = 1;
   std::unordered_map<int, std::unique_ptr<TableData>> tables_;
   std::unordered_map<int, std::unique_ptr<DictDescriptor>> dicts_;
+  std::unordered_map<int, std::set<ChunkKey>>
+      dict_mapping_;  // maps (lazy) dictionary to table data
   mutable mapd_shared_mutex data_mutex_;
   mutable mapd_shared_mutex dict_mutex_;
 };
