@@ -80,6 +80,11 @@ jobs:
           sudo dpkg -i intel-igc-core_1.0.12812.24_amd64.deb intel-level-zero-gpu_1.3.25018.24_amd64.deb libigdgmm12_22.3.0_amd64.deb intel-igc-opencl_1.0.12812.24_amd64.deb
           conda install -n omnisci-dev -c conda-forge level-zero-devel pkg-config
 
+      - name: Install clang
+        if: inputs.name == 'clang'
+        run: |
+          conda install -n omnisci-dev -c conda-forge compiler-rt
+
       - name: Restore Maven cache
         uses: actions/cache@v3
         with:

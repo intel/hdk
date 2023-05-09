@@ -1,4 +1,4 @@
-name: Build
+name: Forge
 on:
   workflow_dispatch:
     inputs:
@@ -24,4 +24,4 @@ jobs:
         run: |
           cp recipe/* hdk-feedstock/recipe/
           cd hdk-feedstock
-          python build-locally.py linux_64_c_compiler_version11cuda_compiler_versionNonecxx_compiler_version11numpy1.21python3.9.____cpython
+          python build-locally.py linux_64_c_compiler_version9cuda_compilernvcccuda_compiler_version11.0cxx_compiler_version9numpy1.21python3.9.____cpython

@@ -25,6 +25,13 @@ jobs:
       cuda_compiler_version: 12-0
       options: -DENABLE_CUDA=on
 
+  build-clang:
+    name: Build Clang
+    uses: ./.github/workflows/build.yml
+    with:
+      name: clang
+      options: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
   build-l0:
     name: Build
     uses: ./.github/workflows/build.yml
@@ -53,6 +60,15 @@ jobs:
     needs: build
     uses: ./.github/workflows/test.yml
     with:
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: sanity
+      
+  sanity-clang:
+    name: Sanity test (Gtests, Clang)
+    needs: build-clang
+    uses: ./.github/workflows/test.yml
+    with:
+      name: clang
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: sanity
 
@@ -117,3 +133,4 @@ jobs:
   pytest:
     name: PyHDK (Pytest)
     uses: ./.github/workflows/pytest.yml
+
