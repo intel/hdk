@@ -47,7 +47,6 @@
 #include "QueryEngine/CostModel/Dispatchers/DefaultExecutionPolicy.h"
 #include "QueryEngine/CostModel/Dispatchers/ProportionBasedExecutionPolicy.h"
 #include "QueryEngine/CostModel/Dispatchers/RRExecutionPolicy.h"
-#include "QueryEngine/CostModel/DummyCostModel.h"
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 #include "QueryEngine/Descriptors/QueryFragmentDescriptor.h"
 #include "QueryEngine/DynamicWatchdog.h"
@@ -77,6 +76,8 @@
 #include "Shared/scope.h"
 #include "Shared/threading.h"
 #include "ThirdParty/robin_hood.h"
+
+#include "CostModel/IterativeCostModel.h"
 
 using namespace std::string_literals;
 
@@ -171,6 +172,19 @@ Executor::Executor(const ExecutorId executor_id,
   });
   Executor::initialize_extension_module_sources();
   update_extension_modules();
+
+  if (config_->exec.enable_cost_model) {
+    try {
+      cost_model = std::make_shared<costmodel::IterativeCostModel>();
+      cost_model->calibrate({{ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}});
+    } catch (costmodel::CostModelException& e) {
+      LOG(DEBUG1) << "Cost model will be disabled due to creation error: " << e.what();
+    }
+  }
+}
+
+std::shared_ptr<costmodel::CostModel> Executor::getCostModel() {
+  return cost_model;
 }
 
 void Executor::initialize_extension_module_sources() {
@@ -1628,7 +1642,9 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
           ra_exe_unit_in.query_plan_dag,
           ra_exe_unit_in.hash_table_build_plan_dag,
           ra_exe_unit_in.table_id_to_node_map,
-          ra_exe_unit_in.union_all};
+          ra_exe_unit_in.union_all,
+          ra_exe_unit_in.cost_model,
+          ra_exe_unit_in.templs};
 }
 
 }  // namespace
@@ -1825,6 +1841,84 @@ hdk::ResultSetTable Executor::finishStreamExecution(
   return result;
 }
 
+std::pair<std::unique_ptr<policy::ExecutionPolicy>, ExecutorDeviceType>
+Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
+                                       const ExecutorDeviceType requested_device_type,
+                                       const std::vector<InputTableInfo>& query_infos,
+                                       size_t& max_groups_buffer_entry_guess) {
+  if (needFallbackOnCPU(ra_exe_unit, requested_device_type)) {
+    LOG(DEBUG1) << "Devices Restricted, falling back on CPU";
+    return {std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
+                ExecutorDeviceType::CPU),
+            ExecutorDeviceType::CPU};
+  }
+
+  CHECK(!query_infos.empty());
+  if (!max_groups_buffer_entry_guess) {
+    LOG(DEBUG1) << "The query has failed the first execution attempt because of running "
+                   "out of group by slots. Make the conservative choice: allocate "
+                   "fragment size slots and run on the CPU.";
+    max_groups_buffer_entry_guess = compute_buffer_entry_guess(query_infos);
+    return {std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
+                ExecutorDeviceType::CPU),
+            ExecutorDeviceType::CPU};
+  }
+
+  std::unique_ptr<policy::ExecutionPolicy> exe_policy;
+  auto cfg = config_->exec.heterogeneous;
+
+  if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
+      cfg.enable_heterogeneous_execution && !ra_exe_unit.templs.empty()) {
+    size_t bytes = 0;
+
+    // TODO(bagrorg): how can we get bytes estimation more correctly?
+    for (const auto& e : query_infos) {
+      auto t = e.info;
+      for (const auto& f : t.fragments) {
+        for (const auto& [k, v] : f.getChunkMetadataMapPhysical()) {
+          bytes += v->numBytes();
+        }
+      }
+    }
+
+    LOG(DEBUG1) << "Cost Model enabled, making prediction for templates "
+                << toString(ra_exe_unit.templs) << " for size " << bytes;
+
+    costmodel::QueryInfo qi = {ra_exe_unit.templs, bytes};
+
+    try {
+      exe_policy = ra_exe_unit.cost_model->predict(qi);
+      return {std::move(exe_policy), requested_device_type};
+    } catch (costmodel::CostModelException& e) {
+      LOG(DEBUG1) << "Cost model got an exception: " << e.what();
+    }
+  }
+
+  LOG(DEBUG1) << "Cost Model disabled, template is unknown or error occured: templs="
+              << toString(ra_exe_unit.templs) << " cost_model=" << ra_exe_unit.cost_model
+              << ", cost model in config: "
+              << (config_->exec.enable_cost_model ? "enabled" : "disabled")
+              << ", heterogeneous execution: " << cfg.enable_heterogeneous_execution
+      ? "enabled"
+      : "disabled";
+
+  if (cfg.enable_heterogeneous_execution) {
+    if (cfg.forced_heterogeneous_distribution) {
+      std::map<ExecutorDeviceType, unsigned> distribution{
+          {ExecutorDeviceType::CPU, cfg.forced_cpu_proportion},
+          {ExecutorDeviceType::GPU, cfg.forced_gpu_proportion}};
+      exe_policy = std::make_unique<policy::ProportionBasedExecutionPolicy>(
+          std::move(distribution));
+    } else {
+      exe_policy = std::make_unique<policy::RoundRobinExecutionPolicy>();
+    }
+  } else {
+    exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
+        requested_device_type);
+  }
+  return {std::move(exe_policy), requested_device_type};
+}
+
 hdk::ResultSetTable Executor::executeWorkUnitImpl(
     size_t& max_groups_buffer_entry_guess,
     const bool is_agg,
@@ -1838,22 +1932,8 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     DataProvider* data_provider,
     ColumnCacheMap& column_cache) {
   INJECT_TIMER(Exec_executeWorkUnit);
-  std::unique_ptr<policy::ExecutionPolicy> exe_policy;
-  const auto device_type = getDeviceTypeForTargets(ra_exe_unit, co.device_type);
-  LOG(DEBUG1) << "Device type for targets: " << device_type;
-  CHECK(!query_infos.empty());
-  if (!max_groups_buffer_entry_guess) {
-    LOG(DEBUG1) << "The query has failed the first execution attempt because of running "
-                   "out of group by slots. Make the conservative choice: allocate "
-                   "fragment size slots and run on the CPU.";
-    CHECK(device_type == ExecutorDeviceType::CPU);
-    max_groups_buffer_entry_guess = compute_buffer_entry_guess(query_infos);
-    exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
-        ExecutorDeviceType::CPU);
-  } else {
-    costmodel::DummyCostModel cost_model(device_type, config_->exec.heterogeneous);
-    exe_policy = cost_model.predict(ra_exe_unit);
-  }
+  auto [exe_policy, fallback_device] = getExecutionPolicyForTargets(
+      ra_exe_unit, co.device_type, query_infos, max_groups_buffer_entry_guess);
 
   int8_t crt_min_byte_width{MAX_BYTE_WIDTH_SUPPORTED};
   do {
@@ -1867,7 +1947,6 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
         query_comp_descs_owned;
     std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>
         query_mem_descs_owned;
-
     for (auto dt : exe_policy->devices()) {
       auto query_comp_desc_owned = std::make_unique<QueryCompilationDescriptor>();
       query_comp_desc_owned->setUseGroupByBufferDesc(co.use_groupby_buffer_desc);
@@ -1911,7 +1990,7 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     }
 
     if (eo.just_explain) {
-      return {executeExplain(*query_comp_descs_owned.at(device_type))};
+      return {executeExplain(*query_comp_descs_owned.at(fallback_device))};
     }
 
     for (const auto target_expr : ra_exe_unit.target_exprs) {
@@ -1947,13 +2026,13 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
                                   co,
                                   is_agg,
                                   allow_single_frag_table_opt,
-                                  *query_comp_descs_owned[device_type].get(),
-                                  *query_mem_descs_owned[device_type].get(),
+                                  *query_comp_descs_owned[fallback_device].get(),
+                                  *query_mem_descs_owned[fallback_device].get(),
                                   exe_policy.get(),
                                   available_gpus,
                                   available_cpus);
         }
-        launchKernels(shared_context, std::move(kernels), device_type, co);
+        launchKernels(shared_context, std::move(kernels), fallback_device, co);
       } catch (QueryExecutionError& e) {
         if (eo.with_dynamic_watchdog && interrupted_.load() &&
             e.getErrorCode() == ERR_OUT_OF_TIME) {
@@ -1974,7 +2053,7 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
       try {
         ExecutorDeviceType reduction_device_type = ExecutorDeviceType::CPU;
         if (!config_->exec.heterogeneous.enable_heterogeneous_execution) {
-          reduction_device_type = device_type;
+          reduction_device_type = fallback_device;
         }
         return collectAllDeviceResults(shared_context,
                                        ra_exe_unit,
@@ -2149,6 +2228,15 @@ void Executor::addTransientStringLiterals(
 ExecutorDeviceType Executor::getDeviceTypeForTargets(
     const RelAlgExecutionUnit& ra_exe_unit,
     const ExecutorDeviceType requested_device_type) {
+  if (needFallbackOnCPU(ra_exe_unit, requested_device_type)) {
+    return ExecutorDeviceType::CPU;
+  }
+  
+  return requested_device_type;
+}
+
+bool Executor::needFallbackOnCPU(const RelAlgExecutionUnit& ra_exe_unit,
+                                 const ExecutorDeviceType requested_device_type) {
   for (const auto target_expr : ra_exe_unit.target_exprs) {
     const auto agg_info =
         get_target_info(target_expr, getConfig().exec.group_by.bigint_count);
@@ -2158,15 +2246,15 @@ ExecutorDeviceType Executor::getDeviceTypeForTargets(
            agg_info.agg_kind == hdk::ir::AggType::kSum) &&
           agg_info.agg_arg_type->isFp64()) {
         LOG(DEBUG1) << "Falling back to CPU for AVG or SUM of DOUBLE";
-        return ExecutorDeviceType::CPU;
+        return true;
       }
     }
     if (dynamic_cast<const hdk::ir::RegexpExpr*>(target_expr)) {
       LOG(DEBUG1) << "Falling back to CPU for REGEXP";
-      return ExecutorDeviceType::CPU;
+      return true;
     }
   }
-  return requested_device_type;
+  return false;
 }
 
 namespace {
@@ -2566,8 +2654,11 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
   ScopeGuard pool_guard([&shared_context]() { shared_context.setThreadPool(nullptr); });
 #endif  // HAVE_TBB
 
-  VLOG(1) << "Launching " << kernels.size() << " kernels for query on "
-          << (device_type == ExecutorDeviceType::CPU ? "CPU"s : "GPU"s) << ".";
+  VLOG(1) << "Launching " << kernels.size() << " kernels for query on: ";
+  for (size_t i = 0; i < kernels.size(); i++) {
+    VLOG(1) << "\t" << i << ' ' << (toString(kernels[i])) << ".";
+  }
+
   size_t kernel_idx = 1;
   for (auto& kernel : kernels) {
     CHECK(kernel.get());

@@ -35,7 +35,7 @@ LinearRegression::LinearRegression(std::vector<Detail::Measurement>&& measuremen
 
 LinearRegression::~LinearRegression() = default;
 
-size_t LinearRegression::getExtrapolatedData(size_t bytes) {
+size_t LinearRegression::getExtrapolatedData(size_t bytes) const {
   arma::vec x = {1.0, static_cast<double>(bytes)};
   return static_cast<size_t>(arma::dot(x, pimpl_->weights));
 }

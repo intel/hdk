@@ -80,6 +80,8 @@
 #include "StringDictionary/StringDictionary.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 
+#include "CostModel/CostModel.h"
+
 using QueryCompilationDescriptorOwned = std::unique_ptr<QueryCompilationDescriptor>;
 class QueryMemoryDescriptor;
 using QueryMemoryDescriptorOwned = std::unique_ptr<QueryMemoryDescriptor>;
@@ -279,6 +281,8 @@ class Executor : public StringDictionaryProxyProvider {
     return extension_module_context_.get();
   }
 
+  std::shared_ptr<costmodel::CostModel> getCostModel();
+
   /**
    * Returns pointer to the intermediate tables vector currently stored by this
    * executor.
@@ -461,6 +465,15 @@ class Executor : public StringDictionaryProxyProvider {
   ExecutorDeviceType getDeviceTypeForTargets(
       const RelAlgExecutionUnit& ra_exe_unit,
       const ExecutorDeviceType requested_device_type);
+
+  bool needFallbackOnCPU(const RelAlgExecutionUnit& ra_exe_unit,
+                         const ExecutorDeviceType requested_device_type);
+
+  std::pair<std::unique_ptr<policy::ExecutionPolicy>, ExecutorDeviceType>
+  getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
+                               const ExecutorDeviceType requested_device_type,
+                               const std::vector<InputTableInfo>& query_infos,
+                               size_t& max_groups_buffer_entry_guess);
 
   ResultSetPtr collectAllDeviceResults(
       SharedKernelContext& shared_context,
@@ -971,6 +984,8 @@ class Executor : public StringDictionaryProxyProvider {
 
   int64_t kernel_queue_time_ms_ = 0;
   int64_t compilation_queue_time_ms_ = 0;
+
+  std::shared_ptr<costmodel::CostModel> cost_model;
 
   // Singleton instance used for an execution unit which is a project with window
   // functions.

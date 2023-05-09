@@ -11,29 +11,23 @@
     limitations under the License.
 */
 
-#pragma once
-
-#include "ExtrapolationModel.h"
-
-#include <memory>
+#include "ExtrapolationModelProvider.h"
 
 namespace costmodel {
-
-class LinearRegression : public ExtrapolationModel {
- public:
-  LinearRegression(const std::vector<Detail::Measurement>& measurement);
-
-  LinearRegression(std::vector<Detail::Measurement>&& measurement);
-
-  virtual ~LinearRegression();
-
-  size_t getExtrapolatedData(size_t bytes) const override;
-
- protected:
-  void buildRegressionCoefficients();
-
-  struct PrivateImpl;
-  std::unique_ptr<PrivateImpl> pimpl_;
-};
-
+std::unique_ptr<ExtrapolationModel> ExtrapolationModelProvider::provide(
+    const std::vector<Detail::Measurement>& measurement) {
+#ifdef HAVE_ARMADILLO
+  return std::make_unique<LinearRegression>(measurement);
+#else
+  return std::make_unique<LinearExtrapolation>(measurement);
+#endif
+}
+std::unique_ptr<ExtrapolationModel> ExtrapolationModelProvider::provide(
+    std::vector<Detail::Measurement>&& measurement) {
+#ifdef HAVE_ARMADILLO
+  return std::make_unique<LinearRegression>(std::move(measurement));
+#else
+  return std::make_unique<LinearExtrapolation>(std::move(measurement));
+#endif
+}
 }  // namespace costmodel

@@ -26,6 +26,7 @@
 #ifndef QUERYENGINE_RELALGEXECUTIONUNIT_H
 #define QUERYENGINE_RELALGEXECUTIONUNIT_H
 
+#include "CostModel/CostModel.h"
 #include "Descriptors/InputDescriptors.h"
 #include "RelAlgDagBuilder.h"
 #include "Shared/sqldefs.h"
@@ -142,6 +143,9 @@ struct RelAlgExecutionUnit {
   TableIdToNodeMap table_id_to_node_map{};
   // empty if not a UNION, true if UNION ALL, false if regular UNION
   const std::optional<bool> union_all;
+
+  std::shared_ptr<costmodel::CostModel> cost_model;
+  std::vector<costmodel::AnalyticalTemplate> templs;
 };
 
 std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_unit);

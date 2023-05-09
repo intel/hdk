@@ -8,7 +8,8 @@ EmptyDataSource::EmptyDataSource()
                                   {AnalyticalTemplate::GroupBy,
                                    AnalyticalTemplate::Join,
                                    AnalyticalTemplate::Reduce,
-                                   AnalyticalTemplate::Scan}}) {}
+                                   AnalyticalTemplate::Scan,
+                                   AnalyticalTemplate::Sort}}) {}
 
 Detail::DeviceMeasurements EmptyDataSource::getMeasurements(
     const std::vector<ExecutorDeviceType>& devices,

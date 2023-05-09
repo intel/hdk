@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2022 Intel Corporation
+    Copyright (c) 2023 Intel Corporation
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
@@ -19,17 +19,15 @@
 
 namespace costmodel {
 
-class DummyCostModel : public CostModel {
+class IterativeCostModel : public CostModel {
  public:
-  DummyCostModel(ExecutorDeviceType dt, const HeterogenousConfig& cfg)
-      : CostModel(std::make_unique<EmptyDataSource>()), dt_(dt), cfg_(cfg) {}
+  IterativeCostModel();
+  IterativeCostModel(CostModelConfig config) : CostModel(std::move(config)) {}
 
-  std::unique_ptr<policy::ExecutionPolicy> predict(
-      const RelAlgExecutionUnit& queryDag) override;
+  virtual std::unique_ptr<policy::ExecutionPolicy> predict(QueryInfo query_info) const;
 
  private:
-  const ExecutorDeviceType dt_;
-  const HeterogenousConfig& cfg_;
+  static constexpr size_t optimization_iterations_ = 1024;
 };
 
 }  // namespace costmodel

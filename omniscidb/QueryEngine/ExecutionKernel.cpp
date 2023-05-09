@@ -150,6 +150,10 @@ void ExecutionKernel::run(Executor* executor,
   }
 }
 
+std::string ExecutionKernel::toString() const {
+  return chosen_device_type == ExecutorDeviceType::CPU ? "CPU" : "GPU";
+}
+
 void ExecutionKernel::runImpl(Executor* executor,
                               const size_t thread_idx,
                               SharedKernelContext& shared_context) {

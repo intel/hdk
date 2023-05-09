@@ -17,7 +17,7 @@
 
 namespace costmodel {
 
-size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) {
+size_t LinearExtrapolation::getExtrapolatedData(size_t bytes) const {
   size_t id1, id2;
   Detail::Measurement tmp = {bytes, 0};
 
