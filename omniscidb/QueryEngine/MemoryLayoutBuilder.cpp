@@ -421,7 +421,8 @@ CountDistinctDescriptors init_count_distinct_descriptors(
       CountDistinctImplType count_distinct_impl_type{CountDistinctImplType::HashSet};
       int64_t bitmap_sz_bits{0};
       if (agg_info.agg_kind == hdk::ir::AggType::kApproxCountDistinct) {
-        const auto error_rate = agg_expr->arg1()->as<hdk::ir::Constant>();
+        const auto error_rate =
+            agg_expr->arg1() ? agg_expr->arg1()->as<hdk::ir::Constant>() : nullptr;
         if (error_rate) {
           CHECK(error_rate->type()->isInt32());
           CHECK_GE(error_rate->value().intval, 1);

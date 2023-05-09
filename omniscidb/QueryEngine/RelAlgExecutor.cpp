@@ -989,8 +989,9 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
     if (agg_info.agg_kind != hdk::ir::AggType::kApproxCountDistinct) {
       continue;
     }
-    CHECK(target_expr->is<hdk::ir::AggExpr>());
-    const auto arg = target_expr->as<hdk::ir::AggExpr>()->argShared();
+    auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
+    CHECK(agg_expr);
+    const auto arg = agg_expr->argShared();
     CHECK(arg);
     auto arg_type = arg->type();
     // Avoid calling getExpressionRange for variable length types (string and array),
@@ -1012,7 +1013,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
         get_count_distinct_sub_bitmap_count(bitmap_sz_bits, ra_exe_unit, device_type);
     int64_t approx_bitmap_sz_bits{0};
     const auto error_rate =
-        target_expr->as<hdk::ir::AggExpr>()->arg1()->as<hdk::ir::Constant>();
+        agg_expr->arg1() ? agg_expr->arg1()->as<hdk::ir::Constant>() : nullptr;
     if (error_rate) {
       CHECK(error_rate->type()->isInt32());
       CHECK_GE(error_rate->value().intval, 1);
