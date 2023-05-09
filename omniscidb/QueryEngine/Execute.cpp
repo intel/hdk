@@ -2231,7 +2231,7 @@ ExecutorDeviceType Executor::getDeviceTypeForTargets(
   if (needFallbackOnCPU(ra_exe_unit, requested_device_type)) {
     return ExecutorDeviceType::CPU;
   }
-  
+
   return requested_device_type;
 }
 
