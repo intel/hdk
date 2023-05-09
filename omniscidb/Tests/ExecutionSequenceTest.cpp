@@ -88,6 +88,19 @@ class ExecutionSequenceTest : public ::testing::Test {
 
   ExecutionResult runQuery(std::unique_ptr<QueryDag> dag, bool just_explain = false) {
     auto ra_executor = RelAlgExecutor(getExecutor(), getStorage(), std::move(dag));
+    auto schema_provider = getStorage();
+    auto dbs = schema_provider->listDatabases();
+    // Current JSON format supports a single database only. To support result
+    // sets in SQL queries, we add tables from the ResultSetRegistry using
+    // negative table ids.
+    auto tables = schema_provider->listTables(dbs[0]);
+    auto more_tables = schema_provider->listTables(dbs[0]);
+    for (auto table : more_tables) {
+      LOG(ERROR) << table->toString();
+      for (auto column : schema_provider->listColumns(dbs[0], table->table_id)) {
+        LOG(ERROR) << column->toString();
+      }
+    }
     auto eo = ExecutionOptions::fromConfig(config());
     eo.just_explain = just_explain;
     eo.allow_loop_joins = true;

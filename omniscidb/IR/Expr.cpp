@@ -256,6 +256,7 @@ ExprPtr Expr::decompress() const {
     return makeExpr<UOper>(new_type, contains_agg_, OpType::kCast, shared_from_this());
   } else if (type_->id() == Type::kDate && type_->size() != 8) {
     auto date_type = static_cast<const DateType*>(type_);
+    LOG(ERROR) << "decompress type: " << type_->toString();
     return makeExpr<UOper>(type_->ctx().date64(TimeUnit::kSecond, date_type->nullable()),
                            contains_agg_,
                            OpType::kCast,

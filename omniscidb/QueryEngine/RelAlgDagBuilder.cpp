@@ -129,6 +129,7 @@ const hdk::ir::Type* buildType(hdk::ir::Context& ctx,
     return ctx.timestamp(precisionToTimeUnit(precision), nullable);
   }
   if (type_name == std::string("DATE")) {
+    LOG(ERROR) << "type_name: " << type_name;
     return ctx.date64(hdk::ir::TimeUnit::kSecond, nullable);
   }
   if (type_name == std::string("TIME")) {
@@ -2306,6 +2307,7 @@ class RelAlgDispatcher {
   }
 
   std::vector<TargetMetaInfo> parseTupleType(const rapidjson::Value& tuple_type_arr) {
+    LOG(ERROR) << "ParseTuple? ";
     CHECK(tuple_type_arr.IsArray());
     std::vector<TargetMetaInfo> tuple_type;
     for (auto tuple_type_arr_it = tuple_type_arr.Begin();

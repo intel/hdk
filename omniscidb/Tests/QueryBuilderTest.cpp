@@ -375,6 +375,18 @@ class QueryBuilderTest : public TestSuite {
 
     createTable("withNull", {{"a", ctx().int64()}});
     insertCsvValues("withNull", "1\nNULL");
+
+    LOG(ERROR) << "===========================getStorage()===========================";
+    auto schema_provider = getStorage();
+    auto dbs = schema_provider->listDatabases();
+    auto tables = schema_provider->listTables(dbs[0]);
+    auto more_tables = schema_provider->listTables(dbs[0]);
+    for (auto table : more_tables) {
+      LOG(ERROR) << table->toString();
+      for (auto column : schema_provider->listColumns(dbs[0], table->table_id)) {
+        LOG(ERROR) << "   " << column->toString();
+      }
+    }
   }
 
   static void TearDownTestSuite() {
@@ -546,15 +558,36 @@ TEST_F(QueryBuilderTest, DateToInt) {
   LOG(ERROR) << "res: " << toArrow(res)->ToString();
   compare_res_data(res, std::vector<int32_t>({946684800, 1426636800}));
 
-  dag = tinfo_a.proj(tinfo_a.ref("col_date")).finalize();
+  dag = tinfo_a.proj("col_date").finalize();
   res = runQuery(std::move(dag));
-  LOG(ERROR) << "res: " << res.toString();
-  LOG(ERROR) << "res: " << toArrow(res)->ToString();
+  LOG(ERROR) << "second res: " << res.toString();
+  LOG(ERROR) << "second res: " << toArrow(res)->ToString();
   compare_res_data(
       res,
-      std::vector<int64_t>(
-          {dateTimeParse<hdk::ir::Type::kDate>("2000-01-01", TimeUnit::kDay),
-           dateTimeParse<hdk::ir::Type::kDate>("2015-03-18", TimeUnit::kDay)}));
+      std::vector<int32_t>(
+          {dateTimeParse<int32_t, hdk::ir::Type::kDate>("2000-01-01", TimeUnit::kDay),
+           dateTimeParse<int32_t, hdk::ir::Type::kDate>("2015-03-18", TimeUnit::kDay)}));
+}
+
+TEST_F(QueryBuilderTest, DateToInt2) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto tinfo_a = builder.scan("test_date");
+
+  auto dag = tinfo_a.proj("col_date").finalize();
+  auto res = runQuery(std::move(dag));
+  LOG(ERROR) << "second res: " << res.toString();
+  LOG(ERROR) << "second res: " << toArrow(res)->ToString();
+  compare_res_data(
+      res,
+      std::vector<int32_t>(
+          {dateTimeParse<int32_t, hdk::ir::Type::kDate>("2000-01-01", TimeUnit::kDay),
+           dateTimeParse<int32_t, hdk::ir::Type::kDate>("2015-03-18", TimeUnit::kDay)}));
+
+  dag = tinfo_a.finalize();
+  res = runQuery(std::move(dag));
+  LOG(ERROR) << "second res: " << res.toString();
+  LOG(ERROR) << "second res: " << toArrow(res)->ToString();
 }
 
 TEST_F(QueryBuilderTest, Arithmetics2) {

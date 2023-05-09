@@ -345,6 +345,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
   TableInfoPtr res;
   int table_id;
   mapd_unique_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  LOG(ERROR) << "Table ------- " << table_name << " -------";
   size_t next_col_idx = 0;
   {
     mapd_unique_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
@@ -395,8 +396,10 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
           type = elem_type;
         }
       }
+      LOG(ERROR) << "adding col info " << type->toString();
       auto col_info = addColumnInfo(
           db_id_, table_id, columnId(next_col_idx++), col.name, type, false);
+      LOG(ERROR) << "added col info " << col_info->toString();
     }
     addRowidColumn(db_id_, table_id, columnId(next_col_idx++));
   }
@@ -418,6 +421,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
     table.fragment_size = options.fragment_size;
     table.schema = schema;
   }
+  LOG(ERROR) << "table info " << res->toString() << " schema: " << schema->ToString(true);
 
   return res;
 }

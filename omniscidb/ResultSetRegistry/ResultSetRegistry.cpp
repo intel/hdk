@@ -124,7 +124,7 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   addRowidColumn(db_id_, table_id, columnId(first_rs->colCount()));
 
   // TODO: lazily compute row count and try to avoid global write
-  // locks for that
+  // locks for Date
   auto table_data = std::make_unique<TableData>();
   size_t row_count = 0;
   for (auto& rs : table.results()) {
