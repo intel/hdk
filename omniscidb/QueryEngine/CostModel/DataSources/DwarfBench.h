@@ -38,8 +38,8 @@ class DwarfBenchDataSource : public DataSource {
       const std::vector<AnalyticalTemplate>& templates) override;
 
  private:
-  const size_t dwarfBenchIterations_ = 10;
-  const std::vector<size_t> dwarfBenchInputSizes_ = {256, 512, 1024, 2048};
+  const size_t dwarf_bench_iterations_ = 10;
+  const std::vector<size_t> dwarf_bench_input_sizes_ = {256, 512, 1024, 2048};
 
   std::vector<Detail::Measurement> measureTemplateOnDevice(ExecutorDeviceType device,
                                                            AnalyticalTemplate templ);

@@ -29,7 +29,7 @@ class ExtrapolationModel {
       : measurement_(std::move(measurement)) {}
   virtual ~ExtrapolationModel() = default;
 
-  virtual size_t getExtrapolatedData(size_t bytes) = 0;
+  virtual size_t getExtrapolatedData(size_t bytes) const = 0;
 
  protected:
   std::vector<Detail::Measurement> measurement_;

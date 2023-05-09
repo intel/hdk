@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2022 Intel Corporation
+    Copyright (c) 2023 Intel Corporation
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
@@ -11,22 +11,23 @@
     limitations under the License.
 */
 
-#include "DataSource.h"
+#pragma once
+
+#include <memory>
+
+#include "LinearExtrapolation.h"
+
+#ifdef HAVE_ARMADILLO
+#include "LinearRegression.h"
+#endif
 
 namespace costmodel {
-
-DataSource::DataSource(const DataSourceConfig& config) : config_(config) {}
-
-const std::string& DataSource::getName() {
-  return config_.data_source_name;
-}
-
-bool DataSource::isDeviceSupported(ExecutorDeviceType device) {
-  return config_.supported_devices.find(device) != config_.supported_devices.end();
-}
-
-bool DataSource::isTemplateSupported(AnalyticalTemplate templ) {
-  return config_.supported_templates.find(templ) != config_.supported_templates.end();
-}
+class ExtrapolationModelProvider {
+ public:
+  std::unique_ptr<ExtrapolationModel> provide(
+      const std::vector<Detail::Measurement>& measurement);
+  std::unique_ptr<ExtrapolationModel> provide(
+      std::vector<Detail::Measurement>&& measurement);
+};
 
 }  // namespace costmodel

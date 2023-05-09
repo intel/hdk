@@ -24,7 +24,7 @@ class LinearExtrapolation : public ExtrapolationModel {
   LinearExtrapolation(std::vector<Detail::Measurement>&& measurement)
       : ExtrapolationModel(std::move(measurement)) {}
 
-  size_t getExtrapolatedData(size_t bytes) override;
+  size_t getExtrapolatedData(size_t bytes) const override;
 };
 
 }  // namespace costmodel

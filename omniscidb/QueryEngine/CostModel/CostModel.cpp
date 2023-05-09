@@ -14,50 +14,77 @@
 #include "CostModel.h"
 #include "ExtrapolationModels/LinearExtrapolation.h"
 
+#ifdef HAVE_ARMADILLO
+#include "ExtrapolationModels/LinearRegression.h"
+#endif
+
 namespace costmodel {
 
-CostModel::CostModel(std::unique_ptr<DataSource> _dataSource)
-    : dataSource_(std::move(_dataSource)) {
+CostModel::CostModel(CostModelConfig config) : config_(std::move(config)) {
   for (AnalyticalTemplate templ : templates_) {
-    if (!dataSource_->isTemplateSupported(templ))
-      throw CostModelException("template " + templateToString(templ) +
-                               " not supported in " + dataSource_->getName() +
-                               " data source");
+    if (!config_.data_source->isTemplateSupported(templ))
+      throw CostModelException("template " + toString(templ) + " not supported in " +
+                               config_.data_source->getName() + " data source");
   }
 
   for (ExecutorDeviceType device : devices_) {
-    if (!dataSource_->isDeviceSupported(device))
+    if (!config_.data_source->isDeviceSupported(device))
       throw CostModelException("device " + deviceToString(device) + " not supported in " +
-                               dataSource_->getName() + " data source");
+                               config_.data_source->getName() + " data source");
   }
 }
 
 void CostModel::calibrate(const CaibrationConfig& conf) {
-  std::lock_guard<std::mutex> g{latch_};
+  std::unique_lock<std::shared_mutex> l(latch_);
 
   Detail::DeviceMeasurements dm;
 
   try {
-    dm = dataSource_->getMeasurements(conf.devices, templates_);
+    dm = config_.data_source->getMeasurements(conf.devices, templates_);
   } catch (const std::exception& e) {
     LOG(ERROR) << "Cost model calibration failure: " << e.what();
     return;
   }
 
-  for (const auto& dmEntry : dm) {
-    ExecutorDeviceType device = dmEntry.first;
+  for (const auto& dm_entry : dm) {
+    ExecutorDeviceType device = dm_entry.first;
 
-    for (auto& templateMeasurement : dmEntry.second) {
-      AnalyticalTemplate templ = templateMeasurement.first;
+    for (auto& template_measurement : dm_entry.second) {
+      AnalyticalTemplate templ = template_measurement.first;
       dp_[device][templ] =
-          std::make_unique<LinearExtrapolation>(std::move(templateMeasurement.second));
+          extrapolation_provider_.provide(std::move(template_measurement.second));
     }
   }
 }
 
-const std::vector<AnalyticalTemplate> CostModel::templates_ = {GroupBy,
-                                                               Join,
-                                                               Scan,
-                                                               Reduce};
+std::vector<CostModel::DeviceExtrapolations> CostModel::getExtrapolations(
+    const std::vector<ExecutorDeviceType>& devices,
+    const std::vector<AnalyticalTemplate>& templs) const {
+  std::vector<DeviceExtrapolations> devices_extrapolations;
+  for (ExecutorDeviceType device : devices) {
+    auto device_measurements_it = dp_.find(device);
+    if (device_measurements_it == dp_.end()) {
+      throw CostModelException("there is no " + deviceToString(device) +
+                               " in measured data");
+    }
+    std::vector<std::shared_ptr<ExtrapolationModel>> extrapolations;
+
+    for (AnalyticalTemplate templ : templs) {
+      auto model_it = device_measurements_it->second.find(templ);
+      if (model_it == device_measurements_it->second.end()) {
+        throw CostModelException("there is no " + toString(templ) +
+                                 " in measured data for " + deviceToString(device));
+      }
+
+      extrapolations.push_back(model_it->second);
+    }
+
+    devices_extrapolations.push_back({device, std::move(extrapolations)});
+  }
+
+  return devices_extrapolations;
+}
+
+const std::vector<AnalyticalTemplate> CostModel::templates_ = {Scan, Sort, Join, GroupBy};
 
 }  // namespace costmodel

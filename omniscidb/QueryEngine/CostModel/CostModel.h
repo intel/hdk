@@ -14,15 +14,14 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 
 #include "DataSources/DataSource.h"
-#include "ExtrapolationModels/ExtrapolationModel.h"
+#include "ExtrapolationModels/ExtrapolationModelProvider.h"
 #include "Measurements.h"
 
 #include "Dispatchers/ExecutionPolicy.h"
 #include "QueryEngine/CompilationOptions.h"
-#include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 
 namespace costmodel {
 
@@ -30,21 +29,41 @@ struct CaibrationConfig {
   std::vector<ExecutorDeviceType> devices;
 };
 
+struct QueryInfo {
+  std::vector<AnalyticalTemplate> templs;
+  size_t bytes_size;
+};
+
+struct CostModelConfig {
+  std::unique_ptr<DataSource> data_source;
+};
+
 using TemplatePredictions =
-    std::unordered_map<AnalyticalTemplate, std::unique_ptr<ExtrapolationModel>>;
+    std::unordered_map<AnalyticalTemplate, std::shared_ptr<ExtrapolationModel>>;
 using DevicePredictions = std::unordered_map<ExecutorDeviceType, TemplatePredictions>;
 
 class CostModel {
  public:
-  CostModel(std::unique_ptr<DataSource> _dataSource);
+  CostModel(CostModelConfig config);
   virtual ~CostModel() = default;
 
   virtual void calibrate(const CaibrationConfig& conf);
   virtual std::unique_ptr<policy::ExecutionPolicy> predict(
-      const RelAlgExecutionUnit& queryDag) = 0;
+      QueryInfo query_info) const = 0;
 
  protected:
-  std::unique_ptr<DataSource> dataSource_;
+  struct DeviceExtrapolations {
+    ExecutorDeviceType device;
+    std::vector<std::shared_ptr<ExtrapolationModel>> extrapolations;
+  };
+
+  std::vector<DeviceExtrapolations> getExtrapolations(
+      const std::vector<ExecutorDeviceType>& devices,
+      const std::vector<AnalyticalTemplate>& templs) const;
+
+  CostModelConfig config_;
+
+  ExtrapolationModelProvider extrapolation_provider_;
 
   DevicePredictions dp_;
 
@@ -53,10 +72,10 @@ class CostModel {
   std::vector<ExecutorDeviceType> devices_ = {ExecutorDeviceType::CPU,
                                               ExecutorDeviceType::GPU};
 
-  std::mutex latch_;
+  mutable std::shared_mutex latch_;
 };
 
-class CostModelException : std::runtime_error {
+class CostModelException : public std::runtime_error {
  public:
   CostModelException(const std::string& msg)
       : std::runtime_error("CostModel exception: " + msg){};

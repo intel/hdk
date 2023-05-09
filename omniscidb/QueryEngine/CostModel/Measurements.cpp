@@ -2,7 +2,7 @@
 
 namespace costmodel {
 
-std::string templateToString(AnalyticalTemplate templ) {
+std::string toString(AnalyticalTemplate templ) {
   switch (templ) {
     case AnalyticalTemplate::Join:
       return "Join";

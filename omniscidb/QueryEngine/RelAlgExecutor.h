@@ -28,6 +28,7 @@
 #include "QueryEngine/RelAlgSchemaProvider.h"
 #include "QueryEngine/SpeculativeTopN.h"
 #include "QueryEngine/StreamingTopN.h"
+#include "QueryEngine/Visitors/TemplateAggregationVisitor.h"
 #include "Shared/scope.h"
 
 #include <ctime>
@@ -247,6 +248,8 @@ class RelAlgExecutor {
   std::optional<std::function<void()>> post_execution_callback_;
 
   std::shared_ptr<StreamExecutionContext> stream_execution_context_;
+
+  TemplateAggregationVisitor templVisitor;
 
   friend class PendingExecutionClosure;
 };

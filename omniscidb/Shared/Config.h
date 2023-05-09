@@ -107,6 +107,8 @@ struct ExecutionConfig {
 
   bool materialize_inner_join_tables = true;
   std::string initialize_with_gpu_vendor = "";
+
+  bool enable_cost_model = false;
 };
 
 struct FilterPushdownConfig {
