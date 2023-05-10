@@ -206,11 +206,17 @@ class CorrAggregate final : public CompoundAggregate {
         builder_.ifThenElse(x_cnt.eq(0), builder_.nullCst(x_cnt.type()), x_cnt);
     auto y_cnt_or_null =
         builder_.ifThenElse(y_cnt.eq(0), builder_.nullCst(y_cnt.type()), y_cnt);
+    // In case of integer input, we compute sums in INT64 for better precision
+    // but move to FP64 here to avoid overflows in multiplications.
+    auto sum_x_fp = sum_x.cast(ctx_.fp64());
+    auto sum_y_fp = sum_y.cast(ctx_.fp64());
+    auto sum_quad_x_fp = sum_quad_x.cast(ctx_.fp64());
+    auto sum_quad_y_fp = sum_quad_y.cast(ctx_.fp64());
 
-    auto den1 = x_cnt_or_null * sum_quad_x - sum_x * sum_x;
-    auto den2 = y_cnt_or_null * sum_quad_y - sum_y * sum_y;
+    auto den1 = x_cnt_or_null * sum_quad_x_fp - sum_x_fp * sum_x_fp;
+    auto den2 = y_cnt_or_null * sum_quad_y_fp - sum_y_fp * sum_y_fp;
     auto den = den1.mul(den2).pow(0.5);
-    auto corr = (avg_x_mul_y * x_cnt_or_null * y_cnt_or_null - sum_x * sum_y) / den;
+    auto corr = (avg_x_mul_y * x_cnt_or_null * y_cnt_or_null - sum_x_fp * sum_y_fp) / den;
 
     reduce_proj_exprs.emplace_back(corr.expr());
   }
