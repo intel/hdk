@@ -37,6 +37,9 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "Shared/funcannotations.h"
+RUNTIME_EXPORT bool g_lazy_materialize_dictionaries{false};
+
 using namespace std::string_literals;
 
 namespace {
@@ -147,6 +150,13 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
           key[CHUNK_KEY_DB_IDX], key[CHUNK_KEY_TABLE_IDX], key[CHUNK_KEY_COLUMN_IDX])
           ->type;
 
+  if (col_type->isExtDictionary()) {
+    auto dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto dict_descriptor = getDictMetadata(
+        dict_id);  // this will force materialize the dictionary. it is thread safe
+    CHECK(dict_descriptor);
+  }
+
   if (!col_type->isVarLen()) {
     size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
     size_t frag_idx = static_cast<size_t>(key[CHUNK_KEY_FRAGMENT_IDX] - 1);
@@ -156,7 +166,8 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
     size_t rows_to_fetch = num_bytes ? num_bytes / elem_size : frag.row_count;
     const auto* fixed_type =
         dynamic_cast<const arrow::FixedWidthType*>(table.col_data[col_idx]->type().get());
-    CHECK(fixed_type);
+    CHECK(fixed_type) << table.col_data[col_idx]->type()->ToString() << " (table "
+                      << key[CHUNK_KEY_TABLE_IDX] << ", column " << col_idx << ")";
     size_t arrow_elem_size = fixed_type->bit_width() / 8;
     // For fixed size arrays we simply use elem type in arrow and therefore have to scale
     // to get a proper slice.
@@ -330,13 +341,153 @@ TableFragmentsInfo ArrowStorage::getEmptyTableMetadata(int table_id) const {
   return res;
 }
 
-const DictDescriptor* ArrowStorage::getDictMetadata(int dict_id, bool /*load_dict*/) {
+const DictDescriptor* ArrowStorage::getDictMetadata(int dict_id, bool load_dict) {
   mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   CHECK_EQ(getSchemaId(dict_id), schema_id_);
   if (dicts_.count(dict_id)) {
-    return dicts_.at(dict_id).get();
+    auto dict = dicts_.at(dict_id).get();
+    CHECK(dict);
+    if (!dict->is_materialized && load_dict) {
+      std::lock_guard<std::mutex> materialization_lock(dict->mutex);
+      // after we get the lock, check the atomic again
+      if (!dict->is_materialized) {
+        materializeDictionary(dict);
+      }
+    }
+    return dict->dict_descriptor.get();
   }
   return nullptr;
+}
+
+void ArrowStorage::materializeDictionary(DictionaryData* dict) {
+  CHECK(dict);
+  CHECK(!dict->table_ids.empty());
+
+  const auto dict_desc = dict->dict_descriptor.get();
+  CHECK(dict_desc);
+  auto* string_dict = dict_desc->stringDict.get();
+  CHECK(string_dict);
+  const int elem_size = dict_desc->dictNBits / 8;
+
+  for (const auto table_id : dict->table_ids) {
+    auto& table = *tables_.at(table_id);
+    mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
+    mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
+    if (table.row_count == 0) {
+      // skip empty tables
+      continue;
+    }
+    auto col_ids = dict->table_ids_to_column_ids.at(table_id);
+    CHECK(!col_ids.empty());
+
+    for (const auto col_id : col_ids) {
+      CHECK_LT(col_id, int(table.col_data.size()))
+          << "(" << table_id << ", " << col_id << ")";
+      auto col_data = table.col_data[col_id];
+      CHECK(col_data);
+
+      if (col_data->type() != arrow::utf8()) {
+        VLOG(1) << "Skipping dictionary materialization for already materialized column "
+                << col_id << " in table " << table_id;
+        continue;
+      }
+
+      arrow::ArrayVector col_indices_data;
+      const auto& chunks = col_data->chunks();
+      for (const auto& crt_chunk : chunks) {
+        auto col_strings =
+            std::static_pointer_cast<arrow::StringArray>(crt_chunk->Slice(0));
+        CHECK(col_strings);
+
+        const size_t bulk_size = static_cast<size_t>(col_strings->length());
+
+        // dictionary conversion
+        std::vector<std::string_view> bulk(bulk_size);
+        for (size_t j = 0; j < bulk_size; j++) {
+          if (!col_strings->IsNull(j)) {
+            auto view = col_strings->GetView(j);
+            bulk[j] = std::string_view(view.data(), view.length());
+          }
+        }
+
+        std::shared_ptr<arrow::Array> indices_chunk;
+        if (elem_size == 4) {
+          // not an encoded dictionary
+          std::shared_ptr<arrow::Buffer> indices_buf;
+          auto res = arrow::AllocateBuffer(bulk_size * 4);
+          CHECK(res.ok());
+          indices_buf = std::move(res).ValueOrDie();
+          auto raw_data = reinterpret_cast<int32_t*>(indices_buf->mutable_data());
+          string_dict->getOrAddBulk(bulk, raw_data);
+          indices_chunk = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
+        } else {
+          // encoded
+          std::vector<int32_t> indices_buffer(bulk_size);
+          string_dict->getOrAddBulk(bulk, indices_buffer.data());
+
+          // create arrow buffer of encoded size and copy into it
+          std::shared_ptr<arrow::Buffer> encoded_indices_buf;
+          auto res = arrow::AllocateBuffer(bulk_size * elem_size);
+          CHECK(res.ok());
+          encoded_indices_buf = std::move(res).ValueOrDie();
+          switch (elem_size) {
+            case 1: {
+              auto encoded_indices_buf_ptr =
+                  reinterpret_cast<int8_t*>(encoded_indices_buf->mutable_data());
+              CHECK(encoded_indices_buf_ptr);
+              for (size_t i = 0; i < bulk_size; i++) {
+                encoded_indices_buf_ptr[i] =
+                    indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
+                            indices_buffer[i] > std::numeric_limits<uint8_t>::max()
+                        ? std::numeric_limits<uint8_t>::max()
+                        : indices_buffer[i];
+              }
+              indices_chunk =
+                  std::make_shared<arrow::Int8Array>(bulk_size, encoded_indices_buf);
+              break;
+            }
+            case 2: {
+              auto encoded_indices_buf_ptr =
+                  reinterpret_cast<int16_t*>(encoded_indices_buf->mutable_data());
+              CHECK(encoded_indices_buf_ptr);
+              for (size_t i = 0; i < bulk_size; i++) {
+                encoded_indices_buf_ptr[i] =
+                    indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
+                            indices_buffer[i] > std::numeric_limits<uint16_t>::max()
+                        ? std::numeric_limits<uint16_t>::max()
+                        : indices_buffer[i];
+              }
+              indices_chunk =
+                  std::make_shared<arrow::Int16Array>(bulk_size, encoded_indices_buf);
+              break;
+              break;
+            }
+            default:
+              LOG(FATAL) << "Unrecognized element size " << elem_size;
+          }
+        }
+        CHECK(indices_chunk);
+        col_indices_data.push_back(indices_chunk);
+      }
+
+      dict_lock.unlock();
+
+      CHECK_EQ(col_indices_data.size(), chunks.size());
+      auto new_col_data = arrow::ChunkedArray::Make(col_indices_data).ValueOrDie();
+
+      VLOG(1) << "Materialized string dictionary for column " << col_id << " in table "
+              << table_id;
+      for (auto& frag : table.fragments) {
+        CHECK_LT(col_id, frag.metadata.size());
+        auto& meta = frag.metadata[col_id];
+        meta->fillChunkStats(
+            computeStats(new_col_data->Slice(frag.offset, frag.row_count), dict->type));
+      }
+
+      table.col_data[col_id] = new_col_data;
+    }  // per column
+  }    // per table
+  dict->is_materialized = true;
 }
 
 TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
@@ -364,23 +515,42 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
         auto dict_type = elem_type->as<hdk::ir::ExtDictionaryType>();
         auto sharing_id = dict_type->dictId();
         if (sharing_id < 0 && dict_ids.count(sharing_id)) {
-          elem_type = ctx_.extDict(
-              dict_type->elemType(), dict_ids.at(sharing_id), dict_type->size());
+          const auto dict_id = dict_ids.at(sharing_id);
+          elem_type = ctx_.extDict(dict_type->elemType(), dict_id, dict_type->size());
+          auto* dict_data = dicts_.at(dict_id).get();
+          dict_data->addTableColumnPair(table_id, next_col_idx);
         } else if (sharing_id <= 0) {
           if (next_dict_id_ > MAX_DB_ID) {
             throw std::runtime_error("Dictionary count limit exceeded.");
           }
 
           int dict_id = addSchemaIdChecked(next_dict_id_++, schema_id_);
-          auto dict_desc = std::make_unique<DictDescriptor>(
-              db_id_, dict_id, col.name, 32, true, 1, table_name, true);
+          auto dict_desc =
+              std::make_unique<DictDescriptor>(db_id_,
+                                               dict_id,
+                                               col.name,
+                                               /*nbits=*/dict_type->size() * 8,
+                                               /*is_shared=*/true,
+                                               /*refcount=*/1,
+                                               table_name,
+                                               /*temp=*/true);
           dict_desc->stringDict =
               std::make_shared<StringDictionary>(DictRef{db_id_, dict_id});
           if (sharing_id < 0) {
             dict_ids.emplace(sharing_id, dict_id);
           }
-          dicts_.emplace(dict_id, std::move(dict_desc));
+          if (dicts_.find(dict_id) == dicts_.end()) {
+            auto dict_data_owned =
+                std::make_unique<DictionaryData>(std::move(dict_desc), dict_type);
+            CHECK(dicts_.emplace(dict_id, std::move(dict_data_owned)).second);
+          }
+          auto* dict_data = dicts_.at(dict_id).get();
+          dict_data->addTableColumnPair(table_id, next_col_idx);
           elem_type = ctx_.extDict(dict_type->elemType(), dict_id, dict_type->size());
+        } else {
+          CHECK_GT(sharing_id, 0);
+          auto* dict_data = dicts_.at(sharing_id).get();
+          dict_data->addTableColumnPair(table_id, next_col_idx);
         }
 
         if (type->isFixedLenArray()) {
@@ -488,6 +658,20 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     frag.metadata.resize(at->columns().size());
   }
 
+  std::vector<bool> lazy_fetch_cols(at->columns().size(), false);
+  if (g_lazy_materialize_dictionaries) {
+    VLOG(1) << "Appending arrow table with lazy dictionary materialization enabled";
+    for (size_t col_idx = 0; col_idx < at->columns().size(); col_idx++) {
+      auto col_info = getColumnInfo(db_id_, table_id, columnId(col_idx));
+      CHECK(col_info);
+      auto col_type = col_info->type;
+      auto col_arr = at->column(col_idx);
+      if (col_type->isExtDictionary() && col_arr->type()->id() == arrow::Type::STRING) {
+        lazy_fetch_cols[col_idx] = true;
+      }
+    }
+  }
+
   mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   threading::parallel_for(
       threading::blocked_range(0, (int)at->columns().size()), [&](auto range) {
@@ -504,16 +688,16 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                                      col_type->toString());
           }
 
-          StringDictionary* dict = nullptr;
+          DictionaryData* dict_data = nullptr;
           auto elem_type =
               col_type->isArray()
                   ? dynamic_cast<const hdk::ir::ArrayBaseType*>(col_type)->elemType()
                   : col_type;
           if (elem_type->isExtDictionary()) {
-            dict = dicts_
-                       .at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(elem_type)
-                               ->dictId())
-                       ->stringDict.get();
+            dict_data = dicts_
+                            .at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(elem_type)
+                                    ->dictId())
+                            .get();
           }
 
           if (col_type->isDecimal()) {
@@ -521,17 +705,24 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
           } else if (col_type->isExtDictionary()) {
             switch (col_arr->type()->id()) {
               case arrow::Type::STRING:
-                col_arr = createDictionaryEncodedColumn(dict, col_arr, col_type);
+                if (!g_lazy_materialize_dictionaries) {
+                  col_arr = createDictionaryEncodedColumn(
+                      dict_data->dict()->stringDict.get(), col_arr, col_type);
+                }
                 break;
               case arrow::Type::DICTIONARY:
-                col_arr = convertArrowDictionary(dict, col_arr, col_type);
+                col_arr = convertArrowDictionary(
+                    dict_data->dict()->stringDict.get(), col_arr, col_type);
                 break;
               default:
                 CHECK(false);
             }
           } else if (col_type->isString()) {
           } else {
-            col_arr = replaceNullValues(col_arr, col_type, dict);
+            col_arr = replaceNullValues(
+                col_arr,
+                col_type,
+                dict_data ? dict_data->dict()->stringDict.get() : nullptr);
           }
 
           col_data[col_idx] = col_arr;
@@ -571,9 +762,15 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                     auto meta = std::make_shared<ChunkMetadata>(
                         col_info->type, num_bytes, frag.row_count);
 
-                    meta->fillChunkStats(computeStats(
-                        col_arr->Slice(frag.offset, frag.row_count * elems_count),
-                        col_type));
+                    if (!lazy_fetch_cols[col_idx]) {
+                      meta->fillChunkStats(computeStats(
+                          col_arr->Slice(frag.offset, frag.row_count * elems_count),
+                          col_type));
+                    } else {
+                      int32_t min = 0;
+                      int32_t max = static_cast<int32_t>(col_arr->length());
+                      meta->fillChunkStats(min, max, /*has_nulls=*/true);
+                    }
                     frag.metadata[col_idx] = meta;
                   }
                 });  // each fragment
@@ -1098,4 +1295,13 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseParquetFile(
   }
 
   return table;
+}
+
+ArrowStorage::DictionaryData::DictionaryData(
+    std::unique_ptr<DictDescriptor>&& dict_descriptor,
+    const hdk::ir::ExtDictionaryType* type)
+    : dict_descriptor(std::move(dict_descriptor)), type(type) {
+  if (!g_lazy_materialize_dictionaries) {
+    is_materialized = true;
+  }
 }
