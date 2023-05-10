@@ -65,7 +65,16 @@ if(DEFINED ENV{CONDA_PREFIX})
   set(ENABLE_CONDA ON)
   set(CMAKE_SYSROOT "$ENV{CONDA_BUILD_SYSROOT}")
   list(APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}")
-  file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" CMAKE_INSTALL_PREFIX)
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    # When conda build is running CONDA_PREFIX points to build env
+    # while install should happen to host env to detect new files. If
+    # CMAKE_INSTALL_PREFIX is already defined to point to host env we
+    # should not override it here but we override the default value
+    # /usr/local (C:\Program Files) to conda environment location to
+    # execute in CI.
+    file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} CACHE PATH "..." FORCE)
+  endif()
 endif()
 
 string(TIMESTAMP HDK_BUILD_DATE "%Y%m%d")
