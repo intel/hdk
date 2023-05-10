@@ -146,6 +146,25 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     size_t row_count = 0;
   };
 
+  struct DictionaryData {
+    std::mutex mutex;
+    std::unique_ptr<DictDescriptor> dict_descriptor;
+    const hdk::ir::ExtDictionaryType* type;
+    std::set<int> table_ids;
+    std::unordered_map<int, std::set<int>> table_ids_to_column_ids;
+    std::atomic<bool> is_materialized{false};
+
+    DictionaryData(std::unique_ptr<DictDescriptor>&& dict_descriptor,
+                   const hdk::ir::ExtDictionaryType* type);
+
+    void addTableColumnPair(const int table_id, const int col_id) {
+      table_ids.insert(table_id);
+      CHECK(table_ids_to_column_ids[table_id].insert(col_id).second);
+    }
+
+    DictDescriptor* dict() const { return dict_descriptor.get(); }
+  };
+
   class ArrowChunkDataToken : public Data_Namespace::AbstractDataToken {
    public:
     ArrowChunkDataToken(std::shared_ptr<arrow::Array> chunk,
@@ -212,12 +231,14 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                             size_t elem_size,
                             size_t num_bytes) const;
 
+  void materializeDictionary(DictionaryData* dict_data);
+
   int db_id_;
   int schema_id_;
   int next_table_id_ = 1;
   int next_dict_id_ = 1;
   std::unordered_map<int, std::unique_ptr<TableData>> tables_;
-  std::unordered_map<int, std::unique_ptr<DictDescriptor>> dicts_;
+  std::unordered_map<int, std::unique_ptr<DictionaryData>> dicts_;
   mutable mapd_shared_mutex data_mutex_;
   mutable mapd_shared_mutex dict_mutex_;
 };
