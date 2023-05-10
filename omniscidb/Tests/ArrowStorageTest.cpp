@@ -778,8 +778,10 @@ TEST_F(ArrowStorageTest, DropTable_SharedDicts) {
     ASSERT_EQ(storage.getColumnInfo(*col_info), nullptr);
   }
 
-  ASSERT_NE(storage.getDictMetadata(getDictId(col1_info->type)), nullptr);
-  ASSERT_EQ(storage.getDictMetadata(getDictId(col2_info->type)), nullptr);
+  ASSERT_NE(storage.getDictMetadata(getDictId(col1_info->type), /*load_dict=*/false),
+            nullptr);
+  ASSERT_EQ(storage.getDictMetadata(getDictId(col2_info->type), /*load_dict=*/false),
+            nullptr);
 }
 
 void Test_ImportCsv_Numbers(const std::string& file_name,
