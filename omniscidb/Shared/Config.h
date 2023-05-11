@@ -45,6 +45,7 @@ struct GroupByConfig {
   bool enable_gpu_smem_group_by = true;
   bool enable_gpu_smem_non_grouped_agg = true;
   bool enable_gpu_smem_grouped_non_count_agg = true;
+  bool enable_cpu_multifrag_kernels = true;
   size_t gpu_smem_threshold = 4096;
   unsigned hll_precision_bits = 11;
   size_t baseline_threshold = 1'000'000;

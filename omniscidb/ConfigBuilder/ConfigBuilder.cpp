@@ -152,6 +152,12 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->implicit_value(true),
       "Enable using GPU shared memory for grouped non-count aggregate queries.");
   opt_desc.add_options()(
+      "enable-cpu-groupby-multifrag-kernels",
+      po::value<bool>(&config_->exec.group_by.enable_cpu_multifrag_kernels)
+          ->default_value(config_->exec.group_by.enable_cpu_multifrag_kernels)
+          ->implicit_value(true),
+      "Enable multifragment kernels for groupby queries on CPU.");
+  opt_desc.add_options()(
       "gpu-shared-mem-threshold",
       po::value<size_t>(&config_->exec.group_by.gpu_smem_threshold)
           ->default_value(config_->exec.group_by.gpu_smem_threshold),
