@@ -1163,7 +1163,8 @@ size_t ResultSet::getNDVEstimator() const {
   if (ratio == 0.) {
     LOG(WARNING)
         << "Failed to get a high quality cardinality estimation, falling back to "
-           "approximate group by buffer size guess.";
+           "approximate group by buffer size guess. Estimator buffer size is "
+        << total_bits << " bits.";
     return 0;
   }
   return -static_cast<double>(total_bits) * log(ratio);

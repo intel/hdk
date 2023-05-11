@@ -124,7 +124,11 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
       }
       // For zero or high cardinalities, use baseline layout.
       if (!cardinality || cardinality > baseline_threshold) {
-        return {QueryDescriptionType::GroupByBaselineHash, 0, 0, 0, false};
+        return {QueryDescriptionType::GroupByBaselineHash,
+                0,
+                int64_t(cardinality),
+                0,
+                has_nulls};
       }
       return {QueryDescriptionType::GroupByPerfectHash,
               0,
@@ -132,7 +136,11 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
               0,
               has_nulls};
     } catch (...) {  // overflow when computing cardinality
-      return {QueryDescriptionType::GroupByBaselineHash, 0, 0, 0, false};
+      return {QueryDescriptionType::GroupByBaselineHash,
+              0,
+              std::numeric_limits<int64_t>::max(),
+              0,
+              false};
     }
   }
   // For single column groupby on high timestamps, force baseline hash due to wide ranges
@@ -1136,6 +1144,8 @@ std::unique_ptr<QueryMemoryDescriptor> MemoryLayoutBuilder::build(
       !group_cardinality_estimation && !just_explain) {
     const auto col_range_info = get_col_range_info(
         ra_exe_unit_, query_infos, group_cardinality_estimation, executor, device_type);
+    LOG(INFO) << "Request query retry with estimator for group col range ("
+              << col_range_info.min << ", " << col_range_info.max << ")";
     throw CardinalityEstimationRequired(col_range_info.max - col_range_info.min);
   }
 
