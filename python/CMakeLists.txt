@@ -29,6 +29,9 @@ set(pydeps
 # expression.
 set(SETUP_LD_PATH_LIST $<TARGET_FILE_DIR:Calcite>$<SEMICOLON>$<TARGET_FILE_DIR:IR>$<SEMICOLON>$<TARGET_FILE_DIR:ArrowStorage>$<SEMICOLON>$<TARGET_FILE_DIR:QueryBuilder>$<SEMICOLON>$<TARGET_FILE_DIR:QueryEngine>$<SEMICOLON>$<TARGET_FILE_DIR:SchemaMgr>$<SEMICOLON>$<TARGET_FILE_DIR:ConfigBuilder>$<SEMICOLON>$<TARGET_FILE_DIR:Logger>$<SEMICOLON>$<TARGET_FILE_DIR:Shared>$<SEMICOLON>$<TARGET_FILE_DIR:DataMgr>$<SEMICOLON>$<TARGET_FILE_DIR:ResultSet>$<SEMICOLON>$<TARGET_FILE_DIR:ResultSetRegistry>$<SEMICOLON>$<TARGET_FILE_DIR:${Boost_LOG_LIBRARY}>)
 
+message(WARNING "Boost_LOG_LIBRARY = $<TARGET_FILE_DIR:${Boost_LOG_LIBRARY}>")
+message(WARNING "SETUP_LD_PATH_LIST = ${SETUP_LD_PATH_LIST}")
+
 if (WIN32)
   # Convert all paths from library list to paths with forward
   # slashes. This is required because on windows paths with back slashes
@@ -40,7 +43,9 @@ else()
   # on Linux.
   set(SETUP_LDFLAGS "$<SHELL_PATH:${SETUP_LD_PATH_LIST}>")
 endif()
+message(WARNING "SETUP_LDFLAGS = ${SETUP_LDFLAGS}")
 set(SETUP_FLAGS -f -I ${CMAKE_CURRENT_SOURCE_DIR} -L ${SETUP_LDFLAGS})
+message(WARNING "SETUP_FLAGS = ${SETUP_FLAGS}")
 
 if (NOT WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
     # On windows enabling debug in python requires python debug library which is absent in conda
@@ -50,6 +55,10 @@ endif()
 
 
 add_custom_target(pyhdk ALL
+    COMMAND echo "Boost_LOG_LIBRARY = $<TARGET_FILE_DIR:${Boost_LOG_LIBRARY}>"
+    COMMAND echo "SETUP_LD_PATH_LIST = ${SETUP_LD_PATH_LIST}"
+    COMMAND echo "SETUP_LDFLAGS = ${SETUP_LDFLAGS}"
+    COMMAND echo "SETUP_FLAGS = ${SETUP_FLAGS}"
     COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} build_ext ${SETUP_FLAGS}
     DEPENDS Calcite ${pydeps}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
