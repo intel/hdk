@@ -24,8 +24,8 @@ size_t RelAlgExecutor::getNDVEstimation(const WorkUnit& work_unit,
                                         const bool is_agg,
                                         const CompilationOptions& co,
                                         const ExecutionOptions& eo) {
-  const auto estimator_exe_unit =
-      create_ndv_execution_unit(work_unit.exe_unit, config_, range);
+  const auto estimator_exe_unit = create_ndv_execution_unit(
+      work_unit.exe_unit, schema_provider_.get(), config_, range);
   size_t one{1};
   ColumnCacheMap column_cache;
   try {
@@ -56,11 +56,30 @@ size_t RelAlgExecutor::getNDVEstimation(const WorkUnit& work_unit,
 }
 
 RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_unit,
+                                              SchemaProvider* schema_provider,
                                               const Config& config,
                                               const int64_t range) {
-  const bool use_large_estimator = range > config.exec.group_by.large_ndv_threshold;
+  bool use_large_estimator = range > config.exec.group_by.large_ndv_threshold;
+  // Check if number of input rows is big enough to require large estimator.
+  if (use_large_estimator) {
+    auto outer_input_it = std::find_if(
+        ra_exe_unit.input_descs.begin(),
+        ra_exe_unit.input_descs.end(),
+        [](const InputDescriptor& desc) { return desc.getNestLevel() == 0; });
+    CHECK(outer_input_it != ra_exe_unit.input_descs.end());
+    auto tinfo = schema_provider->getTableInfo(outer_input_it->getDatabaseId(),
+                                               outer_input_it->getTableId());
+    CHECK(tinfo);
+    if (tinfo->row_count < config.exec.group_by.large_ndv_threshold) {
+      LOG(INFO) << "Avoid large estimator because of the small input ("
+                << tinfo->row_count << " rows).";
+      use_large_estimator = false;
+    }
+  }
   size_t ndv_multiplier =
       use_large_estimator ? config.exec.group_by.large_ndv_multiplier : 1;
+  LOG(INFO) << "Create NDV estimator execution unit for range = " << range
+            << ". Chosen NDV multiplier is " << ndv_multiplier;
   return {
       ra_exe_unit.input_descs,
       ra_exe_unit.input_col_descs,

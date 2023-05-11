@@ -44,6 +44,7 @@ class CardinalityEstimationRequired : public std::runtime_error {
 };
 
 RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_unit,
+                                              SchemaProvider* schema_provider,
                                               const Config& config,
                                               const int64_t range);
 
