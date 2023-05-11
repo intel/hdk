@@ -14,6 +14,8 @@
 
 #include "ConfigBuilder.h"
 
+#include "Logger/Logger.h"
+
 #include <boost/crc.hpp>
 #include <boost/program_options.hpp>
 
@@ -572,12 +574,20 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
     opt_desc.add_options()("gtest_filter", "filters tests, use --help for details");
   }
 
+  // Right now we setup logging independently. Until it's fixed, simply ignore logger
+  // options here.
+  logger::LogOptions log_opts("dummy_opts");
+  log_opts.set_options();
+
+  po::options_description all_opts;
+  all_opts.add(opt_desc).add(log_opts.get_options());
+
   po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv).options(opt_desc).run(), vm);
+  po::store(po::command_line_parser(argc, argv).options(all_opts).run(), vm);
   po::notify(vm);
 
   if (vm.count("help")) {
-    std::cout << opt_desc << std::endl;
+    std::cout << all_opts << std::endl;
     return true;
   }
 
