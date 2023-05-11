@@ -2437,10 +2437,40 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
   const bool uses_lazy_fetch =
       plan_state_->allow_lazy_fetch_ &&
       has_lazy_fetched_columns(getColLazyFetchInfo(ra_exe_unit.target_exprs));
-  const bool use_multifrag_kernel = (device_type == ExecutorDeviceType::GPU) &&
-                                    eo.allow_multifrag && (!uses_lazy_fetch || is_agg);
+  bool use_multifrag_kernel = (device_type == ExecutorDeviceType::GPU) &&
+                              eo.allow_multifrag && (!uses_lazy_fetch || is_agg);
   const auto device_count = deviceCount(device_type);
   CHECK_GT(device_count, 0);
+  // Right now, we don't have any heuristics to determine the perfect number of kernels
+  // we want to execute on CPU and we simply create a kernel per fragment. But there
+  // are some extreme cases when output buffer significanly exceeds fragment size and
+  // then we have few problems:
+  //  1. Output buffer initialization and reduction time exceeds fragment processing
+  //     time, so it's more profitable to use a single thread for processing.
+  //  2. We might simply run out of memory due to many huge hash tables and even bigger
+  //     hash table created later for the reduction.
+  // We need more comprehensive processing costs and memory consumption evaluation here.
+  // For now, detect a simple groupby case when output hash table is bigger than input
+  // table. For this case we use a single multifragment kernel to force single-threaded
+  // execution with no reduction required.
+  if (device_type == ExecutorDeviceType::CPU && table_infos.size() == (size_t)1 &&
+      config_->exec.group_by.enable_cpu_multifrag_kernels &&
+      (query_mem_desc.getQueryDescriptionType() ==
+           QueryDescriptionType::GroupByPerfectHash ||
+       query_mem_desc.getQueryDescriptionType() ==
+           QueryDescriptionType::GroupByBaselineHash)) {
+    size_t input_size = table_infos.front().info.getNumTuples();
+    size_t buffer_size = query_mem_desc.getEntryCount();
+    constexpr size_t threshold_ratio = 2;
+    if (table_infos.front().info.fragments.size() > 1 &&
+        buffer_size * threshold_ratio >= input_size) {
+      LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
+                   "table (input_size is "
+                << input_size << " rows, output buffer is " << buffer_size
+                << " entries).";
+      use_multifrag_kernel = true;
+    }
+  }
 
   fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
                                              shared_context.getFragOffsets(),
@@ -2463,7 +2493,8 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     // high-granularity, fragment by fragment execution instead. For scan only queries on
     // GPU, we want the multifrag kernel path to save the overhead of allocating an output
     // buffer per fragment.
-    auto multifrag_kernel_dispatch = [&ra_exe_unit,
+    auto multifrag_kernel_dispatch = [device_type,
+                                      &ra_exe_unit,
                                       &execution_kernels,
                                       &column_fetcher,
                                       &co,
@@ -2474,7 +2505,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
                                                        const int64_t rowid_lookup_key) {
       execution_kernels.emplace_back(
           std::make_unique<ExecutionKernel>(ra_exe_unit,
-                                            ExecutorDeviceType::GPU,
+                                            device_type,
                                             device_id,
                                             co,
                                             eo,

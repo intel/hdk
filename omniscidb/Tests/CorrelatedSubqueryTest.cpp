@@ -157,6 +157,14 @@ void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
     return;
   }
 
+  // Some tests assume multiple kernels and reduction, so disable multifragment
+  // kernels to provide it.
+  auto old_multifrag_opt = config().exec.group_by.enable_cpu_multifrag_kernels;
+  config().exec.group_by.enable_cpu_multifrag_kernels = false;
+  ScopeGuard guard([old_multifrag_opt]() {
+    config().exec.group_by.enable_cpu_multifrag_kernels = old_multifrag_opt;
+  });
+
   dropTable("test_facts");
   createTable("test_facts", {{"id", colType}, {"val", colType}}, {3});
 
