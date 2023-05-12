@@ -840,8 +840,9 @@ TEST_F(BasicTest, SumAndAverage) {
 }
 
 TEST_F(BasicTest, Distinct) {
-  GTEST_SKIP();
   c("SELECT COUNT(distinct x) FROM test;", g_dt);
+  c("SELECT COUNT(distinct dd) FROM test;", g_dt);
+  c("SELECT COUNT(distinct b) FROM test;", g_dt);
 }
 
 TEST_F(BasicTest, Sort) {
