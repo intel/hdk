@@ -820,13 +820,76 @@ TEST_F(BasicTest, In) {
     g_dt);
 }
 
-TEST_F(BasicTest, InWithStrings) {
+TEST_F(BasicTest, SumAndAverage) {
+  c("SELECT AVG(ff) FROM test;", g_dt);
+  c("SELECT AVG(w) FROM test;", g_dt);
+  c("SELECT AVG(z) FROM test;", g_dt);
+  c("SELECT SUM(CAST(x AS FLOAT)) FROM test GROUP BY y;", g_dt);
+  // c("SELECT AVG(CAST(x AS FLOAT)) FROM test GROUP BY y;", g_dt);
+  c("SELECT count(*) FROM test GROUP BY x;", g_dt);
+  c("SELECT count(ff) FROM test GROUP BY x;", g_dt);
+  c("SELECT x, AVG(ff) AS val FROM test GROUP BY x;", g_dt);
+  c("SELECT SUM(x) FROM test GROUP BY z;", g_dt);
+  c("SELECT SUM(CAST(x AS FLOAT)) FROM test GROUP BY z;", g_dt);
+  c("SELECT MIN(x + y), COUNT(*), AVG(x + 1) FROM test WHERE x + y > 47 AND x + y < 53 "
+    "GROUP BY x, y;",
+    g_dt);
+  c("SELECT t + x, AVG(x) AS avg_x FROM test WHERE z <= 50 and t < 2000 GROUP BY t + x "
+    "ORDER BY avg_x DESC",
+    g_dt);
+}
+
+TEST_F(BasicTest, Distinct) {
   GTEST_SKIP();
+  c("SELECT COUNT(distinct x) FROM test;", g_dt);
+}
+
+TEST_F(BasicTest, Sort) {
+  c("SELECT x from test ORDER BY x ASC;", g_dt);
+  c("SELECT x from test ORDER BY x DESC;", g_dt);
+  c("SELECT COUNT(*) as val from test GROUP BY x ORDER BY val ASC;", g_dt);
+  c("SELECT COUNT(*) as val from test GROUP BY x ORDER BY val DESC;", g_dt);
+  c("SELECT x, COUNT(*) as val from test GROUP BY x ORDER BY val DESC;", g_dt);
+  c("SELECT COUNT(*) as val from test GROUP BY x ORDER BY val ASC LIMIT 2;", g_dt);
+}
+
+class FallbackTest : public ExecuteTestBase, public ::testing::Test {
+ protected:
+  void SetUp() override {
+    config().exec.heterogeneous.allow_query_step_cpu_retry = true;
+    config().exec.heterogeneous.allow_cpu_retry = true;
+  }
+  void TearDown() override {
+    config().exec.heterogeneous.allow_query_step_cpu_retry = false;
+    config().exec.heterogeneous.allow_cpu_retry = false;
+  }
+};
+
+TEST_F(FallbackTest, InWithStrings) {
   c("SELECT COUNT(*) FROM test WHERE real_str IN ('real_foo', 'real_bar');", g_dt);
   c("SELECT COUNT(*) FROM test WHERE real_str IN ('real_foo', 'real_bar', 'real_baz', "
     "'foo');",
     g_dt);
   c("SELECT COUNT(*) FROM test WHERE str IN ('foo', 'bar', 'real_foo');", g_dt);
+}
+
+TEST_F(FallbackTest, Stddev) {
+  // stddev_pop
+  ASSERT_NEAR(static_cast<double>(0.5),
+              v<double>(run_simple_agg("SELECT STDDEV_SAMP(x) FROM test;", g_dt)),
+              static_cast<double>(0.2));
+
+  ASSERT_NEAR(static_cast<double>(0.58),  // corr expansion
+              v<double>(run_simple_agg("SELECT (avg(x * y) - avg(x) * avg(y)) /"
+                                       "(stddev_pop(x) * stddev_pop(y)) FROM test;",
+                                       g_dt)),
+              static_cast<double>(0.01));
+}
+
+TEST_F(FallbackTest, PowerCorr) {
+  ASSERT_NEAR(static_cast<double>(0.33),
+              v<double>(run_simple_agg("SELECT POWER(CORR(x, y), 2) FROM test;", g_dt)),
+              static_cast<double>(0.01));
 }
 
 int main(int argc, char* argv[]) {

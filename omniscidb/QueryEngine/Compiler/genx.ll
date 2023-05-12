@@ -60,6 +60,81 @@ define i64 @agg_count_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_va
     ret i64 0
 }
 
+define i64 @agg_count_double_skip_val(i64* %agg, double noundef %val, double noundef %skip_val) {
+    %no_skip = fcmp one double %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    %val_cst = bitcast double %val to i64
+    %res = call i64 @agg_count(i64* %agg, i64 %val_cst)
+    ret i64 %res
+.skip:
+    %orig = load i64, i64* %agg
+    ret i64 %orig
+}
+
+;; TODO: may cause a CPU fallback on codegen
+define i64 @agg_sum(i64* %agg, i64 noundef %val) {
+    %old = atomicrmw add i64* %agg, i64 %val monotonic
+    ret i64 %old
+}
+
+define void @agg_sum_float(i32 addrspace(4)* %agg, float noundef %val) {
+.entry:
+    %orig = load atomic i32, i32 addrspace(4)* %agg unordered, align 4
+    %cst = bitcast i32 %orig to float
+    br label %.loop
+.loop:
+    %cmp = phi i32 [ %orig, %.entry ], [ %loaded, %.loop ]
+    %cmp_cst = bitcast i32 %cmp to float
+    %new_val = fadd float %cmp_cst, %val
+    %new_val_cst = bitcast float %new_val to i32
+    %val_success = cmpxchg i32 addrspace(4)* %agg, i32 %cmp, i32 %new_val_cst acq_rel monotonic
+    %loaded = extractvalue {i32, i1} %val_success, 0
+    %success = extractvalue {i32, i1} %val_success, 1
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    ret void
+}
+
+define void @agg_sum_float_skip_val(i32 addrspace(4)* %agg, float noundef %val, float noundef %skip_val) {
+    %no_skip = fcmp one float %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    call void @agg_sum_float(i32 addrspace(4)* %agg, float noundef %val)
+    br label %.skip
+.skip:
+    ret void
+}
+
+define void @agg_sum_double(i64 addrspace(4)* %agg, double noundef %val) {
+.entry:
+    %orig = load atomic i64, i64 addrspace(4)* %agg unordered, align 8
+    %cst = bitcast i64 %orig to double
+    br label %.loop
+.loop:
+    %cmp = phi i64 [ %orig, %.entry ], [ %loaded, %.loop ]
+    %cmp_cst = bitcast i64 %cmp to double
+    %new_val = fadd double %cmp_cst, %val
+    %new_val_cst = bitcast double %new_val to i64
+    %val_success = cmpxchg i64 addrspace(4)* %agg, i64 %cmp, i64 %new_val_cst acq_rel monotonic
+    %loaded = extractvalue {i64, i1} %val_success, 0
+    %success = extractvalue {i64, i1} %val_success, 1
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    ret void
+}
+
+define void @agg_sum_double_skip_val(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
+    %no_skip = fcmp one double %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    call void @agg_sum_double(i64 addrspace(4)* %agg, double noundef %val)
+    br label %.skip
+.skip:
+    ret void
+}
+
+
 define i64 @agg_sum_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
