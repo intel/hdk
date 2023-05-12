@@ -658,6 +658,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     frag.metadata.resize(at->columns().size());
   }
 
+  mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   std::vector<bool> lazy_fetch_cols(at->columns().size(), false);
   if (g_lazy_materialize_dictionaries) {
     VLOG(1) << "Appending arrow table with lazy dictionary materialization enabled";
@@ -667,12 +668,18 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       auto col_type = col_info->type;
       auto col_arr = at->column(col_idx);
       if (col_type->isExtDictionary() && col_arr->type()->id() == arrow::Type::STRING) {
-        lazy_fetch_cols[col_idx] = true;
+        auto dict_data =
+            dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
+                .get();
+        CHECK(dict_data);
+        // appends to materialized dictionaries are automatically materialiezd
+        if (!dict_data->is_materialized) {
+          lazy_fetch_cols[col_idx] = true;
+        }
       }
     }
   }
 
-  mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   threading::parallel_for(
       threading::blocked_range(0, (int)at->columns().size()), [&](auto range) {
         for (auto col_idx = range.begin(); col_idx != range.end(); col_idx++) {
@@ -705,7 +712,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
           } else if (col_type->isExtDictionary()) {
             switch (col_arr->type()->id()) {
               case arrow::Type::STRING:
-                if (!g_lazy_materialize_dictionaries) {
+                // if the dictionary has already been materialized, append indices
+                if (!g_lazy_materialize_dictionaries || dict_data->is_materialized) {
                   col_arr = createDictionaryEncodedColumn(
                       dict_data->dict()->stringDict.get(), col_arr, col_type);
                 }
