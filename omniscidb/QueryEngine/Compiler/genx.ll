@@ -32,6 +32,95 @@ define noundef i64 addrspace(3)* @declare_dynamic_shared_memory() {
     ret i64 addrspace(3)* %res
 }
 
+define void @write_projection_int64(i8 addrspace(4)* nocapture noundef writeonly %0, i64 noundef %1, i64 noundef %2) {
+  %4 = icmp eq i64 %1, %2
+  br i1 %4, label %7, label %5
+
+5:                                                ; preds = %3
+  %6 = bitcast i8 addrspace(4)* %0 to i64 addrspace(4)*
+  store i64 %1, i64 addrspace(4)* %6, align 8
+  br label %7
+
+7:                                                ; preds = %5, %3
+  ret void
+}
+
+define void @write_projection_int32(i8 addrspace(4)* nocapture noundef writeonly %0, i32 noundef %1, i64 noundef %2) {
+    ; TODO
+    ret void
+}
+
+; Function Attrs: alwaysinline mustprogress nofree norecurse nosync nounwind uwtable willreturn
+define void @agg_sum_double_skip_val(i64 addrspace(4)* nocapture noundef %0, double noundef %1, double noundef %2) {
+  %4 = fcmp une double %1, %2
+  br i1 %4, label %5, label %15
+
+5:                                                ; preds = %3
+  %6 = load i64, i64 addrspace(4)* %0, align 8
+  %7 = bitcast double %2 to i64
+  %8 = icmp eq i64 %6, %7
+  br i1 %8, label %13, label %9
+
+9:                                                ; preds = %5
+  %10 = bitcast i64 %6 to double
+  %11 = bitcast i64 addrspace(4)* %0 to double addrspace(4)*
+  %12 = fadd double %10, %1
+  store double %12, double addrspace(4)* %11, align 8
+  br label %15
+
+13:                                               ; preds = %5
+  %14 = bitcast i64 addrspace(4)* %0 to double addrspace(4)*
+  store double %1, double addrspace(4)* %14, align 8
+  br label %15
+
+15:                                               ; preds = %13, %9, %3
+  ret void
+}
+
+
+; Function Attrs: alwaysinline mustprogress nofree norecurse nosync nounwind uwtable willreturn
+define dso_local void @agg_min_double_skip_val(i64 addrspace(4)* nocapture noundef %0, double noundef %1, double noundef %2) local_unnamed_addr #7 {
+  %4 = fcmp une double %1, %2
+  br i1 %4, label %5, label %14
+
+5:                                                ; preds = %3
+  %6 = load i64, i64 addrspace(4)* %0
+  %7 = bitcast double %2 to i64
+  %8 = icmp eq i64 %6, %7
+  %9 = bitcast i64 %6 to double
+  %10 = bitcast i64 addrspace(4)* %0 to double addrspace(4)*
+  %11 = fcmp ogt double %9, %1
+  %12 = or i1 %8, %11
+  %13 = select i1 %12, double %1, double %9
+  store double %13, double addrspace(4)* %10, align 8
+  br label %14
+
+14:                                               ; preds = %5, %3
+  ret void
+}
+
+; Function Attrs: alwaysinline mustprogress nofree norecurse nosync nounwind uwtable willreturn
+define dso_local void @agg_max_float_skip_val(i32 addrspace(4)* nocapture noundef %0, float noundef %1, float noundef %2) local_unnamed_addr #7 {
+  %4 = fcmp une float %1, %2
+  br i1 %4, label %5, label %14
+
+5:                                                ; preds = %3
+  %6 = load i32, i32 addrspace(4)* %0, align 4
+  %7 = bitcast float %2 to i32
+  %8 = icmp eq i32 %6, %7
+  %9 = bitcast i32 %6 to float
+  %10 = bitcast i32 addrspace(4)* %0 to float addrspace(4)*
+  %11 = fcmp olt float %9, %1
+  %12 = or i1 %8, %11
+  %13 = select i1 %12, float %1, float %9
+  store float %13, float addrspace(4)* %10, align 4
+  br label %14
+
+14:                                               ; preds = %5, %3
+  ret void
+}
+
+
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)

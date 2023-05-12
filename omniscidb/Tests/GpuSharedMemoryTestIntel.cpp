@@ -117,12 +117,11 @@ void GpuReductionTester::codegenWrapperKernel() {
       input_ptrs->getType()->getScalarType()->getPointerElementType(),
       input_ptrs,
       block_index);
+
   auto input_buffer = ir_builder.CreateLoad(
       llvm::Type::getInt8PtrTy(context_, address_space), input_buffer_gep);
-  auto input_buffer_ptr =
-      ir_builder.CreatePointerCast(input_buffer,
-                                   llvm::Type::getInt64PtrTy(context_, address_space),
-                                   "input_buffer_ptr");
+  auto input_buffer_ptr = ir_builder.CreatePointerCast(
+      input_buffer, llvm::Type::getInt64PtrTy(context_, 4), "input_buffer_ptr");
   const auto buffer_size = ll_int(
       static_cast<int32_t>(query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU)),
       context_);
@@ -136,14 +135,17 @@ void GpuReductionTester::codegenWrapperKernel() {
                                                      },
                                                      "smem_input_buffer_ptr");
 
-  auto output_buffer_ptr =
-      ir_builder.CreatePointerCast(output_buffer,
-                                   llvm::Type::getInt64PtrTy(context_, address_space),
-                                   "output_buffer_ptr");
+  auto smem_input_buffer_ptr1 =
+      ir_builder.CreatePointerCast(smem_input_buffer_ptr,
+                                   llvm::Type::getInt64PtrTy(context_, 4),
+                                   "smem_input_buffer_ptr");
+
+  auto output_buffer_ptr = ir_builder.CreatePointerCast(
+      output_buffer, llvm::Type::getInt64PtrTy(context_, 4), "output_buffer_ptr");
   // call the reduction function
   CHECK(reduction_func_);
   std::vector<llvm::Value*> reduction_args{
-      output_buffer_ptr, smem_input_buffer_ptr, buffer_size};
+      output_buffer_ptr, smem_input_buffer_ptr1, buffer_size};
   ir_builder.CreateCall(reduction_func_, reduction_args);
   ir_builder.CreateBr(bb_exit);
 

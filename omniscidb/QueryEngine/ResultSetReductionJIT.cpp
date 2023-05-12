@@ -607,7 +607,7 @@ ReductionCode ResultSetReductionJIT::codegen() const {
                     executor_->getContext()));
   auto cgen_state = reduction_code.cgen_state = cgen_state_.get();
   cgen_state->set_module_shallow_copy(
-      executor_->getExtensionModuleContext()->getRTModule(/*is_l0=*/false));
+      executor_->getExtensionModuleContext()->getRTModule(/*is_l0=*/true));
   reduction_code.module = cgen_state->module_;
 
   AUTOMATIC_IR_METADATA(cgen_state);
