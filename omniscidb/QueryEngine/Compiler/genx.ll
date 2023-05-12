@@ -148,3 +148,81 @@ define i64 @agg_sum_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val)
 .skip:
     ret i64 0
 }
+
+define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
+.entry:
+    %orig = load atomic i32, i32 addrspace(4)* %addr unordered, align 8
+    br label %.loop
+.loop:
+    %cmp = phi i32 [ %orig, %.entry ], [ %loaded , %.loop ]
+    %new_val = or i32 %cmp, %val
+    %val_success = cmpxchg i32 addrspace(4)* %addr, i32 %cmp, i32 %new_val acq_rel monotonic
+    %loaded = extractvalue {i32, i1} %val_success, 0
+    %success = extractvalue {i32, i1} %val_success, 1
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    ret void
+}
+
+define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
+    %bitmap_idx = sub nsw i64 %val, %min_val
+    %bitmap_idx.i32 = trunc i64 %bitmap_idx to i32
+    %byte_idx.i64 = lshr i64 %bitmap_idx, 3
+    %byte_idx = trunc i64 %byte_idx.i64 to i32
+    %word_idx = lshr i32 %byte_idx, 2
+    %word_idx.i64 = zext i32 %word_idx to i64
+    %byte_word_idx = and i32 %byte_idx, 3
+    %host_addr = load i64, i64* %agg
+    %sub_bm_m1 = sub i64 %sub_bitmap_count, 1
+    %tid = call i64 @get_thread_index()
+    %sub_tid = and i64 %sub_bm_m1, %tid
+    %rhs = mul i64 %sub_tid, %bitmap_bytes
+    %base_dev = add nsw i64 %base_dev_addr, %host_addr
+    %lhs = sub nsw i64 %base_dev, %base_host_addr
+    %bitmap_addr = add i64 %lhs, %rhs
+    %bitmap = inttoptr i64 %bitmap_addr to i32 addrspace(4)*
+    switch i32 %byte_word_idx, label %.exit [
+        i32 0, label %.c0
+        i32 1, label %.c1
+        i32 2, label %.c2
+        i32 3, label %.c3
+   ]
+
+.c0:
+    %btwi0 = getelementptr inbounds i32, i32 addrspace(4)* %bitmap, i64 %word_idx.i64
+    %res0 = and i32 %bitmap_idx.i32, 7
+    br label %.default
+.c1:
+    %btwi1 = getelementptr inbounds i32, i32 addrspace(4)* %bitmap, i64 %word_idx.i64
+    %btidx71 = and i32 %bitmap_idx.i32, 7
+    %res1 = or i32 %btidx71, 8
+    br label %.default
+.c2:
+    %btwi2 = getelementptr inbounds i32, i32 addrspace(4)* %bitmap, i64 %word_idx.i64
+    %btidx72 = and i32 %bitmap_idx.i32, 7
+    %res2 = or i32 %btidx72, 16
+    br label %.default
+.c3:
+    %btwi3 = getelementptr inbounds i32, i32 addrspace(4)* %bitmap, i64 %word_idx.i64
+    %btidx73 = and i32 %bitmap_idx.i32, 7
+    %res3 = or i32 %btidx73, 24
+    br label %.default
+.default:
+    %res = phi i32 [ %res0, %.c0 ], [ %res1, %.c1 ], [ %res2, %.c2], [ %res3, %.c3 ]
+    %arg0 = phi i32 addrspace(4)* [ %btwi0, %.c0 ], [ %btwi1, %.c1 ], [ %btwi2, %.c2], [ %btwi3, %.c3 ]
+    %arg1 = shl nuw i32 1, %res
+    tail call void @atomic_or(i32 addrspace(4)* %arg0, i32 noundef %arg1)
+    br label %.exit
+.exit:
+    ret void
+}
+
+define void @agg_count_distinct_bitmap_skip_val_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %skip_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
+ %no_skip = icmp ne i64 %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    call void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes)
+    br label %.skip
+.skip:
+    ret void
+}
