@@ -130,6 +130,23 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
 
   int dbId() const { return db_id_; }
 
+  std::shared_ptr<arrow::Table> parseCsvFile(const std::string& file_name,
+                                             const CsvParseOptions parse_options,
+                                             const ColumnInfoList& col_infos = {}) const;
+  std::shared_ptr<arrow::Table> parseCsvData(const std::string& csv_data,
+                                             const CsvParseOptions parse_options,
+                                             const ColumnInfoList& col_infos = {}) const;
+  std::shared_ptr<arrow::Table> parseCsv(std::shared_ptr<arrow::io::InputStream> input,
+                                         const CsvParseOptions parse_options,
+                                         const ColumnInfoList& col_infos = {}) const;
+  std::shared_ptr<arrow::Table> parseJsonData(const std::string& json_data,
+                                              const JsonParseOptions parse_options,
+                                              const ColumnInfoList& col_infos = {}) const;
+  std::shared_ptr<arrow::Table> parseJson(std::shared_ptr<arrow::io::InputStream> input,
+                                          const JsonParseOptions parse_options,
+                                          const ColumnInfoList& col_infos = {}) const;
+  std::shared_ptr<arrow::Table> parseParquetFile(const std::string& file_name) const;
+
  private:
   struct DataFragment {
     size_t offset = 0;
@@ -191,22 +208,6 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                       std::shared_ptr<arrow::Schema> rhs);
   ChunkStats computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
                           const hdk::ir::Type* type);
-  std::shared_ptr<arrow::Table> parseCsvFile(const std::string& file_name,
-                                             const CsvParseOptions parse_options,
-                                             const ColumnInfoList& col_infos = {});
-  std::shared_ptr<arrow::Table> parseCsvData(const std::string& csv_data,
-                                             const CsvParseOptions parse_options,
-                                             const ColumnInfoList& col_infos = {});
-  std::shared_ptr<arrow::Table> parseCsv(std::shared_ptr<arrow::io::InputStream> input,
-                                         const CsvParseOptions parse_options,
-                                         const ColumnInfoList& col_infos = {});
-  std::shared_ptr<arrow::Table> parseJsonData(const std::string& json_data,
-                                              const JsonParseOptions parse_options,
-                                              const ColumnInfoList& col_infos = {});
-  std::shared_ptr<arrow::Table> parseJson(std::shared_ptr<arrow::io::InputStream> input,
-                                          const JsonParseOptions parse_options,
-                                          const ColumnInfoList& col_infos = {});
-  std::shared_ptr<arrow::Table> parseParquetFile(const std::string& file_name);
   TableFragmentsInfo getEmptyTableMetadata(int table_id) const;
   void fetchFixedLenData(const TableData& table,
                          size_t frag_idx,
