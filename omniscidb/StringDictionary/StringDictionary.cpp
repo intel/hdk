@@ -227,23 +227,6 @@ void throw_string_too_long_error(std::string_view str, const DictRef& dict_ref) 
 
 }  // namespace
 
-template <class String>
-void StringDictionary::getOrAddBulkArray(
-    const std::vector<std::vector<String>>& string_array_vec,
-    std::vector<std::vector<int32_t>>& ids_array_vec) {
-  ids_array_vec.resize(string_array_vec.size());
-  for (size_t i = 0; i < string_array_vec.size(); i++) {
-    auto& strings = string_array_vec[i];
-    auto& ids = ids_array_vec[i];
-    ids.resize(strings.size());
-    getOrAddBulk(strings, &ids[0]);
-  }
-}
-
-template void StringDictionary::getOrAddBulkArray(
-    const std::vector<std::vector<std::string>>& string_array_vec,
-    std::vector<std::vector<int32_t>>& ids_array_vec);
-
 /**
  * Method to hash a vector of strings in parallel.
  * @param string_vec input vector of strings to be hashed
@@ -1277,64 +1260,6 @@ void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache)
     updated_cache[idx++] = sorted_cache[s_idx++];
   }
   sorted_cache.swap(updated_cache);
-}
-
-std::vector<std::string_view> StringDictionary::getStringViews(
-    const size_t generation) const {
-  auto timer = DEBUG_TIMER(__func__);
-  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-  const int64_t num_strings = generation >= 0 ? generation : storageEntryCount();
-  CHECK_LE(num_strings, static_cast<int64_t>(StringDictionary::MAX_STRCOUNT));
-  // The CHECK_LE below is currently redundant with the check
-  // above against MAX_STRCOUNT, however given we iterate using
-  // int32_t types for efficiency (to match type expected by
-  // getStringFromStorageFast, check that the # of strings is also
-  // in the int32_t range in case MAX_STRCOUNT is changed
-
-  // Todo(todd): consider aliasing the max logical type width
-  // (currently int32_t) throughout StringDictionary
-  CHECK_LE(num_strings, std::numeric_limits<int32_t>::max());
-
-  std::vector<std::string_view> string_views(num_strings);
-  // We can bail early if the generation-specified dictionary is empty
-  if (num_strings == 0) {
-    return string_views;
-  }
-  constexpr int64_t tbb_parallel_threshold{1000};
-  if (num_strings < tbb_parallel_threshold) {
-    // Use int32_t to match type expected by getStringFromStorageFast
-    for (int32_t string_idx = 0; string_idx < num_strings; ++string_idx) {
-      string_views[string_idx] = getStringFromStorageFast(string_idx);
-    }
-  } else {
-    constexpr int64_t target_strings_per_thread{1000};
-    const ThreadInfo thread_info(
-        std::thread::hardware_concurrency(), num_strings, target_strings_per_thread);
-    CHECK_GE(thread_info.num_threads, 1L);
-    CHECK_GE(thread_info.num_elems_per_thread, 1L);
-
-    tbb::task_arena limited_arena(thread_info.num_threads);
-    CHECK_LE(tbb::this_task_arena::max_concurrency(), thread_info.num_threads);
-    limited_arena.execute([&] {
-      tbb::parallel_for(
-          tbb::blocked_range<int64_t>(
-              0, num_strings, thread_info.num_elems_per_thread /* tbb grain_size */),
-          [&](const tbb::blocked_range<int64_t>& r) {
-            // r should be in range of int32_t per CHECK above
-            const int32_t start_idx = r.begin();
-            const int32_t end_idx = r.end();
-            for (int32_t string_idx = start_idx; string_idx != end_idx; ++string_idx) {
-              string_views[string_idx] = getStringFromStorageFast(string_idx);
-            }
-          },
-          tbb::simple_partitioner());
-    });
-  }
-  return string_views;
-}
-
-std::vector<std::string_view> StringDictionary::getStringViews() const {
-  return getStringViews(storageEntryCount());
 }
 
 std::vector<int32_t> StringDictionary::buildDictionaryTranslationMap(

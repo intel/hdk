@@ -85,24 +85,6 @@ TEST(StringDictionary, ManyAddsAndGets) {
   }
 }
 
-TEST(StringDictionary, GetStringViews) {
-  const DictRef dict_ref(-1, 1);
-  std::shared_ptr<StringDictionary> string_dict =
-      std::make_shared<StringDictionary>(dict_ref, g_cache_string_hash);
-  std::vector<std::string> strings;
-  std::vector<int32_t> string_ids(g_op_count);
-  for (int i = 0; i < g_op_count; ++i) {
-    strings.emplace_back(std::to_string(i));
-  }
-  string_dict->getOrAddBulk(strings, string_ids.data());
-
-  const auto string_views = string_dict->getStringViews();
-  ASSERT_EQ(string_views.size(), static_cast<size_t>(g_op_count));
-  for (int i = 0; i < g_op_count; ++i) {
-    ASSERT_EQ(strings[i], std::string(string_views[i]));
-  }
-}
-
 TEST(StringDictionary, GetOrAddBulk) {
   const DictRef dict_ref(-1, 1);
   StringDictionary string_dict(dict_ref, g_cache_string_hash);
