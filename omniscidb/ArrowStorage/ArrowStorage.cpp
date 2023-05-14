@@ -38,7 +38,7 @@
 #endif
 
 #include "Shared/funcannotations.h"
-RUNTIME_EXPORT bool g_lazy_materialize_dictionaries{false};
+RUNTIME_EXPORT bool g_lazy_materialize_dictionaries{true};
 
 using namespace std::string_literals;
 
