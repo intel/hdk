@@ -70,9 +70,6 @@ class StringDictionary {
   template <class T, class String>
   void getOrAddBulkParallel(const std::vector<String>& string_vec, T* encoded_vec);
   template <class String>
-  void getOrAddBulkArray(const std::vector<std::vector<String>>& string_array_vec,
-                         std::vector<std::vector<int32_t>>& ids_array_vec);
-  template <class String>
   int32_t getIdOfString(const String&) const;
   std::string getString(int32_t string_id) const;
   std::pair<char*, size_t> getStringBytes(int32_t string_id) const noexcept;
@@ -93,9 +90,6 @@ class StringDictionary {
                                      const size_t generation) const;
 
   std::vector<std::string> copyStrings() const;
-
-  std::vector<std::string_view> getStringViews() const;
-  std::vector<std::string_view> getStringViews(const size_t generation) const;
 
   std::vector<int32_t> buildDictionaryTranslationMap(
       const std::shared_ptr<StringDictionary> dest_dict,
