@@ -7,16 +7,26 @@
 
 #include <tbb/parallel_for.h>
 
+#include "Shared/measure.h"
+
 boost::filesystem::path g_data_path;
-size_t num_threads = 64;
+size_t num_threads = 15;
 size_t g_fragment_size = 160000000 / num_threads;
 bool g_use_parquet{false};
 ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
+EXTERN extern bool g_lazy_materialize_dictionaries;
+
 using namespace TestHelpers::ArrowSQLRunner;
 
-#define USE_HOT_DATA
+// #define USE_HOT_DATA
 #define PARALLEL_IMPORT_ENABLED
+
+// when we want to measure storage latencies, read the csv files before starting the
+// benchmark
+#ifndef USE_HOT_DATA
+std::vector<std::shared_ptr<arrow::Table>> g_taxi_data_files;
+#endif
 
 std::istream& operator>>(std::istream& in, ExecutorDeviceType& device_type) {
   std::string token;
@@ -96,7 +106,7 @@ static void createTaxiTableCsv() {
                {"vendor_id", ctx().extDict(ctx().text(), 0)},
                {"pickup_datetime", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
                {"dropoff_datetime", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
-               {"store_and_fwd_flag", ctx().text()},
+               {"store_and_fwd_flag", ctx().extDict(ctx().text(), 0)},
                {"rate_code_id", ctx().int16()},
                {"pickup_longitude", ctx().fp64()},
                {"pickup_latitude", ctx().fp64()},
@@ -114,8 +124,8 @@ static void createTaxiTableCsv() {
                {"total_amount", ctx().fp64()},
                {"payment_type", ctx().extDict(ctx().text(), 0)},
                {"trip_type", ctx().int8()},
-               {"pickup", ctx().text()},
-               {"dropoff", ctx().text()},
+               {"pickup", ctx().extDict(ctx().text(), 0)},
+               {"dropoff", ctx().extDict(ctx().text(), 0)},
                {"cab_type", ctx().extDict(ctx().text(), 0)},  // grouped
                {"precipitation", ctx().fp64()},
                {"snow_depth", ctx().int16()},
@@ -126,22 +136,22 @@ static void createTaxiTableCsv() {
                {"pickup_nyct2010_gid", ctx().int64()},
                {"pickup_ctlabel", ctx().fp64()},
                {"pickup_borocode", ctx().int32()},
-               {"pickup_boroname", ctx().text()},  // TODO: share dict
+               {"pickup_boroname", ctx().extDict(ctx().text(), 0)},  // TODO: share dict
                {"pickup_ct2010", ctx().int32()},
                {"pickup_boroct2010", ctx().int32()},
-               {"pickup_cdeligibil", ctx().text()},
-               {"pickup_ntacode", ctx().text()},
-               {"pickup_ntaname", ctx().text()},
+               {"pickup_cdeligibil", ctx().extDict(ctx().text(), 0)},
+               {"pickup_ntacode", ctx().extDict(ctx().text(), 0)},
+               {"pickup_ntaname", ctx().extDict(ctx().text(), 0)},
                {"pickup_puma", ctx().int32()},
                {"dropoff_nyct2010_gid", ctx().int64()},
                {"dropoff_ctlabel", ctx().fp64()},
                {"dropoff_borocode", ctx().int64()},
-               {"dropoff_boroname", ctx().text()},
+               {"dropoff_boroname", ctx().extDict(ctx().text(), 0)},
                {"dropoff_ct2010", ctx().int32()},
                {"dropoff_boroct2010", ctx().int32()},
-               {"dropoff_cdeligibil", ctx().text()},
-               {"dropoff_ntacode", ctx().text()},
-               {"dropoff_ntaname", ctx().text()},
+               {"dropoff_cdeligibil", ctx().extDict(ctx().text(), 0)},
+               {"dropoff_ntacode", ctx().extDict(ctx().text(), 0)},
+               {"dropoff_ntaname", ctx().extDict(ctx().text(), 0)},
                {"dropoff_puma", ctx().int32()}},
               to);
 }
@@ -151,6 +161,49 @@ static void createTaxiTable() {
     createTaxiTableParquet();
   } else {
     createTaxiTableCsv();
+  }
+}
+
+static std::vector<std::shared_ptr<arrow::Table>> readTaxiFilesCsv(
+    const ColumnInfoList& col_infos) {
+  std::vector<std::shared_ptr<arrow::Table>> taxi_arrow_data;
+  auto time = measure<>::execution([&]() {
+    namespace fs = boost::filesystem;
+    ArrowStorage::CsvParseOptions po;
+    po.header = false;
+    if (fs::is_directory(g_data_path)) {
+      std::vector<std::string> csv_files;
+      for (auto it = fs::directory_iterator{g_data_path}; it != fs::directory_iterator{};
+           it++) {
+        if (fs::is_directory(it->path())) {
+          continue;
+        }
+        csv_files.push_back(it->path().string());
+      }
+      tbb::task_arena arena(num_threads);
+      taxi_arrow_data.resize(csv_files.size());
+      arena.execute([&] {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, csv_files.size()),
+                          [&](const tbb::blocked_range<size_t>& r) {
+                            for (size_t i = r.begin(); i != r.end(); ++i) {
+                              taxi_arrow_data[i] =
+                                  getStorage()->parseCsvFile(csv_files[i], po, col_infos);
+                            }
+                          });
+      });
+    } else {
+      taxi_arrow_data.push_back(
+          getStorage()->parseCsvFile(g_data_path.string(), po, col_infos));
+    }
+  });
+
+  std::cout << "Read taxi csv files in " << time << " ms" << std::endl;
+  return taxi_arrow_data;
+}
+
+static void loadTaxiArrowData() {
+  for (auto& data_file : g_taxi_data_files) {
+    getStorage()->appendArrowTable(data_file, "trips");
   }
 }
 
@@ -218,7 +271,11 @@ static void populateTaxiTable() {
   if (g_use_parquet) {
     populateTaxiTableParquet();
   } else {
-    populateTaxiTableCsv();
+    if (!g_taxi_data_files.empty()) {
+      loadTaxiArrowData();
+    } else {
+      populateTaxiTableCsv();
+    }
   }
 }
 
@@ -352,6 +409,11 @@ int main(int argc, char* argv[]) {
                          ->default_value(ExecutorDeviceType::CPU),
                      "Device type to use.");
 
+  desc.add_options()("use-lazy-materialization",
+                     po::value<bool>(&g_lazy_materialize_dictionaries)
+                         ->implicit_value(true)
+                         ->default_value(g_lazy_materialize_dictionaries));
+
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
   log_options.set_options();  // update default values
@@ -368,10 +430,26 @@ int main(int argc, char* argv[]) {
   logger::init(log_options);
   init(config);
 
+  if (g_lazy_materialize_dictionaries) {
+    std::cout << "Using lazy materialization!" << std::endl;
+  }
+
   try {
 #ifdef USE_HOT_DATA
     createTaxiTable();
     populateTaxiTable();
+#else
+    if (g_use_parquet) {
+      throw std::runtime_error("Cannot use parquet files in cold data mode yet.");
+    }
+    createTaxiTable();
+    auto table_info = getStorage()->getTableInfo(getStorage()->dbId(), "trips");
+    if (!table_info) {
+      throw std::runtime_error("Cannot find table \"trips\", creation failed?");
+    }
+
+    auto col_infos = getStorage()->listColumns(table_info->db_id, table_info->table_id);
+    g_taxi_data_files = readTaxiFilesCsv(col_infos);
 #endif
     // warmup();
     ::benchmark::RunSpecifiedBenchmarks();
