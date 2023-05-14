@@ -371,8 +371,10 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
 
   for (const auto table_id : dict->table_ids) {
     auto& table = *tables_.at(table_id);
+
+    // TODO: should we add the data lock here?
     mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
-    mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
+
     if (table.row_count == 0) {
       // skip empty tables
       continue;
@@ -470,8 +472,6 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
         col_indices_data.push_back(indices_chunk);
       }
 
-      dict_lock.unlock();
-
       CHECK_EQ(col_indices_data.size(), chunks.size());
       auto new_col_data = arrow::ChunkedArray::Make(col_indices_data).ValueOrDie();
 
@@ -480,6 +480,7 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
       for (auto& frag : table.fragments) {
         CHECK_LT(col_id, frag.metadata.size());
         auto& meta = frag.metadata[col_id];
+        // compute chunk stats is multi threaded, so we single thread this
         meta->fillChunkStats(
             computeStats(new_col_data->Slice(frag.offset, frag.row_count), dict->type));
       }
@@ -1161,7 +1162,7 @@ ChunkStats ArrowStorage::computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
 std::shared_ptr<arrow::Table> ArrowStorage::parseCsvFile(
     const std::string& file_name,
     const CsvParseOptions parse_options,
-    const ColumnInfoList& col_infos) {
+    const ColumnInfoList& col_infos) const {
   std::shared_ptr<arrow::io::ReadableFile> inp;
   auto file_result = arrow::io::ReadableFile::Open(file_name.c_str());
   ARROW_THROW_NOT_OK(file_result.status());
@@ -1171,7 +1172,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsvFile(
 std::shared_ptr<arrow::Table> ArrowStorage::parseCsvData(
     const std::string& csv_data,
     const CsvParseOptions parse_options,
-    const ColumnInfoList& col_infos) {
+    const ColumnInfoList& col_infos) const {
   auto input = std::make_shared<arrow::io::BufferReader>(csv_data);
   return parseCsv(input, parse_options, col_infos);
 }
@@ -1179,7 +1180,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsvData(
 std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
     std::shared_ptr<arrow::io::InputStream> input,
     const CsvParseOptions parse_options,
-    const ColumnInfoList& col_infos) {
+    const ColumnInfoList& col_infos) const {
   auto io_context = arrow::io::default_io_context();
 
   auto arrow_parse_options = arrow::csv::ParseOptions::Defaults();
@@ -1232,7 +1233,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseCsv(
 std::shared_ptr<arrow::Table> ArrowStorage::parseJsonData(
     const std::string& json_data,
     const JsonParseOptions parse_options,
-    const ColumnInfoList& col_infos) {
+    const ColumnInfoList& col_infos) const {
   auto input = std::make_shared<arrow::io::BufferReader>(json_data);
   return parseJson(input, parse_options, col_infos);
 }
@@ -1240,7 +1241,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseJsonData(
 std::shared_ptr<arrow::Table> ArrowStorage::parseJson(
     std::shared_ptr<arrow::io::InputStream> input,
     const JsonParseOptions parse_options,
-    const ColumnInfoList& col_infos) {
+    const ColumnInfoList& col_infos) const {
   arrow::FieldVector fields;
   fields.reserve(col_infos.size());
   for (auto& col_info : col_infos) {
@@ -1279,7 +1280,7 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseJson(
 }
 
 std::shared_ptr<arrow::Table> ArrowStorage::parseParquetFile(
-    const std::string& file_name) {
+    const std::string& file_name) const {
   auto file_result = arrow::io::ReadableFile::Open(file_name.c_str());
   ARROW_THROW_NOT_OK(file_result.status());
   auto inp = file_result.ValueOrDie();
