@@ -231,11 +231,33 @@ struct ExecuteTestBase {
     }
   }
 
+  static void createGpuSortTestTable() {
+    createTable("gpu_sort_test",
+                {{"x", ctx().int64()},
+                 {"y", ctx().int32()},
+                 {"z", ctx().int16()},
+                 {"t", ctx().int8()}},
+                {2});
+    run_sqlite_query("DROP TABLE IF EXISTS gpu_sort_test;");
+    run_sqlite_query(
+        "CREATE TABLE gpu_sort_test (x bigint, y int, z smallint, t tinyint);");
+    TestHelpers::ValuesGenerator gen("gpu_sort_test");
+    for (size_t i = 0; i < 4; ++i) {
+      insertCsvValues("gpu_sort_test", "2,2,2,2");
+      run_sqlite_query(gen(2, 2, 2, 2));
+    }
+    for (size_t i = 0; i < 6; ++i) {
+      insertCsvValues("gpu_sort_test", "16000,16000,16000,127");
+      run_sqlite_query(gen(16000, 16000, 16000, 127));
+    }
+  }
+
   static void createAndPopulateTestTables() {
     createTestInnerTable();
     createTestTable();
     createSmallTestsTable();
     createTestInnerLoopJoinTable();
+    createGpuSortTestTable();
   }
 };
 
@@ -851,6 +873,7 @@ TEST_F(BasicTest, Sort) {
   c("SELECT COUNT(*) as val from test GROUP BY x ORDER BY val DESC;", g_dt);
   c("SELECT x, COUNT(*) as val from test GROUP BY x ORDER BY val DESC;", g_dt);
   c("SELECT COUNT(*) as val from test GROUP BY x ORDER BY val ASC LIMIT 2;", g_dt);
+  c("SELECT x, COUNT(*) AS val FROM gpu_sort_test GROUP BY x ORDER BY val DESC;", g_dt);
 }
 
 class FallbackTest : public ExecuteTestBase, public ::testing::Test {
