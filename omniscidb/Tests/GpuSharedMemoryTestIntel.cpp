@@ -407,6 +407,23 @@ void perform_test_and_verify_results(TestInputData input) {
 
 }  // namespace
 
+void insert_globals(llvm::Module* from, llvm::Module* to) {
+  for (const llvm::GlobalVariable& I : from->globals()) {
+    std::cerr << "Adding global " << I.getName().str() << std::endl;
+    llvm::GlobalVariable* new_gv =
+        new llvm::GlobalVariable(*to,
+                                 I.getValueType(),
+                                 I.isConstant(),
+                                 I.getLinkage(),
+                                 (llvm::Constant*)nullptr,
+                                 I.getName(),
+                                 (llvm::GlobalVariable*)nullptr,
+                                 I.getThreadLocalMode(),
+                                 I.getType()->getAddressSpace());
+    new_gv->copyAttributesFrom(&I);
+  }
+}
+
 void GpuReductionTester::performReductionTest(
     const std::vector<std::unique_ptr<ResultSet>>& result_sets,
     const ResultSetStorage* gpu_result_storage,
@@ -421,6 +438,8 @@ void GpuReductionTester::performReductionTest(
   for (auto& F : *ext_module) {
     compiler::insert_declaration(ext_module.get(), module_, F.getName().str());
   }
+
+  insert_globals(ext_module.get(), module_);
 
   DUMP_MODULE(module_, "after.linking.before.replace_function.spirv.ll")
 
