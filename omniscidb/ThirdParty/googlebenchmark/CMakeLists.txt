@@ -97,9 +97,6 @@ if (BENCHMARK_BUILD_32_BITS)
 endif()
 
 if (MSVC)
-  # Turn compiler warnings up to 11
-  string(REGEX REPLACE "[-/]W[1-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
   if (NOT BENCHMARK_ENABLE_EXCEPTIONS)

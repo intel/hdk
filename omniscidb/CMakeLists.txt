@@ -338,19 +338,7 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
 option(FORCE_COLORED_COMPILER_OUTPUT "Enable ANSI-coloring for gnu/clang." OFF)
 
-if(MSVC)
-  option(ENABLE_NO_WINWARNINGS "disable most windows warnings" ON)
-  add_compile_definitions("NOMINMAX")
-  if(ENABLE_NO_WINWARNINGS)
-    add_compile_definitions("_STL_EXTRA_DISABLED_WARNINGS=4146 4242 4244 4267 4355 4365 4458 4624 4820 4996 5204 5219" "NOMINMAX")
-    # disable 4702 unreachable code warning
-    # with /Qspectre set, disable the warning C5045
-    add_compile_options(/W0 /wd4702 /wd5045)
-  else()
-    add_compile_options(/W4 /permisive-)
-  endif()
-  add_compile_options(/EHsc /std:c++17 /Qspectre)
-else()
+if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS")
   if (${FORCE_COLORED_COMPILER_OUTPUT})
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
