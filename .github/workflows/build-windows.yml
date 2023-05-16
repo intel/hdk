@@ -71,12 +71,12 @@ jobs:
           & $env:CONDA\condabin\conda.bat info
           & $env:CONDA\condabin\conda.bat list -n omnisci-dev
           & $env:CONDA\condabin\conda.bat run --no-capture-output -n omnisci-dev omniscidb\scripts\conda\build.bat ${{ inputs.options }}
-          Compress-Archive -Path . -DestinationPath $env:TMP\build.zip
+          Compress-Archive -Path * -DestinationPath $env:TMP\build.zip
 
       - name: Upload build and src files
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.RUN_STAMP }}-build
+          name: ${{ env.RUN_STAMP }}-win-build
           path: ${{ env.TMP }}/build.zip
 
       - name: Upload logs
