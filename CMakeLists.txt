@@ -39,6 +39,7 @@ if (WIN32)
   # always defines __cplusplus to 199711L. A valid number is needed in llvm headers.
   add_compile_options(/Zc:__cplusplus)
   # MSVC warnings management
+  # TODO: Instead of supressing these warnings they should be addressed.
   option(ENABLE_NO_WINWARNINGS "disable most windows warnings" ON)
   add_compile_definitions("NOMINMAX")
   if(ENABLE_NO_WINWARNINGS)
