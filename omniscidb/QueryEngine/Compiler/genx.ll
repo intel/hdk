@@ -9,6 +9,8 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
+@slm.buf.i64 = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 8
+
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
