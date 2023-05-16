@@ -85,9 +85,9 @@ Standalone examples are available in the `examples` directory. Most examples run
 
 ### Dependencies 
 
-Miniconda installation required. (Anaconda may produce build issues.) Use one of this [miniconda installers](https://docs.conda.io/en/latest/miniconda.html).
+Miniconda installation is required. (Anaconda may produce build issues.) Use one of these [miniconda installers](https://docs.conda.io/en/latest/miniconda.html).
 
-Conda environments are used for HDK development. Use the yaml file in `omniscidb/scripts/`:
+Conda environments are used for HDK development. Use the YAML file in `omniscidb/scripts/`:
 
 ```bash
 conda env create -f omniscidb/scripts/mapd-deps-conda-dev-env.yml
@@ -96,7 +96,7 @@ conda activate omnisci-dev
 
 ### Compilation
 
-If using a Conda enviornment, run the following to build and install HDK:
+If using a Conda environment, run the following to build and install HDK:
 
 ```bash
 mkdir build && cd build
@@ -105,15 +105,34 @@ make -j
 make install
 ```
 
-By default CUDA support disabled.
+By default GPU support is disabled.
 
 To verify check `python -c 'import pyhdk'` executed without an error.
+
+#### Compilation with Intel GPU support
+
+##### Dependencies
+
+Install extra dependencies into the existing environment:
+
+```bash
+conda install -c conda-forge level-zero-devel pkg-config
+```
+
+##### Compilation
+
+```bash
+mkdir build && cd build
+cmake -DENABLE_L0=on ..
+make -j 
+make install
+```
 
 #### Compilation with CUDA support
 
 ##### Dependencies
 
-Install extra dependencies into existing environment or into a new one.
+Install extra dependencies into an existing environment or a new one.
 
 ```bash
 conda install -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda arrow-cpp=11.0=*cuda
@@ -123,16 +142,16 @@ conda install -c conda-forge cudatoolkit-dev arrow-cpp-proc=3.0.0=cuda arrow-cpp
 
 ```bash
 mkdir build && cd build
-cmake -DENABLE_CUDA=on  ..
+cmake -DENABLE_CUDA=on ..
 make -j 
 make install
 ```
 
 ### Issues
 
-If you meet issues during build refer to [`.github/workflows/build.yml`](.github/workflows/build.yml). This file describes compilation steps used for CI build.
+If you meet issues during the build refer to [`.github/workflows/build.yml`](.github/workflows/build.yml). This file describes the compilation steps used for the CI build.
 
-If you are still facing issues please create github issue. 
+If you are still facing issues please create a github issue. 
 
 ## Test
 
@@ -155,7 +174,7 @@ pytest python/tests/modin
 pytest python/tests/ 
 ```
 
-## (Optional dependecy) Modin installation
+## (Optional dependency) Modin installation
 
 Installation into conda environment. 
 
@@ -167,11 +186,11 @@ cd modin && pip install -e .
 
 ## Pytest logging 
 
-To enable logging enable with this function: 
+To enable logging: 
 ```python
 pyhdk.initLogger(debug_logs=True)
 ```
 
-In `setup_class(..)` body.
+In the `setup_class(..)` body.
 
-Logs are by default located at `hdk_log/` folder. 
+Logs are by default located in the `hdk_log/` folder. 
