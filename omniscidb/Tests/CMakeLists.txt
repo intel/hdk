@@ -245,39 +245,60 @@ list(APPEND SANITY_TESTS StringDictionaryHashTest)
 
 set_tests_properties(${SANITY_TESTS} PROPERTIES LABELS "sanity")
 
+if (WIN32)
+  # The following command doesn't create a directory if it already
+  # exists but prints and error if this directore cannot be created.
+  set(MKDIR_TMP dir tmp >nul 2>nul || mkdir tmp >nul 2>nul || mkdir tmp)
+  # On windows "env" command is available as a part of binaries that
+  # conda installs in omnisci-dev environment. The problem with this
+  # "env" command is that it converts paths in %PATH% into mingw style
+  # paths where %CONDA_PREFIX%\Library\bin path is converted into
+  # /usr/bin or /bin path that are valid only for mingw
+  # applications. Running HDK tests with PATH pointing somewhere to
+  # /usr/bin breaks DLL search for libraries installed into
+  # %CONDA_PREFIX%\Library\bin, e.g. all boost libraries. So instead
+  # of "env" from conda we need to use a windows replacement here.
+  # Note starting \" quote here and finishing \" in
+  # EXCLUDE_SANITY_TESTS. It makes the whole command to be enclosed in
+  # quotes that /s instructs to strip.
+  set(ENV_COMMAND cmd /s /v /c \"set AWS_REGION=${AWS_REGION} && set AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} && set AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} && )
+  # The following tests fail on Windows:
+  # ArrowBasedExecuteTest, ArrowStorageSqlTest, NoCatalogRelAlgTest
+  # ExecutionSequenceTest, CorrelatedSubqueryTest
+  # excluded because of https://github.com/intel-ai/hdk/issues/488.
+  # ResultSetTest excluded because of https://github.com/intel-ai/hdk/issues/489
+  # StringDictionaryTest excluded because of https://github.com/intel-ai/hdk/issues/490
+  # QueryBuilderTest excluded because of https://github.com/intel-ai/hdk/issues/491
+  set(EXCLUDE_SANITY_TESTS "-E \"(ArrowBasedExecuteTest^|ResultSetTest^|StringDictionaryTest^|QueryBuilderTest^|ArrowStorageSqlTest^|NoCatalogRelAlgTest^|ExecutionSequenceTest^|CorrelatedSubqueryTest)\""\")
+else()
+  set(MKDIR_TMP mkdir -p tmp)
+  set(ENV_COMMAND env AWS_REGION=${AWS_REGION} AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY})
+endif()
+
 add_custom_target(sanity_tests
-    COMMAND mkdir -p tmp
+    COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
-    COMMAND env AWS_REGION=${AWS_REGION}
-                AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                ${CMAKE_CTEST_COMMAND} --verbose --label-regex sanity
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex sanity ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS}
     USES_TERMINAL)
 
 cmake_host_system_information(RESULT CPU_NUM QUERY NUMBER_OF_PHYSICAL_CORES)
 add_custom_target(sanity_tests_par
-    COMMAND mkdir -p tmp
+    COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
-    COMMAND env AWS_REGION=${AWS_REGION}
-                AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                ${CMAKE_CTEST_COMMAND} --verbose --label-regex sanity -j ${CPU_NUM}
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex sanity -j ${CPU_NUM} ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS}
     USES_TERMINAL)
 
 add_custom_target(all_tests
-    COMMAND mkdir -p tmp
+    COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
-    COMMAND env AWS_REGION=${AWS_REGION}
-                AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                ${CMAKE_CTEST_COMMAND} --verbose
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS} UtilTest StringDictionaryTest StringTransformTest
     USES_TERMINAL)
 
 add_custom_target(topk_tests
-    COMMAND mkdir -p tmp
+    COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose --tests-regex "\"(TopKTest)\""
     DEPENDS TopKTest)
@@ -292,7 +313,7 @@ if(ENABLE_L0)
   set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
 
   add_custom_target(enabling_tests
-      COMMAND mkdir -p tmp
+      COMMAND ${MKDIR_TMP}
       COMMAND touch tmp/DictPayload
       COMMAND ${CMAKE_CTEST_COMMAND} --verbose --label-regex enabling
       DEPENDS ${ENABLING_TESTS}

@@ -126,6 +126,14 @@ jobs:
       name: cpu
       options: -DCMAKE_BUILD_TYPE=Release -DENABLE_FOLLY=off -G "Visual Studio 17 2022"
 
+  windows-sanity:
+    name: Sanity test (Gtests)
+    needs: windows-build
+    uses: ./.github/workflows/test-windows.yml
+    with:
+      cache-suffix: ${{ needs.windows-build.outputs.cache-suffix }}
+      test: sanity
+
   modin:
     name: Integration HDK with Modin (Pytest)
     uses: ./.github/workflows/modin.yml
