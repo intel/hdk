@@ -38,6 +38,14 @@ if (WIN32)
   # corresponding to the real C++ language standard version. Without this option Microsoft compiler
   # always defines __cplusplus to 199711L. A valid number is needed in llvm headers.
   add_compile_options(/Zc:__cplusplus)
+  # MSVC warnings management
+  option(ENABLE_NO_WINWARNINGS "disable most windows warnings" ON)
+  add_compile_definitions("NOMINMAX")
+  if(ENABLE_NO_WINWARNINGS)
+    add_compile_options(/W0 /wd5045)
+  else()
+    add_compile_options(/W4 /permisive-)
+  endif()
 else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
   # Do not allow undefined symbols when linking shared libraries because such symbols break

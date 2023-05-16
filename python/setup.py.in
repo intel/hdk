@@ -49,6 +49,7 @@ def gen_compile_flags() -> list:
         cpp_version_flags = [
             "/std:c++17",
             "/Zc:__cplusplus",
+            "/w",
             "/DBOOST_USE_WINAPI_VERSION=0x0600",
         ]
     return [
