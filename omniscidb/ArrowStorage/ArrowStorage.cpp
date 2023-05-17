@@ -32,6 +32,7 @@
 #include <arrow/util/value_parsing.h>
 #include <parquet/api/reader.h>
 #include <parquet/arrow/reader.h>
+#include <boost/align/aligned_allocator.hpp>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
@@ -424,12 +425,13 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
           indices_chunk = std::make_shared<arrow::Int32Array>(bulk_size, indices_buf);
         } else {
           // encoded
-          std::vector<int32_t> indices_buffer(bulk_size);
+          std::vector<int32_t, boost::alignment::aligned_allocator<int32_t, 64>>
+              indices_buffer(bulk_size);
           string_dict->getOrAddBulk(bulk, indices_buffer.data());
 
           // create arrow buffer of encoded size and copy into it
           std::shared_ptr<arrow::Buffer> encoded_indices_buf;
-          auto res = arrow::AllocateBuffer(bulk_size * elem_size);
+          auto res = arrow::AllocateBuffer(bulk_size * elem_size, /*alignment=*/64);
           CHECK(res.ok());
           encoded_indices_buf = std::move(res).ValueOrDie();
           switch (elem_size) {
@@ -437,13 +439,8 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
               auto encoded_indices_buf_ptr =
                   reinterpret_cast<int8_t*>(encoded_indices_buf->mutable_data());
               CHECK(encoded_indices_buf_ptr);
-              for (size_t i = 0; i < bulk_size; i++) {
-                encoded_indices_buf_ptr[i] =
-                    indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
-                            indices_buffer[i] > std::numeric_limits<uint8_t>::max()
-                        ? std::numeric_limits<uint8_t>::max()
-                        : indices_buffer[i];
-              }
+              encodeStrDictIndices(
+                  encoded_indices_buf_ptr, indices_buffer.data(), bulk_size);
               indices_chunk =
                   std::make_shared<arrow::Int8Array>(bulk_size, encoded_indices_buf);
               break;
@@ -452,13 +449,8 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
               auto encoded_indices_buf_ptr =
                   reinterpret_cast<int16_t*>(encoded_indices_buf->mutable_data());
               CHECK(encoded_indices_buf_ptr);
-              for (size_t i = 0; i < bulk_size; i++) {
-                encoded_indices_buf_ptr[i] =
-                    indices_buffer[i] == std::numeric_limits<int32_t>::min() ||
-                            indices_buffer[i] > std::numeric_limits<uint16_t>::max()
-                        ? std::numeric_limits<uint16_t>::max()
-                        : indices_buffer[i];
-              }
+              encodeStrDictIndices(
+                  encoded_indices_buf_ptr, indices_buffer.data(), bulk_size);
               indices_chunk =
                   std::make_shared<arrow::Int16Array>(bulk_size, encoded_indices_buf);
               break;

@@ -21,6 +21,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 
+#include <immintrin.h>
+
 #include <iostream>
 
 using namespace std::string_literals;
@@ -1224,4 +1226,142 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
         std::make_shared<arrow::Int32Array>(arrow_indices->length(), dict_indices_buf));
   }
   return std::make_shared<arrow::ChunkedArray>(converted_chunks);
+}
+
+#ifndef _MSC_VER
+__attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
+    int16_t* encoded_indices_buf,
+    const int32_t* indices_buf,
+    const size_t buf_size_in) {
+  constexpr int vector_window = (512 / 8) / 4;  // elements in a vector
+
+  LOG(ERROR) << "Running vectorized 16-bit conversion";
+  const int32_t* indices_buf_ptr = indices_buf;
+
+  std::memset(encoded_indices_buf, std::numeric_limits<uint16_t>::max(), buf_size_in);
+
+  __m512i null_vals =
+      _mm512_set1_epi32(static_cast<int>(std::numeric_limits<int32_t>::min()));
+  __m512i out_of_range_vals =
+      _mm512_set1_epi32(static_cast<int>(std::numeric_limits<uint16_t>::max()));
+
+  int buf_remaining = buf_size_in - vector_window;
+  while (buf_remaining > 0) {
+    __m512i vec_buf = _mm512_load_epi32(indices_buf_ptr);
+
+    // first, replace null sentinels
+    __mmask16 null_sentinel_mask = _mm512_cmpeq_epi32_mask(vec_buf, null_vals);
+
+    // then, replace out of range elements with the corresponding null sentinel
+    __mmask16 out_of_range_mask = _mm512_cmpgt_epi32_mask(vec_buf, out_of_range_vals);
+
+    // union the masks
+    __mmask16 nulls_mask = _mm512_kand(null_sentinel_mask, out_of_range_mask);
+
+    // finally, convert all elements to signed int16, skipping masked elements which will
+    // be left null
+    _mm512_mask_cvtsepi32_storeu_epi16(encoded_indices_buf, nulls_mask, vec_buf);
+
+    encoded_indices_buf -= vector_window;
+    indices_buf_ptr -= vector_window;
+    buf_remaining -= vector_window;
+  }
+
+  // TODO
+}
+
+__attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
+    int8_t* encoded_indices_buf,
+    const int32_t* indices_buf,
+    const size_t buf_size) {
+  VLOG(2) << "Running vectorized 8-bit conversion";
+  constexpr int vector_window_bytes = (512 / 8);
+  constexpr int vector_window =
+      vector_window_bytes / sizeof(int32_t);  // elements in a vector
+  const int buf_size_bytes = buf_size * sizeof(int32_t);
+  std::memset(encoded_indices_buf, std::numeric_limits<uint8_t>::max(), buf_size_bytes);
+
+  __m512i null_vals =
+      _mm512_set1_epi32(static_cast<int>(std::numeric_limits<int32_t>::min()));
+  __m512i out_of_range_vals =
+      _mm512_set1_epi32(static_cast<int>(std::numeric_limits<uint8_t>::max()));
+
+  const int vec_buf_end = floor(buf_size / vector_window) * vector_window;
+  int pos = 0;
+  int8_t* crt_encoded_indices_buf_ptr = encoded_indices_buf;
+  const int32_t* crt_indices_buf_ptr = indices_buf;
+  while (pos < vec_buf_end) {
+    __m512i vec_buf = _mm512_load_epi32(crt_indices_buf_ptr);
+
+    // first, replace null sentinels
+    __mmask16 null_sentinel_mask = _mm512_cmpeq_epu32_mask(vec_buf, null_vals);
+
+    // then, replace out of range elements with the corresponding null sentinel
+    __mmask16 out_of_range_mask = _mm512_cmpgt_epu32_mask(vec_buf, out_of_range_vals);
+
+    // union the masks
+    __mmask16 nulls_mask =
+        _mm512_knot(_mm512_kand(null_sentinel_mask, out_of_range_mask));
+
+    // finally, convert all elements to signed int16, skipping masked elements which will
+    // be left null
+    _mm512_mask_cvtusepi32_storeu_epi8(crt_encoded_indices_buf_ptr, nulls_mask, vec_buf);
+
+    crt_encoded_indices_buf_ptr += vector_window;
+    crt_indices_buf_ptr += vector_window;
+    pos += vector_window;
+  }
+
+  // remainder
+  for (int i = pos; i < int(buf_size); i++) {
+    encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
+                                     indices_buf[i] > std::numeric_limits<uint8_t>::max()
+                                 ? std::numeric_limits<uint8_t>::max()
+                                 : indices_buf[i];
+  }
+}
+
+#endif
+
+// TODO: centralize
+#if defined(_MSC_VER)
+#define DEFAULT_TARGET_ATTRIBUTE
+#else
+#define DEFAULT_TARGET_ATTRIBUTE __attribute__((target("default")))
+#endif
+
+DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
+                                                       const int32_t* indices_buf,
+                                                       const size_t buf_size) {
+  CHECK(false);
+  for (size_t i = 0; i < buf_size; i++) {
+    encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
+                                     indices_buf[i] > std::numeric_limits<uint16_t>::max()
+                                 ? std::numeric_limits<uint16_t>::max()
+                                 : indices_buf[i];
+  }
+}
+
+DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int8_t* encoded_indices_buf,
+                                                       const int32_t* indices_buf,
+                                                       const size_t buf_size) {
+  CHECK(false);
+  for (size_t i = 0; i < buf_size; i++) {
+    encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
+                                     indices_buf[i] > std::numeric_limits<uint8_t>::max()
+                                 ? std::numeric_limits<uint8_t>::max()
+                                 : indices_buf[i];
+  }
+}
+
+void encodeStrDictIndices(int8_t* encoded_indices_buf,
+                          const int32_t* indices_buf,
+                          const size_t buf_size) {
+  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, buf_size);
+}
+
+void encodeStrDictIndices(int16_t* encoded_indices_buf,
+                          const int32_t* indices_buf,
+                          const size_t buf_size) {
+  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, buf_size);
 }

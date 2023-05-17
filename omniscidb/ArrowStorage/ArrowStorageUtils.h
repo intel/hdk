@@ -43,3 +43,11 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
     StringDictionary* dict,
     std::shared_ptr<arrow::ChunkedArray> arr,
     const hdk::ir::Type* type);
+
+void encodeStrDictIndices(int8_t* encoded_indices_buf,
+                          const int32_t* indices_buf,
+                          const size_t buf_size);
+
+void encodeStrDictIndices(int16_t* encoded_indices_buf,
+                          const int32_t* indices_buf,
+                          const size_t buf_size);
