@@ -777,7 +777,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                           col_type));
                     } else {
                       int32_t min = 0;
-                      int32_t max = static_cast<int32_t>(col_arr->length());
+                      int32_t max = -1;
                       meta->fillChunkStats(min, max, /*has_nulls=*/true);
                     }
                     frag.metadata[col_idx] = meta;
