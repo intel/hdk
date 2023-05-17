@@ -1232,61 +1232,73 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
 __attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
     int16_t* encoded_indices_buf,
     const int32_t* indices_buf,
-    const size_t buf_size_in) {
-  constexpr int vector_window = (512 / 8) / 4;  // elements in a vector
-
-  LOG(ERROR) << "Running vectorized 16-bit conversion";
-  const int32_t* indices_buf_ptr = indices_buf;
-
-  std::memset(encoded_indices_buf, std::numeric_limits<uint16_t>::max(), buf_size_in);
+    const size_t num_elems) {
+  VLOG(2) << "Running vectorized 16-bit conversion";
+  constexpr int vector_window_bytes = (512 / 8);
+  constexpr int vector_window =
+      vector_window_bytes / sizeof(int32_t);  // elements in a vector
+  const size_t encoded_buf_size_bytes = num_elems * sizeof(int16_t);
+  std::memset(
+      encoded_indices_buf, std::numeric_limits<uint16_t>::max(), encoded_buf_size_bytes);
 
   __m512i null_vals =
       _mm512_set1_epi32(static_cast<int>(std::numeric_limits<int32_t>::min()));
   __m512i out_of_range_vals =
       _mm512_set1_epi32(static_cast<int>(std::numeric_limits<uint16_t>::max()));
 
-  int buf_remaining = buf_size_in - vector_window;
-  while (buf_remaining > 0) {
-    __m512i vec_buf = _mm512_load_epi32(indices_buf_ptr);
+  const int vec_buf_end = floor(num_elems / vector_window) * vector_window;
+  int pos = 0;
+  int16_t* crt_encoded_indices_buf_ptr = encoded_indices_buf;
+  const int32_t* crt_indices_buf_ptr = indices_buf;
+  while (pos < vec_buf_end) {
+    __m512i vec_buf = _mm512_load_epi32(crt_indices_buf_ptr);
 
     // first, replace null sentinels
-    __mmask16 null_sentinel_mask = _mm512_cmpeq_epi32_mask(vec_buf, null_vals);
+    __mmask16 null_sentinel_mask = _mm512_cmpeq_epu32_mask(vec_buf, null_vals);
 
     // then, replace out of range elements with the corresponding null sentinel
-    __mmask16 out_of_range_mask = _mm512_cmpgt_epi32_mask(vec_buf, out_of_range_vals);
+    __mmask16 out_of_range_mask = _mm512_cmpgt_epu32_mask(vec_buf, out_of_range_vals);
 
     // union the masks
-    __mmask16 nulls_mask = _mm512_kand(null_sentinel_mask, out_of_range_mask);
+    __mmask16 nulls_mask =
+        _mm512_knot(_mm512_kand(null_sentinel_mask, out_of_range_mask));
 
     // finally, convert all elements to signed int16, skipping masked elements which will
     // be left null
-    _mm512_mask_cvtsepi32_storeu_epi16(encoded_indices_buf, nulls_mask, vec_buf);
+    _mm512_mask_cvtusepi32_storeu_epi16(crt_encoded_indices_buf_ptr, nulls_mask, vec_buf);
 
-    encoded_indices_buf -= vector_window;
-    indices_buf_ptr -= vector_window;
-    buf_remaining -= vector_window;
+    crt_encoded_indices_buf_ptr += vector_window;
+    crt_indices_buf_ptr += vector_window;
+    pos += vector_window;
   }
 
-  // TODO
+  // remainder
+  for (int i = pos; i < int(num_elems); i++) {
+    encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
+                                     indices_buf[i] > std::numeric_limits<uint16_t>::max()
+                                 ? std::numeric_limits<uint16_t>::max()
+                                 : indices_buf[i];
+  }
 }
 
 __attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
     int8_t* encoded_indices_buf,
     const int32_t* indices_buf,
-    const size_t buf_size) {
+    const size_t num_elems) {
   VLOG(2) << "Running vectorized 8-bit conversion";
   constexpr int vector_window_bytes = (512 / 8);
   constexpr int vector_window =
       vector_window_bytes / sizeof(int32_t);  // elements in a vector
-  const int buf_size_bytes = buf_size * sizeof(int32_t);
-  std::memset(encoded_indices_buf, std::numeric_limits<uint8_t>::max(), buf_size_bytes);
+  const size_t encoded_buf_size_bytes = num_elems * sizeof(int8_t);
+  std::memset(
+      encoded_indices_buf, std::numeric_limits<uint8_t>::max(), encoded_buf_size_bytes);
 
   __m512i null_vals =
       _mm512_set1_epi32(static_cast<int>(std::numeric_limits<int32_t>::min()));
   __m512i out_of_range_vals =
       _mm512_set1_epi32(static_cast<int>(std::numeric_limits<uint8_t>::max()));
 
-  const int vec_buf_end = floor(buf_size / vector_window) * vector_window;
+  const int vec_buf_end = floor(num_elems / vector_window) * vector_window;
   int pos = 0;
   int8_t* crt_encoded_indices_buf_ptr = encoded_indices_buf;
   const int32_t* crt_indices_buf_ptr = indices_buf;
@@ -1313,7 +1325,7 @@ __attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
   }
 
   // remainder
-  for (int i = pos; i < int(buf_size); i++) {
+  for (int i = pos; i < int(num_elems); i++) {
     encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
                                      indices_buf[i] > std::numeric_limits<uint8_t>::max()
                                  ? std::numeric_limits<uint8_t>::max()
@@ -1332,9 +1344,8 @@ __attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
 
 DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
                                                        const int32_t* indices_buf,
-                                                       const size_t buf_size) {
-  CHECK(false);
-  for (size_t i = 0; i < buf_size; i++) {
+                                                       const size_t num_elems) {
+  for (size_t i = 0; i < num_elems; i++) {
     encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
                                      indices_buf[i] > std::numeric_limits<uint16_t>::max()
                                  ? std::numeric_limits<uint16_t>::max()
@@ -1344,9 +1355,8 @@ DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int16_t* encoded_indices_
 
 DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int8_t* encoded_indices_buf,
                                                        const int32_t* indices_buf,
-                                                       const size_t buf_size) {
-  CHECK(false);
-  for (size_t i = 0; i < buf_size; i++) {
+                                                       const size_t num_elems) {
+  for (size_t i = 0; i < num_elems; i++) {
     encoded_indices_buf[i] = indices_buf[i] == std::numeric_limits<int32_t>::min() ||
                                      indices_buf[i] > std::numeric_limits<uint8_t>::max()
                                  ? std::numeric_limits<uint8_t>::max()
@@ -1354,14 +1364,16 @@ DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int8_t* encoded_indices_b
   }
 }
 
+// dispatch the appropriate impl function depending on whether avx512 is available
+
 void encodeStrDictIndices(int8_t* encoded_indices_buf,
                           const int32_t* indices_buf,
-                          const size_t buf_size) {
-  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, buf_size);
+                          const size_t num_elems) {
+  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, num_elems);
 }
 
 void encodeStrDictIndices(int16_t* encoded_indices_buf,
                           const int32_t* indices_buf,
-                          const size_t buf_size) {
-  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, buf_size);
+                          const size_t num_elems) {
+  return encodeStrDictIndicesImpl(encoded_indices_buf, indices_buf, num_elems);
 }
