@@ -11,7 +11,7 @@
 
 boost::filesystem::path g_data_path;
 size_t num_threads = 15;
-size_t g_fragment_size = 160000000 / num_threads;
+size_t g_fragment_size = 140'000'000 / num_threads;
 bool g_use_parquet{false};
 ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
@@ -126,7 +126,7 @@ static void createTaxiTableCsv() {
                {"trip_type", ctx().int8()},
                {"pickup", ctx().extDict(ctx().text(), 0)},
                {"dropoff", ctx().extDict(ctx().text(), 0)},
-               {"cab_type", ctx().extDict(ctx().text(), 0)},  // grouped
+               {"cab_type", ctx().extDict(ctx().text(), 0, 4)},  // grouped
                {"precipitation", ctx().fp64()},
                {"snow_depth", ctx().int16()},
                {"snowfall", ctx().fp64()},
@@ -354,11 +354,11 @@ static void taxi_q4(benchmark::State& state) {
 }
 
 // functions as warmup for hot data
-BENCHMARK(table_count)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q1)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q2)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q3)->Unit(benchmark::kMillisecond);
-BENCHMARK(taxi_q4)->Unit(benchmark::kMillisecond);
+BENCHMARK(table_count)->Unit(benchmark::kMillisecond)->MinTime(10.0);
+BENCHMARK(taxi_q1)->Unit(benchmark::kMillisecond)->MinTime(10.0);
+BENCHMARK(taxi_q2)->Unit(benchmark::kMillisecond)->MinTime(10.0);
+BENCHMARK(taxi_q3)->Unit(benchmark::kMillisecond)->MinTime(10.0);
+BENCHMARK(taxi_q4)->Unit(benchmark::kMillisecond)->MinTime(10.0);
 
 int main(int argc, char* argv[]) {
   ::benchmark::Initialize(&argc, argv);
