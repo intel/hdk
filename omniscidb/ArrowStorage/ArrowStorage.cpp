@@ -370,7 +370,9 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
   const int elem_size = dict_desc->dictNBits / 8;
 
   for (const auto table_id : dict->table_ids) {
+    mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
     auto& table = *tables_.at(table_id);
+    data_lock.unlock();
 
     // TODO: should we add the data lock here?
     mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
