@@ -14,6 +14,7 @@ from pyarrow.lib cimport pyarrow_unwrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport TypeInfo, Config, CConfig, CContext
+from pyhdk._common import buildConfig
 
 from collections.abc import Iterable
 
@@ -238,10 +239,10 @@ cdef class CsvParseOptions:
 cdef class ArrowStorage(Storage):
   cdef shared_ptr[CArrowStorage] c_storage
 
-  def __cinit__(self, int schema_id):
+  def __cinit__(self, int schema_id, Config config = buildConfig()):
     cdef string schema_name = f"schema_#{schema_id}"
     cdef int db_id = (schema_id << 24) + 1
-    self.c_storage = make_shared[CArrowStorage](schema_id, schema_name, db_id)
+    self.c_storage = make_shared[CArrowStorage](schema_id, schema_name, db_id, config.c_config)
     self.c_schema_provider = static_pointer_cast[CSchemaProvider, CArrowStorage](self.c_storage)
     self.c_abstract_buffer_mgr = static_pointer_cast[CAbstractBufferMgr, CArrowStorage](self.c_storage)
 

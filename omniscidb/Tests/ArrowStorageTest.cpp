@@ -646,13 +646,17 @@ auto& ctx = hdk::ir::Context::defaultCtx();
 
 class ArrowStorageTest : public ::testing::Test {
  protected:
-  static void SetUpTestSuite() {}
+  static void SetUpTestSuite() { config_ = std::make_shared<Config>(); }
 
   static void TearDownTestSuite() {}
+
+  static ConfigPtr config_;
 };
 
+ConfigPtr ArrowStorageTest::config_;
+
 TEST_F(ArrowStorageTest, CreateTable_OK) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto tinfo = storage.createTable(
       "table1", {{"col1", ctx.int32()}, {"col2", ctx.fp32()}, {"col3", ctx.fp64()}});
   checkTableInfo(tinfo, TEST_DB_ID, tinfo->table_id, "table1", 0);
@@ -666,42 +670,42 @@ TEST_F(ArrowStorageTest, CreateTable_OK) {
 }
 
 TEST_F(ArrowStorageTest, CreateTable_EmptyTableName) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_THROW(storage.createTable("", {{"col1", ctx.int32()}}), std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_DuplicatedTableName) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_NO_THROW(storage.createTable("table1", {{"col1", ctx.int32()}}));
   ASSERT_THROW(storage.createTable("table1", {{"col1", ctx.int32()}}),
                std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_NoColumns) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_THROW(storage.createTable("table1", {}), std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_DuplicatedColumns) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_THROW(
       storage.createTable("table1", {{"col1", ctx.int32()}, {"col1", ctx.int32()}}),
       std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_EmptyColumnName) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_THROW(storage.createTable("table1", {{"", ctx.int32()}}), std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_ReservedColumnName) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ASSERT_THROW(storage.createTable("table1", {{"rowid", ctx.int32()}}),
                std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, CreateTable_SharedDict) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto type_dict0 = ctx.extDict(ctx.text(), 0);
   auto type_dict1 = ctx.extDict(ctx.text(), -1);
   auto type_dict2 = ctx.extDict(ctx.text(), -2);
@@ -723,13 +727,13 @@ TEST_F(ArrowStorageTest, CreateTable_SharedDict) {
 }
 
 TEST_F(ArrowStorageTest, CreateTable_WrongDictId) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto type = ctx.extDict(ctx.text(), 1);
   ASSERT_THROW(storage.createTable("table1", {{"col1", type}}), std::runtime_error);
 }
 
 TEST_F(ArrowStorageTest, ImportArrowTable) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto col_a = std::make_shared<arrow::Field>("A", arrow::null());
   auto schema = arrow::schema({col_a});
 
@@ -744,7 +748,7 @@ TEST_F(ArrowStorageTest, ImportArrowTable) {
 }
 
 TEST_F(ArrowStorageTest, DropTable) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto tinfo = storage.createTable("table1",
                                    {{"col1", ctx.int32()},
                                     {"col2", ctx.fp32()},
@@ -761,7 +765,7 @@ TEST_F(ArrowStorageTest, DropTable) {
 }
 
 TEST_F(ArrowStorageTest, DropTable_SharedDicts) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto tinfo1 = storage.createTable("table1", {{"col1", ctx.extDict(ctx.text(), 0)}});
   auto col1_info = storage.getColumnInfo(*tinfo1, "col1");
 
@@ -786,9 +790,10 @@ TEST_F(ArrowStorageTest, DropTable_SharedDicts) {
 
 void Test_ImportCsv_Numbers(const std::string& file_name,
                             const ArrowStorage::CsvParseOptions parse_options,
+                            ConfigPtr config,
                             bool pass_schema,
                             size_t fragment_size = 32'000'000) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = fragment_size;
   TableInfoPtr tinfo;
@@ -814,55 +819,55 @@ void Test_ImportCsv_Numbers(const std::string& file_name,
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_Header) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_NoHeader) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
-  Test_ImportCsv_Numbers("numbers_noheader.csv", parse_options, true);
+  Test_ImportCsv_Numbers("numbers_noheader.csv", parse_options, config_, true);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_Delim) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.delimiter = '|';
-  Test_ImportCsv_Numbers("numbers_delim.csv", parse_options, true);
+  Test_ImportCsv_Numbers("numbers_delim.csv", parse_options, config_, true);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 5);
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 2);
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 1);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 5);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 2);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_SmallBlock) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 20;
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_Numbers_SmallBlock_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 20;
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 5);
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 2);
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, true, 1);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 5);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 2);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, true, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_Numbers_Header) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, false);
+  Test_ImportCsv_Numbers("numbers_header.csv", parse_options, config_, false);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_Numbers_NoHeader) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
-  Test_ImportCsv_Numbers("numbers_noheader.csv", parse_options, false);
+  Test_ImportCsv_Numbers("numbers_noheader.csv", parse_options, config_, false);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Header) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 32'000'000;
   ArrowStorage::CsvParseOptions parse_options;
@@ -874,7 +879,7 @@ TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Header) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_Header) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 32'000'000;
   ArrowStorage::CsvParseOptions parse_options;
@@ -889,7 +894,7 @@ TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_Header) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Append_Header) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
 
   table_options.fragment_size = 32'000'000;
@@ -905,7 +910,7 @@ TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_Append_Header) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportToCreated_Header) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
 
   TableInfoPtr tinfo =
       storage.createTable("table1", {{"col1", ctx.int32()}, {"col2", ctx.fp32()}});
@@ -922,7 +927,7 @@ TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportToCreated_Hea
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_NullableTypeHeader) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
 
   TableInfoPtr tinfo = storage.createTable(
       "table1", {{"col1", ctx.int32(false)}, {"col2", ctx.fp32(false)}});
@@ -939,7 +944,7 @@ TEST_F(ArrowStorageTest, ImportCsv_KnownSchema_NullsColumn_NullableTypeHeader) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportCsvToCsv_Header) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
 
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 32'000'000;
@@ -959,7 +964,7 @@ TEST_F(ArrowStorageTest, ImportCsv_UnknownSchema_NullsColumn_ImportCsvToCsv_Head
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_DateTime) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   TableInfoPtr tinfo = storage.importCsvFile(
@@ -967,7 +972,7 @@ TEST_F(ArrowStorageTest, ImportCsv_DateTime) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header1) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_header.csv"),
@@ -984,7 +989,7 @@ TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header1) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header2) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   TableInfoPtr tinfo = storage.importCsvFile(getFilePath("numbers_header.csv"),
@@ -1001,7 +1006,7 @@ TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_Header2) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader1) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
@@ -1019,7 +1024,7 @@ TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader1) {
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader2) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
@@ -1037,7 +1042,7 @@ TEST_F(ArrowStorageTest, ImportCsv_PartialSchema_NoHeader2) {
 }
 
 TEST_F(ArrowStorageTest, AppendCsvData) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   TableInfoPtr tinfo =
       storage.createTable("table1", {{"col1", ctx.int32()}, {"col2", ctx.fp32()}});
   ArrowStorage::CsvParseOptions parse_options;
@@ -1047,8 +1052,8 @@ TEST_F(ArrowStorageTest, AppendCsvData) {
       storage, tinfo->table_id, 3, 32'000'000, range(3, (int32_t)1), range(3, 10.0f));
 }
 
-void Test_AppendCsv_Numbers(size_t fragment_size) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+void Test_AppendCsv_Numbers(size_t fragment_size, ConfigPtr config) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config);
   ArrowStorage::TableOptions table_options;
   ArrowStorage::CsvParseOptions parse_options;
   table_options.fragment_size = fragment_size;
@@ -1069,21 +1074,22 @@ void Test_AppendCsv_Numbers(size_t fragment_size) {
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Numbers) {
-  Test_AppendCsv_Numbers(100);
+  Test_AppendCsv_Numbers(100, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Numbers_Multifrag) {
-  Test_AppendCsv_Numbers(10);
-  Test_AppendCsv_Numbers(5);
-  Test_AppendCsv_Numbers(2);
-  Test_AppendCsv_Numbers(1);
+  Test_AppendCsv_Numbers(10, config_);
+  Test_AppendCsv_Numbers(5, config_);
+  Test_AppendCsv_Numbers(2, config_);
+  Test_AppendCsv_Numbers(1, config_);
 }
 
 void Test_ImportCsv_Strings(bool pass_schema,
                             bool read_twice,
                             const ArrowStorage::CsvParseOptions& parse_options,
+                            ConfigPtr config,
                             size_t fragment_size = 32'000'000) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = fragment_size;
   TableInfoPtr tinfo;
@@ -1119,76 +1125,77 @@ void Test_ImportCsv_Strings(bool pass_schema,
 
 TEST_F(ArrowStorageTest, ImportCsv_Strings) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(true, false, parse_options);
+  Test_ImportCsv_Strings(true, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Strings_SmallBlock) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Strings(true, false, parse_options);
+  Test_ImportCsv_Strings(true, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Strings_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(true, false, parse_options, 3);
-  Test_ImportCsv_Strings(true, false, parse_options, 2);
-  Test_ImportCsv_Strings(true, false, parse_options, 1);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 3);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 2);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Strings_SmallBlock_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Strings(true, false, parse_options, 3);
-  Test_ImportCsv_Strings(true, false, parse_options, 2);
-  Test_ImportCsv_Strings(true, false, parse_options, 1);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 3);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 2);
+  Test_ImportCsv_Strings(true, false, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Strings_NoSchema) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(false, false, parse_options);
+  Test_ImportCsv_Strings(false, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Strings) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(true, true, parse_options);
+  Test_ImportCsv_Strings(true, true, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Strings_SmallBlock) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Strings(true, true, parse_options);
+  Test_ImportCsv_Strings(true, true, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Strings_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(true, true, parse_options, 7);
-  Test_ImportCsv_Strings(true, true, parse_options, 5);
-  Test_ImportCsv_Strings(true, true, parse_options, 3);
-  Test_ImportCsv_Strings(true, true, parse_options, 2);
-  Test_ImportCsv_Strings(true, true, parse_options, 1);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 7);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 5);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 3);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 2);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Strings_SmallBlock_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Strings(true, true, parse_options, 7);
-  Test_ImportCsv_Strings(true, true, parse_options, 5);
-  Test_ImportCsv_Strings(true, true, parse_options, 3);
-  Test_ImportCsv_Strings(true, true, parse_options, 2);
-  Test_ImportCsv_Strings(true, true, parse_options, 1);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 7);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 5);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 3);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 2);
+  Test_ImportCsv_Strings(true, true, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Strings_NoSchema) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Strings(false, true, parse_options);
+  Test_ImportCsv_Strings(false, true, parse_options, config_);
 }
 
 void Test_ImportCsv_Dict(bool shared_dict,
                          bool read_twice,
                          const ArrowStorage::CsvParseOptions& parse_options,
+                         ConfigPtr config,
                          size_t fragment_size = 32'000'000,
                          int index_size = 4) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = fragment_size;
   TableInfoPtr tinfo;
@@ -1241,86 +1248,86 @@ void Test_ImportCsv_Dict(bool shared_dict,
 
 TEST_F(ArrowStorageTest, ImportCsv_Dict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(false, false, parse_options);
+  Test_ImportCsv_Dict(false, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Dict_SmallBlock) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Dict(false, false, parse_options);
+  Test_ImportCsv_Dict(false, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Dict_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(false, false, parse_options, 5);
-  Test_ImportCsv_Dict(false, false, parse_options, 3);
-  Test_ImportCsv_Dict(false, false, parse_options, 2);
-  Test_ImportCsv_Dict(false, false, parse_options, 1);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 5);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 3);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 2);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_Dict_SmallBlock_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Dict(false, false, parse_options, 5);
-  Test_ImportCsv_Dict(false, false, parse_options, 3);
-  Test_ImportCsv_Dict(false, false, parse_options, 2);
-  Test_ImportCsv_Dict(false, false, parse_options, 1);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 5);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 3);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 2);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_SharedDict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(true, false, parse_options);
+  Test_ImportCsv_Dict(true, false, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_SmallDict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(false, false, parse_options, 100, 2);
-  Test_ImportCsv_Dict(false, false, parse_options, 3, 2);
-  Test_ImportCsv_Dict(false, false, parse_options, 2, 1);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 100, 2);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 3, 2);
+  Test_ImportCsv_Dict(false, false, parse_options, config_, 2, 1);
 }
 
 TEST_F(ArrowStorageTest, ImportCsv_SharedSmallDict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(true, true, parse_options, 100, 2);
-  Test_ImportCsv_Dict(true, true, parse_options, 3, 2);
-  Test_ImportCsv_Dict(true, true, parse_options, 2, 1);
+  Test_ImportCsv_Dict(true, true, parse_options, config_, 100, 2);
+  Test_ImportCsv_Dict(true, true, parse_options, config_, 3, 2);
+  Test_ImportCsv_Dict(true, true, parse_options, config_, 2, 1);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Dict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(false, true, parse_options);
+  Test_ImportCsv_Dict(false, true, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Dict_SmallBlock) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Dict(false, true, parse_options);
+  Test_ImportCsv_Dict(false, true, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Dict_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(false, true, parse_options, 5);
-  Test_ImportCsv_Dict(false, true, parse_options, 3);
-  Test_ImportCsv_Dict(false, true, parse_options, 2);
-  Test_ImportCsv_Dict(false, true, parse_options, 1);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 5);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 3);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 2);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_Dict_SmallBlock_Multifrag) {
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.block_size = 50;
-  Test_ImportCsv_Dict(false, true, parse_options, 5);
-  Test_ImportCsv_Dict(false, true, parse_options, 3);
-  Test_ImportCsv_Dict(false, true, parse_options, 2);
-  Test_ImportCsv_Dict(false, true, parse_options, 1);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 5);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 3);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 2);
+  Test_ImportCsv_Dict(false, true, parse_options, config_, 1);
 }
 
 TEST_F(ArrowStorageTest, AppendCsv_SharedDict) {
   ArrowStorage::CsvParseOptions parse_options;
-  Test_ImportCsv_Dict(true, true, parse_options);
+  Test_ImportCsv_Dict(true, true, parse_options, config_);
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   TableInfoPtr tinfo = storage.createTable(
       "table1", {{"col1", ctx.int32()}, {"col2", ctx.fp32()}, {"col3", ctx.text()}});
   storage.appendJsonData(R"___({"col1": 1, "col2": 10.0, "col3": "s1"}
@@ -1337,7 +1344,7 @@ TEST_F(ArrowStorageTest, AppendJsonData) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_Arrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto int_array = ctx.arrayVarLen(ctx.int32());
   auto float_array = ctx.arrayVarLen(ctx.fp32());
   TableInfoPtr tinfo =
@@ -1359,7 +1366,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_Arrays) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_ArraysWithNulls) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto int_array = ctx.arrayVarLen(ctx.int32());
   auto float_array = ctx.arrayVarLen(ctx.fp32());
   TableInfoPtr tinfo =
@@ -1383,7 +1390,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_ArraysWithNulls) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_FixedSizeArrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto int3_array = ctx.arrayFixed(3, ctx.int32());
   auto float2_array = ctx.arrayFixed(2, ctx.fp32());
   TableInfoPtr tinfo =
@@ -1413,7 +1420,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_FixedSizeArrays) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_StringFixedSizeArrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto string3_array_type = ctx.arrayFixed(3, ctx.extDict(ctx.text(), 0));
   TableInfoPtr tinfo = storage.createTable("table1", {{"col1", string3_array_type}});
   storage.appendJsonData(R"___({"col1": ["str1", "str2"]}
@@ -1433,7 +1440,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_StringFixedSizeArrays) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_DateTime) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   TableInfoPtr tinfo =
       storage.createTable("table1",
                           {{"ts_0", ctx.timestamp(hdk::ir::TimeUnit::kSecond)},
@@ -1477,7 +1484,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_DateTime) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_DateTime_Multifrag) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 2;
   TableInfoPtr tinfo =
@@ -1596,7 +1603,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_DateTime_Multifrag) {
 }
 
 TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 2;
   TableInfoPtr tinfo = storage.createTable(
@@ -1620,7 +1627,7 @@ TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls) {
 }
 
 TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls_SingleChunk) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::TableOptions table_options;
   table_options.fragment_size = 2;
   TableInfoPtr tinfo = storage.createTable(
@@ -1647,7 +1654,7 @@ TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls_SingleChunk) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_BoolArrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto bool_3 = ctx.arrayFixed(3, ctx.boolean());
   auto bool_any = ctx.arrayVarLen(ctx.boolean());
   TableInfoPtr tinfo = storage.createTable("table1", {{"b1", bool_3}, {"b2", bool_any}});
@@ -1670,7 +1677,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_BoolArrays) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_IntArrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto smallint_any = ctx.arrayVarLen(ctx.int16());
   TableInfoPtr tinfo = storage.createTable("table1", {{"siv", smallint_any}});
   storage.appendJsonData("{\"siv\": [1, 2, 3]}", tinfo->table_id);
@@ -1692,7 +1699,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_IntArrays) {
 }
 
 TEST_F(ArrowStorageTest, AppendCsvData_Decimals) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   ArrowStorage::CsvParseOptions parse_options;
   parse_options.header = false;
   TableInfoPtr tinfo = storage.createTable(
@@ -1710,7 +1717,7 @@ TEST_F(ArrowStorageTest, AppendCsvData_Decimals) {
 }
 
 TEST_F(ArrowStorageTest, AppendJsonData_DecimalArrays) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto decimal_3 = ctx.arrayFixed(3, ctx.decimal64(10, 2));
   auto decimal_any = ctx.arrayVarLen(ctx.decimal64(10, 4));
   TableInfoPtr tinfo =
@@ -1736,7 +1743,7 @@ TEST_F(ArrowStorageTest, AppendJsonData_DecimalArrays) {
 }
 
 TEST_F(ArrowStorageTest, ImportParquet) {
-  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto tinfo = storage.importParquetFile(getFilePath("int_float.parquet"), "table1");
 
   checkData(storage,

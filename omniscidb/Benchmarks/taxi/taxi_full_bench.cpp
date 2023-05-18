@@ -15,8 +15,6 @@ size_t g_fragment_size = 160000000 / num_threads;
 bool g_use_parquet{false};
 ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
-EXTERN extern bool g_lazy_materialize_dictionaries;
-
 using namespace TestHelpers::ArrowSQLRunner;
 
 // #define USE_HOT_DATA
@@ -409,10 +407,11 @@ int main(int argc, char* argv[]) {
                          ->default_value(ExecutorDeviceType::CPU),
                      "Device type to use.");
 
-  desc.add_options()("use-lazy-materialization",
-                     po::value<bool>(&g_lazy_materialize_dictionaries)
-                         ->implicit_value(true)
-                         ->default_value(g_lazy_materialize_dictionaries));
+  desc.add_options()(
+      "use-lazy-materialization",
+      po::value<bool>(&config->storage.enable_lazy_dict_materialization)
+          ->implicit_value(true)
+          ->default_value(config->storage.enable_lazy_dict_materialization));
 
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
@@ -430,7 +429,7 @@ int main(int argc, char* argv[]) {
   logger::init(log_options);
   init(config);
 
-  if (g_lazy_materialize_dictionaries) {
+  if (config->storage.enable_lazy_dict_materialization) {
     std::cout << "Using lazy materialization!" << std::endl;
   }
 

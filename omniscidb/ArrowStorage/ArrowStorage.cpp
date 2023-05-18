@@ -37,9 +37,6 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "Shared/funcannotations.h"
-RUNTIME_EXPORT bool g_lazy_materialize_dictionaries{false};
-
 using namespace std::string_literals;
 
 namespace {
@@ -543,8 +540,10 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
             dict_ids.emplace(sharing_id, dict_id);
           }
           if (dicts_.find(dict_id) == dicts_.end()) {
-            auto dict_data_owned =
-                std::make_unique<DictionaryData>(std::move(dict_desc), dict_type);
+            auto dict_data_owned = std::make_unique<DictionaryData>(
+                std::move(dict_desc),
+                dict_type,
+                config_->storage.enable_lazy_dict_materialization);
             CHECK(dicts_.emplace(dict_id, std::move(dict_data_owned)).second);
           }
           auto* dict_data = dicts_.at(dict_id).get();
@@ -663,7 +662,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
 
   mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
   std::vector<bool> lazy_fetch_cols(at->columns().size(), false);
-  if (g_lazy_materialize_dictionaries) {
+  if (config_->storage.enable_lazy_dict_materialization) {
     VLOG(1) << "Appending arrow table with lazy dictionary materialization enabled";
     for (size_t col_idx = 0; col_idx < at->columns().size(); col_idx++) {
       auto col_info = getColumnInfo(db_id_, table_id, columnId(col_idx));
@@ -716,7 +715,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
             switch (col_arr->type()->id()) {
               case arrow::Type::STRING:
                 // if the dictionary has already been materialized, append indices
-                if (!g_lazy_materialize_dictionaries || dict_data->is_materialized) {
+                if (!config_->storage.enable_lazy_dict_materialization ||
+                    dict_data->is_materialized) {
                   col_arr = createDictionaryEncodedColumn(
                       dict_data->dict()->stringDict.get(), col_arr, col_type);
                 }
@@ -1310,9 +1310,10 @@ std::shared_ptr<arrow::Table> ArrowStorage::parseParquetFile(
 
 ArrowStorage::DictionaryData::DictionaryData(
     std::unique_ptr<DictDescriptor>&& dict_descriptor,
-    const hdk::ir::ExtDictionaryType* type)
+    const hdk::ir::ExtDictionaryType* type,
+    const bool enable_lazy_materialization)
     : dict_descriptor(std::move(dict_descriptor)), type(type) {
-  if (!g_lazy_materialize_dictionaries) {
+  if (!enable_lazy_materialization) {
     is_materialized = true;
   }
 }

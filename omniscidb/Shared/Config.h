@@ -172,6 +172,10 @@ struct DebugConfig {
   bool enable_automatic_ir_metadata = true;
 };
 
+struct StorageConfig {
+  bool enable_lazy_dict_materialization = false;
+};
+
 struct Config {
   ExecutionConfig exec;
   OptimizationsConfig opts;
@@ -179,6 +183,7 @@ struct Config {
   MemoryConfig mem;
   CacheConfig cache;
   DebugConfig debug;
+  StorageConfig storage;
 };
 
 using ConfigPtr = std::shared_ptr<Config>;
