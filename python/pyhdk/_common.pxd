@@ -240,6 +240,9 @@ cdef extern from "omniscidb/Shared/Config.h":
     string use_ra_cache
     bool enable_automatic_ir_metadata
 
+  cdef cppclass CStorageConfig "StorageConfig":
+    bool enable_lazy_dict_materialization
+
   cdef cppclass CConfig "Config":
     CExecutionConfig exec
     COptimizationsConfig opts
@@ -247,6 +250,7 @@ cdef extern from "omniscidb/Shared/Config.h":
     CMemoryConfig mem
     CCacheConfig cache
     CDebugConfig debug
+    CStorageConfig storage
 
 ctypedef shared_ptr[CConfig] CConfigPtr
 

@@ -1657,7 +1657,7 @@ class HDK:
         if "debug_logs" in kwargs:
             initLogger(debug_logs=kwargs.pop("debug_logs"))
         self._config = buildConfig(**kwargs)
-        self._storage = ArrowStorage(1)
+        self._storage = ArrowStorage(1, self._config)
         rs_registry = ResultSetRegistry(self._config)
         self._data_mgr = DataMgr(self._config)
         self._data_mgr.registerDataProvider(self._storage)

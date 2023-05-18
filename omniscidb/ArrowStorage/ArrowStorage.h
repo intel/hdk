@@ -17,6 +17,7 @@
 #include "DataMgr/AbstractDataProvider.h"
 #include "DataProvider/DictDescriptor.h"
 #include "SchemaMgr/SimpleSchemaProvider.h"
+#include "Shared/Config.h"
 #include "Shared/mapd_shared_mutex.h"
 
 #include <arrow/api.h>
@@ -55,10 +56,11 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     size_t block_size = 1 << 20;  // Default block size is 1MB
   };
 
-  ArrowStorage(int schema_id, const std::string& schema_name, int db_id)
+  ArrowStorage(int schema_id, const std::string& schema_name, int db_id, ConfigPtr config)
       : SimpleSchemaProvider(hdk::ir::Context::defaultCtx(), schema_id, schema_name)
       , db_id_(db_id)
-      , schema_id_(getSchemaId(db_id)) {}
+      , schema_id_(getSchemaId(db_id))
+      , config_(config) {}
 
   void fetchBuffer(const ChunkKey& key,
                    Data_Namespace::AbstractBuffer* dest,
@@ -172,7 +174,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     std::atomic<bool> is_materialized{false};
 
     DictionaryData(std::unique_ptr<DictDescriptor>&& dict_descriptor,
-                   const hdk::ir::ExtDictionaryType* type);
+                   const hdk::ir::ExtDictionaryType* type,
+                   const bool enable_lazy_materialization);
 
     void addTableColumnPair(const int table_id, const int col_id) {
       table_ids.insert(table_id);
@@ -242,4 +245,6 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   std::unordered_map<int, std::unique_ptr<DictionaryData>> dicts_;
   mutable mapd_shared_mutex data_mutex_;
   mutable mapd_shared_mutex dict_mutex_;
+
+  ConfigPtr config_;
 };

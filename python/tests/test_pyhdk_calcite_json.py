@@ -17,7 +17,7 @@ class TestCalciteJson:
     def setup_class(cls):
         # pyhdk.initLogger(debug_logs=True)
         cls.config = pyhdk.buildConfig()
-        cls.storage = pyhdk.storage.ArrowStorage(1)
+        cls.storage = pyhdk.storage.ArrowStorage(1, cls.config)
         cls.data_mgr = pyhdk.storage.DataMgr(cls.config)
         cls.data_mgr.registerDataProvider(cls.storage)
 

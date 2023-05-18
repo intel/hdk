@@ -14,7 +14,8 @@ import pytest
 
 class TestArrowStorage:
     def test_import_arrow_table(self):
-        storage = pyhdk.storage.ArrowStorage(123)
+        config = pyhdk.buildConfig()
+        storage = pyhdk.storage.ArrowStorage(123, config)
         assert storage is not None
         assert storage.getId() == 123
 
@@ -62,12 +63,18 @@ class TestArrowStorage:
         assert columns[2].type.size == 8
         assert columns[2].is_rowid == True
 
+    # TODO: remove once modin has been updated
+    def test_default_constructed_config(self):
+        storage = pyhdk.storage.ArrowStorage(456)
+        assert storage is not None
+        assert storage.getId() == 456
+
 
 class TestCalcite:
     @classmethod
     def setup_class(cls):
         cls.config = pyhdk.buildConfig()
-        cls.storage = pyhdk.storage.ArrowStorage(1)
+        cls.storage = pyhdk.storage.ArrowStorage(1, cls.config)
         cls.calcite = pyhdk.sql.Calcite(cls.storage, cls.config)
 
         at = pyarrow.Table.from_pandas(

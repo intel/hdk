@@ -318,7 +318,8 @@ class ArrowSQLRunnerImpl {
       config_ = std::make_shared<Config>();
     }
 
-    storage_ = std::make_shared<ArrowStorage>(TEST_SCHEMA_ID, "test", TEST_DB_ID);
+    storage_ =
+        std::make_shared<ArrowStorage>(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
     rs_registry_ = std::make_shared<hdk::ResultSetRegistry>(config_);
     schema_mgr_ = std::make_shared<SchemaMgr>();
     schema_mgr_->registerProvider(TEST_SCHEMA_ID, storage_);

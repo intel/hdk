@@ -82,7 +82,7 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
   internal_->config = buildConfig();
 
   internal_->storage = std::make_shared<ArrowStorage>(
-      internal_->schema_id, internal_->db_name, internal_->db_id);
+      internal_->schema_id, internal_->db_name, internal_->db_id, internal_->config);
 
   internal_->data_mgr =
       std::make_shared<Data_Namespace::DataMgr>(*internal_->config.get());

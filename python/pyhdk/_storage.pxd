@@ -127,8 +127,8 @@ cdef class Storage(SchemaProvider):
   cdef shared_ptr[CAbstractBufferMgr] c_abstract_buffer_mgr
 
 cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
-  cdef cppclass CArrowStorage "ArrowStorage"(CSchemaProvider, CAbstractDataProvider):
-    CArrowStorage(int, string, int) except +;
+  cdef cppclass CArrowStorage "ArrowStorage"(CSchemaProvider, CAbstractDataProvider, shared_ptr[CConfig]):
+    CArrowStorage(int, string, int, shared_ptr[CConfig]) except +;
 
     CTableInfoPtr createTable(const string&, const vector[CColumnDescription]&, const CTableOptions&) except +
 

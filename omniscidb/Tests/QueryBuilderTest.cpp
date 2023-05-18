@@ -264,7 +264,8 @@ class QueryBuilderTest : public TestSuite {
   static void SetUpTestSuite() {
     auto data_mgr = getDataMgr();
     auto ps_mgr = data_mgr->getPersistentStorageMgr();
-    storage2_ = std::make_shared<ArrowStorage>(TEST_SCHEMA_ID2, "test2", TEST_DB_ID2);
+    storage2_ = std::make_shared<ArrowStorage>(
+        TEST_SCHEMA_ID2, "test2", TEST_DB_ID2, configPtr());
     ps_mgr->registerDataProvider(TEST_SCHEMA_ID2, storage2_);
     schema_mgr_ = std::make_shared<SchemaMgr>();
     schema_mgr_->registerProvider(TEST_SCHEMA_ID, getStorage());
