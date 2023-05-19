@@ -58,6 +58,7 @@ endif()
 
 # Tests + Microbenchmarks
 add_executable(StringDictionaryBenchmark StringDictionaryBenchmark.cpp)
+add_executable(ArrowStorageBenchmark ArrowStorageBenchmark.cpp)
 
 if(ENABLE_L0)
   add_executable(L0MgrExecuteTest L0MgrExecuteTest.cpp)
@@ -132,6 +133,12 @@ if(ENABLE_FOLLY)
   target_link_libraries(StringDictionaryBenchmark benchmark gtest StringDictionary Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Folly_LIBRARIES} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
 else()
   target_link_libraries(StringDictionaryBenchmark benchmark gtest StringDictionary Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
+endif()
+
+if(ENABLE_FOLLY)
+  target_link_libraries(ArrowStorageBenchmark benchmark gtest ArrowStorage Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Folly_LIBRARIES} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
+else()
+  target_link_libraries(ArrowStorageBenchmark benchmark gtest ArrowStorage Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
 endif()
 
 if(ENABLE_CUDA)

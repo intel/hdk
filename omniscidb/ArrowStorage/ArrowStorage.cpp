@@ -372,7 +372,6 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
     auto& table = *tables_.at(table_id);
     data_lock.unlock();
 
-    // TODO: should we add the data lock here?
     mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
 
     if (table.row_count == 0) {
