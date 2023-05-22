@@ -117,6 +117,21 @@ void LogOptions::parse_command_line(int argc, char const* const* argv) {
   po::notify(vm);  // Sets LogOptions member variables.
 }
 
+void LogOptions::parse_command_line(const std::string& app_name,
+                                    const std::string& cmd_line) {
+  std::vector<std::string> args;
+  if (!cmd_line.empty()) {
+    args = po::split_unix(cmd_line);
+  }
+
+  std::vector<const char*> argv;
+  argv.push_back(app_name.c_str());
+  for (auto& arg : args) {
+    argv.push_back(arg.c_str());
+  }
+  return parse_command_line(static_cast<int>(argv.size()), argv.data());
+}
+
 // Must be called before init() to take effect.
 void LogOptions::set_base_path(std::string const& base_path) {
   base_path_ = base_path;
