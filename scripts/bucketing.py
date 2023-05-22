@@ -123,6 +123,8 @@ def advanced_bucketize(p: subprocess.CompletedProcess):
             add_to_bucket(report[top_level_bucket], "HASH_TABLE_CACHE", test)
         elif "SQLiteComparator" in p.stdout:
             add_to_bucket(report[top_level_bucket], "INCORRECT_RESULT", test)
+        elif "device hung" in p.stderr:
+            add_to_bucket(report[top_level_bucket], "DEVICE_HUNG", test)
         else:
             add_to_bucket(report[top_level_bucket], "OTHER", test, p.stderr)
 
