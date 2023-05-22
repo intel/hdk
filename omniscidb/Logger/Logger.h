@@ -151,6 +151,7 @@ class LogOptions {
   boost::filesystem::path full_log_dir() const;
   boost::program_options::options_description const& get_options() const;
   void parse_command_line(int, char const* const*);
+  void parse_command_line(const std::string& app_name, const std::string& cmd_line);
   void set_base_path(std::string const& base_path);
   void set_options();
 };

@@ -112,6 +112,7 @@ cdef extern from "omniscidb/Logger/Logger.h" namespace "logger":
 
   cdef cppclass CLogOptions "logger::LogOptions":
     CLogOptions(const char*)
+    void parse_command_line(const string&, const string&)
     CSeverity severity_
 
   cdef void CInitLogger "logger::init"(const CLogOptions &)
