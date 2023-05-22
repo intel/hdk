@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "Expr.h"
 #include "ExprRewriter.h"
 
