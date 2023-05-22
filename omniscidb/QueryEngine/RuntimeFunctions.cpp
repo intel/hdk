@@ -1187,7 +1187,7 @@ ALWAYS_INLINE GENERIC_ADDR_SPACE int64_t* get_matching_group_value(
     const T* key,
     const uint32_t key_count,
     const uint32_t row_size_quad) {
-  auto off = h * row_size_quad;
+  uint64_t off = static_cast<uint64_t>(h) * row_size_quad;
   auto row_ptr = reinterpret_cast<T*>(groups_buffer + off);
   if (*row_ptr == get_empty_key<typename remove_addr_space<T>::type>()) {
     memcpy(reinterpret_cast<GENERIC_ADDR_SPACE void*>(row_ptr),
