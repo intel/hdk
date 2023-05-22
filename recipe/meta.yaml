@@ -1,6 +1,6 @@
 {% set version = "0.5.0" %}  # PEP 386
 
-{% set number = "0" %}
+{% set number = "1" %}
 {% set cuda_enabled = cuda_compiler_version is not undefined and cuda_compiler_version == '11.0' %}
 {% set build_ext = "cuda" if cuda_enabled else "cpu" %}
 {% set build_string = "h{}_{}".format(PKG_HASH, number) %}
@@ -34,7 +34,7 @@ outputs:
     script: build-hdk.sh
     build:
       string: {{ py_build_string_ext }}
-      skip: True  # [py not in (38, 39, 310)]
+      skip: True  # [py not in (38, 39, 310, 311)]
       missing_dso_whitelist:
         - '*/libcuda.*'  # [cuda_compiler_version not in (undefined, "None")]
         - '*/libjvm.so'
