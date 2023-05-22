@@ -84,22 +84,34 @@ static void import_csv(benchmark::State& state) {
   }
 }
 
-// TODO: need to figure out a way to clear out materialized dict
 static void dictionary_materialize(benchmark::State& state) {
   ArrowStorage storage(/*schema_id=*/123, /*schema_name=*/"test", /*db_id=*/1, g_config);
 
   // generate some data
   auto csv = genCsv(10'000'000);
-
   ArrowStorage::CsvParseOptions parse_options;
   auto csv_table = storage.parseCsvData(csv, parse_options);
-  storage.importArrowTable(csv_table, "test_table");
+
   for (auto _ : state) {
+    state.PauseTiming();  // Stop timers. They will not count until they are resumed.
+    storage.dropTable("test_table", /*throw_if_not_exist=*/false);
+    const auto table_info = storage.importArrowTable(csv_table, "test_table");
+    CHECK(table_info);
+    const auto db_id = table_info->db_id;
+    const auto table_id = table_info->table_id;
+    const auto col_infos = storage.listColumns(db_id, table_id);
+    CHECK_EQ(col_infos.size(), size_t(3));  // int col, str col, row_id
+    const auto& dict_col_info_ptr = col_infos[1];
+    CHECK(dict_col_info_ptr);
+    const auto dict_id =
+        dict_col_info_ptr->type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    state.ResumeTiming();  // And resume timers. They are now counting again.
+    storage.getDictMetadata(dict_id, /*load_dict=*/true);
   }
 }
 
 BENCHMARK(import_csv)->Unit(benchmark::kMillisecond)->Iterations(10);
-// BENCHMARK(dictionary_materialize)->Unit(benchmark::kMillisecond)->MinTime(10);
+BENCHMARK(dictionary_materialize)->Unit(benchmark::kMillisecond)->Iterations(25);
 
 int main(int argc, char* argv[]) {
   ::benchmark::Initialize(&argc, argv);
@@ -119,6 +131,7 @@ int main(int argc, char* argv[]) {
 
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
+  log_options.severity_clog_ = logger::Severity::WARNING;
   log_options.set_options();  // update default values
   desc.add(log_options.get_options());
 
@@ -131,6 +144,10 @@ int main(int argc, char* argv[]) {
   }
 
   logger::init(log_options);
+  if (g_config->storage.enable_lazy_dict_materialization) {
+    LOG(WARNING) << "Using lazy materialization.";
+  }
+
   try {
     ::benchmark::RunSpecifiedBenchmarks();
   } catch (const std::exception& e) {
