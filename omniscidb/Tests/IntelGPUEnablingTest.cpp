@@ -252,12 +252,43 @@ struct ExecuteTestBase {
     }
   }
 
+  static void createRandomTestTable() {
+    createTable("random_test",
+                {{"x1", ctx().int32()},
+                 {"x2", ctx().int32()},
+                 {"x3", ctx().int32()},
+                 {"x4", ctx().int32()},
+                 {"x5", ctx().int32()}},
+                {256});
+    run_sqlite_query("DROP TABLE IF EXISTS random_test;");
+    run_sqlite_query(
+        "CREATE TABLE random_test (x1 int, x2 int, x3 int, x4 int, x5 int);");
+
+    TestHelpers::ValuesGenerator gen("random_test");
+    std::string csv_data;
+    constexpr double pi = 3.141592653589793;
+    for (size_t i = 0; i < 512; i++) {
+      int32_t x1 = static_cast<int32_t>((3 * i + 1) % 5);
+      int32_t x2 = static_cast<int32_t>(std::floor(10 * std::sin(i * pi / 64.0)));
+      int32_t x3 = static_cast<int32_t>(std::floor(10 * std::cos(i * pi / 45.0)));
+      int32_t x4 =
+          static_cast<int32_t>(100000000 * std::floor(10 * std::sin(i * pi / 32.0)));
+      int32_t x5 = static_cast<int32_t>(std::floor(1000000000 * std::cos(i * pi / 32.0)));
+      run_sqlite_query(gen(x1, x2, x3, x4, x5));
+      csv_data += std::to_string(x1) + "," + std::to_string(x2) + "," +
+                  std::to_string(x3) + "," + std::to_string(x4) + "," +
+                  std::to_string(x5) + "\n";
+    }
+    insertCsvValues("random_test", csv_data);
+  }
+
   static void createAndPopulateTestTables() {
     createTestInnerTable();
     createTestTable();
     createSmallTestsTable();
     createTestInnerLoopJoinTable();
     createGpuSortTestTable();
+    createRandomTestTable();
   }
 };
 
@@ -568,6 +599,48 @@ TEST_F(GroupByTest, WithCase) {
   c("SELECT CASE WHEN x > 8 THEN 100000000 ELSE 42 END AS c, COUNT(*) FROM test GROUP "
     "BY c;",
     g_dt);
+}
+
+TEST_F(GroupByTest, GroupByBaselineHash) {
+  c("SELECT cast(x1 as double) as key, COUNT(*), SUM(x2), MIN(x3), MAX(x4) FROM "
+    "random_test"
+    " GROUP BY key ORDER BY key;",
+    g_dt);
+  c("SELECT cast(x2 as double) as key, COUNT(*), SUM(x1), AVG(x3), MIN(x4) FROM "
+    "random_test"
+    " GROUP BY key ORDER BY key;",
+    g_dt);
+  c("SELECT cast(x3 as double) as key, COUNT(*), AVG(x2), MIN(x1), COUNT(x4) FROM "
+    "random_test"
+    " GROUP BY key ORDER BY key;",
+    g_dt);
+  c("SELECT x4 as key, COUNT(*), AVG(x1), MAX(x2), MAX(x3) FROM random_test"
+    " GROUP BY key ORDER BY key;",
+    g_dt);
+  c("SELECT x5 as key, COUNT(*), MAX(x1), MIN(x2), SUM(x3) FROM random_test"
+    " GROUP BY key ORDER BY key;",
+    g_dt);
+  // c("SELECT x1, x2, x3, x4, COUNT(*), MIN(x5) FROM random_test "
+  //   "GROUP BY x1, x2, x3, x4 ORDER BY x1, x2, x3, x4;",
+  //   g_dt);
+  {
+    std::string query(
+        "SELECT x, COUNT(*) from (SELECT ofd - 2 as x FROM test) GROUP BY x ORDER BY "
+        "x ASC");
+    c(query + " NULLS FIRST;", query + ";", g_dt);
+  }
+  {
+    std::string query(
+        "SELECT x, COUNT(*) from (SELECT cast(ofd - 2 as bigint) as x FROM test) GROUP "
+        "BY x ORDER BY x ASC");
+    c(query + " NULLS FIRST;", query + ";", g_dt);
+  }
+  {
+    std::string query(
+        "SELECT x, COUNT(*) from (SELECT ofq - 2 as x FROM test) GROUP BY x ORDER BY "
+        "x ASC");
+    c(query + " NULLS FIRST;", query + ";", g_dt);
+  }
 }
 
 class BasicTest : public ExecuteTestBase, public ::testing::Test {};

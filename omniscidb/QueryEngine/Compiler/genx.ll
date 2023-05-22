@@ -226,3 +226,66 @@ define void @agg_count_distinct_bitmap_skip_val_gpu(i64* %agg, i64 noundef %val,
 .skip:
     ret void
 }
+
+
+define i64 @atomic_cas_int_64(i64 addrspace(4)* %p, i64 %cmp, i64 %val) {
+    %val_success = cmpxchg i64 addrspace(4)* %p, i64 %cmp, i64 %val acq_rel monotonic
+    %old = extractvalue {i64, i1} %val_success, 0
+    ret i64 %old
+}
+
+define i32 @atomic_cas_int_32(i32 addrspace(4)* %p, i32 %cmp, i32 %val) {
+    %val_success = cmpxchg i32 addrspace(4)* %p, i32 %cmp, i32 %val acq_rel monotonic
+    %old = extractvalue {i32, i1} %val_success, 0
+    ret i32 %old
+}
+
+define i64 @atomic_xchg_int_64(i64 addrspace(4)* %p, i64 %val) {
+    %old = atomicrmw xchg i64 addrspace(4)* %p, i64 %val monotonic
+    ret i64 %old
+}
+
+define i32 @atomic_xchg_int_32(i32 addrspace(4)* %p, i32 %val) {
+    %old = atomicrmw xchg i32 addrspace(4)* %p, i32 %val monotonic
+    ret i32 %old
+}
+
+define void @agg_max(i64* %agg, i64 noundef %val) {
+    %old = atomicrmw max i64* %agg, i64 %val monotonic
+    ret void
+}
+
+define void @agg_max_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+    %no_skip = icmp ne i64 %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    call void @agg_max(i64* %agg, i64 noundef %val)
+    br label %.skip
+.skip:
+    ret void
+}
+
+define void @agg_min(i64* %agg, i64 noundef %val) {
+    %old = atomicrmw min i64* %agg, i64 %val acq_rel
+    ret void
+}
+
+declare i64 @llvm.smin.i64(i64, i64)
+
+define void @agg_min_skip_val(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
+    %no_skip = icmp ne i64 %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    %orig = load atomic i64, i64 addrspace(4)* %agg unordered, align 8
+    br label %.loop
+.loop:
+    %loaded = phi i64 [ %orig, %.noskip ], [ %old, %.loop ]
+    %isnull = icmp eq i64 %loaded, %skip_val
+    %min = call i64 @llvm.smin.i64(i64 %loaded, i64 %val)
+    %st = select i1 %isnull, i64 %val, i64 %min
+    %old = call i64 @atomic_cas_int_64(i64 addrspace(4)* %agg, i64 %loaded, i64 %st)
+    %success = icmp eq i64 %old, %loaded
+    br i1 %success, label %.skip, label %.loop
+.skip:
+    ret void
+}
