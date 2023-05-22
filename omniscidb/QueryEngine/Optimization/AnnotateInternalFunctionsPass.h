@@ -15,10 +15,7 @@
  */
 
 #include <llvm/IR/Function.h>
-
-#include <llvm/Analysis/CallGraph.h>
-#include <llvm/Analysis/CallGraphSCCPass.h>
-
+#include <llvm/IR/PassManager.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -31,18 +28,30 @@
  * optimizer to more aggressively remove / reorder these functions and is particularly
  * important for dead code elimination.
  */
-class AnnotateInternalFunctionsPass : public llvm::CallGraphSCCPass {
+class AnnotateInternalFunctionsPass
+    : public llvm::PassInfoMixin<AnnotateInternalFunctionsPass> {
  public:
   static char ID;
-  AnnotateInternalFunctionsPass() : CallGraphSCCPass(ID) {}
 
-  bool runOnSCC(llvm::CallGraphSCC& SCC) override {
+  llvm::PreservedAnalyses run(llvm::LazyCallGraph::SCC& SCC,
+                              llvm::CGSCCAnalysisManager& AM,
+                              llvm::LazyCallGraph& CG,
+                              llvm::CGSCCUpdateResult& UR) {
     bool updated_function_defs = false;
 
+#if 0
+    for (llvm::LazyCallGraph::Node& N : InitialC) {
+      llvm::Function* Fn = &N.getFunction();
+      llvm::errs() << "llvm::PreservedAnalyse run(), Function=" << Fn->getName() << "\n";
+    }
+#endif
+
+    // --------------
     // iterate the call graph
     for (auto& node : SCC) {
-      CHECK(node);
-      auto fcn = node->getFunction();
+      CHECK(&node);
+
+      llvm::Function* fcn = &node.getFunction();
       if (!fcn) {
         continue;
       }
@@ -64,10 +73,8 @@ class AnnotateInternalFunctionsPass : public llvm::CallGraphSCCPass {
       }
     }
 
-    return updated_function_defs;
+    return llvm::PreservedAnalyses::all();
   }
-
-  llvm::StringRef getPassName() const override { return "AnnotateInternalFunctionsPass"; }
 
  private:
   static const std::set<std::string> extension_functions;
@@ -119,8 +126,8 @@ const std::set<std::string> AnnotateInternalFunctionsPass::extension_functions =
                           "is_point_in_merc_view",
                           "is_point_size_in_merc_view"};
 
-// TODO: consider either adding specializations here for the `__X` versions (for different
-// types), or just truncate the function name removing the underscores in
+// TODO: consider either adding specializations here for the `__X` versions (for
+// different types), or just truncate the function name removing the underscores in
 // `isInternalMathFunction`.
 const std::set<std::string> AnnotateInternalFunctionsPass::math_builtins =
     std::set<std::string>{"Acos",  "Asin",    "Atan", "Atan2",    "Ceil",    "Cos",
