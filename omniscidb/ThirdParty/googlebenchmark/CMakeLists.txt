@@ -146,6 +146,9 @@ else()
   # Disable warnings regarding deprecated parts of the library while building
   # and testing those parts of the library.
   add_cxx_compiler_flag(-Wno-deprecated-declarations)
+
+  # Disable usused var warning
+  add_cxx_compiler_flag(-Wno-unused-variable)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     # Intel silently ignores '-Wno-deprecated-declarations',
     # warning no. 1786 must be explicitly disabled.
