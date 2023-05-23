@@ -440,6 +440,24 @@ void GpuReductionTester::performReductionTest(
   }
 
   insert_globals(ext_module.get(), module_);
+  DUMP_MODULE(module_, "after.insert_global.spirv.ll")
+
+  // Initialize shared memory buffer
+  const auto slm_buffer = module_->getNamedGlobal("slm.buf.i64");
+  CHECK(slm_buffer);
+  llvm::ArrayType* ArrayTy_0 =
+      llvm::ArrayType::get(llvm::IntegerType::get(module_->getContext(), 64), 1024);
+  llvm::ConstantAggregateZero* const_array_2 =
+      llvm::ConstantAggregateZero::get(ArrayTy_0);
+  slm_buffer->setInitializer(const_array_2);
+
+#ifdef DEBUG
+  // Check global string name
+  for (llvm::GlobalVariable& G : module_->getGlobalList()) {
+    // std::ostringstream oss;
+    std::cerr << " global var =  " << G.getName().str() << std::endl;
+  }
+#endif
 
   DUMP_MODULE(module_, "after.linking.before.replace_function.spirv.ll")
 
