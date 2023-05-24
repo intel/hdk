@@ -19,13 +19,11 @@ from Cython.Build import cythonize
 from distutils.core import setup, Extension
 
 import os
-import numpy as np
 import pyarrow as pa
 
 
 def gen_include_dirs() -> list:
     return [
-        np.get_include(),
         pa.get_include(),
         "@CMAKE_CURRENT_SOURCE_DIR@",
         "@CMAKE_SOURCE_DIR@",
