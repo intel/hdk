@@ -864,6 +864,23 @@ std::shared_ptr<CompilationContext> L0Backend::generateNativeCode(
   return generateNativeGPUCode(exts_, func, wrapper_func, live_funcs, co, gpu_target_);
 }
 
+void insert_globals(llvm::Module* from, llvm::Module* to) {
+  for (const llvm::GlobalVariable& I : from->globals()) {
+    std::cerr << "Adding global " << I.getName().str() << std::endl;
+    llvm::GlobalVariable* new_gv =
+        new llvm::GlobalVariable(*to,
+                                 I.getValueType(),
+                                 I.isConstant(),
+                                 I.getLinkage(),
+                                 (llvm::Constant*)nullptr,
+                                 I.getName(),
+                                 (llvm::GlobalVariable*)nullptr,
+                                 I.getThreadLocalMode(),
+                                 I.getType()->getAddressSpace());
+    new_gv->copyAttributesFrom(&I);
+  }
+}
+
 std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
     const std::map<ExtModuleKinds, std::unique_ptr<llvm::Module>>& exts,
     llvm::Function* func,
@@ -880,6 +897,8 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   DUMP_MODULE(module, "before.linking.spirv.ll")
 
   CHECK(exts.find(ExtModuleKinds::spirv_helper_funcs_module) != exts.end());
+
+  insert_globals(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(), module);
 
   for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
     insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
@@ -955,7 +974,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   opts.setDesiredBIsRepresentation(SPIRV::BIsRepresentation::OpenCL12);
   opts.setDebugInfoEIS(SPIRV::DebugInfoEIS::OpenCL_DebugInfo_100);
 
-#if 0
+#if 1
   std::error_code ec;
   llvm::raw_fd_ostream os("gen.ll", ec);
   module->print(os, nullptr);

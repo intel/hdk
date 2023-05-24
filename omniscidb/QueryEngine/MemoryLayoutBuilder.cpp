@@ -1092,8 +1092,11 @@ std::unique_ptr<QueryMemoryDescriptor> MemoryLayoutBuilder::build(
     Executor* executor,
     const ExecutorDeviceType device_type) {
   bool sort_on_gpu_hint =
-      device_type == ExecutorDeviceType::GPU && allow_multifrag &&
-      !ra_exe_unit_.sort_info.order_entries.empty() &&
+      // device_type == ExecutorDeviceType::GPU && allow_multifrag &&
+      // !ra_exe_unit_.sort_info.order_entries.empty() &&
+      (device_type == ExecutorDeviceType::GPU && executor->getDataMgr()->getGpuMgr() &&
+       executor->getDataMgr()->getGpuMgr()->getPlatform() != GpuMgrPlatform::L0) &&
+      allow_multifrag && !ra_exe_unit_.sort_info.order_entries.empty() &&
       gpu_can_handle_order_entries(
           ra_exe_unit_, query_infos, ra_exe_unit_.sort_info.order_entries, executor);
   // must_use_baseline_sort is true iff we'd sort on GPU with the old algorithm
