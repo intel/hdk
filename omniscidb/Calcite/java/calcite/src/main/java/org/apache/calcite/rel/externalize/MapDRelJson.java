@@ -562,11 +562,6 @@ public class MapDRelJson {
   }
 
   SqlOperator toOp(RelInput relInput, String name) {
-    // in case different operator has the same kind, check with both name and kind.
-    String kind = name;
-    String syntax = "FUNCTION";
-    SqlKind sqlKind = SqlKind.valueOf(kind);
-    SqlSyntax sqlSyntax = SqlSyntax.valueOf(syntax);
     MapDSqlOperatorTable operatorTable =
             new MapDSqlOperatorTable(SqlStdOperatorTable.instance());
     MapDSqlOperatorTable.addUDF(operatorTable, null);
