@@ -319,6 +319,27 @@ inline void check_sort_node_source_constraint(const hdk::ir::Sort* sort) {
   }
 }
 
+/**
+ * Check if multifrag result of input would be OK for node execution.
+ */
+inline bool supportsMultifragInput(const hdk::ir::Node* node,
+                                   const hdk::ir::Node* input) {
+  if (node->is<hdk::ir::Sort>()) {
+    node = node->getInput(0);
+  }
+  if (!node->hasInput(input)) {
+    return true;
+  }
+  if (node->is<hdk::ir::Project>() &&
+      hasWindowFunctionExpr(node->as<hdk::ir::Project>())) {
+    return false;
+  }
+  if (node->is<hdk::ir::LogicalUnion>()) {
+    return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 void RelAlgExecutor::prepareLeafExecution(
@@ -376,8 +397,20 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
   // this join info needs to be maintained throughout an entire query runtime
   for (size_t i = 0; i < exec_desc_count; i++) {
     VLOG(1) << "Executing query step " << i;
+    // When we execute the last step, we expect the result to consist of a single
+    // ResultSet. Also, check if following steps can consume multifrag input.
+    auto multifrag_result = eo.multifrag_result && (i != (exec_desc_count - 1));
+    if (multifrag_result) {
+      for (size_t j = i + 1; j < exec_desc_count; j++) {
+        if (!supportsMultifragInput(seq.step(j), seq.step(i))) {
+          multifrag_result = false;
+          break;
+        }
+      }
+    }
+    auto fixed_eo = eo.with_multifrag_result(multifrag_result);
     try {
-      executeStep(seq.step(i), co, eo, queue_time_ms);
+      executeStep(seq.step(i), co, fixed_eo, queue_time_ms);
     } catch (const QueryMustRunOnCpu&) {
       CHECK(co.device_type == ExecutorDeviceType::GPU);
       if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
@@ -385,7 +418,7 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
       }
       LOG(INFO) << "Retrying current query step " << i << " on CPU";
       const auto co_cpu = CompilationOptions::makeCpuOnly(co);
-      executeStep(seq.step(i), co_cpu, eo, queue_time_ms);
+      executeStep(seq.step(i), co_cpu, fixed_eo, queue_time_ms);
     } catch (const NativeExecutionError&) {
       if (!config_.exec.enable_interop) {
         throw;
@@ -689,6 +722,10 @@ ExecutionResult RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
     }
   }
 
+  // Request single ResultSet in the resulting table if we are going to sort it.
+  if (sort) {
+    eo_with_limit.multifrag_result = false;
+  }
   auto res = executeWorkUnit(work_unit,
                              step_root->getOutputMetainfo(),
                              is_agg_step(step_root),

@@ -31,6 +31,8 @@ struct TableRef {
     return table_id == other.table_id && db_id == other.db_id;
   }
 
+  bool operator!=(const TableRef& other) const { return !(*this == other); }
+
   bool operator<(const TableRef& other) const {
     return std::tie(db_id, table_id) < std::tie(other.db_id, other.table_id);
   }

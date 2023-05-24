@@ -99,7 +99,7 @@ struct ExecutionConfig {
   bool enable_experimental_string_functions = false;
   bool enable_interop = false;
   size_t parallel_linearization_threshold = 10'000;
-  bool enable_multifrag_rs = false;
+  bool enable_multifrag_rs = true;
 
   size_t override_gpu_block_size = 0;
   size_t override_gpu_grid_size = 0;

@@ -527,16 +527,18 @@ void WorkUnitBuilder::processUnion(const hdk::ir::LogicalUnion* logical_union) {
   }
   // Will throw a std::runtime_error if types don't match.
   logical_union->checkForMatchingMetaInfoTypes();
-  // Only Projections and Aggregates from a UNION are supported for now.
-  CHECK(dag_);
-  dag_->eachNode([logical_union](hdk::ir::Node const* node) {
-    if (node->hasInput(logical_union) &&
-        !shared::dynamic_castable_to_any<hdk::ir::Project,
-                                         hdk::ir::LogicalUnion,
-                                         hdk::ir::Aggregate>(node)) {
-      throw std::runtime_error("UNION ALL not yet supported in this context.");
-    }
-  });
+  if (logical_union != root_) {
+    // Only Projections and Aggregates from a UNION are supported for now.
+    CHECK(dag_);
+    dag_->eachNode([logical_union](hdk::ir::Node const* node) {
+      if (node->hasInput(logical_union) &&
+          !shared::dynamic_castable_to_any<hdk::ir::Project,
+                                           hdk::ir::LogicalUnion,
+                                           hdk::ir::Aggregate>(node)) {
+        throw std::runtime_error("UNION ALL not yet supported in this context.");
+      }
+    });
+  }
 
   const auto query_infos = get_table_infos(input_descs_, executor_);
   auto const max_num_tuples =
@@ -547,11 +549,10 @@ void WorkUnitBuilder::processUnion(const hdk::ir::LogicalUnion* logical_union) {
                         return std::max(max, query_info.info.getNumTuples());
                       });
 
-  // We expect input ot be either scan or an execution point.
-  // In both cases target expressions should already have all
-  // required column vars.
-  CHECK(logical_union->getInput(0)->is<ir::Scan>() ||
-        logical_union->getInput(0)->getResult());
+  // We expect input ot be an execution point. In this case target
+  // expressions should already have all required column vars.
+  CHECK(logical_union->getInput(0)->getResult() &&
+        logical_union->getInput(1)->getResult());
   CHECK_EQ(logical_union->size(), target_exprs_[rte_idx].size());
 
   scan_limit_ = max_num_tuples;
@@ -810,18 +811,16 @@ void WorkUnitBuilder::computeInputColDescs() {
 
   // For UNION we only have column variables for a single table used
   // in target expressions but should mark all columns as used.
-  if (union_all_) {
-    for (auto& col_var : collector.result()) {
-      for (auto tdesc : input_descs_) {
-        if (col_var.tableId() != tdesc.getTableId()) {
-          auto col_info = std::make_shared<ColumnInfo>(col_var.dbId(),
-                                                       tdesc.getTableId(),
-                                                       col_var.columnId(),
-                                                       "",
-                                                       col_var.type(),
-                                                       false);
-          col_descs.push_back(
-              std::make_shared<InputColDescriptor>(col_info, col_var.rteIdx()));
+  if (union_all_ && !col_descs.empty()) {
+    CHECK_EQ(col_descs.front()->getNestLevel(), 0);
+    CHECK_EQ(input_descs_.size(), (size_t)2);
+    TableRef processed_table_ref(col_descs.front()->getDatabaseId(),
+                                 col_descs.front()->getTableId());
+    for (auto tdesc : input_descs_) {
+      if (tdesc.getTableRef() != processed_table_ref) {
+        auto columns = schema_provider_->listColumns(tdesc.getTableRef());
+        for (auto& col_info : columns) {
+          col_descs.push_back(std::make_shared<InputColDescriptor>(col_info, 0));
         }
       }
     }
