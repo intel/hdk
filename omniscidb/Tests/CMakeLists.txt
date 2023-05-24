@@ -65,16 +65,19 @@ if(ENABLE_L0)
   add_executable(SpirvBuildTest SpirvBuildTest.cpp)
   add_executable(DataMgrWithL0Test DataMgrWithL0Test.cpp)
   add_executable(IntelGPUEnablingTest IntelGPUEnablingTest.cpp)
+  add_executable(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel.cpp ResultSetTestUtils.cpp)
 
   target_link_libraries(L0MgrExecuteTest L0Mgr gtest ${llvm_libs} Logger OSDependent)
   target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
   target_link_libraries(DataMgrWithL0Test DataMgr gtest)
   target_link_libraries(IntelGPUEnablingTest gtest QueryEngine ArrowQueryRunner)
+  target_link_libraries(GpuSharedMemoryTestIntel gtest QueryEngine ArrowQueryRunner)
 
   add_test(L0MgrExecuteTest L0MgrExecuteTest ${TEST_ARGS})
   add_test(SpirvBuildTest SpirvBuildTest ${TEST_ARGS})
   add_test(DataMgrWithL0Test DataMgrWithL0Test ${TEST_ARGS})
   add_test(IntelGPUEnablingTest IntelGPUEnablingTest ${TEST_ARGS})
+  add_test(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel ${TEST_ARGS})
 endif()
 
 add_executable(CostModelTest CostModel/CostModelTest.cpp)
@@ -140,6 +143,10 @@ if(ENABLE_CUDA)
   target_link_libraries(GpuSharedMemoryTest gtest Logger QueryEngine)
 endif()
 
+if(ENABLE_L0)
+  target_link_libraries(GpuSharedMemoryTestIntel gtest Logger QueryEngine)
+endif()
+
 set(TEST_ARGS "--gtest_output=xml:../")
 add_test(UtilTest UtilTest ${TEST_ARGS})
 add_test(ArrowBasedExecuteTest ArrowBasedExecuteTest ${TEST_ARGS})
@@ -178,6 +185,7 @@ if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
 endif()
 if(ENABLE_L0)
+  add_test(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel ${TEST_ARGS})
   add_test(NAME PuntToCpu COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.Punt*" ${TEST_ARGS})
   set_tests_properties(PuntToCpu PROPERTIES LABELS "enabling")
   add_test(NAME StreamingTopNFallback COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.TopKHeap:Select.TimeInterval:Select.OverflowAndUnderFlow" ${TEST_ARGS})
@@ -235,6 +243,9 @@ if(ENABLE_CUDA)
   list(APPEND TEST_PROGRAMS GpuSharedMemoryTest)
 endif()
 
+if(ENABLE_L0)
+  list(APPEND TEST_PROGRAMS GpuSharedMemoryTestIntel)
+endif()
 #if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 #  list(APPEND TEST_PROGRAMS UdfTest)
 #endif()
@@ -288,6 +299,7 @@ if(ENABLE_L0)
     SpirvBuildTest
     L0MgrExecuteTest
     IntelGPUEnablingTest
+    GpuSharedMemoryTestIntel
   )
   set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
 
