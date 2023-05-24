@@ -676,7 +676,7 @@ cdef class QueryBuilder:
     if not isinstance(scale_decimal, int):
       raise TypeError("Use True or False for 'scale_decimal' arg.")
 
-    cdef const CType *c_type
+    cdef const CType *c_type = NULL
     cdef vector[CBuilderExpr] elems
 
     if cst_type is not None:
