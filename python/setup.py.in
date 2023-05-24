@@ -44,7 +44,9 @@ def get_hdk_shared_libs() -> list:
 
 
 def gen_compile_flags() -> list:
-    cpp_version_flags = ["-std=c++17"]
+    # A lot of ununsed variables warnings generated during
+    # cimport of pyarrow_unwrap_table, CTable
+    cpp_version_flags = ["-std=c++17", "-Wno-unused-variable"]
     if os.name == "nt":
         cpp_version_flags = [
             "/std:c++17",
