@@ -1744,20 +1744,14 @@ extern "C" RUNTIME_EXPORT void multifrag_query(
 }
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE bool check_interrupt() {
-  if (check_interrupt_init(static_cast<unsigned>(INT_CHECK))) {
-    return true;
-  }
-  return false;
+  return check_interrupt_init(static_cast<unsigned>(INT_CHECK));
 }
 
 extern "C" RUNTIME_EXPORT bool check_interrupt_init(unsigned command) {
   static std::atomic_bool runtime_interrupt_flag{false};
 
   if (command == static_cast<unsigned>(INT_CHECK)) {
-    if (runtime_interrupt_flag.load()) {
-      return true;
-    }
-    return false;
+    return runtime_interrupt_flag.load();
   }
   if (command == static_cast<unsigned>(INT_ABORT)) {
     runtime_interrupt_flag.store(true);

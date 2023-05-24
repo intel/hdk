@@ -1834,24 +1834,11 @@ void Executor::insertErrorCodeChecker(llvm::Function* query_func,
         llvm::Value* err_lv = &*inst_it;
         auto error_check_bb =
             bb_it->splitBasicBlock(llvm::BasicBlock::iterator(br_instr), ".error_check");
-        llvm::Value* error_code_arg = nullptr;
-        auto arg_cnt = 0;
-        for (auto arg_it = query_func->arg_begin(); arg_it != query_func->arg_end();
-             arg_it++, ++arg_cnt) {
-          // since multi_frag_* func has anonymous arguments so we use arg_offset
-          // explicitly to capture "error_code" argument in the func's argument list
-          if (hoist_literals) {
-            if (arg_cnt == 9) {
-              error_code_arg = &*arg_it;
-              break;
-            }
-          } else {
-            if (arg_cnt == 8) {
-              error_code_arg = &*arg_it;
-              break;
-            }
-          }
-        }
+
+        // since multi_frag_* func has anonymous arguments so we use arg_offset
+        // explicitly to capture "error_code" argument in the func's argument list
+        unsigned arg_cnt = hoist_literals ? 9 : 8;
+        llvm::Value* error_code_arg = query_func->getArg(arg_cnt);
         CHECK(error_code_arg);
         llvm::Value* err_code = nullptr;
         if (allow_runtime_query_interrupt) {
@@ -1869,6 +1856,9 @@ void Executor::insertErrorCodeChecker(llvm::Function* query_func,
               detected_interrupt,
               cgen_state_->llInt(Executor::ERR_INTERRUPTED),
               detected_error);
+          interrupt_checker_ir_builder.CreateCall(
+              cgen_state_->module_->getFunction("record_error_code"),
+              std::vector<llvm::Value*>{err_code, error_code_arg});
           interrupt_checker_ir_builder.CreateBr(error_check_bb);
           llvm::ReplaceInstWithInst(&check_interrupt_br_instr,
                                     llvm::BranchInst::Create(interrupt_check_bb));
@@ -1884,10 +1874,6 @@ void Executor::insertErrorCodeChecker(llvm::Function* query_func,
             llvm::ICmpInst::ICMP_NE, err_code, cgen_state_->llInt(0));
         auto error_bb = llvm::BasicBlock::Create(
             cgen_state_->context_, ".error_exit", query_func, new_bb);
-        llvm::CallInst::Create(cgen_state_->module_->getFunction("record_error_code"),
-                               std::vector<llvm::Value*>{err_code, error_code_arg},
-                               "",
-                               error_bb);
         llvm::ReturnInst::Create(cgen_state_->context_, error_bb);
         llvm::ReplaceInstWithInst(&br_instr,
                                   llvm::BranchInst::Create(error_bb, new_bb, err_lv));
