@@ -254,6 +254,37 @@ void checkFunctionOper(const BuilderExpr& expr,
   ASSERT_EQ(expr.expr()->as<FunctionOper>()->name(), fn_name);
 }
 
+void checkWindowFunction(const BuilderExpr& expr,
+                         const std::string& name,
+                         const Type* type,
+                         WindowFunctionKind kind,
+                         size_t args,
+                         size_t part_keys,
+                         size_t order_keys) {
+  CHECK_EQ(expr.name(), name);
+  CHECK_EQ(expr.expr()->type()->toString(), type->toString());
+  ASSERT_TRUE(expr.expr()->is<WindowFunction>());
+  auto wnd_fn = expr.expr()->as<WindowFunction>();
+  ASSERT_EQ(wnd_fn->kind(), kind);
+  ASSERT_EQ(wnd_fn->args().size(), args);
+  ASSERT_EQ(wnd_fn->partitionKeys().size(), part_keys);
+  ASSERT_EQ(wnd_fn->orderKeys().size(), order_keys);
+  ASSERT_EQ(wnd_fn->collation().size(), order_keys);
+}
+
+void checkWindowCollation(const BuilderExpr& expr,
+                          size_t idx,
+                          const BuilderExpr& key,
+                          SortDirection dir,
+                          NullSortedPosition null_pos) {
+  auto wnd_fn = expr.expr()->as<WindowFunction>();
+  ASSERT_TRUE(wnd_fn);
+  ASSERT_LT(idx, wnd_fn->orderKeys().size());
+  ASSERT_TRUE(wnd_fn->orderKeys()[idx]->equal(key.expr().get()));
+  ASSERT_EQ(wnd_fn->collation()[idx].is_desc, dir == SortDirection::Descending);
+  ASSERT_EQ(wnd_fn->collation()[idx].nulls_first, null_pos == NullSortedPosition::First);
+}
+
 }  // anonymous namespace
 
 class QueryBuilderTest : public TestSuite {
@@ -4076,6 +4107,463 @@ TEST_F(QueryBuilderTest, Pow) {
   EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_time")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_timestamp")), InvalidQueryError);
   EXPECT_THROW(scan.ref("col_d").pow(scan.ref("col_arr_i32")), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, Over) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto expr1 = builder.rank();
+  checkWindowFunction(
+      expr1, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 0, 0);
+
+  auto expr2 = expr1.over();
+  checkWindowFunction(
+      expr2, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 0, 0);
+
+  auto expr3 = expr1.over(scan.ref("col_bi"));
+  checkWindowFunction(
+      expr3, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 1, 0);
+  ASSERT_TRUE(expr3.expr()->as<WindowFunction>()->partitionKeys()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+
+  auto expr4 = expr1.over({scan.ref("col_bi"), scan.ref("col_i")});
+  checkWindowFunction(
+      expr4, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 2, 0);
+  ASSERT_TRUE(expr4.expr()->as<WindowFunction>()->partitionKeys()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  ASSERT_TRUE(expr4.expr()->as<WindowFunction>()->partitionKeys()[1]->equal(
+      scan.ref("col_i").expr().get()));
+
+  auto expr5 = expr1.over(scan.ref("col_bi")).over(scan.ref("col_i"));
+  checkWindowFunction(
+      expr5, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 2, 0);
+  ASSERT_TRUE(expr5.expr()->as<WindowFunction>()->partitionKeys()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  ASSERT_TRUE(expr5.expr()->as<WindowFunction>()->partitionKeys()[1]->equal(
+      scan.ref("col_i").expr().get()));
+
+  EXPECT_THROW(expr1.over(scan.ref("col_bi").add(1)), InvalidQueryError);
+  EXPECT_THROW(expr1.over(builder.cst(1)), InvalidQueryError);
+  EXPECT_THROW(builder.cst(1).over(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").stdDev().over(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").over(), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, OrderBy) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto expr1 = builder.rank();
+  checkWindowFunction(
+      expr1, "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 0, 0);
+
+  auto expr2 = expr1.orderBy(scan.ref("col_i"));
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy(
+      scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy(scan.ref("col_i"), "asc");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy(scan.ref("col_i"), "desc", "first");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy({scan.ref("col_i"), scan.ref("col_bi")});
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy({scan.ref("col_i"), scan.ref("col_bi")},
+                        SortDirection::Descending,
+                        NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy({scan.ref("col_i"), scan.ref("col_bi")}, "asc");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy({scan.ref("col_i"), scan.ref("col_bi")}, "desc", "first");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 =
+      expr1.orderBy(std::vector<BuilderExpr>({scan.ref("col_i"), scan.ref("col_bi")}));
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy(std::vector<BuilderExpr>({scan.ref("col_i"), scan.ref("col_bi")}),
+                        SortDirection::Descending,
+                        NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy(std::vector<BuilderExpr>({scan.ref("col_i"), scan.ref("col_bi")}),
+                        "asc");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Ascending, NullSortedPosition::Last);
+
+  expr2 = expr1.orderBy(
+      std::vector<BuilderExpr>({scan.ref("col_i"), scan.ref("col_bi")}), "desc", "first");
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy(
+      {scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First});
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy({scan.ref("col_i"), "desc", "first"});
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Descending, NullSortedPosition::First);
+
+  expr2 = expr1.orderBy(
+      {BuilderOrderByKey(
+           scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last),
+       BuilderOrderByKey(scan.ref("col_bi"), "desc", "first")});
+  checkWindowCollation(
+      expr2, 0, scan.ref("col_i"), SortDirection::Ascending, NullSortedPosition::Last);
+  checkWindowCollation(
+      expr2, 1, scan.ref("col_bi"), SortDirection::Descending, NullSortedPosition::First);
+
+  EXPECT_THROW(expr1.orderBy(scan.ref("col_bi").add(1)), InvalidQueryError);
+  EXPECT_THROW(expr1.orderBy(builder.cst(1)), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").sum().orderBy(scan.ref("col_i")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_bi").orderBy(scan.ref("col_i")), InvalidQueryError);
+  EXPECT_THROW(builder.rank().orderBy(scan.ref("col_i"), "descc"), InvalidQueryError);
+  EXPECT_THROW(builder.rank().orderBy(scan.ref("col_i"), "desc", "lasttt"),
+               InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, RowNumber) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkWindowFunction(builder.rowNumber(),
+                      "row_number",
+                      ctx().int64(false),
+                      WindowFunctionKind::RowNumber,
+                      0,
+                      0,
+                      0);
+  checkWindowFunction(
+      builder.rowNumber().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "row_number",
+      ctx().int64(false),
+      WindowFunctionKind::RowNumber,
+      0,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, Rank) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkWindowFunction(
+      builder.rank(), "rank", ctx().int64(false), WindowFunctionKind::Rank, 0, 0, 0);
+  checkWindowFunction(builder.rank().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+                      "rank",
+                      ctx().int64(false),
+                      WindowFunctionKind::Rank,
+                      0,
+                      1,
+                      1);
+}
+
+TEST_F(QueryBuilderTest, DenseRank) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkWindowFunction(builder.denseRank(),
+                      "dense_rank",
+                      ctx().int64(false),
+                      WindowFunctionKind::DenseRank,
+                      0,
+                      0,
+                      0);
+  checkWindowFunction(
+      builder.denseRank().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "dense_rank",
+      ctx().int64(false),
+      WindowFunctionKind::DenseRank,
+      0,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, PercentRank) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkWindowFunction(builder.percentRank(),
+                      "percent_rank",
+                      ctx().fp64(false),
+                      WindowFunctionKind::PercentRank,
+                      0,
+                      0,
+                      0);
+  checkWindowFunction(
+      builder.percentRank().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "percent_rank",
+      ctx().fp64(false),
+      WindowFunctionKind::PercentRank,
+      0,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, NTile) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto ntile1 = builder.nTile(5);
+  checkWindowFunction(
+      ntile1, "ntile", ctx().int64(false), WindowFunctionKind::NTile, 1, 0, 0);
+  checkCst(ntile1.expr()->as<WindowFunction>()->args()[0], 5, ctx().int64(false));
+  checkWindowFunction(
+      builder.nTile(5).over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "ntile",
+      ctx().int64(false),
+      WindowFunctionKind::NTile,
+      1,
+      1,
+      1);
+  EXPECT_THROW(builder.nTile(0), InvalidQueryError);
+  EXPECT_THROW(builder.nTile(-1), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, Lag) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto lag1 = scan.ref("col_bi").lag();
+  checkWindowFunction(
+      lag1, "col_bi_lag", ctx().int64(), WindowFunctionKind::Lag, 2, 0, 0);
+  ASSERT_TRUE(lag1.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkCst(lag1.expr()->as<WindowFunction>()->args()[1], 1, ctx().int64(false));
+
+  auto lag5 = scan.ref("col_i").lag(5);
+  checkWindowFunction(lag5, "col_i_lag", ctx().int32(), WindowFunctionKind::Lag, 2, 0, 0);
+  ASSERT_TRUE(lag5.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(lag5.expr()->as<WindowFunction>()->args()[1], 5, ctx().int64(false));
+
+  auto lag0 = scan.ref("col_i").lag(0);
+  checkWindowFunction(lag0, "col_i_lag", ctx().int32(), WindowFunctionKind::Lag, 2, 0, 0);
+  ASSERT_TRUE(lag0.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(lag0.expr()->as<WindowFunction>()->args()[1], 0, ctx().int64(false));
+
+  auto lagm5 = scan.ref("col_i").lag(-5);
+  checkWindowFunction(
+      lagm5, "col_i_lag", ctx().int32(), WindowFunctionKind::Lag, 2, 0, 0);
+  ASSERT_TRUE(lagm5.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(lagm5.expr()->as<WindowFunction>()->args()[1], -5, ctx().int64(false));
+
+  checkWindowFunction(
+      scan.ref("col_i").lag(5).over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_lag",
+      ctx().int32(),
+      WindowFunctionKind::Lag,
+      2,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, Lead) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto lead1 = scan.ref("col_bi").lead();
+  checkWindowFunction(
+      lead1, "col_bi_lead", ctx().int64(), WindowFunctionKind::Lead, 2, 0, 0);
+  ASSERT_TRUE(lead1.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkCst(lead1.expr()->as<WindowFunction>()->args()[1], 1, ctx().int64(false));
+
+  auto lead5 = scan.ref("col_i").lead(5);
+  checkWindowFunction(
+      lead5, "col_i_lead", ctx().int32(), WindowFunctionKind::Lead, 2, 0, 0);
+  ASSERT_TRUE(lead5.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(lead5.expr()->as<WindowFunction>()->args()[1], 5, ctx().int64(false));
+
+  auto lead0 = scan.ref("col_i").lead(0);
+  checkWindowFunction(
+      lead0, "col_i_lead", ctx().int32(), WindowFunctionKind::Lead, 2, 0, 0);
+  ASSERT_TRUE(lead0.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(lead0.expr()->as<WindowFunction>()->args()[1], 0, ctx().int64(false));
+
+  auto leadm5 = scan.ref("col_i").lead(-5);
+  checkWindowFunction(
+      leadm5, "col_i_lead", ctx().int32(), WindowFunctionKind::Lead, 2, 0, 0);
+  ASSERT_TRUE(leadm5.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_i").expr().get()));
+  checkCst(leadm5.expr()->as<WindowFunction>()->args()[1], -5, ctx().int64(false));
+
+  checkWindowFunction(
+      scan.ref("col_i").lead(5).over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_lead",
+      ctx().int32(),
+      WindowFunctionKind::Lead,
+      2,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, FirstValue) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto first_value = scan.ref("col_bi").firstValue();
+  checkWindowFunction(first_value,
+                      "col_bi_first_value",
+                      ctx().int64(),
+                      WindowFunctionKind::FirstValue,
+                      1,
+                      0,
+                      0);
+  ASSERT_TRUE(first_value.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").firstValue().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_first_value",
+      ctx().int32(),
+      WindowFunctionKind::FirstValue,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, LastValueValue) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto last_value = scan.ref("col_bi").lastValue();
+  checkWindowFunction(last_value,
+                      "col_bi_last_value",
+                      ctx().int64(),
+                      WindowFunctionKind::LastValue,
+                      1,
+                      0,
+                      0);
+  ASSERT_TRUE(last_value.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").lastValue().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_last_value",
+      ctx().int32(),
+      WindowFunctionKind::LastValue,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, WindowAvg) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto avg = scan.ref("col_bi").avg().over();
+  checkWindowFunction(avg, "col_bi_avg", ctx().fp64(), WindowFunctionKind::Avg, 1, 0, 0);
+  ASSERT_TRUE(avg.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").avg().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_avg",
+      ctx().fp64(),
+      WindowFunctionKind::Avg,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, WindowSum) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto sum = scan.ref("col_bi").sum().over();
+  checkWindowFunction(sum, "col_bi_sum", ctx().int64(), WindowFunctionKind::Sum, 1, 0, 0);
+  ASSERT_TRUE(sum.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").sum().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_sum",
+      ctx().int64(),
+      WindowFunctionKind::Sum,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, WindowMin) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto min = scan.ref("col_bi").min().over();
+  checkWindowFunction(min, "col_bi_min", ctx().int64(), WindowFunctionKind::Min, 1, 0, 0);
+  ASSERT_TRUE(min.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").min().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_min",
+      ctx().int32(),
+      WindowFunctionKind::Min,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, WindowMax) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  auto max = scan.ref("col_bi").max().over();
+  checkWindowFunction(max, "col_bi_max", ctx().int64(), WindowFunctionKind::Max, 1, 0, 0);
+  ASSERT_TRUE(max.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(
+      scan.ref("col_i").max().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+      "col_i_max",
+      ctx().int32(),
+      WindowFunctionKind::Max,
+      1,
+      1,
+      1);
+}
+
+TEST_F(QueryBuilderTest, WindowCount) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test3");
+  checkWindowFunction(builder.count().over(),
+                      "count",
+                      ctx().int32(false),
+                      WindowFunctionKind::Count,
+                      0,
+                      0,
+                      0);
+  auto count_bi = scan.ref("col_bi").count().over();
+  checkWindowFunction(
+      count_bi, "col_bi_count", ctx().int32(false), WindowFunctionKind::Count, 1, 0, 0);
+  ASSERT_TRUE(count_bi.expr()->as<WindowFunction>()->args()[0]->equal(
+      scan.ref("col_bi").expr().get()));
+  checkWindowFunction(builder.count().over(scan.ref("col_bi")).orderBy(scan.ref("col_i")),
+                      "count",
+                      ctx().int32(false),
+                      WindowFunctionKind::Count,
+                      0,
+                      1,
+                      1);
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

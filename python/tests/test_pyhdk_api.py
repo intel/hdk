@@ -953,6 +953,98 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_over_order_by(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, None], "b": [1, 2, 1, 2, 1]})
+
+        res = ht.proj(r=hdk.row_number().over(ht.ref("b")).order_by(ht.ref("a"))).run()
+        check_res(res, {"r": [1, 1, 2, 2, 3]})
+
+        res = ht.proj(
+            r=hdk.row_number().over(ht.ref("b")).order_by((ht.ref("a"), "desc"))
+        ).run()
+        check_res(res, {"r": [2, 2, 1, 1, 3]})
+
+        res = ht.proj(
+            r=hdk.row_number()
+            .over(ht.ref("b"))
+            .order_by((ht.ref("a"), "desc", "first"))
+        ).run()
+        check_res(res, {"r": [3, 2, 2, 1, 1]})
+
+        with pytest.raises(TypeError):
+            hdk.row_number().over("b")
+        with pytest.raises(TypeError):
+            hdk.row_number().over(1)
+        with pytest.raises(TypeError):
+            hdk.row_number().order_by("a")
+        with pytest.raises(TypeError):
+            hdk.row_number().order_by(0)
+        with pytest.raises(TypeError):
+            hdk.row_number().order_by(("a"))
+        with pytest.raises(TypeError):
+            hdk.row_number().order_by((ht.ref("a"), True))
+        with pytest.raises(TypeError):
+            hdk.row_number().order_by((ht.ref("a"), "asc", False))
+
+    def test_row_number(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b": [1, 2, 3, 4, 5]})
+        res = ht.proj(hdk.row_number().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        check_res(res, {"row_number": [1, 1, 2, 2, 3]})
+
+    def test_rank(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b": [2, 2, 1, 3, 1]})
+        res = ht.proj(hdk.rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        check_res(res, {"rank": [3, 1, 1, 2, 1]})
+
+    def test_dense_rank(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b": [2, 2, 1, 3, 1]})
+        res = ht.proj(hdk.dense_rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        check_res(res, {"dense_rank": [2, 1, 1, 2, 1]})
+
+    def test_percent_rank(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [4, 2, 1, 3, 5]})
+        res = ht.proj(hdk.percent_rank().order_by(ht.ref("a"))).run()
+        check_res(res, {"percent_rank": [0.75, 0.25, 0, 0.5, 1]})
+
+    def test_ntile(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b": [1, 2, 3, 4, 5]})
+        res = ht.proj(hdk.ntile(2).over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        check_res(res, {"ntile": [1, 1, 1, 2, 2]})
+
+    def test_lag(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        res = ht.proj(ht.ref("a").lag(2)).run()
+        check_res(res, {"a_lag": ["null", "null", 1, 2, 3]})
+
+    def test_lead(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        res = ht.proj(ht.ref("a").lead(2)).run()
+        check_res(res, {"a_lead": [3, 4, 5, "null", "null"]})
+
+    def test_first_value(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1, 2, 1, 2, 1]})
+        res = ht.proj(
+            ht.ref("a").first_value().over(ht.ref("b")).order_by(ht.ref("a"))
+        ).run()
+        check_res(res, {"a_first_value": [1, 2, 1, 2, 1]})
+
+    def test_last_value(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1, 2, 1, 2, 1]})
+        res = ht.proj(
+            ht.ref("a").last_value().over(ht.ref("b")).order_by(ht.ref("a"))
+        ).run()
+        check_res(res, {"a_last_value": [1, 2, 3, 4, 5]})
+
 
 class TestSql(BaseTest):
     def test_no_alias(self):

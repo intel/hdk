@@ -64,6 +64,8 @@ class Expr : public std::enable_shared_from_this<Expr> {
   virtual std::string toString() const = 0;
   virtual void print() const;
 
+  bool equal(const Expr* rhs) const { return *this == *rhs; }
+
   /*
    * @brief decompress adds cast operator to decompress encoded result
    */

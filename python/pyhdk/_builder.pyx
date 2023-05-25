@@ -101,6 +101,26 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.stdDev()
     return res
 
+  def lag(self, int n = 1):
+    res = QueryExpr();
+    res.c_expr = self.c_expr.lag(n)
+    return res
+
+  def lead(self, int n = 1):
+    res = QueryExpr();
+    res.c_expr = self.c_expr.lead(n)
+    return res
+
+  def first_value(self):
+    res = QueryExpr();
+    res.c_expr = self.c_expr.firstValue()
+    return res
+
+  def last_value(self):
+    res = QueryExpr();
+    res.c_expr = self.c_expr.lastValue()
+    return res
+
   def logical_and(self, value):
     value = self._process_op_expr(value)
     res = QueryExpr()
@@ -256,6 +276,40 @@ cdef class QueryExpr:
     value = self._process_op_expr(value)
     res = QueryExpr()
     res.c_expr = self.c_expr.at((<QueryExpr>value).c_expr)
+    return res
+
+  def over(self, *args):
+    cdef vector[CBuilderExpr] keys
+    for arg in args:
+      if not isinstance(arg, QueryExpr):
+        raise TypeError(f"Expected QueryExpr arg for 'over' method. Provided: {type(arg)}.")
+      keys.push_back((<QueryExpr>arg).c_expr)
+    res = QueryExpr()
+    res.c_expr = self.c_expr.over(keys)
+    return res
+
+  def order_by(self, *args):
+    cdef vector[CBuilderOrderByKey] keys
+    for arg in args:
+      if isinstance(arg, tuple):
+        key = arg[0]
+        if not isinstance(key, QueryExpr):
+          raise TypeError(f"Expected QueryExpr for order_by key. Provided: {type(key)}.")
+        order = arg[1] if len(arg) > 1 else "asc"
+        if not isinstance(order, str):
+          raise TypeError(f"Expected 'asc' or 'desc' for sort order. Provided: {order}.")
+        null_pos = arg[2] if len(arg) > 2 else "last"
+        if not isinstance(null_pos, str):
+          raise TypeError(f"Expected 'first' or 'last' for nulls position. Provided: {null_pos}.")
+      else:
+        if not isinstance(arg, QueryExpr):
+          raise TypeError(f"Expected QueryExpr or tuple arg for 'order_by' method. Provided: {type(arg)}.")
+        key = arg
+        order = "asc"
+        null_pos = "last"
+      keys.push_back(CBuilderOrderByKey((<QueryExpr>key).c_expr, order, null_pos))
+    res = QueryExpr()
+    res.c_expr = self.c_expr.orderBy(keys)
     return res
 
   def __eq__(self, value):
@@ -665,6 +719,31 @@ cdef class QueryBuilder:
   def count(self):
     res = QueryExpr()
     res.c_expr = self.c_builder.get().count()
+    return res
+
+  def row_number(self):
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().rowNumber()
+    return res
+
+  def rank(self):
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().rank()
+    return res
+
+  def dense_rank(self):
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().denseRank()
+    return res
+
+  def percent_rank(self):
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().percentRank()
+    return res
+
+  def ntile(self, int tile_count):
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().nTile(tile_count)
     return res
 
   def cst(self, value, cst_type=None, scale_decimal=True):

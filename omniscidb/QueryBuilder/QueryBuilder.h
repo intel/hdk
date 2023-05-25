@@ -22,6 +22,30 @@ class InvalidQueryError : public Error {
 class QueryBuilder;
 class BuilderNode;
 class ExprRewriter;
+class BuilderExpr;
+
+class BuilderOrderByKey {
+ public:
+  BuilderOrderByKey();
+  BuilderOrderByKey(const BuilderExpr& expr,
+                    SortDirection dir = SortDirection::Ascending,
+                    NullSortedPosition null_pos = NullSortedPosition::Last);
+  BuilderOrderByKey(const BuilderExpr& expr,
+                    const std::string& dir,
+                    const std::string& null_pos = "last");
+
+  ExprPtr expr() const { return expr_; }
+  SortDirection dir() const { return dir_; }
+  NullSortedPosition nullsPosition() const { return null_pos_; }
+
+  static SortDirection parseSortDirection(const std::string& val);
+  static NullSortedPosition parseNullPosition(const std::string& val);
+
+ protected:
+  ExprPtr expr_;
+  SortDirection dir_;
+  NullSortedPosition null_pos_;
+};
 
 class BuilderExpr {
  public:
@@ -54,6 +78,11 @@ class BuilderExpr {
   BuilderExpr singleValue() const;
   BuilderExpr stdDev() const;
   BuilderExpr corr(const BuilderExpr& arg) const;
+
+  BuilderExpr lag(int n = 1) const;
+  BuilderExpr lead(int n = 1) const;
+  BuilderExpr firstValue() const;
+  BuilderExpr lastValue() const;
 
   BuilderExpr agg(const std::string& agg_str, const BuilderExpr& arg) const;
   BuilderExpr agg(const std::string& agg_str, double val = HUGE_VAL) const;
@@ -172,6 +201,31 @@ class BuilderExpr {
   BuilderExpr at(const BuilderExpr& idx) const;
   BuilderExpr at(int idx) const;
   BuilderExpr at(int64_t idx) const;
+
+  BuilderExpr over() const;
+  BuilderExpr over(const BuilderExpr& key) const;
+  BuilderExpr over(const std::vector<BuilderExpr>& keys) const;
+
+  BuilderExpr orderBy(BuilderExpr key,
+                      SortDirection dir = SortDirection::Ascending,
+                      NullSortedPosition null_pos = NullSortedPosition::Last) const;
+  BuilderExpr orderBy(BuilderExpr key,
+                      const std::string& dir,
+                      const std::string& null_pos = "last") const;
+  BuilderExpr orderBy(std::initializer_list<BuilderExpr> keys,
+                      SortDirection dir = SortDirection::Ascending,
+                      NullSortedPosition null_pos = NullSortedPosition::Last) const;
+  BuilderExpr orderBy(std::initializer_list<BuilderExpr> keys,
+                      const std::string& dir,
+                      const std::string& null_pos = "last") const;
+  BuilderExpr orderBy(const std::vector<BuilderExpr>& keys,
+                      SortDirection dir = SortDirection::Ascending,
+                      NullSortedPosition null_pos = NullSortedPosition::Last) const;
+  BuilderExpr orderBy(const std::vector<BuilderExpr>& keys,
+                      const std::string& dir,
+                      const std::string& null_pos = "last") const;
+  BuilderExpr orderBy(const BuilderOrderByKey& key) const;
+  BuilderExpr orderBy(const std::vector<BuilderOrderByKey>& keys) const;
 
   BuilderExpr rewrite(ExprRewriter& rewriter) const;
 
@@ -506,6 +560,11 @@ class QueryBuilder {
   BuilderNode scan(const TableRef& table_ref) const;
 
   BuilderExpr count() const;
+  BuilderExpr rowNumber() const;
+  BuilderExpr rank() const;
+  BuilderExpr denseRank() const;
+  BuilderExpr percentRank() const;
+  BuilderExpr nTile(int tile_count) const;
 
   BuilderExpr cst(int val) const;
   BuilderExpr cst(int val, const Type* type) const;

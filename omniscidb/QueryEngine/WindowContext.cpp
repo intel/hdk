@@ -466,10 +466,13 @@ void WindowFunctionContext::computePartition(const size_t partition_idx,
         dynamic_cast<const hdk::ir::ColumnVar*>(order_keys[order_column_idx].get());
     CHECK(order_col);
     const auto& order_col_collation = collation[order_column_idx];
-    const auto asc_comparator = makeComparator(order_col,
-                                               order_column_buffer,
-                                               payload() + offset,
-                                               order_col_collation.nulls_first);
+    // For descending sort we use ascending comparator but swap LHS and RHS
+    // when comparing. Unfortunately, this also changes NULLs position, so
+    // we fix it up accordingly.
+    bool nulls_first = order_col_collation.is_desc ? !order_col_collation.nulls_first
+                                                   : order_col_collation.nulls_first;
+    const auto asc_comparator =
+        makeComparator(order_col, order_column_buffer, payload() + offset, nulls_first);
     auto comparator = asc_comparator;
     if (order_col_collation.is_desc) {
       comparator = [asc_comparator](const int64_t lhs, const int64_t rhs) {
