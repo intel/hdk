@@ -509,7 +509,71 @@ std::vector<NodePtr> collectNodes(NodePtr node) {
   return nodes;
 }
 
+/**
+ * Check if expr is WindowFunction or AggExpr that can be transformed
+ * into corresponding WindowFunction.
+ */
+std::shared_ptr<const WindowFunction> checkOrGetWindowFn(ExprPtr expr) {
+  if (expr->is<WindowFunction>()) {
+    return std::dynamic_pointer_cast<const WindowFunction>(expr);
+  }
+
+  if (auto agg = expr->as<AggExpr>()) {
+    switch (agg->aggType()) {
+      case AggType::kCount:
+        if (agg->arg()) {
+          return std::shared_ptr<const WindowFunction>(new WindowFunction(
+              agg->type(), WindowFunctionKind::Count, {agg->argShared()}, {}, {}, {}));
+        } else {
+          return std::shared_ptr<const WindowFunction>(
+              new WindowFunction(agg->type(), WindowFunctionKind::Count, {}, {}, {}, {}));
+        }
+      case AggType::kAvg:
+        return std::shared_ptr<const WindowFunction>(new WindowFunction(
+            agg->type(), WindowFunctionKind::Avg, {agg->argShared()}, {}, {}, {}));
+      case AggType::kMin:
+        return std::shared_ptr<const WindowFunction>(new WindowFunction(
+            agg->type(), WindowFunctionKind::Min, {agg->argShared()}, {}, {}, {}));
+      case AggType::kMax:
+        return std::shared_ptr<const WindowFunction>(new WindowFunction(
+            agg->type(), WindowFunctionKind::Max, {agg->argShared()}, {}, {}, {}));
+      case AggType::kSum:
+        return std::shared_ptr<const WindowFunction>(new WindowFunction(
+            agg->type(), WindowFunctionKind::Sum, {agg->argShared()}, {}, {}, {}));
+      default:
+        break;
+    }
+  }
+
+  return nullptr;
+}
+
 }  // namespace
+
+BuilderOrderByKey::BuilderOrderByKey()
+    : expr_(nullptr)
+    , dir_(SortDirection::Ascending)
+    , null_pos_(NullSortedPosition::Last) {}
+
+BuilderOrderByKey::BuilderOrderByKey(const BuilderExpr& expr,
+                                     SortDirection dir,
+                                     NullSortedPosition null_pos)
+    : expr_(expr.expr()), dir_(dir), null_pos_(null_pos) {}
+
+BuilderOrderByKey::BuilderOrderByKey(const BuilderExpr& expr,
+                                     const std::string& dir,
+                                     const std::string& null_pos)
+    : expr_(expr.expr())
+    , dir_(parseSortDirection(dir))
+    , null_pos_(parseNullPosition(null_pos)) {}
+
+SortDirection BuilderOrderByKey::parseSortDirection(const std::string& val) {
+  return BuilderSortField::parseSortDirection(val);
+}
+
+NullSortedPosition BuilderOrderByKey::parseNullPosition(const std::string& val) {
+  return BuilderSortField::parseNullPosition(val);
+}
 
 BuilderExpr::BuilderExpr() : builder_(nullptr) {}
 
@@ -664,6 +728,42 @@ BuilderExpr BuilderExpr::corr(const BuilderExpr& arg) const {
     name += "_" + arg.name_;
   }
   return {builder_, agg, name, true};
+}
+
+BuilderExpr BuilderExpr::lag(int n) const {
+  ExprPtr expr{new WindowFunction(expr_->type(),
+                                  WindowFunctionKind::Lag,
+                                  {expr_, builder_->cst(n).expr()},
+                                  {},
+                                  {},
+                                  {})};
+  auto name = name_.empty() ? "lag" : name_ + "_lag";
+  return {builder_, expr, name, true};
+}
+
+BuilderExpr BuilderExpr::lead(int n) const {
+  ExprPtr expr{new WindowFunction(expr_->type(),
+                                  WindowFunctionKind::Lead,
+                                  {expr_, builder_->cst(n).expr()},
+                                  {},
+                                  {},
+                                  {})};
+  auto name = name_.empty() ? "lead" : name_ + "_lead";
+  return {builder_, expr, name, true};
+}
+
+BuilderExpr BuilderExpr::firstValue() const {
+  ExprPtr expr{new WindowFunction(
+      expr_->type(), WindowFunctionKind::FirstValue, {expr_}, {}, {}, {})};
+  auto name = name_.empty() ? "first_value" : name_ + "_first_value";
+  return {builder_, expr, name, true};
+}
+
+BuilderExpr BuilderExpr::lastValue() const {
+  ExprPtr expr{new WindowFunction(
+      expr_->type(), WindowFunctionKind::LastValue, {expr_}, {}, {}, {})};
+  auto name = name_.empty() ? "last_value" : name_ + "_last_value";
+  return {builder_, expr, name, true};
 }
 
 BuilderExpr BuilderExpr::agg(const std::string& agg_str, const BuilderExpr& arg) const {
@@ -1515,6 +1615,144 @@ BuilderExpr BuilderExpr::at(int idx) const {
 
 BuilderExpr BuilderExpr::at(int64_t idx) const {
   return at(builder_->cst(idx, builder_->ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::over() const {
+  return over(std::vector<BuilderExpr>());
+}
+
+BuilderExpr BuilderExpr::over(const BuilderExpr& key) const {
+  return over(std::vector<BuilderExpr>({key}));
+}
+
+BuilderExpr BuilderExpr::over(const std::vector<BuilderExpr>& keys) const {
+  auto wnd_fn = checkOrGetWindowFn(expr_);
+  if (!wnd_fn) {
+    throw InvalidQueryError()
+        << "Expected window function or supported aggregate (COUNT, AVG, MIN, MAX, SUM) "
+           "for OVER. Provided: "
+        << expr_->toString();
+  }
+
+  if (!keys.empty()) {
+    for (auto& key : keys) {
+      if (!key.expr()->is<ColumnRef>()) {
+        throw InvalidQueryError() << "Currently, only column references can be used as a "
+                                     "partition key. Provided: "
+                                  << key.expr()->toString();
+      }
+    }
+
+    ExprPtrVector new_part_keys;
+    new_part_keys.reserve(wnd_fn->partitionKeys().size() + keys.size());
+    new_part_keys.insert(new_part_keys.end(),
+                         wnd_fn->partitionKeys().begin(),
+                         wnd_fn->partitionKeys().end());
+    for (auto& expr : keys) {
+      new_part_keys.push_back(expr.expr());
+    }
+    wnd_fn = makeExpr<WindowFunction>(wnd_fn->type(),
+                                      wnd_fn->kind(),
+                                      wnd_fn->args(),
+                                      new_part_keys,
+                                      wnd_fn->orderKeys(),
+                                      wnd_fn->collation());
+  }
+
+  return {builder_, wnd_fn, name_, auto_name_};
+}
+
+BuilderExpr BuilderExpr::orderBy(BuilderExpr key,
+                                 SortDirection dir,
+                                 NullSortedPosition null_pos) const {
+  return orderBy(std::vector<BuilderExpr>({key}), dir, null_pos);
+}
+
+BuilderExpr BuilderExpr::orderBy(BuilderExpr key,
+                                 const std::string& dir,
+                                 const std::string& null_pos) const {
+  return orderBy(std::vector<BuilderExpr>({key}), dir, null_pos);
+}
+
+BuilderExpr BuilderExpr::orderBy(std::initializer_list<BuilderExpr> keys,
+                                 SortDirection dir,
+                                 NullSortedPosition null_pos) const {
+  return orderBy(std::vector<BuilderExpr>(keys), dir, null_pos);
+}
+
+BuilderExpr BuilderExpr::orderBy(std::initializer_list<BuilderExpr> keys,
+                                 const std::string& dir,
+                                 const std::string& null_pos) const {
+  return orderBy(std::vector<BuilderExpr>(keys), dir, null_pos);
+}
+
+BuilderExpr BuilderExpr::orderBy(const std::vector<BuilderExpr>& keys,
+                                 SortDirection dir,
+                                 NullSortedPosition null_pos) const {
+  std::vector<BuilderOrderByKey> order_keys;
+  order_keys.reserve(keys.size());
+  for (auto& key : keys) {
+    order_keys.emplace_back(key, dir, null_pos);
+  }
+  return orderBy(order_keys);
+}
+
+BuilderExpr BuilderExpr::orderBy(const std::vector<BuilderExpr>& keys,
+                                 const std::string& dir,
+                                 const std::string& null_pos) const {
+  std::vector<BuilderOrderByKey> order_keys;
+  order_keys.reserve(keys.size());
+  for (auto& key : keys) {
+    order_keys.emplace_back(key, dir, null_pos);
+  }
+  return orderBy(order_keys);
+}
+
+BuilderExpr BuilderExpr::orderBy(const BuilderOrderByKey& key) const {
+  return orderBy(std::vector<BuilderOrderByKey>({key}));
+}
+
+BuilderExpr BuilderExpr::orderBy(const std::vector<BuilderOrderByKey>& keys) const {
+  auto wnd_fn = expr_->as<WindowFunction>();
+  if (!wnd_fn) {
+    throw InvalidQueryError() << "Expected window function for ORDER BY. Provided: "
+                              << expr_->toString();
+  }
+
+  for (auto& key : keys) {
+    if (!key.expr()->is<ColumnRef>()) {
+      throw InvalidQueryError()
+          << "Currently, only column references can be used in ORDER BY. Provided: "
+          << key.expr()->toString();
+    }
+  }
+
+  ExprPtrVector new_order_keys = wnd_fn->orderKeys();
+  new_order_keys.reserve(wnd_fn->orderKeys().size() + keys.size());
+  new_order_keys.insert(
+      new_order_keys.end(), wnd_fn->orderKeys().begin(), wnd_fn->orderKeys().end());
+  for (auto& key : keys) {
+    new_order_keys.push_back(key.expr());
+  }
+
+  std::vector<OrderEntry> new_collation;
+  new_collation.reserve(wnd_fn->collation().size() + keys.size());
+  new_collation.insert(
+      new_collation.end(), wnd_fn->collation().begin(), wnd_fn->collation().end());
+  for (auto& key : keys) {
+    new_collation.emplace_back(static_cast<int>(new_collation.size()),
+                               key.dir() == SortDirection::Descending,
+                               key.nullsPosition() == NullSortedPosition::First);
+  }
+
+  auto res = makeExpr<WindowFunction>(wnd_fn->type(),
+                                      wnd_fn->kind(),
+                                      wnd_fn->args(),
+                                      wnd_fn->partitionKeys(),
+                                      new_order_keys,
+                                      new_collation);
+
+  return {builder_, res, name_, auto_name_};
 }
 
 BuilderExpr BuilderExpr::rewrite(ExprRewriter& rewriter) const {
@@ -2626,6 +2864,44 @@ BuilderExpr QueryBuilder::count() const {
       config_->exec.group_by.bigint_count ? ctx_.int64(false) : ctx_.int32(false);
   auto agg = makeExpr<AggExpr>(count_type, AggType::kCount, nullptr, false, nullptr);
   return {this, agg, "count", true};
+}
+
+BuilderExpr QueryBuilder::rowNumber() const {
+  ExprPtr expr{new WindowFunction(
+      ctx_.int64(false), WindowFunctionKind::RowNumber, {}, {}, {}, {})};
+  return {this, expr, "row_number", true};
+}
+
+BuilderExpr QueryBuilder::rank() const {
+  ExprPtr expr{
+      new WindowFunction(ctx_.int64(false), WindowFunctionKind::Rank, {}, {}, {}, {})};
+  return {this, expr, "rank", true};
+}
+
+BuilderExpr QueryBuilder::denseRank() const {
+  ExprPtr expr{new WindowFunction(
+      ctx_.int64(false), WindowFunctionKind::DenseRank, {}, {}, {}, {})};
+  return {this, expr, "dense_rank", true};
+}
+
+BuilderExpr QueryBuilder::percentRank() const {
+  ExprPtr expr{new WindowFunction(
+      ctx_.fp64(false), WindowFunctionKind::PercentRank, {}, {}, {}, {})};
+  return {this, expr, "percent_rank", true};
+}
+
+BuilderExpr QueryBuilder::nTile(int tile_count) const {
+  if (tile_count <= 0) {
+    throw InvalidQueryError()
+        << "Expected positive integer for tile count argument. Provided: " << tile_count;
+  }
+  ExprPtr expr{new WindowFunction(ctx_.int64(false),
+                                  WindowFunctionKind::NTile,
+                                  {cst(tile_count).expr()},
+                                  {},
+                                  {},
+                                  {})};
+  return {this, expr, "ntile", true};
 }
 
 BuilderExpr QueryBuilder::cst(int val) const {

@@ -1644,6 +1644,20 @@ std::string WindowFunction::toString() const {
   for (const auto& arg : args_) {
     result += " " + arg->toString();
   }
+  if (!partition_keys_.empty()) {
+    result += " PARTITION BY";
+    for (const auto& part_key : partition_keys_) {
+      result += " " + part_key->toString();
+    }
+  }
+  if (!order_keys_.empty()) {
+    result += " ORDER BY";
+    for (size_t i = 0; i < order_keys_.size(); ++i) {
+      result += " " + order_keys_[i]->toString();
+      result += collation_[i].is_desc ? " DESC" : " ASC";
+      result += collation_[i].nulls_first ? " NULLS FIRST" : " NULLS LAST";
+    }
+  }
   return result + ") ";
 }
 

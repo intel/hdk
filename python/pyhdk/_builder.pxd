@@ -17,6 +17,10 @@ from pyhdk._sql cimport CExecutionResult, CQueryDag
 
 cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
   cdef cppclass CQueryBuilder "hdk::ir::QueryBuilder"
+  cdef cppclass CBuilderExpr "hdk::ir::BuilderExpr"
+
+  cdef cppclass CBuilderOrderByKey "hdk::ir::BuilderOrderByKey":
+    CBuilderOrderByKey(const CBuilderExpr&, const string&, const string&) except +
 
   cdef cppclass CBuilderExpr "hdk::ir::BuilderExpr":
     CBuilderExpr()
@@ -37,6 +41,11 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr sample() except +
     CBuilderExpr singleValue() except +
     CBuilderExpr stdDev() except +
+
+    CBuilderExpr lag(int) except +
+    CBuilderExpr lead(int) except +
+    CBuilderExpr firstValue() except +
+    CBuilderExpr lastValue() except +
 
     CBuilderExpr extract(const string&) except +
 
@@ -74,6 +83,8 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
 
     CBuilderExpr at(const CBuilderExpr&) except +
 
+    CBuilderExpr over(const vector[CBuilderExpr]&) except +
+    CBuilderExpr orderBy(const vector[CBuilderOrderByKey]&) except +
 
   cdef cppclass CBuilderSortField "hdk::ir::BuilderSortField":
     CBuilderSortField(CBuilderExpr, const string&, const string&) except +
@@ -111,6 +122,11 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderNode proj(const vector[CBuilderExpr]&) except +
 
     CBuilderExpr count() except +
+    CBuilderExpr rowNumber() except +
+    CBuilderExpr rank() except +
+    CBuilderExpr denseRank() except +
+    CBuilderExpr percentRank() except +
+    CBuilderExpr nTile(int) except +
 
     CBuilderExpr cstFromIntNoType "cst"(int64_t) except +
     CBuilderExpr cstFromIntNoScale "cstNoScale"(int64_t, const CType*) except +

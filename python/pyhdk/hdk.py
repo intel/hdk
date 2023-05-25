@@ -269,6 +269,116 @@ class QueryExprAPI:
         """
         pass
 
+    def lag(self, n=1):
+        """
+        Create LAG window function with the current expression as its argument.
+
+        Parameters
+        ----------
+        n : int
+            Lag distance.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        >>> ht.proj("a", ht.ref("a").lag(2)).run()
+        Schema:
+          a: INT64
+          a_lag: INT64
+        Data:
+        1|null
+        2|null
+        3|1
+        4|2
+        5|3
+        """
+        pass
+
+    def lead(self, n=1):
+        """
+        Create LEAD window function with the current expression as its argument.
+
+        Parameters
+        ----------
+        n : int
+            Lead distance.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        >>> ht.proj("a", ht.ref("a").lead(2)).run()
+        Schema:
+          a: INT64
+          a_lead: INT64
+        Data:
+        1|3
+        2|4
+        3|5
+        4|null
+        5|null
+        """
+        pass
+
+    def first_value(self):
+        """
+        Create FIRST_VALUE window function with the current expression as its argument.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1, 2, 1, 2, 1]})
+        >>> ht.proj("a", ht.ref("a").first_value().over(ht.ref("b"))).run()
+        Schema:
+          a: INT64
+          a_first_value: INT64
+        Data:
+        1|1
+        2|2
+        3|1
+        4|2
+        5|1
+        """
+        pass
+
+    def last_value(self):
+        """
+        Create LAST_VALUE window function with the current expression as its argument.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1, 2, 1, 2, 1]})
+        >>> ht.proj("a", ht.ref("a").last_value().over(ht.ref("b"))).run()
+        Schema:
+          a: INT64
+          a_last_value: INT64
+        Data:
+        1|1
+        2|2
+        3|3
+        4|4
+        5|5
+        """
+        pass
+
     def extract(self, field):
         """
         Create EXTRACT expression to extract a part of date from the current expression.
@@ -1075,6 +1185,71 @@ class QueryExprAPI:
         Data:
         1|2|null
         2|4|null
+        """
+        pass
+
+    def over(self, *args):
+        """
+        Add partition keys to window function expression. Also, transforms min, max, sum, avg, and count
+        aggregates to corresponding window functions.
+
+
+        Parameters
+        ----------
+        *args : list of QueryExpr
+            Partition keys. Should be column references.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk=pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1]})
+        >>> ht.proj("a", hdk.count().over(ht.ref("a"))).run()
+        Schema:
+          a: INT64
+          count: INT32[NN]
+        Data:
+        1|3
+        2|2
+        1|3
+        2|2
+        1|3
+        """
+        pass
+
+    def order_by(self, *args):
+        """
+        Add order keys to window function expression.
+
+
+        Parameters
+        ----------
+        *args : list of QueryExpr or tuples
+            Order keys. Each argument is QueryExpr or a tuple holding key, sort
+            order ('asc' or 'desc') and optional nulls position ('first' or
+            'last'). By default, sort is ascending and nulls position is last.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk=pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [4, 2, 1, 3, 5]})
+        >>> ht.proj("a", hdk.percent_rank().order_by(ht.ref("a"))).run()
+        Schema:
+          a: INT64
+          percent_rank: FP64[NN]
+        Data:
+        4|0.75
+        2|0.25
+        1|0
+        3|0.5
+        5|1
         """
         pass
 
@@ -2282,6 +2457,124 @@ class HDK:
         5
         """
         return self._builder.count()
+
+    def row_number(self):
+        """
+        Create a ROW_NUMBER window function expression.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1]})
+        >>> ht.proj("a", hdk.row_number().over(ht.ref("a"))).run()
+        Schema:
+          a: INT64
+          row_number: INT64[NN]
+        Data:
+        1|1
+        2|1
+        1|2
+        2|2
+        1|3
+
+        """
+        return self._builder.row_number()
+
+    def rank(self):
+        """
+        Create a RANK window function expression.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b":[2, 2, 1, 3, 1]})
+        >>> ht.proj("a", "b", hdk.rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        Schema:
+          a: INT64
+          b: INT64
+          rank: INT64[NN]
+        Data:
+        1|2|3
+        2|2|1
+        1|1|1
+        2|3|2
+        1|1|1
+        """
+        return self._builder.rank()
+
+    def dense_rank(self):
+        """
+        Create a DENSE_RANK window function expression.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b":[2, 2, 1, 3, 1]})
+        >>> ht.proj("a", "b", hdk.dense_rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        Schema:
+          a: INT64
+          b: INT64
+          dense_rank: INT64[NN]
+        Data:
+        1|2|2
+        2|2|1
+        1|1|1
+        2|3|2
+        1|1|1
+        """
+        return self._builder.dense_rank()
+
+    def percent_rank(self):
+        """
+        Create a PERCENT_RANK window function expression.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [4, 2, 1, 3, 5]})
+        >>> ht.proj("a", hdk.percent_rank().order_by(ht.ref("a"))).run()
+        Schema:
+          a: INT64
+          percent_rank: FP64[NN]
+        Data:
+        4|0.75
+        2|0.25
+        1|0
+        3|0.5
+        5|1
+        """
+        return self._builder.percent_rank()
+
+    def ntile(self, tile_count):
+        """
+        Create a NTILE window function expression.
+
+        Parameters
+        ----------
+        tile_count : int
+            Number of generated tiles.
+
+        Returns
+        -------
+        QueryExpr
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1]})
+        >>> ht.proj("a", hdk.ntile(2).over(ht.ref("a"))).run()
+        Schema:
+          a: INT64
+          ntile: INT64[NN]
+        Data:
+        1|1
+        2|1
+        1|1
+        2|2
+        1|2
+        """
+        return self._builder.ntile(tile_count)
 
 
 def init(**kwargs):
