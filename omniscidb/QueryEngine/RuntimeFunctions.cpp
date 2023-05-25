@@ -569,31 +569,31 @@ DEF_CHECKED_SINGLE_AGG_ID_INT(8)
 #undef DEF_AGG_ID_INT
 #undef DEF_CHECKED_SINGLE_AGG_ID_INT
 
-// #define DEF_WRITE_PROJECTION_INT(n)                                      \
-//   extern "C" RUNTIME_EXPORT ALWAYS_INLINE void write_projection_int##n(  \
-//       GENERIC_ADDR_SPACE int8_t* slot_ptr,                               \
-//       const int##n##_t val,                                              \
-//       const int64_t init_val) {                                          \
-//     if (val != init_val) {                                               \
-//       *reinterpret_cast<GENERIC_ADDR_SPACE int##n##_t*>(slot_ptr) = val; \
-//     }                                                                    \
-//   }
+#define DEF_WRITE_PROJECTION_INT(n)                                      \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE void write_projection_int##n(  \
+      GENERIC_ADDR_SPACE int8_t* slot_ptr,                               \
+      const int##n##_t val,                                              \
+      const int64_t init_val) {                                          \
+    if (val != init_val) {                                               \
+      *reinterpret_cast<GENERIC_ADDR_SPACE int##n##_t*>(slot_ptr) = val; \
+    }                                                                    \
+  }
 
-extern "C" GPU_RT_STUB void write_projection_int64(int8_t GENERIC_ADDR_SPACE*,
-                                                   int64_t,
-                                                   int64_t) {}
+// extern "C" GPU_RT_STUB void write_projection_int64(int8_t GENERIC_ADDR_SPACE*,
+//                                                    int64_t,
+//                                                    int64_t) {}
 
-extern "C" GPU_RT_STUB void write_projection_int32(int8_t GENERIC_ADDR_SPACE*,
-                                                   int32_t,
-                                                   int64_t) {}
+// extern "C" GPU_RT_STUB void write_projection_int32(int8_t GENERIC_ADDR_SPACE*,
+//                                                    int32_t,
+//                                                    int64_t) {}
 
 extern "C" GPU_RT_STUB void agg_sum_double_skip_val(int64_t GENERIC_ADDR_SPACE*,
                                                     double,
                                                     double) {}
 
-// DEF_WRITE_PROJECTION_INT(64)
-// DEF_WRITE_PROJECTION_INT(32)
-// #undef DEF_WRITE_PROJECTION_INT
+DEF_WRITE_PROJECTION_INT(64)
+DEF_WRITE_PROJECTION_INT(32)
+#undef DEF_WRITE_PROJECTION_INT
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE int64_t
 agg_sum_skip_val(GENERIC_ADDR_SPACE int64_t* agg,

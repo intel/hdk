@@ -21,11 +21,6 @@ define i64 addrspace(3)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 n
     ret i64 addrspace(3)* %res
 }
 
-define void @write_back_non_grouped_agg(i64 addrspace(3)* %input_buffer, i64 addrspace(4)* %output_buffer, i32 noundef %agg_idx) { 
-    ; TODO
-    ret void
-}
-
 define noundef i64 addrspace(3)* @declare_dynamic_shared_memory() {
     %res = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
     ret i64 addrspace(3)* %res
