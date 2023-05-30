@@ -17874,6 +17874,14 @@ TEST_F(Select, RowIdJoin) {
   }
 }
 
+TEST_F(Select, ScanLimit) {
+  auto tmp = config().debug.override_scan_limit;
+  config().debug.override_scan_limit = 1;
+  c("SELECT AVG(CAST(x AS FLOAT)) FROM test WHERE x > 0 GROUP BY y;",
+    ExecutorDeviceType::CPU);
+  config().debug.override_scan_limit = tmp;
+}
+
 class SubqueryTestEnv : public ExecuteTestBase, public ::testing::Test {
  protected:
   void SetUp() override {
@@ -18053,6 +18061,11 @@ int main(int argc, char** argv) {
                          ->default_value(config->exec.materialize_inner_join_tables)
                          ->implicit_value(true),
                      "Materialize all inner tables for joins.");
+  desc.add_options()("cpu-only",
+                     po::value<bool>(&config->exec.cpu_only)
+                         ->default_value(config->exec.cpu_only)
+                         ->implicit_value(true),
+                     "Run on CPU only, even if GPUs are available.");
   desc.add_options()(
       "test-help",
       "Print all ExecuteTest specific options (for gtest options use `--help`).");

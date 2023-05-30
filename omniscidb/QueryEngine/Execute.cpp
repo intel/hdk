@@ -3248,6 +3248,11 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
   if (interrupted_.load()) {
     throw QueryExecutionError(ERR_INTERRUPTED);
   }
+  // if (config_->debug.override_scan_limit > 0) {
+  //   scan_limit = config_->debug.override_scan_limit;
+  //   LOG(DEBUG2) << "scan_limit is overriden by the config. New value is " <<
+  //   scan_limit;
+  // }
 
   VLOG(2) << "bool(ra_exe_unit.union_all)=" << bool(ra_exe_unit.union_all)
           << " ra_exe_unit.input_descs="
@@ -3446,6 +3451,7 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
   if (device_type == ExecutorDeviceType::CPU) {
     const int32_t scan_limit_for_query =
         ra_exe_unit_copy.union_all ? ra_exe_unit_copy.scan_limit : scan_limit;
+    LOG(DEBUG4) << "scan_limit_for_query=" << scan_limit_for_query;
     const int32_t max_matched = scan_limit_for_query == 0
                                     ? query_exe_context->query_mem_desc_.getEntryCount()
                                     : scan_limit_for_query;

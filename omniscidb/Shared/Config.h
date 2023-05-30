@@ -170,6 +170,7 @@ struct DebugConfig {
   std::string build_ra_cache = "";
   std::string use_ra_cache = "";
   bool enable_automatic_ir_metadata = true;
+  int64_t override_scan_limit = -1;
 };
 
 struct StorageConfig {
