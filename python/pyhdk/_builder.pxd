@@ -41,6 +41,7 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr sample() except +
     CBuilderExpr singleValue() except +
     CBuilderExpr stdDev() except +
+    CBuilderExpr corr(const CBuilderExpr&) except +
 
     CBuilderExpr lag(int) except +
     CBuilderExpr lead(int) except +

@@ -101,6 +101,13 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.stdDev()
     return res
 
+  def corr(self, arg):
+    if not isinstance(arg, QueryExpr):
+      raise TypeError(f"Expected QueryExpr for corr arg. Provided: {type(arg)}.")
+    res = QueryExpr();
+    res.c_expr = self.c_expr.corr((<QueryExpr>arg).c_expr)
+    return res
+
   def lag(self, int n = 1):
     res = QueryExpr();
     res.c_expr = self.c_expr.lag(n)
