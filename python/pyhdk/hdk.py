@@ -269,6 +269,50 @@ class QueryExprAPI:
         """
         pass
 
+    def stddev(self):
+        """
+        Create sample standard deviation aggregate expression for the current expression.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk=pyhdk.init()
+        >>> ht=hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
+        >>> ht.agg([], ht.ref("a").stddev()).run()
+        Schema:
+          a_stddev: FP64
+        Data:
+        1.58114
+        """
+
+    def corr(self, arg):
+        """
+        Create sample standard correlation aggregate expression for the current expression
+        and the arg.
+
+        Returns
+        -------
+        QueryExpr
+
+        Parameters
+        ----------
+        arg : QueryExpr
+            An expression to compute correlation with..
+
+        Examples
+        --------
+        >>> hdk=pyhdk.init()
+        >>> ht=hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [2, 3, 4, 5, 6]})
+        >>> ht.agg([], ht.ref("a").corr(ht.ref("b"))).run()
+        Schema:
+          a_corr_b: FP64
+        Data:
+        1
+        """
+
     def lag(self, n=1):
         """
         Create LAG window function with the current expression as its argument.

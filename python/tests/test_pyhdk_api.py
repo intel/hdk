@@ -486,6 +486,12 @@ class TestBuilder(BaseTest):
             {"b": [1, 2], "s1": [0.547723, 0.547723], "s2": [1.581139, 1.581139]},
         )
 
+        ht1 = hdk.import_pydict({"a": [0.2, 0.0, 0.6, 0.2], "b": [0.3, 0.6, 0.0, 0.1]})
+        check_res(
+            ht1.agg([], c1="corr(a, b)", c2=ht1["a"].corr(ht1["b"])).run(),
+            {"c1": [-0.851064], "c2": [-0.851064]},
+        )
+
         with pytest.raises(RuntimeError):
             ht.agg("e")
         with pytest.raises(TypeError):
@@ -504,10 +510,13 @@ class TestBuilder(BaseTest):
             ht.agg("a", aggs={"m": 1})
         with pytest.raises(TypeError):
             ht.agg("a", h=1.5)
+        with pytest.raises(TypeError):
+            ht.ref("a").corr("a")
         with pytest.raises(RuntimeError):
             ht.agg("a", h="min(f)")
 
         hdk.drop_table(ht)
+        hdk.drop_table(ht1)
 
     def test_filter(self):
         hdk = pyhdk.init()
