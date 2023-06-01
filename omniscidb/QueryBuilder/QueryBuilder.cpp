@@ -31,124 +31,23 @@ int normalizeColIndex(const Node* node, int col_idx) {
 std::unordered_set<std::string> getColNames(const Node* node) {
   std::unordered_set<std::string> res;
   res.reserve(node->size());
-  if (auto scan = node->as<Scan>()) {
-    for (size_t col_idx = 0; col_idx < node->size(); ++col_idx) {
-      if (!scan->isVirtualCol(col_idx)) {
-        res.insert(scan->getFieldName(col_idx));
-      }
+  auto scan = node->as<Scan>();
+  for (size_t col_idx = 0; col_idx < node->size(); ++col_idx) {
+    if (!scan || !scan->isVirtualCol(col_idx)) {
+      res.insert(node->getFieldName(col_idx));
     }
-  } else if (auto proj = node->as<Project>()) {
-    auto fields = proj->getFields();
-    res.insert(fields.begin(), fields.end());
-  } else if (auto filter = node->as<Filter>()) {
-    res = getColNames(filter->getInput(0));
-  } else if (auto agg = node->as<Aggregate>()) {
-    auto fields = agg->getFields();
-    res.insert(fields.begin(), fields.end());
-  } else if (auto sort = node->as<Sort>()) {
-    res = getColNames(sort->getInput(0));
-  } else if (auto join = node->as<Join>()) {
-    res = getColNames(join->getInput(0));
-    auto rhs_names = getColNames(join->getInput(1));
-    res.insert(rhs_names.begin(), rhs_names.end());
-  } else {
-    throw InvalidQueryError() << "getColNames error: unsupported node: "
-                              << node->toString();
   }
   return res;
 }
 
 std::string getFieldName(const Node* node, int col_idx) {
   col_idx = normalizeColIndex(node, col_idx);
-  if (auto scan = node->as<Scan>()) {
-    return scan->getFieldName(col_idx);
-  }
-  if (auto proj = node->as<Project>()) {
-    return proj->getFieldName(col_idx);
-  }
-  if (auto filter = node->as<Filter>()) {
-    return getFieldName(filter->getInput(0), col_idx);
-  }
-  if (auto agg = node->as<Aggregate>()) {
-    return agg->getFieldName(col_idx);
-  }
-  if (auto sort = node->as<Sort>()) {
-    return getFieldName(sort->getInput(0), col_idx);
-  }
-  if (auto join = node->as<Join>()) {
-    if (col_idx < (int)join->getInput(0)->size()) {
-      return getFieldName(join->getInput(0), col_idx);
-    }
-    return getFieldName(join->getInput(1), col_idx - join->getInput(0)->size());
-  }
-
-  throw InvalidQueryError() << "getFieldName error: unsupported node: "
-                            << node->toString();
+  return node->getFieldName(col_idx);
 }
 
 ExprPtr getRefByName(const Node* node,
                      const std::string& col_name,
                      bool allow_null_res = false);
-
-int getRefIndexByName(const Node* node, const std::string& col_name) {
-  if (node->is<Join>()) {
-    auto lhs_ref_idx = getRefIndexByName(node->getInput(0), col_name);
-    if (lhs_ref_idx >= 0) {
-      return lhs_ref_idx;
-    }
-    auto rhs_ref_idx = getRefIndexByName(node->getInput(1), col_name);
-    if (rhs_ref_idx >= 0) {
-      return rhs_ref_idx + node->getInput(0)->size();
-    }
-    return -1;
-  }
-
-  auto ref = getRefByName(node, col_name, true);
-  return ref ? ref->as<ir::ColumnRef>()->index() : -1;
-}
-
-ExprPtr getRefByName(const Scan* scan, const std::string& col_name) {
-  for (size_t i = 0; i < scan->size(); ++i) {
-    if (scan->getColumnInfo(i)->name == col_name) {
-      return getNodeColumnRef(scan, (unsigned)i);
-    }
-  }
-  return nullptr;
-}
-
-ExprPtr getRefByName(const Project* proj, const std::string& col_name) {
-  for (size_t i = 0; i < proj->size(); ++i) {
-    if (proj->getFieldName(i) == col_name) {
-      return getNodeColumnRef(proj, (unsigned)i);
-    }
-  }
-  return nullptr;
-}
-
-ExprPtr getRefByName(const Filter* filter, const std::string& col_name) {
-  auto idx = getRefIndexByName(filter->getInput(0), col_name);
-  if (idx >= 0) {
-    return getNodeColumnRef(filter, idx);
-  }
-  return nullptr;
-}
-
-ExprPtr getRefByName(const Aggregate* agg, const std::string& col_name) {
-  for (size_t i = 0; i < agg->size(); ++i) {
-    if (agg->getFieldName(i) == col_name) {
-      return getNodeColumnRef(agg, (unsigned)i);
-    }
-  }
-  return nullptr;
-}
-
-ExprPtr getRefByName(const Sort* sort, const std::string& col_name) {
-  auto idx = getRefIndexByName(sort->getInput(0), col_name);
-  if (idx >= 0) {
-    return getNodeColumnRef(sort, idx);
-  }
-  return nullptr;
-}
 
 ExprPtr getRefByName(const Join* join, const std::string& col_name) {
   auto lhs_input_ref = getRefByName(join->getInput(0), col_name, true);
@@ -162,21 +61,14 @@ ExprPtr getRefByName(const Join* join, const std::string& col_name) {
 
 ExprPtr getRefByName(const Node* node, const std::string& col_name, bool allow_null_res) {
   ExprPtr res = nullptr;
-  if (auto scan = node->as<Scan>()) {
-    res = getRefByName(scan, col_name);
-  } else if (auto proj = node->as<Project>()) {
-    res = getRefByName(proj, col_name);
-  } else if (auto filter = node->as<Filter>()) {
-    res = getRefByName(filter, col_name);
-  } else if (auto agg = node->as<Aggregate>()) {
-    res = getRefByName(agg, col_name);
-  } else if (auto sort = node->as<Sort>()) {
-    res = getRefByName(sort, col_name);
-  } else if (auto join = node->as<Join>()) {
+  if (auto join = node->as<Join>()) {
     res = getRefByName(join, col_name);
   } else {
-    throw InvalidQueryError() << "getRefByName error: unsupported node: "
-                              << node->toString();
+    for (size_t i = 0; i < node->size(); ++i) {
+      if (node->getFieldName(i) == col_name) {
+        res = getNodeColumnRef(node, (unsigned)i);
+      }
+    }
   }
 
   if (!res && !allow_null_res) {

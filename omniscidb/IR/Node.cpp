@@ -63,41 +63,6 @@ bool is_one_of(const Node* node) {
   return dynamic_cast<const T1*>(node) || is_one_of<T2, Ts...>(node);
 }
 
-bool isRenamedInput(const Node* node, const size_t index, const std::string& new_name) {
-  CHECK_LT(index, node->size());
-  if (auto join = dynamic_cast<const Join*>(node)) {
-    CHECK_EQ(size_t(2), join->inputCount());
-    const auto lhs_size = join->getInput(0)->size();
-    if (index < lhs_size) {
-      return isRenamedInput(join->getInput(0), index, new_name);
-    }
-    CHECK_GE(index, lhs_size);
-    return isRenamedInput(join->getInput(1), index - lhs_size, new_name);
-  }
-
-  if (auto scan = dynamic_cast<const Scan*>(node)) {
-    return new_name != scan->getFieldName(index);
-  }
-
-  if (auto aggregate = dynamic_cast<const Aggregate*>(node)) {
-    return new_name != aggregate->getFieldName(index);
-  }
-
-  if (auto project = dynamic_cast<const Project*>(node)) {
-    return new_name != project->getFieldName(index);
-  }
-
-  if (auto logical_values = dynamic_cast<const LogicalValues*>(node)) {
-    const auto& tuple_type = logical_values->getTupleType();
-    CHECK_LT(index, tuple_type.size());
-    return new_name != tuple_type[index].get_resname();
-  }
-
-  CHECK(dynamic_cast<const Sort*>(node) || dynamic_cast<const Filter*>(node) ||
-        dynamic_cast<const LogicalUnion*>(node));
-  return isRenamedInput(node->getInput(0), index, new_name);
-}
-
 }  // namespace
 
 std::atomic<unsigned> Node::crt_id_ = FIRST_NODE_ID;
@@ -190,7 +155,7 @@ bool Project::isRenaming() const {
   for (size_t i = 0; i < fields_.size(); ++i) {
     auto col_ref = dynamic_cast<const ColumnRef*>(exprs_[i].get());
     CHECK(col_ref);
-    if (isRenamedInput(col_ref->node(), col_ref->index(), fields_[i])) {
+    if (col_ref->node()->getFieldName(col_ref->index()) != fields_[i]) {
       return true;
     }
   }
@@ -278,20 +243,6 @@ size_t LogicalUnion::toHash() const {
     boost::hash_combine(*hash_, is_all_);
   }
   return *hash_;
-}
-
-std::string LogicalUnion::getFieldName(const size_t i) const {
-  if (auto const* input = dynamic_cast<Project const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<LogicalUnion const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<Aggregate const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  } else if (auto const* input = dynamic_cast<Scan const*>(inputs_[0].get())) {
-    return input->getFieldName(i);
-  }
-  UNREACHABLE() << "Unhandled input type: " << ::toString(inputs_.front());
-  return {};
 }
 
 void LogicalUnion::checkForMatchingMetaInfoTypes() const {
