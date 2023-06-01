@@ -174,6 +174,8 @@ class Node {
 
   virtual std::shared_ptr<Node> deepCopy() const = 0;
 
+  virtual const std::string& getFieldName(size_t i) const = 0;
+
   /**
    * Clears the ptr to the result for this descriptor. Is only used for overriding step
    * results in distributed mode.
@@ -224,7 +226,7 @@ class Scan : public Node {
 
   const size_t getNumFragments() const { return table_info_->fragments; }
 
-  const std::string& getFieldName(const size_t i) const {
+  const std::string& getFieldName(size_t i) const override {
     CHECK_LT(i, column_infos_.size());
     return column_infos_[i]->name;
   }
@@ -325,7 +327,7 @@ class Project : public Node {
   const std::vector<std::string>& getFields() const { return fields_; }
   void setFields(std::vector<std::string> fields) { fields_ = std::move(fields); }
 
-  const std::string getFieldName(const size_t i) const {
+  const std::string& getFieldName(size_t i) const override {
     CHECK_LT(i, fields_.size());
     return fields_[i];
   }
@@ -388,7 +390,7 @@ class Aggregate : public Node {
   const std::vector<std::string>& getFields() const { return fields_; }
   void setFields(std::vector<std::string> new_fields) { fields_ = std::move(new_fields); }
 
-  const std::string getFieldName(const size_t i) const {
+  const std::string& getFieldName(size_t i) const override {
     CHECK_LT(i, fields_.size());
     return fields_[i];
   }
@@ -492,6 +494,13 @@ class Join : public Node {
     return std::make_shared<Join>(*this);
   }
 
+  const std::string& getFieldName(size_t i) const override {
+    if (i < getInput(0)->size()) {
+      return getInput(0)->getFieldName(i);
+    }
+    return getInput(1)->getFieldName(i - getInput(0)->size());
+  }
+
  private:
   ExprPtr condition_;
   const JoinType join_type_;
@@ -582,7 +591,7 @@ class TranslatedJoin : public Node {
     CHECK(false);
     return nullptr;
   }
-  std::string getFieldName(const size_t i) const;
+  const std::string& getFieldName(size_t i) const override { CHECK(false); }
   std::vector<const ColumnVar*> getJoinCols(bool lhs) const {
     if (lhs) {
       return lhs_join_cols_;
@@ -654,6 +663,10 @@ class Filter : public Node {
 
   std::shared_ptr<Node> deepCopy() const override {
     return std::make_shared<Filter>(*this);
+  }
+
+  const std::string& getFieldName(size_t i) const override {
+    return getInput(0)->getFieldName(i);
   }
 
  private:
@@ -739,6 +752,10 @@ class Sort : public Node {
     return std::make_shared<Sort>(*this);
   }
 
+  const std::string& getFieldName(size_t i) const override {
+    return getInput(0)->getFieldName(i);
+  }
+
  private:
   std::vector<SortField> collation_;
   const size_t limit_;
@@ -803,6 +820,10 @@ class LogicalValues : public Node {
     return std::make_shared<LogicalValues>(*this);
   }
 
+  const std::string& getFieldName(size_t i) const override {
+    return tuple_type_[i].get_resname();
+  }
+
  private:
   std::vector<TargetMetaInfo> tuple_type_;
   std::vector<ExprPtrVector> values_;
@@ -818,7 +839,9 @@ class LogicalUnion : public Node {
   std::string toString() const override;
   size_t toHash() const override;
 
-  std::string getFieldName(const size_t i) const;
+  const std::string& getFieldName(size_t i) const override {
+    return getInput(0)->getFieldName(i);
+  }
 
   inline bool isAll() const { return is_all_; }
   // Will throw a std::runtime_error if MetaInfo types don't match.
