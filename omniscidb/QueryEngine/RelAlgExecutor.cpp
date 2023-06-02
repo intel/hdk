@@ -1147,6 +1147,11 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
       }
     }
   }
+  if (eo.override_scan_limit > 0) {
+    LOG(DEBUG2) << "scan_limit (=" << eo.override_scan_limit
+                << ") is overriden by the config.";
+    ra_exe_unit.scan_limit = eo.override_scan_limit;
+  }
 
   if (g_columnar_large_projections) {
     const auto prefer_columnar = should_output_columnar(ra_exe_unit);

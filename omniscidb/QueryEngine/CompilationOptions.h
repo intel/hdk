@@ -112,6 +112,7 @@ struct ExecutionOptions {
   std::vector<size_t> outer_fragment_indices{};
   bool multifrag_result = false;
   bool preserve_order = false;
+  int64_t override_scan_limit = -1;
 
   static ExecutionOptions fromConfig(const Config& config) {
     auto eo = ExecutionOptions();
@@ -134,6 +135,7 @@ struct ExecutionOptions {
 
     eo.multifrag_result = config.exec.enable_multifrag_rs;
     eo.preserve_order = false;
+    eo.override_scan_limit = config.debug.override_scan_limit;
 
     return eo;
   }
