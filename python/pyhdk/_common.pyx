@@ -198,6 +198,9 @@ def buildConfig(*, enable_debug_timer=None, enable_union=False, **kwargs):
   cmd_str = cmd_str.replace("_", "-")
   cdef string app = "PyHDK".encode('UTF-8')
   cdef CConfigBuilder builder
+  #cmd_str = cmd_str.replace("False", "false")
+  #cmd_str = cmd_str.replace("True", "true")
+  print(cmd_str)
   builder.parseCommandLineArgs(app, cmd_str, False)
   cdef Config config = Config()
   config.c_config = builder.config()

@@ -364,6 +364,9 @@ cdef class DataMgr:
   def __cinit__(self, Config config):
     self.c_data_mgr = make_shared[CDataMgr](dereference(config.c_config), 0)
 
+  def __cdel__(self):
+    print("DataMgr.__del__()")
+
   cpdef registerDataProvider(self, Storage storage):
     cdef schema_id = storage.getId()
     cdef shared_ptr[CAbstractBufferMgr] buffer_mgr = storage.c_abstract_buffer_mgr

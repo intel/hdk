@@ -49,7 +49,7 @@ using DevicePtr = int8_t*;
 using DeviceFuncPtr = l0::L0Kernel*;
 void run_test_kernel(DeviceFuncPtr func, std::vector<void*>& params, GpuMgr* mgr) {
   l0::L0Manager* mgr_ = dynamic_cast<l0::L0Manager*>(mgr);
-  auto device = mgr_->drivers()[0]->devices()[0];
+  auto& device = mgr_->drivers()[0]->devices()[0];
   auto q = device->command_queue();
   auto q_list = device->create_command_list();
   ze_group_count_t dispatchTraits = {1, 1, 1};

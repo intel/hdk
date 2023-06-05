@@ -196,13 +196,22 @@ cdef class RelAlgExecutor:
     self.c_rel_alg_executor = make_shared[CRelAlgExecutor](c_executor, c_schema_provider, move(c_dag))
     self.c_data_mgr = data_mgr.c_data_mgr
 
+  def __del__(self):
+    print("RelAlgExecutor.__del__()")
+
   def execute(self, **kwargs):
+    print("RelAlgExecutor.execute()")
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
     cdef CCompilationOptions c_co
+    print(f'kwargs in execute: {kwargs}')
+    print('Got device type:', kwargs.get("device_type", "auto"))
+    print('config.exec.cpu_only=', config.exec.cpu_only)
     if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
       c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU, False)
+      print("running on GPU!")
     else:
       c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU, False)
+      print("running on CPU!")
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))

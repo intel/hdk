@@ -33,7 +33,7 @@ namespace l0 {
 class L0Device;
 class L0Driver {
  private:
-  std::vector<std::shared_ptr<L0Device>> devices_;
+  std::vector<std::unique_ptr<L0Device>> devices_;
 
 #ifdef HAVE_L0
   ze_context_handle_t context_;
@@ -43,12 +43,13 @@ class L0Driver {
  public:
 #ifdef HAVE_L0
   explicit L0Driver(ze_driver_handle_t handle);
+  L0Driver(const L0Driver&) = delete;
   ze_context_handle_t ctx() const;
-  ze_driver_handle_t driver() const;
+  ze_driver_handle_t handle() const;
   ~L0Driver();
 #endif
 
-  const std::vector<std::shared_ptr<L0Device>>& devices() const;
+  const std::vector<std::unique_ptr<L0Device>>& devices() const;
 };
 
 class L0Module;
@@ -59,7 +60,7 @@ class L0CommandQueue;
 class L0Device {
  private:
 #ifdef HAVE_L0
-  ze_device_handle_t device_;
+  ze_device_handle_t handle_;
   ze_device_properties_t props_;
   ze_device_compute_properties_t compute_props_;
 #endif
@@ -81,10 +82,11 @@ class L0Device {
   uint32_t maxGroupSize() const;
   ze_device_handle_t device() const;
   ze_context_handle_t ctx() const;
-  ~L0Device();
 #else
   L0Device() = default;
 #endif
+  L0Device(const L0Device&) = delete;
+  ~L0Device();
 };
 
 class L0Module : public std::enable_shared_from_this<L0Module> {
@@ -198,6 +200,7 @@ void* allocate_device_mem(const size_t num_bytes, L0Device& device);
 class L0Manager : public GpuMgr {
  public:
   L0Manager();
+  ~L0Manager();
 
   void copyHostToDevice(int8_t* device_ptr,
                         const int8_t* host_ptr,
@@ -245,10 +248,10 @@ class L0Manager : public GpuMgr {
   virtual bool hasSharedMemoryAtomicsSupport() const override;
   virtual size_t getMinSharedMemoryPerBlockForAllDevices() const override;
 
-  const std::vector<std::shared_ptr<L0Driver>>& drivers() const;
+  const std::vector<std::unique_ptr<L0Driver>>& drivers() const;
 
  private:
-  std::vector<std::shared_ptr<L0Driver>> drivers_;
+  std::vector<std::unique_ptr<L0Driver>> drivers_;
 };
 
 }  // namespace l0

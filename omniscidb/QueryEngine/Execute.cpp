@@ -3540,6 +3540,7 @@ int32_t Executor::executePlan(const RelAlgExecutionUnit& ra_exe_unit,
         ra_exe_unit_copy, query_exe_context->query_mem_desc_, co);
     CHECK(*results);
     VLOG(2) << "results->rowCount()=" << (*results)->rowCount();
+    VLOG(2) << (*results)->contentToString();
     (*results)->holdLiterals(hoist_buf);
   }
   if (results && error_code &&

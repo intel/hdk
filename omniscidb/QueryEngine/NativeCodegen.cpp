@@ -385,7 +385,7 @@ std::shared_ptr<CompilationContext> Executor::optimizeAndCodegenGPU(
 
   auto key = get_code_cache_key(query_func, cgen_state_.get());
   auto cached_code = Executor::gpu_code_accessor->get_value(key);
-  if (cached_code) {
+  if (cached_code && config_->debug.enable_gpu_code_compilation_cache) {
     return cached_code;
   }
 

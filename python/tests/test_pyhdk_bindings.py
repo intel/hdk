@@ -95,3 +95,10 @@ class TestCalcite:
         assert len(ra["rels"]) == 2
         assert ra["rels"][0]["relOp"] == "LogicalTableScan"
         assert ra["rels"][1]["relOp"] == "LogicalProject"
+
+
+class TestConfigBuilder:
+    def test_config_options_parsing(self):
+        config = pyhdk.buildConfig(cpu_only=False)
+        # assert config.exec.cpu_only == False
+        assert config.c_config.exec.cpu_only == False

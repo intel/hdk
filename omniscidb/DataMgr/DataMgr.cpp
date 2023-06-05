@@ -63,6 +63,7 @@ DataMgr::DataMgr(const Config& config, const size_t numReaderThreads)
 }
 
 DataMgr::~DataMgr() {
+  std::cerr << "~DataMgr()" << std::endl;
   for (auto& [p, ctx] : device_contexts_) {
     for (size_t device = 0; device < ctx->buffer_mgrs.size(); device++) {
       delete ctx->buffer_mgrs[device];

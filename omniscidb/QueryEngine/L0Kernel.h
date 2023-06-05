@@ -18,7 +18,7 @@
 #include "QueryEngine/CompilationContext.h"
 
 struct L0BinResult {
-  std::shared_ptr<l0::L0Device> device;
+  l0::L0Device* device;
   std::shared_ptr<l0::L0Module> module;
   std::shared_ptr<l0::L0Kernel> kernel;
 };
@@ -30,7 +30,7 @@ L0BinResult spv_to_bin(const std::string& spv,
 
 class L0DeviceCompilationContext {
  public:
-  L0DeviceCompilationContext(std::shared_ptr<l0::L0Device> device,
+  L0DeviceCompilationContext(l0::L0Device* device,
                              std::shared_ptr<l0::L0Kernel> kernel,
                              std::shared_ptr<l0::L0Module> module,
                              const l0::L0Manager* l0_mgr,
@@ -38,11 +38,11 @@ class L0DeviceCompilationContext {
                              unsigned int num_options,
                              void** option_vals = nullptr);
   l0::L0Kernel* kernel() { return kernel_.get(); }
-  l0::L0Device* device() { return device_.get(); }
+  l0::L0Device* device() { return device_; }
   ~L0DeviceCompilationContext();
 
  private:
-  std::shared_ptr<l0::L0Device> device_;
+  l0::L0Device* device_;
   std::shared_ptr<l0::L0Module> module_;
   std::shared_ptr<l0::L0Kernel> kernel_;
   const l0::L0Manager* l0_mgr_;
@@ -53,6 +53,7 @@ class L0CompilationContext : public CompilationContext {
  public:
   using L0DevCompilationContextPtr = std::unique_ptr<L0DeviceCompilationContext>;
   L0CompilationContext() = default;
+  ~L0CompilationContext() { std::cerr << "~L0CompilationContext" << std::endl; }
 
   std::vector<void*> getNativeFunctionPointers() const {
     std::vector<void*> fn_ptrs;

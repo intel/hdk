@@ -26,20 +26,20 @@ L0BinResult spv_to_bin(const std::string& spv,
   CHECK(!spv.empty());
   CHECK(mgr);
 
-  auto driver = mgr->drivers()[0];
-  auto device = driver->devices()[0];
+  auto& driver = mgr->drivers()[0];
+  auto& device = driver->devices()[0];
 
   CHECK(driver);
-  CHECK(device);
+  CHECK(device.get());
 
   auto module = device->create_module((uint8_t*)spv.data(), spv.size(), true);
   auto kernel = module->create_kernel(name.c_str(), block_size, 1, 1);
 
-  return {device, module, kernel};
+  return {device.get(), module, kernel};
 }
 
 L0DeviceCompilationContext::L0DeviceCompilationContext(
-    std::shared_ptr<l0::L0Device> device,
+    l0::L0Device* device,
     std::shared_ptr<l0::L0Kernel> kernel,
     std::shared_ptr<l0::L0Module> module,
     const l0::L0Manager* l0_mgr,
@@ -50,6 +50,10 @@ L0DeviceCompilationContext::L0DeviceCompilationContext(
     , module_(module)
     , kernel_(kernel)
     , l0_mgr_(l0_mgr)
-    , device_id_(device_id) {}
+    , device_id_(device_id) {
+  std::cerr << "L0DeviceCompilationContext()" << std::endl;
+}
 
-L0DeviceCompilationContext::~L0DeviceCompilationContext() {}
+L0DeviceCompilationContext::~L0DeviceCompilationContext() {
+  std::cerr << "~L0DeviceCompilationContext()" << std::endl;
+}

@@ -89,8 +89,8 @@ std::string SPIRVExecuteTest::generateSimpleSPIRV() {
 
 TEST_F(SPIRVExecuteTest, TranslateSimpleWithL0Manager) {
   auto mgr = std::make_shared<l0::L0Manager>();
-  auto driver = mgr->drivers()[0];
-  auto device = driver->devices()[0];
+  auto& driver = mgr->drivers()[0];
+  auto& device = driver->devices()[0];
 
   auto spv = generateSimpleSPIRV();
 
@@ -222,8 +222,8 @@ TEST_F(SPIRVExecuteTest, SPIRVBuiltins) {
   auto spv = ss.str();
 
   auto mgr = std::make_shared<l0::L0Manager>();
-  auto driver = mgr->drivers()[0];
-  auto device = driver->devices()[0];
+  auto& driver = mgr->drivers()[0];
+  auto& device = driver->devices()[0];
 
   auto mod = device->create_module((uint8_t*)spv.data(), spv.length());
 
