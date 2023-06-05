@@ -1750,7 +1750,7 @@ class QueryNodeAPI:
         """
         pass
 
-    def run(self):
+    def run(self, **kwargs):
         """
         Run query with the current node as a query root node.
 
@@ -2624,6 +2624,7 @@ class HDK:
 def init(**kwargs):
     if init._instance is None:
         init._instance = HDK(**kwargs)
+    # TODO: kwargs are ignored here
     return init._instance
 
 
