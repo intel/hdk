@@ -95,12 +95,28 @@ jobs:
       name: cuda
       options: -DENABLE_PYTHON=off -DENABLE_CUDA=on
 
+  build-clang-docker:
+    name: Build Clang
+    uses: ./.github/workflows/build-docker.yml
+    with:
+      name: clang
+      options: -DENABLE_PYTHON=off -DENABLE_CUDA=on -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
   test-cuda-docker:
     name: Sanity test (Gtests)
     needs: build-cuda-docker
     uses: ./.github/workflows/test-docker.yml
     with:
       name: cuda
+      # input for a push event is an empty string, convert it to boolean
+      reset-cache: ${{ !!inputs.reset-cache }}
+
+  test-clang-docker:
+    name: Sanity test (Gtests)
+    needs: build-cuda-docker
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      name: clang
       # input for a push event is an empty string, convert it to boolean
       reset-cache: ${{ !!inputs.reset-cache }}
 
