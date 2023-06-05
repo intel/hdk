@@ -171,6 +171,7 @@ struct DebugConfig {
   std::string build_ra_cache = "";
   std::string use_ra_cache = "";
   bool enable_automatic_ir_metadata = true;
+  bool enable_gpu_code_compilation_cache = true;
 };
 
 struct StorageConfig {
