@@ -14,17 +14,18 @@ from dataclasses import dataclass
 
 from helpers import check_schema, check_res
 
+
 @dataclass
 class ExecutionConfig:
-    cpu_only: bool
     enable_heterogeneous: bool
     device_type: str
 
-cpu_cfg = ExecutionConfig(True, False, "CPU")
-gpu_cfg = ExecutionConfig(False, False, "GPU")
-het_cfg = ExecutionConfig(False, True, "auto")
 
-@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
+cpu_cfg = ExecutionConfig(False, "CPU")
+gpu_cfg = ExecutionConfig(False, "GPU")
+het_cfg = ExecutionConfig(True, "AUTO")
+
+
 class BaseTest:
     @staticmethod
     def check_cst(cst, val, type):
@@ -38,8 +39,8 @@ class BaseTest:
 
 
 class TestImport(BaseTest):
-    def test_create_table(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+    def test_create_table(self):
+        hdk = pyhdk.init()
         pyhdk.initLogger(debug_logs=True)
 
         ht = hdk.create_table("test1", [("a", "int"), ("b", hdk.type("fp"))])
@@ -67,8 +68,8 @@ class TestImport(BaseTest):
         with pytest.raises(TypeError) as e:
             hdk.create_table("test2", {"a": "int"}, fragment_size="4")
 
-    def test_import_pydict(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+    def test_import_pydict(self):
+        hdk = pyhdk.init()
         table_name = "table_test_import_pydict"
         ht = hdk.import_pydict({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}, table_name)
         assert ht.is_scan
@@ -81,8 +82,8 @@ class TestImport(BaseTest):
     @pytest.mark.parametrize("create_table", [True, False])
     @pytest.mark.parametrize("full_schema", [None, True, False])
     @pytest.mark.parametrize("glob", [True, False])
-    def test_import_csv(self, exe_cfg, header, create_table, full_schema, glob):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+    def test_import_csv(self, header, create_table, full_schema, glob):
+        hdk = pyhdk.init()
         table_name = "table_import_csv"
 
         if create_table:
@@ -124,7 +125,7 @@ class TestImport(BaseTest):
         )
 
         check_schema(ht.schema, real_schema)
-        check_res(ht.proj(0, 1).run(device_type=exe_cfg.device_type), ref_data)
+        check_res(ht.proj(0, 1).run(), ref_data)
 
         hdk.drop_table(table_name)
 
@@ -134,8 +135,8 @@ class TestImport(BaseTest):
     # e.g. parquet replacing [s] with [ms] on save of Time32.
     @pytest.mark.parametrize("create_table", [True, False])
     @pytest.mark.parametrize("glob", [True, False])
-    def test_import_parquet(self, exe_cfg, create_table, glob):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+    def test_import_parquet(self, create_table, glob):
+        hdk = pyhdk.init()
         table_name = "table_parquet"
 
         if glob:
@@ -158,14 +159,15 @@ class TestImport(BaseTest):
 
         ht = hdk.import_parquet(file_name, table_name)
         check_schema(ht.schema, real_schema)
-        check_res(ht.proj(0, 1).run(device_type=exe_cfg.device_type), ref_data)
+        check_res(ht.proj(0, 1).run(), ref_data)
 
         hdk.drop_table(table_name)
 
 
+@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
 class TestBuilder(BaseTest):
     def test_scan(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         table_name = "table_test_scan"
         hdk.import_pydict({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}, table_name)
         ht = hdk.scan(table_name)
@@ -178,7 +180,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(table_name)
 
     def test_drop_table(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         table_name = "table_test_drop_table"
 
         hdk.import_pydict({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}, table_name)
@@ -197,7 +199,7 @@ class TestBuilder(BaseTest):
             hdk.drop_table(1)
 
     def test_type_from_str(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         assert str(hdk.type("int")) == "INT64"
         assert str(hdk.type("fp")) == "FP64"
         assert str(hdk.type("text[NN] ")) == "TEXT[NN]"
@@ -205,7 +207,7 @@ class TestBuilder(BaseTest):
             hdk.type(1)
 
     def test_cst(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         self.check_cst(hdk.cst(None), "NULL", "NULLT")
         self.check_cst(hdk.cst(None, "int"), "NULL", "INT64")
         self.check_cst(hdk.cst(None, hdk.type("fp")), "NULL", "FP64")
@@ -258,7 +260,7 @@ class TestBuilder(BaseTest):
             hdk.cst([])
 
     def test_ref(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]})
         self.check_ref(ht.ref(0), 0)
         self.check_ref(ht.ref(1), 1)
@@ -282,7 +284,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_proj(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]})
         proj = ht.proj(
             0,
@@ -315,7 +317,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_sort(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {
                 "a": [1, 2, 1, 2, 1, 2, 1, None, 1, 2],
@@ -332,7 +334,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.sort(("a", "desc"), (ht.ref("b"), "asc")).run(device_type=exe_cfg.device_type),
+            ht.sort(("a", "desc"), (ht.ref("b"), "asc")).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": [2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, "null"],
                 "b": [1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, "null", 2.0],
@@ -340,7 +344,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.sort(("a", "desc", "first"), ht.ref("b")).run(device_type=exe_cfg.device_type),
+            ht.sort(("a", "desc", "first"), ht.ref("b")).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": ["null", 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0],
                 "b": [2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, "null"],
@@ -348,7 +354,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.sort(("a", "desc"), fields={"b": "asc"}).run(device_type=exe_cfg.device_type),
+            ht.sort(("a", "desc"), fields={"b": "asc"}).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": [2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, "null"],
                 "b": [1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, "null", 2.0],
@@ -356,7 +364,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.sort(fields={"b": ("asc", "first")}, a="desc").run(device_type=exe_cfg.device_type),
+            ht.sort(fields={"b": ("asc", "first")}, a="desc").run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": [1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, "null"],
                 "b": ["null", 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0],
@@ -364,7 +374,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.sort(b=("asc", "first"), a=("desc", "first")).run(device_type=exe_cfg.device_type),
+            ht.sort(b=("asc", "first"), a=("desc", "first")).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": [1.0, 2.0, 2.0, 1.0, 1.0, "null", 2.0, 2.0, 1.0, 1.0],
                 "b": ["null", 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0],
@@ -436,8 +448,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_agg(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
-        dt = "CPU" if exe_cfg else "GPU"
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {
                 "a": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
@@ -478,7 +489,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.agg(ht.ref("b"), cd=ht.ref("a").count(True)).sort("b").run(device_type=exe_cfg.device_type),
+            ht.agg(ht.ref("b"), cd=ht.ref("a").count(True))
+            .sort("b")
+            .run(device_type=exe_cfg.device_type),
             {"b": [1, 2], "cd": [2, 2]},
         )
 
@@ -495,7 +508,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.agg("b", s1="stddev(a)", s2=ht["c"].stddev()).sort("b").run(device_type=exe_cfg.device_type),
+            ht.agg("b", s1="stddev(a)", s2=ht["c"].stddev())
+            .sort("b")
+            .run(device_type=exe_cfg.device_type),
             {"b": [1, 2], "s1": [0.547723, 0.547723], "s2": [1.581139, 1.581139]},
         )
 
@@ -532,19 +547,25 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht1)
 
     def test_filter(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {"a": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "b": [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]}
         )
 
         check_res(
-            ht.filter(ht["a"] > 5).run(device_type=exe_cfg.device_type), {"a": [6, 7, 8, 9, 10], "b": [5, 4, 3, 2, 1]}
+            ht.filter(ht["a"] > 5).run(device_type=exe_cfg.device_type),
+            {"a": [6, 7, 8, 9, 10], "b": [5, 4, 3, 2, 1]},
         )
 
-        check_res(ht.filter(ht["a"] >= 6, ht["b"] > 4).run(device_type=exe_cfg.device_type), {"a": [6], "b": [5]})
+        check_res(
+            ht.filter(ht["a"] >= 6, ht["b"] > 4).run(device_type=exe_cfg.device_type),
+            {"a": [6], "b": [5]},
+        )
 
         check_res(
-            ht.filter((ht["a"] < 2).logical_or(ht["b"] <= 2)).run(device_type=exe_cfg.device_type),
+            ht.filter((ht["a"] < 2).logical_or(ht["b"] <= 2)).run(
+                device_type=exe_cfg.device_type
+            ),
             {"a": [1, 9, 10], "b": [10, 2, 1]},
         )
 
@@ -559,9 +580,17 @@ class TestBuilder(BaseTest):
 
         ht = hdk.import_pydict({"a": [1, 2, None, None, 5], "b": [10, 9, 8, 7, 6]})
 
-        check_res(ht.filter(ht["a"].is_null()).proj("b").run(device_type=exe_cfg.device_type), {"b": [8, 7]})
+        check_res(
+            ht.filter(ht["a"].is_null()).proj("b").run(device_type=exe_cfg.device_type),
+            {"b": [8, 7]},
+        )
 
-        check_res(ht.filter(ht["a"].is_not_null()).proj("b").run(device_type=exe_cfg.device_type), {"b": [10, 9, 6]})
+        check_res(
+            ht.filter(ht["a"].is_not_null())
+            .proj("b")
+            .run(device_type=exe_cfg.device_type),
+            {"b": [10, 9, 6]},
+        )
 
         with pytest.raises(TypeError):
             ht.filter("a")
@@ -571,7 +600,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_join(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht1 = hdk.import_pydict(
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
         )
@@ -579,7 +608,10 @@ class TestBuilder(BaseTest):
             {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5], "y": [5.5, 4.4, 3.3, 2.2, 1.1]}
         )
 
-        check_res(ht1.join(ht2).run(device_type=exe_cfg.device_type), {"a": [3], "b": [3], "x": [3.3], "y": [3.3]})
+        check_res(
+            ht1.join(ht2).run(device_type=exe_cfg.device_type),
+            {"a": [3], "b": [3], "x": [3.3], "y": [3.3]},
+        )
 
         check_res(
             ht1.join(ht2, how="left").run(device_type=exe_cfg.device_type),
@@ -624,7 +656,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht1.join(ht2, cond=ht1["a"].eq(ht2["b"])).run(device_type=exe_cfg.device_type),
+            ht1.join(ht2, cond=ht1["a"].eq(ht2["b"])).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a": [1, 2, 3, 4, 5],
                 "b": [5, 4, 3, 2, 1],
@@ -656,17 +690,25 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht2)
 
     def test_math_ops(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
         )
 
-        check_res(ht.proj(ht["a"].uminus()).run(device_type=exe_cfg.device_type), {"expr_1": [-1, -2, -3, -4, -5]})
-
-        check_res(ht.proj(-ht["a"]).run(device_type=exe_cfg.device_type), {"expr_1": [-1, -2, -3, -4, -5]})
+        check_res(
+            ht.proj(ht["a"].uminus()).run(device_type=exe_cfg.device_type),
+            {"expr_1": [-1, -2, -3, -4, -5]},
+        )
 
         check_res(
-            ht.proj(a1=ht["a"] + ht["b"], a2=ht["a"] + 1, a3=ht["a"] + 1.5).run(device_type=exe_cfg.device_type),
+            ht.proj(-ht["a"]).run(device_type=exe_cfg.device_type),
+            {"expr_1": [-1, -2, -3, -4, -5]},
+        )
+
+        check_res(
+            ht.proj(a1=ht["a"] + ht["b"], a2=ht["a"] + 1, a3=ht["a"] + 1.5).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [6, 6, 6, 6, 6],
                 "a2": [2, 3, 4, 5, 6],
@@ -675,7 +717,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.proj(a1=ht["a"] - ht["b"], a2=ht["a"] - 1, a3=ht["a"] - 1.5).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"] - ht["b"], a2=ht["a"] - 1, a3=ht["a"] - 1.5).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [-4, -2, 0, 2, 4],
                 "a2": [0, 1, 2, 3, 4],
@@ -684,7 +728,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.proj(a1=ht["a"] * ht["b"], a2=ht["a"] * 2, a3=ht["a"] * 1.5).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"] * ht["b"], a2=ht["a"] * 2, a3=ht["a"] * 1.5).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [5, 8, 9, 8, 5],
                 "a2": [2, 4, 6, 8, 10],
@@ -693,7 +739,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.proj(a1=ht["a"] / ht["b"], a2=ht["a"] / 2, a3=ht["a"] / 2.0).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"] / ht["b"], a2=ht["a"] / 2, a3=ht["a"] / 2.0).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [0.2, 0.5, 1.0, 2.0, 5.0],
                 "a2": [0.5, 1.0, 1.5, 2.0, 2.5],
@@ -702,7 +750,9 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.proj(a1=ht["a"] // ht["b"], a2=ht["a"] // 2, a3=ht["x"] // 2.0).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"] // ht["b"], a2=ht["a"] // 2, a3=ht["x"] // 2.0).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [0, 0, 1, 2, 5],
                 "a2": [0, 1, 1, 2, 2],
@@ -726,18 +776,22 @@ class TestBuilder(BaseTest):
         )
 
         check_res(
-            ht.proj(a1=ht["a"] % ht["b"], a2=ht["a"] % 2).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"] % ht["b"], a2=ht["a"] % 2).run(
+                device_type=exe_cfg.device_type
+            ),
             {"a1": [1, 2, 0, 0, 0], "a2": [1, 0, 1, 0, 1]},
         )
 
         hdk.drop_table(ht)
 
     def test_cast(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1.1, 2.2, 3.3, 4.4, 5.5]})
 
         check_res(
-            ht.proj(c1=ht["a"].cast("fp64"), c2=ht["b"].cast("int")).run(device_type=exe_cfg.device_type),
+            ht.proj(c1=ht["a"].cast("fp64"), c2=ht["b"].cast("int")).run(
+                device_type=exe_cfg.device_type
+            ),
             {"c1": [1.0, 2.0, 3.0, 4.0, 5.0], "c2": [1, 2, 3, 4, 6]},
         )
 
@@ -751,7 +805,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_extract(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {
                 "a": pandas.to_datetime(
@@ -775,7 +829,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_date_add(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict(
             {
                 "a": pandas.to_datetime(
@@ -832,25 +886,28 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_unnest(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.create_table("test1", [("a", "array(int)")])
         hdk.import_pydict({"a": [[1, 2], [1, 2, 3, 4]]}, ht)
 
         check_res(
-            ht.proj(a=ht["a"].unnest()).agg(["a"], "count").sort("a").run(device_type=exe_cfg.device_type),
+            ht.proj(a=ht["a"].unnest())
+            .agg(["a"], "count")
+            .sort("a")
+            .run(device_type=exe_cfg.device_type),
             {"a": [1, 2, 3, 4], "count": [2, 2, 1, 1]},
         )
 
         hdk.drop_table(ht)
 
     def test_pow(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [1.0, 2.0, 3.0, 4.0, 5.0]})
 
         check_res(
-            ht.proj(
-                a1=ht["a"].pow(2), a2=ht["a"].pow(ht["b"]), b=ht["b"].pow(2.0)
-            ).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"].pow(2), a2=ht["a"].pow(ht["b"]), b=ht["b"].pow(2.0)).run(
+                device_type=exe_cfg.device_type
+            ),
             {
                 "a1": [1.0, 4.0, 9.0, 16.0, 25.0],
                 "a2": [1.0, 4.0, 27.0, 256.0, 3125.0],
@@ -861,19 +918,21 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_at(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.create_table("test1", [("a", "array(int)"), ("b", "int")])
         hdk.import_pydict({"a": [[1, 2], [2, 3, 4]], "b": [2, 3]}, ht)
 
         check_res(
-            ht.proj(a1=ht["a"].at(1), a2=ht["a"][ht["b"]], a3=ht["a"].at(-1)).run(device_type=exe_cfg.device_type),
+            ht.proj(a1=ht["a"].at(1), a2=ht["a"][ht["b"]], a3=ht["a"].at(-1)).run(
+                device_type=exe_cfg.device_type
+            ),
             {"a1": [1, 2], "a2": [2, 4], "a3": ["null", "null"]},
         )
 
         hdk.drop_table(ht)
 
     def test_run_on_res(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
 
         res1 = ht.proj("b", "a").run(device_type=exe_cfg.device_type)
@@ -891,7 +950,9 @@ class TestBuilder(BaseTest):
         res4 = res2.run(device_type=exe_cfg.device_type)
         check_res(res4, {"a": [1, 2, 3, 4, 5], "count": [1, 1, 1, 1, 1]})
 
-        res5 = res4.filter(res4.ref("a") > res4["count"]).run(device_type=exe_cfg.device_type)
+        res5 = res4.filter(res4.ref("a") > res4["count"]).run(
+            device_type=exe_cfg.device_type
+        )
         check_res(res5, {"a": [2, 3, 4, 5], "count": [1, 1, 1, 1]})
 
         res6 = res5.run(device_type=exe_cfg.device_type)
@@ -907,7 +968,7 @@ class TestBuilder(BaseTest):
         )
 
     def test_row(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.create_table(
             "test1", [("a", "int"), ("b", "fp64"), ("c", "text"), ("d", "array(int)")]
         )
@@ -932,7 +993,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_shape(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
         assert ht.shape == (5, 2)
         hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]}, ht)
@@ -948,7 +1009,7 @@ class TestBuilder(BaseTest):
             res2.proj(0).shape
 
     def test_head(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
 
         res = ht.run(device_type=exe_cfg.device_type)
@@ -962,7 +1023,7 @@ class TestBuilder(BaseTest):
         hdk.drop_table(ht)
 
     def test_tail(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
 
         res = ht.run(device_type=exe_cfg.device_type)
@@ -1076,18 +1137,22 @@ class TestBuilder(BaseTest):
         check_res(res, {"a_last_value": [1, 2, 3, 4, 5]})
 
 
+@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
 
         check_res(
-            hdk.sql(f"SELECT a, b FROM {ht.table_name};"),
+            hdk.sql(
+                f"SELECT a, b FROM {ht.table_name};",
+                query_opts={"device_type": exe_cfg.device_type},
+            ),
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]},
         )
 
     def test_alias(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht1 = hdk.import_pydict(
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
         )
@@ -1096,11 +1161,19 @@ class TestSql(BaseTest):
         )
 
         check_res(
-            hdk.sql("SELECT a, b FROM t1;", t1=ht1),
+            hdk.sql(
+                "SELECT a, b FROM t1;",
+                t1=ht1,
+                query_opts={"device_type": exe_cfg.device_type},
+            ),
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]},
         )
         check_res(
-            hdk.sql("SELECT a, b FROM t1;", t1=ht2),
+            hdk.sql(
+                "SELECT a, b FROM t1;",
+                t1=ht2,
+                query_opts={"device_type": exe_cfg.device_type},
+            ),
             {"a": [1, 2, 3, 4, 5], "b": [1, 2, 3, 4, 5]},
         )
 
@@ -1109,6 +1182,7 @@ class TestSql(BaseTest):
                 "SELECT t1.a, t1.b, t1.x, t2.y FROM t1, t2 WHERE t1.b = t2.a ORDER BY t1.a;",
                 t1=ht1,
                 t2=ht2,
+                query_opts={"device_type": exe_cfg.device_type},
             ),
             {
                 "a": [1, 2, 3, 4, 5],
@@ -1119,18 +1193,29 @@ class TestSql(BaseTest):
         )
 
     def test_run_on_res(self, exe_cfg):
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
         ht1 = hdk.import_pydict(
             {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1], "x": [1.1, 2.2, 3.3, 4.4, 5.5]}
         )
 
-        res1 = hdk.sql("SELECT a, b FROM t1;", t1=ht1)
+        res1 = hdk.sql(
+            "SELECT a, b FROM t1;",
+            t1=ht1,
+            query_opts={"device_type": exe_cfg.device_type},
+        )
         check_res(res1, {"a": [1, 2, 3, 4, 5], "b": [5, 4, 3, 2, 1]})
 
-        res2 = hdk.sql("SELECT b + 1 as b, a - 1 as a FROM t1;", t1=res1)
+        res2 = hdk.sql(
+            "SELECT b + 1 as b, a - 1 as a FROM t1;",
+            t1=res1,
+            query_opts={"device_type": exe_cfg.device_type},
+        )
         check_res(res2, {"b": [6, 5, 4, 3, 2], "a": [0, 1, 2, 3, 4]})
 
-        res3 = hdk.sql(f"SELECT b - 1 as b, a + 1 as a FROM {res1.table_name};")
+        res3 = hdk.sql(
+            f"SELECT b - 1 as b, a + 1 as a FROM {res1.table_name};",
+            query_opts={"device_type": exe_cfg.device_type},
+        )
         check_res(res3, {"b": [4, 3, 2, 1, 0], "a": [2, 3, 4, 5, 6]})
 
 
@@ -1176,7 +1261,7 @@ class BaseTaxiTest:
 class TestTaxiSql(BaseTaxiTest):
     def test_taxi_over_csv_modular(self, exe_cfg):
         # Initialize HDK components
-        config = pyhdk.buildConfig(cpu_only=exe_cfg.cpu_only)
+        config = pyhdk.buildConfig()
         storage = pyhdk.storage.ArrowStorage(1, config)
         data_mgr = pyhdk.storage.DataMgr(config)
         data_mgr.registerDataProvider(storage)
@@ -1193,7 +1278,7 @@ class TestTaxiSql(BaseTaxiTest):
             "SELECT cab_type, count(*) as cnt FROM trips GROUP BY cab_type;"
         )
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, ra)
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q1_res(res)
 
         # Run Taxi Q2 SQL query
@@ -1204,7 +1289,7 @@ class TestTaxiSql(BaseTaxiTest):
                ORDER BY passenger_count;"""
         )
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, ra)
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q2_res(res)
 
         # Run Taxi Q3 SQL query
@@ -1215,7 +1300,7 @@ class TestTaxiSql(BaseTaxiTest):
                ORDER BY passenger_count;"""
         )
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, ra)
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q3_res(res)
 
         # Run Taxi Q4 SQL query
@@ -1230,14 +1315,14 @@ class TestTaxiSql(BaseTaxiTest):
                ORDER BY pickup_year, cnt desc;"""
         )
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(executor, storage, data_mgr, ra)
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q4_res(res)
 
         storage.dropTable("trips")
 
     def test_taxi_over_csv_explicit_instance(self, exe_cfg):
         # Initialize HDK components wrapped into a single object
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         # import for all cases?
@@ -1247,7 +1332,10 @@ class TestTaxiSql(BaseTaxiTest):
         )
 
         # Run Taxi Q1 SQL query
-        res = hdk.sql("SELECT cab_type, count(*) as cnt FROM trips GROUP BY cab_type;")
+        res = hdk.sql(
+            "SELECT cab_type, count(*) as cnt FROM trips GROUP BY cab_type;",
+            query_opts={"device_type": exe_cfg.device_type},
+        )
         self.check_taxi_q1_res(res)
 
         # Run Taxi Q2 SQL query
@@ -1255,7 +1343,8 @@ class TestTaxiSql(BaseTaxiTest):
             """SELECT passenger_count, AVG(total_amount) as total_amount_avg
                FROM trips
                GROUP BY passenger_count
-               ORDER BY passenger_count;"""
+               ORDER BY passenger_count;""",
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q2_res(res)
 
@@ -1264,7 +1353,8 @@ class TestTaxiSql(BaseTaxiTest):
             """SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, count(*) as cnt
                FROM trips
                GROUP BY passenger_count, pickup_year
-               ORDER BY passenger_count;"""
+               ORDER BY passenger_count;""",
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q3_res(res)
 
@@ -1277,7 +1367,8 @@ class TestTaxiSql(BaseTaxiTest):
                  count(*) AS cnt
                FROM trips
                GROUP BY passenger_count, pickup_year, distance
-               ORDER BY pickup_year, cnt desc;"""
+               ORDER BY pickup_year, cnt desc;""",
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q4_res(res)
 
@@ -1285,7 +1376,7 @@ class TestTaxiSql(BaseTaxiTest):
 
     def test_taxi_over_csv_explicit_aliases(self, exe_cfg):
         # Initialize HDK components hidden from users
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         # Tables are referenced through the resulting object
@@ -1299,6 +1390,7 @@ class TestTaxiSql(BaseTaxiTest):
         res = hdk.sql(
             "SELECT cab_type, count(*) as cnt FROM trips GROUP BY cab_type;",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q1_res(res)
 
@@ -1309,6 +1401,7 @@ class TestTaxiSql(BaseTaxiTest):
                GROUP BY passenger_count
                ORDER BY passenger_count;""",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q2_res(res)
 
@@ -1319,6 +1412,7 @@ class TestTaxiSql(BaseTaxiTest):
                GROUP BY passenger_count, pickup_year
                ORDER BY passenger_count;""",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q3_res(res)
 
@@ -1333,6 +1427,7 @@ class TestTaxiSql(BaseTaxiTest):
                GROUP BY passenger_count, pickup_year, distance
                ORDER BY pickup_year, cnt desc;""",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q4_res(res)
 
@@ -1341,7 +1436,7 @@ class TestTaxiSql(BaseTaxiTest):
     @pytest.mark.skip(reason="unimplemented concept")
     def test_taxi_over_csv_multistep(self, exe_cfg):
         # Initialize HDK components hidden from users
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         trips = hdk.importCsvFile(
@@ -1353,6 +1448,7 @@ class TestTaxiSql(BaseTaxiTest):
             """SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year
                FROM trips""",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         res = hdk.sql(
             """SELECT passenger_count, pickup_year, count(*) as cnt
@@ -1360,6 +1456,7 @@ class TestTaxiSql(BaseTaxiTest):
                GROUP BY passenger_count, pickup_year
                ORDER BY passenger_count;""",
             trips=tmp,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         self.check_taxi_q3_res(res)
 
@@ -1371,14 +1468,20 @@ class TestTaxiSql(BaseTaxiTest):
                  cast(trip_distance as int) AS distance
                FROM trips;""",
             trips=trips,
+            query_opts={"device_type": exe_cfg.device_type},
         )
         tmp = hdk.sql(
             """SELECT passenger_count, pickup_year, distance, count(*) AS cnt
                FROM trips
                GROUP BY passenger_count, pickup_year, distance;""",
             trips=tmp,
+            query_opts={"device_type": exe_cfg.device_type},
         )
-        res = hdk.sql("SELET * FROM trips ORDER BY pickup_year, cnt desc;", trips=tmp)
+        res = hdk.sql(
+            "SELET * FROM trips ORDER BY pickup_year, cnt desc;",
+            trips=tmp,
+            query_opts={"device_type": exe_cfg.device_type},
+        )
         self.check_taxi_q4_res(res)
 
         hdk.drop_table(trips)
@@ -1387,7 +1490,7 @@ class TestTaxiSql(BaseTaxiTest):
 class TestTaxiIR(BaseTaxiTest):
     def test_taxi_over_csv_modular(self, exe_cfg):
         # Initialize HDK components
-        config = pyhdk.buildConfig(cpu_only=exe_cfg.cpu_only)
+        config = pyhdk.buildConfig()
         storage = pyhdk.storage.ArrowStorage(1, config)
         data_mgr = pyhdk.storage.DataMgr(config)
         data_mgr.registerDataProvider(storage)
@@ -1404,7 +1507,7 @@ class TestTaxiIR(BaseTaxiTest):
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(
             executor, storage, data_mgr, dag=dag
         )
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q1_res(res)
 
         # Run Taxi Q2 IR query
@@ -1418,7 +1521,7 @@ class TestTaxiIR(BaseTaxiTest):
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(
             executor, storage, data_mgr, dag=dag
         )
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q2_res(res)
 
         # Run Taxi Q3 IR query
@@ -1436,7 +1539,7 @@ class TestTaxiIR(BaseTaxiTest):
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(
             executor, storage, data_mgr, dag=dag
         )
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q3_res(res)
 
         # Run Taxi Q4 IR query
@@ -1455,14 +1558,14 @@ class TestTaxiIR(BaseTaxiTest):
         rel_alg_executor = pyhdk.sql.RelAlgExecutor(
             executor, storage, data_mgr, dag=dag
         )
-        res = rel_alg_executor.execute()
+        res = rel_alg_executor.execute(device_type=exe_cfg.device_type)
         self.check_taxi_q4_res(res)
 
         storage.dropTable("trips")
 
     def test_taxi_over_csv_explicit_instance(self, exe_cfg):
         # Initialize HDK components wrapped into a single object
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         hdk.import_csv(
@@ -1470,7 +1573,11 @@ class TestTaxiIR(BaseTaxiTest):
         )
 
         # Run Taxi Q1 IR query
-        res = hdk.scan("trips").agg("cab_type", "count").run(device_type=exe_cfg.device_type)
+        res = (
+            hdk.scan("trips")
+            .agg("cab_type", "count")
+            .run(device_type=exe_cfg.device_type)
+        )
         self.check_taxi_q1_res(res)
 
         # Run Taxi Q2 IR query
@@ -1512,7 +1619,7 @@ class TestTaxiIR(BaseTaxiTest):
 
     def test_taxi_over_csv_implicit_scan(self, exe_cfg):
         # Initialize HDK components hidden from users
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         # How to reference it in SQL? Use file name as a table name? Use the same approach as in Modin?
@@ -1562,7 +1669,7 @@ class TestTaxiIR(BaseTaxiTest):
     @pytest.mark.skip(reason="unimplemented concept")
     def test_run_query_on_results(self, exe_cfg):
         # Initialize HDK components hidden from users
-        hdk = pyhdk.init(cpu_only=exe_cfg.cpu_only)
+        hdk = pyhdk.init()
 
         # Import data
         trips = hdk.importCsvFile(
@@ -1570,7 +1677,9 @@ class TestTaxiIR(BaseTaxiTest):
         )
 
         # Run a part of Taxi Q2 IR query
-        res = trips.agg("passenger_count", "avg(total_amount)").run(device_type=exe_cfg.device_type)
+        res = trips.agg("passenger_count", "avg(total_amount)").run(
+            device_type=exe_cfg.device_type
+        )
         # Now sort it to get the final result
         # Can we make it without transforming to Arrow with the following import to ArrowStorage?
         res = res.sort("passenger_count").run(device_type=exe_cfg.device_type)
