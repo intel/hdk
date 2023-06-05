@@ -1261,7 +1261,7 @@ class BaseTaxiTest:
 class TestTaxiSql(BaseTaxiTest):
     def test_taxi_over_csv_modular(self, exe_cfg):
         # Initialize HDK components
-        config = pyhdk.buildConfig()
+        config = pyhdk.buildConfig(enable_gpu_code_compilation_cache=False)
         storage = pyhdk.storage.ArrowStorage(1, config)
         data_mgr = pyhdk.storage.DataMgr(config)
         data_mgr.registerDataProvider(storage)
@@ -1490,7 +1490,7 @@ class TestTaxiSql(BaseTaxiTest):
 class TestTaxiIR(BaseTaxiTest):
     def test_taxi_over_csv_modular(self, exe_cfg):
         # Initialize HDK components
-        config = pyhdk.buildConfig()
+        config = pyhdk.buildConfig(enable_gpu_code_compilation_cache=False)
         storage = pyhdk.storage.ArrowStorage(1, config)
         data_mgr = pyhdk.storage.DataMgr(config)
         data_mgr.registerDataProvider(storage)

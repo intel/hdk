@@ -574,6 +574,12 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->debug.enable_automatic_ir_metadata)
                              ->implicit_value(true),
                          "Enable automatic IR metadata (debug builds only).");
+  opt_desc.add_options()(
+      "enable-gpu-code-compilation-cache",
+      po::value<bool>(&config_->debug.enable_gpu_code_compilation_cache)
+          ->default_value(config_->debug.enable_gpu_code_compilation_cache)
+          ->implicit_value(true),
+      "Enable GPU compilation code caching.");
 
   // storage
   opt_desc.add_options()(
