@@ -18027,6 +18027,10 @@ int main(int argc, char** argv) {
       "cpu-prop", po::value<unsigned>(&config->exec.heterogeneous.forced_cpu_proportion));
   desc.add_options()(
       "gpu-prop", po::value<unsigned>(&config->exec.heterogeneous.forced_gpu_proportion));
+  desc.add_options()("cpu-only",
+                     po::value<bool>(&config->exec.cpu_only)
+                         ->default_value(config->exec.cpu_only)
+                         ->implicit_value(true));
   desc.add_options()("dump-ir",
                      po::value<bool>()->default_value(false)->implicit_value(true),
                      "Dump IR and PTX for all executed queries to file."
