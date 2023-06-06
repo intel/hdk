@@ -33,14 +33,6 @@
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;
 
-bool skip_tests_on_gpu(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !(gpusPresent());
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
 void setupTest(const hdk::ir::Type* valueType, int factsCount, int lookupCount) {
   dropTable("test_facts");
   dropTable("test_lookup");
@@ -153,10 +145,6 @@ void runSingleValueTestValidation(const hdk::ir::Type* colType, ExecutorDeviceTy
 }
 
 void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
-  if (skip_tests_on_gpu(dt)) {
-    return;
-  }
-
   // Some tests assume multiple kernels and reduction, so disable multifragment
   // kernels to provide it.
   auto old_multifrag_opt = config().exec.group_by.enable_cpu_multifrag_kernels;
@@ -210,7 +198,7 @@ void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
 }
 
 TEST(Select, SingleValue) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+  for (auto dt : testedDevices()) {
     runSingleValueTest(ctx().int8(), dt);
     runSingleValueTest(ctx().int16(), dt);
     runSingleValueTest(ctx().int32(), dt);

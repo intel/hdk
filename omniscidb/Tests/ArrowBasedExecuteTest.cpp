@@ -1613,26 +1613,10 @@ class ExecuteTestBase {
   }
 };
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#if defined(HAVE_CUDA) || defined(HAVE_L0)
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 class Errors : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(Errors, InvalidQueries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_ANY_THROW(run_multiple_agg(
         "SELECT * FROM test WHERE 1 = 2 AND ( 1 = 2 and 3 = 4 limit 100);", dt));
     EXPECT_ANY_THROW(run_multiple_agg("SET x = y;", dt));
@@ -1642,8 +1626,7 @@ TEST_F(Errors, InvalidQueries) {
 class Insert : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(Insert, NullArrayNullEmpty) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("table_array_empty", {{"val", ctx().arrayVarLen(ctx().int32())}});
     EXPECT_NO_THROW(insertJsonValues("table_array_empty", "{\"val\": []}"));
     EXPECT_NO_THROW(run_simple_agg("SELECT * from table_array_empty;", dt));
@@ -1753,8 +1736,7 @@ TEST_F(Insert, NullArrayNullEmpty) {
 }
 
 TEST_F(Insert, IntArrayInsert) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("table_int_array", {{"bi", ctx().arrayVarLen(ctx().int64())}});
 
     vector<std::string> vals = {"1", "33000", "650000", "1", "-7", "null", "5000000000"};
@@ -1785,8 +1767,7 @@ TEST_F(Insert, IntArrayInsert) {
 }
 
 TEST_F(Insert, DictBoundary) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("table_with_small_dict",
                 {{"i", ctx().int32()}, {"t", ctx().extDict(ctx().text(), 0, 1)}});
 
@@ -1813,8 +1794,7 @@ TEST_F(Insert, DictBoundary) {
 class KeyForString : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(KeyForString, KeyForString) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_NO_THROW(
         createTable("kfs",
                     {{"ts", ctx().extDict(ctx().text(), 0, 1)},
@@ -1915,9 +1895,7 @@ TEST_F(KeyForString, KeyForString) {
 class Select : public ExecuteTestBase, public ::testing::Test {};
 
 TEST_F(Select, NullWithAndOr) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     createTable("table_bool_test", {{"id", ctx().int32()}, {"val", ctx().boolean()}});
     insertCsvValues("table_bool_test", "1,true\n2,false\n3,");
 
@@ -1990,8 +1968,7 @@ TEST_F(Select, NullWithAndOr) {
 }
 
 TEST_F(Select, NullGroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("table_null_group_by", {{"val", ctx().extDict(ctx().text(), 0)}});
     insertJsonValues("table_null_group_by", "{\"val\": null}");
     run_simple_agg("SELECT val FROM table_null_group_by GROUP BY val;", dt);
@@ -2005,8 +1982,7 @@ TEST_F(Select, NullGroupBy) {
 }
 
 TEST_F(Select, FilterAndSimpleAggregation) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test;", dt);
     c("SELECT COUNT(f) FROM test;", dt);
     c("SELECT COUNT(smallint_nulls), COUNT(*), COUNT(fn) FROM test;", dt);
@@ -2321,8 +2297,7 @@ TEST_F(Select, FilterAndSimpleAggregation) {
 }
 
 TEST_F(Select, AggregateOnEmptyDecimalColumn) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (int p = 1; p <= 18; ++p) {
       for (int s = 0; s <= p - 1; ++s) {
         std::string tbl_name = "D" + std::to_string(p) + "_" + std::to_string(s);
@@ -2345,8 +2320,7 @@ TEST_F(Select, AggregateOnEmptyDecimalColumn) {
 }
 
 TEST_F(Select, AggregateConstantValueOnEmptyTable) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // tinyint: -126 / 126
     c("SELECT MIN(-126), MAX(-126), SUM(-126), AVG(-126), MIN(126), MAX(126), SUM(126), "
       "AVG(126) FROM "
@@ -2385,8 +2359,7 @@ TEST_F(Select, AggregateConstantValueOnEmptyTable) {
 }
 
 TEST_F(Select, AggregateOnEmptyTable) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT AVG(x), AVG(y), AVG(z), AVG(t), AVG(f), AVG(d) FROM empty_test_table;", dt);
     c("SELECT MIN(x), MIN(y), MIN(z), MIN(t), MIN(f), MIN(d), MIN(b) FROM "
       "empty_test_table;",
@@ -2421,8 +2394,7 @@ TEST_F(Select, AggregateOnEmptyTable) {
 
 TEST_F(Select, LimitAndOffset) {
   CHECK(g_num_rows >= 4);
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       const auto rows = run_multiple_agg("SELECT * FROM test LIMIT 5;", dt);
       ASSERT_EQ(size_t(5), rows->rowCount());
@@ -2462,8 +2434,7 @@ TEST_F(Select, LimitAndOffset) {
 }
 
 TEST_F(Select, FloatAndDoubleTests) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT MIN(f) FROM test;", dt);
     c("SELECT MAX(f) FROM test;", dt);
     c("SELECT AVG(f) FROM test;", dt);
@@ -2549,8 +2520,7 @@ TEST_F(Select, FloatAndDoubleTests) {
 }
 
 TEST_F(Select, FilterShortCircuit) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE x > 6 AND x < 8 AND z > 100 AND z < 102 AND t > "
       "1000 AND UNLIKELY(t < 1002);",
       dt);
@@ -2586,9 +2556,7 @@ TEST_F(Select, FilterShortCircuit) {
 }
 
 TEST_F(Select, InValues) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c(R"(SELECT x FROM test WHERE x IN (8, 9, 10, 11, 12, 13, 14) GROUP BY x ORDER BY x;)",
       dt);
     c(R"(SELECT y FROM test WHERE y IN (43, 44, 45, 46, 47, 48, 49) GROUP BY y ORDER BY y;)",
@@ -2602,8 +2570,7 @@ TEST_F(Select, InValues) {
 }
 
 TEST_F(Select, FilterAndMultipleAggregation) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT AVG(x), AVG(y) FROM test;", dt);
     c("SELECT MIN(x), AVG(x * y), MAX(y + 7), COUNT(*) FROM test WHERE x + y > 47 AND x "
       "+ y < 51;",
@@ -2726,9 +2693,7 @@ TEST_F(Select, GroupBy) {
     }
   };
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test_ranges GROUP BY i, b;", dt);
     c("SELECT i, b FROM test_ranges GROUP BY i, b;", dt);
 
@@ -2809,8 +2774,7 @@ TEST_F(Select, GroupBy) {
 }
 
 TEST_F(Select, ExecutePlanWithoutGroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // SQLite doesn't support NOW(), and timestamps may not be exactly equal,
     // so just test for no throw.
     EXPECT_NO_THROW(
@@ -2825,8 +2789,7 @@ TEST_F(Select, ExecutePlanWithoutGroupBy) {
 }
 
 TEST_F(Select, FilterAndGroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT MIN(x + y) FROM test WHERE x + y > 47 AND x + y < 53 GROUP BY x, y;", dt);
     c("SELECT MIN(x + y) FROM test WHERE x + y > 47 AND x + y < 53 GROUP BY x + 1, x + "
       "y;",
@@ -2884,8 +2847,7 @@ TEST_F(Select, FilterAndGroupBy) {
 }
 
 TEST_F(Select, GroupByBoundariesAndNull) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       std::string query(
           "SELECT CAST(CASE WHEN x = 7 THEN 2147483647 ELSE null END AS INTEGER) AS "
@@ -2908,8 +2870,7 @@ TEST_F(Select, GroupByBoundariesAndNull) {
 }
 
 TEST_F(Select, NestedGroupByWithFloat) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     char const* query =
         "SELECT c, x, f FROM ("
         "   SELECT x, COUNT(*) AS c, f"
@@ -2923,9 +2884,7 @@ TEST_F(Select, NestedGroupByWithFloat) {
 }
 
 TEST_F(Select, Arrays) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // Simple lazy projection
     compare_array(run_simple_agg("SELECT arr_i16 FROM array_test WHERE x = 8;", dt),
                   std::vector<int64_t>({2, 3, 4}));
@@ -3093,9 +3052,7 @@ TEST_F(Select, Arrays) {
 }
 
 TEST_F(Select, FilterCastToDecimal) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(static_cast<int64_t>(5),
               v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE x > 7.1;", dt)));
     ASSERT_EQ(
@@ -3111,8 +3068,7 @@ TEST_F(Select, FilterCastToDecimal) {
 }
 
 TEST_F(Select, FilterAndGroupByMultipleAgg) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT MIN(x + y), COUNT(*), AVG(x + 1) FROM test WHERE x + y > 47 AND x + y < 53 "
       "GROUP BY x, y;",
       dt);
@@ -3123,8 +3079,7 @@ TEST_F(Select, FilterAndGroupByMultipleAgg) {
 }
 
 TEST_F(Select, GroupByKeylessAndNotKeyless) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT fixed_str FROM test WHERE fixed_str = 'fish' GROUP BY fixed_str;", dt);
     c("SELECT AVG(x), fixed_str FROM test WHERE fixed_str = 'fish' GROUP BY fixed_str;",
       dt);
@@ -3136,8 +3091,7 @@ TEST_F(Select, GroupByKeylessAndNotKeyless) {
 }
 
 TEST_F(Select, Having) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT MAX(y) AS n FROM test WHERE x = 7 GROUP BY z HAVING MAX(x) > 5 ORDER BY n;",
       dt);
     c("SELECT MAX(y) AS n FROM test WHERE x = 7 GROUP BY z HAVING MAX(x) > 5 ORDER BY n "
@@ -3200,8 +3154,7 @@ TEST_F(Select, ConstantWidthBucketExpr) {
     return std::make_pair(omnisci_query, sqlite_query);
   };
   std::vector<std::string> col_names{"i1", "i2", "i4", "i8", "d", "f", "dc", "n"};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // in single-mode, we can see std::runtime_error exception for the below test queries
     // having unsupported or invalid arguments of the function
     // but in dist-mode, we detect Calcite SQL error instead of std::runtime_error
@@ -3308,9 +3261,7 @@ TEST_F(Select, WidthBucketExpr) {
   std::vector<std::string> wrong_partition_expr{"i1-1", "-1*i1", "d", "f", "dc", "n"};
   std::vector<std::string> null_col_names{
       "i1n", "i2n", "i4n", "i8n", "dn", "fn", "dcn", "nn"};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     for (auto& col : col_names) {
       std::string q = "SELECT WIDTH_BUCKET(i1, i1, " + col + ", i1) FROM wb_test;";
       EXPECT_ANY_THROW(run_simple_agg(q, dt));
@@ -3438,8 +3389,7 @@ TEST_F(Select, WidthBucketWithGroupBy) {
     return oss.str();
   };
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c(query_gen("wb_test_nullable", true, false),
       query_gen("wb_test_nullable", false, false),
       dt);
@@ -3464,9 +3414,7 @@ TEST_F(Select, WidthBucketWithGroupBy) {
 }
 
 TEST_F(Select, WidthBucketNullability) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     {
       // no results
       auto result = run_multiple_agg(
@@ -3490,9 +3438,7 @@ TEST_F(Select, CountWithLimitAndOffset) {
   createTable("count_test", {{"val", ctx().int32()}});
   insertCsvValues("count_test", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(int64_t(10),
               v<int64_t>(run_simple_agg(
                   "SELECT count(*) FROM (SELECT * FROM count_test);", dt)));
@@ -3586,9 +3532,7 @@ TEST_F(Select, CountWithLimitAndOffset) {
   }
 
   int64_t size = static_cast<int64_t>(pow(2, 16) * 10);
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(int64_t(size),
               v<int64_t>(run_simple_agg(
                   "SELECT count(*) FROM (SELECT * FROM count_test);", dt)));
@@ -3682,8 +3626,7 @@ TEST_F(Select, CountWithLimitAndOffset) {
 }
 
 TEST_F(Select, CountDistinct) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(distinct x) FROM test;", dt);
     c("SELECT COUNT(distinct b) FROM test;", dt);
     c("SELECT COUNT(distinct f) FROM test;", dt);
@@ -3712,8 +3655,7 @@ TEST_F(Select, CountDistinct) {
 }
 
 TEST_F(Select, ApproxCountDistinct) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT APPROX_COUNT_DISTINCT(x) FROM test;",
       "SELECT COUNT(distinct x) FROM test;",
       dt);
@@ -4018,8 +3960,7 @@ TEST_F(Select, ApproxPercentileValidate) {
 }
 
 TEST_F(Select, ScanNoAggregation) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT * FROM test ORDER BY x ASC, y ASC;", dt);
     c("SELECT t.* FROM test t ORDER BY x ASC, y ASC;", dt);
     c("SELECT x, z, t FROM test ORDER BY x ASC, y ASC;", dt);
@@ -4058,8 +3999,7 @@ TEST_F(Select, ScanNoAggregation) {
 }
 
 TEST_F(Select, OrderBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     const auto rows = run_multiple_agg(
         "SELECT x, y, z + t, x * y AS m FROM test ORDER BY 3 desc LIMIT 5;", dt);
     CHECK_EQ(rows->rowCount(), std::min(size_t(5), static_cast<size_t>(g_num_rows)) + 0);
@@ -4189,8 +4129,7 @@ TEST_F(Select, OrderBy) {
 }
 
 TEST_F(Select, VariableLengthOrderBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT real_str FROM test ORDER BY real_str;", dt);
     EXPECT_THROW(
         run_multiple_agg("SELECT arr_float FROM array_test ORDER BY arr_float;", dt),
@@ -4202,15 +4141,13 @@ TEST_F(Select, VariableLengthOrderBy) {
 }
 
 TEST_F(Select, TopKHeap) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT str, x FROM proj_top ORDER BY x DESC LIMIT 1;", dt);
   }
 }
 
 TEST_F(Select, ComplexQueries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) * MAX(y) - SUM(z) FROM test;", dt);
     c("SELECT x + y AS a, COUNT(*) * MAX(y) - SUM(z) AS b FROM test WHERE z BETWEEN 100 "
       "AND 200 GROUP BY x, y;",
@@ -4257,17 +4194,14 @@ TEST_F(Select, ComplexQueries) {
 }
 
 TEST_F(Select, MultiStepQueries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT z, (z * SUM(x)) / SUM(y) + 1 FROM test GROUP BY z ORDER BY z;", dt);
     c("SELECT z,COUNT(*), AVG(x) / SUM(y) + 1 FROM test GROUP BY z ORDER BY z;", dt);
   }
 }
 
 TEST_F(Select, GroupByPushDownFilterIntoExprRange) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     const auto rows = run_multiple_agg(
         "SELECT b, COUNT(*) AS n FROM test WHERE b GROUP BY b ORDER BY b", dt);
     ASSERT_EQ(
@@ -4290,8 +4224,7 @@ TEST_F(Select, GroupByPushDownFilterIntoExprRange) {
 }
 
 TEST_F(Select, GroupByExprNoFilterNoAggregate) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT x + y AS a FROM test GROUP BY a ORDER BY a;", dt);
     ASSERT_EQ(8,
               v<int64_t>(run_simple_agg("SELECT TRUNCATE(x, 0) AS foo FROM test GROUP BY "
@@ -4301,25 +4234,21 @@ TEST_F(Select, GroupByExprNoFilterNoAggregate) {
 }
 
 TEST_F(Select, DistinctProjection) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT DISTINCT str FROM test ORDER BY str;", dt);
     c("SELECT DISTINCT(str), SUM(x) FROM test WHERE x > 7 GROUP BY str LIMIT 2;", dt);
   }
 }
 
 TEST_F(Select, ProjectionCountOptimization) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c(R"(select count(*) from (select cast(x * 1 as int) as x1 from test) s, (select cast(x * 2 as int) as x2 from test WHERE x = 8) t;)",
       dt);
   }
 }
 
 TEST_F(Select, Case) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT SUM(CASE WHEN x BETWEEN 6 AND 7 THEN 1 WHEN x BETWEEN 8 AND 9 THEN 2 ELSE "
       "3 END) FROM test;",
       dt);
@@ -4653,8 +4582,7 @@ TEST_F(Select, Case) {
 }
 
 TEST_F(Select, CaseSubQuery) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT CASE WHEN (SELECT COUNT(*) FROM test) < 10"
       "       THEN (SELECT 2*COUNT(*) FROM test) + 5"
       "       ELSE (SELECT 3*COUNT(*) FROM test) - 5"
@@ -4669,9 +4597,7 @@ TEST_F(Select, CaseSubQuery) {
 }
 
 TEST_F(Select, Strings) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT str, COUNT(*) FROM test GROUP BY str HAVING COUNT(*) > 5 ORDER BY str;",
       dt);
     c("SELECT str, COUNT(*) FROM test WHERE str = 'bar' GROUP BY str HAVING COUNT(*) > 4 "
@@ -4797,9 +4723,7 @@ TEST_F(Select, Strings) {
 }
 
 TEST_F(Select, SharedDictionary) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT shared_dict, COUNT(*) FROM test GROUP BY shared_dict HAVING COUNT(*) > 5 "
       "ORDER BY shared_dict;",
       dt);
@@ -4933,8 +4857,7 @@ TEST_F(Select, SharedDictionary) {
 }
 
 TEST_F(Select, StringCompare) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE str = 'ba';", dt);
     c("SELECT COUNT(*) FROM test WHERE str <> 'ba';", dt);
 
@@ -5019,8 +4942,7 @@ TEST_F(Select, DictionaryStringEquality) {
 
   for (auto enable_watchdog : {true, false}) {
     config().exec.watchdog.enable = enable_watchdog;
-    for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-      SKIP_NO_GPU();
+    for (auto dt : testedDevices()) {
       c("SELECT COUNT(*) FROM test WHERE str = fixed_str", dt);
       c("SELECT COUNT(*) FROM test WHERE str <> fixed_str", dt);
       c("SELECT COUNT(*) FROM test WHERE fixed_str = str", dt);
@@ -5035,9 +4957,7 @@ TEST_F(Select, DictionaryStringEquality) {
 
 TEST_F(Select, StringsNoneEncoding) {
   createTestLotsColsTable();
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE real_str LIKE 'real_%%%';", dt);
     c("SELECT COUNT(*) FROM test WHERE real_str LIKE 'real_ba%';", dt);
     c("SELECT COUNT(*) FROM test WHERE real_str LIKE '%eal_bar';", dt);
@@ -5101,9 +5021,7 @@ TEST_F(Select, StringsNoneEncoding) {
 }
 
 TEST_F(Select, TimeSyntaxCheck) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1325376000LL,
               v<int64_t>(run_simple_agg("SELECT DATE_TRUNC(year, CAST('2012-05-08 "
                                         "20:15:12' AS TIMESTAMP)) FROM test limit 1;",
@@ -5204,8 +5122,7 @@ TEST_F(Select, TimeSyntaxCheck) {
 }
 
 TEST_F(Select, Time) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // check DATE Formats
     ASSERT_EQ(
         static_cast<int64_t>(g_num_rows + g_num_rows / 2),
@@ -6576,9 +6493,7 @@ TEST_F(Select, Time) {
 }
 
 TEST_F(Select, DateTruncate) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1325376000LL,
               v<int64_t>(run_simple_agg(
                   R"(SELECT DATE_TRUNC(year, CAST('2012-05-08 20:15:12' AS TIMESTAMP));)",
@@ -6837,9 +6752,7 @@ TEST_F(Select, DateTruncate) {
 }
 
 TEST_F(Select, ExtractEpoch) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // Test EXTRACT(epoch) for high-precision timestamps when read from a table.
     ASSERT_TRUE(v<int64_t>(run_simple_agg(
         "SELECT MIN(DATEDIFF('second', DATE '1970-01-01', dt) = EXTRACT('epoch' FROM "
@@ -6900,9 +6813,7 @@ TEST_F(Select, ExtractEpoch) {
 }
 
 TEST_F(Select, DateTruncate2) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_EQ("1900-01-01 12:34:59", date_trunc("SECOND", "1900-01-01 12:34:59", dt));
     ASSERT_EQ("1900-01-01 12:35:00", date_trunc("SECOND", "1900-01-01 12:35:00", dt));
     ASSERT_EQ("3900-01-01 12:34:59", date_trunc("SECOND", "3900-01-01 12:34:59", dt));
@@ -7140,9 +7051,7 @@ TEST_F(Select, DateTruncate2) {
 TEST_F(Select, TimeRedux) {
   // The time tests need a general cleanup. Collect tests found from specific bugs here so
   // we don't accidentally remove them
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(
         15,
         v<int64_t>(run_simple_agg(
@@ -7172,8 +7081,7 @@ TEST_F(Select, TimeRedux) {
 }
 
 TEST_F(Select, In) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE x IN (7, 8);", dt);
     c("SELECT COUNT(*) FROM test WHERE x IN (9, 10);", dt);
     c("SELECT COUNT(*) FROM test WHERE z IN (101, 102);", dt);
@@ -7190,8 +7098,7 @@ TEST_F(Select, In) {
 }
 
 TEST_F(Select, DivByZero) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg("SELECT x / 0 FROM test;", dt), std::runtime_error);
     EXPECT_THROW(run_multiple_agg("SELECT 1 / 0 FROM test;", dt), std::runtime_error);
     EXPECT_THROW(run_multiple_agg("SELECT COUNT(distinct x / 0) FROM test;", dt),
@@ -7223,8 +7130,7 @@ TEST_F(Select, DivByZero) {
 
 TEST_F(Select, ReturnNullFromDivByZero) {
   config().exec.codegen.null_div_by_zero = true;
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT x / 0 FROM test;", dt);
     c("SELECT 1 / 0 FROM test;", dt);
     c("SELECT f / 0. FROM test;", dt);
@@ -7244,8 +7150,7 @@ TEST_F(Select, ReturnNullFromModByZero) {
   ScopeGuard sg = [old_null_mod_by_zero] {
     config().exec.codegen.null_mod_by_zero = old_null_mod_by_zero;
   };
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT x % 0 FROM test;", dt);
     c("SELECT w % 0 FROM test;", dt);
     c("SELECT y % 0 FROM test;", dt);
@@ -7257,8 +7162,7 @@ TEST_F(Select, ReturnNullFromModByZero) {
 
 TEST_F(Select, ReturnInfFromDivByZero) {
   config().exec.codegen.inf_div_by_zero = true;
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT f / 0. FROM test;", "SELECT 2e308 FROM test;", dt);
     c("SELECT d / 0. FROM test;", "SELECT 2e308 FROM test;", dt);
     c("SELECT -f / 0. FROM test;", "SELECT -2e308 FROM test;", dt);
@@ -7269,8 +7173,7 @@ TEST_F(Select, ReturnInfFromDivByZero) {
 }
 
 TEST_F(Select, ConstantFolding) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT 1 + 2 FROM test limit 1;", dt);
     c("SELECT 1 + 2.3 FROM test limit 1;", dt);
     c("SELECT 2.3 + 1 FROM test limit 1;", dt);
@@ -7311,8 +7214,7 @@ TEST_F(Select, ConstantFolding) {
 }
 
 TEST_F(Select, OverflowAndUnderFlow) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE z + 32600 > 0;", dt);
     c("SELECT COUNT(*) FROM test WHERE z + 32666 > 0;", dt);
     c("SELECT COUNT(*) FROM test WHERE -32670 - z < 0;", dt);
@@ -7467,8 +7369,7 @@ TEST_F(Select, DetectOverflowedLiteralBuf) {
 }
 
 TEST_F(Select, BooleanColumn) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(static_cast<int64_t>(g_num_rows + g_num_rows / 2),
               v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test WHERE bn;", dt)));
     ASSERT_EQ(static_cast<int64_t>(g_num_rows),
@@ -7495,8 +7396,7 @@ TEST_F(Select, BooleanColumn) {
 }
 
 TEST_F(Select, UnsupportedCast) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg("SELECT CAST(x AS VARCHAR) FROM test;", dt),
                  std::runtime_error);
     EXPECT_THROW(run_multiple_agg("SELECT CAST(f AS VARCHAR) FROM test;", dt),
@@ -7509,8 +7409,7 @@ TEST_F(Select, UnsupportedCast) {
 }
 
 TEST_F(Select, CastFromLiteral) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT CAST(2.3 AS TINYINT) FROM test;", dt);
     c("SELECT CAST(2.3 AS SMALLINT) FROM test;", dt);
     c("SELECT CAST(2.3 AS INT) FROM test;", dt);
@@ -7529,8 +7428,7 @@ TEST_F(Select, CastFromLiteral) {
 }
 
 TEST_F(Select, CastFromNull) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT CAST(NULL AS TINYINT) FROM test;", dt);
     c("SELECT CAST(NULL AS SMALLINT) FROM test;", dt);
     c("SELECT CAST(NULL AS INT) FROM test;", dt);
@@ -7548,8 +7446,7 @@ TEST_F(Select, CastFromNull2) {
   run_sqlite_query("DROP TABLE IF EXISTS cast_from_null2;");
   run_sqlite_query("CREATE TABLE cast_from_null2 (d DOUBLE, dd DECIMAL(8,2));");
   run_sqlite_query("INSERT INTO cast_from_null2 VALUES (1.0, NULL);");
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT d * dd FROM cast_from_null2;", dt);
   }
   dropTable("cast_from_null2");
@@ -7559,8 +7456,7 @@ TEST_F(Select, CastRound) {
   auto const run = [](char const* n, char const* type, ExecutorDeviceType const dt) {
     return run_simple_agg(std::string("SELECT CAST(") + n + " AS " + type + ");", dt);
   };
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(127, v<int64_t>(run("127.4999999999999999", "TINYINT", dt)));
     EXPECT_ANY_THROW(run("127.5", "TINYINT", dt));  // overflow
     EXPECT_EQ(-128, v<int64_t>(run("-128.4999999999999999", "TINYINT", dt)));
@@ -7659,8 +7555,7 @@ TEST_F(Select, CastRound) {
 }
 
 TEST_F(Select, CastRoundNullable) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(
         20,
         v<int64_t>(run_simple_agg(
@@ -7699,8 +7594,7 @@ TEST_F(Select, ExtensionFunctionsTypeMatching) {
                           // function
   constexpr double RESULT_EPS =
       1.0e-8;  // Sufficient to differentiate fp32 and fp64 results
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       ASSERT_NEAR(
           double_result, v<double>(run_simple_agg("SELECT log(10);", dt)), RESULT_EPS);
@@ -7788,9 +7682,7 @@ TEST_F(Select, CastDecimalToDecimal) {
   insertCsvValues("decimal_to_decimal_test",
                   "1,456.78956\n2,456.12345\n-1,-456.78956\n-2,-456.12345");
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_NEAR(456.78956,
                 v<double>(run_simple_agg(
                     "SELECT val FROM decimal_to_decimal_test WHERE id = 1;", dt)),
@@ -7935,8 +7827,7 @@ TEST_F(Select, CastDecimalToDecimal) {
 }
 
 TEST_F(Select, ColumnWidths) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT DISTINCT x FROM test_inner ORDER BY x;", dt);
     c("SELECT DISTINCT y FROM test_inner ORDER BY y;", dt);
     c("SELECT DISTINCT xx FROM test_inner ORDER BY xx;", dt);
@@ -7954,8 +7845,7 @@ TEST_F(Select, ColumnWidths) {
 }
 
 TEST_F(Select, TimeInterval) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(
         60 * 60 * 1000LL,
         v<int64_t>(run_simple_agg("SELECT INTERVAL '1' HOUR FROM test LIMIT 1;", dt)));
@@ -8194,9 +8084,7 @@ TEST_F(Select, TimeInterval) {
 }
 
 TEST_F(Select, LogicalValues) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // empty logical values
     c("SELECT 1 + 2;", dt);
     c("SELECT 1 * 2.1;", dt);
@@ -8304,8 +8192,7 @@ TEST_F(Select, LogicalValues) {
 }
 
 TEST_F(Select, UnsupportedNodes) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // MAT No longer throws a logicalValues gets a regular parse error'
     // EXPECT_THROW(run_multiple_agg("SELECT *;", dt), std::runtime_error);
     EXPECT_THROW(run_multiple_agg("SELECT x, COUNT(*) FROM test GROUP BY ROLLUP(x);", dt),
@@ -8314,16 +8201,14 @@ TEST_F(Select, UnsupportedNodes) {
 }
 
 TEST_F(Select, UnsupportedMultipleArgAggregate) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg("SELECT COUNT(distinct x, y) FROM test;", dt),
                  std::runtime_error);
   }
 }
 
 TEST_F(Select, ArrayUnnest) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     unsigned power10 = 1;
     for (const unsigned int_width : {16, 32, 64}) {
       auto result_rows =
@@ -8434,8 +8319,7 @@ TEST_F(Select, ArrayUnnest) {
 }
 
 TEST_F(Select, ArrayIndex) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (size_t row_idx = 0; row_idx < g_array_test_row_count; ++row_idx) {
       ASSERT_EQ(1,
                 v<int64_t>(run_simple_agg(
@@ -8492,8 +8376,7 @@ TEST_F(Select, ArrayIndex) {
 }
 
 TEST_F(Select, ArrayCountDistinct) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (const unsigned int_width : {16, 32, 64}) {
       ASSERT_EQ(
           int64_t(g_array_test_row_count + 2),
@@ -8546,8 +8429,7 @@ TEST_F(Select, ArrayCountDistinct) {
 }
 
 TEST_F(Select, ArrayAnyAndAll) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     unsigned power10 = 1;
     for (const unsigned int_width : {16, 32, 64}) {
       ASSERT_EQ(
@@ -8652,8 +8534,7 @@ TEST_F(Select, ArrayAnyAndAll) {
 }
 
 TEST_F(Select, ArrayUnsupported) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg("SELECT MIN(arr_i64) FROM array_test;", dt),
                  std::runtime_error);
     EXPECT_THROW(run_multiple_agg("SELECT MIN(arr3_i64) FROM array_test;", dt),
@@ -8666,16 +8547,14 @@ TEST_F(Select, ArrayUnsupported) {
 }
 
 TEST_F(Select, ExpressionRewrite) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT count(*) from test where f/2.0 >= 0.6;", dt);
     c("SELECT count(*) from test where d/0.5 < 5.0;", dt);
   }
 }
 
 TEST_F(Select, OrRewrite) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test WHERE str = 'foo' OR str = 'bar' OR str = 'baz' OR str "
       "= 'foo' OR str = 'bar' OR str "
       "= 'baz' OR str = 'foo' OR str = 'bar' OR str = 'baz' OR str = 'baz' OR str = "
@@ -8690,8 +8569,7 @@ TEST_F(Select, OrRewrite) {
 }
 
 TEST_F(Select, GpuSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT x, COUNT(*) AS val FROM gpu_sort_test GROUP BY x ORDER BY val DESC;", dt);
     c("SELECT y, COUNT(*) AS val FROM gpu_sort_test GROUP BY y ORDER BY val DESC;", dt);
     c("SELECT y, COUNT(*), COUNT(*) AS val FROM gpu_sort_test GROUP BY y ORDER BY val "
@@ -8707,8 +8585,7 @@ TEST_F(Select, SpeculativeTopNSort) {
     config().exec.parallel_top_min = orig;
   };
   size_t test_values[]{size_t(0), config().exec.parallel_top_min};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (auto parallel_top_min : test_values) {
       config().exec.parallel_top_min = parallel_top_min;
       c("SELECT x, COUNT(*) AS val FROM gpu_sort_test GROUP BY x ORDER BY val DESC LIMIT "
@@ -8750,8 +8627,7 @@ TEST_F(Select, TopNSortWithWatchdogOn) {
   // config().exec.parallel_top_min)
   // ("Sorting the result would be too slow")
   bool test_values[]{true, false};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (auto watchdog : test_values) {
       config().exec.watchdog.enable = watchdog;
       EXPECT_NO_THROW(
@@ -8776,8 +8652,7 @@ TEST_F(Select, GroupByPerfectHash) {
 
   auto run_test = [](const bool bigint_count_flag) {
     config().exec.group_by.bigint_count = bigint_count_flag;
-    for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-      SKIP_NO_GPU();
+    for (auto dt : testedDevices()) {
       // single-column perfect hash:
       c("SELECT COUNT(*) FROM test GROUP BY x ORDER BY x DESC;", dt);
       c("SELECT y, COUNT(*) FROM test GROUP BY y ORDER BY y DESC;", dt);
@@ -8844,8 +8719,7 @@ TEST_F(Select, GroupByPerfectHash) {
 }
 
 TEST_F(Select, GroupByBaselineHash) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT cast(x1 as double) as key, COUNT(*), SUM(x2), MIN(x3), MAX(x4) FROM "
       "random_test"
       " GROUP BY key ORDER BY key;",
@@ -8889,8 +8763,7 @@ TEST_F(Select, GroupByBaselineHash) {
 }
 
 TEST_F(Select, GroupByConstrainedByInQueryRewrite) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) AS n, x FROM query_rewrite_test WHERE x IN (2, 5) GROUP BY x "
       "HAVING n > 0 ORDER BY n DESC;",
       dt);
@@ -8912,15 +8785,13 @@ TEST_F(Select, GroupByConstrainedByInQueryRewrite) {
 }
 
 TEST_F(Select, RedundantGroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT DISTINCT(x) from test where y < 10 and z > 30 GROUP BY x;", dt);
   }
 }
 
 TEST_F(Select, BigDecimalRange) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT CAST(d AS BIGINT) AS di, COUNT(*) FROM big_decimal_range_test GROUP BY d "
       "HAVING di > 0 ORDER BY d;",
       dt);
@@ -8932,8 +8803,7 @@ TEST_F(Select, BigDecimalRange) {
 }
 
 TEST_F(Select, ScalarSubquery) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT SUM(x) + SUM(y) FROM test GROUP BY z HAVING (SELECT x FROM test "
       "GROUP BY x HAVING x > 7 LIMIT 1) > 7 ORDER BY z;",
       dt);
@@ -8946,8 +8816,7 @@ TEST_F(Select, ScalarSubquery) {
 }
 
 TEST_F(Select, DecimalCompression) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     std::string omnisci_sql = "";
     std::string sqlite_sql = "";
 
@@ -9009,8 +8878,7 @@ TEST_F(Select, BigintGroupByColCompactionTest) {
   insertCsvValues("bigint_groupby_col_compaction_test",
                   "-6312639302689611776\n-6312639302689611776\n-6312639302689611776\n-"
                   "6336283200715718656\n-6312639302689603584");
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     const auto result = run_multiple_agg(
         "SELECT * FROM bigint_groupby_col_compaction_test GROUP BY c ORDER BY c;", dt);
     ASSERT_EQ(size_t(3), result->rowCount());
@@ -9042,8 +8910,7 @@ TEST_F(Drop, AfterDrop) {
 }
 
 TEST_F(Select, Empty) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM emptytab;", dt);
     c("SELECT SUM(x) FROM emptytab;", dt);
     c("SELECT SUM(y) FROM emptytab;", dt);
@@ -9094,8 +8961,7 @@ TEST_F(Select, Empty) {
 }
 
 TEST_F(Select, Subqueries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT str, SUM(y) AS n FROM test WHERE x > (SELECT COUNT(*) FROM test) - 14 "
       "GROUP BY str ORDER BY str ASC;",
       dt);
@@ -9273,8 +9139,7 @@ TEST_F(Select, Subqueries) {
 }
 
 TEST_F(Select, Joins_Arrays) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(int64_t(0),
               v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM test, array_test_inner "
                                         "WHERE test.x = ALL array_test_inner.arr_i16;",
@@ -9401,8 +9266,7 @@ TEST_F(Select, Joins_Fixed_Size_Array_Multi_Frag) {
   };
 
   // skip to test GPU device until we fix the #5425 issue
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     test_query("mf_f_arr", dt);
     test_query("mf_d_arr", dt);
     test_query("mf_i_arr", dt);
@@ -9426,8 +9290,7 @@ TEST_F(Select, Joins_Fixed_Size_Array_Multi_Frag) {
 }
 
 TEST_F(Select, Joins_EmptyTable) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT test.x, emptytab.x FROM test, emptytab WHERE test.x = emptytab.x;", dt);
     c("SELECT COUNT(*) FROM test, emptytab GROUP BY test.x;", dt);
     c("SELECT COUNT(*) FROM test, emptytab, test_inner where test.x = emptytab.x;", dt);
@@ -9438,8 +9301,7 @@ TEST_F(Select, Joins_EmptyTable) {
 }
 
 TEST_F(Select, Joins_Fragmented_SelfJoin_And_LoopJoin) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(
         run_multiple_agg("SELECT COUNT(*) FROM test a, test b WHERE b.x = b.x;", dt),
         std::runtime_error);
@@ -9457,8 +9319,7 @@ TEST_F(Select, Joins_Fragmented_SelfJoin_And_LoopJoin) {
 }
 
 TEST_F(Select, Joins_ImplicitJoins) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x = test_inner.x;", dt);
     c("SELECT COUNT(*) FROM test, hash_join_test WHERE test.t = hash_join_test.t;", dt);
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x < test_inner.x + 1;", dt);
@@ -9537,8 +9398,7 @@ TEST_F(Select, Joins_ImplicitJoins) {
 }
 
 TEST_F(Select, Joins_DifferentIntegerTypes) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x = test_inner.xx;", dt);
     c("SELECT test_inner.xx, COUNT(*) AS n FROM test, test_inner WHERE test.x = "
       "test_inner.xx GROUP BY test_inner.xx ORDER BY n;",
@@ -9549,8 +9409,7 @@ TEST_F(Select, Joins_DifferentIntegerTypes) {
 TEST_F(Select, Joins_FilterPushDown) {
   auto default_flag = config().opts.filter_pushdown.enable;
   auto default_lower_frac = config().opts.filter_pushdown.low_frac;
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (auto fpd : {std::make_pair(true, 1.0), std::make_pair(false, 0.0)}) {
       BOOST_PRAGMA_MESSAGE(
           "Enabling filter pushdown fails on a check, re-enable config options when "
@@ -9616,8 +9475,7 @@ TEST_F(Select, Joins_FilterPushDown) {
 }
 
 TEST_F(Select, Joins_InnerJoin_TwoTables) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test a JOIN single_row_test b ON a.x = b.x;", dt);
     c("SELECT COUNT(*) from test a JOIN single_row_test b ON a.ofd = b.x;", dt);
     c("SELECT COUNT(*) FROM test JOIN test_inner ON test.x = test_inner.x;", dt);
@@ -9682,8 +9540,7 @@ TEST_F(Select, Joins_InnerJoin_TwoTables) {
 }
 
 TEST_F(Select, Joins_InnerJoin_AtLeastThreeTables) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT count(*) FROM test AS a JOIN join_test AS b ON a.x = b.x JOIN test_inner "
       "AS c ON b.str = c.str;",
       dt);
@@ -9752,8 +9609,7 @@ TEST_F(Select, Joins_InnerJoin_AtLeastThreeTables) {
 }
 
 TEST_F(Select, Joins_InnerJoin_Filters) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT count(*) FROM test AS a JOIN join_test AS b ON a.x = b.x JOIN test_inner "
       "AS c ON b.str = c.str WHERE a.y "
       "< 43;",
@@ -9827,9 +9683,7 @@ TEST_F(Select, Joins_LeftJoinFiltered) {
   for (bool enable_filter_hoisting : {false, true}) {
     config().opts.enable_left_join_filter_hoisting = enable_filter_hoisting;
 
-    for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-      SKIP_NO_GPU();
-
+    for (auto dt : testedDevices()) {
       {
         const std::string query =
             R"(SELECT COUNT(*) FROM test LEFT JOIN test_inner ON test.x = test_inner.x WHERE test.y > 42;)";
@@ -9864,8 +9718,7 @@ TEST_F(Select, Joins_LeftJoinFiltered) {
 }
 
 TEST_F(Select, Joins_LeftOuterJoin) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT test.x, test_inner.x FROM test LEFT OUTER JOIN test_inner ON test.x = "
       "test_inner.x ORDER BY test.x ASC;",
       dt);
@@ -10015,8 +9868,7 @@ TEST_F(Select, Joins_LeftOuterJoin) {
 }
 
 TEST_F(Select, Joins_LeftJoin_Filters) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT test.x, test_inner.x FROM test LEFT OUTER JOIN test_inner ON test.x = "
       "test_inner.x WHERE test.y > 40 "
       "ORDER BY test.x ASC;",
@@ -10085,8 +9937,7 @@ TEST_F(Select, Joins_LeftJoin_Filters) {
 TEST_F(Select, Joins_LeftJoin_MultiQuals) {
   // a test to check whether we can evaluate left join having multiple-quals
   // with our hash join framework, instead of using loop join
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_NO_THROW(
         run_multiple_agg("SELECT a.x, COUNT(b.y) FROM test a LEFT JOIN test_inner b ON "
                          "b.x = a.x AND b.str NOT LIKE 'box' GROUP BY a.x ORDER BY a.x;",
@@ -10107,9 +9958,7 @@ TEST_F(Select, Joins_LeftJoin_MultiQuals) {
 }
 
 TEST_F(Select, Joins_OuterJoin_OptBy_NullRejection) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // single-column outer join predicate
 
     // 1. execute full outer join via left outer join
@@ -10630,8 +10479,7 @@ TEST_F(Select, Joins_OuterJoin_OptBy_NullRejection) {
 }
 
 TEST_F(Select, Joins_MultiCompositeColumns) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT a.x, b.str FROM test AS a JOIN join_test AS b ON a.str = b.str AND a.x = "
       "b.x ORDER BY a.x, b.str;",
       dt);
@@ -10670,8 +10518,7 @@ TEST_F(Select, Joins_MultiCompositeColumns) {
 }
 
 TEST_F(Select, Joins_BuildHashTable) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test, join_test WHERE test.str = join_test.dup_str;", dt);
     // Intentionally duplicate previous string join to cover hash table building.
     c("SELECT COUNT(*) FROM test, join_test WHERE test.str = join_test.dup_str;", dt);
@@ -10684,9 +10531,7 @@ TEST_F(Select, Joins_BuildHashTable) {
 }
 
 TEST_F(Select, Joins_CoalesceColumns) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM coalesce_cols_test_0 t0 INNER JOIN coalesce_cols_test_2 t1 "
       "ON t0.x = t1.x AND t0.y = t1.y;",
       dt);
@@ -10742,8 +10587,7 @@ TEST_F(Select, Joins_CoalesceColumns) {
 }
 
 TEST_F(Select, Joins_ComplexQueries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test a JOIN (SELECT * FROM test WHERE y < 43) b ON a.x = "
       "b.x "
       "JOIN join_test c ON a.x = c.x "
@@ -10782,9 +10626,7 @@ TEST_F(Select, Joins_ComplexQueries) {
 }
 
 TEST_F(Select, Joins_TimeAndDate) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // Inner joins
     c("SELECT COUNT(*) FROM test a, test b WHERE a.m = b.m;", dt);
     c("SELECT COUNT(*) FROM test a, test b WHERE a.n = b.n;", dt);
@@ -10837,8 +10679,7 @@ TEST_F(Select, Joins_TimeAndDate) {
 }
 
 TEST_F(Select, Joins_OneOuterExpression) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x - 1 = test_inner.x;", dt);
     c("SELECT COUNT(*) FROM test_inner, test WHERE test.x - 1 = test_inner.x;", dt);
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x + 0 = test_inner.x;", dt);
@@ -10860,9 +10701,7 @@ TEST_F(Select, Joins_Subqueries) {
     return;
   }
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // Subquery loop join
     auto result_rows = run_multiple_agg(
         R"(SELECT t, n FROM (SELECT UNNEST(arr_str) as t, COUNT(*) as n FROM  array_test GROUP BY t ORDER BY n DESC), unnest_join_test WHERE t <> x ORDER BY t LIMIT 1;)",
@@ -10946,9 +10785,7 @@ TEST_F(JoinTest, EmptyJoinTables) {
     config().opts.from_table_reordering = table_reordering_state;
   };
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("SELECT COUNT(*) FROM jointest_a a INNER JOIN "
                                         "jointest_b b ON a.x = b.x;",
@@ -10983,8 +10820,7 @@ TEST_F(JoinTest, EmptyJoinTables) {
 }
 
 TEST_F(Select, Joins_MultipleOuterExpressions) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM test, test_inner WHERE test.x - 1 = test_inner.x AND "
       "test.str = test_inner.str;",
       dt);
@@ -11016,8 +10852,7 @@ TEST_F(Select, Joins_MultipleOuterExpressions) {
 }
 
 TEST_F(Select, Joins_Decimal) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT COUNT(*) FROM hash_join_decimal_test as t1, hash_join_decimal_test as t2 "
       "WHERE t1.x = t2.x;",
       dt);
@@ -11047,9 +10882,7 @@ TEST_F(Select, Joins_Decimal) {
 }
 
 TEST_F(Select, RuntimeFunctions) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT SUM(ABS(-x + 1)) FROM test;", dt);
     c("SELECT SUM(ABS(-w + 1)) FROM test;", dt);
     c("SELECT SUM(ABS(-y + 1)) FROM test;", dt);
@@ -11224,8 +11057,7 @@ TEST_F(Select, RuntimeFunctions) {
 }
 
 TEST_F(Select, TextGroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg(" select count(*) from (SELECT tnone, count(*) cc from "
                                   "text_group_by_test group by tnone);",
                                   dt),
@@ -11242,8 +11074,7 @@ TEST_F(Select, TextGroupBy) {
 }
 
 TEST_F(Select, UnsupportedExtensions) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg(
                      "SELECT TRUNCATE(2016, CAST(1.0 as BIGINT)) FROM test LIMIT 1;", dt),
                  std::runtime_error);
@@ -11251,15 +11082,13 @@ TEST_F(Select, UnsupportedExtensions) {
 }
 
 TEST_F(Select, SortOfIntermediateResult) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT real_str FROM test ORDER BY x, rowid;", dt);
   }
 }
 
 TEST_F(Select, PgShim) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT str, SUM(x), COUNT(str) FROM test WHERE \"y\" = 42 AND str = 'Shim All The "
       "Things!' GROUP BY str;",
       dt);
@@ -11267,22 +11096,19 @@ TEST_F(Select, PgShim) {
 }
 
 TEST_F(Select, CaseInsensitive) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT X, COUNT(*) AS N FROM test GROUP BY teSt.x ORDER BY n DESC;", dt);
   }
 }
 
 TEST_F(Select, Deserialization) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT CAST(CAST(x AS float) * 0.0000000000 AS INT) FROM test;", dt);
   }
 }
 
 TEST_F(Select, DesugarTransform) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT * FROM emptytab ORDER BY emptytab. x;", dt);
     c("SELECT COUNT(*) FROM test WHERE x IN (SELECT x + 1 AS foo FROM test GROUP BY foo "
       "ORDER BY COUNT(*) DESC LIMIT "
@@ -11292,8 +11118,7 @@ TEST_F(Select, DesugarTransform) {
 }
 
 TEST_F(Select, ArrowOutput) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c_arrow("SELECT str, COUNT(*) FROM test GROUP BY str ORDER BY str ASC;", dt);
     c_arrow("SELECT x, y, w, z, t, f, d, str, ofd, ofq FROM test ORDER BY x ASC, y ASC;",
             dt);
@@ -11309,9 +11134,7 @@ TEST_F(Select, ArrowOutput) {
 }
 
 TEST_F(Select, ArrowDictionaries) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // Projection - should be dense
     c_arrow(
         "SELECT t FROM test_window_func_large_multi_frag WHERE i_1000 < 800 AND t <> 'e' "
@@ -11355,8 +11178,7 @@ TEST_F(Select, WatchdogTest) {
   ScopeGuard reset_Watchdog_state = [&watchdog_state] {
     config().exec.watchdog.enable = watchdog_state;
   };
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT x, SUM(f) AS n FROM test GROUP BY x ORDER BY n DESC LIMIT 5;", dt);
     c("SELECT COUNT(*) FROM test WHERE str = "
       "'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz';",
@@ -11468,8 +11290,7 @@ TEST_F(Select, PuntQueryStepToCPU) {
 // Select.Time does a lot of DATEADD tests already.  These focus on high-precision
 // timestamps before, across, and after the epoch=0 boundary.
 TEST_F(Select, Dateadd) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // Comparing strings is preferred, but "Cast from TIMESTAMP(6) to TEXT not supported"
     EXPECT_EQ(timestampToInt64("1960-03-29 23:59:59.999999", dt),
               dateadd("month", 1, "1960-02-29 23:59:59.999999", dt));
@@ -11580,8 +11401,7 @@ TEST_F(Select, Dateadd) {
 
 // Test adding intervals that are higher precision than the timestamp being added to.
 TEST_F(Select, DateaddHighPrecision) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // Comparing strings is preferred, but "Cast from TIMESTAMP(6) to TEXT not supported"
     EXPECT_EQ(timestampToInt64("1960-02-29 23:59:59", dt),
               dateadd("millisecond", 999, "1960-02-29 23:59:59", dt));
@@ -11736,8 +11556,7 @@ TEST_F(Select, DateaddHighPrecision) {
 }
 
 TEST_F(Select, Datediff) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     EXPECT_EQ(
         999999997LL,
         datediff(
@@ -11914,8 +11733,7 @@ TEST_F(Select, Datediff) {
 }
 
 TEST_F(Select, TimestampPrecision_DateTruncate) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(978307200000LL,
               v<int64_t>(run_simple_agg(
                   "SELECT DATE_TRUNC(millennium, m_3) FROM test limit 1;", dt)));
@@ -12055,8 +11873,7 @@ TEST_F(Select, TimestampPrecision_DateTruncate) {
 }
 
 TEST_F(Select, TimestampPrecision_Extract) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1146023344LL,
               v<int64_t>(run_simple_agg(
                   "SELECT EXTRACT(epoch from m_9) FROM test limit 1;", dt)));
@@ -12232,8 +12049,7 @@ TEST_F(Select, TimestampPrecision_Extract) {
 }
 
 TEST_F(Select, TimestampPrecision_DatePart) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(2014LL,
               v<int64_t>(
                   run_simple_agg("SELECT DATEPART('year', m_3) FROM test limit 1;", dt)));
@@ -12338,8 +12154,7 @@ TEST_F(Select, TimestampPrecision_DatePart) {
 }
 
 TEST_F(Select, TimestampPrecision_DateAdd) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1177559344607435125LL,
               v<int64_t>(run_simple_agg(
                   "SELECT DATEADD('year',1, m_9) FROM test limit 1;", dt)));
@@ -12467,8 +12282,7 @@ TEST_F(Select, TimestampPrecision_DateAdd) {
 }
 
 TEST_F(Select, TimestampPrecision_DateDiff) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1146023344607435125LL - 931701773874533000LL,
               v<int64_t>(run_simple_agg(
                   "SELECT DATEDIFF('nanosecond', m_6, m_9) FROM test limit 1;", dt)));
@@ -12803,8 +12617,7 @@ TEST_F(Select, TimestampPrecision_DateDiff) {
 }
 
 TEST_F(Select, TimestampPrecision_TimestampAdd) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1177559344607435125LL,
               v<int64_t>(run_simple_agg(
                   "SELECT TIMESTAMPADD(YEAR,1, m_9) FROM test limit 1;", dt)));
@@ -12872,8 +12685,7 @@ TEST_F(Select, TimestampPrecision_TimestampAdd) {
 }
 
 TEST_F(Select, TimestampPrecision_Interval) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1177559344607435125LL,
               v<int64_t>(run_simple_agg(
                   "SELECT (m_9 + INTERVAL '1' year) from test limit 1;", dt)));
@@ -12986,8 +12798,7 @@ TEST_F(Select, TimestampPrecision_Interval) {
 }
 
 TEST_F(Select, TimestampPrecision_HighPrecisionCastsWithIntervals) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(
         1146023345LL,
         v<int64_t>(run_simple_agg(
@@ -13089,8 +12900,7 @@ TEST_F(Select, TimestampPrecision_CastFromInt) {
       " = CAST(t AS TIMESTAMP(6)) FROM test WHERE t=1001 GROUP BY t;",
       "SELECT CAST('1970-01-01 00:00:00.000001001' AS TIMESTAMP(9))"
       " = CAST(t AS TIMESTAMP(9)) FROM test WHERE t=1001 GROUP BY t;"};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (char const* const query : queries) {
       ASSERT_TRUE(v<int64_t>(run_simple_agg(query, dt))) << query;
     }
@@ -13098,8 +12908,7 @@ TEST_F(Select, TimestampPrecision_CastFromInt) {
 }
 
 TEST_F(Select, TimestampPrecision_CastsImplicitAndExplicit) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(
         1418509395000000000,
         v<int64_t>(run_simple_agg(
@@ -13191,8 +13000,7 @@ TEST_F(Select, TimestampPrecision_CastsImplicitAndExplicit) {
 }
 
 TEST_F(Select, TimestampPrecision_Dates) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(
         static_cast<int64_t>(g_num_rows + g_num_rows / 2),
         v<int64_t>(run_simple_agg(
@@ -13310,8 +13118,7 @@ TEST_F(Select, TimestampPrecision_Dates) {
 }
 
 TEST_F(Select, TimestampPrecision_HighPrecision) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1418509395000,
               v<int64_t>(run_simple_agg(
                   "SELECT CAST(m as TIMESTAMP(3)) FROM test limit 1;", dt)));
@@ -13564,8 +13371,7 @@ TEST_F(Select, TimestampPrecision_HighPrecision) {
 }
 
 TEST_F(Select, TimestampPrecision_FunctionCompositions) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1,
               v<int64_t>(run_simple_agg(
                   "select dateadd('minute',1,dateadd('millisecond',1,m)) = TIMESTAMP(0) "
@@ -13648,8 +13454,7 @@ TEST_F(Select, TimestampPrecision_FunctionCompositions) {
 }
 
 TEST_F(Select, TimestampPrecision_FunctionsWithHighPrecisionsAndDates) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(1,
               v<int64_t>(run_simple_agg(
                   "SELECT PG_DATE_TRUNC('day' , PG_DATE_TRUNC('millisecond', "
@@ -14139,8 +13944,7 @@ TEST_F(Select, TimestampPrecision_FunctionsWithHighPrecisionsAndDates) {
 }
 
 TEST_F(Select, TimestampPrecision_JoinOnDifferentPrecisions) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(
         5,
         v<int64_t>(run_simple_agg("select count(*) from test where m_9 between "
@@ -14191,8 +13995,7 @@ TEST_F(Select, TimestampPrecision_JoinOnDifferentPrecisions) {
 }
 
 TEST_F(Select, TimestampPrecision_EmptyFilters) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       auto rows = run_multiple_agg(
           "SELECT PG_DATE_TRUNC('day', m), COUNT(*) FROM test WHERE m >= "
@@ -14210,8 +14013,7 @@ TEST_F(Select, TimestampPrecision_EmptyFilters) {
 }
 
 TEST_F(Select, TimestampPrecisionFormat) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("ts_format",
                 {{"ts_3", ctx().timestamp(hdk::ir::TimeUnit::kMilli)},
                  {"ts_6", ctx().timestamp(hdk::ir::TimeUnit::kMicro)},
@@ -14302,8 +14104,7 @@ TEST_F(Select, TimestampPrecisionFormat) {
 }
 
 TEST_F(Select, TimestampPrecisionOverflowUnderflow) {
-  for (const auto& dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (const auto& dt : testedDevices()) {
     ASSERT_EQ(1,
               v<int64_t>(
                   run_simple_agg("select count(*) from ts_overflow_underflow where (a >= "
@@ -14358,8 +14159,7 @@ TEST_F(Select, TimestampPrecisionOverflowUnderflow) {
 }
 
 TEST_F(Select, CurrentUser) {
-  for (const auto& dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (const auto& dt : testedDevices()) {
     ASSERT_EQ(1,
               v<int64_t>(run_simple_agg(
                   "SELECT COUNT(*) FROM test_current_user WHERE u = CURRENT_USER;", dt)));
@@ -14397,8 +14197,7 @@ void validate_timestamp_agg(const ResultSet& row,
 }  // namespace
 
 TEST_F(Select, TimestampCastAggregates) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     createTable("timestamp_agg",
                 {{"val", ctx().int32()},
                  {"dt", ctx().date32(hdk::ir::TimeUnit::kDay)},
@@ -14588,8 +14387,7 @@ TEST_F(Select, TimestampCastAggregates) {
 
 // Tests generated from scripts/pg_test/generate_extract_tests.rb
 TEST_F(Select, ExtractFromNegativeTimes) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(11LL,
               v<int64_t>(run_simple_agg(
                   "SELECT EXTRACT(DAY FROM TIMESTAMP '1913-12-11 10:09:08');", dt)));
@@ -15270,8 +15068,7 @@ TEST_F(Select, ExtractFromNegativeTimes) {
 }
 
 TEST_F(Select, WeekOne) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // 2009 Jan 4 is a Sunday
     EXPECT_EQ(52L,
               v<int64_t>(run_simple_agg(
@@ -15591,9 +15388,7 @@ TEST_F(Select, WeekOne) {
 }
 
 TEST_F(Select, NonCorrelated_Exists) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT ename FROM emp WHERE EXISTS (SELECT dname FROM dept WHERE deptno > 40) "
       "ORDER BY ename;",
       dt);
@@ -15616,9 +15411,7 @@ TEST_F(Select, NonCorrelated_Exists) {
 }
 
 TEST_F(Select, Correlated_Exists) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT ename FROM emp E WHERE EXISTS (SELECT D.dname FROM dept D WHERE "
       "D.deptno > 40 and E.deptno = D.deptno) ORDER BY ename;",
       dt);
@@ -15641,9 +15434,7 @@ TEST_F(Select, Correlated_Exists) {
 }
 
 TEST_F(Select, Correlated_In) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c("SELECT f.val FROM corr_in_facts f WHERE f.val IN (SELECT l.val FROM "
       "corr_in_lookup l WHERE f.id = "
       "l.id) AND f.val > 3",
@@ -15664,9 +15455,7 @@ TEST_F(Select, Correlated_In) {
 }
 
 TEST_F(Select, QuotedColumnIdentifier) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     createTable("identifier_test", {{"id", ctx().int32()}, {"sum", ctx().int64()}});
     insertCsvValues("identifier_test", "1,1\n2,2\n3,3");
 
@@ -15681,9 +15470,7 @@ TEST_F(Select, QuotedColumnIdentifier) {
 }
 
 TEST_F(Select, ROUND) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     {
       // Check no 2nd parameter
       // the cast is required. SQLite seems to only return FLOATs
@@ -15828,8 +15615,7 @@ TEST_F(Select, ROUND) {
 }
 
 TEST_F(Select, Sample) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ("else",
               boost::get<std::string>(v<NullableString>(run_simple_agg(
                   "SELECT SAMPLE(CASE WHEN x IN (9) THEN str ELSE 'else' END) FROM test;",
@@ -17020,16 +16806,13 @@ TEST_F(Select, FilterNodeCoalesce) {
 }
 
 TEST_F(Select, EmptyString) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     EXPECT_THROW(run_multiple_agg("", dt), std::exception);
   }
 }
 
 TEST_F(Select, MultiStepColumnarization) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       std::string query(
           "SELECT T.x, MAX(T.y) FROM(SELECT x, log10(SUM(f)) as y FROM test GROUP BY x) "
@@ -17137,8 +16920,7 @@ TEST_F(Select, MultiStepColumnarization) {
 }
 
 TEST_F(Select, LogicalSizedColumns) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // non-grouped aggregate:
     c("SELECT MIN(tiny_int), MAX(tiny_int), MIN(tiny_int_null), MAX(tiny_int_null), "
       "COUNT(tiny_int), SUM(tiny_int), AVG(tiny_int) FROM logical_size_test;",
@@ -17226,9 +17008,7 @@ TEST_F(Select, LogicalSizedColumns) {
 }
 
 TEST_F(Select, GroupEmptyBlank) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     createTable("blank_test",
                 {{"t1", ctx().extDict(ctx().text(false), 0, 4)}, {"i1", ctx().int32()}},
                 {10});
@@ -17249,7 +17029,6 @@ TEST_F(Select, GroupEmptyBlank) {
 // Uses tables from import_union_all_tests().
 TEST_F(Select, UnionAll) {
   for (auto dt : {ExecutorDeviceType::CPU /*, ExecutorDeviceType::GPU*/}) {
-    SKIP_NO_GPU();
     c("SELECT a0, a1, a2, a3 FROM union_all_a"
       " WHERE a0 BETWEEN 111 AND 115"
       " UNION ALL"
@@ -17453,8 +17232,7 @@ TEST_F(Select, UnionAll) {
 }
 
 TEST_F(Select, VariableLengthAggs) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // non-encoded strings:
     c("SELECT x, COUNT(real_str) FROM test GROUP BY x ORDER BY x desc;", dt);
     EXPECT_THROW(run_multiple_agg(
@@ -17498,8 +17276,7 @@ TEST_F(Select, VariableLengthAggs) {
 TEST_F(Select, Interop) {
   config().exec.enable_interop = true;
   ScopeGuard interop_guard = [] { config().exec.enable_interop = false; };
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT 'dict_' || str c1, 'fake_' || substring(real_str, 6) c2, x + 56 c3, f c4, "
       "-d c5, smallint_nulls c6 FROM test WHERE ('fake_' || substring(real_str, 6)) LIKE "
       "'%_ba%' ORDER BY c1 ASC, c2 ASC, c3 ASC, c4 ASC, c5 ASC, c6 ASC;",
@@ -17538,9 +17315,7 @@ TEST_F(Select, Interop) {
 
 // Test https://github.com/omnisci/omniscidb/issues/463
 TEST_F(Select, LeftJoinDictionaryGenerationIssue463) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     createTable("issue463_table1",
                 {{"playerID", ctx().extDict(ctx().text(), 0)},
                  {"yearID", ctx().int64()},
@@ -17663,9 +17438,7 @@ FROM (
 // and so is eliminated by an RA optimization. This tests internal logic that still
 // accesses the string "Chicago" from a StringDictionary with generation=-1.
 TEST_F(Select, StringFromEliminatedColumn) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     createTable("flights",
                 {{"plane_model", ctx().extDict(ctx().text(), 0)},
                  {"dest_city", ctx().extDict(ctx().text(), 0)}},
@@ -17704,8 +17477,7 @@ TEST_F(Select, StringFromEliminatedColumn) {
 }
 
 TEST_F(Select, VarlenLazyFetch) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     {
       const auto query(
           "SELECT t, real_str, array_i16 FROM varlen_table where rowid = 222;");
@@ -17720,9 +17492,7 @@ TEST_F(Select, VarlenLazyFetch) {
 }
 
 TEST_F(Select, SampleRatio) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // looking for 8-12 pass at a 50% sampling rate. This is dependent on data
     // distribution.
     const auto num_rows = v<int64_t>(
@@ -17757,8 +17527,7 @@ TEST_F(Select, SampleRatio) {
 }
 
 TEST_F(Select, OffsetInFragment) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     // With fragment_size of 2, we should have 10 frags
     EXPECT_EQ(10,
               v<int64_t>(run_simple_agg(
@@ -17807,8 +17576,7 @@ TEST_F(Select, ParseIntegerExceptions) {
        "Integer 9223372036854775808 is out of range for INT64[NN]"},
       {"SELECT * FROM test WHERE '1e3.0'=1;",
        "Unexpected character \".\" encountered in INT32[NN] value 1e3.0"}};
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     for (auto const& test : tests) {
       try {
         run_multiple_agg(test.query, dt);
@@ -17836,9 +17604,7 @@ TEST_F(Select, RowIdJoin) {
   };
   config().exec.join.trivial_loop_join_threshold = 1;
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     c(R"(SELECT t1.x, t2.y FROM test t1 LEFT JOIN test_inner t2 ON t1.rowid = t2.rowid;)",
       dt);
     c(R"(SELECT t1.x, t2.y, COUNT(*) FROM test t1 LEFT JOIN test_inner t2 ON t1.rowid = t2.rowid GROUP BY 1, 2 ORDER BY 1, 2 NULLS LAST;)",
@@ -17909,9 +17675,7 @@ class SubqueryTestEnv : public ExecuteTestBase, public ::testing::Test {
 };
 
 TEST_F(SubqueryTestEnv, SubqueryTest) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // multi-step subquery
     c(R"(select t1.r1, t1.r2, t1.r3 from R1 t1 where t1.r1 in (select t2.r1 from R1 t2 join (select * from R1) t3 on t2.r1 = t3.r1) order by 1, 2;)",
       dt);
@@ -17960,9 +17724,7 @@ const size_t ManyRowsTest::row_count = 129;
 // ensure lazy fetch works properly for queries where the number of rows exceeds the bit
 // width of the target type
 TEST_F(ManyRowsTest, Projection) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     EXPECT_NO_THROW({
       auto result = run_multiple_agg(
           R"(SELECT t, x, y from many_rows ORDER BY x ASC NULLS FIRST;)", dt);

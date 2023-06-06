@@ -31,20 +31,6 @@ EXTERN extern bool g_is_test_env;
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
 class HighCardinalityStringEnv : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -327,13 +313,13 @@ class LowCardinalityThresholdTest : public ::testing::Test {
 };
 
 TEST_F(LowCardinalityThresholdTest, GroupBy) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  config().exec.heterogeneous.allow_cpu_retry = true;
+  for (auto dt : testedDevices()) {
     auto result = run_multiple_agg(
         R"(select fl,ar,dep from low_cardinality group by fl,ar,dep;)", dt);
     EXPECT_EQ(result->rowCount(), config().exec.group_by.big_group_threshold);
   }
+  config().exec.heterogeneous.allow_cpu_retry = false;
 }
 
 class BigCardinalityThresholdTest : public ::testing::Test {
@@ -343,6 +329,7 @@ class BigCardinalityThresholdTest : public ::testing::Test {
     initial_baseline_max_groups = config().exec.watchdog.baseline_max_groups;
     config().exec.watchdog.baseline_max_groups =
         config().exec.group_by.big_group_threshold + 1;
+    config().exec.heterogeneous.allow_cpu_retry = true;
 
     createTable("big_cardinality",
                 {{"fl", ctx().extDict(ctx().text(), 0)},
@@ -360,6 +347,7 @@ class BigCardinalityThresholdTest : public ::testing::Test {
   void TearDown() override {
     config().exec.watchdog.enable = false;
     config().exec.watchdog.baseline_max_groups = initial_baseline_max_groups;
+    config().exec.heterogeneous.allow_cpu_retry = false;
     dropTable("big_cardinality");
   }
 
@@ -367,9 +355,7 @@ class BigCardinalityThresholdTest : public ::testing::Test {
 };
 
 TEST_F(BigCardinalityThresholdTest, EmptyFilters) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     auto result = run_multiple_agg(
         R"(SELECT fl,ar,dep FROM big_cardinality WHERE fl = 'a' GROUP BY fl,ar,dep;)",
         dt);
@@ -395,6 +381,8 @@ int main(int argc, char** argv) {
   po::notify(vm);
 
   init();
+  config().exec.heterogeneous.allow_cpu_retry = false;
+  config().exec.heterogeneous.allow_query_step_cpu_retry = false;
 
   int err{0};
   try {

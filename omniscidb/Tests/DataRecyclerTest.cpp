@@ -40,23 +40,6 @@ EXTERN extern bool g_is_test_env;
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;
 
-bool g_cpu_only{false};
-
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 namespace {
 
 void drop_table() {
@@ -1050,7 +1033,7 @@ TEST(DataRecycler, Empty_Hashtable) {
     executor->clearMemory(memory_level, getDataMgr());
     executor->getQueryPlanDagCache().clearQueryPlanCache();
   };
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
+  for (auto dt : testedDevices()) {
     run_multiple_agg("SELECT COUNT(1) FROM t5 INNER JOIN t6 ON (t5.c1 = t6.c1);", dt);
     clearCaches(dt);
     run_multiple_agg(
@@ -1150,8 +1133,7 @@ TEST(DataRecycler, DISABLED_Hashtable_For_Dict_Encoded_Column) {
 
   auto perform_test = [&clear_caches, &check_query](
                           const auto queries, size_t expected_num_cached_hashtable) {
-    for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-      SKIP_NO_GPU();
+    for (auto dt : testedDevices()) {
       run_multiple_agg(queries.first, dt);
       run_multiple_agg(queries.second, dt);
       check_query(queries.first, false);

@@ -30,25 +30,6 @@ using namespace TestHelpers::ArrowSQLRunner;
 
 namespace {
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-}  // namespace
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
-namespace {
-
 void create_and_populate_tables() {
   createTable("tdata",
               {{"id", ctx().int16()},
@@ -120,8 +101,7 @@ void drop_tables() {
 }  // namespace
 
 TEST(Select, TopK_LIMIT_AscendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i NULLS FIRST LIMIT 5;",
       "SELECT i FROM tdata ORDER BY i ASC LIMIT 5;",
       dt);
@@ -150,8 +130,7 @@ TEST(Select, TopK_LIMIT_AscendSort) {
 }
 
 TEST(Select, TopK_LIMIT_DescendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i DESC NULLS LAST LIMIT 5;",
       "SELECT i FROM tdata ORDER BY i DESC LIMIT 5;",
       dt);
@@ -180,8 +159,7 @@ TEST(Select, TopK_LIMIT_DescendSort) {
 }
 
 TEST(Select, TopK_LIMIT_GreaterThan_TotalOfDataRows_AscendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT b FROM tdata ORDER BY b NULLS FIRST LIMIT 11;",
       "SELECT b FROM tdata ORDER BY b LIMIT 11;",
       dt);
@@ -207,8 +185,7 @@ TEST(Select, TopK_LIMIT_GreaterThan_TotalOfDataRows_AscendSort) {
 }
 
 TEST(Select, TopK_LIMIT_GreaterThan_TotalOfDataRows_DescendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i DESC NULLS LAST LIMIT 11;",
       "SELECT i FROM tdata ORDER BY i DESC LIMIT 11;",
       dt);
@@ -237,8 +214,7 @@ TEST(Select, TopK_LIMIT_GreaterThan_TotalOfDataRows_DescendSort) {
 }
 
 TEST(Select, TopK_LIMIT_OFFSET_TopHalf_AscendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i NULLS FIRST LIMIT 5 OFFSET 0;",
       "SELECT i FROM tdata ORDER BY i LIMIT 5 OFFSET 0;",
       dt);
@@ -267,8 +243,7 @@ TEST(Select, TopK_LIMIT_OFFSET_TopHalf_AscendSort) {
 }
 
 TEST(Select, TopK_LIMIT_OFFSET_TopHalf_DescendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i DESC NULLS LAST LIMIT 5 OFFSET 0;",
       "SELECT i FROM tdata ORDER BY i DESC LIMIT 5 OFFSET 0;",
       dt);
@@ -297,8 +272,7 @@ TEST(Select, TopK_LIMIT_OFFSET_TopHalf_DescendSort) {
 }
 
 TEST(Select, DISABLED_TopK_LIMIT_OFFSET_BottomHalf_AscendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i NULLS FIRST LIMIT 5 OFFSET 5;",
       "SELECT i FROM tdata ORDER BY i LIMIT 5 OFFSET 5;",
       dt);
@@ -327,8 +301,7 @@ TEST(Select, DISABLED_TopK_LIMIT_OFFSET_BottomHalf_AscendSort) {
 }
 
 TEST(Select, DISABLED_TopK_LIMIT_OFFSET_BottomHalf_DescendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i DESC NULLS LAST LIMIT 5 OFFSET 5;",
       "SELECT i FROM tdata ORDER BY i DESC LIMIT 5 OFFSET 5;",
       dt);
@@ -357,8 +330,7 @@ TEST(Select, DISABLED_TopK_LIMIT_OFFSET_BottomHalf_DescendSort) {
 }
 
 TEST(Select, DISABLED_TopK_LIMIT_OFFSET_GreaterThan_TotalOfDataRows_AscendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i NULLS FIRST LIMIT 5 OFFSET 11;",
       "SELECT i FROM tdata ORDER BY i LIMIT 5 OFFSET 11;",
       dt);
@@ -387,8 +359,7 @@ TEST(Select, DISABLED_TopK_LIMIT_OFFSET_GreaterThan_TotalOfDataRows_AscendSort) 
 }
 
 TEST(Select, DISABLED_TopK_LIMIT_OFFSET_GreaterThan_TotalOfDataRows_DescendSort) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i FROM tdata ORDER BY i DESC NULLS LAST LIMIT 5 OFFSET 11;",
       "SELECT i FROM tdata ORDER BY i DESC LIMIT 5 OFFSET 11;",
       dt);
@@ -417,8 +388,7 @@ TEST(Select, DISABLED_TopK_LIMIT_OFFSET_GreaterThan_TotalOfDataRows_DescendSort)
 }
 
 TEST(Select, DISABLED_TopK_LIMIT_OFFSET_DifferentOrders) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     c("SELECT i,d FROM tdata ORDER BY d DESC NULLS LAST LIMIT 5 OFFSET 11;",
       "SELECT i,d FROM tdata ORDER BY d DESC LIMIT 5 OFFSET 11;",
       dt);

@@ -140,6 +140,7 @@ set(TEST_ARGS "--gtest_output=xml:../")
 add_test(UtilTest UtilTest ${TEST_ARGS})
 add_test(ArrowBasedExecuteTest ArrowBasedExecuteTest ${TEST_ARGS})
 add_test(NAME ArrowBasedExecuteTestColumnarOutput COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--enable-columnar-output")
+add_test(NAME ArrowBasedExeucteTestCpuOnly COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--cpu-only")
 add_test(CodeGeneratorTest CodeGeneratorTest ${TEST_ARGS})
 add_test(ResultSetTest ResultSetTest ${TEST_ARGS})
 add_test(ColumnarResultsTest ColumnarResultsTest ${TEST_ARGS})
@@ -271,6 +272,13 @@ add_custom_target(sanity_tests
     COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
     COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex sanity ${EXCLUDE_SANITY_TESTS}
+    DEPENDS ${TEST_PROGRAMS}
+    USES_TERMINAL)
+
+add_custom_target(sanity_cpu_only_tests
+    COMMAND ${MKDIR_TMP}
+    COMMAND touch tmp/DictPayload
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex sanity_cpu ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS}
     USES_TERMINAL)
 

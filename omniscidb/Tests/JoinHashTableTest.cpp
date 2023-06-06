@@ -17,7 +17,6 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
 
-#include "CudaMgr/CudaMgr.h"
 #include "DataMgr/DataMgr.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
@@ -43,26 +42,11 @@ namespace {
 ExecutorDeviceType g_device_type;
 }
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 int deviceCount(const ExecutorDeviceType device_type) {
   if (device_type == ExecutorDeviceType::GPU) {
-    const auto cuda_mgr = getDataMgr()->getCudaMgr();
-    CHECK(cuda_mgr);
-    return cuda_mgr->getDeviceCount();
+    const auto gpu_mgr = getDataMgr()->getGpuMgr();
+    CHECK(gpu_mgr);
+    return gpu_mgr->getDeviceCount();
   } else {
     return 1;
   }
@@ -148,8 +132,7 @@ std::pair<std::string, std::shared_ptr<HashJoin>> checkProperQualDetection(
 TEST(Build, PerfectOneToOne1) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -187,8 +170,7 @@ TEST(Build, PerfectOneToOne1) {
 TEST(Build, PerfectOneToOne2) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -224,8 +206,7 @@ TEST(Build, PerfectOneToOne2) {
 TEST(Build, PerfectOneToMany1) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -256,8 +237,7 @@ TEST(Build, PerfectOneToMany1) {
 TEST(Build, PerfectOneToMany2) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -291,8 +271,7 @@ TEST(Build, detectProperJoinQual) {
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -378,8 +357,7 @@ TEST(Build, KeyedOneToOne) {
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -423,8 +401,7 @@ TEST(Build, KeyedOneToMany) {
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -466,8 +443,7 @@ TEST(Build, KeyedOneToMany) {
 TEST(MultiFragment, PerfectOneToOne) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -505,8 +481,7 @@ TEST(MultiFragment, PerfectOneToOne) {
 TEST(MultiFragment, PerfectOneToMany) {
   auto executor = Executor::getExecutor(getDataMgr());
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -548,8 +523,7 @@ TEST(MultiFragment, KeyedOneToOne) {
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();
@@ -614,8 +588,7 @@ TEST(MultiFragment, KeyedOneToMany) {
   auto storage = getStorage();
   executor->setSchemaProvider(storage);
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     g_device_type = dt;
 
     JoinHashTableCacheInvalidator::invalidateCaches();

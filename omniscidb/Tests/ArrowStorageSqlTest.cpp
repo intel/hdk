@@ -38,8 +38,13 @@ std::string getFilePath(const std::string& file_name) {
 
 ExecutionResult runSqlQuery(const std::string& sql,
                             ExecutorDeviceType dt = ExecutorDeviceType::CPU) {
+  CompilationOptions co =
+      (dt == ExecutorDeviceType::GPU)
+          ? CompilationOptions::defaults(
+                dt, getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0)
+          : CompilationOptions::defaults(dt);
   return TestHelpers::ArrowSQLRunner::runSqlQuery(
-      sql, CompilationOptions::defaults(dt), ExecutionOptions::fromConfig(config()));
+      sql, co, ExecutionOptions::fromConfig(config()));
 }
 
 }  // anonymous namespace
@@ -188,24 +193,8 @@ class ArrowStorageTaxiTest : public ::testing::Test {
   }
 };
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#if defined(HAVE_CUDA) || defined(HAVE_L0)
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 TEST_F(ArrowStorageTaxiTest, TaxiQuery1) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     auto res = runSqlQuery("SELECT cab_type, count(*) FROM trips GROUP BY cab_type;", dt);
     compare_res_data(
         res, std::vector<std::string>({"green"s}), std::vector<int32_t>({20}));
@@ -213,8 +202,7 @@ TEST_F(ArrowStorageTaxiTest, TaxiQuery1) {
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery2) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     auto res = runSqlQuery(
         "SELECT passenger_count, AVG(total_amount) FROM trips GROUP BY passenger_count "
         "ORDER BY passenger_count;",
@@ -226,8 +214,7 @@ TEST_F(ArrowStorageTaxiTest, TaxiQuery2) {
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery3) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     auto res = runSqlQuery(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "count(*) FROM trips GROUP BY passenger_count, pickup_year ORDER BY "
@@ -241,8 +228,7 @@ TEST_F(ArrowStorageTaxiTest, TaxiQuery3) {
 }
 
 TEST_F(ArrowStorageTaxiTest, TaxiQuery4) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     auto res = runSqlQuery(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP "
@@ -262,6 +248,8 @@ int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
 
   init();
+  config().exec.heterogeneous.allow_cpu_retry = false;
+  config().exec.heterogeneous.allow_query_step_cpu_retry = false;
 
   int err{0};
   try {
