@@ -11203,7 +11203,8 @@ TEST_F(Select, PuntToCPU) {
       };
 
   const auto dt = ExecutorDeviceType::GPU;
-  if (skip_tests(dt)) {
+  if (std::find(testedDevices().begin(), testedDevices().end(), dt) ==
+      testedDevices().end()) {
     return;
   }
 
@@ -11236,7 +11237,8 @@ TEST_F(Select, PuntQueryStepToCPU) {
       };
 
   const auto dt = ExecutorDeviceType::GPU;
-  if (skip_tests(dt)) {
+  if (std::find(testedDevices().begin(), testedDevices().end(), dt) ==
+      testedDevices().end()) {
     return;
   }
 
