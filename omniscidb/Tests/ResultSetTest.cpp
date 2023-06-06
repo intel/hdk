@@ -2967,6 +2967,8 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
   // we trigger parallel columnarize conversion for SELECT query
   // so, the purpose of this test is to check
   // whether the large columnar conversion is done correctly
+  config().exec.heterogeneous.allow_cpu_retry = true;
+  config().exec.heterogeneous.allow_query_step_cpu_retry = true;
 
   // load 50M rows - single-frag
   createTable(
@@ -3012,6 +3014,8 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
     const auto crt_row2 = res2.get()->getNextRow(false, false);
     EXPECT_EQ(answer, v<int64_t>(crt_row1[0]));
   }
+  config().exec.heterogeneous.allow_cpu_retry = true;
+  config().exec.heterogeneous.allow_query_step_cpu_retry = true;
 }
 
 TEST(Util, ReinterpretBits) {
@@ -3091,14 +3095,36 @@ TEST(Util, PairToDouble) {
 }
 
 int main(int argc, char** argv) {
+  auto config = std::make_shared<Config>();
   g_is_test_env = true;
 
-  TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
+  namespace po = boost::program_options;
 
-  init();
-  config().exec.heterogeneous.allow_cpu_retry = false;
-  config().exec.heterogeneous.allow_query_step_cpu_retry = false;
+  po::options_description desc("Options");
+
+  // these two are here to allow passing correctly google testing parameters
+  desc.add_options()("gtest_list_tests", "list all test");
+  desc.add_options()("gtest_filter", "filters tests, use --help for details");
+
+  desc.add_options()("cpu-only",
+                     po::value<bool>(&config->exec.cpu_only)
+                         ->default_value(config->exec.cpu_only)
+                         ->implicit_value(true));
+
+  logger::LogOptions log_options(argv[0]);
+  log_options.severity_ = logger::Severity::FATAL;
+  log_options.set_options();  // update default values
+  desc.add(log_options.get_options());
+
+  po::variables_map vm;
+  po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+  po::notify(vm);
+
+  logger::init(log_options);
+  config->exec.heterogeneous.allow_cpu_retry = false;
+  config->exec.heterogeneous.allow_query_step_cpu_retry = false;
+  init(config);
 
   g_data_provider = std::make_shared<DataMgrDataProvider>(getDataMgr());
 
