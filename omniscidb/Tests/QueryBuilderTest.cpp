@@ -5302,6 +5302,25 @@ TEST_F(Issue355, Reproducer) {
   compare_res_data(res, std::vector<int64_t>({1}), std::vector<int64_t>({12}));
 }
 
+class Issue513 : public TestSuite {
+ protected:
+  static void SetUpTestSuite() {
+    createTable("test_513", {{"A", ctx().int64()}});
+    insertCsvValues("test_513", "1\n2\n3");
+  }
+
+  static void TearDownTestSuite() { dropTable("test_513"); }
+};
+
+TEST_F(Issue513, Reproducer) {
+  QueryBuilder builder(ctx(), getStorage(), configPtr());
+  auto scan = builder.scan("test_513");
+  auto proj = scan.proj(scan.ref("A").isNull());
+  auto dag = proj.agg(std::vector<std::string>(), {proj.ref(0).count()}).finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res, std::vector<int32_t>({3}));
+}
+
 TEST_F(QueryBuilderTest, RunOnResult) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
 
