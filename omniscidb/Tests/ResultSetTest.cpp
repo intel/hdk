@@ -48,21 +48,6 @@ std::shared_ptr<DataMgrDataProvider> g_data_provider;
 
 EXTERN extern bool g_is_test_env;
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 TEST(Construct, Allocate) {
   std::vector<TargetInfo> target_infos;
   QueryMemoryDescriptor query_mem_desc;
@@ -3006,9 +2991,7 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
 
   int64_t answer = 9999999;
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     // single-frag test
     std::shared_ptr<ResultSet> res1 = run_multiple_agg(
         "SELECT COUNT(1) FROM (SELECT x FROM t_large WHERE x < 2) t, t_small r where t.x "
@@ -3114,6 +3097,8 @@ int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
 
   init();
+  config().exec.heterogeneous.allow_cpu_retry = false;
+  config().exec.heterogeneous.allow_query_step_cpu_retry = false;
 
   g_data_provider = std::make_shared<DataMgrDataProvider>(getDataMgr());
 

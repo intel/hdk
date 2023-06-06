@@ -45,21 +45,6 @@ using namespace TestHelpers::ArrowSQLRunner;
 const int kNoMatch = -1;
 const int kNotPresent = -2;
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
-
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 namespace {
 
 size_t getNumberOfCachedPerfectHashTables() {
@@ -610,9 +595,7 @@ TEST(Select, DropAndReCreate_OneToMany_HashTable_WithReversedTupleInsertion) {
 }
 
 TEST(Truncate, JoinCacheInvalidationTest) {
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     dropTable("cache_invalid_t1");
     createTable("cache_invalid_t1", {{"k1", ctx().extDict(ctx().text(), 0)}});
     insertCsvValues("cache_invalid_t1", "1\n2\n3\n4\n5");
@@ -648,9 +631,7 @@ TEST(Truncate, JoinCacheInvalidationTest) {
 TEST(Delete, JoinCacheInvalidationTest_DropTable) {
   // todo: when we support per-table cached hashtable invalidation,
   // then this test should be changed either
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
-
+  for (auto dt : testedDevices()) {
     dropTable("cache_invalid_t1");
     createTable("cache_invalid_t1", {{"k1", ctx().extDict(ctx().text(), 0)}});
     insertCsvValues("cache_invalid_t1", "1\n2\n3\n4\n5");

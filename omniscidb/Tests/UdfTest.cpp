@@ -38,13 +38,6 @@
 using namespace TestHelpers;
 using namespace TestHelpers::ArrowSQLRunner;
 
-#define SKIP_NO_GPU()                                        \
-  if (skip_tests(dt)) {                                      \
-    CHECK(dt == ExecutorDeviceType::GPU);                    \
-    LOG(WARNING) << "GPU not available, skipping GPU tests"; \
-    continue;                                                \
-  }
-
 namespace {
 
 std::string udf_file_name_base("../../Tests/Udf/udf_sample");
@@ -65,13 +58,6 @@ std::string get_udf_ast_filename() {
   return udf_file_name_base + ".ast";
 }
 
-bool skip_tests(const ExecutorDeviceType device_type) {
-#ifdef HAVE_CUDA
-  return device_type == ExecutorDeviceType::GPU && !gpusPresent();
-#else
-  return device_type == ExecutorDeviceType::GPU;
-#endif
-}
 
 CudaMgr_Namespace::NvidiaDeviceArch init_nvidia_device_arch() {
 #ifdef HAVE_CUDA
@@ -245,8 +231,7 @@ TEST_F(UDFCompilerTest, UdfQuery) {
       "{\"name\": \"Jim\", \"pay_by_quarter\": null}\n"
       "{\"name\": \"Carla\", \"pay_by_quarter\": [7000, null, null, 9000]}\n");
 
-  for (auto dt : {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU}) {
-    SKIP_NO_GPU();
+  for (auto dt : testedDevices()) {
     ASSERT_EQ(7,
               v<int64_t>(run_simple_agg("SELECT udf_range_int(high_p, low_p) from stocks "
                                         "where entry_d = '2019-05-06';",

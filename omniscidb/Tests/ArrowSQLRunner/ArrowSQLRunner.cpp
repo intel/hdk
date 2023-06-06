@@ -389,6 +389,13 @@ bool gpusPresent() {
   return ArrowSQLRunnerImpl::get()->gpusPresent();
 }
 
+std::vector<ExecutorDeviceType> testedDevices() {
+  return (gpusPresent() && !config().exec.cpu_only)
+             ? std::vector<ExecutorDeviceType>{ExecutorDeviceType::CPU,
+                                               ExecutorDeviceType::GPU}
+             : std::vector<ExecutorDeviceType>{ExecutorDeviceType::CPU};
+}
+
 void printStats() {
   return ArrowSQLRunnerImpl::get()->printStats();
 }

@@ -47,6 +47,8 @@ bool gpusPresent();
 
 void printStats();
 
+std::vector<ExecutorDeviceType> testedDevices();
+
 void createTable(
     const std::string& table_name,
     const std::vector<ArrowStorage::ColumnDescription>& columns,
