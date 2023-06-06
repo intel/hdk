@@ -730,6 +730,11 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
     }
   }
   if (need_conversion) {
+    // Boolean values can be represented as a i1 LLVM values and cannot be NULLs.
+    if (target->getType()->isIntegerTy(1)) {
+      return executor_->cgen_state_->castToTypeIn(target_to_cast, chosen_bytes << 3);
+    }
+
     auto cmp = arg_type->isFloatingPoint() ? LL_BUILDER.CreateFCmpOEQ(target, arg_null)
                                            : LL_BUILDER.CreateICmpEQ(target, arg_null);
     return LL_BUILDER.CreateSelect(
