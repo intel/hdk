@@ -26,7 +26,7 @@ jobs:
       options: -DENABLE_CUDA=on
 
   clang-build:
-    name: Clang Build
+    name: Build (Clang)
     uses: ./.github/workflows/build.yml
     with:
       name: clang
