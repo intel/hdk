@@ -62,6 +62,15 @@ jobs:
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: sanity
+
+  sanity-cpu:
+    name: CPU-only Sanity tests (Gtests)
+    needs: build-l0
+    uses: ./.github/workflows/test.yml
+    with:
+      name: l0
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: sanity_cpu
       
   sanity-clang:
     name: Sanity test (Gtests, Clang)
