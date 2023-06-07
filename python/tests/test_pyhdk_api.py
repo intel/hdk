@@ -10,20 +10,8 @@ import pandas
 import pytest
 import pyhdk
 import numpy as np
-from dataclasses import dataclass
 
 from helpers import check_schema, check_res
-
-
-@dataclass
-class ExecutionConfig:
-    enable_heterogeneous: bool
-    device_type: str
-
-
-cpu_cfg = ExecutionConfig(False, "CPU")
-gpu_cfg = ExecutionConfig(False, "GPU")
-het_cfg = ExecutionConfig(True, "AUTO")
 
 
 class BaseTest:
@@ -164,7 +152,6 @@ class TestImport(BaseTest):
         hdk.drop_table(table_name)
 
 
-@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
 class TestBuilder(BaseTest):
     def test_scan(self, exe_cfg):
         hdk = pyhdk.init()
@@ -1137,7 +1124,6 @@ class TestBuilder(BaseTest):
         check_res(res, {"a_last_value": [1, 2, 3, 4, 5]})
 
 
-@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):
         hdk = pyhdk.init()
@@ -1219,7 +1205,6 @@ class TestSql(BaseTest):
         check_res(res3, {"b": [4, 3, 2, 1, 0], "a": [2, 3, 4, 5, 6]})
 
 
-@pytest.mark.parametrize("exe_cfg", [cpu_cfg, gpu_cfg])
 class BaseTaxiTest:
     @staticmethod
     def check_taxi_q1_res(res):
