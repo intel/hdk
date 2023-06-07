@@ -3,11 +3,14 @@
 usage() { echo "Usage: $0 [-s (skip large buffers)]" 1>&2; exit 1; }
 
 TEST_FLAGS=''
+CPU_ONLY=0
 
-while getopts "s" o; do
+while getopts "sc" o; do
     case "${o}" in
         s)
             TEST_FLAGS='SKIP_LARGE_BUFFERS=true'
+            ;;
+        c)  CPU_ONLY=1
             ;;
         *)
             usage
@@ -31,5 +34,8 @@ export CPLUS_INCLUDE_PATH=$(get_cxx_include_path)
 
 cd ../../../build
 
-make sanity_tests
-
+if [[ $CPU_ONLY -eq 1 ]]; then
+    make sanity_cpu_only_tests
+else
+    make sanity_tests
+fi

@@ -71,6 +71,12 @@ jobs:
         run: |
           conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh -s 
 
+      - name: Run sanity tests
+        if: inputs.test == 'sanity_cpu'
+        # skip large buffer tests due to limited memory on ghrunnners instances
+        run: |
+          conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh -s -c
+
       - name: Run ASAN test
         if: inputs.test == 'asan'
         run: |

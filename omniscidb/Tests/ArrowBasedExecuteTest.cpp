@@ -11203,11 +11203,10 @@ TEST_F(Select, PuntToCPU) {
       };
 
   const auto dt = ExecutorDeviceType::GPU;
-  if (std::find(testedDevices().begin(), testedDevices().end(), dt) ==
-      testedDevices().end()) {
+  auto devices = testedDevices();
+  if (std::find(devices.begin(), devices.end(), dt) == devices.end()) {
     return;
   }
-
   config().mem.gpu.input_mem_limit_percent = 1e-10;
   EXPECT_THROW(run_multiple_agg("SELECT x, COUNT(*) FROM test GROUP BY x;", dt),
                std::runtime_error);
@@ -11237,8 +11236,8 @@ TEST_F(Select, PuntQueryStepToCPU) {
       };
 
   const auto dt = ExecutorDeviceType::GPU;
-  if (std::find(testedDevices().begin(), testedDevices().end(), dt) ==
-      testedDevices().end()) {
+  auto devices = testedDevices();
+  if (std::find(devices.begin(), devices.end(), dt) == devices.end()) {
     return;
   }
 
