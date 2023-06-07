@@ -390,7 +390,7 @@ bool gpusPresent() {
 }
 
 std::vector<ExecutorDeviceType> testedDevices() {
-  return (gpusPresent() && !config().exec.cpu_only)
+  return (!config().exec.cpu_only && gpusPresent())
              ? std::vector<ExecutorDeviceType>{ExecutorDeviceType::CPU,
                                                ExecutorDeviceType::GPU}
              : std::vector<ExecutorDeviceType>{ExecutorDeviceType::CPU};
