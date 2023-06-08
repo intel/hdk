@@ -169,9 +169,9 @@ add_test(ExecutionSequenceTest ExecutionSequenceTest ${TEST_ARGS})
 add_test(QueryBuilderTest QueryBuilderTest ${TEST_ARGS})
 
 add_test(NAME ArrowBasedExecuteTestColumnarOutputCpuOnly COMMAND ArrowBasedExecuteTest ${TEST_ARGS} "--enable-columnar-output")
-set_tests_properties(ArrowBasedExecuteTestColumnarOutputCpuOnly PROPERTIES LABELS "sanity_cpu")
+set_tests_properties(ArrowBasedExecuteTestColumnarOutputCpuOnly PROPERTIES LABELS "cpu_only")
 add_test(NAME StringDictionaryHashTestCpuOnly COMMAND StringDictionaryTest ${TEST_ARGS} "--enable-string-dict-hash-cache")
-set_tests_properties(StringDictionaryHashTestCpuOnly PROPERTIES LABELS "sanity_cpu")
+set_tests_properties(StringDictionaryHashTestCpuOnly PROPERTIES LABELS "cpu_only")
 
 if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
@@ -239,7 +239,7 @@ endif()
 function(add_default_cpu_only_tests TEST_LIST)
   foreach(t ${TEST_LIST})
     add_test("${t}CpuOnly" ${t} ${TEST_ARGS} "--cpu-only")
-    set_tests_properties("${t}CpuOnly" PROPERTIES LABELS "sanity_cpu")
+    set_tests_properties("${t}CpuOnly" PROPERTIES LABELS "cpu_only")
   endforeach()
 endfunction()
 add_default_cpu_only_tests("${TEST_PROGRAMS}")
@@ -291,7 +291,7 @@ add_custom_target(sanity_tests
 add_custom_target(sanity_cpu_only_tests
     COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
-    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex sanity_cpu ${EXCLUDE_SANITY_TESTS}
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex cpu_only ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS}
     USES_TERMINAL)
 
