@@ -70,6 +70,10 @@ void parse_cli_args(int argc, char* argv[], ConfigPtr config) {
                      po::value<bool>(&config->rs.enable_columnar_output)
                          ->default_value(config->rs.enable_columnar_output),
                      "Enable columnar_output");
+  desc.add_options()("cpu-only",
+                     po::value<bool>(&config->exec.cpu_only)
+                         ->default_value(config->exec.cpu_only)
+                         ->implicit_value(true));
 
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;

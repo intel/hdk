@@ -111,6 +111,7 @@ class NoCatalogSqlTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
     config_ = std::make_shared<Config>();
+    config_->exec.cpu_only = true;
 
     schema_provider_ = std::make_shared<TestSchemaProvider>();
 
@@ -264,6 +265,7 @@ TEST_F(NoCatalogSqlTest, MultipleCalciteMultipleThreads) {
 TEST(CalciteReinitTest, SingleThread) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
+  config->exec.cpu_only = true;
   for (int i = 0; i < 10; ++i) {
     auto calcite = CalciteMgr::get();
     auto query_ra =
@@ -275,6 +277,7 @@ TEST(CalciteReinitTest, SingleThread) {
 TEST(CalciteReinitTest, MultipleThreads) {
   auto schema_provider = std::make_shared<TestSchemaProvider>();
   auto config = std::make_shared<Config>();
+  config->exec.cpu_only = true;
   for (int i = 0; i < 10; ++i) {
     auto f = std::async(std::launch::async, [schema_provider, config]() {
       auto calcite = CalciteMgr::get();
@@ -296,6 +299,7 @@ void parse_cli_args_to_globals(int argc, char* argv[]) {
   desc.add_options()("use-groupby-buffer-desc",
                      po::bool_switch()->default_value(false),
                      "Use GroupBy Buffer Descriptor for hash tables.");
+  desc.add_options()("cpu-only", "ignored option");
 
   po::variables_map vm;
 

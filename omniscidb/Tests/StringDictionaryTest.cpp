@@ -874,6 +874,7 @@ int main(int argc, char** argv) {
           ->default_value(g_cache_string_hash)
           ->implicit_value(true),
       "Cache string hash values in the string dictionary server during import.");
+  desc.add_options()("cpu-only", "ignored option");
 
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
