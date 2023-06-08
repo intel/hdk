@@ -29,7 +29,6 @@ class BaseTest:
 class TestImport(BaseTest):
     def test_create_table(self):
         hdk = pyhdk.init()
-        pyhdk.initLogger(debug_logs=True)
 
         ht = hdk.create_table("test1", [("a", "int"), ("b", hdk.type("fp"))])
         check_schema(ht.schema, {"a": "INT64", "b": "FP64"})
