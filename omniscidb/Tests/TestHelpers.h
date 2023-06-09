@@ -25,6 +25,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 #include <boost/variant.hpp>
+#include "Shared/ConfigOptions.h"
 
 namespace TestHelpers {
 

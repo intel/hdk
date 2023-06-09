@@ -1,42 +1,24 @@
 /*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Copyright (C) 2023 Intel Corporation
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "ConfigBuilder.h"
 #include "Shared/ConfigOptions.h"
 
-#include "Logger/Logger.h"
-
-#include "Logger/Logger.h"
-
-#include <boost/crc.hpp>
-#include <boost/program_options.hpp>
-
-#include <iostream>
-
-namespace po = boost::program_options;
-
-ConfigBuilder::ConfigBuilder() {
-  config_ = std::make_shared<Config>();
+template <typename T>
+auto get_option_range_checker(T min, T max, const char* opt) {
+  return [min, max, opt](T val) {
+    if (val < min || val > max) {
+      throw po::validation_error(
+          po::validation_error::invalid_option_value, opt, std::to_string(val));
+    }
+  };
 }
 
-ConfigBuilder::ConfigBuilder(ConfigPtr config) : config_(config) {}
-
-bool ConfigBuilder::parseCommandLineArgs(int argc,
-                                         char const* const* argv,
-                                         bool allow_gtest_flags) {
+po::options_description get_config_builder_options(bool allow_gtest_flags,
+                                                   ConfigPtr config_) {
   po::options_description opt_desc;
-
   opt_desc.add_options()("help,h", "Show available options.");
 
   // exec.watchdog
@@ -141,23 +123,18 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->implicit_value(true),
       "Enable using GPU shared memory for grouped non-count aggregate queries.");
   opt_desc.add_options()(
-      "enable-cpu-groupby-multifrag-kernels",
-      po::value<bool>(&config_->exec.group_by.enable_cpu_multifrag_kernels)
-          ->default_value(config_->exec.group_by.enable_cpu_multifrag_kernels)
-          ->implicit_value(true),
-      "Enable multifragment kernels for groupby queries on CPU.");
-  opt_desc.add_options()(
       "gpu-shared-mem-threshold",
       po::value<size_t>(&config_->exec.group_by.gpu_smem_threshold)
           ->default_value(config_->exec.group_by.gpu_smem_threshold),
       "GPU shared memory threshold (in bytes). If query requires larger buffers than "
       "this threshold, we disable those optimizations. 0 means no static cap.");
-  opt_desc.add_options()("hll-precision-bits",
-                         po::value<unsigned>(&config_->exec.group_by.hll_precision_bits)
-                             ->default_value(config_->exec.group_by.hll_precision_bits)
-                             ->notifier(get_range_checker(1U, 16U, "hll-precision-bits")),
-                         "Number of bits in range [1, 16] used from the hash value used "
-                         "to specify the bucket number.");
+  opt_desc.add_options()(
+      "hll-precision-bits",
+      po::value<unsigned>(&config_->exec.group_by.hll_precision_bits)
+          ->default_value(config_->exec.group_by.hll_precision_bits)
+          ->notifier(get_option_range_checker(1U, 16U, "hll-precision-bits")),
+      "Number of bits in range [1, 16] used from the hash value used "
+      "to specify the bucket number.");
   opt_desc.add_options()(
       "groupby-baseline-threshold",
       po::value<size_t>(&config_->exec.group_by.baseline_threshold)
@@ -303,6 +280,12 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       "Enable the filter function protection feature for the SQL JIT compiler. "
       "Normally should be on but techs might want to disable for troubleshooting.");
 
+  opt_desc.add_options()(
+      "dump-after-all",
+      po::value<bool>(&config_->exec.codegen.dump_after_all)
+          ->default_value(config_->exec.codegen.dump_after_all)
+          ->implicit_value(false),
+      "Dump LLVM IR before optimizations and after each optimization step. ");
   // exec
   opt_desc.add_options()("streaming-top-n-max",
                          po::value<size_t>(&config_->exec.streaming_topn_max)
@@ -351,16 +334,6 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->exec.cpu_only)
                              ->implicit_value(true),
                          "Run on CPU only, even if GPUs are available.");
-  opt_desc.add_options()("initialize-with-gpu-vendor",
-                         po::value<std::string>(&config_->exec.initialize_with_gpu_vendor)
-                             ->default_value(config_->exec.initialize_with_gpu_vendor),
-                         "GPU vendor to use for Data Manager initialization. Valid "
-                         "values are \"intel\" and \"nvidia\".");
-
-  opt_desc.add_options()(
-      "use-cost-model",
-      po::value<bool>(&config_->exec.enable_cost_model)->default_value(false),
-      "Use Cost Model for query execution when it is possible.");
 
   // opts.filter_pushdown
   opt_desc.add_options()("enable-filter-push-down",
@@ -478,7 +451,7 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       "gpu-input-mem-limit",
       po::value<double>(&config_->mem.gpu.input_mem_limit_percent)
           ->default_value(config_->mem.gpu.input_mem_limit_percent)
-          ->notifier(get_range_checker(0.01, 0.99, "gpu-input-mem-limit")),
+          ->notifier(get_option_range_checker(0.01, 0.99, "gpu-input-mem-limit")),
       "Max part of GPU memory that can be used for input data. Must be in range [0.01, "
       "0.99].");
   opt_desc.add_options()(
@@ -568,47 +541,5 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
     opt_desc.add_options()("gtest_list_tests", "list all test");
     opt_desc.add_options()("gtest_filter", "filters tests, use --help for details");
   }
-
-  // Right now we setup logging independently. Until it's fixed, simply ignore logger
-  // options here.
-  logger::LogOptions log_opts("dummy_opts");
-  log_opts.set_options();
-
-  po::options_description all_opts;
-  all_opts.add(opt_desc).add(log_opts.get_options());
-
-  po::options_description opt_desc =
-      get_config_builder_options(allow_gtest_flags, config_);
-  po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv).options(all_opts).run(), vm);
-  po::notify(vm);
-
-  if (vm.count("help")) {
-    std::cout << all_opts << std::endl;
-    return true;
-  }
-
-  return false;
-}
-
-bool ConfigBuilder::parseCommandLineArgs(const std::string& app_name,
-                                         const std::string& cmd_args,
-                                         bool allow_gtest_flags) {
-  std::vector<std::string> args;
-  if (!cmd_args.empty()) {
-    args = po::split_unix(cmd_args);
-  }
-
-  // Generate command line to  CommandLineOptions for DBHandler
-  std::vector<const char*> argv;
-  argv.push_back(app_name.c_str());
-  for (auto& arg : args) {
-    argv.push_back(arg.c_str());
-  }
-  return parseCommandLineArgs(
-      static_cast<int>(argv.size()), argv.data(), allow_gtest_flags);
-}
-
-ConfigPtr ConfigBuilder::config() {
-  return config_;
+  return opt_desc;
 }

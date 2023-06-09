@@ -1495,6 +1495,7 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   CompilationOptions co_codegen_traits = co;
   co_codegen_traits.codegen_traits_desc = backend->traitsDesc();
+  co_codegen_traits.dump_after_all = config_->exec.codegen.dump_after_all;
 
   if (is_gpu) {
     cgen_state_->module_->setDataLayout(traits.dataLayout());

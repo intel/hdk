@@ -6,6 +6,7 @@
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "ArrowSQLRunner/SQLiteComparator.h"
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "TestHelpers.h"
 
 #include <gtest/gtest.h>
@@ -990,7 +991,7 @@ TEST_F(FallbackTest, PowerCorr) {
 }
 
 int main(int argc, char* argv[]) {
-  auto config = std::make_shared<Config>();
+  ConfigBuilder builder;
   testing::InitGoogleTest(&argc, argv);
 
   namespace po = boost::program_options;
@@ -1004,8 +1005,8 @@ int main(int argc, char* argv[]) {
   logger::LogOptions log_options(argv[0]);
   log_options.severity_ = logger::Severity::FATAL;
   log_options.set_options();
-  desc.add(log_options.get_options());
-
+  desc.add(log_options.get_options())
+      .add(get_config_builder_options(false, builder.config()));
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
   po::notify(vm);
@@ -1017,7 +1018,7 @@ int main(int argc, char* argv[]) {
   }
 
   logger::init(log_options);
-
+  auto config = builder.config();
   config->exec.heterogeneous.allow_query_step_cpu_retry = false;
   config->exec.heterogeneous.allow_cpu_retry = false;
 

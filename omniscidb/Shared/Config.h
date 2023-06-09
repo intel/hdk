@@ -83,6 +83,7 @@ struct CodegenConfig {
   bool null_mod_by_zero = false;
   bool hoist_literals = true;
   bool enable_filter_function = true;
+  bool dump_after_all;
 };
 
 struct ExecutionConfig {

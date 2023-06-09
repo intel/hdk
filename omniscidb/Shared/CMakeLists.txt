@@ -1,4 +1,5 @@
 set(shared_source_files
+    ConfigOptions.cpp
     StringTransform.cpp
     DateTimeParser.cpp
     StackTrace.cpp
