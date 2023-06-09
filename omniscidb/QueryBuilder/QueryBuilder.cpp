@@ -911,7 +911,8 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
       return {builder_, expr_->cast(new_type), "", true};
     }
   } else if (expr_->type()->isDate()) {
-    if (new_type->isDate() || new_type->isTimestamp()) {
+    LOG(ERROR) << "Conversion date: " << expr_->type() << " new_type: " << new_type;
+    if (new_type->isInteger() || new_type->isDate() || new_type->isTimestamp()) {
       return {builder_, expr_->cast(new_type), "", true};
     }
   } else if (expr_->type()->isTime()) {
@@ -919,7 +920,7 @@ BuilderExpr BuilderExpr::cast(const Type* new_type) const {
       return {builder_, expr_->cast(new_type), "", true};
     }
   } else if (expr_->type()->isTimestamp()) {
-    if (new_type->isNumber() || new_type->isDate() || new_type->isTimestamp()) {
+    if (new_type->isInteger() || new_type->isDate() || new_type->isTimestamp()) {
       return {builder_, expr_->cast(new_type), "", true};
     }
   }

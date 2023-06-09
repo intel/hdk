@@ -94,6 +94,7 @@ std::pair<Datum, bool> datum_from_scalar_tv(const ScalarTargetValue* scalar_tv,
     case hdk::ir::Type::kTimestamp: {
       const auto ival = boost::get<int64_t>(scalar_tv);
       CHECK(ival);
+      LOG(ERROR) << "translator: " << type->toString() << " scalar val: " << scalar_tv;
       if (*ival == inline_int_null_value(type)) {
         is_null_const = true;
       } else {

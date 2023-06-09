@@ -142,6 +142,8 @@ const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
   auto& ctx = left_type->ctx();
   const hdk::ir::Type* result_type;
   const hdk::ir::Type* common_type;
+  LOG(ERROR) << "analyze_type_info - left type: " << left_type->toString()
+             << " right: " << right_type->toString();
   *new_left_type = left_type;
   *new_right_type = right_type;
   if (hdk::ir::isLogic(op)) {
@@ -306,6 +308,8 @@ const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
   } else {
     throw std::runtime_error("invalid binary operator type.");
   }
+  LOG(ERROR) << "new left: " << (*new_left_type)->toString()
+             << " right: " << (*new_right_type)->toString();
   result_type =
       result_type->withNullable(left_type->nullable() || right_type->nullable());
   return result_type;

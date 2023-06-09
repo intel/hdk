@@ -28,6 +28,7 @@ namespace {
 
 const hdk::ir::Type* type_from_arrow_field(hdk::ir::Context& ctx,
                                            const arrow::Field& field) {
+  LOG(ERROR) << "type_from_arrow called: " << field.type()->ToString();
   switch (field.type()->id()) {
     case arrow::Type::INT8:
       return ctx.int8(field.nullable());

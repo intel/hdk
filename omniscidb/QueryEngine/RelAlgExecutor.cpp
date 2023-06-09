@@ -218,6 +218,20 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
   executor_->setupCaching(data_provider_, col_descs, phys_table_ids);
 
   ScopeGuard restore_metainfo_cache = [this] { executor_->clearMetaInfoCache(); };
+
+  auto schema_provider = executor_->getSchemaProvider();
+  auto dbs = schema_provider->listDatabases();
+  // Current JSON format supports a single database only. To support result
+  // sets in SQL queries, we add tables from the ResultSetRegistry using
+  // negative table ids.
+  auto tables = schema_provider->listTables(dbs[0]);
+  auto more_tables = schema_provider->listTables(dbs[0]);
+  for (auto table : more_tables) {
+    LOG(ERROR) << table->toString();
+    for (auto column : schema_provider->listColumns(dbs[0], table->table_id)) {
+      LOG(ERROR) << column->toString();
+    }
+  }
   hdk::QueryExecutionSequence query_seq(ra, executor_->getConfigPtr());
   if (just_explain_plan) {
     std::stringstream ss;
@@ -260,6 +274,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
   for (auto& subquery : getSubqueries()) {
     auto subquery_ra = subquery->node();
     CHECK(subquery_ra);
+    LOG(ERROR) << "subq node: " << subquery_ra->toString();
     if (subquery_ra->hasContextData()) {
       continue;
     }
@@ -268,6 +283,7 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
     hdk::QueryExecutionSequence subquery_seq(subquery_ra, executor_->getConfigPtr());
     ra_executor.execute(subquery_seq, co, eo, 0);
   }
+  LOG(ERROR) << "seq front: " << query_seq.steps().front()->toString();
 
   auto shared_res = execute(query_seq, co, eo, queue_time_ms);
   return std::move(*shared_res);

@@ -50,6 +50,30 @@ int64_t dateTimeParse(std::string_view const s, hdk::ir::TimeUnit unit) {
   }
 }
 
+namespace {
+
+template <
+    class To,
+    class From,
+    std::enable_if_t<std::is_arithmetic_v<To> && std::is_arithmetic_v<From>, bool> = true>
+To numeric_cast(From v) {
+  auto r = static_cast<To>(v);
+  if (static_cast<From>(r) != v || std::signbit(r) != std::signbit(v))
+    throw std::runtime_error("numeric_cast<>() failed");
+  return r;
+}
+}  // namespace
+
+template <typename R, hdk::ir::Type::Id TYPE>
+R dateTimeParse(std::string_view const s, hdk::ir::TimeUnit unit) {
+  if (auto const time = dateTimeParseOptional<TYPE>(s, unit)) {
+    return numeric_cast<R>(*time);
+  } else {
+    throw std::runtime_error(
+        cat("Invalid date/time (", std::to_string(TYPE), ") string (", s, ')'));
+  }
+}
+
 template <hdk::ir::Type::Id TYPE>
 int64_t dateTimeParse(std::string_view const s, int dim) {
   hdk::ir::TimeUnit unit;
