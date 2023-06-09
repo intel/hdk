@@ -123,6 +123,12 @@ po::options_description get_config_builder_options(bool allow_gtest_flags,
           ->implicit_value(true),
       "Enable using GPU shared memory for grouped non-count aggregate queries.");
   opt_desc.add_options()(
+      "enable-cpu-groupby-multifrag-kernels",
+      po::value<bool>(&config_->exec.group_by.enable_cpu_multifrag_kernels)
+          ->default_value(config_->exec.group_by.enable_cpu_multifrag_kernels)
+          ->implicit_value(true),
+      "Enable multifragment kernels for groupby queries on CPU.");
+  opt_desc.add_options()(
       "gpu-shared-mem-threshold",
       po::value<size_t>(&config_->exec.group_by.gpu_smem_threshold)
           ->default_value(config_->exec.group_by.gpu_smem_threshold),
@@ -334,6 +340,16 @@ po::options_description get_config_builder_options(bool allow_gtest_flags,
                              ->default_value(config_->exec.cpu_only)
                              ->implicit_value(true),
                          "Run on CPU only, even if GPUs are available.");
+  opt_desc.add_options()("initialize-with-gpu-vendor",
+                         po::value<std::string>(&config_->exec.initialize_with_gpu_vendor)
+                             ->default_value(config_->exec.initialize_with_gpu_vendor),
+                         "GPU vendor to use for Data Manager initialization. Valid "
+                         "values are \"intel\" and \"nvidia\".");
+
+  opt_desc.add_options()(
+      "use-cost-model",
+      po::value<bool>(&config_->exec.enable_cost_model)->default_value(false),
+      "Use Cost Model for query execution when it is possible.");
 
   // opts.filter_pushdown
   opt_desc.add_options()("enable-filter-push-down",
