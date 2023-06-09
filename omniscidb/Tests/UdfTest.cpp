@@ -58,7 +58,6 @@ std::string get_udf_ast_filename() {
   return udf_file_name_base + ".ast";
 }
 
-
 CudaMgr_Namespace::NvidiaDeviceArch init_nvidia_device_arch() {
 #ifdef HAVE_CUDA
   auto cuda_mgr = std::make_unique<CudaMgr_Namespace::CudaMgr>(/*num_gpus=*/0);

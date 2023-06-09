@@ -18,6 +18,7 @@
 #include "InExprDetector.h"
 #include "TestHelpers.h"
 
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/CompilationOptions.h"
@@ -1207,8 +1208,9 @@ TEST(DataRecycler, DISABLED_Hashtable_For_Dict_Encoded_Column) {
 int main(int argc, char* argv[]) {
   testing::InitGoogleTest(&argc, argv);
   TestHelpers::init_logger_stderr_only(argc, argv);
-
-  auto config = std::make_shared<Config>();
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
   init(config);
   PerfectJoinHashTable::initCaches(config);

@@ -17,6 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
 
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "DataMgr/DataMgr.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
@@ -672,8 +673,9 @@ TEST(Other, Regression) {
 int main(int argc, char** argv) {
   TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
-
-  auto config = std::make_shared<Config>();
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
   init(config);
   PerfectJoinHashTable::initCaches(config);

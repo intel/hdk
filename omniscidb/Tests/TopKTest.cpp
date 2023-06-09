@@ -16,6 +16,7 @@
  */
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "TestHelpers.h"
 
 #include <gtest/gtest.h>
@@ -426,8 +427,11 @@ TEST(Select, DISABLED_TopK_LIMIT_OFFSET_DifferentOrders) {
 int main(int argc, char* argv[]) {
   TestHelpers::init_logger_stderr_only(argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
-  init();
+  init(config);
 
   int err{0};
 

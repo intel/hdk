@@ -22,6 +22,7 @@
  */
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "ResultSetTestUtils.h"
 #include "Shared/scope.h"
 #include "TestHelpers.h"
@@ -3102,33 +3103,14 @@ TEST(Util, PairToDouble) {
 }
 
 int main(int argc, char** argv) {
-  auto config = std::make_shared<Config>();
   g_is_test_env = true;
 
   testing::InitGoogleTest(&argc, argv);
-  namespace po = boost::program_options;
+  TestHelpers::init_logger_stderr_only(argc, argv);
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
-  po::options_description desc("Options");
-
-  // these two are here to allow passing correctly google testing parameters
-  desc.add_options()("gtest_list_tests", "list all test");
-  desc.add_options()("gtest_filter", "filters tests, use --help for details");
-
-  desc.add_options()("cpu-only",
-                     po::value<bool>(&config->exec.cpu_only)
-                         ->default_value(config->exec.cpu_only)
-                         ->implicit_value(true));
-
-  logger::LogOptions log_options(argv[0]);
-  log_options.severity_ = logger::Severity::FATAL;
-  log_options.set_options();  // update default values
-  desc.add(log_options.get_options());
-
-  po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-  po::notify(vm);
-
-  logger::init(log_options);
   config->exec.heterogeneous.allow_cpu_retry = false;
   config->exec.heterogeneous.allow_query_step_cpu_retry = false;
   init(config);

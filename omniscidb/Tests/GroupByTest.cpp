@@ -17,6 +17,7 @@
 #include "TestHelpers.h"
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
 #include "QueryEngine/CardinalityEstimator.h"
@@ -368,26 +369,13 @@ TEST_F(BigCardinalityThresholdTest, EmptyFilters) {
 }
 
 int main(int argc, char** argv) {
-  auto config = std::make_shared<Config>();
   g_is_test_env = true;
 
   TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
-  namespace po = boost::program_options;
-
-  po::options_description desc("Options");
-
-  logger::LogOptions log_options(argv[0]);
-  log_options.max_files_ = 0;  // stderr only by default
-  desc.add(log_options.get_options());
-  desc.add_options()("cpu-only",
-                     po::value<bool>(&config->exec.cpu_only)
-                         ->default_value(config->exec.cpu_only)
-                         ->implicit_value(true));
-
-  po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-  po::notify(vm);
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
   config->exec.heterogeneous.allow_cpu_retry = false;
   config->exec.heterogeneous.allow_query_step_cpu_retry = false;

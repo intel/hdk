@@ -17,6 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "TestHelpers.h"
 
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "Logger/Logger.h"
 #include "QueryEngine/DataRecycler/HashtableRecycler.h"
 #include "QueryEngine/Execute.h"
@@ -664,8 +665,11 @@ TEST(Delete, JoinCacheInvalidationTest_DropTable) {
 int main(int argc, char** argv) {
   TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
 
-  init();
+  init(config);
 
   int err{0};
 

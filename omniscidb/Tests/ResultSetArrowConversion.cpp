@@ -17,6 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "ArrowTestHelpers.h"
 
+#include "ConfigBuilder/ConfigBuilder.h"
 #include "ResultSet/ArrowResultSet.h"
 #include "Shared/ArrowUtil.h"
 #include "Shared/InlineNullValues.h"
@@ -951,15 +952,15 @@ TEST(ArrowTable, FixedLenArrays) {
 
 int main(int argc, char* argv[]) {
   testing::InitGoogleTest(&argc, argv);
+  TestHelpers::init_logger_stderr_only(argc, argv);
+  ConfigBuilder builder;
+  builder.parseCommandLineArgs(argc, argv, true);
+  auto config = builder.config();
+
+  init(config);
 
   int err{0};
   try {
-    auto config = std::make_shared<Config>();
-
-    parse_cli_args(argc, argv, config);
-
-    init(config);
-
     import_data();
 
     err = RUN_ALL_TESTS();
