@@ -49,6 +49,52 @@ class StringGuardForL0 : public ir::ExprVisitor<void> {
   bool string_present_{false};
 };
 
+class StringDictTransGuardForL0 : public ir::ExprVisitor<ColumnInfo*> {
+ public:
+  bool isStrDictTranslation() { return string_dict_translation_; }
+
+ protected:
+  ColumnInfo* visitColumnVar(const hdk::ir::ColumnVar* col_ref) override {
+    if (col_ref->columnInfo()->type->isExtDictionary() &&
+        col_ref->columnInfo()
+            ->type->as<hdk::ir::ExtDictionaryType>()
+            ->elemType()
+            ->isString()) {
+      return col_ref->columnInfo().get();
+    }
+    return nullptr;
+  }
+
+  const hdk::ir::Node* defaultResult(const hdk::ir::Expr*) { return nullptr; }
+
+  ColumnInfo* visitBinOper(const hdk::ir::BinOper* bin_oper) override {
+    ColumnInfo* left = nullptr;
+    ColumnInfo* right = nullptr;
+    if (auto left_col = bin_oper->leftOperand()->as<hdk::ir::UOper>()) {
+      if (auto left_col_u = left_col->operand()->as<hdk::ir::ColumnVar>()) {
+        left = visitColumnVar(left_col_u);
+      }
+    } else if (auto left_col = bin_oper->leftOperand()->as<hdk::ir::ColumnVar>()) {
+      left = visitColumnVar(left_col);
+    }
+    if (auto right_col = bin_oper->rightOperand()->as<hdk::ir::UOper>()) {
+      if (auto right_col_u = right_col->operand()->as<hdk::ir::ColumnVar>()) {
+        right = visitColumnVar(right_col_u);
+      }
+    } else if (auto right_col = bin_oper->rightOperand()->as<hdk::ir::ColumnVar>()) {
+      right = visitColumnVar(right_col);
+    }
+
+    if (left && right && left != right) {  // If both are dictionaries and are not the
+                                           // same column -> translation
+      string_dict_translation_ = true;
+    }
+    return nullptr;
+  }
+
+ private:
+  bool string_dict_translation_{false};
+};
 class NestLevelRewriter : public ir::ExprRewriter {
  public:
   NestLevelRewriter(std::vector<size_t> permutation)
@@ -451,7 +497,7 @@ void WorkUnitBuilder::processFilter(const ir::Filter* filter) {
       executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
     StringGuardForL0 strConstCollector;
     strConstCollector.visit(filter->getConditionExpr());
-    if (strConstCollector.isStrPresent() && co_.device_type == ExecutorDeviceType::GPU) {
+    if (strConstCollector.isStrPresent()) {
       throw QueryMustRunOnCpu();
     }
   }
@@ -770,6 +816,15 @@ void WorkUnitBuilder::computeInputColDescs() {
     collector.visit(expr.get());
   }
   for (auto& expr : quals_) {
+    if (expr->as<hdk::ir::BinOper>() && co_.device_type == ExecutorDeviceType::GPU &&
+        executor_ && executor_->getDataMgr()->getGpuMgr() &&
+        executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+      StringDictTransGuardForL0 strDictTransGuard;
+      strDictTransGuard.visit(expr.get());
+      if (strDictTransGuard.isStrDictTranslation()) {
+        throw QueryMustRunOnCpu();
+      }
+    }
     collector.visit(expr.get());
   }
   for (auto& expr : groupby_exprs_) {
@@ -788,12 +843,7 @@ void WorkUnitBuilder::computeInputColDescs() {
       executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
     ColumnVarSet non_targets_touch = collector.result();
     for (const auto& col_var : non_targets_touch) {
-      if (col_var.columnInfo()->type->isString() ||
-          (col_var.columnInfo()->type->isExtDictionary() &&
-           col_var.columnInfo()
-               ->type->as<hdk::ir::ExtDictionaryType>()
-               ->elemType()
-               ->isString())) {
+      if (col_var.columnInfo()->type->isString()) {
         throw QueryMustRunOnCpu();
       }
     }
