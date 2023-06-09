@@ -23,6 +23,7 @@
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "ResultSetTestUtils.h"
+#include "Shared/scope.h"
 #include "TestHelpers.h"
 
 #include "DataMgr/DataMgrDataProvider.h"
@@ -2967,6 +2968,14 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
   // we trigger parallel columnarize conversion for SELECT query
   // so, the purpose of this test is to check
   // whether the large columnar conversion is done correctly
+  const auto allow_cpu_retry_state = config().exec.heterogeneous.allow_cpu_retry;
+  const auto allow_query_step_cpu_retry_state =
+      config().exec.heterogeneous.allow_query_step_cpu_retry;
+  ScopeGuard reset = [&] {
+    config().exec.heterogeneous.allow_cpu_retry = allow_cpu_retry_state;
+    config().exec.heterogeneous.allow_query_step_cpu_retry =
+        allow_query_step_cpu_retry_state;
+  };
   config().exec.heterogeneous.allow_cpu_retry = true;
   config().exec.heterogeneous.allow_query_step_cpu_retry = true;
 
@@ -3014,8 +3023,6 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
     const auto crt_row2 = res2.get()->getNextRow(false, false);
     EXPECT_EQ(answer, v<int64_t>(crt_row1[0]));
   }
-  config().exec.heterogeneous.allow_cpu_retry = true;
-  config().exec.heterogeneous.allow_query_step_cpu_retry = true;
 }
 
 TEST(Util, ReinterpretBits) {

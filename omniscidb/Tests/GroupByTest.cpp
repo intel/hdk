@@ -22,6 +22,7 @@
 #include "QueryEngine/CardinalityEstimator.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/InputMetadata.h"
+#include "Shared/scope.h"
 
 #include <boost/filesystem.hpp>
 #include <fstream>
@@ -313,13 +314,16 @@ class LowCardinalityThresholdTest : public ::testing::Test {
 };
 
 TEST_F(LowCardinalityThresholdTest, GroupBy) {
+  const auto allow_cpu_retry_state = config().exec.heterogeneous.allow_cpu_retry;
+  ScopeGuard reset = [&] {
+    config().exec.heterogeneous.allow_cpu_retry = allow_cpu_retry_state;
+  };
   config().exec.heterogeneous.allow_cpu_retry = true;
   for (auto dt : testedDevices()) {
     auto result = run_multiple_agg(
         R"(select fl,ar,dep from low_cardinality group by fl,ar,dep;)", dt);
     EXPECT_EQ(result->rowCount(), config().exec.group_by.big_group_threshold);
   }
-  config().exec.heterogeneous.allow_cpu_retry = false;
 }
 
 class BigCardinalityThresholdTest : public ::testing::Test {
