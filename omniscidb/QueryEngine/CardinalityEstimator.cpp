@@ -70,7 +70,8 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
     auto tinfo = schema_provider->getTableInfo(outer_input_it->getDatabaseId(),
                                                outer_input_it->getTableId());
     CHECK(tinfo);
-    if (tinfo->row_count < config.exec.group_by.large_ndv_threshold) {
+    if (static_cast<int64_t>(tinfo->row_count) <
+        config.exec.group_by.large_ndv_threshold) {
       LOG(INFO) << "Avoid large estimator because of the small input ("
                 << tinfo->row_count << " rows).";
       use_large_estimator = false;

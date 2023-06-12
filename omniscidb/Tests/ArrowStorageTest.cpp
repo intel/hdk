@@ -13,6 +13,7 @@
  */
 
 #include "ArrowStorage/ArrowStorage.h"
+#include "Shared/ArrowUtil.h"
 
 #include "TestHelpers.h"
 
@@ -736,11 +737,10 @@ TEST_F(ArrowStorageTest, ImportArrowTable) {
   ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto col_a = std::make_shared<arrow::Field>("A", arrow::null());
   auto schema = arrow::schema({col_a});
-
   std::shared_ptr<arrow::Array> empty_array;
   arrow::NumericBuilder<arrow::FloatType> float64_builder;
-  float64_builder.AppendValues({});
-  float64_builder.Finish(&empty_array);
+  ARROW_THROW_NOT_OK(float64_builder.AppendValues({}));
+  ARROW_THROW_NOT_OK(float64_builder.Finish(&empty_array));
   auto table = arrow::Table::Make(schema, {empty_array});
   ASSERT_NO_THROW(
       storage.importArrowTable(table, "test_empty", ArrowStorage::TableOptions{1}));

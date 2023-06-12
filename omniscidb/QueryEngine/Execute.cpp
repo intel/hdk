@@ -1989,9 +1989,8 @@ Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
               << toString(ra_exe_unit.templs) << " cost_model=" << ra_exe_unit.cost_model
               << ", cost model in config: "
               << (config_->exec.enable_cost_model ? "enabled" : "disabled")
-              << ", heterogeneous execution: " << cfg.enable_heterogeneous_execution
-      ? "enabled"
-      : "disabled";
+              << ", heterogeneous execution: "
+              << (cfg.enable_heterogeneous_execution ? "enabled" : "disabled");
 
   if (cfg.enable_heterogeneous_execution) {
     if (cfg.forced_heterogeneous_distribution) {
