@@ -51,6 +51,9 @@ DEVICE unsigned week_start_from_yoe(unsigned const yoe) {
 
 }  // namespace
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t
 extract_hour(const int64_t lcltime) {
   return unsigned_mod(lcltime, kSecsPerDay) / kSecsPerHour;
@@ -267,6 +270,7 @@ extract_year(const int64_t timeval) {
   return 2000 + era * 400 + yoe + (MARJAN <= doy);
 }
 
+#pragma GCC diagnostic pop
 /*
  * @brief support the SQL EXTRACT function
  */

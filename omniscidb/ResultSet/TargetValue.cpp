@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#pragma once
-
 #include "TargetValue.h"
 
 #include "IR/Type.h"

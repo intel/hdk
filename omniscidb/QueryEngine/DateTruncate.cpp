@@ -35,6 +35,8 @@
 #include <ctime>
 #include <limits>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 #define DATE_TRUNC_FUNC_JIT(funcname)                                                \
   extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE int64_t funcname(int64_t timeval) { \
     return funcname##_##impl(timeval);                                               \
@@ -574,3 +576,5 @@ DateDiffHighPrecisionNullable(const hdk::ir::DateTruncField datepart,
   }
   return DateDiffHighPrecision(datepart, startdate, enddate, start_dim, end_dim);
 }
+
+#pragma GCC diagnostic pop

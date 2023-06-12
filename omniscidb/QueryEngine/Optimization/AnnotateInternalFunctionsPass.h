@@ -37,8 +37,6 @@ class AnnotateInternalFunctionsPass
                               llvm::CGSCCAnalysisManager& AM,
                               llvm::LazyCallGraph& CG,
                               llvm::CGSCCUpdateResult& UR) {
-    bool updated_function_defs = false;
-
 #if 0
     for (llvm::LazyCallGraph::Node& N : InitialC) {
       llvm::Function* Fn = &N.getFunction();
@@ -57,7 +55,6 @@ class AnnotateInternalFunctionsPass
       }
       if (isInternalStatelessFunction(fcn->getName()) ||
           isInternalMathFunction(fcn->getName())) {
-        updated_function_defs = true;
         std::vector<llvm::Attribute::AttrKind> attrs{llvm::Attribute::NoFree,
                                                      llvm::Attribute::NoSync,
                                                      llvm::Attribute::NoUnwind,
@@ -68,7 +65,6 @@ class AnnotateInternalFunctionsPass
           fcn->addFnAttr(attr);
         }
       } else if (isReadOnlyFunction(fcn->getName())) {
-        updated_function_defs = true;
         fcn->addFnAttr(llvm::Attribute::ReadOnly);
       }
     }
