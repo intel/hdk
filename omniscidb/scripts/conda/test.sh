@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage() { echo "Usage: $0 [-s (skip large buffers)]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [-s (skip large buffers)] [-c (force cpu-only execution)]" 1>&2; exit 1; }
 
 TEST_FLAGS=''
 CPU_ONLY=0
