@@ -243,6 +243,7 @@ function(add_default_cpu_only_tests TEST_LIST)
   endforeach()
 endfunction()
 add_default_cpu_only_tests("${TEST_PROGRAMS}")
+set(EXCLUDE_PLATFORM_SPECIFIC_TESTS CodeGeneratorTest)
 
 
 set(SANITY_TESTS ${TEST_PROGRAMS})
@@ -291,7 +292,7 @@ add_custom_target(sanity_tests
 add_custom_target(sanity_cpu_only_tests
     COMMAND ${MKDIR_TMP}
     COMMAND touch tmp/DictPayload
-    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex cpu_only ${EXCLUDE_SANITY_TESTS}
+    COMMAND ${ENV_COMMAND} $<SHELL_PATH:${CMAKE_CTEST_COMMAND}> --verbose --label-regex cpu_only -E ${EXCLUDE_PLATFORM_SPECIFIC_TESTS} ${EXCLUDE_SANITY_TESTS}
     DEPENDS ${TEST_PROGRAMS}
     USES_TERMINAL)
 
