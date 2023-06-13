@@ -136,12 +136,14 @@ class JVM {
       LOG(FATAL) << "Cannot find calcite jar library.";
     }
     std::string max_mem_arg = "-Xmx" + std::to_string(max_mem_mb) + "m";
+    std::string log_dir_arg = "-DlogDir=hdk_log";
     JavaVMInitArgs vm_args;
-    auto options = std::make_unique<JavaVMOption[]>(2);
+    auto options = std::make_unique<JavaVMOption[]>(3);
     options[0].optionString = const_cast<char*>(class_path_arg.c_str());
     options[1].optionString = const_cast<char*>(max_mem_arg.c_str());
+    options[2].optionString = const_cast<char*>(log_dir_arg.c_str());
     vm_args.version = JNI_VERSION_1_8;
-    vm_args.nOptions = 1;
+    vm_args.nOptions = 3;
     vm_args.options = options.get();
     vm_args.ignoreUnrecognized = false;
 
