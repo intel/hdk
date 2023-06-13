@@ -51,6 +51,7 @@ import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexSubQuery;
 import org.apache.calcite.rex.RexWindow;
 import org.apache.calcite.rex.RexWindowBound;
+import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.JoinType;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlFunction;
@@ -69,9 +70,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Utilities for converting {@link org.apache.calcite.rel.RelNode} into JSON
@@ -437,6 +442,51 @@ public class MapDRelJson {
         } else {
           type = rexBuilder.deriveReturnType(operator, rexOperands);
         }
+
+        List<Map> keys;
+        if ((operator instanceof SqlAggFunction)
+                && ((keys = (List<Map>) map.getOrDefault("partition_keys", null)) != null)) {
+          List<RexNode> partKeys = keys.stream().map(k -> toRex(relInput, k))
+                  .collect(Collectors.toList());
+
+          keys = (List<Map>) map.getOrDefault("order_keys", Collections.emptyList());
+          List<RexFieldCollation> orderKeys = new ArrayList<>(keys.size());
+          for (Map ok : keys) {
+            RexNode left = toRex(relInput, ok.get("field"));
+            Set<SqlKind> right = new HashSet<>();
+            if ("DESCENDING".equals(ok.get("direction"))) right.add(SqlKind.DESCENDING);
+            right.add("LAST".equals(ok.get("nulls")) ? SqlKind.NULLS_LAST : SqlKind.NULLS_FIRST);
+            orderKeys.add(new RexFieldCollation(left, right));
+          }
+
+          Map lower = (Map) map.getOrDefault("lower_bound", Collections.emptyMap());
+          Map upper = (Map) map.getOrDefault("upper_bound", Collections.emptyMap());
+          RexWindowBound lowerBound;
+          RexWindowBound upperBound;
+
+          if (Boolean.TRUE.equals(lower.getOrDefault("unbounded", true))) {
+            if (Boolean.TRUE.equals(lower.getOrDefault("preceding", true)))
+              lowerBound = RexWindowBounds.UNBOUNDED_PRECEDING;
+            else
+              lowerBound = RexWindowBounds.UNBOUNDED_FOLLOWING;
+          } else {
+            lowerBound = RexWindowBounds.CURRENT_ROW;
+          }
+          if (Boolean.TRUE.equals(upper.getOrDefault("is_current_row", true))) {
+            upperBound = RexWindowBounds.CURRENT_ROW;
+          } else {
+            if (Boolean.TRUE.equals(upper.getOrDefault("preceding", true)))
+              upperBound = RexWindowBounds.UNBOUNDED_PRECEDING;
+            else
+              upperBound = RexWindowBounds.UNBOUNDED_FOLLOWING;
+          }
+
+          boolean rows = Boolean.TRUE.equals(map.getOrDefault("is_rows", true));
+          return rexBuilder.makeOver(type, (SqlAggFunction) operator, rexOperands,
+                  partKeys, ImmutableList.copyOf(orderKeys), lowerBound, upperBound,
+                  rows, true, false, false, false);
+        }
+
         return rexBuilder.makeCall(type, operator, rexOperands);
       }
       final Integer input = (Integer) map.get("input");
