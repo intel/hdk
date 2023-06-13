@@ -146,7 +146,7 @@ class LogOptions {
   bool rotate_daily_{true};
   size_t rotation_size_{10 << 20};
 
-  LogOptions(char const* argv0);
+  LogOptions(char const* argv0, const std::string& default_log_path = "hdk_log");
   ~LogOptions();  // Needed to allow forward declarations within std::unique_ptr.
   boost::filesystem::path full_log_dir() const;
   boost::program_options::options_description const& get_options() const;

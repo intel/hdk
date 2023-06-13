@@ -185,7 +185,7 @@ cdef class TypeInfo:
     return self.c_type_info.toString()
 
 
-def buildConfig(*, enable_debug_timer=None, enable_union=False, **kwargs):
+def buildConfig(*, enable_debug_timer=None, enable_union=False, log_dir="hdk_log", **kwargs):
   global g_enable_debug_timer
   if enable_debug_timer is not None:
     g_enable_debug_timer = enable_debug_timer
@@ -201,12 +201,14 @@ def buildConfig(*, enable_debug_timer=None, enable_union=False, **kwargs):
   builder.parseCommandLineArgs(app, cmd_str, False)
   cdef Config config = Config()
   config.c_config = builder.config()
+  config.c_config.get().debug.log_dir = log_dir
   return config
 
-def initLogger(*, debug_logs=False, **kwargs):
+def initLogger(*, debug_logs=False, log_dir="hdk_log", **kwargs):
   argv0 = "PyHDK".encode('UTF-8')
   cdef char *cargv0 = argv0
-  cdef unique_ptr[CLogOptions] opts = make_unique[CLogOptions](cargv0)
+  cdef string default_log_dir = log_dir
+  cdef unique_ptr[CLogOptions] opts = make_unique[CLogOptions](cargv0, default_log_dir)
   cmd_str = "".join(' --%s %r' % arg for arg in kwargs.iteritems())
   cmd_str = cmd_str.replace("_", "-")
   opts.get().parse_command_line(argv0, cmd_str)
