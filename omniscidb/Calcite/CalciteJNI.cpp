@@ -81,8 +81,9 @@ class JVM {
     bool detach_thread_on_destruction_;
   };
 
-  static std::shared_ptr<JVM> getInstance(size_t max_mem_mb) {
-    std::call_once(instance_init_flag_, [=] { instance_ = createJVM(max_mem_mb); });
+  static std::shared_ptr<JVM> getInstance(size_t max_mem_mb, const std::string& log_dir) {
+    std::call_once(instance_init_flag_,
+                   [=] { instance_ = createJVM(max_mem_mb, log_dir); });
     return instance_;
   }
 
@@ -120,7 +121,7 @@ class JVM {
  private:
   JVM(JavaVM* jvm) : jvm_(jvm) {}
 
-  static std::shared_ptr<JVM> createJVM(size_t max_mem_mb) {
+  static std::shared_ptr<JVM> createJVM(size_t max_mem_mb, const std::string& log_dir) {
     auto root_abs_path = omnisci::get_root_abs_path();
     std::string class_path_arg = "-Djava.class.path=";
     if (std::filesystem::exists(root_abs_path +
@@ -136,7 +137,7 @@ class JVM {
       LOG(FATAL) << "Cannot find calcite jar library.";
     }
     std::string max_mem_arg = "-Xmx" + std::to_string(max_mem_mb) + "m";
-    std::string log_dir_arg = "-DlogDir=hdk_log";
+    std::string log_dir_arg = "-DlogDir=" + log_dir;
     JavaVMInitArgs vm_args;
     auto options = std::make_unique<JavaVMOption[]>(3);
     options[0].optionString = const_cast<char*>(class_path_arg.c_str());
@@ -173,9 +174,11 @@ std::shared_ptr<JVM> JVM::instance_;
 
 class CalciteJNI {
  public:
-  CalciteJNI(const std::string& udf_filename, size_t calcite_max_mem_mb) {
+  CalciteJNI(const std::string& udf_filename,
+             size_t calcite_max_mem_mb,
+             const std::string& log_dir) {
     // Initialize JVM.
-    jvm_ = JVM::getInstance(calcite_max_mem_mb);
+    jvm_ = JVM::getInstance(calcite_max_mem_mb, log_dir);
     auto env = jvm_->getEnv();
 
     // Create CalciteServerHandler object.
@@ -574,10 +577,12 @@ CalciteMgr::~CalciteMgr() {
   worker_.join();
 }
 
-CalciteMgr* CalciteMgr::get(const std::string& udf_filename, size_t calcite_max_mem_mb) {
+CalciteMgr* CalciteMgr::get(const std::string& udf_filename,
+                            const std::string& log_dir,
+                            size_t calcite_max_mem_mb) {
   std::call_once(instance_init_flag_, [=] {
-    instance_ =
-        std::unique_ptr<CalciteMgr>(new CalciteMgr(udf_filename, calcite_max_mem_mb));
+    instance_ = std::unique_ptr<CalciteMgr>(
+        new CalciteMgr(udf_filename, calcite_max_mem_mb, log_dir));
   });
   return instance_.get();
 }
@@ -669,13 +674,19 @@ void CalciteMgr::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
   result.wait();
 }
 
-CalciteMgr::CalciteMgr(const std::string& udf_filename, size_t calcite_max_mem_mb) {
+CalciteMgr::CalciteMgr(const std::string& udf_filename,
+                       size_t calcite_max_mem_mb,
+                       const std::string& log_dir) {
   // todo: should register an exit handler for ctrl + c
-  worker_ = std::thread(&CalciteMgr::worker, this, udf_filename, calcite_max_mem_mb);
+  worker_ =
+      std::thread(&CalciteMgr::worker, this, udf_filename, calcite_max_mem_mb, log_dir);
 }
 
-void CalciteMgr::worker(const std::string& udf_filename, size_t calcite_max_mem_mb) {
-  auto calcite_jni = std::make_unique<CalciteJNI>(udf_filename, calcite_max_mem_mb);
+void CalciteMgr::worker(const std::string& udf_filename,
+                        size_t calcite_max_mem_mb,
+                        const std::string& log_dir) {
+  auto calcite_jni =
+      std::make_unique<CalciteJNI>(udf_filename, calcite_max_mem_mb, log_dir);
 
   std::unique_lock<std::mutex> lock(queue_mutex_);
   while (true) {

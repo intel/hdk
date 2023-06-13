@@ -26,7 +26,7 @@ cdef class Calcite:
     cdef string udf_filename = kwargs.get("udf_filename", "")
     cdef size_t calcite_max_mem_mb = kwargs.get("calcite_max_mem_mb", 1024)
 
-    self.calcite = CalciteMgr.get(udf_filename, calcite_max_mem_mb)
+    self.calcite = CalciteMgr.get(udf_filename, config.c_config.get().debug.log_dir, calcite_max_mem_mb)
     self.schema_provider = schema_provider.c_schema_provider
     self.config = config.c_config
 

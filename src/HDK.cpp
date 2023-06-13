@@ -91,6 +91,7 @@ HDK::HDK() : internal_(std::make_unique<Internal>()) {
 
   // Calcite
   internal_->calcite = CalciteMgr::get(/*udf_filename=*/"",
+                                       /*hdk_log_dir=*/"hdk_log",
                                        /*calcite_max_mem_mb=*/1024);
 
   // Executor
