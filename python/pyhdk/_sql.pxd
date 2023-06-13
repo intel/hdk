@@ -31,7 +31,7 @@ cdef extern from "omniscidb/Calcite/CalciteJNI.h":
 
   cdef cppclass CalciteMgr:    
     @staticmethod
-    CalciteMgr* get(const string&, size_t);
+    CalciteMgr* get(const string&, const string&, size_t);
     
     string process(const string&, const string&, CSchemaProvider*, CConfig*, const vector[FilterPushDownInfo]&, bool, bool, bool) except +
 

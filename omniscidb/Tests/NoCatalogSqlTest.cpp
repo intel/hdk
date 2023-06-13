@@ -126,7 +126,7 @@ class NoCatalogSqlTest : public ::testing::Test {
   }
 
   static void init_calcite(const std::string& udf_filename) {
-    calcite_ = CalciteMgr::get(udf_filename);
+    calcite_ = CalciteMgr::get(udf_filename, config_->debug.log_dir);
   }
 
   static void TearDownTestSuite() {

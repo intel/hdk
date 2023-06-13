@@ -240,6 +240,7 @@ cdef extern from "omniscidb/Shared/Config.h":
     string build_ra_cache
     string use_ra_cache
     bool enable_automatic_ir_metadata
+    string log_dir
 
   cdef cppclass CStorageConfig "StorageConfig":
     bool enable_lazy_dict_materialization

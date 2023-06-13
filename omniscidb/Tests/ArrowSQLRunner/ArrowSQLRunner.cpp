@@ -334,7 +334,7 @@ class ArrowSQLRunnerImpl {
     executor_->setSchemaProvider(schema_mgr_);
 
     if (config_->debug.use_ra_cache.empty() || !config_->debug.build_ra_cache.empty()) {
-      calcite_ = CalciteMgr::get(udf_filename, 1024);
+      calcite_ = CalciteMgr::get(udf_filename, config_->debug.log_dir, 1024);
 
       if (config_->debug.use_ra_cache.empty()) {
         ExtensionFunctionsWhitelist::add(calcite_->getExtensionFunctionWhitelist());

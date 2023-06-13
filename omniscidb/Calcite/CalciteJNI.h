@@ -43,6 +43,7 @@ class CalciteMgr {
   ~CalciteMgr();
 
   static CalciteMgr* get(const std::string& udf_filename = "",
+                         const std::string& log_dir = "hdk_log",
                          size_t calcite_max_mem_mb = 1024);
 
   std::string process(const std::string& db_name,
@@ -61,9 +62,13 @@ class CalciteMgr {
                                     bool is_runtime = true);
 
  private:
-  explicit CalciteMgr(const std::string& udf_filename, size_t calcite_max_mem_mb);
+  explicit CalciteMgr(const std::string& udf_filename,
+                      size_t calcite_max_mem_mb,
+                      const std::string& log_dir);
 
-  void worker(const std::string& udf_filename, size_t calcite_max_mem_mb);
+  void worker(const std::string& udf_filename,
+              size_t calcite_max_mem_mb,
+              const std::string& log_dir);
 
   void submitTaskToQueue(Task&& task);
 
