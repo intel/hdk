@@ -63,4 +63,4 @@ jobs:
 
       - name: Run pytest
         run: |
-          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} pytest python/tests/ --ignore=python/tests/modin
+          $CONDA/bin/conda run -n ${{ env.CONDA_ENV }} pytest -s python/tests/ --ignore=python/tests/modin
