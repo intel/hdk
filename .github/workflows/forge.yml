@@ -24,4 +24,5 @@ jobs:
         run: |
           cp recipe/* hdk-feedstock/recipe/
           cd hdk-feedstock
-          python build-locally.py linux_64_c_compiler_version9cuda_compilernvcccuda_compiler_version11.0cxx_compiler_version9numpy1.21python3.9.____cpython
+          config=$(cd .ci_support && ls -1 linux*versionNone*python3.9*.yaml)
+          python build-locally.py $(basename "$config" .yaml)
