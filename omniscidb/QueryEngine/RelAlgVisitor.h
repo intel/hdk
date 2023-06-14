@@ -59,6 +59,10 @@ class RelAlgVisitor {
     if (logical_union) {
       return aggregateResult(result, visitLogicalUnion(logical_union));
     }
+    const auto shuffle = dynamic_cast<const hdk::ir::Shuffle*>(rel_alg);
+    if (shuffle) {
+      return aggregateResult(result, visitShuffle(shuffle));
+    }
     LOG(FATAL) << "Unhandled rel_alg type: " << rel_alg->toString();
     return {};
   }
@@ -82,6 +86,8 @@ class RelAlgVisitor {
   virtual T visitLogicalUnion(const hdk::ir::LogicalUnion*) const {
     return defaultResult();
   }
+
+  virtual T visitShuffle(const hdk::ir::Shuffle*) const { return defaultResult(); }
 
  protected:
   virtual T aggregateResult(const T& aggregate, const T& next_result) const {

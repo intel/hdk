@@ -75,6 +75,16 @@ class PhysicalInputsNodeVisitor : public RelAlgVisitor<ResultType> {
     return result;
   }
 
+  ResultType visitShuffle(const hdk::ir::Shuffle* shuffle) const override {
+    ResultType result;
+    ExprVisitor visitor;
+    for (auto& expr : shuffle->exprs()) {
+      const auto inputs = visitor.visit(expr.get());
+      result.insert(inputs.begin(), inputs.end());
+    }
+    return result;
+  }
+
  protected:
   ResultType aggregateResult(const ResultType& aggregate,
                              const ResultType& next_result) const override {

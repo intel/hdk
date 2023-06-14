@@ -25,10 +25,21 @@ class ExprCollector : public ExprVisitor<void> {
     return collect(expr.get(), std::forward<Ts>(args)...);
   }
 
+  template <typename... Ts>
+  static ResultType collect(const ExprPtrVector& exprs, Ts&&... args) {
+    CollectorType collector(std::forward<Ts>(args)...);
+    for (auto& expr : exprs) {
+      collector.visit(expr.get());
+    }
+    return std::move(collector.result_);
+  }
+
   ResultType& result() { return result_; }
   const ResultType& result() const { return result_; }
 
  protected:
+  using BaseClass = ExprCollector<ResultType, CollectorType>;
+
   ResultType result_;
 };
 

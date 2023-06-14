@@ -38,10 +38,12 @@
 #include "QueryEngine/WindowContext.h"
 #include "QueryEngine/WorkUnitBuilder.h"
 #include "QueryOptimizer/CanonicalizeQuery.h"
+#include "ResultSet/ColRangeInfo.h"
 #include "ResultSet/HyperLogLog.h"
 #include "ResultSetRegistry/ResultSetRegistry.h"
 #include "SchemaMgr/SchemaMgr.h"
 #include "SessionInfo.h"
+#include "Shared/MathUtils.h"
 #include "Shared/funcannotations.h"
 #include "Shared/measure.h"
 #include "Shared/misc.h"
@@ -163,9 +165,10 @@ ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
 
     constexpr bool vlog_result_set_summary{false};
     if constexpr (vlog_result_set_summary) {
-      VLOG(1) << execution_result.getRows()->summaryToString();
+      for (size_t i = 0; i < execution_result.getToken()->resultSetCount(); ++i) {
+        VLOG(1) << execution_result.getToken()->resultSet(i)->summaryToString();
+      }
     }
-    execution_result.getRows()->moveToBegin();
 
     if (post_execution_callback_) {
       VLOG(1) << "Running post execution callback.";
@@ -187,11 +190,23 @@ ExecutionResult RelAlgExecutor::executeRelAlgQuery(const CompilationOptions& co,
   return run_query(co_cpu);
 }
 
-void printTree(const hdk::ir::Node* node, std::string prefix = "|") {
-  std::cout << prefix << node->toString() << std::endl;
-  for (size_t i = 0; i < node->inputCount(); ++i) {
-    printTree(node->getInput(i), prefix + "----");
+std::string treeToString(const hdk::ir::Node* node,
+                         bool stop_on_executed = true,
+                         std::string prefix = "|") {
+  std::stringstream ss;
+  ss << prefix << node->toString() << std::endl;
+  if (!stop_on_executed || !node->getResult()) {
+    for (size_t i = 0; i < node->inputCount(); ++i) {
+      ss << treeToString(node->getInput(i), stop_on_executed, prefix + "----");
+    }
   }
+  return ss.str();
+}
+
+void printTree(const hdk::ir::Node* node,
+               bool stop_on_executed = true,
+               std::string prefix = "|") {
+  std::cout << treeToString(node, stop_on_executed, prefix);
 }
 
 ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptions& co,
@@ -398,8 +413,11 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
   for (size_t i = 0; i < exec_desc_count; i++) {
     VLOG(1) << "Executing query step " << i;
     // When we execute the last step, we expect the result to consist of a single
-    // ResultSet. Also, check if following steps can consume multifrag input.
-    auto multifrag_result = eo.multifrag_result && (i != (exec_desc_count - 1));
+    // ResultSet unless said otherwise by the config. Also, check if following steps
+    // can consume multifrag input.
+    auto multifrag_result =
+        eo.multifrag_result &&
+        (i != (exec_desc_count - 1) || config_.exec.enable_multifrag_execution_result);
     if (multifrag_result) {
       for (size_t j = i + 1; j < exec_desc_count; j++) {
         if (!supportsMultifragInput(seq.step(j), seq.step(i))) {
@@ -426,6 +444,9 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
       auto eo_extern = eo;
       eo_extern.executor_type = ::ExecutorType::Extern;
       executeStep(seq.step(i), co, eo_extern, queue_time_ms);
+    } catch (const RequestPartitionedAggregation& e) {
+      executeStepWithPartitionedAggregation(
+          seq.step(i), co, eo, e.estimatedBufferSize(), queue_time_ms);
     }
   }
 
@@ -548,66 +569,18 @@ const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
   return res;
 }
 
-template <class RA>
 std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const RA* ra_node,
+    const hdk::ir::Node* node,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
   std::vector<hdk::ir::TargetMetaInfo> targets_meta;
-  CHECK_EQ(ra_node->size(), target_exprs.size());
-  for (size_t i = 0; i < ra_node->size(); ++i) {
+  CHECK_EQ(node->size(), target_exprs.size());
+  for (size_t i = 0; i < node->size(); ++i) {
     CHECK(target_exprs[i]);
     // TODO(alex): remove the count distinct type fixup.
-    targets_meta.emplace_back(ra_node->getFieldName(i),
+    targets_meta.emplace_back(node->getFieldName(i),
                               canonicalTypeForExpr(*target_exprs[i]));
   }
   return targets_meta;
-}
-
-template <>
-std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const hdk::ir::Node* node,
-    const std::vector<const hdk::ir::Expr*>& target_exprs);
-
-template <>
-std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const hdk::ir::Filter* filter,
-    const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  return get_targets_meta(filter->getInput(0), target_exprs);
-}
-
-template <>
-std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const hdk::ir::Sort* sort,
-    const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  return get_targets_meta(sort->getInput(0), target_exprs);
-}
-
-template <>
-std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const hdk::ir::LogicalUnion* logical_union,
-    const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  return get_targets_meta(logical_union->getInput(0), target_exprs);
-}
-
-template <>
-std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
-    const hdk::ir::Node* node,
-    const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  if (auto proj = node->as<hdk::ir::Project>()) {
-    return get_targets_meta(proj, target_exprs);
-  } else if (auto logical_union = node->as<hdk::ir::LogicalUnion>()) {
-    return get_targets_meta(logical_union, target_exprs);
-  } else if (auto agg = node->as<hdk::ir::Aggregate>()) {
-    return get_targets_meta(agg, target_exprs);
-  } else if (auto scan = node->as<hdk::ir::Scan>()) {
-    return get_targets_meta(scan, target_exprs);
-  } else if (auto sort = node->as<hdk::ir::Sort>()) {
-    return get_targets_meta(sort, target_exprs);
-  } else if (auto filter = node->as<hdk::ir::Filter>()) {
-    return get_targets_meta(filter, target_exprs);
-  }
-  UNREACHABLE() << "Unhandled node type: " << node->toString();
-  return {};
 }
 
 bool is_agg_step(const hdk::ir::Node* node) {
@@ -617,12 +590,70 @@ bool is_agg_step(const hdk::ir::Node* node) {
   if (node->is<hdk::ir::Aggregate>()) {
     return true;
   }
+  if (auto shuffle = node->as<hdk::ir::Shuffle>()) {
+    return shuffle->isCount();
+  }
   for (size_t i = 0; i < node->inputCount(); ++i) {
     if (is_agg_step(node->getInput(i))) {
       return true;
     }
   }
   return false;
+}
+
+class NonGroupbyInputColIndicesCollector
+    : public hdk::ir::ExprCollector<std::set<unsigned>,
+                                    NonGroupbyInputColIndicesCollector> {
+ public:
+  NonGroupbyInputColIndicesCollector(const hdk::ir::Aggregate* agg) : agg_(agg){};
+
+  static std::set<unsigned> collect(const hdk::ir::Aggregate* agg) {
+    return BaseClass::collect(agg->getAggs(), agg);
+  }
+
+ protected:
+  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
+    if (col_ref->index() >= agg_->getGroupByCount()) {
+      result_.insert(col_ref->index());
+    }
+  }
+
+  const hdk::ir::Aggregate* agg_;
+};
+
+void buildUsedAggColumns(const hdk::ir::Aggregate* agg,
+                         hdk::ir::ExprPtrVector& out_exprs,
+                         std::vector<std::string>& out_fields,
+                         std::unordered_map<unsigned, unsigned>& out_mapping) {
+  auto input = agg->getInput(0);
+  for (size_t i = 0; i < agg->getGroupByCount(); ++i) {
+    out_exprs.push_back(hdk::ir::getNodeColumnRef(input, static_cast<unsigned>(i)));
+    out_fields.push_back(input->getFieldName(i));
+  }
+  auto data_cols = NonGroupbyInputColIndicesCollector::collect(agg);
+  for (auto& idx : data_cols) {
+    out_mapping[idx] = static_cast<unsigned>(out_exprs.size());
+    out_exprs.push_back(hdk::ir::getNodeColumnRef(input, idx));
+    out_fields.push_back(input->getFieldName(idx));
+  }
+}
+
+// Check of node should be executed before shuffle can be applied to it.
+// Shuffle goes in two passes and, due to lack of appropriate cost model,
+// we prefer shuffle's input to be materialized. Exception is when it is
+// a simple projection.
+// TODO: enable more cases when cheap operation can be merged into shuffle.
+bool shouldMaterializeShuffleInput(const hdk::ir::Node* node) {
+  if (node->getResult() || node->is<hdk::ir::Scan>()) {
+    return false;
+  }
+
+  auto proj = node->as<hdk::ir::Project>();
+  if (!proj) {
+    return true;
+  }
+
+  return !proj->isSimple() || shouldMaterializeShuffleInput(proj->getInput(0));
 }
 
 }  // namespace
@@ -662,15 +693,162 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
   return res;
 }
 
+void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* step_root,
+                                                           const CompilationOptions& co,
+                                                           const ExecutionOptions& eo,
+                                                           size_t estimated_buffer_size,
+                                                           const int64_t queue_time_ms) {
+  auto sort = step_root->as<hdk::ir::Sort>();
+  auto agg = sort ? sort->getInput(0)->as<hdk::ir::Aggregate>()
+                  : step_root->as<hdk::ir::Aggregate>();
+  CHECK(agg);
+
+  // Materialize data to shuffle if required.
+  auto agg_input = agg->getInput(0);
+  auto agg_input_shared = const_cast<hdk::ir::Aggregate*>(agg)->getAndOwnInput(0);
+  std::shared_ptr<hdk::ir::Project> proj;
+  std::unordered_map<unsigned, unsigned> input_map;
+  if (shouldMaterializeShuffleInput(agg_input)) {
+    // Make additional projection to possibly filter out unused columns (e.g. in
+    // case of join).
+    hdk::ir::ExprPtrVector exprs;
+    std::vector<std::string> fields;
+    buildUsedAggColumns(agg, exprs, fields, input_map);
+    proj = std::make_shared<hdk::ir::Project>(
+        std::move(exprs), std::move(fields), agg_input_shared);
+    VLOG(1) << "Materializing data for partitioning.";
+    executeStep(proj.get(), co, eo, queue_time_ms);
+  }
+
+  // Now that data to shuffle is materialized, we can start shuffling. As the first
+  // step, we compute the desired number of resulting partitions and compute their sizes.
+  // By default, we want to have enough partitions to load all cores but not to slow
+  // down partitioning too much by too many output streams.
+  size_t min_partitions = config_.exec.group_by.min_partitions
+                              ? config_.exec.group_by.min_partitions
+                              : cpu_threads() * 2;
+  size_t max_partitions = std::max(config_.exec.group_by.max_partitions, min_partitions);
+  // For now, we require number of partitions to be power of 2 to avoid division
+  // operation in partitioning code.
+  min_partitions = shared::roundUpToPow2(min_partitions);
+  max_partitions = shared::roundUpToPow2(max_partitions);
+  size_t partitions = min_partitions;
+  // Increase number of partitions until we achieve target output buffer size or
+  // hit the partitioning limit.
+  while (partitions < max_partitions &&
+         estimated_buffer_size / partitions >
+             config_.exec.group_by.partitioning_buffer_target_size) {
+    partitions = partitions * 2;
+  }
+  VLOG(1) << "Selected to use " << partitions << " partitions. Used range is ["
+          << min_partitions << ", " << max_partitions << "]. Estimated buffer size is "
+          << estimated_buffer_size;
+  hdk::ir::ShuffleFunction shuffle_fn{hdk::ir::ShuffleFunction::kHash, partitions};
+  VLOG(1) << "Selected shuffle function is " << shuffle_fn;
+  hdk::ir::NodePtr shuffle_input = proj ? proj : agg_input_shared;
+  hdk::ir::ExprPtrVector shuffle_keys;
+  for (unsigned i = 0; i < static_cast<unsigned>(agg->getGroupByCount()); ++i) {
+    shuffle_keys.push_back(getNodeColumnRef(shuffle_input.get(), i));
+  }
+  hdk::ir::NodePtr count_shuffle_node = std::make_shared<hdk::ir::Shuffle>(
+      shuffle_keys,
+      hdk::ir::makeExpr<hdk::ir::AggExpr>(hdk::ir::Context::defaultCtx().int64(false),
+                                          hdk::ir::AggType::kCount,
+                                          nullptr,
+                                          false,
+                                          nullptr),
+      "part_size",
+      shuffle_fn,
+      shuffle_input);
+  VLOG(1) << "Execute COUNT(*) for data shuffle.";
+  {
+    auto timer = DEBUG_TIMER("Partitions histogram computation");
+    executeStep(
+        count_shuffle_node.get(), co, eo.with_columnar_output(true), queue_time_ms);
+  }
+
+  // With partition sizes now known, start actual data shuffling.
+  hdk::ir::ExprPtrVector shuffle_input_cols;
+  std::vector<std::string> fields;
+  if (proj) {
+    shuffle_input_cols = hdk::ir::getNodeColumnRefs(proj.get());
+    fields = proj->getFields();
+  } else {
+    hdk::ir::ExprPtrVector exprs;
+    buildUsedAggColumns(agg, shuffle_input_cols, fields, input_map);
+  }
+  hdk::ir::ExprPtrVector shuffle_exprs;
+  auto offsets_ref = hdk::ir::getNodeColumnRef(count_shuffle_node.get(), 0);
+  hdk::ir::NodePtr shuffle_node = std::make_shared<hdk::ir::Shuffle>(
+      std::move(shuffle_keys),
+      std::move(shuffle_input_cols),
+      std::move(fields),
+      shuffle_fn,
+      std::vector<hdk::ir::NodePtr>({shuffle_input, count_shuffle_node}));
+  VLOG(1) << "Execute data shuffle.";
+  auto shuffle_eo = eo;
+  shuffle_eo.output_columnar_hint = true;
+  shuffle_eo.preserve_order = false;
+  auto shuffle_co = co;
+  shuffle_co.allow_lazy_fetch = false;
+  {
+    auto timer = DEBUG_TIMER("Data shuffling");
+    executeStep(shuffle_node.get(), shuffle_co, shuffle_eo, queue_time_ms);
+  }
+
+  // Now we can remove projection and its result to free memory.
+  if (proj) {
+    temporary_tables_.erase(-proj->getId());
+    proj.reset();
+  }
+
+  // Create new aggregation node and execute it.
+  auto part_agg = std::make_shared<hdk::ir::Aggregate>(
+      agg->getGroupByCount(), agg->getAggs(), agg->getFields(), agg_input_shared);
+  part_agg->replaceInput(agg_input_shared, shuffle_node, input_map);
+  part_agg->setPartitioned(true);
+  // Use max partition size for a new entry count guess.
+  auto count_res_token = temporary_tables_.at(-count_shuffle_node->getId());
+  const uint64_t* size_buf = reinterpret_cast<const uint64_t*>(
+      count_res_token->resultSet(count_res_token->resultSetCount() - 1)
+          ->getStorage()
+          ->getUnderlyingBuffer());
+  auto max_partition_size = *std::max_element(size_buf, size_buf + partitions);
+  part_agg->setBufferEntryCountHint(max_partition_size * 2);
+  VLOG(1) << "Using buffer entry count hint for partitioned aggregation: "
+          << part_agg->bufferEntryCountHint();
+  hdk::ir::NodePtr new_root = part_agg;
+  if (sort) {
+    new_root = sort->deepCopy();
+    new_root->replaceInput(new_root->getAndOwnInput(0), part_agg);
+  }
+  VLOG(1) << "Execute partitioned aggregation.";
+  {
+    auto timer = DEBUG_TIMER("Partitioned aggregation");
+    executeStep(new_root.get(), co, eo, queue_time_ms);
+  }
+
+  // Register result as a temporary table for the original node.
+  addTemporaryTable(-step_root->getId(), new_root->getResult()->getToken());
+  step_root->setResult(new_root->getResult());
+  // Remove temporary tables we don't need anymore.
+  temporary_tables_.erase(-count_shuffle_node->getId());
+  temporary_tables_.erase(-shuffle_node->getId());
+  temporary_tables_.erase(-part_agg->getId());
+  temporary_tables_.erase(-new_root->getId());
+}
+
 void RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,
                                  const CompilationOptions& co,
                                  const ExecutionOptions& eo,
                                  const int64_t queue_time_ms) {
+  VLOG(1) << "Executing query step:\n" << treeToString(step_root, true);
   ExecutionResult res;
   try {
     // TODO: move allow_speculative_sort to ExecutionOptions?
     res = executeStep(step_root, co, eo, queue_time_ms, true);
   } catch (const SpeculativeTopNFailed& e) {
+    VLOG(1) << "Retrying step with disabled speculative TopN.";
     res = executeStep(step_root, co, eo, queue_time_ms, false);
   }
 
@@ -1088,6 +1266,88 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
   return ra_exe_unit;
 }
 
+// Here we try to decide if we should use hash partitioning for groupby execution.
+// Partitioned aggregation is beneficial in case of a very large output buffer.
+// Partitioning allows us to reduce the size of the buffer used for each partition
+// and also completely avoid reduction.
+// Current heuristic is very simple and covers the case when a lot of very small
+// groups are processed.
+void maybeRequestPartitionedAggregation(const RelAlgExecutionUnit& ra_exe_unit,
+                                        size_t estimated_buffer_entries,
+                                        const CompilationOptions& co,
+                                        DataProvider* data_provider,
+                                        const Config& config) {
+  // Partitioned aggregation is supported for CPU only.
+  if (co.device_type != ExecutorDeviceType::CPU) {
+    VLOG(1) << "Ignore partitioned aggregation option for non-CPU device";
+    return;
+  }
+
+  // Check if allowed by the config.
+  if (!config.exec.group_by.enable_cpu_partitioned_groupby) {
+    VLOG(1) << "Ignore partitioned aggregation option. Disabled by config.";
+    return;
+  }
+
+  for (auto& input : ra_exe_unit.input_col_descs) {
+    if (input->type()->isVarLen()) {
+      VLOG(1) << "Drop partitioned aggregation option due to varlen data.";
+      return;
+    }
+  }
+
+  // Check output buffer size threshold.
+  size_t entry_size = 0;
+  for (auto& key : ra_exe_unit.groupby_exprs) {
+    if (!key) {
+      entry_size += 8;
+    } else {
+      if (key->type()->isString() || key->type()->isArray()) {
+        entry_size += 16;
+      } else {
+        entry_size += key->type()->canonicalSize();
+      }
+    }
+  }
+  for (auto expr : ra_exe_unit.target_exprs) {
+    // Skip key columns.
+    if (!expr->is<hdk::ir::ColumnVar>()) {
+      entry_size += expr->type()->canonicalSize();
+    }
+  }
+  if (estimated_buffer_entries * entry_size <
+      config.exec.group_by.partitioning_buffer_size_threshold) {
+    VLOG(1)
+        << "Drop partitioned aggregation option due to the small output buffer size of "
+        << (estimated_buffer_entries * entry_size) << " bytes. Threshold value is "
+        << config.exec.group_by.partitioning_buffer_size_threshold;
+    return;
+  }
+
+  // Request shuffle when the number of estimated groups is comparable to the input
+  // rows count. For now, ignore the fact that joins and filters change the number of
+  // rows to be aggregated, so simply use the size of the outermost table.
+  // Number entries is 2x of the estimated number of groups. Use partitioning if we
+  // expect less than the configured threshold number of rows per each group in average.
+  auto table_meta =
+      data_provider->getTableMetadata(ra_exe_unit.input_descs[0].getDatabaseId(),
+                                      ra_exe_unit.input_descs[0].getTableId());
+  if (table_meta.getNumTuples() * 2 <
+      estimated_buffer_entries * config.exec.group_by.partitioning_group_size_threshold) {
+    LOG(INFO) << "Requesting partitioned aggregation (entries="
+              << estimated_buffer_entries << ", rows=" << table_meta.getNumTuples()
+              << ")";
+    throw RequestPartitionedAggregation(entry_size, estimated_buffer_entries);
+  }
+
+  VLOG(1) << "Drop partitioned aggregation option due to the small estimated number of "
+             "groups. Input rows: "
+          << table_meta.getNumTuples()
+          << " Estimated group count: " << (estimated_buffer_entries / 2)
+          << " Threshold ratio: "
+          << config.exec.group_by.partitioning_group_size_threshold;
+}
+
 }  // namespace
 
 ExecutionResult RelAlgExecutor::executeWorkUnit(
@@ -1202,10 +1462,17 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
       result = execute_and_handle_errors(
           card, /*has_cardinality_estimation=*/true, /*has_ndv_estimation=*/false);
     } else {
-      result = execute_and_handle_errors(max_groups_buffer_entry_guess,
-                                         groups_approx_upper_bound(table_infos) <=
-                                             config_.exec.group_by.big_group_threshold,
-                                         /*has_ndv_estimation=*/false);
+      result = execute_and_handle_errors(
+          max_groups_buffer_entry_guess,
+          // In case of partitioned aggregation, we use max partition size as an
+          // estimation.
+          // In case of small enough input, we use configured default estimation.
+          // Otherwise, we state that we don't have an estimation and cardinality
+          // estimator would be requested in case of baseline hash groupby.
+          ra_exe_unit.partitioned_aggregation ||
+              groups_approx_upper_bound(table_infos) <=
+                  config_.exec.group_by.big_group_threshold,
+          /*has_ndv_estimation=*/ra_exe_unit.partitioned_aggregation);
     }
   } catch (const CardinalityEstimationRequired& e) {
     // check the cardinality cache
@@ -1221,6 +1488,8 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
                                     : std::min(groups_approx_upper_bound(table_infos),
                                                g_estimator_failure_max_groupby_size);
       CHECK_GT(estimated_groups_buffer_entry_guess, size_t(0));
+      maybeRequestPartitionedAggregation(
+          ra_exe_unit, estimated_groups_buffer_entry_guess, co, data_provider_, config_);
       result = execute_and_handle_errors(
           estimated_groups_buffer_entry_guess, true, /*has_ndv_estimation=*/true);
       if (!(eo.just_validate || eo.just_explain)) {

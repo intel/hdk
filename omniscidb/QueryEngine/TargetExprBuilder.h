@@ -96,6 +96,20 @@ struct TargetExprCodegenBuilder {
                llvm::Value* varlen_output_buffer,
                DiamondCodegen& diamond_codegen) const;
 
+  void codegenSingleTarget(
+      RowFuncBuilder* row_func_builder,
+      Executor* executor,
+      const QueryMemoryDescriptor& query_mem_desc,
+      const CompilationOptions& co,
+      const GpuSharedMemoryContext& gpu_smem_context,
+      const std::tuple<llvm::Value*, llvm::Value*>& agg_out_ptr_w_idx,
+      const std::vector<llvm::Value*>& agg_out_vec,
+      llvm::Value* output_buffer_byte_stream,
+      llvm::Value* out_row_idx,
+      llvm::Value* varlen_output_buffer,
+      DiamondCodegen& diamond_codegen,
+      size_t target_idx) const;
+
   void codegenSampleExpressions(
       RowFuncBuilder* row_func_builder,
       Executor* executor,

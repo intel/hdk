@@ -350,7 +350,10 @@ RelAlgExecutionUnit WorkUnitBuilder::exeUnit() const {
           query_plan_dag_,
           hash_table_build_plan_dag_,
           table_id_to_node_map_,
-          union_all_};
+          union_all_,
+          shuffle_fn_,
+          partition_offsets_col_,
+          partitioned_aggregation_};
 }
 
 void WorkUnitBuilder::build() {
@@ -430,6 +433,8 @@ void WorkUnitBuilder::process(const ir::Node* node) {
     processUnion(node->as<ir::LogicalUnion>());
   } else if (node->is<ir::Join>()) {
     processJoin(node->as<ir::Join>());
+  } else if (node->is<ir::Shuffle>()) {
+    processShuffle(node->as<ir::Shuffle>());
   } else {
     CHECK(false) << "Unsupported node: " + node->toString();
   }
@@ -465,6 +470,10 @@ void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
   }
   target_exprs_[rte_idx] = std::move(new_target_exprs);
   is_agg_ = true;
+  partitioned_aggregation_ = agg->isPartitioned();
+  if (agg->bufferEntryCountHint()) {
+    max_groups_buffer_entry_guess_ = agg->bufferEntryCountHint();
+  }
 }
 
 void WorkUnitBuilder::processProject(const ir::Project* proj) {
@@ -635,6 +644,49 @@ void WorkUnitBuilder::processJoin(const ir::Join* join) {
   left_deep_tree_id_ = join->getId();
 }
 
+void WorkUnitBuilder::processShuffle(const ir::Shuffle* shuffle) {
+  RelAlgTranslator translator(
+      executor_, input_nest_levels_, join_types_, now_, eo_.just_explain);
+  auto rte_idx = all_nest_levels_.at(shuffle);
+  CHECK_EQ(rte_idx, 0);
+
+  ir::ExprPtrVector new_target_exprs;
+  for (auto& expr : shuffle->exprs()) {
+    auto rewritten_expr = input_rewriter_.visit(expr.get());
+    auto target_expr = translate(rewritten_expr.get(), translator, eo_.executor_type);
+    new_target_exprs.emplace_back(std::move(target_expr));
+  }
+
+  for (size_t i = 0; i < shuffle->size(); ++i) {
+    input_rewriter_.addReplacement(shuffle, i, new_target_exprs[i]);
+  }
+  target_exprs_[rte_idx] = std::move(new_target_exprs);
+
+  if (!groupby_exprs_.empty()) {
+    CHECK_EQ(groupby_exprs_.size(), (size_t)1);
+    CHECK(groupby_exprs_.front() == nullptr);
+    groupby_exprs_.clear();
+  }
+
+  for (auto& expr : shuffle->keys()) {
+    auto rewritten_expr = input_rewriter_.visit(expr.get());
+    auto key_expr = translate(rewritten_expr.get(), translator, eo_.executor_type);
+    groupby_exprs_.emplace_back(std::move(key_expr));
+  }
+
+  // If the node has two inputs then the first column of the second input node
+  // holds computed offsets
+  if (shuffle->inputCount() > 1) {
+    CHECK_EQ(shuffle->inputCount(), (size_t)2);
+    auto rewritten_expr =
+        input_rewriter_.visit(hdk::ir::getNodeColumnRef(shuffle->getInput(1), 0).get());
+    partition_offsets_col_ =
+        translate(rewritten_expr.get(), translator, eo_.executor_type);
+  }
+
+  shuffle_fn_ = shuffle->fn();
+}
+
 std::list<hdk::ir::ExprPtr> WorkUnitBuilder::makeJoinQuals(
     const hdk::ir::Expr* join_condition) {
   RelAlgTranslator translator(
@@ -731,6 +783,17 @@ void WorkUnitBuilder::computeSimpleQuals() {
   quals_ = std::move(quals);
 }
 
+void WorkUnitBuilder::assignUnionOrder(const ir::Node* node, int order) {
+  if (auto scan = node->as<ir::Scan>()) {
+    union_order_[{scan->getDatabaseId(), scan->getTableId()}] = order;
+  } else {
+    CHECK(node->getResult());
+    auto token = node->getResult()->getToken();
+    CHECK(token);
+    union_order_[{token->dbId(), token->tableId()}] = order;
+  }
+}
+
 int WorkUnitBuilder::assignNestLevels(const ir::Node* node, int start_idx) {
   all_nest_levels_.emplace(node, start_idx);
 
@@ -743,16 +806,26 @@ int WorkUnitBuilder::assignNestLevels(const ir::Node* node, int start_idx) {
     for (size_t i = 0; i < node->inputCount(); ++i) {
       auto input_node = node->getInput(i);
       assignNestLevels(input_node, start_idx);
-      if (auto scan = input_node->as<ir::Scan>()) {
-        union_order_[{scan->getDatabaseId(), scan->getTableId()}] = i;
-      } else {
-        CHECK(input_node->getResult());
-        auto token = input_node->getResult()->getToken();
-        CHECK(token);
-        union_order_[{token->dbId(), token->tableId()}] = i;
-      }
+      assignUnionOrder(input_node, static_cast<int>(i));
     }
     ++start_idx;
+  } else if (node->is<ir::Shuffle>()) {
+    for (size_t i = 0; i < node->inputCount(); ++i) {
+      auto input_node = node->getInput(i);
+      assignNestLevels(input_node, start_idx);
+    }
+    ++start_idx;
+    if (node->inputCount() > 1) {
+      // union_order_ is used to sort input descriptors. We want data
+      // table to be the first and partition sizes table be the second.
+      CHECK_EQ(input_nest_levels_.size(), (size_t)2);
+      if (input_nest_levels_.begin()->first == node->getInput(1)) {
+        assignUnionOrder((++input_nest_levels_.begin())->first, 0);
+      } else {
+        assignUnionOrder(input_nest_levels_.begin()->first, 0);
+      }
+      assignUnionOrder(node->getInput(1), 1);
+    }
   } else {
     for (size_t i = 0; i < node->inputCount(); ++i) {
       start_idx = assignNestLevels(node->getInput(i), start_idx);
@@ -853,6 +926,10 @@ void WorkUnitBuilder::computeInputColDescs() {
     collector.visit(expr.get());
   }
 
+  if (partition_offsets_col_) {
+    collector.visit(partition_offsets_col_.get());
+  }
+
   std::vector<std::shared_ptr<const InputColDescriptor>> col_descs;
   for (auto& col_var : collector.result()) {
     col_descs.push_back(std::make_shared<const InputColDescriptor>(col_var.columnInfo(),
@@ -870,7 +947,9 @@ void WorkUnitBuilder::computeInputColDescs() {
       if (tdesc.getTableRef() != processed_table_ref) {
         auto columns = schema_provider_->listColumns(tdesc.getTableRef());
         for (auto& col_info : columns) {
-          col_descs.push_back(std::make_shared<InputColDescriptor>(col_info, 0));
+          if (!col_info->is_rowid) {
+            col_descs.push_back(std::make_shared<InputColDescriptor>(col_info, 0));
+          }
         }
       }
     }

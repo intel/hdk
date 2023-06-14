@@ -45,6 +45,10 @@ class TemplateAggregationVisitor : public RelAlgVisitor<TemplateSample> {
     return rejectNode();
   }
 
+  virtual TemplateSample visitShuffle(const hdk::ir::Shuffle*) const {
+    return rejectNode();
+  }
+
   std::vector<costmodel::AnalyticalTemplate> getTemplates() {
     std::vector<costmodel::AnalyticalTemplate> ret(collected_templates_);
     collected_templates_.clear();

@@ -115,6 +115,7 @@ class ExprVisitor {
     if (auto agg = expr->as<AggExpr>()) {
       return visitAggExpr(agg);
     }
+    CHECK(false) << "Unhandled expr: " << expr->toString();
     return defaultResult(expr);
   }
 

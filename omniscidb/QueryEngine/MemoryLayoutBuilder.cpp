@@ -93,6 +93,20 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
                                 std::optional<int64_t> group_cardinality_estimation,
                                 Executor* executor,
                                 const ExecutorDeviceType device_type) {
+  if (ra_exe_unit.shuffle_fn) {
+    CHECK(!ra_exe_unit.target_exprs.empty());
+    // For shuffle COUNT(*) query we use keyless perfect hash.
+    if (ra_exe_unit.isShuffleCount()) {
+      return {QueryDescriptionType::GroupByPerfectHash,
+              0,
+              static_cast<int64_t>(ra_exe_unit.shuffle_fn->partitions),
+              0,
+              false};
+    }
+    // For actual shuffle we use Projection.
+    CHECK(ra_exe_unit.isShuffle());
+    return {QueryDescriptionType::Projection, 0, 1, 0, false};
+  }
   const Config& config = executor->getConfig();
   // Use baseline layout more eagerly on the GPU if the query uses count distinct,
   // because our HyperLogLog implementation is 4x less memory efficient on GPU.
@@ -236,6 +250,11 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
                              const std::vector<InputTableInfo>& query_infos,
                              const bool is_group_by,
                              Executor* executor) {
+  // Shuffle counters always go keyless.
+  if (ra_exe_unit.isShuffleCount()) {
+    return {true, 0};
+  }
+
   bool keyless{true}, found{false};
   int32_t num_agg_expr{0};
   int32_t index{0};
@@ -541,7 +560,8 @@ int8_t pick_target_compact_width(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<InputTableInfo>& query_infos,
                                  const int8_t crt_min_byte_width,
                                  bool bigint_count) {
-  if (bigint_count) {
+  // Currently, we cannot handle 32-bit shuffle counters.
+  if (bigint_count || ra_exe_unit.isShuffleCount()) {
     return sizeof(int64_t);
   }
   int8_t compact_width{0};
@@ -857,7 +877,7 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
       // (acts as a key)
       idx_target_as_key = keyless_info.target_index;
 
-      if (group_col_widths.size() > 1) {
+      if (ra_exe_unit.isShuffleCount() || group_col_widths.size() > 1) {
         // col range info max contains the expected cardinality of the output
         entry_count = static_cast<size_t>(actual_col_range_info.max);
         actual_col_range_info.bucket = 0;
