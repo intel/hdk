@@ -102,6 +102,11 @@ enum class WindowFunctionKind {
   SumInternal  // For deserialization from Calcite only. Gets rewritten to a regular SUM.
 };
 
+enum class ShuffleKind {
+  Hash,
+  Range,
+};
+
 }  // namespace hdk::ir
 
 inline std::string toString(hdk::ir::OpType op) {
@@ -236,6 +241,17 @@ inline std::string toString(hdk::ir::WindowFunctionKind kind) {
   return "";
 }
 
+inline std::string toString(hdk::ir::ShuffleKind kind) {
+  switch (kind) {
+    case hdk::ir::ShuffleKind::Hash:
+      return "Hash";
+    case hdk::ir::ShuffleKind::Range:
+      return "Range";
+  }
+  LOG(FATAL) << "Invalid shuffle kind.";
+  return "";
+}
+
 namespace hdk::ir {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::OpType op) {
@@ -251,6 +267,10 @@ inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::WindowFunctionKind kind) {
+  return os << toString(kind);
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::ShuffleKind kind) {
   return os << toString(kind);
 }
 

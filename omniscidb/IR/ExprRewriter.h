@@ -326,6 +326,19 @@ class ExprRewriter : public ExprVisitor<ExprPtr> {
     return defaultResult(agg);
   }
 
+  ExprPtr visitShuffleStore(const hdk::ir::ShuffleStore* shuffle) override {
+    ExprPtr new_val = visit(shuffle->val());
+    ExprPtr new_out_buffers = visit(shuffle->outBuffers());
+    ExprPtr new_offsets = visit(shuffle->offsets());
+    if (new_val.get() != shuffle->val() ||
+        new_out_buffers.get() != shuffle->outBuffers() ||
+        new_offsets.get() != shuffle->offsets()) {
+      return hdk::ir::makeExpr<hdk::ir::ShuffleStore>(
+          shuffle->type(), new_val, new_out_buffers, new_offsets);
+    }
+    return defaultResult(shuffle);
+  }
+
   ExprPtr defaultResult(const hdk::ir::Expr* expr) const override {
     return expr->shared_from_this();
   }

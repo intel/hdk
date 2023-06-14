@@ -30,7 +30,8 @@ enum class QueryDescriptionType {
   GroupByBaselineHash,
   Projection,
   NonGroupedAggregate,
-  Estimator
+  Estimator,
+  Shuffle
 };
 
 inline std::ostream& operator<<(std::ostream& os, const QueryDescriptionType& t) {
@@ -45,6 +46,8 @@ inline std::ostream& operator<<(std::ostream& os, const QueryDescriptionType& t)
       return os << "QueryDescriptionType::NonGroupedAggregate";
     case QueryDescriptionType::Estimator:
       return os << "QueryDescriptionType::Estimator";
+    case QueryDescriptionType::Shuffle:
+      return os << "QueryDescriptionType::Shuffle";
     default:
       return os << "Invalid Query Description Type";
   };

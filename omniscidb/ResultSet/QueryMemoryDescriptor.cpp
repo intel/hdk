@@ -636,6 +636,8 @@ std::string QueryMemoryDescriptor::queryDescTypeToString() const {
       return "Non-grouped Aggregate";
     case QueryDescriptionType::Estimator:
       return "Estimator";
+    case QueryDescriptionType::Shuffle:
+      return "Shuffle";
     default:
       UNREACHABLE();
   }

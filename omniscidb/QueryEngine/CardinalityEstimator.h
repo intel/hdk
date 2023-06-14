@@ -43,6 +43,22 @@ class CardinalityEstimationRequired : public std::runtime_error {
   const int64_t range_;
 };
 
+class RequestPartitionedAggregation : public std::runtime_error {
+ public:
+  RequestPartitionedAggregation(size_t entry_size, size_t estimated_buffer_entries)
+      : std::runtime_error("RequestPartitionedAggregation")
+      , entry_size_(entry_size)
+      , estimated_buffer_entries_(estimated_buffer_entries) {}
+
+  size_t entrySize() const { return entry_size_; }
+  size_t estimatedBufferEntries() const { return estimated_buffer_entries_; }
+  size_t estimatedBufferSize() const { return entry_size_ * estimated_buffer_entries_; }
+
+ private:
+  size_t entry_size_;
+  size_t estimated_buffer_entries_;
+};
+
 RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_unit,
                                               SchemaProvider* schema_provider,
                                               const Config& config,

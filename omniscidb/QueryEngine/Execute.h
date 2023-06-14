@@ -475,13 +475,14 @@ class Executor : public StringDictionaryProxyProvider {
                                const std::vector<InputTableInfo>& query_infos,
                                size_t& max_groups_buffer_entry_guess);
 
-  ResultSetPtr collectAllDeviceResults(
+  hdk::ResultSetTable collectAllDeviceResults(
       SharedKernelContext& shared_context,
       const RelAlgExecutionUnit& ra_exe_unit,
       const QueryMemoryDescriptor& query_mem_desc,
       const ExecutorDeviceType device_type,
       std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-      const CompilationOptions& co);
+      const CompilationOptions& co,
+      const ExecutionOptions& eo);
 
   std::unordered_map<int, const hdk::ir::BinOper*> getInnerTabIdToJoinCond() const;
 
@@ -656,7 +657,15 @@ class Executor : public StringDictionaryProxyProvider {
       std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& all_fragment_results,
       std::shared_ptr<RowSetMemoryOwner>,
       const QueryMemoryDescriptor&) const;
+  hdk::ResultSetTable reducePartitionSizes(
+      std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device,
+      const QueryMemoryDescriptor& query_mem_desc,
+      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) const;
 
+  void allocateShuffleBuffers(const std::vector<InputTableInfo>& query_infos,
+                              const RelAlgExecutionUnit& ra_exe_unit,
+                              std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+                              SharedKernelContext& shared_context);
   hdk::ResultSetTable executeWorkUnitImpl(size_t& max_groups_buffer_entry_guess,
                                           const bool is_agg,
                                           const bool allow_single_frag_table_opt,
@@ -981,6 +990,9 @@ class Executor : public StringDictionaryProxyProvider {
   Data_Namespace::DataMgr* data_mgr_;
   const TemporaryTables* temporary_tables_;
   TableIdToNodeMap table_id_to_node_map_;
+
+  std::vector<std::vector<int8_t*>> shuffle_out_bufs_;
+  std::vector<int8_t**> shuffle_out_buf_ptrs_;
 
   int64_t kernel_queue_time_ms_ = 0;
   int64_t compilation_queue_time_ms_ = 0;

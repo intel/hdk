@@ -115,6 +115,10 @@ class ExprVisitor {
     if (auto agg = expr->as<AggExpr>()) {
       return visitAggExpr(agg);
     }
+    if (auto shuffle = expr->as<ShuffleStore>()) {
+      return visitShuffleStore(shuffle);
+    }
+    CHECK(false) << "Unhandled expr: " << expr->toString();
     return defaultResult(expr);
   }
 
@@ -294,6 +298,13 @@ class ExprVisitor {
       visit(agg->arg1());
     }
     return defaultResult(agg);
+  }
+
+  virtual T visitShuffleStore(const hdk::ir::ShuffleStore* shuffle) {
+    visit(shuffle->val());
+    visit(shuffle->outBuffers());
+    visit(shuffle->offsets());
+    return defaultResult(shuffle);
   }
 
   virtual T defaultResult(const hdk::ir::Expr*) const {

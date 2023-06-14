@@ -591,6 +591,13 @@ ExprPtr ArrayExpr::withType(const Type* new_type) const {
   return makeExpr<ArrayExpr>(new_type, contained_expressions_, is_null_, local_alloc_);
 }
 
+ExprPtr ShuffleStore::withType(const Type* new_type) const {
+  if (type_->equal(new_type)) {
+    return shared_from_this();
+  }
+  return makeExpr<ShuffleStore>(new_type, val_, out_buffers_, offsets_);
+}
+
 ExprPtr Constant::castNumber(const Type* new_type) const {
   Datum new_value = value_;
   switch (type_->id()) {
@@ -1299,6 +1306,15 @@ bool ArrayExpr::operator==(Expr const& rhs) const {
   return true;
 }
 
+bool ShuffleStore::operator==(Expr const& rhs) const {
+  if (typeid(rhs) != typeid(ShuffleStore)) {
+    return false;
+  }
+  ShuffleStore const& casted_rhs = static_cast<ShuffleStore const&>(rhs);
+  return *val_ == *casted_rhs.val_ && *out_buffers_ == *casted_rhs.out_buffers_ &&
+         *offsets_ == *casted_rhs.offsets_;
+}
+
 std::string ColumnVar::toString() const {
   return "(ColumnVar db: " + std::to_string(dbId()) +
          " table: " + std::to_string(tableId()) +
@@ -1676,6 +1692,11 @@ std::string ArrayExpr::toString() const {
   }
   str += "]";
   return str;
+}
+
+std::string ShuffleStore::toString() const {
+  return "ShuffleStore(" + val_->toString() + ", " + out_buffers_->toString() + ", " +
+         offsets_->toString() + ")";
 }
 
 std::string OrderEntry::toString() const {
@@ -2154,6 +2175,15 @@ size_t ArrayExpr::hash() const {
     }
     boost::hash_combine(*hash_, local_alloc_);
     boost::hash_combine(*hash_, is_null_);
+  }
+  return *hash_;
+}
+
+size_t ShuffleStore::hash() const {
+  if (!hash_) {
+    boost::hash_combine(*hash_, val_->hash());
+    boost::hash_combine(*hash_, out_buffers_->hash());
+    boost::hash_combine(*hash_, offsets_->hash());
   }
   return *hash_;
 }

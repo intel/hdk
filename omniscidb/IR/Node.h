@@ -375,7 +375,9 @@ class Aggregate : public Node {
             NodePtr input)
       : groupby_count_(groupby_count)
       , aggs_(std::move(aggs))
-      , fields_(std::move(fields)) {
+      , fields_(std::move(fields))
+      , partitioned_(false)
+      , buffer_entry_hint_(0) {
     inputs_.emplace_back(std::move(input));
   }
 
@@ -404,6 +406,12 @@ class Aggregate : public Node {
 
   void setAggExprs(ExprPtrVector new_aggs) { aggs_ = std::move(new_aggs); }
 
+  bool isPartitioned() const { return partitioned_; }
+  void setPartitioned(bool val) { partitioned_ = val; }
+
+  size_t bufferEntryHint() const { return buffer_entry_hint_; }
+  void setBufferEntryHint(size_t val) { buffer_entry_hint_ = val; }
+
   void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
 
   std::string toString() const override {
@@ -415,6 +423,7 @@ class Aggregate : public Node {
                ::toString(aggs_),
                ", fields=",
                ::toString(fields_),
+               (partitioned_ ? ", partitioned" : ""),
                ", inputs=",
                inputsToString(inputs_),
                ")");
@@ -443,6 +452,8 @@ class Aggregate : public Node {
   const size_t groupby_count_;
   ExprPtrVector aggs_;
   std::vector<std::string> fields_;
+  bool partitioned_;
+  size_t buffer_entry_hint_;
 };
 
 class Join : public Node {
@@ -591,7 +602,9 @@ class TranslatedJoin : public Node {
     CHECK(false);
     return nullptr;
   }
-  const std::string& getFieldName(size_t i) const override { CHECK(false); }
+  const std::string& getFieldName(size_t i) const override {
+    throw std::runtime_error("Unexpected call to TranslatedJoin::getFieldName.");
+  }
   std::vector<const ColumnVar*> getJoinCols(bool lhs) const {
     if (lhs) {
       return lhs_join_cols_;
@@ -851,6 +864,69 @@ class LogicalUnion : public Node {
   bool const is_all_;
 };
 
+struct ShuffleFunction {
+  enum Kind {
+    kHash,
+  };
+
+  Kind kind;
+  size_t partitions;
+
+  size_t hash() const;
+  std::string toString() const;
+};
+
+std::ostream& operator<<(std::ostream& os, const ShuffleFunction& fn);
+std::ostream& operator<<(std::ostream& os, ShuffleFunction::Kind kind);
+
+class Shuffle : public Node {
+ public:
+  Shuffle(ExprPtrVector keys,
+          ExprPtr expr,
+          std::string field,
+          ShuffleFunction fn,
+          NodePtr input);
+  Shuffle(ExprPtrVector keys,
+          ExprPtrVector exprs,
+          std::vector<std::string> fields,
+          ShuffleFunction fn,
+          std::vector<NodePtr> input);
+  Shuffle(const Shuffle& other) = default;
+
+  const ExprPtrVector& keys() const { return keys_; }
+  const ExprPtrVector& exprs() const { return exprs_; }
+  const std::vector<std::string>& fields() const { return fields_; }
+  ShuffleFunction fn() const { return fn_; }
+
+  size_t size() const override { return exprs_.size(); }
+
+  // Shuffle node can be used for computing partition sizes and perform
+  // actual partitioning. The first version uses COUNT aggregte as its
+  // only target expression.
+  bool isCount() const {
+    return exprs_.size() == (size_t)1 && exprs_.front()->is<AggExpr>();
+  }
+
+  std::string toString() const override;
+  size_t toHash() const override;
+  void rewriteExprs(hdk::ir::ExprRewriter& rewriter) override;
+
+  std::shared_ptr<Node> deepCopy() const override {
+    return std::make_shared<Shuffle>(*this);
+  }
+
+  const std::string& getFieldName(size_t i) const override {
+    CHECK_LT(i, fields_.size());
+    return fields_[i];
+  }
+
+ private:
+  ExprPtrVector keys_;
+  ExprPtrVector exprs_;
+  std::vector<std::string> fields_;
+  ShuffleFunction fn_;
+};
+
 class QueryNotSupported : public std::runtime_error {
  public:
   QueryNotSupported(const std::string& reason) : std::runtime_error(reason) {}
@@ -919,3 +995,5 @@ size_t getNodeColumnCount(const Node* node);
 ExprPtr getJoinInputColumnRef(const ColumnRef* col_ref);
 
 }  // namespace hdk::ir
+
+std::string toString(hdk::ir::ShuffleFunction::Kind kind);

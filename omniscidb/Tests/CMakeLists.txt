@@ -49,6 +49,7 @@ add_executable(ArrowStorageSqlTest ArrowStorageSqlTest.cpp)
 add_executable(ResultSetArrowConversion ResultSetArrowConversion.cpp)
 add_executable(ExecutionSequenceTest ExecutionSequenceTest.cpp TestRelAlgDagBuilder.cpp)
 add_executable(QueryBuilderTest QueryBuilderTest.cpp TestRelAlgDagBuilder.cpp)
+add_executable(PartitionedGroupByTest PartitionedGroupByTest.cpp)
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_executable(UdfTest UdfTest.cpp)
@@ -125,6 +126,7 @@ target_link_libraries(ParallelSortTest gtest TBB::tbb Logger)
 target_link_libraries(ResultSetArrowConversion gtest QueryEngine ArrowQueryRunner ArrowStorage)
 target_link_libraries(ExecutionSequenceTest gtest QueryEngine ArrowQueryRunner ArrowStorage ConfigBuilder)
 target_link_libraries(QueryBuilderTest gtest QueryBuilder QueryEngine ArrowQueryRunner IR ArrowStorage ConfigBuilder)
+target_link_libraries(PartitionedGroupByTest gtest QueryEngine ArrowQueryRunner IR ArrowStorage ConfigBuilder)
 
 if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   target_link_libraries(UdfTest gtest UdfCompiler QueryEngine ArrowQueryRunner)
@@ -173,6 +175,7 @@ add_test(ParallelSortTest ParallelSortTest ${TEST_ARGS})
 add_test(ResultSetArrowConversion ResultSetArrowConversion ${TEST_ARGS})
 add_test(ExecutionSequenceTest ExecutionSequenceTest ${TEST_ARGS})
 add_test(QueryBuilderTest QueryBuilderTest ${TEST_ARGS})
+add_test(PartitionedGroupByTest PartitionedGroupByTest ${TEST_ARGS})
 
 if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
@@ -229,6 +232,7 @@ set(TEST_PROGRAMS
   ResultSetArrowConversion
   ExecutionSequenceTest
   QueryBuilderTest
+  PartitionedGroupByTest
 )
 
 if(ENABLE_CUDA)

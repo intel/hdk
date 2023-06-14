@@ -446,6 +446,8 @@ extern "C" RUNTIME_EXPORT ALWAYS_INLINE void agg_min(GENERIC_ADDR_SPACE int64_t*
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE void agg_id(GENERIC_ADDR_SPACE int64_t* agg,
                                                     const int64_t val) {
+  printf("store %ld at %p\n", val, agg);
+  fflush(stdout);
   *agg = val;
 }
 
@@ -537,6 +539,8 @@ DEF_AGG_MIN_INT(8)
   extern "C" RUNTIME_EXPORT ALWAYS_INLINE void agg_id_int##n(     \
       GENERIC_ADDR_SPACE int##n##_t* agg, const int##n##_t val) { \
     *agg = val;                                                   \
+    printf("store %d at %p\n", val, agg);                         \
+    fflush(stdout);                                               \
   }
 
 #define DEF_CHECKED_SINGLE_AGG_ID_INT(n)                                        \
@@ -1066,6 +1070,21 @@ pos_start_impl(GENERIC_ADDR_SPACE int32_t* error_code) {
     error_code[0] = 0;
   }
   return row_index_resume;
+}
+
+extern "C" RUNTIME_EXPORT void print_i32(int32_t val) {
+  printf("%d\n", val);
+  fflush(stdout);
+}
+
+extern "C" RUNTIME_EXPORT void print_i64(int64_t val) {
+  printf("%ld\n", val);
+  fflush(stdout);
+}
+
+extern "C" RUNTIME_EXPORT void print_ptr(void* val) {
+  printf("%p\n", val);
+  fflush(stdout);
 }
 
 extern "C" RUNTIME_EXPORT NEVER_INLINE int32_t group_buff_idx_impl() {

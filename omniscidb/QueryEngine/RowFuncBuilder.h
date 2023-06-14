@@ -60,6 +60,10 @@ class RowFuncBuilder {
       const QueryMemoryDescriptor& query_mem_desc,
       const CompilationOptions& co,
       DiamondCodegen& codegen);
+  std::tuple<llvm::Value*, llvm::Value*> codegenPartitionKey(
+      const QueryMemoryDescriptor& query_mem_desc,
+      const CompilationOptions& co,
+      DiamondCodegen& codegen);
 
   llvm::Value* codegenVarlenOutputBuffer(const QueryMemoryDescriptor& query_mem_desc,
                                          const CompilationOptions& co);
@@ -80,6 +84,7 @@ class RowFuncBuilder {
       const int32_t row_size_quad,
       const CompilationOptions& co);
   llvm::Function* codegenPerfectHashFunction(const CompilationOptions& co);
+  llvm::Function* codegenPartitioningHashFunction(const CompilationOptions& co);
 
   std::tuple<llvm::Value*, llvm::Value*> codegenMultiColumnBaselineHash(
       const CompilationOptions& co,
@@ -101,6 +106,11 @@ class RowFuncBuilder {
                        const CompilationOptions& co,
                        const GpuSharedMemoryContext& gpu_smem_context,
                        DiamondCodegen& diamond_codegen);
+  bool codegenShuffle(const std::tuple<llvm::Value*, llvm::Value*>& agg_out_ptr_w_idx,
+                      QueryMemoryDescriptor& query_mem_desc,
+                      const CompilationOptions& co,
+                      const GpuSharedMemoryContext& gpu_smem_context,
+                      DiamondCodegen& diamond_codegen);
 
   llvm::Value* codegenWindowRowPointer(const hdk::ir::WindowFunction* window_func,
                                        const QueryMemoryDescriptor& query_mem_desc,
@@ -137,7 +147,12 @@ class RowFuncBuilder {
 
   std::vector<llvm::Value*> codegenAggArg(const hdk::ir::Expr* target_expr,
                                           const CompilationOptions& co);
+  std::vector<llvm::Value*> codegenShuffleStore(const hdk::ir::ShuffleStore* target_expr,
+                                                const CompilationOptions& co);
 
+  llvm::Value* emitCall(llvm::IRBuilder<>& ir_builder,
+                        const std::string& fname,
+                        const std::vector<llvm::Value*>& args);
   llvm::Value* emitCall(const std::string& fname, const std::vector<llvm::Value*>& args);
 
   void checkErrorCode(llvm::Value* retCode);

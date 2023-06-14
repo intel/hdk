@@ -589,7 +589,10 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
     out_vec.push_back(
         reinterpret_cast<int64_t*>(estimator_result_set_->getHostEstimatorBuffer()));
   } else {
-    if (!is_group_by) {
+    if (ra_exe_unit.isShuffle()) {
+      out_vec.push_back(
+          reinterpret_cast<int64_t*>(executor_->shuffle_out_buf_ptrs_.data()));
+    } else if (!is_group_by) {
       for (size_t i = 0; i < init_agg_vals.size(); ++i) {
         auto buff = new int64_t[num_out_frags];
         out_vec.push_back(static_cast<int64_t*>(buff));
@@ -626,11 +629,43 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
                           query_mem_desc_);
   }
 
+  ////////////////////
+  static std::mutex m;
+  std::lock_guard<std::mutex> l(m);
+  std::cout << "out_vec:";
+  for (auto ptr : out_vec) {
+    std::cout << " " << (void*)ptr << std::endl;
+  }
+  std::cout << "Fragments: " << num_fragments << std::endl;
+  for (size_t frag_idx = 0; frag_idx < num_fragments; ++frag_idx) {
+    std::cout << "Fragment #" << frag_idx << std::endl;
+    for (size_t col_idx = 0; col_idx < col_buffers.front().size(); ++col_idx) {
+      std::cout << "Column #" << col_idx << " " << (void*)col_buffers[frag_idx][col_idx]
+                << ":";
+      for (int64_t i = 0; i < *num_rows_ptr; ++i) {
+        if (col_idx <= 1) {
+          std::cout << " "
+                    << reinterpret_cast<const int64_t*>(
+                           col_buffers[frag_idx][col_idx])[i];
+        } else {
+          std::cout << " "
+                    << reinterpret_cast<const int32_t*>(
+                           col_buffers[frag_idx][col_idx])[i];
+        }
+      }
+      std::cout << std::endl;
+    }
+  }
+  ////////////////////
+
   CHECK(native_code);
   const int64_t* join_hash_tables_ptr =
       join_hash_tables.size() == 1
           ? reinterpret_cast<int64_t*>(join_hash_tables[0])
           : (join_hash_tables.size() > 1 ? &join_hash_tables[0] : nullptr);
+  int64_t** out_buffers = ra_exe_unit.isShuffle() || !is_group_by
+                              ? out_vec.data()
+                              : query_buffers_->getGroupByBuffersPtr();
   if (hoist_literals) {
     using agg_query = void (*)(const int8_t***,  // col_buffers
                                const uint64_t*,  // num_fragments
@@ -645,19 +680,18 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
                                const uint32_t*,  // num_tables
                                const int64_t*);  // join_hash_tables_ptr
     if (is_group_by) {
-      reinterpret_cast<agg_query>(native_code->func())(
-          multifrag_cols_ptr,
-          &num_fragments,
-          literal_buff.data(),
-          num_rows_ptr,
-          flatened_frag_offsets.data(),
-          &scan_limit,
-          &total_matched_init,
-          cmpt_val_buff.data(),
-          query_buffers_->getGroupByBuffersPtr(),
-          error_code,
-          &num_tables,
-          join_hash_tables_ptr);
+      reinterpret_cast<agg_query>(native_code->func())(multifrag_cols_ptr,
+                                                       &num_fragments,
+                                                       literal_buff.data(),
+                                                       num_rows_ptr,
+                                                       flatened_frag_offsets.data(),
+                                                       &scan_limit,
+                                                       &total_matched_init,
+                                                       cmpt_val_buff.data(),
+                                                       out_buffers,
+                                                       error_code,
+                                                       &num_tables,
+                                                       join_hash_tables_ptr);
     } else {
       reinterpret_cast<agg_query>(native_code->func())(multifrag_cols_ptr,
                                                        &num_fragments,
@@ -667,7 +701,7 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
                                                        &scan_limit,
                                                        &total_matched_init,
                                                        init_agg_vals.data(),
-                                                       out_vec.data(),
+                                                       out_buffers,
                                                        error_code,
                                                        &num_tables,
                                                        join_hash_tables_ptr);
@@ -685,18 +719,17 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
                                const uint32_t*,  // num_tables
                                const int64_t*);  // join_hash_tables_ptr
     if (is_group_by) {
-      reinterpret_cast<agg_query>(native_code->func())(
-          multifrag_cols_ptr,
-          &num_fragments,
-          num_rows_ptr,
-          flatened_frag_offsets.data(),
-          &scan_limit,
-          &total_matched_init,
-          cmpt_val_buff.data(),
-          query_buffers_->getGroupByBuffersPtr(),
-          error_code,
-          &num_tables,
-          join_hash_tables_ptr);
+      reinterpret_cast<agg_query>(native_code->func())(multifrag_cols_ptr,
+                                                       &num_fragments,
+                                                       num_rows_ptr,
+                                                       flatened_frag_offsets.data(),
+                                                       &scan_limit,
+                                                       &total_matched_init,
+                                                       cmpt_val_buff.data(),
+                                                       out_buffers,
+                                                       error_code,
+                                                       &num_tables,
+                                                       join_hash_tables_ptr);
     } else {
       reinterpret_cast<agg_query>(native_code->func())(multifrag_cols_ptr,
                                                        &num_fragments,
@@ -705,7 +738,7 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
                                                        &scan_limit,
                                                        &total_matched_init,
                                                        init_agg_vals.data(),
-                                                       out_vec.data(),
+                                                       out_buffers,
                                                        error_code,
                                                        &num_tables,
                                                        join_hash_tables_ptr);

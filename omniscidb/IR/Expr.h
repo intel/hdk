@@ -1099,6 +1099,27 @@ class ArrayExpr : public Expr {
   bool is_null_;  // constant is NULL
 };
 
+class ShuffleStore : public Expr {
+ public:
+  ShuffleStore(const Type* type, ExprPtr val, ExprPtr out_buffers, ExprPtr offsets)
+      : Expr(type), val_(val), out_buffers_(out_buffers), offsets_(offsets) {}
+
+  ExprPtr withType(const Type* new_type) const override;
+  std::string toString() const override;
+  bool operator==(Expr const& rhs) const override;
+
+  const Expr* val() const { return val_.get(); }
+  const Expr* outBuffers() const { return out_buffers_.get(); }
+  const Expr* offsets() const { return offsets_.get(); }
+
+  size_t hash() const override;
+
+ private:
+  ExprPtr val_;
+  ExprPtr out_buffers_;
+  ExprPtr offsets_;
+};
+
 // Returns true if the two expr vectors are equal (same size and each element are
 // equal).
 bool exprsEqual(const ExprPtrVector& lhs, const ExprPtrVector& rhs);

@@ -273,6 +273,9 @@ RelAlgExecutionUnit QueryRewriter::rewriteAggregateOnGroupByColumn(
                                          ra_exe_unit_in.query_plan_dag,
                                          ra_exe_unit_in.hash_table_build_plan_dag,
                                          ra_exe_unit_in.table_id_to_node_map,
-                                         ra_exe_unit_in.union_all};
+                                         ra_exe_unit_in.union_all,
+                                         ra_exe_unit_in.shuffle_fn,
+                                         ra_exe_unit_in.partition_offsets_col,
+                                         ra_exe_unit_in.partitioned_aggregation};
   return rewritten_exe_unit;
 }

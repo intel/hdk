@@ -126,6 +126,11 @@ class RelAlgExecutor {
                    const CompilationOptions& co,
                    const ExecutionOptions& eo,
                    const int64_t queue_time_ms);
+  void executeStepWithPartitionedAggregation(const hdk::ir::Node* step_root,
+                                             const CompilationOptions& co,
+                                             const ExecutionOptions& eo,
+                                             size_t estimated_buffer_size,
+                                             const int64_t queue_time_ms);
   ExecutionResult executeStep(const hdk::ir::Node* step_root,
                               const CompilationOptions& co,
                               const ExecutionOptions& eo,

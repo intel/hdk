@@ -209,7 +209,8 @@ bool is_l0_module(const llvm::Module* m) {
   return m->getTargetTriple().rfind("spir", 0) == 0;
 }
 
-llvm::Value* CgenState::emitCall(const std::string& fname,
+llvm::Value* CgenState::emitCall(llvm::IRBuilder<>& ir_builder,
+                                 const std::string& fname,
                                  const std::vector<llvm::Value*>& args) {
   // Get the function reference from the query module.
   auto func = module_->getFunction(fname);
@@ -218,7 +219,12 @@ llvm::Value* CgenState::emitCall(const std::string& fname,
   // module.
   maybeCloneFunctionRecursive(func, is_l0_module(module_));
 
-  return ir_builder_.CreateCall(func, args);
+  return ir_builder.CreateCall(func, args);
+}
+
+llvm::Value* CgenState::emitCall(const std::string& fname,
+                                 const std::vector<llvm::Value*>& args) {
+  return emitCall(ir_builder_, fname, args);
 }
 
 void CgenState::emitErrorCheck(llvm::Value* condition,

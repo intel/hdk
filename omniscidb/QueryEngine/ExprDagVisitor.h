@@ -33,6 +33,8 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     } else if (auto translated_join =
                    dynamic_cast<const hdk::ir::TranslatedJoin*>(node)) {
       visitTranslatedJoin(translated_join);
+    } else if (auto shuffle = dynamic_cast<const hdk::ir::Shuffle*>(node)) {
+      visitShuffle(shuffle);
     } else {
       LOG(FATAL) << "Unsupported node type: " << node->toString();
     }
@@ -81,6 +83,15 @@ class ExprDagVisitor : public ScalarExprVisitor<void*> {
     }
     if (auto* outer_join_condition = translated_join->getOuterJoinCond()) {
       visit(outer_join_condition);
+    }
+  }
+
+  virtual void visitShuffle(const hdk::ir::Shuffle* shuffle) {
+    for (auto& expr : shuffle->keys()) {
+      visit(expr.get());
+    }
+    for (auto& expr : shuffle->exprs()) {
+      visit(expr.get());
     }
   }
 

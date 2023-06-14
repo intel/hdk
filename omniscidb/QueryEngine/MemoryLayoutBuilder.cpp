@@ -93,6 +93,19 @@ ColRangeInfo get_col_range_info(const RelAlgExecutionUnit& ra_exe_unit,
                                 std::optional<int64_t> group_cardinality_estimation,
                                 Executor* executor,
                                 const ExecutorDeviceType device_type) {
+  // For shuffling COUNT(*) query we use keyless perfect hash.
+  // For shuffling itself we use dummy keyless perfect hash.
+  if (ra_exe_unit.shuffle_fn) {
+    CHECK(!ra_exe_unit.target_exprs.empty());
+    if (ra_exe_unit.target_exprs.front()->is<hdk::ir::AggExpr>()) {
+      return {QueryDescriptionType::GroupByPerfectHash,
+              0,
+              static_cast<int64_t>(ra_exe_unit.shuffle_fn->partitions),
+              0,
+              false};
+    }
+    return {QueryDescriptionType::Projection, 0, 1, 0, false};
+  }
   const Config& config = executor->getConfig();
   // Use baseline layout more eagerly on the GPU if the query uses count distinct,
   // because our HyperLogLog implementation is 4x less memory efficient on GPU.
@@ -236,6 +249,10 @@ KeylessInfo get_keyless_info(const RelAlgExecutionUnit& ra_exe_unit,
                              const std::vector<InputTableInfo>& query_infos,
                              const bool is_group_by,
                              Executor* executor) {
+  if (ra_exe_unit.shuffle_fn) {
+    return {true, 0};
+  }
+
   bool keyless{true}, found{false};
   int32_t num_agg_expr{0};
   int32_t index{0};
@@ -541,7 +558,7 @@ int8_t pick_target_compact_width(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<InputTableInfo>& query_infos,
                                  const int8_t crt_min_byte_width,
                                  bool bigint_count) {
-  if (bigint_count) {
+  if (bigint_count || ra_exe_unit.isShuffleCount()) {
     return sizeof(int64_t);
   }
   int8_t compact_width{0};
@@ -793,6 +810,10 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
 
   auto col_slot_context = ColSlotContext(
       ra_exe_unit.target_exprs, {}, executor->getConfig().exec.group_by.bigint_count);
+  ////////////////////
+  std::cout << "build_query_memory_descriptor col_slot_context:" << std::endl
+            << col_slot_context.toString();
+  ////////////////////
 
   const auto min_slot_size =
       pick_target_compact_width(ra_exe_unit,
@@ -802,6 +823,10 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
 
   col_slot_context.setAllSlotsPaddedSize(min_slot_size);
   col_slot_context.validate();
+  ////////////////////
+  std::cout << "build_query_memory_descriptor col_slot_context2:" << std::endl
+            << col_slot_context.toString();
+  ////////////////////
 
   if (!is_group_by) {
     CHECK(!must_use_baseline_sort);
@@ -857,7 +882,7 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
       // (acts as a key)
       idx_target_as_key = keyless_info.target_index;
 
-      if (group_col_widths.size() > 1) {
+      if (ra_exe_unit.isShuffleCount() || group_col_widths.size() > 1) {
         // col range info max contains the expected cardinality of the output
         entry_count = static_cast<size_t>(actual_col_range_info.max);
         actual_col_range_info.bucket = 0;
@@ -942,31 +967,45 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
                                         executor->getConfig().exec.group_by.bigint_count);
       break;
     }
+    case QueryDescriptionType::Shuffle:
+      col_slot_context = ColSlotContext(ra_exe_unit.target_exprs,
+                                        target_groupby_indices,
+                                        executor->getConfig().exec.group_by.bigint_count);
+      // col_slot_context.setAllSlotsPaddedSizeToLogicalSize();
+      break;
     default:
       UNREACHABLE() << "Unknown query type";
   }
+  ////////////////////
+  std::cout << "build_query_memory_descriptor col_slot_context3:" << std::endl
+            << col_slot_context.toString();
+  ////////////////////
 
   auto approx_quantile =
       anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kApproxQuantile);
-  return std::make_unique<QueryMemoryDescriptor>(executor->getDataMgr(),
-                                                 executor->getConfigPtr(),
-                                                 query_infos,
-                                                 approx_quantile,
-                                                 allow_multifrag,
-                                                 keyless_hash,
-                                                 interleaved_bins_on_gpu,
-                                                 idx_target_as_key,
-                                                 actual_col_range_info,
-                                                 col_slot_context,
-                                                 group_col_widths,
-                                                 group_col_compact_width,
-                                                 target_groupby_indices,
-                                                 entry_count,
-                                                 count_distinct_descriptors,
-                                                 sort_on_gpu_hint,
-                                                 output_columnar,
-                                                 must_use_baseline_sort,
-                                                 streaming_top_n);
+  auto res = std::make_unique<QueryMemoryDescriptor>(executor->getDataMgr(),
+                                                     executor->getConfigPtr(),
+                                                     query_infos,
+                                                     approx_quantile,
+                                                     allow_multifrag,
+                                                     keyless_hash,
+                                                     interleaved_bins_on_gpu,
+                                                     idx_target_as_key,
+                                                     actual_col_range_info,
+                                                     col_slot_context,
+                                                     group_col_widths,
+                                                     group_col_compact_width,
+                                                     target_groupby_indices,
+                                                     entry_count,
+                                                     count_distinct_descriptors,
+                                                     sort_on_gpu_hint,
+                                                     output_columnar,
+                                                     must_use_baseline_sort,
+                                                     streaming_top_n);
+  ////////////////////
+  std::cout << "build_query_memory_descriptor result:" << std::endl << res->toString();
+  ////////////////////
+  return res;
 }
 
 std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(

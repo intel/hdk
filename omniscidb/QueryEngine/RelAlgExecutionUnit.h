@@ -143,9 +143,21 @@ struct RelAlgExecutionUnit {
   TableIdToNodeMap table_id_to_node_map{};
   // empty if not a UNION, true if UNION ALL, false if regular UNION
   const std::optional<bool> union_all;
+  // If non-empty, then this unit is a shuffling unit with the specified
+  // function. groupby_exprs hold keys, target_exprs hold all output
+  // expressions.
+  std::optional<hdk::ir::ShuffleFunction> shuffle_fn;
+  // When shuffling data, this references the column holding computed
+  // partition offsets.
+  hdk::ir::ExprPtr partition_offsets_col;
+  // Set to true when aggregating partitioned input.
+  bool partitioned_aggregation;
 
   std::shared_ptr<costmodel::CostModel> cost_model;
   std::vector<costmodel::AnalyticalTemplate> templs;
+
+  bool isShuffleCount() const { return shuffle_fn && !partition_offsets_col; }
+  bool isShuffle() const { return shuffle_fn && partition_offsets_col; }
 };
 
 std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_unit);
