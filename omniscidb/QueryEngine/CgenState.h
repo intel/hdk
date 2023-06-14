@@ -283,6 +283,9 @@ struct CgenState {
     return result;
   }
 
+  llvm::Value* emitCall(llvm::IRBuilder<>& ir_builder,
+                        const std::string& fname,
+                        const std::vector<llvm::Value*>& args);
   llvm::Value* emitCall(const std::string& fname, const std::vector<llvm::Value*>& args);
 
   size_t getLiteralBufferUsage(const int device_id) {

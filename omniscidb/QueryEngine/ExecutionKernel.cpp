@@ -104,7 +104,7 @@ const std::vector<uint64_t>& SharedKernelContext::getFragOffsets() {
   return all_frag_row_offsets_;
 }
 
-void SharedKernelContext::addDeviceResults(ResultSetPtr&& device_results,
+void SharedKernelContext::addDeviceResults(ResultSetPtr device_results,
                                            int outer_table_id,
                                            std::vector<size_t> outer_table_fragment_ids) {
   std::lock_guard<std::mutex> lock(reduce_mutex_);
@@ -409,7 +409,7 @@ void ExecutionKernel::runImpl(Executor* executor,
     err = executor->executePlan(ra_exe_unit_,
                                 compilation_result,
                                 query_comp_desc.hoistLiterals(),
-                                &device_results_,
+                                ra_exe_unit_.isShuffle() ? nullptr : &device_results_,
                                 chosen_device_type,
                                 co,
                                 fetch_result->col_buffers,

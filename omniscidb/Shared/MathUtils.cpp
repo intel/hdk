@@ -14,20 +14,4 @@
  * limitations under the License.
  */
 
-namespace shared {
-
-bool isPowOfTwo(unsigned n) {
-  return (n & (n - 1)) == 0;
-}
-
-unsigned getExpOfTwo(unsigned n) {
-  unsigned i = 0;
-
-  while ((n = n >> 1)) {
-    ++i;
-  }
-
-  return i;
-}
-
-}  // namespace shared
+namespace shared {}  // namespace shared

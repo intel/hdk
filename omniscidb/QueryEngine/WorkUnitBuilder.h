@@ -63,9 +63,11 @@ class WorkUnitBuilder {
   void processSort(const ir::Sort* sort);
   void processUnion(const ir::LogicalUnion* logical_union);
   void processJoin(const ir::Join* join);
+  void processShuffle(const ir::Shuffle* shuffle);
   std::list<hdk::ir::ExprPtr> makeJoinQuals(const hdk::ir::Expr* join_condition);
   void reorderTables();
   void computeSimpleQuals();
+  void assignUnionOrder(const ir::Node* node, int order);
   int assignNestLevels(const ir::Node* node, int start_idx = 0);
   void computeJoinTypes(const ir::Node* node, bool allow_join = true);
   void computeInputDescs();
@@ -133,6 +135,9 @@ class WorkUnitBuilder {
   HashTableBuildDagMap hash_table_build_plan_dag_;
   TableIdToNodeMap table_id_to_node_map_;
   std::optional<bool> union_all_;
+  std::optional<ir::ShuffleFunction> shuffle_fn_;
+  hdk::ir::ExprPtr partition_offsets_col_;
+  bool partitioned_aggregation_ = false;
 
   std::optional<unsigned> left_deep_tree_id_;
   size_t max_groups_buffer_entry_guess_;

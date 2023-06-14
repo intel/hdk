@@ -45,6 +45,7 @@
 #include "QueryEngine/TopKSort.h"
 #include "QueryEngine/WindowContext.h"
 #include "ResultSet/QueryMemoryDescriptor.h"
+#include "Shared/MathUtils.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/funcannotations.h"
 #include "ThirdParty/robin_hood.h"
@@ -123,6 +124,7 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
 
   {
     const bool is_group_by = !ra_exe_unit_.groupby_exprs.empty();
+    const bool is_shuffle = !!ra_exe_unit_.shuffle_fn;
 
     if (executor_->isArchMaxwell(co.device_type)) {
       executor_->prependForceSync();
@@ -135,7 +137,12 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
                               false);
     filter_false = filter_cfg.cond_false_;
 
-    if (is_group_by) {
+    if (is_shuffle) {
+      filter_cfg.setChainToNext();
+      auto agg_out_ptr_w_idx = codegenPartitionKey(query_mem_desc, co, filter_cfg);
+      can_return_error = codegenShuffle(
+          agg_out_ptr_w_idx, query_mem_desc, co, gpu_smem_context, filter_cfg);
+    } else if (is_group_by) {
       if (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection &&
           !query_mem_desc.useStreamingTopN()) {
         const auto crt_matched = get_arg_by_name(ROW_FUNC, "crt_matched");
@@ -463,6 +470,69 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
   }
   CHECK(false);
   return std::make_tuple(nullptr, nullptr);
+}
+
+std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenPartitionKey(
+    const QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co,
+    DiamondCodegen& diamond_codegen) {
+  AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
+  auto arg_it = ROW_FUNC->arg_begin();
+  auto groups_buffer = arg_it++;
+
+  std::stack<llvm::BasicBlock*> array_loops;
+  CHECK(query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection ||
+        query_mem_desc.getQueryDescriptionType() ==
+            QueryDescriptionType::GroupByPerfectHash);
+  CHECK(ra_exe_unit_.shuffle_fn);
+  CHECK(ra_exe_unit_.shuffle_fn->kind == hdk::ir::ShuffleFunction::kHash);
+
+  CodeGenerator code_generator(executor_, co.codegen_traits_desc);
+  // The following code implements MurmurHash64A.
+  auto mul_value = LL_INT(0xc6a4a7935bd1e995LLU);
+  auto shr_value = LL_INT(47LLU);
+  uint64_t hash_init_val =
+      0 ^ (ra_exe_unit_.groupby_exprs.size() * 8 * 0xc6a4a7935bd1e995LLU);
+  llvm::Value* cur_hash_value = LL_INT(hash_init_val);
+  for (const auto& group_expr : ra_exe_unit_.groupby_exprs) {
+    // k = static_cast<uint64_t>(val)
+    auto group_key = code_generator.codegen(group_expr.get(), true, co).front();
+    if (!group_key->getType()->isIntegerTy(64)) {
+      group_key =
+          LL_BUILDER.CreateBitCast(executor_->cgen_state_->castToTypeIn(group_key, 64),
+                                   get_int_type(64, LL_CONTEXT));
+    }
+    // k *= m;
+    group_key = LL_BUILDER.CreateMul(group_key, mul_value);
+    // k ^= k >> r;
+    group_key =
+        LL_BUILDER.CreateXor(group_key, LL_BUILDER.CreateLShr(group_key, shr_value));
+    // k *= m;
+    group_key = LL_BUILDER.CreateMul(group_key, mul_value);
+    // h ^= k;
+    cur_hash_value = LL_BUILDER.CreateXor(cur_hash_value, group_key);
+    // h *= m;
+    cur_hash_value = LL_BUILDER.CreateMul(cur_hash_value, mul_value);
+  }
+  // h ^= h >> r;
+  cur_hash_value = LL_BUILDER.CreateXor(cur_hash_value,
+                                        LL_BUILDER.CreateLShr(cur_hash_value, shr_value));
+  // h *= m;
+  cur_hash_value = LL_BUILDER.CreateMul(cur_hash_value, mul_value);
+  // h ^= h >> r;
+  cur_hash_value = LL_BUILDER.CreateXor(cur_hash_value,
+                                        LL_BUILDER.CreateLShr(cur_hash_value, shr_value));
+  // h = h % partitions
+  size_t partitions = ra_exe_unit_.shuffle_fn->partitions;
+  if (shared::isPowOfTwo(partitions)) {
+    cur_hash_value = LL_BUILDER.CreateAnd(cur_hash_value, LL_INT(partitions - 1));
+  } else {
+    cur_hash_value = LL_BUILDER.CreateURem(cur_hash_value, LL_INT(partitions));
+  }
+  cur_hash_value = executor_->cgen_state_->castToTypeIn(cur_hash_value, 32);
+  cur_hash_value->setName("partition_key");
+
+  return std::make_tuple(groups_buffer, cur_hash_value);
 }
 
 llvm::Value* RowFuncBuilder::codegenVarlenOutputBuffer(
@@ -862,6 +932,92 @@ bool RowFuncBuilder::codegenAggCalls(
   return can_return_error;
 }
 
+bool RowFuncBuilder::codegenShuffle(
+    const std::tuple<llvm::Value*, llvm::Value*>& agg_out_ptr_w_idx,
+    QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co,
+    const GpuSharedMemoryContext& gpu_smem_context,
+    DiamondCodegen& diamond_codegen) {
+  if (ra_exe_unit_.isShuffleCount()) {
+    TargetExprCodegenBuilder target_builder(ra_exe_unit_, true);
+    CHECK_EQ(ra_exe_unit_.target_exprs.size(), (size_t)1);
+    target_builder(ra_exe_unit_.target_exprs.front(), executor_, query_mem_desc, co);
+    target_builder.codegen(this,
+                           executor_,
+                           query_mem_desc,
+                           co,
+                           gpu_smem_context,
+                           agg_out_ptr_w_idx,
+                           {},
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           diamond_codegen);
+  } else {
+    // In data shuffle we don't use the regular way to compute output buffer and offset.
+    // This is because each output partition has its own size.
+    // The first element of the agg_out_ptr_w_idx pair is holding array of arrays of
+    // output buffer pointers. First partitioning key and then target index are used to
+    // access these arrays to get actual output buffer for the current value.
+    CodeGenerator code_generator(executor_, co.codegen_traits_desc);
+    auto output_buffers = std::get<0>(agg_out_ptr_w_idx);
+    auto partition_key = std::get<1>(agg_out_ptr_w_idx);
+    output_buffers = LL_BUILDER.CreateBitCast(
+        output_buffers,
+        llvm::Type::getInt8PtrTy(LL_CONTEXT)->getPointerTo()->getPointerTo());
+    auto partition_byte_streams = LL_BUILDER.CreateLoad(
+        llvm::Type::getInt8PtrTy(LL_CONTEXT)->getPointerTo(),
+        LL_BUILDER.CreateGEP(llvm::Type::getInt8PtrTy(LL_CONTEXT)->getPointerTo(),
+                             output_buffers,
+                             partition_key),
+        "partition_byte_streams");
+    // Read the current partition offset from the offsets column.
+    CHECK(ra_exe_unit_.partition_offsets_col->is<hdk::ir::ColumnVar>());
+    auto offsets_col = code_generator.colByteStream(
+        ra_exe_unit_.partition_offsets_col->as<hdk::ir::ColumnVar>(), true, false);
+    offsets_col = LL_BUILDER.CreateBitCast(
+        offsets_col, llvm::Type::getInt64PtrTy(LL_CONTEXT), "partition_offsets");
+    auto offset_ptr = LL_BUILDER.CreateGEP(llvm::Type::getInt64Ty(LL_CONTEXT),
+                                           offsets_col,
+                                           partition_key,
+                                           "partition_offset_ptr");
+    auto offset_val = LL_BUILDER.CreateLoad(
+        llvm::Type::getInt64Ty(LL_CONTEXT), offset_ptr, "partition_offset");
+    TargetExprCodegenBuilder target_builder(ra_exe_unit_, true);
+    for (size_t target_idx = 0; target_idx < ra_exe_unit_.target_exprs.size();
+         ++target_idx) {
+      auto target_expr = ra_exe_unit_.target_exprs[target_idx];
+      auto target_byte_stream =
+          LL_BUILDER.CreateLoad(llvm::Type::getInt8PtrTy(LL_CONTEXT),
+                                LL_BUILDER.CreateGEP(llvm::Type::getInt8PtrTy(LL_CONTEXT),
+                                                     partition_byte_streams,
+                                                     LL_INT(target_idx)),
+                                "target_byte_stream_" + std::to_string(target_idx));
+      size_t chosen_bytes = query_mem_desc.getPaddedSlotWidthBytes(target_idx);
+
+      target_builder(target_expr, executor_, query_mem_desc, co);
+      target_builder.codegenSingleTarget(this,
+                                         executor_,
+                                         query_mem_desc,
+                                         co,
+                                         gpu_smem_context,
+                                         agg_out_ptr_w_idx,
+                                         {},
+                                         target_byte_stream,
+                                         offset_val,
+                                         nullptr,
+                                         diamond_codegen,
+                                         target_idx);
+    }
+    // Increment offset value
+    auto new_offset_val =
+        LL_BUILDER.CreateAdd(offset_val, LL_INT(1LLU), "new_partition_offset");
+    LL_BUILDER.CreateStore(new_offset_val, offset_ptr);
+  }
+
+  return false;
+}
+
 /**
  * @brief: returns the pointer to where the aggregation should be stored.
  */
@@ -883,7 +1039,6 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
             chosen_bytes == 8);
       CHECK(output_buffer_byte_stream);
       CHECK(out_row_idx);
-      size_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
       // multiplying by chosen_bytes, i.e., << log2(chosen_bytes)
 #ifdef _WIN32
       auto out_per_col_byte_idx =
@@ -892,7 +1047,16 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       auto out_per_col_byte_idx =
           LL_BUILDER.CreateShl(out_row_idx, __builtin_ffs(chosen_bytes) - 1);
 #endif
-      auto byte_offset = LL_BUILDER.CreateAdd(out_per_col_byte_idx, LL_INT(col_off));
+
+      llvm::Value* byte_offset;
+      // For shuffle we use multiple destinations with different column sizes, so
+      // we prepare column_pointer in advance instead of adding an offset here.
+      if (ra_exe_unit_.isShuffle()) {
+        byte_offset = out_per_col_byte_idx;
+      } else {
+        size_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
+        byte_offset = LL_BUILDER.CreateAdd(out_per_col_byte_idx, LL_INT(col_off));
+      }
       byte_offset->setName("out_byte_off_target_" + std::to_string(target_idx));
       auto output_ptr = LL_BUILDER.CreateGEP(
           output_buffer_byte_stream->getType()->getScalarType()->getPointerElementType(),
@@ -1243,6 +1407,13 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
   return agg_expr ? code_generator.codegen(agg_expr->arg(), true, co)
                   : code_generator.codegen(
                         target_expr, !executor_->plan_state_->allow_lazy_fetch_, co);
+}
+
+llvm::Value* RowFuncBuilder::emitCall(llvm::IRBuilder<>& ir_builder,
+                                      const std::string& fname,
+                                      const std::vector<llvm::Value*>& args) {
+  AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
+  return executor_->cgen_state_->emitCall(ir_builder, fname, args);
 }
 
 llvm::Value* RowFuncBuilder::emitCall(const std::string& fname,

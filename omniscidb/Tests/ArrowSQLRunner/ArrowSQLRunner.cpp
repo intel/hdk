@@ -106,6 +106,21 @@ class ArrowSQLRunnerImpl {
     return res;
   }
 
+  ExecutionResult runQuery(std::unique_ptr<hdk::ir::QueryDag> dag,
+                           ExecutorDeviceType device_type,
+                           bool allow_loop_joins) {
+    auto ra_executor =
+        std::make_unique<RelAlgExecutor>(executor_.get(), schema_mgr_, std::move(dag));
+    auto eo = getExecutionOptions(allow_loop_joins);
+    auto co = getCompilationOptions(device_type);
+    ExecutionResult res;
+
+    execution_time_ += measure<std::chrono::microseconds>::execution(
+        [&]() { res = ra_executor->executeRelAlgQuery(co, eo, false); });
+
+    return res;
+  }
+
   ExecutionResult runSqlQuery(const std::string& sql,
                               ExecutorDeviceType device_type,
                               const ExecutionOptions& eo) {
@@ -438,6 +453,13 @@ ExecutionResult runSqlQuery(const std::string& sql,
                             ExecutorDeviceType device_type,
                             bool allow_loop_joins) {
   return ArrowSQLRunnerImpl::get()->runSqlQuery(sql, device_type, allow_loop_joins);
+}
+
+ExecutionResult runQuery(std::unique_ptr<hdk::ir::QueryDag> dag,
+                         ExecutorDeviceType device_type,
+                         bool allow_loop_joins) {
+  return ArrowSQLRunnerImpl::get()->runQuery(
+      std::move(dag), device_type, allow_loop_joins);
 }
 
 ExecutionOptions getExecutionOptions(bool allow_loop_joins, bool just_explain) {

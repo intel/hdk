@@ -156,6 +156,12 @@ struct ExecutionOptions {
     return eo;
   }
 
+  ExecutionOptions with_columnar_output(bool enable = true) const {
+    ExecutionOptions eo = *this;
+    eo.output_columnar_hint = enable;
+    return eo;
+  }
+
  private:
   ExecutionOptions() {}
 };

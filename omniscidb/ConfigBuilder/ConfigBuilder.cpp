@@ -183,6 +183,39 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       po::value<size_t>(&config_->exec.group_by.large_ndv_multiplier)
           ->default_value(config_->exec.group_by.large_ndv_multiplier),
       "A multiplier applied to NDV estimator buffer size for large ranges.");
+  opt_desc.add_options()(
+      "enable-cpu-partitioned-groupby",
+      po::value<bool>(&config_->exec.group_by.enable_cpu_partitioned_groupby)
+          ->default_value(config_->exec.group_by.enable_cpu_partitioned_groupby)
+          ->implicit_value(true),
+      "Enable partitioned aggregation on CPU.");
+  opt_desc.add_options()(
+      "groupby-partitioning-buffer-size-threshold",
+      po::value<size_t>(&config_->exec.group_by.partitioning_buffer_size_threshold)
+          ->default_value(config_->exec.group_by.partitioning_buffer_size_threshold),
+      "Minimal estimated output buffer size to enable partitioned aggregation.");
+  opt_desc.add_options()(
+      "groupby-partitioning-group-size-threshold",
+      po::value<double>(&config_->exec.group_by.partitioning_group_size_threshold)
+          ->default_value(config_->exec.group_by.partitioning_group_size_threshold),
+      "Maximum average estimated number of rows per output group to enable partitioned "
+      "aggregation.");
+  opt_desc.add_options()("groupby-min-partitions",
+                         po::value<size_t>(&config_->exec.group_by.min_partitions)
+                             ->default_value(config_->exec.group_by.min_partitions),
+                         "A minimal number of partitions to be used for partitioned "
+                         "aggregation. 0 value is used for auto-detection.");
+  opt_desc.add_options()("groupby-max-partitions",
+                         po::value<size_t>(&config_->exec.group_by.max_partitions)
+                             ->default_value(config_->exec.group_by.max_partitions),
+                         "A maximum number of partitions to be used for partitioned "
+                         "aggregation.");
+  opt_desc.add_options()(
+      "groupby-partitioning-target-buffer-size",
+      po::value<size_t>(&config_->exec.group_by.partitioning_buffer_target_size)
+          ->default_value(config_->exec.group_by.partitioning_buffer_target_size),
+      "A preferred aggregation output buffer size used to compute number of partitions "
+      "to use.");
 
   // exec.window
   opt_desc.add_options()("enable-window-functions",
@@ -349,6 +382,12 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->implicit_value(true),
       "Enable multi-fragment intermediate results to improve execution parallelism for "
       "queries with multiple execution steps");
+  opt_desc.add_options()(
+      "enable-multifrag-execution-result",
+      po::value<bool>(&config_->exec.enable_multifrag_execution_result)
+          ->default_value(config_->exec.enable_multifrag_execution_result)
+          ->implicit_value(true),
+      "Enable multi-fragment final execution result");
   opt_desc.add_options()("gpu-block-size",
                          po::value<size_t>(&config_->exec.override_gpu_block_size)
                              ->default_value(config_->exec.override_gpu_block_size),

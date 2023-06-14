@@ -51,6 +51,12 @@ struct GroupByConfig {
   size_t baseline_threshold = 1'000'000;
   int64_t large_ndv_threshold = 10'000'000;
   size_t large_ndv_multiplier = 256;
+  bool enable_cpu_partitioned_groupby = true;
+  size_t partitioning_buffer_size_threshold = 1 << 30;
+  double partitioning_group_size_threshold = 2.0;
+  size_t min_partitions = 0;
+  size_t max_partitions = 1024;
+  size_t partitioning_buffer_target_size = 32 << 20;
 };
 
 struct WindowFunctionsConfig {
@@ -101,6 +107,7 @@ struct ExecutionConfig {
   bool enable_interop = false;
   size_t parallel_linearization_threshold = 10'000;
   bool enable_multifrag_rs = true;
+  bool enable_multifrag_execution_result = false;
 
   size_t override_gpu_block_size = 0;
   size_t override_gpu_grid_size = 0;

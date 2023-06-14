@@ -628,6 +628,37 @@ void TargetExprCodegenBuilder::codegen(
   }
 }
 
+void TargetExprCodegenBuilder::codegenSingleTarget(
+    RowFuncBuilder* row_func_builder,
+    Executor* executor,
+    const QueryMemoryDescriptor& query_mem_desc,
+    const CompilationOptions& co,
+    const GpuSharedMemoryContext& gpu_smem_context,
+    const std::tuple<llvm::Value*, llvm::Value*>& agg_out_ptr_w_idx,
+    const std::vector<llvm::Value*>& agg_out_vec,
+    llvm::Value* output_buffer_byte_stream,
+    llvm::Value* out_row_idx,
+    llvm::Value* varlen_output_buffer,
+    DiamondCodegen& diamond_codegen,
+    size_t target_idx) const {
+  CHECK(row_func_builder);
+  CHECK(executor);
+  AUTOMATIC_IR_METADATA(executor->cgen_state_.get());
+
+  CHECK_LT(target_idx, target_exprs_to_codegen.size());
+  target_exprs_to_codegen[target_idx].codegen(row_func_builder,
+                                              executor,
+                                              query_mem_desc,
+                                              co,
+                                              gpu_smem_context,
+                                              agg_out_ptr_w_idx,
+                                              agg_out_vec,
+                                              output_buffer_byte_stream,
+                                              out_row_idx,
+                                              varlen_output_buffer,
+                                              diamond_codegen);
+}
+
 void TargetExprCodegenBuilder::codegenSampleExpressions(
     RowFuncBuilder* row_func_builder,
     Executor* executor,

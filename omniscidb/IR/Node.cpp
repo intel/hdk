@@ -284,6 +284,90 @@ void LogicalUnion::checkForMatchingMetaInfoTypes() const {
   }
 }
 
+size_t ShuffleFunction::hash() const {
+  size_t res = 0;
+  boost::hash_combine(res, kind);
+  boost::hash_combine(res, partitions);
+  return res;
+}
+
+std::string ShuffleFunction::toString() const {
+  std::stringstream ss;
+  ss << kind << "(" << partitions << ")";
+  return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& os, const ShuffleFunction& fn) {
+  os << fn.toString();
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, ShuffleFunction::Kind kind) {
+  os << ::toString(kind);
+  return os;
+}
+
+Shuffle::Shuffle(ExprPtrVector keys,
+                 ExprPtr expr,
+                 std::string field,
+                 ShuffleFunction fn,
+                 NodePtr input)
+    : keys_(keys), exprs_({std::move(expr)}), fields_({std::move(field)}), fn_(fn) {
+  inputs_.emplace_back(std::move(input));
+}
+
+Shuffle::Shuffle(ExprPtrVector keys,
+                 ExprPtrVector exprs,
+                 std::vector<std::string> fields,
+                 ShuffleFunction fn,
+                 std::vector<NodePtr> inputs)
+    : keys_(keys), exprs_(std::move(exprs)), fields_(std::move(fields)), fn_(fn) {
+  inputs_ = std::move(inputs);
+}
+
+std::string Shuffle::toString() const {
+  return cat(::typeName(this),
+             getIdString(),
+             "(keys=",
+             ::toString(keys_),
+             ", exprs=",
+             ::toString(exprs_),
+             ", fields",
+             ::toString(fields_),
+             ", fn=",
+             ::toString(fn_),
+             ")");
+}
+
+size_t Shuffle::toHash() const {
+  if (!hash_) {
+    hash_ = typeid(Shuffle).hash_code();
+    for (auto& expr : keys_) {
+      boost::hash_combine(*hash_, expr->hash());
+    }
+    for (auto& expr : exprs_) {
+      boost::hash_combine(*hash_, expr->hash());
+    }
+    for (auto& field : fields_) {
+      boost::hash_combine(*hash_, field);
+    }
+    boost::hash_combine(*hash_, fn_.hash());
+    for (auto& node : inputs_) {
+      boost::hash_combine(*hash_, node->toHash());
+    }
+  }
+  return *hash_;
+}
+
+void Shuffle::rewriteExprs(hdk::ir::ExprRewriter& rewriter) {
+  for (size_t i = 0; i < keys_.size(); ++i) {
+    keys_[i] = rewriter.visit(keys_[i].get());
+  }
+  for (size_t i = 0; i < exprs_.size(); ++i) {
+    exprs_[i] = rewriter.visit(exprs_[i].get());
+  }
+}
+
 namespace {
 
 void collectNodes(NodePtr node, std::vector<NodePtr> nodes) {
@@ -318,7 +402,7 @@ void QueryDag::resetQueryExecutionState() {
 // TODO: always simply use node->size()
 size_t getNodeColumnCount(const Node* node) {
   // Nodes that don't depend on input.
-  if (is_one_of<Scan, Project, Aggregate, LogicalUnion, LogicalValues>(node)) {
+  if (is_one_of<Scan, Project, Aggregate, LogicalUnion, LogicalValues, Shuffle>(node)) {
     return node->size();
   }
 
@@ -356,7 +440,8 @@ ExprPtrVector getNodeColumnRefs(const Node* node) {
                 LogicalValues,
                 Filter,
                 Sort,
-                Join>(node)) {
+                Join,
+                Shuffle>(node)) {
     return genColumnRefs(node, getNodeColumnCount(node));
   }
 
@@ -374,7 +459,8 @@ ExprPtr getNodeColumnRef(const Node* node, unsigned index) {
                 LogicalValues,
                 Filter,
                 Sort,
-                Join>(node)) {
+                Join,
+                Shuffle>(node)) {
     return makeExpr<ColumnRef>(getColumnType(node, index), node, index);
   }
 
@@ -458,3 +544,12 @@ const Type* getColumnType(const Node* node, size_t col_idx) {
 }
 
 }  // namespace hdk::ir
+
+std::string toString(hdk::ir::ShuffleFunction::Kind kind) {
+  switch (kind) {
+    case hdk::ir::ShuffleFunction::kHash:
+      return "Hash";
+  }
+  LOG(FATAL) << "Invalid shuffle kind.";
+  return "";
+}

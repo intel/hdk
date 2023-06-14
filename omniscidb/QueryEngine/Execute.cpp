@@ -70,6 +70,7 @@
 #include "QueryEngine/SpeculativeTopN.h"
 #include "QueryEngine/StringDictionaryGenerations.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
+#include "ResultSet/ColRangeInfo.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/funcannotations.h"
 #include "Shared/measure.h"
@@ -1366,6 +1367,76 @@ ResultSetPtr Executor::reduceSpeculativeTopN(
   return m.asRows(ra_exe_unit, row_set_mem_owner, query_mem_desc, this, top_n, desc);
 }
 
+hdk::ResultSetTable Executor::reducePartitionHistogram(
+    std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& results_per_device,
+    const QueryMemoryDescriptor& query_mem_desc,
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) const {
+  std::vector<ResultSetPtr> results;
+  std::vector<int64_t*> buffers;
+
+  results.reserve(results_per_device.size() + 1);
+  buffers.reserve(results_per_device.size() + 1);
+
+  // In the reduction result we want each fragment result to hold an offset in
+  // output buffer instead of number of rows. Also, we want to make an additional
+  // result set holding final partition sizes. Achieve it by using a new zero-filled
+  // buffer for the the first fragment and partial sums for all other having
+  // partition sizes in the last of them.
+  // Additionally, we want them to be columnar Projection instead of PerfectHash
+  // to later zero-copy fetch all rows.
+  using IndexedResultSet = std::pair<ResultSetPtr, std::vector<size_t>>;
+  std::sort(results_per_device.begin(),
+            results_per_device.end(),
+            [](const IndexedResultSet& lhs, const IndexedResultSet& rhs) {
+              CHECK_GE(lhs.second.size(), size_t(1));
+              CHECK_GE(rhs.second.size(), size_t(1));
+              return lhs.second.front() < rhs.second.front();
+            });
+
+  auto parts = query_mem_desc.getEntryCount();
+  auto proj_mem_desc = query_mem_desc;
+  proj_mem_desc.setQueryDescriptionType(QueryDescriptionType::Projection);
+  proj_mem_desc.setHasKeylessHash(false);
+  proj_mem_desc.clearGroupColWidths();
+  // Currently, all perfect hash tables are expected to to use 8 byte padded width.
+  CHECK_EQ(static_cast<int>(proj_mem_desc.getPaddedSlotWidthBytes(0)), 8);
+  auto first_rs =
+      std::make_shared<ResultSet>(results_per_device.front().first->getTargetInfos(),
+                                  ExecutorDeviceType::CPU,
+                                  proj_mem_desc,
+                                  row_set_mem_owner,
+                                  data_mgr_,
+                                  blockSize(),
+                                  gridSize());
+  first_rs->allocateStorage(plan_state_->init_agg_vals_);
+  results.push_back(first_rs);
+  buffers.push_back(
+      reinterpret_cast<int64_t*>(first_rs->getStorage()->getUnderlyingBuffer()));
+  for (auto& pr : results_per_device) {
+    auto buf = pr.first->getStorage()->getUnderlyingBuffer();
+    auto proj_rs =
+        std::make_shared<ResultSet>(results_per_device.front().first->getTargetInfos(),
+                                    ExecutorDeviceType::CPU,
+                                    proj_mem_desc,
+                                    row_set_mem_owner,
+                                    data_mgr_,
+                                    blockSize(),
+                                    gridSize());
+    proj_rs->allocateStorage(buf, {});
+    results.push_back(proj_rs);
+    buffers.push_back(reinterpret_cast<int64_t*>(buf));
+  }
+
+  memset(buffers[0], 0, sizeof(int64_t) * parts);
+  for (size_t i = 2; i < buffers.size(); ++i) {
+    for (size_t j = 0; j < parts; ++j) {
+      buffers[i][j] += buffers[i - 1][j];
+    }
+  }
+
+  return hdk::ResultSetTable(std::move(results));
+}
+
 namespace {
 
 std::unordered_set<int> get_available_gpus(const Data_Namespace::DataMgr* data_mgr) {
@@ -1628,6 +1699,15 @@ std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_uni
   if (ra_exe_unit.union_all) {
     os << "\n\tUnion: " << std::string(*ra_exe_unit.union_all ? "UNION ALL" : "UNION");
   }
+  if (ra_exe_unit.shuffle_fn) {
+    os << "\n\tShuffle: " << *ra_exe_unit.shuffle_fn;
+  }
+  if (ra_exe_unit.partition_offsets_col) {
+    os << "\n\tPartition offsets column: "
+       << ra_exe_unit.partition_offsets_col->toString();
+  }
+  os << "\n\tPartitioned aggregation: " << ra_exe_unit.partitioned_aggregation;
+
   return os;
 }
 
@@ -1649,6 +1729,9 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
           ra_exe_unit_in.hash_table_build_plan_dag,
           ra_exe_unit_in.table_id_to_node_map,
           ra_exe_unit_in.union_all,
+          ra_exe_unit_in.shuffle_fn,
+          ra_exe_unit_in.partition_offsets_col,
+          ra_exe_unit_in.partitioned_aggregation,
           ra_exe_unit_in.cost_model,
           ra_exe_unit_in.templs};
 }
@@ -1695,6 +1778,7 @@ hdk::ResultSetTable Executor::executeWorkUnit(
     }
     return result;
   } catch (const CompilationRetryNewScanLimit& e) {
+    CHECK(!ra_exe_unit_in.shuffle_fn);
     auto result =
         executeWorkUnitImpl(max_groups_buffer_entry_guess,
                             is_agg,
@@ -1823,7 +1907,8 @@ hdk::ResultSetTable Executor::finishStreamExecution(
                                      *ctx->query_mem_desc,
                                      ctx->query_comp_desc->getDeviceType(),
                                      row_set_mem_owner_,
-                                     ctx->co);
+                                     ctx->co,
+                                     ctx->eo);
     } catch (ReductionRanOutOfSlots&) {
       throw QueryExecutionError(ERR_OUT_OF_SLOTS);
     } catch (QueryExecutionError& e) {
@@ -1925,6 +2010,93 @@ Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
   return {std::move(exe_policy), requested_device_type};
 }
 
+// TODO: move this code to QueryMemoryInitializer
+void Executor::allocateShuffleBuffers(
+    const std::vector<InputTableInfo>& query_infos,
+    const RelAlgExecutionUnit& ra_exe_unit,
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+    SharedKernelContext& shared_context) {
+  CHECK(ra_exe_unit.isShuffle());
+  auto partitions = ra_exe_unit.shuffle_fn->partitions;
+  std::vector<TargetInfo> target_infos;
+  for (auto& expr : ra_exe_unit.target_exprs) {
+    CHECK(expr->is<hdk::ir::ColumnVar>()) << "Unsupported expr: " << expr->toString();
+    target_infos.push_back(get_target_info(expr, getConfig().exec.group_by.bigint_count));
+  }
+
+  ColSlotContext slot_context(ra_exe_unit.target_exprs, {}, false);
+  QueryMemoryDescriptor query_mem_desc(
+      getDataMgr(),
+      getConfigPtr(),
+      query_infos,
+      false /*approx_quantile*/,
+      false /*allow_multifrag*/,
+      false /*keyless_hash*/,
+      false /*interleaved_bins_on_gpu*/,
+      -1 /*idx_target_as_key*/,
+      ColRangeInfo{QueryDescriptionType::Projection, 0, 0, 0, true},
+      slot_context,
+      {} /*group_col_widths*/,
+      8 /*group_col_compact_width*/,
+      {} /*target_groupby_indices*/,
+      0 /*entry_count*/,
+      {} /*count_distinct_descriptors*/,
+      false /*sort_on_gpu_hint*/,
+      true /*output_columnar*/,
+      false /*must_use_baseline_sort*/,
+      false /*use_streaming_top_n*/);
+
+  // Get buffer holding partition sizes. It is stored in the last fragment
+  // of the second input table.
+  CHECK_EQ(ra_exe_unit.input_descs.size(), (size_t)2);
+  auto count_table_info =
+      schema_provider_->getTableInfo(ra_exe_unit.input_descs.back().getTableRef());
+  CHECK_EQ(count_table_info->row_count, partitions * count_table_info->fragments);
+  auto count_cols = schema_provider_->listColumns(*count_table_info);
+  CHECK_EQ(count_cols.size(), (size_t)2);
+  auto count_col_info = count_cols.front();
+  auto unpin = [](Data_Namespace::AbstractBuffer* buf) { buf->unPin(); };
+  std::unique_ptr<Data_Namespace::AbstractBuffer, decltype(unpin)> sizes_buf(
+      data_mgr_->getChunkBuffer({count_col_info->db_id,
+                                 count_col_info->table_id,
+                                 count_col_info->column_id,
+                                 static_cast<int>(count_table_info->fragments)},
+                                Data_Namespace::MemoryLevel::CPU_LEVEL,
+                                0,
+                                partitions * sizeof(uint64_t)),
+      unpin);
+  CHECK_EQ(sizes_buf->size(), partitions * sizeof(uint64_t));
+  const uint64_t* sizes_ptr =
+      reinterpret_cast<const uint64_t*>(sizes_buf->getMemoryPtr());
+
+  // Create result set for each output partition.
+  shuffle_out_bufs_.clear();
+  shuffle_out_buf_ptrs_.clear();
+  shuffle_out_bufs_.reserve(partitions);
+  shuffle_out_buf_ptrs_.reserve(partitions);
+  for (size_t i = 0; i < partitions; ++i) {
+    query_mem_desc.setEntryCount(sizes_ptr[i]);
+    auto rs = std::make_shared<ResultSet>(target_infos,
+                                          ExecutorDeviceType::CPU,
+                                          query_mem_desc,
+                                          row_set_mem_owner,
+                                          getDataMgr(),
+                                          blockSize(),
+                                          gridSize());
+    rs->allocateStorage({});
+
+    shuffle_out_bufs_.emplace_back();
+    for (size_t target_idx = 0; target_idx < ra_exe_unit.target_exprs.size();
+         ++target_idx) {
+      shuffle_out_bufs_.back().push_back(
+          const_cast<int8_t*>(rs->getColumnarBuffer(target_idx)));
+    }
+    shuffle_out_buf_ptrs_.push_back(shuffle_out_bufs_.back().data());
+
+    shared_context.addDeviceResults(std::move(rs), 0, {i + 1});
+  }
+}
+
 hdk::ResultSetTable Executor::executeWorkUnitImpl(
     size_t& max_groups_buffer_entry_guess,
     const bool is_agg,
@@ -1949,6 +2121,11 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
       column_fetcher.freeLinearizedBuf();
       column_fetcher.freeTemporaryCpuLinearizedIdxBuf();
     };
+
+    if (ra_exe_unit.isShuffle()) {
+      allocateShuffleBuffers(query_infos, ra_exe_unit, row_set_mem_owner, shared_context);
+    }
+
     std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>
         query_comp_descs_owned;
     std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>
@@ -2066,7 +2243,8 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
                                        *query_mem_descs_owned[reduction_device_type],
                                        reduction_device_type,
                                        row_set_mem_owner,
-                                       co);
+                                       co,
+                                       eo);
       } catch (ReductionRanOutOfSlots&) {
         throw QueryExecutionError(ERR_OUT_OF_SLOTS);
       } catch (OverflowOrUnderflow&) {
@@ -2361,19 +2539,30 @@ ResultSetPtr build_row_for_empty_input(
 
 }  // namespace
 
-ResultSetPtr Executor::collectAllDeviceResults(
+hdk::ResultSetTable Executor::collectAllDeviceResults(
     SharedKernelContext& shared_context,
     const RelAlgExecutionUnit& ra_exe_unit,
     const QueryMemoryDescriptor& query_mem_desc,
     const ExecutorDeviceType device_type,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-    const CompilationOptions& co) {
+    const CompilationOptions& co,
+    const ExecutionOptions& eo) {
   auto timer = DEBUG_TIMER(__func__);
   auto& result_per_device = shared_context.getFragmentResults();
   if (result_per_device.empty() && query_mem_desc.getQueryDescriptionType() ==
                                        QueryDescriptionType::NonGroupedAggregate) {
     return build_row_for_empty_input(
         this, ra_exe_unit.target_exprs, query_mem_desc, device_type);
+  }
+  if (ra_exe_unit.shuffle_fn) {
+    // Reduction of shuffle COUNT(*) results.
+    CHECK(ra_exe_unit.isShuffleCount()) << "unexpected shuffle results";
+    return reducePartitionHistogram(result_per_device, query_mem_desc, row_set_mem_owner);
+  }
+  // Partitioned aggregation results don't need to be merged unless it is required
+  // by execution options.
+  if (ra_exe_unit.partitioned_aggregation && eo.multifrag_result) {
+    return get_separate_results(result_per_device);
   }
   if (use_speculative_top_n(ra_exe_unit, query_mem_desc)) {
     try {
@@ -2461,6 +2650,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
   // execution with no reduction required.
   if (device_type == ExecutorDeviceType::CPU && table_infos.size() == (size_t)1 &&
       config_->exec.group_by.enable_cpu_multifrag_kernels &&
+      !ra_exe_unit.partitioned_aggregation &&
       (query_mem_desc.getQueryDescriptionType() ==
            QueryDescriptionType::GroupByPerfectHash ||
        query_mem_desc.getQueryDescriptionType() ==
@@ -2742,7 +2932,7 @@ std::vector<size_t> Executor::getTableFragmentIndices(
   const auto outer_table_fragments = outer_table_fragments_it->second;
   CHECK(outer_table_fragments_it != selected_tables_fragments.end());
   CHECK_LT(outer_frag_idx, outer_table_fragments->size());
-  if (!table_idx) {
+  if (!table_idx || ra_exe_unit.isShuffle()) {
     return {outer_frag_idx};
   }
   const auto& outer_fragment_info = (*outer_table_fragments)[outer_frag_idx];

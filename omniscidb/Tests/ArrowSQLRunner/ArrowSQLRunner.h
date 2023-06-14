@@ -74,6 +74,10 @@ ExecutionResult runSqlQuery(const std::string& sql,
                             ExecutorDeviceType device_type,
                             bool allow_loop_joins);
 
+ExecutionResult runQuery(std::unique_ptr<hdk::ir::QueryDag> dag,
+                         ExecutorDeviceType device_type = ExecutorDeviceType::CPU,
+                         bool allow_loop_joins = false);
+
 ExecutionOptions getExecutionOptions(bool allow_loop_joins, bool just_explain = false);
 
 CompilationOptions getCompilationOptions(ExecutorDeviceType device_type);

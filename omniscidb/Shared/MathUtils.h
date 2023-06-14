@@ -19,9 +19,32 @@
 
 namespace shared {
 
-bool isPowOfTwo(unsigned n);
+template <typename T, class = typename std::enable_if_t<std::is_unsigned<T>::value>>
+bool isPowOfTwo(T n) {
+  return (n & (n - 1)) == 0;
+}
 
-unsigned getExpOfTwo(unsigned n);
+template <typename T, class = typename std::enable_if_t<std::is_unsigned<T>::value>>
+unsigned getExpOfTwo(T n) {
+  unsigned i = 0;
+
+  while ((n = n >> 1)) {
+    ++i;
+  }
+
+  return i;
+}
+
+template <typename T, class = typename std::enable_if_t<std::is_unsigned<T>::value>>
+T roundUpToPow2(T val) {
+#ifdef _MSC_VER
+  return val == static_cast<T>(1) ? static_cast<T>(1)
+                                  : static_cast<T>(1) << (64 - __lzcnt64(val - 1));
+#else
+  return val == static_cast<T>(1) ? static_cast<T>(1)
+                                  : static_cast<T>(1) << (64 - __builtin_clzl(val - 1));
+#endif
+}
 
 }  // namespace shared
 
