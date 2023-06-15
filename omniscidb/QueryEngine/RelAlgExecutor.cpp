@@ -763,7 +763,11 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
       shuffle_fn,
       shuffle_input);
   VLOG(1) << "Execute COUNT(*) for data shuffle.";
-  executeStep(count_shuffle_node.get(), co, eo.with_columnar_output(true), queue_time_ms);
+  {
+    auto timer = DEBUG_TIMER("Partition sizes computation");
+    executeStep(
+        count_shuffle_node.get(), co, eo.with_columnar_output(true), queue_time_ms);
+  }
 
   // With partition sizes now known, start actual data shuffling.
   hdk::ir::ExprPtrVector shuffle_input_cols;
@@ -789,7 +793,10 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
   shuffle_eo.preserve_order = false;
   auto shuffle_co = co;
   shuffle_co.allow_lazy_fetch = false;
-  executeStep(shuffle_node.get(), shuffle_co, shuffle_eo, queue_time_ms);
+  {
+    auto timer = DEBUG_TIMER("Data shuffling");
+    executeStep(shuffle_node.get(), shuffle_co, shuffle_eo, queue_time_ms);
+  }
 
   // Now we can remove projection and its result to free memory.
   if (proj) {
@@ -797,12 +804,12 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
     proj.reset();
   }
   ////////////////////
-  auto token = temporary_tables_.at(-shuffle_node->getId());
-  for (size_t i = 0; i < token->resultSetCount(); ++i) {
-    auto rs = token->resultSet(i);
-    std::cout << "Partition #" << i << std::endl << rs->contentToString();
-  }
-  std::cout << "input_map=" << ::toString(input_map) << std::endl;
+  // auto token = temporary_tables_.at(-shuffle_node->getId());
+  // for (size_t i = 0; i < token->resultSetCount(); ++i) {
+  //   auto rs = token->resultSet(i);
+  //   std::cout << "Partition #" << i << std::endl << rs->contentToString();
+  // }
+  // std::cout << "input_map=" << ::toString(input_map) << std::endl;
   ////////////////////
 
   // Create new aggregation node and execute it.
@@ -826,7 +833,10 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
     new_root->replaceInput(new_root->getAndOwnInput(0), part_agg);
   }
   VLOG(1) << "Execute partitioned aggregation.";
-  executeStep(new_root.get(), co, eo, queue_time_ms);
+  {
+    auto timer = DEBUG_TIMER("Partitioned aggregation");
+    executeStep(new_root.get(), co, eo, queue_time_ms);
+  }
 
   // Register result as a temporary table for the original node.
   addTemporaryTable(-step_root->getId(), new_root->getResult()->getToken());

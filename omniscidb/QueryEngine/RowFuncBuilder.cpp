@@ -976,8 +976,8 @@ bool RowFuncBuilder::codegenShuffle(
     const GpuSharedMemoryContext& gpu_smem_context,
     DiamondCodegen& diamond_codegen) {
   ////////////////////
-  std::cout << "RowFuncBuilder::codegenShuffle" << std::endl
-            << query_mem_desc.toString() << std::endl;
+  // std::cout << "RowFuncBuilder::codegenShuffle" << std::endl
+  //           << query_mem_desc.toString() << std::endl;
   ////////////////////
   if (ra_exe_unit_.isShuffleCount()) {
     TargetExprCodegenBuilder target_builder(ra_exe_unit_, true);
@@ -1025,9 +1025,9 @@ bool RowFuncBuilder::codegenShuffle(
     auto offset_val = LL_BUILDER.CreateLoad(
         llvm::Type::getInt64Ty(LL_CONTEXT), offset_ptr, "partition_offset");
     ////////////////////
-    emitCall("print_i32", {partition_key});
-    emitCall("print_i64", {offset_val});
-    std::cout << query_mem_desc.toString();
+    // emitCall("print_i32", {partition_key});
+    // emitCall("print_i64", {offset_val});
+    // std::cout << query_mem_desc.toString();
     ////////////////////
     TargetExprCodegenBuilder target_builder(ra_exe_unit_, true);
     for (size_t target_idx = 0; target_idx < ra_exe_unit_.target_exprs.size();
@@ -1044,6 +1044,7 @@ bool RowFuncBuilder::codegenShuffle(
       size_t chosen_bytes = query_mem_desc.getPaddedSlotWidthBytes(target_idx);
 
       ////////////////////
+      /*
       emitCall("print_ptr",
                {LL_BUILDER.CreateBitCast(output_buffers,
                                          llvm::Type::getInt8PtrTy(LL_CONTEXT))});
@@ -1053,6 +1054,7 @@ bool RowFuncBuilder::codegenShuffle(
       emitCall("print_ptr", {target_byte_stream});
       std::cout << "Chosen size for target #" << target_idx << " is " << chosen_bytes
                 << std::endl;
+      */
       ////////////////////
 
       target_builder(target_expr, executor_, query_mem_desc, co);
@@ -1122,9 +1124,9 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       }
       byte_offset->setName("out_byte_off_target_" + std::to_string(target_idx));
       ////////////////////
-      std::cout << "codegenAggColumnPtr chosen_bytes=" << chosen_bytes << std::endl;
-      // emitCall("print_i64", {byte_offset});
-      // emitCall("print_ptr", {output_buffer_byte_stream});
+      // std::cout << "codegenAggColumnPtr chosen_bytes=" << chosen_bytes << std::endl;
+      //  emitCall("print_i64", {byte_offset});
+      //  emitCall("print_ptr", {output_buffer_byte_stream});
       ////////////////////
       auto output_ptr = LL_BUILDER.CreateGEP(
           output_buffer_byte_stream->getType()->getScalarType()->getPointerElementType(),

@@ -333,8 +333,8 @@ void TargetExprCodegen::codegenAggregate(
         !lazy_fetched && !arg_type->isNull() && arg_type->isFloatingPoint();
     if (is_group_by) {
       ////////////////////
-      std::cout << "TargetExprCodegen::codegenAggregate chosen_bytes=" << chosen_bytes
-                << std::endl;
+      //std::cout << "TargetExprCodegen::codegenAggregate chosen_bytes=" << chosen_bytes
+      //          << std::endl;
       ////////////////////
       agg_col_ptr = row_func_builder->codegenAggColumnPtr(output_buffer_byte_stream,
                                                           out_row_idx,

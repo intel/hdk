@@ -93,10 +93,10 @@ TEST_F(PartitionedGroupByTest, SingleKey) {
   auto res1 = runQuery(std::move(dag1));
   // Check the result has 4 fragments (partitions).
   ////////////////////
-  for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
-    std::cout << "Result fragment #" << i << std::endl
-              << res1.getToken()->resultSet(i)->contentToString();
-  }
+  // for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
+  //   std::cout << "Result fragment #" << i << std::endl
+  //             << res1.getToken()->resultSet(i)->contentToString();
+  // }
   ////////////////////
   ASSERT_EQ(res1.getToken()->resultSetCount(), (size_t)4);
   auto dag2 = builder.scan(res1.tableName()).sort({0}).finalize();
@@ -125,10 +125,10 @@ TEST_F(PartitionedGroupByTest, MultipleKeys) {
   auto res1 = runQuery(std::move(dag1));
   // Check the result has 4 fragments (partitions).
   ////////////////////
-  for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
-    std::cout << "Result fragment #" << i << std::endl
-              << res1.getToken()->resultSet(i)->contentToString();
-  }
+  // for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
+  //   std::cout << "Result fragment #" << i << std::endl
+  //             << res1.getToken()->resultSet(i)->contentToString();
+  // }
   ////////////////////
   ASSERT_EQ(res1.getToken()->resultSetCount(), (size_t)4);
   auto dag2 = builder.scan(res1.tableName()).sort({0, 1, 2, 3}).finalize();
@@ -157,10 +157,10 @@ TEST_F(PartitionedGroupByTest, ReorderedKeys) {
   auto res1 = runQuery(std::move(dag1));
   // Check the result has 4 fragments (partitions).
   ////////////////////
-  for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
-    std::cout << "Result fragment #" << i << std::endl
-              << res1.getToken()->resultSet(i)->contentToString();
-  }
+  // for (size_t i = 0; i < res1.getToken()->resultSetCount(); ++i) {
+  //   std::cout << "Result fragment #" << i << std::endl
+  //             << res1.getToken()->resultSet(i)->contentToString();
+  // }
   ////////////////////
   ASSERT_EQ(res1.getToken()->resultSetCount(), (size_t)4);
   auto dag2 = builder.scan(res1.tableName()).sort({2}).finalize();

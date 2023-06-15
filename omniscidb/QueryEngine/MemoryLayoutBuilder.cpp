@@ -811,8 +811,8 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
   auto col_slot_context = ColSlotContext(
       ra_exe_unit.target_exprs, {}, executor->getConfig().exec.group_by.bigint_count);
   ////////////////////
-  std::cout << "build_query_memory_descriptor col_slot_context:" << std::endl
-            << col_slot_context.toString();
+  // std::cout << "build_query_memory_descriptor col_slot_context:" << std::endl
+  //           << col_slot_context.toString();
   ////////////////////
 
   const auto min_slot_size =
@@ -824,8 +824,8 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
   col_slot_context.setAllSlotsPaddedSize(min_slot_size);
   col_slot_context.validate();
   ////////////////////
-  std::cout << "build_query_memory_descriptor col_slot_context2:" << std::endl
-            << col_slot_context.toString();
+  // std::cout << "build_query_memory_descriptor col_slot_context2:" << std::endl
+  //           << col_slot_context.toString();
   ////////////////////
 
   if (!is_group_by) {
@@ -977,8 +977,8 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
       UNREACHABLE() << "Unknown query type";
   }
   ////////////////////
-  std::cout << "build_query_memory_descriptor col_slot_context3:" << std::endl
-            << col_slot_context.toString();
+  // std::cout << "build_query_memory_descriptor col_slot_context3:" << std::endl
+  //           << col_slot_context.toString();
   ////////////////////
 
   auto approx_quantile =
@@ -1003,7 +1003,7 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
                                                      must_use_baseline_sort,
                                                      streaming_top_n);
   ////////////////////
-  std::cout << "build_query_memory_descriptor result:" << std::endl << res->toString();
+  // std::cout << "build_query_memory_descriptor result:" << std::endl << res->toString();
   ////////////////////
   return res;
 }

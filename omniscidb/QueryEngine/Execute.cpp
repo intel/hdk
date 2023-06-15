@@ -1395,8 +1395,8 @@ hdk::ResultSetTable Executor::reducePartitionSizes(
   // Currently, all perfect hash tables are expected to to use 8 byte padded width.
   CHECK_EQ(static_cast<int>(proj_mem_desc.getPaddedSlotWidthBytes(0)), 8);
   /////////////////////
-  std::cout << "Projection mem desc used for offsets:" << std::endl;
-  std::cout << proj_mem_desc.toString();
+  // std::cout << "Projection mem desc used for offsets:" << std::endl;
+  // std::cout << proj_mem_desc.toString();
   /////////////////////
   auto first_rs =
       std::make_shared<ResultSet>(results_per_device.front().first->getTargetInfos(),
@@ -1424,12 +1424,12 @@ hdk::ResultSetTable Executor::reducePartitionSizes(
     results.push_back(proj_rs);
     buffers.push_back(reinterpret_cast<int64_t*>(buf));
     ////////////////////
-    std::cout << "Counters:";
-    for (size_t i = 0; i < parts; ++i) {
-      std::cout << " " << buffers.back()[i];
-    }
-    std::cout << std::endl;
-    std::cout << "Related projection RS:" << std::endl << proj_rs->contentToString();
+    // std::cout << "Counters:";
+    // for (size_t i = 0; i < parts; ++i) {
+    //   std::cout << " " << buffers.back()[i];
+    // }
+    // std::cout << std::endl;
+    // std::cout << "Related projection RS:" << std::endl << proj_rs->contentToString();
     ////////////////////
   }
 
@@ -1441,12 +1441,12 @@ hdk::ResultSetTable Executor::reducePartitionSizes(
   }
 
   ////////////////////
-  std::cout << "Offsets:" << std::endl;
-  for (size_t i = 0; i < results_per_device.size(); ++i) {
-    std::cout << results[i]->contentToString();
-  }
-  std::cout << "Sizes:" << std::endl;
-  std::cout << results.back()->contentToString();
+  // std::cout << "Offsets:" << std::endl;
+  // for (size_t i = 0; i < results_per_device.size(); ++i) {
+  //   std::cout << results[i]->contentToString();
+  // }
+  // std::cout << "Sizes:" << std::endl;
+  // std::cout << results.back()->contentToString();
   ////////////////////
 
   return hdk::ResultSetTable(std::move(results));
@@ -2111,20 +2111,21 @@ void Executor::allocateShuffleBuffers(
     // shuffle_results.push_back(rs);
     // shuffle_buffers.push_back(rs->getStorage()->getUnderlyingBuffer());
     ////////////////////
-    std::cout << "Built mem desc for shuffle fragment #" << (i + 1) << std::endl
-              << query_mem_desc.toString() << std::endl;
-    std::cout << "Partition buffer pointers:" << std::endl;
-    for (size_t target_idx = 0; target_idx < ra_exe_unit.target_exprs.size();
-         ++target_idx) {
-      std::cout << "  col" << target_idx << ": "
-                << (void*)shuffle_out_bufs_.back()[target_idx] << std::endl;
-    }
-    std::cout << " are located at " << (void*)shuffle_out_buf_ptrs_.back() << std::endl;
+    // std::cout << "Built mem desc for shuffle fragment #" << (i + 1) << std::endl
+    //           << query_mem_desc.toString() << std::endl;
+    // std::cout << "Partition buffer pointers:" << std::endl;
+    // for (size_t target_idx = 0; target_idx < ra_exe_unit.target_exprs.size();
+    //      ++target_idx) {
+    //   std::cout << "  col" << target_idx << ": "
+    //             << (void*)shuffle_out_bufs_.back()[target_idx] << std::endl;
+    // }
+    // std::cout << " are located at " << (void*)shuffle_out_buf_ptrs_.back() <<
+    // std::endl;
     ////////////////////
   }
   ////////////////////
-  std::cout << "shuffle_out_buf_ptrs_.data()=" << (void*)shuffle_out_buf_ptrs_.data()
-            << std::endl;
+  // std::cout << "shuffle_out_buf_ptrs_.data()=" << (void*)shuffle_out_buf_ptrs_.data()
+  //           << std::endl;
   ////////////////////
 }
 
@@ -2590,7 +2591,7 @@ hdk::ResultSetTable Executor::collectAllDeviceResults(
     CHECK(ra_exe_unit.isShuffleCount()) << "unexpected shuffle results";
     return reducePartitionSizes(result_per_device, query_mem_desc, row_set_mem_owner);
   }
-  // Partitioned aggregation results don't need to be merged unlees it is required
+  // Partitioned aggregation results don't need to be merged unless it is required
   // by execution options.
   if (ra_exe_unit.partitioned_aggregation && eo.multifrag_result) {
     return get_separate_results(result_per_device);
@@ -3129,6 +3130,7 @@ FetchResult Executor::fetchChunks(
                             selected_fragments,
                             ra_exe_unit);
   ////////////////////
+  /*
   static std::mutex m;
   std::lock_guard<std::mutex> l(m);
   std::cout << "selected_fragments" << std::endl;
@@ -3138,6 +3140,7 @@ FetchResult Executor::fetchChunks(
   }
   std::cout << "selected_fragments_crossjoin=" << ::toString(selected_fragments_crossjoin)
             << std::endl;
+  */
   ////////////////////
 
   CartesianProduct<std::vector<std::vector<size_t>>> frag_ids_crossjoin(
@@ -3186,8 +3189,8 @@ FetchResult Executor::fetchChunks(
                     << col_id->getColId() << ")";
           }
           ////////////////////
-          std::cout << "linearizeColumnFragments " << col_id->getColInfo()->toString()
-                    << std::endl;
+          // std::cout << "linearizeColumnFragments " << col_id->getColInfo()->toString()
+          //           << std::endl;
           ////////////////////
           frag_col_buffers[it->second] = column_fetcher.linearizeColumnFragments(
               col_id->getColInfo(),
@@ -3200,8 +3203,9 @@ FetchResult Executor::fetchChunks(
               thread_idx);
         } else {
           ////////////////////
-          std::cout << "getAllTableColumnFragments " << col_id->getColInfo()->toString()
-                    << std::endl;
+          // std::cout << "getAllTableColumnFragments " <<
+          // col_id->getColInfo()->toString()
+          //           << std::endl;
           ////////////////////
           frag_col_buffers[it->second] =
               column_fetcher.getAllTableColumnFragments(col_id->getColInfo(),
@@ -3213,8 +3217,8 @@ FetchResult Executor::fetchChunks(
         }
       } else {
         ////////////////////
-        std::cout << "getOneTableColumnFragment " << frag_id << " "
-                  << col_id->getColInfo()->toString() << std::endl;
+        // std::cout << "getOneTableColumnFragment " << frag_id << " "
+        //           << col_id->getColInfo()->toString() << std::endl;
         ////////////////////
         frag_col_buffers[it->second] =
             column_fetcher.getOneTableColumnFragment(col_id->getColInfo(),

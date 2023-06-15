@@ -630,6 +630,7 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
   }
 
   ////////////////////
+  /*
   static std::mutex m;
   std::lock_guard<std::mutex> l(m);
   std::cout << "out_vec:";
@@ -656,6 +657,7 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
       std::cout << std::endl;
     }
   }
+  */
   ////////////////////
 
   CHECK(native_code);

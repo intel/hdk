@@ -124,8 +124,8 @@ void ExecutionKernel::run(Executor* executor,
                           const size_t thread_idx,
                           SharedKernelContext& shared_context) {
   ////////////////////
-  static std::mutex m;
-  std::lock_guard<std::mutex> l(m);
+  // static std::mutex m;
+  // std::lock_guard<std::mutex> l(m);
   ////////////////////
   DEBUG_TIMER("ExecutionKernel::run");
   INJECT_TIMER(kernel_run);

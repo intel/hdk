@@ -51,7 +51,7 @@ struct GroupByConfig {
   size_t baseline_threshold = 1'000'000;
   int64_t large_ndv_threshold = 10'000'000;
   size_t large_ndv_multiplier = 256;
-  bool enable_cpu_partitioned_groupby = true;
+  bool enable_cpu_partitioned_groupby = false;
   size_t partitioning_buffer_size_threshold = 1 << 30;
   double partitioning_group_size_threshold = 2.0;
   size_t min_partitions = 0;
