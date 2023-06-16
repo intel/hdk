@@ -579,6 +579,18 @@ DEF_CHECKED_SINGLE_AGG_ID_INT(8)
     }                                                                    \
   }
 
+// extern "C" GPU_RT_STUB void write_projection_int64(int8_t GENERIC_ADDR_SPACE*,
+//                                                    int64_t,
+//                                                    int64_t) {}
+
+// extern "C" GPU_RT_STUB void write_projection_int32(int8_t GENERIC_ADDR_SPACE*,
+//                                                    int32_t,
+//                                                    int64_t) {}
+
+extern "C" GPU_RT_STUB void agg_sum_double_skip_val(int64_t GENERIC_ADDR_SPACE*,
+                                                    double,
+                                                    double) {}
+
 DEF_WRITE_PROJECTION_INT(64)
 DEF_WRITE_PROJECTION_INT(32)
 #undef DEF_WRITE_PROJECTION_INT
@@ -836,7 +848,7 @@ agg_count_float_skip_val(GENERIC_ADDR_SPACE uint32_t* agg,
 
 #define DATA_T double
 #define ADDR_T int64_t
-DEF_SKIP_AGG(agg_sum_double)
+// DEF_SKIP_AGG(agg_sum_double)
 DEF_SKIP_AGG(agg_max_double)
 DEF_SKIP_AGG(agg_min_double)
 #undef ADDR_T
@@ -1053,7 +1065,7 @@ extern "C" GPU_RT_STUB void sync_warp_protected(int64_t thread_pos, int64_t row_
 extern "C" GPU_RT_STUB void sync_threadblock() {}
 
 extern "C" GPU_RT_STUB void write_back_non_grouped_agg(
-    GENERIC_ADDR_SPACE int64_t* input_buffer,
+    SHARED_ADDR_SPACE int64_t* input_buffer,
     GENERIC_ADDR_SPACE int64_t* output_buffer,
     const int32_t num_agg_cols){};
 // x64 stride functions
@@ -1084,7 +1096,7 @@ extern "C" GPU_RT_STUB int64_t get_thread_index() {
   return 0;
 }
 
-extern "C" GPU_RT_STUB GENERIC_ADDR_SPACE int64_t* declare_dynamic_shared_memory() {
+extern "C" GPU_RT_STUB SHARED_ADDR_SPACE int64_t* declare_dynamic_shared_memory() {
   return nullptr;
 }
 
@@ -1131,7 +1143,7 @@ extern "C" RUNTIME_EXPORT NEVER_INLINE void write_back_nop(
 #endif
 }
 
-extern "C" RUNTIME_EXPORT int64_t* init_shared_mem(
+extern "C" RUNTIME_EXPORT SHARED_ADDR_SPACE int64_t* init_shared_mem(
     GENERIC_ADDR_SPACE const int64_t* global_groups_buffer,
     const int32_t groups_buffer_size) {
   return nullptr;

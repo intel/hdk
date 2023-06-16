@@ -63,13 +63,17 @@ void GpuSharedMemCodeBuilder::codegen(const CompilationOptions& co) {
   // codegen the init function
   init_func_ = createInitFunction(co);
   CHECK(init_func_);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.before.codegenInitialization")
   codegenInitialization();
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.codegenInitialization")
   compiler::verify_function_ir(init_func_);
 
   // codegen the reduction function:
   reduction_func_ = createReductionFunction(co);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.createReductionFunction")
   CHECK(reduction_func_);
   codegenReduction(co);
+  DUMP_MODULE(module_, "GpuSharedMemoryTestIntel.after.codegenReduction")
   compiler::verify_function_ir(reduction_func_);
 }
 
@@ -165,6 +169,16 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
       "f32:32:32-f64:64:64-v16:16:16-"
       "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
   reduction_code.module->setTargetTriple("nvptx64-nvidia-cuda");
+
+#ifdef HAVE_L0
+  reduction_code.module->setDataLayout(
+      "e-p:64:64:64-i1:8:8-i8:8:8-"
+      "i16:16:16-i32:32:32-i64:64:64-"
+      "f32:32:32-f64:64:64-v16:16:16-"
+      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
+  reduction_code.module->setTargetTriple("spir64-unknown-unknown");
+#endif
+
   llvm::Linker linker(*module_);
   std::unique_ptr<llvm::Module> owner(reduction_code.module);
   bool link_error = linker.linkInModule(std::move(owner));
@@ -246,22 +260,25 @@ llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
   auto ptr_type = [&context, &traits](const size_t slot_bytes,
                                       const hdk::ir::Type* type) {
     if (slot_bytes == sizeof(int32_t)) {
-      return traits.smemPointerType(llvm::Type::getInt32Ty(context));
+      // return traits.smemPointerType(llvm::Type::getInt32Ty(context));
+      return llvm::Type::getInt32PtrTy(context, /*address_space=*/3);
     } else {
       CHECK(slot_bytes == sizeof(int64_t));
-      return traits.smemPointerType(llvm::Type::getInt64Ty(context));
+      // return traits.smemPointerType(llvm::Type::getInt64Ty(context));
+      return llvm::Type::getInt64PtrTy(context, /*address_space=*/3);
     }
     UNREACHABLE() << "Invalid slot size encountered: " << std::to_string(slot_bytes);
     return traits.smemPointerType(llvm::Type::getInt32Ty(context));
   };
 
+  auto gep = ir_builder.CreateGEP(
+      dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
+      dest_byte_stream,
+      byte_offset);
+
   const auto casted_dest_slot_address = ir_builder.CreatePointerCast(
-      ir_builder.CreateGEP(
-          dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
-          dest_byte_stream,
-          byte_offset),
-      ptr_type(slot_bytes, type),
-      "dest_slot_adr_" + std::to_string(slot_idx));
+      gep, ptr_type(slot_bytes, type), "dest_slot_adr_" + std::to_string(slot_idx));
+
   return casted_dest_slot_address;
 }
 }  // namespace
@@ -357,7 +374,11 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
   // synchronize all threads within a threadblock:
   const auto sync_threadblock = getFunction("sync_threadblock");
   ir_builder.CreateCall(sync_threadblock, {});
-  ir_builder.CreateRet(shared_mem_buffer);
+
+  const unsigned address_space = 4;
+  auto cast_shared_mem_buffer = ir_builder.CreatePointerCast(
+      shared_mem_buffer, llvm::Type::getInt64PtrTy(context_, address_space));
+  ir_builder.CreateRet(cast_shared_mem_buffer);
 }
 
 llvm::Function* GpuSharedMemCodeBuilder::createReductionFunction(

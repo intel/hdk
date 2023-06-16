@@ -52,4 +52,6 @@ void optimize_ir(llvm::Function* query_func,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co);
 
+void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname);
+
 }  // namespace compiler
