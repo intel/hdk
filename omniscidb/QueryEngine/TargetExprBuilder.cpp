@@ -148,7 +148,7 @@ void TargetExprCodegen::codegen(
   CHECK_GE(slot_index, 0);
   CHECK(is_group_by || static_cast<size_t>(slot_index) < agg_out_vec.size());
 
-  uint32_t col_off{0};
+  size_t col_off{0};
   if (co.device_type == ExecutorDeviceType::GPU && query_mem_desc.threadsShareMemory() &&
       is_simple_count(target_info) && (!arg_expr || !arg_expr->type()->nullable())) {
     CHECK_EQ(size_t(1), agg_fn_names.size());
