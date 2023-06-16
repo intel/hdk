@@ -269,7 +269,7 @@ if (WIN32)
   # ResultSetTest excluded because of https://github.com/intel-ai/hdk/issues/489
   # StringDictionaryTest excluded because of https://github.com/intel-ai/hdk/issues/490
   # QueryBuilderTest excluded because of https://github.com/intel-ai/hdk/issues/491
-  set(EXCLUDE_SANITY_TESTS "-E \"(ArrowBasedExecuteTest^|ResultSetTest^|StringDictionaryTest^|QueryBuilderTest^|ArrowStorageSqlTest^|NoCatalogRelAlgTest^|ExecutionSequenceTest^|CorrelatedSubqueryTest)\""\")
+  set(EXCLUDE_SANITY_TESTS "-E \"(ArrowBasedExecuteTest^|ResultSetTest^|StringDictionaryTest^|QueryBuilderTest^|ArrowStorageSqlTest^|NoCatalogRelAlgTest^|ExecutionSequenceTest^|CorrelatedSubqueryTest)\"" \")
 else()
   set(MKDIR_TMP mkdir -p tmp)
   set(ENV_COMMAND env AWS_REGION=${AWS_REGION} AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY})
