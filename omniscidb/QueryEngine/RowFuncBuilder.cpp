@@ -303,6 +303,8 @@ llvm::Value* RowFuncBuilder::codegenOutputSlot(
     }
     const auto key_slot_idx = get_heap_key_slot_index(
         ra_exe_unit_.target_exprs, target_idx, config_.exec.group_by.bigint_count);
+    CHECK_LE(query_mem_desc.getColOffInBytes(key_slot_idx),
+             std::numeric_limits<uint32_t>::max());
     return emitCall(
         fname,
         {groups_buffer,
@@ -881,7 +883,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
             chosen_bytes == 8);
       CHECK(output_buffer_byte_stream);
       CHECK(out_row_idx);
-      uint32_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
+      size_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
       // multiplying by chosen_bytes, i.e., << log2(chosen_bytes)
 #ifdef _WIN32
       auto out_per_col_byte_idx =
@@ -890,8 +892,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       auto out_per_col_byte_idx =
           LL_BUILDER.CreateShl(out_row_idx, __builtin_ffs(chosen_bytes) - 1);
 #endif
-      auto byte_offset = LL_BUILDER.CreateAdd(out_per_col_byte_idx,
-                                              LL_INT(static_cast<int64_t>(col_off)));
+      auto byte_offset = LL_BUILDER.CreateAdd(out_per_col_byte_idx, LL_INT(col_off));
       byte_offset->setName("out_byte_off_target_" + std::to_string(target_idx));
       auto output_ptr = LL_BUILDER.CreateGEP(
           output_buffer_byte_stream->getType()->getScalarType()->getPointerElementType(),
@@ -903,11 +904,15 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
                                  output_ptr->getType()->getPointerAddressSpace()));
       agg_col_ptr->setName("out_ptr_target_" + std::to_string(target_idx));
     } else {
-      uint32_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
+      size_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
       CHECK_EQ(size_t(0), col_off % chosen_bytes);
       col_off /= chosen_bytes;
-      CHECK(std::get<1>(agg_out_ptr_w_idx));
-      auto offset = LL_BUILDER.CreateAdd(std::get<1>(agg_out_ptr_w_idx), LL_INT(col_off));
+      auto agg_out_idx = std::get<1>(agg_out_ptr_w_idx);
+      CHECK(agg_out_idx);
+      if (!agg_out_idx->getType()->isIntegerTy(64)) {
+        agg_out_idx = executor_->cgen_state_->castToTypeIn(agg_out_idx, 64);
+      }
+      auto offset = LL_BUILDER.CreateAdd(agg_out_idx, LL_INT(col_off));
       auto* bit_cast = LL_BUILDER.CreateBitCast(
           std::get<0>(agg_out_ptr_w_idx),
           llvm::PointerType::get(
@@ -919,7 +924,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
           offset);
     }
   } else {
-    uint32_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
+    size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
     CHECK_EQ(size_t(0), col_off % chosen_bytes);
     col_off /= chosen_bytes;
     auto* bit_cast = LL_BUILDER.CreateBitCast(
