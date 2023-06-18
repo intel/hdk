@@ -42,7 +42,7 @@ jobs:
         run: |
           cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
           getent group render | awk -F : '{ print "RUN groupadd -g "$3" render && usermod -a -G render ghrunner" }' >>Dockerfile
-          docker build . --no-cache --tag hdk-build.${{ inputs.name }}
+          docker build . ${{ inputs.reset-cache && '--no-cache' || '' }} --tag hdk-build.${{ inputs.name }}
 
       - name: Start the container
         run:  |
