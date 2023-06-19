@@ -918,8 +918,33 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
         auto new_call = llvm::CallInst::Create(local_callee, args, call->getName());
 
         llvm::ReplaceInstWithInst(call, new_call);
+        inst = new_call;
+      }
+      for (unsigned op_idx = 0; op_idx < inst->getNumOperands(); ++op_idx) {
+        auto op = inst->getOperand(op_idx);
+        if (auto* global = llvm::dyn_cast<llvm::GlobalVariable>(op)) {
+          auto local_global = to->getGlobalVariable(global->getName(), true);
+          CHECK(local_global);
+          inst->setOperand(op_idx, local_global);
+        }
       }
     }
+  }
+}
+
+void insert_globals(llvm::Module* from, llvm::Module* to) {
+  for (const llvm::GlobalVariable& I : from->globals()) {
+    llvm::GlobalVariable* new_gv =
+        new llvm::GlobalVariable(*to,
+                                 I.getValueType(),
+                                 I.isConstant(),
+                                 I.getLinkage(),
+                                 (llvm::Constant*)nullptr,
+                                 I.getName(),
+                                 (llvm::GlobalVariable*)nullptr,
+                                 I.getThreadLocalMode(),
+                                 I.getType()->getAddressSpace());
+    new_gv->copyAttributesFrom(&I);
   }
 }
 
@@ -940,6 +965,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
 
   CHECK(exts.find(ExtModuleKinds::spirv_helper_funcs_module) != exts.end());
 
+  insert_globals(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(), module);
   for (auto& F : *(exts.at(ExtModuleKinds::spirv_helper_funcs_module))) {
     insert_declaration(exts.at(ExtModuleKinds::spirv_helper_funcs_module).get(),
                        module,
@@ -1079,11 +1105,7 @@ void setSharedMemory(ExecutorDeviceType dt,
     case ExecutorDeviceType::CPU:
       return;
     case ExecutorDeviceType::GPU:
-      if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::CUDA)
-        backend->setSharedMemory(is_gpu_smem_used_);
-      if (gpu_target.gpu_mgr->getPlatform() == GpuMgrPlatform::L0) {
-        CHECK(!is_gpu_smem_used_);
-      }
+      backend->setSharedMemory(is_gpu_smem_used_);
       return;
     default:
       CHECK(false);

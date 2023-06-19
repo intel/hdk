@@ -70,6 +70,7 @@ void verify_function_ir(const llvm::Function* func) {
     err_os << "\n-----\n";
     func->print(err_os, nullptr);
     err_os << "\n-----\n";
+    DUMP_MODULE(func->getParent(), "invalid.ll");
     LOG(FATAL) << err_ss.str();
   }
 }

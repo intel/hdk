@@ -1333,8 +1333,11 @@ ReductionCode GpuReductionHelperJIT::codegen(const CompilationOptions& co) const
       executor_->getContext());
   auto cgen_state = reduction_code.cgen_state = cgen_state_.get();
   // CHECK(executor->thread_id_ == logger::thread_id());  // do we need compilation mutex?
+  bool is_l0 = co.device_type == ExecutorDeviceType::GPU && executor_->getDataMgr() &&
+               executor_->getDataMgr()->getGpuMgr() &&
+               executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0;
   cgen_state->set_module_shallow_copy(
-      executor_->getExtensionModuleContext()->getRTModule(/*is_l0=*/false));
+      executor_->getExtensionModuleContext()->getRTModule(is_l0));
   reduction_code.module = cgen_state->module_;
 
   AUTOMATIC_IR_METADATA(cgen_state);

@@ -271,6 +271,11 @@ void Executor::update_extension_modules(bool update_runtime_modules_only) {
       }
     }
   };
+  auto patch_l0_module = [](ExtModuleKinds kind, llvm::Module* m) {
+    if (kind == ExtModuleKinds::l0_template_module) {
+      m->setTargetTriple("spir64-unknown-unknown");
+    }
+  };
   auto update_module = [&](ExtModuleKinds module_kind, bool erase_not_found = false) {
     CHECK(extension_module_context_);
     auto& extension_modules = extension_module_context_->getExtensionModules();
@@ -279,6 +284,7 @@ void Executor::update_extension_modules(bool update_runtime_modules_only) {
     if (it != Executor::extension_module_sources.end()) {
       auto llvm_module = read_module(module_kind, it->second);
       if (llvm_module) {
+        patch_l0_module(module_kind, llvm_module.get());
         extension_modules[module_kind] = std::move(llvm_module);
       } else if (erase_not_found) {
         extension_modules.erase(module_kind);
