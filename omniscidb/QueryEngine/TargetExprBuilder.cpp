@@ -160,8 +160,11 @@ void TargetExprCodegen::codegen(
         CHECK_EQ(size_t(0), col_off % chosen_bytes);
         col_off /= chosen_bytes;
         CHECK(std::get<1>(agg_out_ptr_w_idx));
-        auto offset =
-            LL_BUILDER.CreateAdd(std::get<1>(agg_out_ptr_w_idx), LL_INT(col_off));
+        const auto casted_out_ptr_idx =
+            LL_BUILDER.CreateCast(llvm::Instruction::CastOps::SExt,
+                                  std::get<1>(agg_out_ptr_w_idx),
+                                  llvm::Type::getInt64Ty(LL_CONTEXT));
+        auto offset = LL_BUILDER.CreateAdd(casted_out_ptr_idx, LL_INT(col_off));
         auto* bit_cast = LL_BUILDER.CreateBitCast(
             std::get<0>(agg_out_ptr_w_idx),
             llvm::PointerType::get(
