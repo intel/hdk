@@ -1131,7 +1131,7 @@ extern "C" RUNTIME_EXPORT NEVER_INLINE void write_back_nop(
 #endif
 }
 
-extern "C" RUNTIME_EXPORT int64_t* init_shared_mem(
+extern "C" RUNTIME_EXPORT GENERIC_ADDR_SPACE int64_t* init_shared_mem(
     GENERIC_ADDR_SPACE const int64_t* global_groups_buffer,
     const int32_t groups_buffer_size) {
   return nullptr;

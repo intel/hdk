@@ -1,3 +1,4 @@
+target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-v128:128:128-n16:32:64"
 target triple = "spir64-unknown-unknown"
 
 declare i64 @__spirv_BuiltInGlobalInvocationId(i32 %dimention)
@@ -9,7 +10,20 @@ declare i64 @__spirv_BuiltInNumWorkgroups(i32 %dimention)
 
 declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
-@slm.buf = internal global [1024 x i64] undef, align 16
+declare void @__spirv_ControlBarrier(i32 %execution_scope, i32 %memory_scope, i32 %memory_semantics)
+
+@slm.buf.i64 = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 4
+
+define i64 addrspace(4)* @declare_dynamic_shared_memory() {
+    %res.share = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    %res = addrspacecast i64 addrspace(3)* %res.share to i64 addrspace(4)*
+    ret i64 addrspace(4)* %res
+}
+
+define void @sync_threadblock() {
+    call void @__spirv_ControlBarrier(i32 2, i32 2, i32 u0x100)
+    ret void
+}
 
 define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
@@ -46,28 +60,28 @@ define i8 @thread_warp_idx(i8 noundef %warp_sz) {
     ret i8 0
 }
 
-define i64 @agg_count(i64* %agg, i64 %val) {
+define i64 @agg_count_shared(i64* %agg, i64 %val) {
     %ld = load i64, i64* %agg
     %old = atomicrmw add i64* %agg, i64 1 monotonic
     ret i64 %old
 }
 
-define i64 @agg_count_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define i64 @agg_count_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    %old = call i64 @agg_count(i64* %agg, i64 %val)
+    %old = call i64 @agg_count_shared(i64* %agg, i64 %val)
     ret i64 %old
 .skip:
     ret i64 0
 }
 
-define i64 @agg_count_double_skip_val(i64* %agg, double noundef %val, double noundef %skip_val) {
+define i64 @agg_count_double_skip_val_shared(i64* %agg, double noundef %val, double noundef %skip_val) {
     %no_skip = fcmp one double %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
     %val_cst = bitcast double %val to i64
-    %res = call i64 @agg_count(i64* %agg, i64 %val_cst)
+    %res = call i64 @agg_count_shared(i64* %agg, i64 %val_cst)
     ret i64 %res
 .skip:
     %orig = load i64, i64* %agg
@@ -75,12 +89,17 @@ define i64 @agg_count_double_skip_val(i64* %agg, double noundef %val, double nou
 }
 
 ;; TODO: may cause a CPU fallback on codegen
-define i64 @agg_sum(i64* %agg, i64 noundef %val) {
-    %old = atomicrmw add i64* %agg, i64 %val monotonic
+define i64 @agg_sum_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
+    %old = atomicrmw add i64 addrspace(4)* %agg, i64 %val monotonic
     ret i64 %old
 }
 
-define void @agg_sum_float(i32 addrspace(4)* %agg, float noundef %val) {
+define i32 @agg_sum_int32_shared(i32 addrspace(4)* %agg, i32 noundef %val) {
+    %old = atomicrmw add i32 addrspace(4)* %agg, i32 %val monotonic
+    ret i32 %old
+}
+
+define void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val) {
 .entry:
     %orig = load atomic i32, i32 addrspace(4)* %agg unordered, align 4
     %cst = bitcast i32 %orig to float
@@ -98,17 +117,17 @@ define void @agg_sum_float(i32 addrspace(4)* %agg, float noundef %val) {
     ret void
 }
 
-define void @agg_sum_float_skip_val(i32 addrspace(4)* %agg, float noundef %val, float noundef %skip_val) {
+define void @agg_sum_float_skip_val_shared(i32 addrspace(4)* %agg, float noundef %val, float noundef %skip_val) {
     %no_skip = fcmp one float %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    call void @agg_sum_float(i32 addrspace(4)* %agg, float noundef %val)
+    call void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val)
     br label %.skip
 .skip:
     ret void
 }
 
-define void @agg_sum_double(i64 addrspace(4)* %agg, double noundef %val) {
+define void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val) {
 .entry:
     %orig = load atomic i64, i64 addrspace(4)* %agg unordered, align 8
     %cst = bitcast i64 %orig to double
@@ -126,18 +145,18 @@ define void @agg_sum_double(i64 addrspace(4)* %agg, double noundef %val) {
     ret void
 }
 
-define void @agg_sum_double_skip_val(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
+define void @agg_sum_double_skip_val_shared(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
     %no_skip = fcmp one double %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    call void @agg_sum_double(i64 addrspace(4)* %agg, double noundef %val)
+    call void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val)
     br label %.skip
 .skip:
     ret void
 }
 
 
-define i64 @agg_sum_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define i64 @agg_sum_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
@@ -149,6 +168,16 @@ define i64 @agg_sum_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val)
     ret i64 %old2
 .skip:
     ret i64 0
+}
+
+define void @agg_id_shared(i64* %agg, i64 noundef %val) {
+    store i64 %val, i64* %agg
+    ret void
+}
+
+define void @agg_id_int32_shared(i32* %agg, i32 noundef %val) {
+    store i32 %val, i32* %agg
+    ret void
 }
 
 define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
@@ -219,7 +248,7 @@ define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noun
     ret void
 }
 
-define i64* @init_shared_mem(i64* %agg_init_val, i32 noundef %groups_buffer_size) {
+define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 noundef %groups_buffer_size) {
 .entry:
     %buf.units = ashr i32 %groups_buffer_size, 3
     %buf.units.i64 = sext i32 %buf.units to i64
@@ -229,27 +258,29 @@ define i64* @init_shared_mem(i64* %agg_init_val, i32 noundef %groups_buffer_size
     br i1 %loop.cond, label %.for_body, label %.exit
 .for_body:
     %pos.idx = phi i64 [ %pos, %.entry ], [ %pos.idx.new, %.for_body ]
-    %agg_init_val.idx = getelementptr inbounds i64, i64* %agg_init_val, i64 %pos.idx
-    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64]* @slm.buf, i64 0, i64 %pos.idx
-    %val = load i64, i64* %agg_init_val.idx
-    store i64 %val, i64* %slm.idx
+    %agg_init_val.idx = getelementptr inbounds i64, i64 addrspace(4)* %agg_init_val, i64 %pos.idx
+    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64] addrspace(3)* @slm.buf.i64, i64 0, i64 %pos.idx
+    %val = load i64, i64 addrspace(4)* %agg_init_val.idx
+    store i64 %val, i64 addrspace(3)* %slm.idx
     %pos.idx.new = add nsw i64 %pos.idx, %wgnum
     %cond = icmp slt i64 %pos.idx.new, %buf.units.i64
     br i1 %cond, label %.for_body, label %.exit
 .exit:
-    %res.ptr = bitcast [1024 x i64]* @slm.buf to i64*
-    ret i64* %res.ptr
+    call void @sync_threadblock()
+    %res.ptr = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    %res.ptr.casted = addrspacecast i64 addrspace(3)* %res.ptr to i64 addrspace(4)*
+    ret i64 addrspace(4)* %res.ptr.casted
 }
 
-define void @write_back_non_grouped_agg(i64* %input_buffer, i64* %output_buffer, i32 noundef %agg_idx) {
+define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 addrspace(4)* %output_buffer, i32 noundef %agg_idx) {
     %tid = call i64 @get_thread_index()
     %agg_idx.i64 = sext i32 %agg_idx to i64
     %cmp = icmp eq i64 %tid, %agg_idx.i64
-    br i1 %cmp, label %.exit, label %.agg
+    br i1 %cmp, label %.agg, label %.exit
 .agg:
-    %gep = getelementptr inbounds i64, i64* %input_buffer, i64 %agg_idx.i64
-    %val = load i64, i64* %gep
-    %old = call i64 @agg_sum_shared(i64* %output_buffer, i64 %val)
+    %gep = getelementptr inbounds i64, i64 addrspace(4)* %input_buffer, i64 %agg_idx.i64
+    %val = load i64, i64 addrspace(4)* %gep
+    %old = call i64 @agg_sum_shared(i64 addrspace(4)* %output_buffer, i64 %val)
     br label %.exit
 .exit:
     ret void
@@ -288,29 +319,29 @@ define i32 @atomic_xchg_int_32(i32 addrspace(4)* %p, i32 %val) {
     ret i32 %old
 }
 
-define void @agg_max(i64* %agg, i64 noundef %val) {
+define void @agg_max_shared(i64* %agg, i64 noundef %val) {
     %old = atomicrmw max i64* %agg, i64 %val monotonic
     ret void
 }
 
-define void @agg_max_skip_val(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define void @agg_max_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    call void @agg_max(i64* %agg, i64 noundef %val)
+    call void @agg_max_shared(i64* %agg, i64 noundef %val)
     br label %.skip
 .skip:
     ret void
 }
 
-define void @agg_min(i64* %agg, i64 noundef %val) {
+define void @agg_min_shared(i64* %agg, i64 noundef %val) {
     %old = atomicrmw min i64* %agg, i64 %val acq_rel
     ret void
 }
 
 declare i64 @llvm.smin.i64(i64, i64)
 
-define void @agg_min_skip_val(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define void @agg_min_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
