@@ -150,6 +150,7 @@ std::unique_ptr<llvm::Module> read_gen_module_from_bc(const std::string& bc_file
   auto owner = llvm::parseBitcodeFile(buffer->getMemBufferRef(), context);
   CHECK(!owner.takeError());
   CHECK(owner->get());
+  owner->get()->setTargetTriple("spir64-unknown-unknown");
   return std::move(owner.get());
 }
 
