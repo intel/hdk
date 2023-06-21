@@ -175,6 +175,7 @@ add_dependencies(QueryEngine QueryEngineFunctionsTargets)
 
 set(cpu_runtime_function_sources RuntimeFunctions.cpp DateAdd.cpp DateTruncate.cpp)
 set(intel_gpu_runtime_function_sources l0_mapd_rt.cpp DateAdd.cpp DateTruncate.cpp)
+set(intel_gpu_helpers_sources genx.cpp)
 
 
 set(hdk_default_runtime_functions_module_dependencies
@@ -250,15 +251,20 @@ link_runtime_module(${intel_gpu_module_name} "${intel_gpu_precompiled_module_lis
 link_runtime_module(${cpu_module_name} "${cpu_precompiled_module_list}")
 
 # SPIRV helper functions & intrinsics
-set(spirv_helper_functions_module genx.bc)
+set(spirv_helper_functions_module genx_impl.bc)
 add_custom_command(
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Compiler/genx.ll
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/genx.bc
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${spirv_helper_functions_module}
     COMMAND ${llvm_as_cmd} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/Compiler/genx.ll -o ${CMAKE_CURRENT_BINARY_DIR}/${spirv_helper_functions_module}
 )
 
+set(spirv_runtime_module genx.bc)
+precompile_modules("genx_mod_lst" ${intel_gpu_module_internal_suffix} ${precompile_intel_gpu_module_cmd} Compiler/genx.cpp)
+list(APPEND genx_mod_lst ${spirv_helper_functions_module})
+link_runtime_module(${spirv_runtime_module} "${genx_mod_lst}")
+
 if(ENABLE_L0)
-    add_custom_target(IntelGPURuntimeModule DEPENDS ${intel_gpu_module_name} ${spirv_helper_functions_module})
+    add_custom_target(IntelGPURuntimeModule DEPENDS ${intel_gpu_module_name} ${spirv_runtime_module})
     add_dependencies(QueryEngine IntelGPURuntimeModule)
 endif()
 
