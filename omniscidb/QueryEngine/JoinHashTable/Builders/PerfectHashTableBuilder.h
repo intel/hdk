@@ -171,7 +171,7 @@ class PerfectJoinHashTableBuilder {
 
     {
       auto timer_init = DEBUG_TIMER("CPU One-To-One Perfect-Hash: init_hash_join_buff");
-      init_hash_join_buff_tbb(cpu_hash_table_buff,
+      init_hash_join_buff(cpu_hash_table_buff,
                               hash_entry_info.getNormalizedHashEntryCount(),
                               hash_join_invalid_val);
     }
@@ -253,7 +253,7 @@ class PerfectJoinHashTableBuilder {
     {
       auto timer_init =
           DEBUG_TIMER("CPU One-To-Many Perfect Hash Table Builder: init_hash_join_buff");
-      init_hash_join_buff_tbb(cpu_hash_table_buff,
+      init_hash_join_buff(cpu_hash_table_buff,
                               hash_entry_info.getNormalizedHashEntryCount(),
                               hash_join_invalid_val);
     }

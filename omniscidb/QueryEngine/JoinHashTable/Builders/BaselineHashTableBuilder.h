@@ -227,18 +227,18 @@ class BaselineJoinHashTableBuilder {
       auto timer_init = DEBUG_TIMER("CPU Baseline-Hash: init_baseline_hash_join_buff_32");
       switch (key_component_width) {
         case 4:
-          init_baseline_hash_join_buff_tbb_32(cpu_hash_table_ptr,
-                                              keyspace_entry_count,
-                                              key_component_count,
-                                              layout == HashType::OneToOne,
-                                              -1);
+          init_baseline_hash_join_buff_32(cpu_hash_table_ptr,
+                                          keyspace_entry_count,
+                                          key_component_count,
+                                          layout == HashType::OneToOne,
+                                          -1);
           break;
         case 8:
-          init_baseline_hash_join_buff_tbb_64(cpu_hash_table_ptr,
-                                              keyspace_entry_count,
-                                              key_component_count,
-                                              layout == HashType::OneToOne,
-                                              -1);
+          init_baseline_hash_join_buff_64(cpu_hash_table_ptr,
+                                          keyspace_entry_count,
+                                          key_component_count,
+                                          layout == HashType::OneToOne,
+                                          -1);
           break;
         default:
           CHECK(false);
@@ -307,7 +307,7 @@ class BaselineJoinHashTableBuilder {
       {
         auto timer_init_additional_buffers =
             DEBUG_TIMER("CPU Baseline-Hash: Additional Buffers init_hash_join_buff");
-        init_hash_join_buff(one_to_many_buff, keyspace_entry_count, -1, 0, 1);
+        init_hash_join_buff(one_to_many_buff, keyspace_entry_count, -1);
       }
       setHashLayout(layout);
       switch (key_component_width) {

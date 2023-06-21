@@ -176,9 +176,7 @@ init_hash_join_buff_cpu(int32_t* groups_buffer,
 
 DEVICE void SUFFIX(init_hash_join_buff)(int32_t* groups_buffer,
                                         const int64_t hash_entry_count,
-                                        const int32_t invalid_slot_val,
-                                        const int32_t cpu_thread_idx,
-                                        const int32_t cpu_thread_count) {
+                                        const int32_t invalid_slot_val) {
 #ifdef __CUDACC__
   int32_t start = threadIdx.x + blockDim.x * blockIdx.x;
   int32_t step = blockDim.x * gridDim.x;
@@ -186,17 +184,6 @@ DEVICE void SUFFIX(init_hash_join_buff)(int32_t* groups_buffer,
     groups_buffer[i] = invalid_slot_val;
   }
 #else
-  int64_t start = hash_entry_count * cpu_thread_idx / cpu_thread_count;
-  int32_t end = hash_entry_count * (cpu_thread_idx + 1) / cpu_thread_count;
-  init_hash_join_buff_cpu(groups_buffer, invalid_slot_val, start, end);
-#endif
-}
-
-#ifndef __CUDACC__
-
-void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
-                                     const int64_t hash_entry_count,
-                                     const int32_t invalid_slot_val) {
   tbb::parallel_for(tbb::blocked_range<int64_t>(0, hash_entry_count),
                     [=](const tbb::blocked_range<int64_t>& r) {
                       const auto start_idx = r.begin();
@@ -206,7 +193,10 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
                         groups_buffer[entry_idx] = invalid_slot_val;
                       }
                     });
+#endif
 }
+
+#ifndef __CUDACC__
 
 #endif  // #ifndef __CUDACC__
 
@@ -396,11 +386,11 @@ DEVICE void SUFFIX(init_baseline_hash_join_buff)(int8_t* hash_buff,
 #ifndef __CUDACC__
 
 template <typename T>
-DEVICE void SUFFIX(init_baseline_hash_join_buff_tbb)(int8_t* hash_buff,
-                                                     const int64_t entry_count,
-                                                     const size_t key_component_count,
-                                                     const bool with_val_slot,
-                                                     const int32_t invalid_slot_val) {
+void init_baseline_hash_join_buff_tbb(int8_t* hash_buff,
+                                      const int64_t entry_count,
+                                      const size_t key_component_count,
+                                      const bool with_val_slot,
+                                      const int32_t invalid_slot_val) {
   const auto hash_entry_size =
       (key_component_count + (with_val_slot ? 1 : 0)) * sizeof(T);
   const T empty_key = SUFFIX(get_invalid_key)<typename remove_addr_space<T>::type>();
@@ -1403,54 +1393,22 @@ void fill_one_to_many_hash_table_bucketized(
                                    launch_fill_row_ids);
 }
 
+#ifndef __CUDACC__
+
 void init_baseline_hash_join_buff_32(int8_t* hash_join_buff,
                                      const int64_t entry_count,
                                      const size_t key_component_count,
                                      const bool with_val_slot,
-                                     const int32_t invalid_slot_val,
-                                     const int32_t cpu_thread_idx,
-                                     const int32_t cpu_thread_count) {
-  init_baseline_hash_join_buff<int32_t>(hash_join_buff,
-                                        entry_count,
-                                        key_component_count,
-                                        with_val_slot,
-                                        invalid_slot_val,
-                                        cpu_thread_idx,
-                                        cpu_thread_count);
+                                     const int32_t invalid_slot_val) {
+  init_baseline_hash_join_buff_tbb<int32_t>(
+      hash_join_buff, entry_count, key_component_count, with_val_slot, invalid_slot_val);
 }
 
 void init_baseline_hash_join_buff_64(int8_t* hash_join_buff,
                                      const int64_t entry_count,
                                      const size_t key_component_count,
                                      const bool with_val_slot,
-                                     const int32_t invalid_slot_val,
-                                     const int32_t cpu_thread_idx,
-                                     const int32_t cpu_thread_count) {
-  init_baseline_hash_join_buff<int64_t>(hash_join_buff,
-                                        entry_count,
-                                        key_component_count,
-                                        with_val_slot,
-                                        invalid_slot_val,
-                                        cpu_thread_idx,
-                                        cpu_thread_count);
-}
-
-#ifndef __CUDACC__
-
-void init_baseline_hash_join_buff_tbb_32(int8_t* hash_join_buff,
-                                         const int64_t entry_count,
-                                         const size_t key_component_count,
-                                         const bool with_val_slot,
-                                         const int32_t invalid_slot_val) {
-  init_baseline_hash_join_buff_tbb<int32_t>(
-      hash_join_buff, entry_count, key_component_count, with_val_slot, invalid_slot_val);
-}
-
-void init_baseline_hash_join_buff_tbb_64(int8_t* hash_join_buff,
-                                         const int64_t entry_count,
-                                         const size_t key_component_count,
-                                         const bool with_val_slot,
-                                         const int32_t invalid_slot_val) {
+                                     const int32_t invalid_slot_val) {
   init_baseline_hash_join_buff_tbb<int64_t>(
       hash_join_buff, entry_count, key_component_count, with_val_slot, invalid_slot_val);
 }

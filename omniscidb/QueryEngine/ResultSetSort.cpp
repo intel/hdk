@@ -34,7 +34,7 @@
 #include "ResultSet/ResultSet.h"
 #include "Shared/Intervals.h"
 #include "Shared/likely.h"
-#include "Shared/parallel_sort.h"  // TODO: is this used?
+#include "Shared/parallel_sort.h"
 #include "Shared/thread_count.h"
 
 #include <future>

@@ -60,51 +60,25 @@ const size_t g_maximum_conditions_to_coalesce{8};
 
 void init_hash_join_buff(int32_t* buff,
                          const int64_t entry_count,
-                         const int32_t invalid_slot_val,
-                         const int32_t cpu_thread_idx,
-                         const int32_t cpu_thread_count);
-
-#ifndef __CUDACC__
-
-void init_hash_join_buff_tbb(int32_t* buff,
-                             const int64_t entry_count,
-                             const int32_t invalid_slot_val);
-
-#endif  // #ifndef __CUDACC__
+                         const int32_t invalid_slot_val);
 
 void init_hash_join_buff_on_device(int32_t* buff,
                                    const int64_t entry_count,
                                    const int32_t invalid_slot_val);
 
+#ifndef __CUDACC__
+
 void init_baseline_hash_join_buff_32(int8_t* hash_join_buff,
                                      const int64_t entry_count,
                                      const size_t key_component_count,
                                      const bool with_val_slot,
-                                     const int32_t invalid_slot_val,
-                                     const int32_t cpu_thread_idx,
-                                     const int32_t cpu_thread_count);
+                                     const int32_t invalid_slot_val);
 
 void init_baseline_hash_join_buff_64(int8_t* hash_join_buff,
                                      const int64_t entry_count,
                                      const size_t key_component_count,
                                      const bool with_val_slot,
-                                     const int32_t invalid_slot_val,
-                                     const int32_t cpu_thread_idx,
-                                     const int32_t cpu_thread_count);
-
-#ifndef __CUDACC__
-
-void init_baseline_hash_join_buff_tbb_32(int8_t* hash_join_buff,
-                                         const int64_t entry_count,
-                                         const size_t key_component_count,
-                                         const bool with_val_slot,
-                                         const int32_t invalid_slot_val);
-
-void init_baseline_hash_join_buff_tbb_64(int8_t* hash_join_buff,
-                                         const int64_t entry_count,
-                                         const size_t key_component_count,
-                                         const bool with_val_slot,
-                                         const int32_t invalid_slot_val);
+                                     const int32_t invalid_slot_val);
 
 #endif  // #ifndef __CUDACC__
 
