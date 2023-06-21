@@ -34,10 +34,10 @@
 #include "Shared/SqlTypesLayout.h"
 #include "Shared/likely.h"
 #include "Shared/thread_count.h"
-#include "Shared/threading.h"
 
 #include <llvm/ExecutionEngine/GenericValue.h>
 
+#include <tbb/parallel_for.h>
 #include <algorithm>
 #include <future>
 #include <numeric>
@@ -211,38 +211,38 @@ void ResultSetReduction::reduce(const ResultSetStorage& this_,
     }
     if (use_multithreaded_reduction(that_entry_count)) {
       if (reduction_code.ir_reduce_loop) {
-        threading::parallel_for(threading::blocked_range<size_t>(0, that_entry_count),
-                                [&this_query_mem_desc,
-                                 this_buff,
-                                 that_buff,
-                                 that_entry_count,
-                                 &reduction_code,
-                                 &that_query_mem_desc,
-                                 executor](auto r) {
-                                  run_reduction_code(reduction_code,
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, that_entry_count),
+                          [&this_query_mem_desc,
+                           this_buff,
+                           that_buff,
+                           that_entry_count,
+                           &reduction_code,
+                           &that_query_mem_desc,
+                           executor](auto r) {
+                            run_reduction_code(reduction_code,
+                                               this_buff,
+                                               that_buff,
+                                               r.begin(),
+                                               r.end(),
+                                               that_entry_count,
+                                               &this_query_mem_desc,
+                                               &that_query_mem_desc,
+                                               nullptr,
+                                               executor);
+                          });
+      } else {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, that_entry_count),
+                          [&this_, &that, this_buff, that_buff, &config](auto r) {
+                            for (size_t entry_idx = r.begin(); entry_idx < r.end();
+                                 ++entry_idx) {
+                              reduceOneEntryBaseline(this_,
+                                                     that,
                                                      this_buff,
                                                      that_buff,
-                                                     r.begin(),
-                                                     r.end(),
-                                                     that_entry_count,
-                                                     &this_query_mem_desc,
-                                                     &that_query_mem_desc,
-                                                     nullptr,
-                                                     executor);
-                                });
-      } else {
-        threading::parallel_for(
-            threading::blocked_range<size_t>(0, that_entry_count),
-            [&this_, &that, this_buff, that_buff, &config](auto r) {
-              for (size_t entry_idx = r.begin(); entry_idx < r.end(); ++entry_idx) {
-                reduceOneEntryBaseline(this_,
-                                       that,
-                                       this_buff,
-                                       that_buff,
-                                       entry_idx,
-                                       config.exec.watchdog.enable_dynamic);
-              }
-            });
+                                                     entry_idx,
+                                                     config.exec.watchdog.enable_dynamic);
+                            }
+                          });
       }
     } else {
       if (reduction_code.ir_reduce_loop) {
@@ -267,8 +267,8 @@ void ResultSetReduction::reduce(const ResultSetStorage& this_,
   }
   if (use_multithreaded_reduction(entry_count)) {
     if (this_query_mem_desc.didOutputColumnar()) {
-      threading::parallel_for(
-          threading::blocked_range<size_t>(0, entry_count),
+      tbb::parallel_for(
+          tbb::blocked_range<size_t>(0, entry_count),
           [&this_, &that, this_buff, that_buff, &serialized_varlen_buffer, executor](
               auto r) {
             reduceEntriesNoCollisionsColWise(this_,
@@ -282,26 +282,26 @@ void ResultSetReduction::reduce(const ResultSetStorage& this_,
           });
     } else {
       CHECK(reduction_code.ir_reduce_loop);
-      threading::parallel_for(threading::blocked_range<size_t>(0, entry_count),
-                              [&this_query_mem_desc,
-                               this_buff,
-                               that_buff,
-                               that_entry_count,
-                               &reduction_code,
-                               &that_query_mem_desc,
-                               &serialized_varlen_buffer,
-                               executor](auto r) {
-                                run_reduction_code(reduction_code,
-                                                   this_buff,
-                                                   that_buff,
-                                                   r.begin(),
-                                                   r.end(),
-                                                   that_entry_count,
-                                                   &this_query_mem_desc,
-                                                   &that_query_mem_desc,
-                                                   &serialized_varlen_buffer,
-                                                   executor);
-                              });
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, entry_count),
+                        [&this_query_mem_desc,
+                         this_buff,
+                         that_buff,
+                         that_entry_count,
+                         &reduction_code,
+                         &that_query_mem_desc,
+                         &serialized_varlen_buffer,
+                         executor](auto r) {
+                          run_reduction_code(reduction_code,
+                                             this_buff,
+                                             that_buff,
+                                             r.begin(),
+                                             r.end(),
+                                             that_entry_count,
+                                             &this_query_mem_desc,
+                                             &that_query_mem_desc,
+                                             &serialized_varlen_buffer,
+                                             executor);
+                        });
     }
   } else {
     if (this_query_mem_desc.didOutputColumnar()) {

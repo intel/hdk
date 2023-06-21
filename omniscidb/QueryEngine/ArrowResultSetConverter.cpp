@@ -20,7 +20,6 @@
 #include "Execute.h"
 #include "Shared/ArrowUtil.h"
 #include "Shared/DateConverters.h"
-#include "Shared/threading.h"
 #include "Shared/toString.h"
 
 //  arrow headers
@@ -341,7 +340,7 @@ int64_t create_bitmap_parallel_for_avx512(uint8_t* bitmap_data,
         bitmap_data_ptr, const_cast<TYPE*>(values_data_ptr), processing_count);
   };
 
-  threading::parallel_for(
+  tbb::parallel_for(
       tbb::blocked_range<size_t>(
           0, (avx512_processing_count + min_block_size - 1) / min_block_size),
       br_par_processor);
@@ -394,7 +393,7 @@ void convert_column(ResultSetPtr result,
 
   std::vector<std::shared_ptr<arrow::Array>> fragments(values.size(), nullptr);
 
-  threading::parallel_for(static_cast<size_t>(0), values.size(), [&](size_t idx) {
+  tbb::parallel_for(static_cast<size_t>(0), values.size(), [&](size_t idx) {
     size_t chunk_rows_count = chunks[idx].second;
 
     auto res = arrow::AllocateBuffer((chunk_rows_count + 7) / 8);
@@ -421,7 +420,7 @@ void convert_column(ResultSetPtr result,
                          ? std::make_shared<NumArray>(
                                chunk_rows_count, values[idx], is_valid, null_count)
                          : std::make_shared<NumArray>(chunk_rows_count, values[idx]);
-  });  // threading::parallel_for
+  });  // tbb::parallel_for
 
   out = std::make_shared<arrow::ChunkedArray>(std::move(fragments));
 }
@@ -1492,7 +1491,7 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
                                    results_->isTruncated());
     } else {
       auto timer = DEBUG_TIMER("fetch data in parallel_for");
-      threading::parallel_for(
+      tbb::parallel_for(
           static_cast<size_t>(0), entry_count, stride, [&](size_t start_entry) {
             const size_t i = start_entry / stride;
             const size_t end_entry = std::min(entry_count, start_entry + stride);
@@ -1513,7 +1512,7 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
     {
       auto timer = DEBUG_TIMER("append rows to arrow, finish builders");
-      threading::parallel_for(static_cast<size_t>(0), col_count, [&](size_t i) {
+      tbb::parallel_for(static_cast<size_t>(0), col_count, [&](size_t i) {
         if (!columnar_conversion_flags[i]) {
           for (size_t j = 0; j < segments_count; ++j) {
             if (column_value_segs[j][i]) {

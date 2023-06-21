@@ -28,7 +28,6 @@
 #include "Shared/TypePunning.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/funcannotations.h"
-#include "Shared/threading.h"
 
 #ifdef HAVE_TBB
 //#include <tbb/parallel_for.h>
@@ -562,7 +561,7 @@ void WindowFunctionContext::compute() {
           config_.exec.window_func.parallel_window_partition_compute_threshold};
   if (should_parallelize) {
     auto timer = DEBUG_TIMER("Window Function Partition Compute");
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, partition_count, cpu_threads())) {
       thread_pool.run([=] { compute_partitions(interval.begin, interval.end); });
     }
@@ -588,7 +587,7 @@ void WindowFunctionContext::compute() {
 
   if (should_parallelize) {
     auto timer = DEBUG_TIMER("Window Function Non-Aggregate Payload Copy Parallelized");
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, elem_count_, cpu_threads())) {
       thread_pool.run([=] { payload_copy(interval.begin, interval.end); });
     }

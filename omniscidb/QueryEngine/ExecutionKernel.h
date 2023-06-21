@@ -21,10 +21,10 @@
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 
 #include "Compiler/Backend.h"
-#include "Shared/threading.h"
 
 #ifdef HAVE_TBB
-#include "tbb/enumerable_thread_specific.h"
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_group.h>
 #endif
 
 class SharedKernelContext {
@@ -55,7 +55,7 @@ class SharedKernelContext {
   auto getThreadPool() {
     return task_group_;
   }
-  void setThreadPool(threading::task_group* tg) {
+  void setThreadPool(tbb::task_group* tg) {
     task_group_ = tg;
   }
   auto& getTlsExecutionContext() {
@@ -72,7 +72,7 @@ class SharedKernelContext {
   std::vector<InputTableInfo> query_infos_;
 
 #ifdef HAVE_TBB
-  threading::task_group* task_group_;
+  tbb::task_group* task_group_;
   tbb::enumerable_thread_specific<std::unique_ptr<QueryExecutionContext>>
       tls_execution_context_;
 #endif  // HAVE_TBB

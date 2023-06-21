@@ -286,7 +286,7 @@ ResultSetComparator<BUFFER_ITERATOR_TYPE>::materializeCountDistinctColumn(
   if (single_threaded_) {
     work(0, num_non_empty_entries);
   } else {
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, num_non_empty_entries, cpu_threads())) {
       thread_pool.run([=] { work(interval.begin, interval.end); });
     }
@@ -323,7 +323,7 @@ ResultSetComparator<BUFFER_ITERATOR_TYPE>::materializeApproxQuantileColumn(
   if (single_threaded_) {
     work(0, size);
   } else {
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, size, cpu_threads())) {
       thread_pool.run([=] { work(interval.begin, interval.end); });
     }
@@ -621,7 +621,7 @@ void parallelTop(ResultSet* rs,
   Permutation permutation;
   permutation.resize(rs->entryCount());
   std::vector<PermutationView> permutation_views(nthreads);
-  threading::task_group top_sort_threads;
+  tbb::task_group top_sort_threads;
   for (auto interval : makeIntervals<PermutationIdx>(0, permutation.size(), nthreads)) {
     top_sort_threads.run([rs,
                           &permutation,
