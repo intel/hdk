@@ -37,9 +37,7 @@
 #include <x86intrin.h>
 #endif
 
-#ifdef HAVE_TBB
 #include <tbb/parallel_for.h>
-#endif
 
 #include <future>
 #endif
@@ -195,7 +193,6 @@ DEVICE void SUFFIX(init_hash_join_buff)(int32_t* groups_buffer,
 }
 
 #ifndef __CUDACC__
-#ifdef HAVE_TBB
 
 void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
                                      const int64_t hash_entry_count,
@@ -211,7 +208,6 @@ void SUFFIX(init_hash_join_buff_tbb)(int32_t* groups_buffer,
                     });
 }
 
-#endif  // #ifdef HAVE_TBB
 #endif  // #ifndef __CUDACC__
 
 #ifdef __CUDACC__
@@ -398,7 +394,6 @@ DEVICE void SUFFIX(init_baseline_hash_join_buff)(int8_t* hash_buff,
 }
 
 #ifndef __CUDACC__
-#ifdef HAVE_TBB
 
 template <typename T>
 DEVICE void SUFFIX(init_baseline_hash_join_buff_tbb)(int8_t* hash_buff,
@@ -427,7 +422,6 @@ DEVICE void SUFFIX(init_baseline_hash_join_buff_tbb)(int8_t* hash_buff,
                     });
 }
 
-#endif  // #ifdef HAVE_TBB
 #endif  // #ifndef __CUDACC__
 
 #ifdef __CUDACC__
@@ -1442,7 +1436,6 @@ void init_baseline_hash_join_buff_64(int8_t* hash_join_buff,
 }
 
 #ifndef __CUDACC__
-#ifdef HAVE_TBB
 
 void init_baseline_hash_join_buff_tbb_32(int8_t* hash_join_buff,
                                          const int64_t entry_count,
@@ -1462,7 +1455,6 @@ void init_baseline_hash_join_buff_tbb_64(int8_t* hash_join_buff,
       hash_join_buff, entry_count, key_component_count, with_val_slot, invalid_slot_val);
 }
 
-#endif  // #ifdef HAVE_TBB
 #endif  // #ifndef __CUDACC__
 
 int fill_baseline_hash_join_buff_32(int8_t* hash_buff,

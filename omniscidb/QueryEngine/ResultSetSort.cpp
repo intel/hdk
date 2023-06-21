@@ -29,18 +29,15 @@
 #include "InPlaceSort.h"
 #include "ResultSetSortImpl.h"
 
+#include <tbb/parallel_sort.h>
 #include "ResultSet/CountDistinct.h"
 #include "ResultSet/ResultSet.h"
 #include "Shared/Intervals.h"
 #include "Shared/likely.h"
-#include "Shared/parallel_sort.h"
+#include "Shared/parallel_sort.h"  // TODO: is this used?
 #include "Shared/thread_count.h"
 
 #include <future>
-
-#ifdef HAVE_TBB
-#include "tbb/parallel_sort.h"
-#endif
 
 #ifdef HAVE_CUDA
 std::unique_ptr<CudaMgr_Namespace::CudaMgr> g_cuda_mgr;  // for unit tests only
@@ -513,10 +510,8 @@ PermutationView topPermutation(PermutationView permutation,
     std::partial_sort(
         permutation.begin(), permutation.begin() + n, permutation.end(), compare);
     permutation.resize(n);
-#ifdef HAVE_TBB
   } else if (!single_threaded) {
     tbb::parallel_sort(permutation.begin(), permutation.end(), compare);
-#endif
   } else {
     std::sort(permutation.begin(), permutation.end(), compare);
   }

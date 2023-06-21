@@ -2678,12 +2678,10 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
   const RelAlgExecutionUnit* ra_exe_unit =
       kernels.empty() ? nullptr : &kernels[0]->ra_exe_unit_;
 
-#ifdef HAVE_TBB
   if (config_->exec.sub_tasks.enable && device_type == ExecutorDeviceType::CPU) {
     shared_context.setThreadPool(&tg);
   }
   ScopeGuard pool_guard([&shared_context]() { shared_context.setThreadPool(nullptr); });
-#endif  // HAVE_TBB
 
   VLOG(1) << "Launching " << kernels.size() << " kernels for query on: ";
   for (size_t i = 0; i < kernels.size(); i++) {

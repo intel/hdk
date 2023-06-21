@@ -330,13 +330,6 @@ void CommandLineOptions::validate() {
     LOG(INFO) << "License key path set to '" << license_path << "'";
   }
   LOG(INFO) << " Server read-only mode is " << read_only;
-#if DISABLE_CONCURRENCY
-  LOG(INFO) << " Threading layer: serial";
-#elif ENABLE_TBB
-  LOG(INFO) << " Threading layer: TBB";
-#else
-  LOG(INFO) << " Threading layer: std";
-#endif
   LOG(INFO) << " Watchdog is set to " << enable_watchdog;
   LOG(INFO) << " Dynamic Watchdog is set to " << enable_dynamic_watchdog;
   if (enable_dynamic_watchdog) {

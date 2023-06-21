@@ -29,12 +29,7 @@
 #include "Shared/checked_alloc.h"
 #include "Shared/funcannotations.h"
 
-#ifdef HAVE_TBB
-//#include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
-#else
-#include <thrust/sort.h>
-#endif
 
 // Non-partitioned version (no join table provided)
 WindowFunctionContext::WindowFunctionContext(
@@ -501,15 +496,9 @@ void WindowFunctionContext::computePartition(const size_t partition_idx,
   if (config_.exec.window_func.parallel_window_partition_sort &&
       partition_size >=
           config_.exec.window_func.parallel_window_partition_sort_threshold) {
-#ifdef HAVE_TBB
     tbb::parallel_sort(output_for_partition_buff,
                        output_for_partition_buff + partition_size,
                        col_tuple_comparator);
-#else
-    thrust::sort(output_for_partition_buff,
-                 output_for_partition_buff + partition_size,
-                 col_tuple_comparator);
-#endif
   } else {
     std::sort(output_for_partition_buff,
               output_for_partition_buff + partition_size,

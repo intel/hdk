@@ -315,7 +315,6 @@ void ExecutionKernel::runImpl(Executor* executor,
     }
   }
 
-#ifdef HAVE_TBB
   bool can_run_subkernels = shared_context.getThreadPool() != nullptr;
 
   // Sub-tasks are supported for groupby queries and estimators only for now.
@@ -358,7 +357,6 @@ void ExecutionKernel::runImpl(Executor* executor,
 
     return;
   }
-#endif  // HAVE_TBB
   if (eo.executor_type == ExecutorType::Native) {
     try {
       query_exe_context_owned =
@@ -448,8 +446,6 @@ void ExecutionKernel::runImpl(Executor* executor,
   shared_context.addDeviceResults(
       std::move(device_results_), outer_table_id, outer_tab_frag_ids);
 }
-
-#ifdef HAVE_TBB
 
 void KernelSubtask::run(Executor* executor) {
   try {
@@ -569,4 +565,3 @@ void KernelSubtask::runImpl(Executor* executor) {
   }
 }
 
-#endif  // HAVE_TBB
