@@ -60,6 +60,7 @@ endif()
 add_executable(StringDictionaryBenchmark StringDictionaryBenchmark.cpp)
 
 if(ENABLE_L0)
+  add_executable(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel.cpp ResultSetTestUtils.cpp)
   add_executable(L0MgrExecuteTest L0MgrExecuteTest.cpp)
   add_executable(SpirvBuildTest SpirvBuildTest.cpp)
   add_executable(DataMgrWithL0Test DataMgrWithL0Test.cpp)
@@ -69,11 +70,13 @@ if(ENABLE_L0)
   target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
   target_link_libraries(DataMgrWithL0Test DataMgr gtest)
   target_link_libraries(IntelGPUEnablingTest gtest QueryEngine ArrowQueryRunner)
+  target_link_libraries(GpuSharedMemoryTestIntel gtest QueryEngine ArrowQueryRunner)
 
   add_test(L0MgrExecuteTest L0MgrExecuteTest ${TEST_ARGS})
   add_test(SpirvBuildTest SpirvBuildTest ${TEST_ARGS})
   add_test(DataMgrWithL0Test DataMgrWithL0Test ${TEST_ARGS})
   add_test(IntelGPUEnablingTest IntelGPUEnablingTest ${TEST_ARGS})
+  add_test(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel ${TEST_ARGS})
 endif()
 
 add_executable(CostModelTest CostModel/CostModelTest.cpp)
@@ -134,6 +137,10 @@ else()
   target_link_libraries(StringDictionaryBenchmark benchmark gtest StringDictionary Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
 endif()
 
+if(ENABLE_L0)
+  target_link_libraries(GpuSharedMemoryTestIntel gtest Logger QueryEngine)
+endif()
+
 if(ENABLE_CUDA)
   target_link_libraries(GpuSharedMemoryTest gtest Logger QueryEngine)
 endif()
@@ -180,6 +187,7 @@ if(ENABLE_CUDA)
   add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
 endif()
 if(ENABLE_L0)
+  add_test(GpuSharedMemoryTestIntel GpuSharedMemoryTestIntel ${TEST_ARGS})
   add_test(NAME PuntToCpu COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.Punt*" ${TEST_ARGS})
   set_tests_properties(PuntToCpu PROPERTIES LABELS "enabling")
   add_test(NAME StreamingTopNFallback COMMAND ArrowBasedExecuteTest "--gtest_filter=Select.TopKHeap:Select.TimeInterval:Select.OverflowAndUnderFlow" ${TEST_ARGS})
@@ -234,6 +242,10 @@ set(TEST_PROGRAMS
 
 if(ENABLE_CUDA)
   list(APPEND TEST_PROGRAMS GpuSharedMemoryTest)
+endif()
+
+if(ENABLE_L0)
+  list(APPEND TEST_PROGRAMS GpuSharedMemoryTestIntel)
 endif()
 
 #if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
@@ -323,6 +335,7 @@ add_custom_target(topk_tests
 
 if(ENABLE_L0)
   set(ENABLING_TESTS
+    GpuSharedMemoryTestIntel
     ArrowStorageSqlTest # taxi queries
     SpirvBuildTest
     L0MgrExecuteTest
