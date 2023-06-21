@@ -60,31 +60,37 @@ define i8 @thread_warp_idx(i8 noundef %warp_sz) {
     ret i8 0
 }
 
-define i64 @agg_count_shared(i64* %agg, i64 %val) {
-    %ld = load i64, i64* %agg
-    %old = atomicrmw add i64* %agg, i64 1 monotonic
+define i64 @agg_count_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
+    %ld = load i64, i64 addrspace(4)* %agg
+    %old = atomicrmw add i64 addrspace(4)* %agg, i64 1 monotonic
     ret i64 %old
 }
 
-define i64 @agg_count_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define i32 @agg_count_int32_shared(i32 addrspace(4)* %agg, i32 noundef %val) {
+    %ld = load i32, i32 addrspace(4)* %agg
+    %old = atomicrmw add i32 addrspace(4)* %agg, i32 1 monotonic
+    ret i32 %old
+}
+
+define i64 @agg_count_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    %old = call i64 @agg_count_shared(i64* %agg, i64 %val)
+    %old = call i64 @agg_count_shared(i64 addrspace(4)* %agg, i64 %val)
     ret i64 %old
 .skip:
     ret i64 0
 }
 
-define i64 @agg_count_double_skip_val_shared(i64* %agg, double noundef %val, double noundef %skip_val) {
+define i64 @agg_count_double_skip_val_shared(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
     %no_skip = fcmp one double %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
     %val_cst = bitcast double %val to i64
-    %res = call i64 @agg_count_shared(i64* %agg, i64 %val_cst)
+    %res = call i64 @agg_count_shared(i64 addrspace(4)* %agg, i64 %val_cst)
     ret i64 %res
 .skip:
-    %orig = load i64, i64* %agg
+    %orig = load i64, i64 addrspace(4)* %agg
     ret i64 %orig
 }
 
@@ -175,11 +181,6 @@ define void @agg_id_shared(i64* %agg, i64 noundef %val) {
     ret void
 }
 
-define void @agg_id_int32_shared(i32* %agg, i32 noundef %val) {
-    store i32 %val, i32* %agg
-    ret void
-}
-
 define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
 .entry:
     %orig = load atomic i32, i32 addrspace(4)* %addr unordered, align 8
@@ -194,6 +195,85 @@ define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
 .exit:
     ret void
 }
+
+define double @atomic_min_float(float addrspace(4)* %addr, float noundef %val) {
+.entry:
+    %orig = load float, float addrspace(4)* %addr, align 8
+    br label %.loop
+.loop:
+    %loaded = phi float [ %orig, %.entry], [ %old.cst, %.loop ]
+    %isless = fcmp olt float %val, %loaded
+    %min = select i1 %isless, float %val, float %loaded
+    %min.cst = bitcast float %min to i32
+    %loaded.cst = bitcast float %loaded to i32
+    %addr.cst = bitcast float addrspace(4)* %addr to i32 addrspace(4)*
+    %old = call i32 @atomic_cas_int_32(i32 addrspace(4)* %addr.cst, i32 %loaded.cst, i32 %min.cst)
+    %old.cst = bitcast i32 %old to float
+    %success = icmp eq i32 %old, %loaded.cst
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    %res = fpext float %old.cst to double
+    ret double %res
+}
+
+define double @atomic_min_double(double addrspace(4)* %addr, double noundef %val) {
+.entry:
+    %orig = load double, double addrspace(4)* %addr, align 8
+    br label %.loop
+.loop:
+    %loaded = phi double [ %orig, %.entry], [ %old.cst, %.loop ]
+    %isless = fcmp olt double %val, %loaded
+    %min = select i1 %isless, double %val, double %loaded
+    %min.cst = bitcast double %min to i64
+    %loaded.cst = bitcast double %loaded to i64
+    %addr.cst = bitcast double addrspace(4)* %addr to i64 addrspace(4)*
+    %old = call i64 @atomic_cas_int_64(i64 addrspace(4)* %addr.cst, i64 %loaded.cst, i64 %min.cst)
+    %old.cst = bitcast i64 %old to double
+    %success = icmp eq i64 %old, %loaded.cst
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    ret double %old.cst
+}
+
+define double @atomic_max_float(float addrspace(4)* %addr, float noundef %val) {
+.entry:
+    %orig = load float, float addrspace(4)* %addr, align 8
+    br label %.loop
+.loop:
+    %loaded = phi float [ %orig, %.entry], [ %old.cst, %.loop ]
+    %isless = fcmp ogt float %val, %loaded
+    %min = select i1 %isless, float %val, float %loaded
+    %min.cst = bitcast float %min to i32
+    %loaded.cst = bitcast float %loaded to i32
+    %addr.cst = bitcast float addrspace(4)* %addr to i32 addrspace(4)*
+    %old = call i32 @atomic_cas_int_32(i32 addrspace(4)* %addr.cst, i32 %loaded.cst, i32 %min.cst)
+    %old.cst = bitcast i32 %old to float
+    %success = icmp eq i32 %old, %loaded.cst
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    %res = fpext float %old.cst to double
+    ret double %res
+}
+
+define double @atomic_max_double(double addrspace(4)* %addr, double noundef %val) {
+.entry:
+    %orig = load double, double addrspace(4)* %addr, align 8
+    br label %.loop
+.loop:
+    %loaded = phi double [ %orig, %.entry], [ %old.cst, %.loop ]
+    %isless = fcmp ogt double %val, %loaded
+    %min = select i1 %isless, double %val, double %loaded
+    %min.cst = bitcast double %min to i64
+    %loaded.cst = bitcast double %loaded to i64
+    %addr.cst = bitcast double addrspace(4)* %addr to i64 addrspace(4)*
+    %old = call i64 @atomic_cas_int_64(i64 addrspace(4)* %addr.cst, i64 %loaded.cst, i64 %min.cst)
+    %old.cst = bitcast i64 %old to double
+    %success = icmp eq i64 %old, %loaded.cst
+    br i1 %success, label %.exit, label %.loop
+.exit:
+    ret double %old.cst
+}
+
 
 define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
     %bitmap_idx = sub nsw i64 %val, %min_val
@@ -319,16 +399,16 @@ define i32 @atomic_xchg_int_32(i32 addrspace(4)* %p, i32 %val) {
     ret i32 %old
 }
 
-define void @agg_max_shared(i64* %agg, i64 noundef %val) {
-    %old = atomicrmw max i64* %agg, i64 %val monotonic
+define void @agg_max_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
+    %old = atomicrmw max i64 addrspace(4)* %agg, i64 %val monotonic
     ret void
 }
 
-define void @agg_max_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define void @agg_max_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    call void @agg_max_shared(i64* %agg, i64 noundef %val)
+    call void @agg_max_shared(i64 addrspace(4)* %agg, i64 noundef %val)
     br label %.skip
 .skip:
     ret void
