@@ -43,11 +43,11 @@ DEF_AGG_ID_INT_SHARED(8)
 #undef DEF_AGG_ID_INT_SHARED
 
 void agg_id_float_shared(GENERIC_ADDR_SPACE int32_t* agg, const float val) {
-  *agg = static_cast<int32_t>(val);
+  *reinterpret_cast<GENERIC_ADDR_SPACE float*>(agg) = val;
 }
 
 void agg_id_double_shared(GENERIC_ADDR_SPACE int64_t* agg, const double val) {
-  *agg = static_cast<int64_t>(val);
+  *reinterpret_cast<GENERIC_ADDR_SPACE double*>(agg) = val;
 }
 
 uint32_t agg_count_float_shared(GENERIC_ADDR_SPACE uint32_t* agg, const float val) {
