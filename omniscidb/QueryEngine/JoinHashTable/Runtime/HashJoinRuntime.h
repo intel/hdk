@@ -35,6 +35,7 @@
 #else
 #include "../../RuntimeFunctions.h"
 #endif
+#include "../../../QueryEngine/Compiler/CommonRuntimeDefs.h"
 #include "../../../Shared/funcannotations.h"
 
 struct GenericKeyHandler;

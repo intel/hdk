@@ -17,6 +17,7 @@
 #ifndef QUERYENGINE_RUNTIMEFUNCTIONS_H
 #define QUERYENGINE_RUNTIMEFUNCTIONS_H
 
+#include "Compiler/CommonRuntimeDefs.h"
 #include "Shared/EmptyKeyValues.h"
 #include "Shared/funcannotations.h"
 
@@ -24,18 +25,6 @@
 #include <ctime>
 #include <limits>
 #include <type_traits>
-
-template <class T>
-struct remove_addr_space {
-  typedef T type;
-};
-
-#ifdef L0_RUNTIME_ENABLED
-template <class T>
-struct remove_addr_space<GENERIC_ADDR_SPACE T> {
-  typedef T type;
-};
-#endif
 
 extern "C" RUNTIME_EXPORT int64_t agg_sum(GENERIC_ADDR_SPACE int64_t* agg,
                                           const int64_t val);

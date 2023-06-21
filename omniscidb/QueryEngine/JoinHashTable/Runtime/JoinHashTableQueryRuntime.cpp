@@ -20,6 +20,7 @@
 
 #include "QueryEngine/CompareKeysInl.h"
 #include "QueryEngine/MurmurHash.h"
+#include "QueryEngine/Compiler/CommonRuntimeDefs.h"
 
 DEVICE bool compare_to_key(GENERIC_ADDR_SPACE const int8_t* entry,
                            GENERIC_ADDR_SPACE const int8_t* key,
