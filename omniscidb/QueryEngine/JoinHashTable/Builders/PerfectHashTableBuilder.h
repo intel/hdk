@@ -172,8 +172,8 @@ class PerfectJoinHashTableBuilder {
     {
       auto timer_init = DEBUG_TIMER("CPU One-To-One Perfect-Hash: init_hash_join_buff");
       init_hash_join_buff(cpu_hash_table_buff,
-                              hash_entry_info.getNormalizedHashEntryCount(),
-                              hash_join_invalid_val);
+                          hash_entry_info.getNormalizedHashEntryCount(),
+                          hash_join_invalid_val);
     }
     const bool for_semi_join = for_semi_anti_join(join_type);
     std::atomic<int> err{0};
@@ -254,8 +254,8 @@ class PerfectJoinHashTableBuilder {
       auto timer_init =
           DEBUG_TIMER("CPU One-To-Many Perfect Hash Table Builder: init_hash_join_buff");
       init_hash_join_buff(cpu_hash_table_buff,
-                              hash_entry_info.getNormalizedHashEntryCount(),
-                              hash_join_invalid_val);
+                          hash_entry_info.getNormalizedHashEntryCount(),
+                          hash_join_invalid_val);
     }
     {
       auto timer_fill = DEBUG_TIMER(
