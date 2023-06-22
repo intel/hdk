@@ -564,4 +564,3 @@ void KernelSubtask::runImpl(Executor* executor) {
     throw QueryExecutionError(err);
   }
 }
-
