@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "CanonizeQuery.h"
+#include "CanonicalizeQuery.h"
 
 #include "IR/Expr.h"
 #include "IR/ExprCollector.h"
@@ -469,7 +469,7 @@ void addWindowFunctionPreProject(
 
 }  // namespace
 
-void canonizeQuery(QueryDag& dag) {
+void canonicalizeQuery(QueryDag& dag) {
   expandCompoundAggregates(dag);
   addWindowFunctionPreProject(dag);
 }

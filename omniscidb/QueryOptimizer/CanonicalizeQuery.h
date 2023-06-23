@@ -10,6 +10,6 @@ namespace hdk::ir {
 
 class QueryDag;
 
-void canonizeQuery(QueryDag& dag);
+void canonicalizeQuery(QueryDag& dag);
 
 }  // namespace hdk::ir

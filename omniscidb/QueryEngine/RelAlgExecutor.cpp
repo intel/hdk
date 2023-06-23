@@ -37,7 +37,7 @@
 #include "QueryEngine/ResultSetSort.h"
 #include "QueryEngine/WindowContext.h"
 #include "QueryEngine/WorkUnitBuilder.h"
-#include "QueryOptimizer/CanonizeQuery.h"
+#include "QueryOptimizer/CanonicalizeQuery.h"
 #include "ResultSet/HyperLogLog.h"
 #include "ResultSetRegistry/ResultSetRegistry.h"
 #include "SchemaMgr/SchemaMgr.h"
@@ -129,7 +129,7 @@ RelAlgExecutor::RelAlgExecutor(Executor* executor,
         mergeProviders(std::vector<SchemaProviderPtr>({schema_provider, rs_registry_}));
   }
 
-  hdk::ir::canonizeQuery(*query_dag_);
+  hdk::ir::canonicalizeQuery(*query_dag_);
 }
 
 RelAlgExecutor::~RelAlgExecutor() {
