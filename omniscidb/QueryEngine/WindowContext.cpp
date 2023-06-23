@@ -28,14 +28,8 @@
 #include "Shared/TypePunning.h"
 #include "Shared/checked_alloc.h"
 #include "Shared/funcannotations.h"
-#include "Shared/threading.h"
 
-#ifdef HAVE_TBB
-//#include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
-#else
-#include <thrust/sort.h>
-#endif
 
 // Non-partitioned version (no join table provided)
 WindowFunctionContext::WindowFunctionContext(
@@ -502,15 +496,9 @@ void WindowFunctionContext::computePartition(const size_t partition_idx,
   if (config_.exec.window_func.parallel_window_partition_sort &&
       partition_size >=
           config_.exec.window_func.parallel_window_partition_sort_threshold) {
-#ifdef HAVE_TBB
     tbb::parallel_sort(output_for_partition_buff,
                        output_for_partition_buff + partition_size,
                        col_tuple_comparator);
-#else
-    thrust::sort(output_for_partition_buff,
-                 output_for_partition_buff + partition_size,
-                 col_tuple_comparator);
-#endif
   } else {
     std::sort(output_for_partition_buff,
               output_for_partition_buff + partition_size,
@@ -562,7 +550,7 @@ void WindowFunctionContext::compute() {
           config_.exec.window_func.parallel_window_partition_compute_threshold};
   if (should_parallelize) {
     auto timer = DEBUG_TIMER("Window Function Partition Compute");
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, partition_count, cpu_threads())) {
       thread_pool.run([=] { compute_partitions(interval.begin, interval.end); });
     }
@@ -588,7 +576,7 @@ void WindowFunctionContext::compute() {
 
   if (should_parallelize) {
     auto timer = DEBUG_TIMER("Window Function Non-Aggregate Payload Copy Parallelized");
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, elem_count_, cpu_threads())) {
       thread_pool.run([=] { payload_copy(interval.begin, interval.end); });
     }

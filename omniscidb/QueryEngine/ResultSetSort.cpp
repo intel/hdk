@@ -29,6 +29,7 @@
 #include "InPlaceSort.h"
 #include "ResultSetSortImpl.h"
 
+#include <tbb/parallel_sort.h>
 #include "ResultSet/CountDistinct.h"
 #include "ResultSet/ResultSet.h"
 #include "Shared/Intervals.h"
@@ -37,10 +38,6 @@
 #include "Shared/thread_count.h"
 
 #include <future>
-
-#ifdef HAVE_TBB
-#include "tbb/parallel_sort.h"
-#endif
 
 #ifdef HAVE_CUDA
 std::unique_ptr<CudaMgr_Namespace::CudaMgr> g_cuda_mgr;  // for unit tests only
@@ -286,7 +283,7 @@ ResultSetComparator<BUFFER_ITERATOR_TYPE>::materializeCountDistinctColumn(
   if (single_threaded_) {
     work(0, num_non_empty_entries);
   } else {
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, num_non_empty_entries, cpu_threads())) {
       thread_pool.run([=] { work(interval.begin, interval.end); });
     }
@@ -323,7 +320,7 @@ ResultSetComparator<BUFFER_ITERATOR_TYPE>::materializeApproxQuantileColumn(
   if (single_threaded_) {
     work(0, size);
   } else {
-    threading::task_group thread_pool;
+    tbb::task_group thread_pool;
     for (auto interval : makeIntervals<size_t>(0, size, cpu_threads())) {
       thread_pool.run([=] { work(interval.begin, interval.end); });
     }
@@ -513,10 +510,8 @@ PermutationView topPermutation(PermutationView permutation,
     std::partial_sort(
         permutation.begin(), permutation.begin() + n, permutation.end(), compare);
     permutation.resize(n);
-#ifdef HAVE_TBB
   } else if (!single_threaded) {
     tbb::parallel_sort(permutation.begin(), permutation.end(), compare);
-#endif
   } else {
     std::sort(permutation.begin(), permutation.end(), compare);
   }
@@ -621,7 +616,7 @@ void parallelTop(ResultSet* rs,
   Permutation permutation;
   permutation.resize(rs->entryCount());
   std::vector<PermutationView> permutation_views(nthreads);
-  threading::task_group top_sort_threads;
+  tbb::task_group top_sort_threads;
   for (auto interval : makeIntervals<PermutationIdx>(0, permutation.size(), nthreads)) {
     top_sort_threads.run([rs,
                           &permutation,

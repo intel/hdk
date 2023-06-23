@@ -165,8 +165,6 @@ include_directories(${Boost_INCLUDE_DIR})
 
 # TBB
 find_package(TBB REQUIRED)
-add_definitions("-DENABLE_TBB")
-add_definitions("-DHAVE_TBB")
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
 # Cost Model

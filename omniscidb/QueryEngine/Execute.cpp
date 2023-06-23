@@ -27,6 +27,7 @@
 #ifdef HAVE_CUDA
 #include <cuda.h>
 #endif  // HAVE_CUDA
+#include <tbb/parallel_reduce.h>
 #include <chrono>
 #include <ctime>
 #include <future>
@@ -74,7 +75,6 @@
 #include "Shared/measure.h"
 #include "Shared/misc.h"
 #include "Shared/scope.h"
-#include "Shared/threading.h"
 #include "ThirdParty/robin_hood.h"
 
 #include "CostModel/IterativeCostModel.h"
@@ -1294,8 +1294,8 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
     for (auto& rs : results_per_device) {
       storages.push_back(const_cast<ResultSetStorage*>(rs.first->getStorage()));
     }
-    threading::parallel_reduce(
-        threading::blocked_range(storages.begin(), storages.end()),
+    tbb::parallel_reduce(
+        tbb::blocked_range(storages.begin(), storages.end()),
         (ResultSetStorage*)nullptr,
         [&](auto r, ResultSetStorage* res) {
           for (auto i = r.begin() + 1; i != r.end(); ++i) {
@@ -2673,17 +2673,15 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
   std::lock_guard<std::mutex> kernel_lock(kernel_mutex_);
   kernel_queue_time_ms_ += timer_stop(clock_begin);
 
-  threading::task_group tg;
+  tbb::task_group tg;
   // A hack to have unused unit for results collection.
   const RelAlgExecutionUnit* ra_exe_unit =
       kernels.empty() ? nullptr : &kernels[0]->ra_exe_unit_;
 
-#ifdef HAVE_TBB
   if (config_->exec.sub_tasks.enable && device_type == ExecutorDeviceType::CPU) {
     shared_context.setThreadPool(&tg);
   }
   ScopeGuard pool_guard([&shared_context]() { shared_context.setThreadPool(nullptr); });
-#endif  // HAVE_TBB
 
   VLOG(1) << "Launching " << kernels.size() << " kernels for query on: ";
   for (size_t i = 0; i < kernels.size(); i++) {

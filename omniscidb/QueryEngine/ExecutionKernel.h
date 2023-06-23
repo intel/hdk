@@ -21,21 +21,14 @@
 #include "QueryEngine/Descriptors/QueryCompilationDescriptor.h"
 
 #include "Compiler/Backend.h"
-#include "Shared/threading.h"
 
-#ifdef HAVE_TBB
-#include "tbb/enumerable_thread_specific.h"
-#endif
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_group.h>
 
 class SharedKernelContext {
  public:
   SharedKernelContext(const std::vector<InputTableInfo>& query_infos)
-      : query_infos_(query_infos)
-#ifdef HAVE_TBB
-      , task_group_(nullptr)
-#endif
-  {
-  }
+      : query_infos_(query_infos), task_group_(nullptr) {}
 
   const std::vector<uint64_t>& getFragOffsets();
 
@@ -45,23 +38,13 @@ class SharedKernelContext {
 
   std::vector<std::pair<ResultSetPtr, std::vector<size_t>>>& getFragmentResults();
 
-  const std::vector<InputTableInfo>& getQueryInfos() const {
-    return query_infos_;
-  }
+  const std::vector<InputTableInfo>& getQueryInfos() const { return query_infos_; }
 
   std::atomic_flag dynamic_watchdog_set = ATOMIC_FLAG_INIT;
 
-#ifdef HAVE_TBB
-  auto getThreadPool() {
-    return task_group_;
-  }
-  void setThreadPool(threading::task_group* tg) {
-    task_group_ = tg;
-  }
-  auto& getTlsExecutionContext() {
-    return tls_execution_context_;
-  }
-#endif  // HAVE_TBB
+  auto getThreadPool() { return task_group_; }
+  void setThreadPool(tbb::task_group* tg) { task_group_ = tg; }
+  auto& getTlsExecutionContext() { return tls_execution_context_; }
 
  private:
   std::mutex reduce_mutex_;
@@ -71,11 +54,9 @@ class SharedKernelContext {
   std::mutex all_frag_row_offsets_mutex_;
   std::vector<InputTableInfo> query_infos_;
 
-#ifdef HAVE_TBB
-  threading::task_group* task_group_;
+  tbb::task_group* task_group_;
   tbb::enumerable_thread_specific<std::unique_ptr<QueryExecutionContext>>
       tls_execution_context_;
-#endif  // HAVE_TBB
 };
 
 class ExecutionKernel {
@@ -132,7 +113,6 @@ class ExecutionKernel {
   friend class KernelSubtask;
 };
 
-#ifdef HAVE_TBB
 class KernelSubtask {
  public:
   KernelSubtask(ExecutionKernel& k,
@@ -166,4 +146,3 @@ class KernelSubtask {
   size_t num_rows_to_process_;
   size_t thread_idx_;
 };
-#endif  // HAVE_TBB

@@ -17,7 +17,6 @@
 #include "IR/Context.h"
 #include "Shared/InlineNullValues.h"
 
-// TODO: use <Shared/threading.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 

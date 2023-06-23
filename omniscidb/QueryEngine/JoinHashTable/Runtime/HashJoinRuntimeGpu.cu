@@ -96,7 +96,7 @@ void fill_hash_join_buff_on_device(int32_t* buff,
 __global__ void init_hash_join_buff_wrapper(int32_t* buff,
                                             const int64_t hash_entry_count,
                                             const int32_t invalid_slot_val) {
-  SUFFIX(init_hash_join_buff)(buff, hash_entry_count, invalid_slot_val, -1, -1);
+  SUFFIX(init_hash_join_buff)(buff, hash_entry_count, invalid_slot_val);
 }
 
 void init_hash_join_buff_on_device(int32_t* buff,

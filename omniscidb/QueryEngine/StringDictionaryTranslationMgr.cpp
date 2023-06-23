@@ -34,9 +34,7 @@
 #include "Shared/checked_alloc.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 
-#ifdef HAVE_TBB
 #include <tbb/parallel_for.h>
-#endif  // HAVE_TBB
 
 StringDictionaryTranslationMgr::StringDictionaryTranslationMgr(
     const int32_t source_string_dict_id,

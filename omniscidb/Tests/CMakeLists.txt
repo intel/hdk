@@ -34,8 +34,6 @@ add_executable(GroupByTest GroupByTest.cpp)
 add_executable(TopKTest TopKTest.cpp)
 add_executable(CorrelatedSubqueryTest CorrelatedSubqueryTest.cpp)
 add_executable(DateTimeUtilsTest Shared/DateTimeUtilsTest.cpp)
-add_executable(ThreadingTest Shared/ThreadingTest.cpp)
-add_executable(ThreadingTestSTD Shared/ThreadingTestStd.cpp)
 add_executable(JoinHashTableTest JoinHashTableTest.cpp)
 add_executable(CachedHashTableTest CachedHashTableTest.cpp)
 add_executable(ColumnarResultsTest ColumnarResultsTest.cpp ResultSetTestUtils.cpp)
@@ -107,8 +105,6 @@ endif()
 
 target_link_libraries(CorrelatedSubqueryTest gtest QueryEngine ArrowQueryRunner ConfigBuilder)
 target_link_libraries(DateTimeUtilsTest gtest Logger IR Shared ${LLVM_LINKER_FLAGS})
-target_link_libraries(ThreadingTest gtest Logger Shared ${LLVM_LINKER_FLAGS} TBB::tbb)
-target_link_libraries(ThreadingTestSTD gtest Logger Shared ${LLVM_LINKER_FLAGS})
 target_link_libraries(JoinHashTableTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(CachedHashTableTest gtest QueryEngine ArrowQueryRunner)
 target_link_libraries(UtilTest OSDependent)
@@ -160,8 +156,6 @@ add_test(GroupByTest GroupByTest ${TEST_ARGS})
 add_test(TopKTest TopKTest ${TEST_ARGS})
 add_test(CorrelatedSubqueryTest CorrelatedSubqueryTest ${TEST_ARGS})
 add_test(DateTimeUtilsTest DateTimeUtilsTest ${TEST_ARGS})
-add_test(ThreadingTest ThreadingTest ${TEST_ARGS})
-add_test(ThreadingTestSTD ThreadingTestSTD ${TEST_ARGS})
 add_test(JoinHashTableTest JoinHashTableTest ${TEST_ARGS})
 add_test(EncoderTest EncoderTest ${TEST_ARGS})
 add_test(DataRecyclerTest DataRecyclerTest ${TEST_ARGS})
@@ -214,8 +208,6 @@ set(TEST_PROGRAMS
   TopKTest
   CorrelatedSubqueryTest
   DateTimeUtilsTest
-  ThreadingTest
-  ThreadingTestSTD
   JoinHashTableTest
   StringFunctionsTest
   StringDictionaryTest

@@ -18,7 +18,6 @@
 #include "IR/Type.h"
 #include "Shared/ArrowUtil.h"
 #include "Shared/measure.h"
-#include "Shared/threading.h"
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -32,6 +31,8 @@
 #include <arrow/util/value_parsing.h>
 #include <parquet/api/reader.h>
 #include <parquet/arrow/reader.h>
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
@@ -682,131 +683,126 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     }
   }
 
-  threading::parallel_for(
-      threading::blocked_range(0, (int)at->columns().size()), [&](auto range) {
-        for (auto col_idx = range.begin(); col_idx != range.end(); col_idx++) {
-          auto col_info = getColumnInfo(db_id_, table_id, columnId(col_idx));
-          auto col_type = col_info->type;
-          auto col_arr = at->column(col_idx);
+  tbb::parallel_for(tbb::blocked_range(0, (int)at->columns().size()), [&](auto range) {
+    for (auto col_idx = range.begin(); col_idx != range.end(); col_idx++) {
+      auto col_info = getColumnInfo(db_id_, table_id, columnId(col_idx));
+      auto col_type = col_info->type;
+      auto col_arr = at->column(col_idx);
 
-          // Conversion of empty string to Nulls and further processing handled
-          // separately.
-          if (!col_type->nullable() && col_arr->null_count() != 0 &&
-              col_arr->type()->id() != arrow::Type::STRING) {
-            throw std::runtime_error("Null values used in non-nullable type: "s +
-                                     col_type->toString());
-          }
+      // Conversion of empty string to Nulls and further processing handled
+      // separately.
+      if (!col_type->nullable() && col_arr->null_count() != 0 &&
+          col_arr->type()->id() != arrow::Type::STRING) {
+        throw std::runtime_error("Null values used in non-nullable type: "s +
+                                 col_type->toString());
+      }
 
-          DictionaryData* dict_data = nullptr;
-          auto elem_type =
-              col_type->isArray()
-                  ? dynamic_cast<const hdk::ir::ArrayBaseType*>(col_type)->elemType()
-                  : col_type;
-          if (elem_type->isExtDictionary()) {
-            dict_data = dicts_
-                            .at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(elem_type)
-                                    ->dictId())
-                            .get();
-          }
+      DictionaryData* dict_data = nullptr;
+      auto elem_type =
+          col_type->isArray()
+              ? dynamic_cast<const hdk::ir::ArrayBaseType*>(col_type)->elemType()
+              : col_type;
+      if (elem_type->isExtDictionary()) {
+        dict_data =
+            dicts_
+                .at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(elem_type)->dictId())
+                .get();
+      }
 
-          if (col_type->isDecimal()) {
-            col_arr = convertDecimalToInteger(col_arr, col_type);
-          } else if (col_type->isExtDictionary()) {
-            switch (col_arr->type()->id()) {
-              case arrow::Type::STRING:
-                // if the dictionary has already been materialized, append indices
-                if (!config_->storage.enable_lazy_dict_materialization ||
-                    dict_data->is_materialized) {
-                  col_arr = createDictionaryEncodedColumn(
-                      dict_data->dict()->stringDict.get(), col_arr, col_type);
-                }
-                break;
-              case arrow::Type::DICTIONARY:
-                col_arr = convertArrowDictionary(
-                    dict_data->dict()->stringDict.get(), col_arr, col_type);
-                break;
-              default:
-                CHECK(false);
+      if (col_type->isDecimal()) {
+        col_arr = convertDecimalToInteger(col_arr, col_type);
+      } else if (col_type->isExtDictionary()) {
+        switch (col_arr->type()->id()) {
+          case arrow::Type::STRING:
+            // if the dictionary has already been materialized, append indices
+            if (!config_->storage.enable_lazy_dict_materialization ||
+                dict_data->is_materialized) {
+              col_arr = createDictionaryEncodedColumn(
+                  dict_data->dict()->stringDict.get(), col_arr, col_type);
             }
-          } else if (col_type->isString()) {
-          } else {
-            col_arr = replaceNullValues(
-                col_arr,
-                col_type,
-                dict_data ? dict_data->dict()->stringDict.get() : nullptr);
-          }
-
-          col_data[col_idx] = col_arr;
-
-          bool compute_stats = !col_type->isString();
-          if (compute_stats) {
-            size_t elems_count = 1;
-            if (col_type->isFixedLenArray()) {
-              elems_count = col_type->size() / elem_type->size();
-            }
-            // Compute stats for each fragment.
-            threading::parallel_for(
-                threading::blocked_range(size_t(0), frag_count), [&](auto frag_range) {
-                  for (size_t frag_idx = frag_range.begin(); frag_idx != frag_range.end();
-                       ++frag_idx) {
-                    auto& frag = fragments[frag_idx];
-
-                    frag.offset =
-                        frag_idx
-                            ? ((frag_idx - 1) * table.fragment_size + first_frag_size)
-                            : 0;
-                    frag.row_count =
-                        frag_idx
-                            ? std::min(table.fragment_size,
-                                       static_cast<size_t>(at->num_rows()) - frag.offset)
-                            : first_frag_size;
-
-                    size_t num_bytes;
-                    if (col_type->isFixedLenArray()) {
-                      num_bytes = frag.row_count * col_type->size();
-                    } else if (col_type->isVarLenArray()) {
-                      num_bytes =
-                          computeTotalStringsLength(col_arr, frag.offset, frag.row_count);
-                    } else {
-                      num_bytes = frag.row_count * col_type->size();
-                    }
-                    auto meta = std::make_shared<ChunkMetadata>(
-                        col_info->type, num_bytes, frag.row_count);
-
-                    if (!lazy_fetch_cols[col_idx]) {
-                      meta->fillChunkStats(computeStats(
-                          col_arr->Slice(frag.offset, frag.row_count * elems_count),
-                          col_type));
-                    } else {
-                      int32_t min = 0;
-                      int32_t max = -1;
-                      meta->fillChunkStats(min, max, /*has_nulls=*/true);
-                    }
-                    frag.metadata[col_idx] = meta;
-                  }
-                });  // each fragment
-          } else {
-            for (size_t frag_idx = 0; frag_idx < frag_count; ++frag_idx) {
-              auto& frag = fragments[frag_idx];
-              frag.offset =
-                  frag_idx ? ((frag_idx - 1) * table.fragment_size + first_frag_size) : 0;
-              frag.row_count =
-                  frag_idx ? std::min(table.fragment_size,
-                                      static_cast<size_t>(at->num_rows()) - frag.offset)
-                           : first_frag_size;
-              CHECK(col_type->isText());
-              auto meta = std::make_shared<ChunkMetadata>(
-                  col_info->type,
-                  computeTotalStringsLength(col_arr, frag.offset, frag.row_count),
-                  frag.row_count);
-              meta->fillStringChunkStats(
-                  col_arr->Slice(frag.offset, frag.row_count)->null_count());
-
-              frag.metadata[col_idx] = meta;
-            }
-          }
+            break;
+          case arrow::Type::DICTIONARY:
+            col_arr = convertArrowDictionary(
+                dict_data->dict()->stringDict.get(), col_arr, col_type);
+            break;
+          default:
+            CHECK(false);
         }
-      });  // each column
+      } else if (col_type->isString()) {
+      } else {
+        col_arr = replaceNullValues(
+            col_arr, col_type, dict_data ? dict_data->dict()->stringDict.get() : nullptr);
+      }
+
+      col_data[col_idx] = col_arr;
+
+      bool compute_stats = !col_type->isString();
+      if (compute_stats) {
+        size_t elems_count = 1;
+        if (col_type->isFixedLenArray()) {
+          elems_count = col_type->size() / elem_type->size();
+        }
+        // Compute stats for each fragment.
+        tbb::parallel_for(
+            tbb::blocked_range(size_t(0), frag_count), [&](auto frag_range) {
+              for (size_t frag_idx = frag_range.begin(); frag_idx != frag_range.end();
+                   ++frag_idx) {
+                auto& frag = fragments[frag_idx];
+
+                frag.offset =
+                    frag_idx ? ((frag_idx - 1) * table.fragment_size + first_frag_size)
+                             : 0;
+                frag.row_count =
+                    frag_idx ? std::min(table.fragment_size,
+                                        static_cast<size_t>(at->num_rows()) - frag.offset)
+                             : first_frag_size;
+
+                size_t num_bytes;
+                if (col_type->isFixedLenArray()) {
+                  num_bytes = frag.row_count * col_type->size();
+                } else if (col_type->isVarLenArray()) {
+                  num_bytes =
+                      computeTotalStringsLength(col_arr, frag.offset, frag.row_count);
+                } else {
+                  num_bytes = frag.row_count * col_type->size();
+                }
+                auto meta = std::make_shared<ChunkMetadata>(
+                    col_info->type, num_bytes, frag.row_count);
+
+                if (!lazy_fetch_cols[col_idx]) {
+                  meta->fillChunkStats(computeStats(
+                      col_arr->Slice(frag.offset, frag.row_count * elems_count),
+                      col_type));
+                } else {
+                  int32_t min = 0;
+                  int32_t max = -1;
+                  meta->fillChunkStats(min, max, /*has_nulls=*/true);
+                }
+                frag.metadata[col_idx] = meta;
+              }
+            });  // each fragment
+      } else {
+        for (size_t frag_idx = 0; frag_idx < frag_count; ++frag_idx) {
+          auto& frag = fragments[frag_idx];
+          frag.offset =
+              frag_idx ? ((frag_idx - 1) * table.fragment_size + first_frag_size) : 0;
+          frag.row_count =
+              frag_idx ? std::min(table.fragment_size,
+                                  static_cast<size_t>(at->num_rows()) - frag.offset)
+                       : first_frag_size;
+          CHECK(col_type->isText());
+          auto meta = std::make_shared<ChunkMetadata>(
+              col_info->type,
+              computeTotalStringsLength(col_arr, frag.offset, frag.row_count),
+              frag.row_count);
+          meta->fillStringChunkStats(
+              col_arr->Slice(frag.offset, frag.row_count)->null_count());
+
+          frag.metadata[col_idx] = meta;
+        }
+      }
+    }
+  });  // each column
   dict_lock.unlock();
 
   if (table.row_count) {

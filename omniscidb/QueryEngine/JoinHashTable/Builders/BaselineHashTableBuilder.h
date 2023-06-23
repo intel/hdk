@@ -222,66 +222,27 @@ class BaselineJoinHashTableBuilder {
     int thread_count = cpu_threads();
     std::vector<std::future<void>> init_cpu_buff_threads;
     setHashLayout(layout);
+    // TODO: unify the hash join buff functions
     {
       auto timer_init = DEBUG_TIMER("CPU Baseline-Hash: init_baseline_hash_join_buff_32");
-#ifdef HAVE_TBB
       switch (key_component_width) {
         case 4:
-          init_baseline_hash_join_buff_tbb_32(cpu_hash_table_ptr,
-                                              keyspace_entry_count,
-                                              key_component_count,
-                                              layout == HashType::OneToOne,
-                                              -1);
+          init_baseline_hash_join_buff_32(cpu_hash_table_ptr,
+                                          keyspace_entry_count,
+                                          key_component_count,
+                                          layout == HashType::OneToOne,
+                                          -1);
           break;
         case 8:
-          init_baseline_hash_join_buff_tbb_64(cpu_hash_table_ptr,
-                                              keyspace_entry_count,
-                                              key_component_count,
-                                              layout == HashType::OneToOne,
-                                              -1);
+          init_baseline_hash_join_buff_64(cpu_hash_table_ptr,
+                                          keyspace_entry_count,
+                                          key_component_count,
+                                          layout == HashType::OneToOne,
+                                          -1);
           break;
         default:
           CHECK(false);
       }
-#else   // #ifdef HAVE_TBB
-      for (int thread_idx = 0; thread_idx < thread_count; ++thread_idx) {
-        init_cpu_buff_threads.emplace_back(
-            std::async(std::launch::async,
-                       [keyspace_entry_count,
-                        key_component_count,
-                        key_component_width,
-                        thread_idx,
-                        thread_count,
-                        cpu_hash_table_ptr,
-                        layout] {
-                         switch (key_component_width) {
-                           case 4:
-                             init_baseline_hash_join_buff_32(cpu_hash_table_ptr,
-                                                             keyspace_entry_count,
-                                                             key_component_count,
-                                                             layout == HashType::OneToOne,
-                                                             -1,
-                                                             thread_idx,
-                                                             thread_count);
-                             break;
-                           case 8:
-                             init_baseline_hash_join_buff_64(cpu_hash_table_ptr,
-                                                             keyspace_entry_count,
-                                                             key_component_count,
-                                                             layout == HashType::OneToOne,
-                                                             -1,
-                                                             thread_idx,
-                                                             thread_count);
-                             break;
-                           default:
-                             CHECK(false);
-                         }
-                       }));
-      }
-      for (auto& child : init_cpu_buff_threads) {
-        child.get();
-      }
-#endif  // !HAVE_TBB
     }
     std::vector<std::future<int>> fill_cpu_buff_threads;
     for (int thread_idx = 0; thread_idx < thread_count; ++thread_idx) {
@@ -346,7 +307,7 @@ class BaselineJoinHashTableBuilder {
       {
         auto timer_init_additional_buffers =
             DEBUG_TIMER("CPU Baseline-Hash: Additional Buffers init_hash_join_buff");
-        init_hash_join_buff(one_to_many_buff, keyspace_entry_count, -1, 0, 1);
+        init_hash_join_buff(one_to_many_buff, keyspace_entry_count, -1);
       }
       setHashLayout(layout);
       switch (key_component_width) {

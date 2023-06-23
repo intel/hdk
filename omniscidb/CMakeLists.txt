@@ -590,26 +590,11 @@ endif()
 
 # TBB
 
-option(ENABLE_TBB "Enable OneTBB for threading (if found)" ON)
-set(TBB_LIBS "")
-find_package(TBB)
+find_package(TBB REQUIRED)
 if(TBB_FOUND)
   message(STATUS "TBB library is found with ${TBB_DIR}")
-  add_definitions("-DHAVE_TBB")
   add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
   list(APPEND TBB_LIBS ${TBB_LIBRARIES})
-  if(ENABLE_TBB)
-    add_definitions("-DENABLE_TBB")
-  else()
-    message(STATUS "Using TBB for threading is DISABLED")
-  endif()
-else()
-  set(ENABLE_TBB OFF)
-endif()
-
-option(DISABLE_CONCURRENCY "Disable parallellism at the threading layer" OFF)
-if(DISABLE_CONCURRENCY)
-  add_definitions("-DDISABLE_CONCURRENCY")
 endif()
 
 list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_BINARY_DIR}/gen-cpp/)
