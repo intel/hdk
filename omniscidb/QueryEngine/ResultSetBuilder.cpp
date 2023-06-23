@@ -161,7 +161,7 @@ ResultSet* ResultSetLogicalValuesBuilder::build() {
 
 // static
 ResultSet* ResultSetLogicalValuesBuilder::create(
-    std::vector<TargetMetaInfo>& label_infos,
+    std::vector<hdk::ir::TargetMetaInfo>& label_infos,
     std::vector<hdk::ir::ExprPtrVector> logical_values) {
   // check to see if number of columns matches (at least the first row)
   size_t numCols =

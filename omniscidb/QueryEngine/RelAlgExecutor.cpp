@@ -549,10 +549,10 @@ const hdk::ir::Type* canonicalTypeForExpr(const hdk::ir::Expr& expr) {
 }
 
 template <class RA>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const RA* ra_node,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
-  std::vector<TargetMetaInfo> targets_meta;
+  std::vector<hdk::ir::TargetMetaInfo> targets_meta;
   CHECK_EQ(ra_node->size(), target_exprs.size());
   for (size_t i = 0; i < ra_node->size(); ++i) {
     CHECK(target_exprs[i]);
@@ -564,33 +564,33 @@ std::vector<TargetMetaInfo> get_targets_meta(
 }
 
 template <>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const hdk::ir::Node* node,
     const std::vector<const hdk::ir::Expr*>& target_exprs);
 
 template <>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const hdk::ir::Filter* filter,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
   return get_targets_meta(filter->getInput(0), target_exprs);
 }
 
 template <>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const hdk::ir::Sort* sort,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
   return get_targets_meta(sort->getInput(0), target_exprs);
 }
 
 template <>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const hdk::ir::LogicalUnion* logical_union,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
   return get_targets_meta(logical_union->getInput(0), target_exprs);
 }
 
 template <>
-std::vector<TargetMetaInfo> get_targets_meta(
+std::vector<hdk::ir::TargetMetaInfo> get_targets_meta(
     const hdk::ir::Node* node,
     const std::vector<const hdk::ir::Expr*>& target_exprs) {
   if (auto proj = node->as<hdk::ir::Project>()) {
@@ -938,8 +938,8 @@ ExecutionResult RelAlgExecutor::executeLogicalValues(
     }
     if (target_meta_info.type()->isNull()) {
       // replace w/ bigint
-      tuple_type[i] = TargetMetaInfo(target_meta_info.get_resname(),
-                                     hdk::ir::Context::defaultCtx().int64());
+      tuple_type[i] = hdk::ir::TargetMetaInfo(target_meta_info.get_resname(),
+                                              hdk::ir::Context::defaultCtx().int64());
     }
     query_mem_desc.addColSlotInfo({std::make_tuple(tuple_type[i].type()->size(), 8)});
   }
@@ -1092,7 +1092,7 @@ RelAlgExecutionUnit decide_approx_count_distinct_implementation(
 
 ExecutionResult RelAlgExecutor::executeWorkUnit(
     const RelAlgExecutor::WorkUnit& work_unit,
-    const std::vector<TargetMetaInfo>& targets_meta,
+    const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
     const bool is_agg,
     const CompilationOptions& co_in,
     const ExecutionOptions& eo_in,
@@ -1305,7 +1305,7 @@ bool RelAlgExecutor::isRowidLookup(const WorkUnit& work_unit) {
 
 ExecutionResult RelAlgExecutor::handleOutOfMemoryRetry(
     const RelAlgExecutor::WorkUnit& work_unit,
-    const std::vector<TargetMetaInfo>& targets_meta,
+    const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
     const bool is_agg,
     const CompilationOptions& co,
     const ExecutionOptions& eo,
@@ -1423,7 +1423,7 @@ void RelAlgExecutor::handlePersistentError(const int32_t error_code) {
 
 ExecutionResult RelAlgExecutor::registerResultSetTable(
     hdk::ResultSetTable table,
-    const std::vector<TargetMetaInfo>& targets_meta,
+    const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
     bool just_explain_result) {
   std::vector<std::string> col_names;
   if (just_explain_result) {

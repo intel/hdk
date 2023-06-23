@@ -93,7 +93,7 @@ class ResultSetLogicalValuesBuilder : public ResultSetBuilder {
   //     ExecutorDeviceType is "CPU"
   //     QueryMemoryDescriptor is "Projection"
   //     RowSetMemoryOwner is default
-  static ResultSet* create(std::vector<TargetMetaInfo>& label_infos,
+  static ResultSet* create(std::vector<hdk::ir::TargetMetaInfo>& label_infos,
                            std::vector<hdk::ir::ExprPtrVector> logical_values);
 };
 

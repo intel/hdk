@@ -165,7 +165,7 @@ class RelAlgExecutor {
 
   ExecutionResult executeWorkUnit(
       const WorkUnit& work_unit,
-      const std::vector<TargetMetaInfo>& targets_meta,
+      const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
       const bool is_agg,
       const CompilationOptions& co_in,
       const ExecutionOptions& eo_in,
@@ -195,13 +195,14 @@ class RelAlgExecutor {
 
   bool isRowidLookup(const WorkUnit& work_unit);
 
-  ExecutionResult handleOutOfMemoryRetry(const RelAlgExecutor::WorkUnit& work_unit,
-                                         const std::vector<TargetMetaInfo>& targets_meta,
-                                         const bool is_agg,
-                                         const CompilationOptions& co,
-                                         const ExecutionOptions& eo,
-                                         const bool was_multifrag_kernel_launch,
-                                         const int64_t queue_time_ms);
+  ExecutionResult handleOutOfMemoryRetry(
+      const RelAlgExecutor::WorkUnit& work_unit,
+      const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
+      const bool is_agg,
+      const CompilationOptions& co,
+      const ExecutionOptions& eo,
+      const bool was_multifrag_kernel_launch,
+      const int64_t queue_time_ms);
 
   // Allows an out of memory error through if CPU retry is enabled. Otherwise, throws an
   // appropriate exception corresponding to the query error code.
@@ -215,9 +216,10 @@ class RelAlgExecutor {
                           const ExecutionOptions& eo,
                           bool allow_speculative_sort);
 
-  ExecutionResult registerResultSetTable(hdk::ResultSetTable table,
-                                         const std::vector<TargetMetaInfo>& targets_meta,
-                                         bool just_explain_result);
+  ExecutionResult registerResultSetTable(
+      hdk::ResultSetTable table,
+      const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
+      bool just_explain_result);
 
   void addTemporaryTable(const int table_id, const hdk::ResultSetTableTokenPtr& token) {
     CHECK_LT(table_id, 0);

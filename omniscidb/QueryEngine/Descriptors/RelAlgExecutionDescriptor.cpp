@@ -24,7 +24,7 @@ ExecutionResult::ExecutionResult()
     , type_(QueryResult) {}
 
 ExecutionResult::ExecutionResult(hdk::ResultSetTableTokenPtr token,
-                                 const std::vector<TargetMetaInfo>& targets_meta)
+                                 const std::vector<hdk::ir::TargetMetaInfo>& targets_meta)
     : result_token_(std::move(token))
     , targets_meta_(targets_meta)
     , filter_push_down_enabled_(false)

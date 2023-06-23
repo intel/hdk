@@ -24,13 +24,14 @@
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/PlanState.h"
 #include "QueryEngine/SerializeToSql.h"
-#include "QueryEngine/TargetMetaInfo.h"
+
+#include "IR/TargetMetaInfo.h"
 
 class Executor;
 
 struct ExternalQueryTable {
   FetchResult fetch_result;
-  std::vector<TargetMetaInfo> schema;
+  std::vector<hdk::ir::TargetMetaInfo> schema;
   std::string from_table;
   const Executor* executor;
 };
