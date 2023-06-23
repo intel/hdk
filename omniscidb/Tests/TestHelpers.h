@@ -18,8 +18,8 @@
 #define TEST_HELPERS_H_
 
 #include "Logger/Logger.h"
-#include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
+#include "ResultSet/ArrowResultSet.h"
 
 #include <gtest/gtest.h>
 #include <boost/algorithm/string.hpp>

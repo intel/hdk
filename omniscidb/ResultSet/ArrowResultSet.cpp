@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "QueryEngine/ArrowResultSet.h"
+#include "ArrowResultSet.h"
 
 #include <arrow/api.h>
 #include <arrow/io/memory.h>
@@ -331,43 +331,15 @@ void ArrowResultSet::resultSetArrowLoopback(
 }
 
 std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
-    const ExecutionResult& results) {
-  // NOTE(wesm): About memory ownership
-
-  // After calling ReadRecordBatch, the buffers inside arrow::RecordBatch now
-  // share ownership of the memory in serialized_arrow_output.records (zero
-  // copy). Not necessary to retain these buffers. Same is true of any
-  // dictionaries contained in serialized_arrow_output.schema; the arrays
-  // reference that memory (zero copy).
-  return std::make_unique<ArrowResultSet>(results.getRows(), results.getTargetsMeta());
-}
-
-std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
-    const ExecutionResult* results,
-    const std::shared_ptr<ResultSet>& rows,
-    const ExecutorDeviceType device_type) {
-  return results ? std::make_unique<ArrowResultSet>(
-                       rows, results->getTargetsMeta(), device_type)
-                 : std::make_unique<ArrowResultSet>(rows, device_type);
-}
-
-std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
-    const ExecutionResult* results,
     const std::shared_ptr<ResultSet>& rows,
     const ExecutorDeviceType device_type,
     const size_t min_result_size_for_bulk_dictionary_fetch,
     const double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
   std::vector<hdk::ir::TargetMetaInfo> dummy_targets_meta;
-  return results ? std::make_unique<ArrowResultSet>(
-                       rows,
-                       results->getTargetsMeta(),
-                       device_type,
-                       min_result_size_for_bulk_dictionary_fetch,
-                       max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch)
-                 : std::make_unique<ArrowResultSet>(
-                       rows,
-                       dummy_targets_meta,
-                       device_type,
-                       min_result_size_for_bulk_dictionary_fetch,
-                       max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
+  return std::make_unique<ArrowResultSet>(
+      rows,
+      dummy_targets_meta,
+      device_type,
+      min_result_size_for_bulk_dictionary_fetch,
+      max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
 }

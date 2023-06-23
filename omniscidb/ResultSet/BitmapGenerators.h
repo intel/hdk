@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 Intel Corporation
+ * Copyright 2021 OmniSci, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef BITMAP_GENERATORS_h
 #define BITMAP_GENERATORS_h
 

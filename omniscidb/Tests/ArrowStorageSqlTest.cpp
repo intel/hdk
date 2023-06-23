@@ -16,8 +16,8 @@
 #include "Calcite/CalciteJNI.h"
 #include "DataMgr/DataMgrBufferProvider.h"
 #include "DataMgr/DataMgrDataProvider.h"
-#include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/RelAlgExecutor.h"
+#include "ResultSet/ArrowResultSet.h"
 
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 

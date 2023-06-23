@@ -18,9 +18,9 @@
 
 #include "ArrowStorage/ArrowStorage.h"
 #include "IR/Context.h"
-#include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
+#include "ResultSet/ArrowResultSet.h"
 #include "ResultSetRegistry/ResultSetRegistry.h"
 #include "Shared/Config.h"
 

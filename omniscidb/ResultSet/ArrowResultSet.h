@@ -16,9 +16,6 @@
 
 #pragma once
 
-#include "CompilationOptions.h"
-#include "Descriptors/RelAlgExecutionDescriptor.h"
-
 #include "DataMgr/DataMgr.h"
 #include "IR/TargetMetaInfo.h"
 #include "ResultSet/ResultSet.h"
@@ -183,26 +180,11 @@ ArrowResultSetRowIterator::value_type ArrowResultSetRowIterator::operator*() con
   return result_set_->getRowAt(crt_row_idx_);
 }
 
-class ExecutionResult;
-
-// The following result_set_arrow_loopback methods are used by our test
-// framework (ExecuteTest specifically) to take results from the executor,
-// serialize them to Arrow and then deserialize them to an ArrowResultSet,
-// which can then be used by the test framework.
-
-std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(const ExecutionResult& results);
-
-std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
-    const ExecutionResult* results,
-    const std::shared_ptr<ResultSet>& rows,
-    const ExecutorDeviceType device_type = ExecutorDeviceType::CPU);
-
 // This version of result_set_arrow_loopback allows setting the parameters that
 // drive the choice between dense and sparse dictionary conversion, used for
 // Select.ArrowDictionaries tests in ExecuteTest
 
 std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
-    const ExecutionResult* results,
     const std::shared_ptr<ResultSet>& rows,
     const ExecutorDeviceType device_type,
     const size_t min_result_size_for_bulk_dictionary_fetch,
