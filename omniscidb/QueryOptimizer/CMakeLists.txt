@@ -1,6 +1,6 @@
 set(query_optimizer_source_files
-    CanonizeQuery.cpp
-    CanonizeQuery.h
+    CanonicalizeQuery.cpp
+    CanonicalizeQuery.h
 )
 
 add_library(QueryOptimizer ${query_optimizer_source_files})
