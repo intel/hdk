@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "QueryEngine/ArrowResultSet.h"
+#include "ResultSet/ArrowResultSet.h"
 #include "Shared/sqltypes.h"
 #include "SqliteConnector/SqliteConnector.h"
 

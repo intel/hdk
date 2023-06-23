@@ -12,9 +12,6 @@ set(query_engine_source_files
     ArithmeticIR.cpp
     ArrayIR.cpp
     ArrayOps.cpp
-    ArrowResultSetConverter.cpp
-    ArrowResultSet.cpp
-    BitmapGenerators.cpp
     CalciteDeserializerUtils.cpp
     CardinalityEstimator.cpp
     CaseIR.cpp
@@ -312,7 +309,6 @@ set(QUERY_ENGINE_LIBS
         SchemaMgr
         SqliteConnector
         SQLite::SQLite3
-        ${Arrow_LIBRARIES}
         )
 
 list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})

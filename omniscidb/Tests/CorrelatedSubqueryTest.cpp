@@ -19,9 +19,9 @@
 #include "TestHelpers.h"
 
 #include "ConfigBuilder/ConfigBuilder.h"
-#include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/RelAlgExecutor.h"
+#include "ResultSet/ArrowResultSet.h"
 #include "Shared/file_delete.h"
 #include "Shared/scope.h"
 

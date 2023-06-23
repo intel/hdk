@@ -263,7 +263,6 @@ class ArrowSQLRunnerImpl {
                double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
     auto results = run_multiple_agg(query_string, device_type);
     auto arrow_omnisci_results = result_set_arrow_loopback(
-        nullptr,
         results,
         device_type,
         min_result_size_for_bulk_dictionary_fetch,

@@ -17,7 +17,7 @@
 #include "ArrowSQLRunner/ArrowSQLRunner.h"
 #include "ArrowTestHelpers.h"
 
-#include "QueryEngine/ArrowResultSet.h"
+#include "ResultSet/ArrowResultSet.h"
 #include "Shared/ArrowUtil.h"
 #include "Shared/InlineNullValues.h"
 #include "Shared/scope.h"

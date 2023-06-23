@@ -137,7 +137,7 @@ cdef extern from "omniscidb/IR/TargetMetaInfo.h":
     const string& get_resname()
     const CType* type()
 
-cdef extern from "omniscidb/QueryEngine/ArrowResultSet.h":
+cdef extern from "omniscidb/ResultSet/ArrowResultSet.h":
   cdef cppclass CArrowResultSetConverter "ArrowResultSetConverter":
     CArrowResultSetConverter(const CResultSetPtr&, const vector[string]&, int)
 

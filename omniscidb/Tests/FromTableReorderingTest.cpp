@@ -16,10 +16,10 @@
 
 #include "TestHelpers.h"
 
-#include "../QueryEngine/ArrowResultSet.h"
 #include "../QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
 #include "../QueryEngine/Execute.h"
 #include "../QueryEngine/FromTableReordering.h"
+#include "../ResultSet/ArrowResultSet.h"
 #include "../Shared/scope.h"
 #include "../SqliteConnector/SqliteConnector.h"
 

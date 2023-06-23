@@ -18,9 +18,9 @@
 #include "ArrowSQLRunner/SQLiteComparator.h"
 #include "TestHelpers.h"
 
-#include "QueryEngine/ArrowResultSet.h"
 #include "QueryEngine/Execute.h"
 #include "QueryEngine/ResultSetReductionJIT.h"
+#include "ResultSet/ArrowResultSet.h"
 #include "Shared/scope.h"
 
 #include <gtest/gtest.h>

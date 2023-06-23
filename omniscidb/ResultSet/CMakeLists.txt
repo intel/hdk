@@ -1,4 +1,7 @@
 set(result_set_source_files
+    ArrowResultSet.cpp
+    ArrowResultSetConverter.cpp
+    BitmapGenerators.cpp
     ColSlotContext.cpp
     QueryMemoryDescriptor.cpp
     ResultSet.cpp
@@ -11,4 +14,4 @@ set(result_set_source_files
 
 add_library(ResultSet ${result_set_source_files})
 
-target_link_libraries(ResultSet DataMgr IR Logger Utils StringDictionary ${Folly_LIBRARIES})
+target_link_libraries(ResultSet DataMgr IR Logger Utils StringDictionary ${Folly_LIBRARIES} ${Arrow_LIBRARIES})

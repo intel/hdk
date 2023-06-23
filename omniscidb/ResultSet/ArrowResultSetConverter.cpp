@@ -17,10 +17,12 @@
 //  project headers
 #include "ArrowResultSet.h"
 #include "BitmapGenerators.h"
-#include "Execute.h"
+
 #include "Shared/ArrowUtil.h"
 #include "Shared/DateConverters.h"
+#include "Shared/thread_count.h"
 #include "Shared/toString.h"
+#include "StringDictionary/StringDictionaryProxy.h"
 
 //  arrow headers
 #include "arrow/api.h"
