@@ -119,6 +119,15 @@ void Project::appendInput(std::string new_field_name, ExprPtr expr) {
   exprs_.emplace_back(std::move(expr));
 }
 
+bool Project::hasWindowFunctionExpr() const {
+  for (auto& expr : exprs_) {
+    if (isWindowFunctionExpr(expr.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool Project::isIdentity() const {
   if (!isSimple()) {
     return false;

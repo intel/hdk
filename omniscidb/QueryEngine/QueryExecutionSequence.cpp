@@ -110,7 +110,7 @@ class QueryExecutionSequenceImpl {
 
     // Due to the current window functions support limitations,
     // both window function result and its input have to be materialized.
-    if (node->is<ir::Project>() && hasWindowFunctionExpr(node->as<ir::Project>())) {
+    if (node->is<ir::Project>() && node->as<ir::Project>()->hasWindowFunctionExpr()) {
       execution_points_.insert(node);
       execution_points_.insert(node->getInput(0));
     }
@@ -175,7 +175,7 @@ class QueryExecutionSequenceImpl {
       CHECK(start != end);
       auto node = graph_[start->m_source];
 
-      if (node->is<ir::Project>() && !hasWindowFunctionExpr(node->as<ir::Project>())) {
+      if (node->is<ir::Project>() && !node->as<ir::Project>()->hasWindowFunctionExpr()) {
         // In case of aggregation we allow only 'simple' projections which
         // don't have complex expressions referencing aggregate exprs.
         bool is_simple = true;
