@@ -331,7 +331,7 @@ inline bool supportsMultifragInput(const hdk::ir::Node* node,
     return true;
   }
   if (node->is<hdk::ir::Project>() &&
-      hasWindowFunctionExpr(node->as<hdk::ir::Project>())) {
+      node->as<hdk::ir::Project>()->hasWindowFunctionExpr()) {
     return false;
   }
   if (node->is<hdk::ir::LogicalUnion>()) {

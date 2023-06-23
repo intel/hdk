@@ -2158,4 +2158,60 @@ size_t ArrayExpr::hash() const {
   return *hash_;
 }
 
+namespace {
+
+// Detect the window function SUM pattern: CASE WHEN COUNT() > 0 THEN SUM ELSE 0
+bool isWindowFunctionSum(const hdk::ir::Expr* expr) {
+  const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
+  if (case_expr && case_expr->exprPairs().size() == 1) {
+    const hdk::ir::Expr* then = case_expr->exprPairs().front().second.get();
+
+    // Allow optional cast.
+    const auto cast = dynamic_cast<const hdk::ir::UOper*>(then);
+    if (cast && cast->isCast()) {
+      then = cast->operand();
+    }
+
+    const auto then_window = dynamic_cast<const hdk::ir::WindowFunction*>(then);
+    if (then_window && then_window->kind() == hdk::ir::WindowFunctionKind::SumInternal) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+bool isWindowFunctionExpr(const hdk::ir::Expr* expr) {
+  if (dynamic_cast<const hdk::ir::WindowFunction*>(expr) != nullptr) {
+    return true;
+  }
+
+  // unwrap from casts, if they exist
+  const auto cast = dynamic_cast<const hdk::ir::UOper*>(expr);
+  if (cast && cast->isCast()) {
+    return isWindowFunctionExpr(cast->operand());
+  }
+
+  if (isWindowFunctionSum(expr)) {
+    return true;
+  }
+
+  // Check for Window Function AVG:
+  // (CASE WHEN count > 0 THEN sum ELSE 0) / COUNT
+  const auto div = dynamic_cast<const hdk::ir::BinOper*>(expr);
+  if (div && div->isDivide()) {
+    const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(div->leftOperand());
+    const auto second_window =
+        dynamic_cast<const hdk::ir::WindowFunction*>(div->rightOperand());
+    if (case_expr && second_window &&
+        second_window->kind() == hdk::ir::WindowFunctionKind::Count) {
+      if (isWindowFunctionSum(case_expr)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 }  // namespace hdk::ir

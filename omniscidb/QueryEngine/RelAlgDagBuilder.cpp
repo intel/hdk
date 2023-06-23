@@ -1639,60 +1639,6 @@ class CoalesceSecondaryProjectVisitor : public ScalarExprVisitor<bool> {
   bool defaultResult() const final { return true; }
 };
 
-// Detect the window function SUM pattern: CASE WHEN COUNT() > 0 THEN SUM ELSE 0
-bool is_window_function_sum(const hdk::ir::Expr* expr) {
-  const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(expr);
-  if (case_expr && case_expr->exprPairs().size() == 1) {
-    const hdk::ir::Expr* then = case_expr->exprPairs().front().second.get();
-
-    // Allow optional cast.
-    const auto cast = dynamic_cast<const hdk::ir::UOper*>(then);
-    if (cast && cast->isCast()) {
-      then = cast->operand();
-    }
-
-    const auto then_window = dynamic_cast<const hdk::ir::WindowFunction*>(then);
-    if (then_window && then_window->kind() == hdk::ir::WindowFunctionKind::SumInternal) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// Detect both window function operators and window function operators embedded in case
-// statements (for null handling)
-bool is_window_function_expr(const hdk::ir::Expr* expr) {
-  if (dynamic_cast<const hdk::ir::WindowFunction*>(expr) != nullptr) {
-    return true;
-  }
-
-  // unwrap from casts, if they exist
-  const auto cast = dynamic_cast<const hdk::ir::UOper*>(expr);
-  if (cast && cast->isCast()) {
-    return is_window_function_expr(cast->operand());
-  }
-
-  if (is_window_function_sum(expr)) {
-    return true;
-  }
-
-  // Check for Window Function AVG:
-  // (CASE WHEN count > 0 THEN sum ELSE 0) / COUNT
-  const auto div = dynamic_cast<const hdk::ir::BinOper*>(expr);
-  if (div && div->isDivide()) {
-    const auto case_expr = dynamic_cast<const hdk::ir::CaseExpr*>(div->leftOperand());
-    const auto second_window =
-        dynamic_cast<const hdk::ir::WindowFunction*>(div->rightOperand());
-    if (case_expr && second_window &&
-        second_window->kind() == hdk::ir::WindowFunctionKind::Count) {
-      if (is_window_function_sum(case_expr)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 class ReplacementExprVisitor : public hdk::ir::ExprRewriter {
  public:
   ReplacementExprVisitor() {}
@@ -1799,13 +1745,13 @@ void separate_window_function_expressions(
     // function expression and a parent expression in a subsequent project node
     for (size_t i = 0; i < window_func_project_node->size(); i++) {
       auto expr = window_func_project_node->getExpr(i);
-      if (is_window_function_expr(expr.get())) {
+      if (hdk::ir::isWindowFunctionExpr(expr.get())) {
         // top level window function exprs are fine
         continue;
       }
 
       std::list<const hdk::ir::Expr*> window_function_exprs =
-          ExprByPredicateCollector::collect(expr.get(), is_window_function_expr);
+          ExprByPredicateCollector::collect(expr.get(), hdk::ir::isWindowFunctionExpr);
       if (!window_function_exprs.empty()) {
         const auto ret = embedded_window_function_exprs.insert(
             std::make_pair(i, window_function_exprs.front()->shared_from_this()));
@@ -1885,117 +1831,6 @@ void separate_window_function_expressions(
   nodes.assign(node_list.begin(), node_list.end());
 }
 
-using InputSet =
-    std::unordered_set<std::pair<const hdk::ir::Node*, unsigned>,
-                       boost::hash<std::pair<const hdk::ir::Node*, unsigned>>>;
-
-class InputCollector : public hdk::ir::ExprCollector<InputSet, InputCollector> {
- protected:
-  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    result_.emplace(col_ref->node(), col_ref->index());
-  }
-};
-
-/**
- * Inserts a simple project before any project containing a window function node. Forces
- * all window function inputs into a single contiguous buffer for centralized processing
- * (e.g. in distributed mode). This is also needed when a window function node is preceded
- * by a filter node, both for correctness (otherwise a window operator will be coalesced
- * with its preceding filter node and be computer over unfiltered results, and for
- * performance, as currently filter nodes that are not coalesced into projects keep all
- * columns from the table as inputs, and hence bring everything in memory.
- * Once the new project has been created, the inputs in the
- * window function project must be rewritten to read from the new project, and to index
- * off the projected exprs in the new project.
- */
-void add_window_function_pre_project(
-    std::vector<std::shared_ptr<hdk::ir::Node>>& nodes,
-    const bool always_add_project_if_first_project_is_window_expr) {
-  std::list<std::shared_ptr<hdk::ir::Node>> node_list(nodes.begin(), nodes.end());
-  size_t project_node_counter{0};
-  for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
-    const auto node = *node_itr;
-
-    auto window_func_project_node = std::dynamic_pointer_cast<hdk::ir::Project>(node);
-    if (!window_func_project_node) {
-      continue;
-    }
-    project_node_counter++;
-    if (!hasWindowFunctionExpr(window_func_project_node.get())) {
-      // this projection node does not have a window function
-      // expression -- skip to the next node in the DAG.
-      continue;
-    }
-
-    const auto prev_node_itr = std::prev(node_itr);
-    const auto prev_node = *prev_node_itr;
-    CHECK(prev_node);
-
-    auto filter_node = std::dynamic_pointer_cast<hdk::ir::Filter>(prev_node);
-
-    auto scan_node = std::dynamic_pointer_cast<hdk::ir::Scan>(prev_node);
-    const bool has_multi_fragment_scan_input =
-        (scan_node && scan_node->getNumFragments() > 1) ? true : false;
-
-    // We currently add a preceding project node in one of two conditions:
-    // 1. always_add_project_if_first_project_is_window_expr = true, which
-    // we currently only set for distributed, but could also be set to support
-    // multi-frag window function inputs, either if we can detect that an input table
-    // is multi-frag up front, or using a retry mechanism like we do for join filter
-    // push down.
-    // TODO(todd): Investigate a viable approach for the above.
-    // 2. Regardless of #1, if the window function project node is preceded by a
-    // filter node. This is required both for correctness and to avoid pulling
-    // all source input columns into memory since non-coalesced filter node
-    // inputs are currently not pruned or eliminated via dead column elimination.
-    // TODO(todd): Investigate whether the shotgun filter node issue affects other
-    // query plans, i.e. filters before joins, and whether there is a more general
-    // approach to solving this (will still need the preceding project node for
-    // window functions preceded by filter nodes for correctness though)
-
-    if (!((always_add_project_if_first_project_is_window_expr &&
-           project_node_counter == 1) ||
-          filter_node || has_multi_fragment_scan_input)) {
-      continue;
-    }
-
-    InputCollector input_collector;
-    for (size_t i = 0; i < window_func_project_node->size(); i++) {
-      input_collector.visit(window_func_project_node->getExpr(i).get());
-    }
-    const InputSet& inputs = input_collector.result();
-
-    // Note: Technically not required since we are mapping old inputs to new input
-    // indices, but makes the re-mapping of inputs easier to follow.
-    std::vector<std::pair<const hdk::ir::Node*, unsigned>> sorted_inputs(inputs.begin(),
-                                                                         inputs.end());
-    std::sort(sorted_inputs.begin(),
-              sorted_inputs.end(),
-              [](const auto& a, const auto& b) { return a.second < b.second; });
-
-    hdk::ir::ExprPtrVector exprs;
-    std::vector<std::string> fields;
-    std::unordered_map<unsigned, unsigned> old_index_to_new_index;
-    for (auto& input : sorted_inputs) {
-      CHECK_EQ(input.first, prev_node.get());
-      auto res =
-          old_index_to_new_index.insert(std::make_pair(input.second, exprs.size()));
-      CHECK(res.second);
-      exprs.emplace_back(hdk::ir::makeExpr<hdk::ir::ColumnRef>(
-          getColumnType(input.first, input.second), input.first, input.second));
-      fields.emplace_back("");
-    }
-
-    auto new_project =
-        std::make_shared<hdk::ir::Project>(std::move(exprs), fields, prev_node);
-    node_list.insert(node_itr, new_project);
-    window_func_project_node->replaceInput(
-        prev_node, new_project, old_index_to_new_index);
-  }
-
-  nodes.assign(node_list.begin(), node_list.end());
-}
-
 int64_t get_int_literal_field(const rapidjson::Value& obj,
                               const char field[],
                               const int64_t default_val) noexcept {
@@ -2072,15 +1907,6 @@ std::shared_ptr<const hdk::ir::Node> get_join_root(
 }
 
 }  // namespace
-
-bool hasWindowFunctionExpr(const hdk::ir::Project* node) {
-  for (const auto& expr : node->getExprs()) {
-    if (is_window_function_expr(expr.get())) {
-      return true;
-    }
-  }
-  return false;
-}
 
 /**
  * Join can become an execution point in a query. This is inconvenient because
@@ -2470,8 +2296,6 @@ void RelAlgDagBuilder::build(const rapidjson::Value& query_ast,
   eliminate_dead_columns(nodes_);
   eliminate_dead_subqueries(subqueries_, nodes_.back().get());
   separate_window_function_expressions(nodes_);
-  add_window_function_pre_project(
-      nodes_, false /* always_add_project_if_first_project_is_window_expr */);
   CHECK(nodes_.size());
   CHECK(nodes_.back().use_count() == 1);
   root_ = nodes_.back();

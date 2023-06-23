@@ -1103,4 +1103,8 @@ class ArrayExpr : public Expr {
 // equal).
 bool exprsEqual(const ExprPtrVector& lhs, const ExprPtrVector& rhs);
 
+// Detect both window function operators and window function operators embedded in case
+// statements (for null handling)
+bool isWindowFunctionExpr(const hdk::ir::Expr* expr);
+
 }  // namespace hdk::ir

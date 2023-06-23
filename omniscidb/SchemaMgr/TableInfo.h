@@ -62,7 +62,7 @@ struct TableInfo : public TableRef {
 
   std::string name;
   bool is_view;
-  // For add_window_function_pre_project in RelAlgDagBuilder.
+  // For addWindowFunctionPreProject.
   size_t fragments;
   size_t row_count;
   bool is_stream;

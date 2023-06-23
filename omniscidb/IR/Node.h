@@ -336,6 +336,8 @@ class Project : public Node {
 
   void appendInput(std::string new_field_name, ExprPtr expr);
 
+  bool hasWindowFunctionExpr() const;
+
   std::string toString() const override {
     return cat(::typeName(this),
                getIdString(),

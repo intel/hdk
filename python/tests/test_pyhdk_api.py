@@ -1002,6 +1002,14 @@ class TestBuilder(BaseTest):
         res = ht.proj(hdk.row_number().over(ht.ref("a")).order_by(ht.ref("b"))).run()
         check_res(res, {"row_number": [1, 1, 2, 2, 3]})
 
+    def test_row_number_multifrag(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict(
+            {"a": [1, 2, 1, 2, 1], "b": [1, 2, 3, 4, 5]}, fragment_size=2
+        )
+        res = ht.proj(hdk.row_number().over(ht.ref("a")).order_by(ht.ref("b"))).run()
+        check_res(res, {"row_number": [1, 1, 2, 2, 3]})
+
     def test_rank(self):
         hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b": [2, 2, 1, 3, 1]})
