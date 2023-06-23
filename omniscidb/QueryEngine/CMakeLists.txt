@@ -296,7 +296,7 @@ set(query_engine_install_artefacts
 if(ENABLE_L0)
     list(APPEND query_engine_install_artefacts
         ${CMAKE_CURRENT_BINARY_DIR}/${intel_gpu_module_name}
-        ${CMAKE_CURRENT_BINARY_DIR}/${spirv_helper_functions_module})
+        ${CMAKE_CURRENT_BINARY_DIR}/${spirv_runtime_module})
 endif()
 install(FILES ${query_engine_install_artefacts} DESTINATION QueryEngine COMPONENT "QE")
 
