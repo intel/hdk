@@ -18,9 +18,9 @@
 
 #include "CompilationOptions.h"
 #include "Descriptors/RelAlgExecutionDescriptor.h"
-#include "TargetMetaInfo.h"
 
 #include "DataMgr/DataMgr.h"
+#include "IR/TargetMetaInfo.h"
 #include "ResultSet/ResultSet.h"
 
 #include <type_traits>
@@ -98,12 +98,12 @@ struct ArrowResult {
 class ArrowResultSet {
  public:
   ArrowResultSet(const std::shared_ptr<ResultSet>& rows,
-                 const std::vector<TargetMetaInfo>& targets_meta,
+                 const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
                  const ExecutorDeviceType device_type = ExecutorDeviceType::CPU);
 
   ArrowResultSet(
       const std::shared_ptr<ResultSet>& rows,
-      const std::vector<TargetMetaInfo>& targets_meta,
+      const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
       const ExecutorDeviceType device_type,
       const size_t min_result_size_for_bulk_dictionary_fetch,
       const double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
@@ -168,7 +168,7 @@ class ArrowResultSet {
 
   std::shared_ptr<ArrowResult> results_;
   std::shared_ptr<ResultSet> rows_;
-  std::vector<TargetMetaInfo> targets_meta_;
+  std::vector<hdk::ir::TargetMetaInfo> targets_meta_;
   std::shared_ptr<arrow::RecordBatch> record_batch_;
   arrow::ipc::DictionaryMemo dictionary_memo_;
 
@@ -176,7 +176,7 @@ class ArrowResultSet {
   // temporary, so we cache these for better performance
   std::vector<std::shared_ptr<arrow::Array>> columns_;
   mutable size_t crt_row_idx_;
-  std::vector<TargetMetaInfo> column_metainfo_;
+  std::vector<hdk::ir::TargetMetaInfo> column_metainfo_;
 };
 
 ArrowResultSetRowIterator::value_type ArrowResultSetRowIterator::operator*() const {

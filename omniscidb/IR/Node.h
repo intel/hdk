@@ -10,8 +10,8 @@
 #include <atomic>
 #include "Expr.h"
 #include "ExprRewriter.h"
+#include "TargetMetaInfo.h"
 
-#include "QueryEngine/TargetMetaInfo.h"
 #include "SchemaMgr/TableInfo.h"
 #include "Shared/Config.h"
 

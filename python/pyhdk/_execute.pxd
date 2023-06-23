@@ -132,8 +132,8 @@ cdef extern from "omniscidb/ResultSetRegistry/ResultSetRegistry.h":
   cdef cppclass CResultSetRegistry "hdk::ResultSetRegistry"(CSchemaProvider, CAbstractDataProvider):
     CResultSetRegistry(shared_ptr[CConfig]) except +;
 
-cdef extern from "omniscidb/QueryEngine/TargetMetaInfo.h":
-  cdef cppclass CTargetMetaInfo "TargetMetaInfo":
+cdef extern from "omniscidb/IR/TargetMetaInfo.h":
+  cdef cppclass CTargetMetaInfo "hdk::ir::TargetMetaInfo":
     const string& get_resname()
     const CType* type()
 

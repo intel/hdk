@@ -30,7 +30,7 @@ class ExecutionResult {
   ExecutionResult();
 
   ExecutionResult(hdk::ResultSetTableTokenPtr token,
-                  const std::vector<TargetMetaInfo>& targets_meta);
+                  const std::vector<hdk::ir::TargetMetaInfo>& targets_meta);
 
   ExecutionResult(const ExecutionResult& that);
 
@@ -66,7 +66,9 @@ class ExecutionResult {
     return {result_token_->tail(n), targets_meta_};
   }
 
-  const std::vector<TargetMetaInfo>& getTargetsMeta() const { return targets_meta_; }
+  const std::vector<hdk::ir::TargetMetaInfo>& getTargetsMeta() const {
+    return targets_meta_;
+  }
 
   const std::vector<PushedDownFilterInfo>& getPushedDownFilterInfo() const;
 
@@ -98,7 +100,7 @@ class ExecutionResult {
 
  private:
   hdk::ResultSetTableTokenPtr result_token_;
-  std::vector<TargetMetaInfo> targets_meta_;
+  std::vector<hdk::ir::TargetMetaInfo> targets_meta_;
   // filters chosen to be pushed down
   std::vector<PushedDownFilterInfo> pushed_down_filter_info_;
   // whether or not it was allowed to look for filters to push down

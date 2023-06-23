@@ -2304,9 +2304,10 @@ class RelAlgDispatcher {
     return ret;
   }
 
-  std::vector<TargetMetaInfo> parseTupleType(const rapidjson::Value& tuple_type_arr) {
+  std::vector<hdk::ir::TargetMetaInfo> parseTupleType(
+      const rapidjson::Value& tuple_type_arr) {
     CHECK(tuple_type_arr.IsArray());
-    std::vector<TargetMetaInfo> tuple_type;
+    std::vector<hdk::ir::TargetMetaInfo> tuple_type;
     for (auto tuple_type_arr_it = tuple_type_arr.Begin();
          tuple_type_arr_it != tuple_type_arr.End();
          ++tuple_type_arr_it) {
@@ -2320,7 +2321,7 @@ class RelAlgDispatcher {
   std::shared_ptr<hdk::ir::LogicalValues> dispatchLogicalValues(
       const rapidjson::Value& logical_values_ra) {
     const auto& tuple_type_arr = field(logical_values_ra, "type");
-    std::vector<TargetMetaInfo> tuple_type = parseTupleType(tuple_type_arr);
+    std::vector<hdk::ir::TargetMetaInfo> tuple_type = parseTupleType(tuple_type_arr);
     const auto& inputs_arr = field(logical_values_ra, "inputs");
     CHECK(inputs_arr.IsArray());
     const auto& tuples_arr = field(logical_values_ra, "tuples");

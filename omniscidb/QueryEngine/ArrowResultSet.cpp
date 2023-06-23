@@ -73,7 +73,7 @@ const hdk::ir::Type* type_from_arrow_field(hdk::ir::Context& ctx,
 }  // namespace
 
 ArrowResultSet::ArrowResultSet(const std::shared_ptr<ResultSet>& rows,
-                               const std::vector<TargetMetaInfo>& targets_meta,
+                               const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
                                const ExecutorDeviceType device_type)
     : rows_(rows), targets_meta_(targets_meta), crt_row_idx_(0) {
   resultSetArrowLoopback(device_type);
@@ -88,7 +88,7 @@ ArrowResultSet::ArrowResultSet(const std::shared_ptr<ResultSet>& rows,
 
 ArrowResultSet::ArrowResultSet(
     const std::shared_ptr<ResultSet>& rows,
-    const std::vector<TargetMetaInfo>& targets_meta,
+    const std::vector<hdk::ir::TargetMetaInfo>& targets_meta,
     const ExecutorDeviceType device_type,
     const size_t min_result_size_for_bulk_dictionary_fetch,
     const double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch)
@@ -357,7 +357,7 @@ std::unique_ptr<ArrowResultSet> result_set_arrow_loopback(
     const ExecutorDeviceType device_type,
     const size_t min_result_size_for_bulk_dictionary_fetch,
     const double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
-  std::vector<TargetMetaInfo> dummy_targets_meta;
+  std::vector<hdk::ir::TargetMetaInfo> dummy_targets_meta;
   return results ? std::make_unique<ArrowResultSet>(
                        rows,
                        results->getTargetsMeta(),

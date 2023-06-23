@@ -61,7 +61,7 @@ int vt_create(sqlite3* db,
   std::transform(p_vt->external_query_table->schema.begin(),
                  p_vt->external_query_table->schema.end(),
                  std::back_inserter(col_defs),
-                 [](const TargetMetaInfo& target_metainfo) {
+                 [](const hdk::ir::TargetMetaInfo& target_metainfo) {
                    return target_metainfo.get_resname() + " " +
                           hdk::ir::sqlTypeName(target_metainfo.type());
                  });
@@ -356,8 +356,8 @@ sqlite3_module omnisci_module = {
     nullptr         // xRollbackto   - function overloading
 };
 
-std::vector<TargetMetaInfo> create_table_schema(const PlanState* plan_state) {
-  std::map<size_t, TargetMetaInfo> schema_map;
+std::vector<hdk::ir::TargetMetaInfo> create_table_schema(const PlanState* plan_state) {
+  std::map<size_t, hdk::ir::TargetMetaInfo> schema_map;
   auto schema_provider = plan_state->executor_->getSchemaProvider();
   for (const auto& kv : plan_state->global_to_local_col_ids_) {
     const int db_id = kv.first.getDatabaseId();
@@ -374,10 +374,10 @@ std::vector<TargetMetaInfo> create_table_schema(const PlanState* plan_state) {
     const auto column_ref =
         serialize_column_ref(db_id, table_id, column_id, schema_provider);
     const auto it_ok =
-        schema_map.emplace(kv.second, TargetMetaInfo(column_ref, column_type));
+        schema_map.emplace(kv.second, hdk::ir::TargetMetaInfo(column_ref, column_type));
     CHECK(it_ok.second);
   }
-  std::vector<TargetMetaInfo> schema;
+  std::vector<hdk::ir::TargetMetaInfo> schema;
   for (const auto& kv : schema_map) {
     schema.push_back(kv.second);
   }

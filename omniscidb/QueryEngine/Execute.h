@@ -62,7 +62,6 @@
 #include "QueryEngine/RowFuncBuilder.h"
 #include "QueryEngine/StringDictionaryGenerations.h"
 #include "QueryEngine/TableGenerations.h"
-#include "QueryEngine/TargetMetaInfo.h"
 #include "QueryEngine/WindowContext.h"
 
 #include "DataMgr/Chunk/Chunk.h"
