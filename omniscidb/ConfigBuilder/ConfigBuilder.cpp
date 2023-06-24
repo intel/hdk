@@ -575,6 +575,14 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->implicit_value(true),
                          "Enable automatic IR metadata (debug builds only).");
 
+  // storage
+  opt_desc.add_options()(
+      "enable-lazy-dict-materialization",
+      po::value<bool>(&config_->storage.enable_lazy_dict_materialization)
+          ->default_value(config_->storage.enable_lazy_dict_materialization)
+          ->implicit_value(true),
+      "Enable lazy materialization of string dictionary columns from Arrow Storage.");
+
   if (allow_gtest_flags) {
     opt_desc.add_options()("gtest_list_tests", "list all test");
     opt_desc.add_options()("gtest_filter", "filters tests, use --help for details");
