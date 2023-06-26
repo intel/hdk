@@ -64,6 +64,10 @@ class ResultSetTableToken : public std::enable_shared_from_this<ResultSetTableTo
            std::to_string(tableId()) + ")";
   }
 
+  std::string description() const;
+  std::string memoryDescription() const;
+  std::string contentToString(bool header) const;
+
  private:
   void reset();
 
