@@ -87,11 +87,13 @@ cdef class ExecutionResult:
 
   @property
   def desc(self):
-    return self.c_result.getRows().get().summaryToString()
+    cdef CResultSetTableTokenPtr c_token = self.c_result.getToken()
+    return c_token.get().description()
 
   @property
   def memory_desc(self):
-    return self.c_result.getRows().get().toString()
+    cdef CResultSetTableTokenPtr c_token = self.c_result.getToken()
+    return c_token.get().memoryDescription()
 
   @property
   def table_name(self):
@@ -152,7 +154,7 @@ cdef class ExecutionResult:
     for key, type_str in self.schema.items():
       res += f"  {key}: {type_str}\n"
     res += "Data:\n"
-    res += self.c_result.getRows().get().contentToString(False)
+    res += self.c_result.getToken().get().contentToString(False)
     return res
 
   def __repr__(self):

@@ -67,4 +67,57 @@ std::shared_ptr<arrow::Table> ResultSetTableToken::toArrow() const {
   return res;
 }
 
+std::string ResultSetTableToken::description() const {
+  auto first_rs = resultSet(0);
+  auto last_rs = resultSet(resultSetCount() - 1);
+  size_t total_entries = first_rs->entryCount();
+  for (size_t rs_idx = 1; rs_idx < resultSetCount(); ++rs_idx) {
+    total_entries += resultSet(rs_idx)->entryCount();
+  }
+  std::ostringstream oss;
+  oss << "Result Set Table Info" << std::endl;
+  oss << "\tFragments: " << resultSetCount() << std::endl;
+  oss << "\tLayout: " << first_rs->getQueryMemDesc().queryDescTypeToString() << std::endl;
+  oss << "\tColumns: " << first_rs->colCount() << std::endl;
+  oss << "\tRows: " << rowCount() << std::endl;
+  oss << "\tEntry count: " << total_entries << std::endl;
+  const std::string did_output_columnar =
+      first_rs->didOutputColumnar() ? "True" : "False;";
+  oss << "\tColumnar: " << did_output_columnar << std::endl;
+  oss << "\tLazy-fetched columns: " << first_rs->getNumColumnsLazyFetched() << std::endl;
+  const std::string is_direct_columnar_conversion_possible =
+      first_rs->isDirectColumnarConversionPossible() ? "True" : "False";
+  oss << "\tDirect columnar conversion possible: "
+      << is_direct_columnar_conversion_possible << std::endl;
+
+  size_t num_columns_zero_copy_columnarizable{0};
+  for (size_t col_idx = 0; col_idx < first_rs->colCount(); col_idx++) {
+    if (first_rs->isZeroCopyColumnarConversionPossible(col_idx)) {
+      num_columns_zero_copy_columnarizable++;
+    }
+  }
+  oss << "\tZero-copy columnar conversion columns: "
+      << num_columns_zero_copy_columnarizable << std::endl;
+
+  oss << "\tHas permutation: "
+      << (first_rs->isPermutationBufferEmpty() ? "False" : "True") << std::endl;
+  auto limit =
+      last_rs->getLimit() ? row_count_ - last_rs->rowCount() + last_rs->getLimit() : 0;
+  oss << "\tLimit: " << limit << std::endl;
+  oss << "\tOffset: " << first_rs->getOffset() << std::endl;
+  return oss.str();
+}
+
+std::string ResultSetTableToken::memoryDescription() const {
+  return resultSet(0)->toString();
+}
+
+std::string ResultSetTableToken::contentToString(bool header) const {
+  std::string res = resultSet(0)->contentToString(header);
+  for (size_t rs_idx = 1; rs_idx < resultSetCount(); ++rs_idx) {
+    res += resultSet(rs_idx)->contentToString(false);
+  }
+  return res;
+}
+
 }  // namespace hdk

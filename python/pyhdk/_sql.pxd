@@ -56,6 +56,9 @@ cdef extern from "omniscidb/ResultSetRegistry/ResultSetTableToken.h":
   cdef cppclass CResultSetTableToken "hdk::ResultSetTableToken":
     size_t rowCount()
     shared_ptr[CArrowTable] toArrow() except +
+    string description()
+    string memoryDescription()
+    string contentToString(bool)
 
 ctypedef shared_ptr[const CResultSetTableToken] CResultSetTableTokenPtr
 
