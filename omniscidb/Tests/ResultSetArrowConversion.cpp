@@ -950,6 +950,26 @@ TEST(ArrowTable, FixedLenArrays) {
   }
 }
 
+TEST(ArrowTable, MultifragResult) {
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  ScopeGuard reset = [prev_enable_multifrag_execution_result] {
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
+  };
+
+  config().exec.enable_multifrag_execution_result = true;
+
+  auto res = runSqlQuery("select * from test_chunked;", ExecutorDeviceType::CPU, false);
+  // Expect two fragments in the result and two batches in converted table.
+  CHECK_EQ(res.getToken()->resultSetCount(), (size_t)2);
+  auto table = res.getToken()->toArrow();
+  CHECK_EQ(table->column(1)->num_chunks(), 2);
+  compare_columns(table6x4_col_i64, table->column(1));
+  compare_columns(table6x4_col_bi, table->column(2));
+  compare_columns(table6x4_col_d, table->column(3));
+}
+
 int main(int argc, char* argv[]) {
   testing::InitGoogleTest(&argc, argv);
   TestHelpers::init_logger_stderr_only(argc, argv);

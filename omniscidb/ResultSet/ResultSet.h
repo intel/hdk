@@ -289,6 +289,7 @@ class ResultSet {
 
   void setColNames(std::vector<std::string> fields);
   bool hasColNames() const;
+  const std::vector<std::string>& getColNames() const;
   std::string colName(size_t col_idx) const;
 
   /**

@@ -212,6 +212,10 @@ ResultSetTableTokenPtr ResultSetRegistry::head(const ResultSetTableToken& token,
     }
   }
 
+  // Copy column names to the resulting table.
+  auto* first_rs = table->fragments.front().rs.get();
+  new_results.front()->setColNames(first_rs->getColNames());
+
   data_lock.unlock();
   table_lock.unlock();
 
@@ -255,6 +259,10 @@ ResultSetTableTokenPtr ResultSetRegistry::tail(const ResultSetTableToken& token,
       }
     }
   }
+
+  // Copy column names to the resulting table.
+  auto* first_rs = table->fragments.front().rs.get();
+  new_results.front()->setColNames(first_rs->getColNames());
 
   data_lock.unlock();
   table_lock.unlock();

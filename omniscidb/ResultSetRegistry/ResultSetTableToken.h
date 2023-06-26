@@ -11,6 +11,8 @@
 #include "DataMgr/ChunkMetadata.h"
 #include "SchemaMgr/TableInfo.h"
 
+#include "arrow/api.h"
+
 namespace hdk {
 
 class ResultSetRegistry;
@@ -54,6 +56,8 @@ class ResultSetTableToken : public std::enable_shared_from_this<ResultSetTableTo
 
   ResultSetTableTokenPtr head(size_t n) const;
   ResultSetTableTokenPtr tail(size_t n) const;
+
+  std::shared_ptr<arrow::Table> toArrow() const;
 
   std::string toString() const {
     return "ResultSetTableToken(" + std::to_string(dbId()) + ":" +

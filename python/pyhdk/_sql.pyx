@@ -74,20 +74,12 @@ cdef extract_array_value(const CArrayTargetValue *array, const CType *c_type):
 
 cdef class ExecutionResult:
   def row_count(self):
-    cdef shared_ptr[CResultSet] c_res
-    c_res = self.c_result.getRows()
-    return int(c_res.get().rowCount())
+    cdef CResultSetTableTokenPtr c_token = self.c_result.getToken()
+    return int(c_token.get().rowCount())
 
   def to_arrow(self):
-    cdef vector[string] col_names
-    cdef vector[CTargetMetaInfo].const_iterator it = self.c_result.getTargetsMeta().const_begin()
-
-    while it != self.c_result.getTargetsMeta().const_end():
-      col_names.push_back(dereference(it).get_resname())
-      preincrement(it)
-
-    cdef unique_ptr[CArrowResultSetConverter] converter = make_unique[CArrowResultSetConverter](self.c_result.getRows(), col_names, -1)
-    cdef shared_ptr[CArrowTable] at = converter.get().convertToArrowTable()
+    cdef CResultSetTableTokenPtr c_token = self.c_result.getToken()
+    cdef shared_ptr[CArrowTable] at = c_token.get().toArrow()
     return pyarrow_wrap_table(at)
 
   def to_explain_str(self):

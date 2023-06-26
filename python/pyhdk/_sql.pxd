@@ -8,6 +8,8 @@ from libcpp.memory cimport shared_ptr, unique_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
+from pyarrow.lib cimport CTable as CArrowTable
+
 from pyhdk._common cimport CConfig, CType
 from pyhdk._storage cimport CSchemaProvider, CSchemaProviderPtr, CDataProvider, CDataMgr, CBufferProvider
 from pyhdk._execute cimport CExecutor, CResultSetPtr, CCompilationOptions, CExecutionOptions, CTargetMetaInfo
@@ -50,6 +52,13 @@ cdef extern from "omniscidb/QueryEngine/RelAlgDagBuilder.h":
   cdef cppclass CRelAlgDagBuilder "RelAlgDagBuilder"(CQueryDag):
     CRelAlgDagBuilder(const string&, int, CSchemaProviderPtr, shared_ptr[CConfig]) except +
 
+cdef extern from "omniscidb/ResultSetRegistry/ResultSetTableToken.h":
+  cdef cppclass CResultSetTableToken "hdk::ResultSetTableToken":
+    size_t rowCount()
+    shared_ptr[CArrowTable] toArrow() except +
+
+ctypedef shared_ptr[const CResultSetTableToken] CResultSetTableTokenPtr
+
 cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h":
   cdef cppclass CExecutionResult "ExecutionResult":
     CExecutionResult()
@@ -60,6 +69,7 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
     const vector[CTargetMetaInfo]& getTargetsMeta()
     string getExplanation()
     const string& tableName()
+    CResultSetTableTokenPtr getToken()
 
     CExecutionResult head(size_t) except +
     CExecutionResult tail(size_t) except +

@@ -468,6 +468,10 @@ bool ResultSet::hasColNames() const {
   return targets_.size() == fields_.size();
 }
 
+const std::vector<std::string>& ResultSet::getColNames() const {
+  return fields_;
+}
+
 std::string ResultSet::colName(size_t col_idx) const {
   if (fields_.empty()) {
     return "col" + std::to_string(col_idx);
