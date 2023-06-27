@@ -21,7 +21,7 @@ on:
 jobs:
   build:
     name: Test (Linux - Docker - ${{ inputs.name }})
-    runs-on: [self-hosted, linux, "${{ inputs.runner }}"]
+    runs-on: [self-hosted, linux, ${{ inputs.runner }}]
     steps:
       - name: Clean
         run: |
