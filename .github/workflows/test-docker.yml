@@ -28,7 +28,6 @@ jobs:
           docker stop hdk-build.${{ inputs.name }} || true
           docker rm hdk-build.${{ inputs.name }} || true
           rm -rf /build-runner/_work/*
-          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
 
       - name: Set env context
         run: |
@@ -38,9 +37,10 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-${{ inputs.build-name }}
 
-      - name: Unpack build files
+      - name: Unpack build files, create Dockerfile
         run: |
           tar -zxf build.tgz
+          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
 
       - name: Start the container
         if: inputs.name != 'l0'
