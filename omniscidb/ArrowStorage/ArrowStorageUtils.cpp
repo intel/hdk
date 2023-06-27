@@ -174,8 +174,9 @@ void copyArrayDataReplacingNulls(T* dst, std::shared_ptr<arrow::Array> arr) {
 
 template <typename T>
 std::shared_ptr<arrow::ChunkedArray> replaceNullValuesImpl(
-    std::shared_ptr<arrow::ChunkedArray> arr) {
-  if (!std::is_same_v<T, bool> && arr->null_count() == 0) {
+    std::shared_ptr<arrow::ChunkedArray> arr,
+    bool force_copy) {
+  if (!force_copy && !std::is_same_v<T, bool> && arr->null_count() == 0) {
     // for boolean columns we still need to convert bitmaps to array
     return arr;
   }
@@ -884,7 +885,9 @@ std::shared_ptr<arrow::ChunkedArray> convertDecimalToInteger(
 std::shared_ptr<arrow::ChunkedArray> replaceNullValues(
     std::shared_ptr<arrow::ChunkedArray> arr,
     const hdk::ir::Type* type,
-    StringDictionary* dict) {
+    StringDictionary* dict,
+    bool force_single_chunk) {
+  bool force_copy = force_single_chunk && (arr->chunks().size() > 1);
   if (type->isTime()) {
     if (type->size() != 8) {
       throw std::runtime_error("Unsupported time type for Arrow import: "s +
@@ -902,7 +905,7 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValues(
       case 2:
         return convertDateReplacingNulls<int32_t, int16_t>(arr);
       case 4:
-        return replaceNullValuesImpl<int32_t>(arr);
+        return replaceNullValuesImpl<int32_t>(arr, force_copy);
       case 8:
         return convertDateReplacingNulls<int32_t, int64_t>(arr);
       default:
@@ -912,13 +915,13 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValues(
   } else if (type->isInteger() || type->isTimestamp()) {
     switch (type->size()) {
       case 1:
-        return replaceNullValuesImpl<int8_t>(arr);
+        return replaceNullValuesImpl<int8_t>(arr, force_copy);
       case 2:
-        return replaceNullValuesImpl<int16_t>(arr);
+        return replaceNullValuesImpl<int16_t>(arr, force_copy);
       case 4:
-        return replaceNullValuesImpl<int32_t>(arr);
+        return replaceNullValuesImpl<int32_t>(arr, force_copy);
       case 8:
-        return replaceNullValuesImpl<int64_t>(arr);
+        return replaceNullValuesImpl<int64_t>(arr, force_copy);
       default:
         throw std::runtime_error("Unsupported integer/datetime type for Arrow import: "s +
                                  type->toString());
@@ -926,12 +929,12 @@ std::shared_ptr<arrow::ChunkedArray> replaceNullValues(
   } else if (type->isFloatingPoint()) {
     switch (type->as<hdk::ir::FloatingPointType>()->precision()) {
       case hdk::ir::FloatingPointType::kFloat:
-        return replaceNullValuesImpl<float>(arr);
+        return replaceNullValuesImpl<float>(arr, force_copy);
       case hdk::ir::FloatingPointType::kDouble:
-        return replaceNullValuesImpl<double>(arr);
+        return replaceNullValuesImpl<double>(arr, force_copy);
     }
   } else if (type->isBoolean()) {
-    return replaceNullValuesImpl<bool>(arr);
+    return replaceNullValuesImpl<bool>(arr, force_copy);
   } else if (type->isFixedLenArray()) {
     return replaceNullValuesFixedSizeArray(arr, type, dict);
   } else if (type->isVarLenArray()) {

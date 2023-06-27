@@ -28,7 +28,8 @@ std::shared_ptr<arrow::DataType> getArrowImportType(hdk::ir::Context& ctx,
 std::shared_ptr<arrow::ChunkedArray> replaceNullValues(
     std::shared_ptr<arrow::ChunkedArray> arr,
     const hdk::ir::Type* type,
-    StringDictionary* dict = nullptr);
+    StringDictionary* dict = nullptr,
+    bool force_single_chunk = false);
 
 std::shared_ptr<arrow::ChunkedArray> convertDecimalToInteger(
     std::shared_ptr<arrow::ChunkedArray> arr,
