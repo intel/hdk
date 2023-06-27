@@ -12,7 +12,7 @@ from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CConfig, CType
 from pyhdk._storage cimport CSchemaProvider, CSchemaProviderPtr, CDataProvider, CDataMgr, CBufferProvider
-from pyhdk._execute cimport CExecutor, CResultSetPtr, CCompilationOptions, CExecutionOptions, CTargetMetaInfo
+from pyhdk._execute cimport CExecutor, CResultSetPtr, CCompilationOptions, CExecutionOptions, CTargetMetaInfo, CTargetValue
 
 cdef extern from "omniscidb/QueryEngine/ExtensionFunctionsWhitelist.h":
   cdef cppclass CExtensionFunction "ExtensionFunction":
@@ -60,6 +60,8 @@ cdef extern from "omniscidb/ResultSetRegistry/ResultSetTableToken.h":
     string memoryDescription()
     string contentToString(bool)
 
+    vector[CTargetValue] row(size_t, bool, bool) except +
+
 ctypedef shared_ptr[const CResultSetTableToken] CResultSetTableTokenPtr
 
 cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h":
@@ -68,7 +70,6 @@ cdef extern from "omniscidb/QueryEngine/Descriptors/RelAlgExecutionDescriptor.h"
     CExecutionResult(const CExecutionResult&)
     CExecutionResult(CExecutionResult&&)
 
-    const CResultSetPtr& getRows()
     const vector[CTargetMetaInfo]& getTargetsMeta()
     string getExplanation()
     const string& tableName()
