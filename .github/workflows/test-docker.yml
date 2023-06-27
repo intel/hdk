@@ -14,17 +14,21 @@ on:
       reset-cache:
         type: boolean
         default: false
+      runner:
+        type: string
+        default: docker
 
 jobs:
   build:
     name: Test (Linux - Docker - ${{ inputs.name }})
-    runs-on: [self-hosted, linux, docker]
+    runs-on: [self-hosted, linux, "${{ inputs.runner }}"]
     steps:
       - name: Clean
         run: |
-            docker stop hdk-build.${{ inputs.name }} || true
-            docker rm hdk-build.${{ inputs.name }} || true
-            rm -rf _work/*
+          docker stop hdk-build.${{ inputs.name }} || true
+          docker rm hdk-build.${{ inputs.name }} || true
+          rm -rf /build-runner/_work/*
+          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
 
       - name: Set env context
         run: |
@@ -38,14 +42,23 @@ jobs:
         run: |
           tar -zxf build.tgz
 
-      - name: Build docker image
-        run: |
-          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
-          docker build . ${{ inputs.reset-cache && '--no-cache ' || '' }}--tag hdk-build.${{ inputs.name }}
-
       - name: Start the container
+        if: inputs.name != 'l0'
         run:  |
+          set -vx
+          docker build . ${{ inputs.reset-cache && '--no-cache ' || '' }}--tag hdk-build.${{ inputs.name }}
           docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl hdk-build.${{ inputs.name }}:latest
+
+      - name: Start L0 container
+        if: inputs.name == 'l0'
+        run:  |
+          set -vx
+          getent group render | awk -F : '{ print "RUN groupadd -g "$3" render && usermod -a -G render ghrunner" }' >>Dockerfile
+          docker build . ${{ inputs.reset-cache && '--no-cache' || '' }}--tag hdk-build.${{ inputs.name }}
+          docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/dri:/dev/dri hdk-build.${{ inputs.name }}:latest
+
+      - name: Copy files into the container
+        run: |
           docker exec hdk-build.${{ inputs.name }} mkdir -p /_work/
           docker cp build.tgz hdk-build.${{ inputs.name }}:/_work/
           docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
@@ -62,7 +75,14 @@ jobs:
         run: |
           echo FIXME docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
 
+      - name: L0 Sanity test
+        if: inputs.name == 'l0'
+        run: |
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/intel-gpu-enabling-test.sh
+
       - name: Stop the container
         if: always()
         run: docker stop hdk-build.${{ inputs.name }} || true
+
 
