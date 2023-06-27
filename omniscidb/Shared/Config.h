@@ -176,6 +176,7 @@ struct DebugConfig {
 
 struct StorageConfig {
   bool enable_lazy_dict_materialization = false;
+  bool enable_non_lazy_data_import = false;
 };
 
 struct Config {

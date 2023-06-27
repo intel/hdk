@@ -582,6 +582,15 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
           ->default_value(config_->storage.enable_lazy_dict_materialization)
           ->implicit_value(true),
       "Enable lazy materialization of string dictionary columns from Arrow Storage.");
+  opt_desc.add_options()(
+      "enable-non-lazy-data-import",
+      po::value<bool>(&config_->storage.enable_non_lazy_data_import)
+          ->default_value(config_->storage.enable_non_lazy_data_import)
+          ->implicit_value(true),
+      "Enable non-lazy data import in Arrow Storage. When enabled, we do as much data "
+      "processing on import as we might require. This might increase overall execution "
+      "time. This option can be used to split data import and execution for performance "
+      "measurements.");
 
   if (allow_gtest_flags) {
     opt_desc.add_options()("gtest_list_tests", "list all test");

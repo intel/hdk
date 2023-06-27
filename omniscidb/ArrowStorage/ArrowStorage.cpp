@@ -715,7 +715,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
         switch (col_arr->type()->id()) {
           case arrow::Type::STRING:
             // if the dictionary has already been materialized, append indices
-            if (!config_->storage.enable_lazy_dict_materialization ||
+            if (config_->storage.enable_non_lazy_data_import ||
+                !config_->storage.enable_lazy_dict_materialization ||
                 dict_data->is_materialized) {
               col_arr = createDictionaryEncodedColumn(
                   dict_data->dict()->stringDict.get(), col_arr, col_type);
@@ -730,8 +731,11 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
         }
       } else if (col_type->isString()) {
       } else {
-        col_arr = replaceNullValues(
-            col_arr, col_type, dict_data ? dict_data->dict()->stringDict.get() : nullptr);
+        col_arr =
+            replaceNullValues(col_arr,
+                              col_type,
+                              dict_data ? dict_data->dict()->stringDict.get() : nullptr,
+                              config_->storage.enable_non_lazy_data_import);
       }
 
       col_data[col_idx] = col_arr;
