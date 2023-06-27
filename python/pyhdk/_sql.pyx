@@ -109,7 +109,7 @@ cdef class ExecutionResult:
 
   def row(self, row_id):
     res = []
-    cdef vector[CTargetValue] vals = self.c_result.getRows().get().getRowAt(row_id, True, True)
+    cdef vector[CTargetValue] vals = self.c_result.getToken().get().row(row_id, True, True)
     cdef vector[CTargetValue].const_iterator it = vals.const_begin()
     cdef const CScalarTargetValue *scalar
     cdef const CArrayTargetValue *array

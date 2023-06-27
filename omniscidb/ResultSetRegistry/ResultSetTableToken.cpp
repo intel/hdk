@@ -67,6 +67,19 @@ std::shared_ptr<arrow::Table> ResultSetTableToken::toArrow() const {
   return res;
 }
 
+std::vector<TargetValue> ResultSetTableToken::row(size_t row_idx,
+                                                  bool translate_strings,
+                                                  bool decimal_to_double) const {
+  for (size_t rs_idx = 0; rs_idx < resultSetCount(); ++rs_idx) {
+    auto rs = resultSet(rs_idx);
+    if (rs->rowCount() > row_idx) {
+      return rs->getRowAt(row_idx, translate_strings, decimal_to_double);
+    }
+    row_idx -= rs->rowCount();
+  }
+  throw std::runtime_error("Out-of-bound row index.");
+}
+
 std::string ResultSetTableToken::description() const {
   auto first_rs = resultSet(0);
   auto last_rs = resultSet(resultSetCount() - 1);

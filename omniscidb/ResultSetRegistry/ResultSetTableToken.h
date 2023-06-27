@@ -59,6 +59,10 @@ class ResultSetTableToken : public std::enable_shared_from_this<ResultSetTableTo
 
   std::shared_ptr<arrow::Table> toArrow() const;
 
+  std::vector<TargetValue> row(size_t row_idx,
+                               bool translate_strings,
+                               bool decimal_to_double) const;
+
   std::string toString() const {
     return "ResultSetTableToken(" + std::to_string(dbId()) + ":" +
            std::to_string(tableId()) + ")";
