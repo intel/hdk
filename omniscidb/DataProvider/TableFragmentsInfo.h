@@ -44,13 +44,19 @@ class FragmentInfo {
     chunkMetadataMap[col] = chunkMetadata;
   }
 
-  const ChunkMetadataMap& getChunkMetadataMap() const;
+  const ChunkMetadataMap& getChunkMetadataMap() const { return chunkMetadataMap; }
 
   const ChunkMetadataMap& getChunkMetadataMapPhysical() const { return chunkMetadataMap; }
 
-  ChunkMetadataMap getChunkMetadataMapPhysicalCopy() const;
+  ChunkMetadataMap getChunkMetadataMapPhysicalCopy() const {
+    ChunkMetadataMap metadata_map;
+    for (const auto& [column_id, chunk_metadata] : chunkMetadataMap) {
+      metadata_map[column_id] = std::make_shared<ChunkMetadata>(*chunk_metadata);
+    }
+    return metadata_map;
+  }
 
-  size_t getNumTuples() const;
+  size_t getNumTuples() const { return numTuples; }
 
   size_t getPhysicalNumTuples() const { return numTuples; }
 
@@ -71,15 +77,22 @@ class TableFragmentsInfo {
  public:
   TableFragmentsInfo() : numTuples(0) {}
 
-  size_t getNumTuples() const;
+  size_t getNumTuples() const { return numTuples; }
 
-  size_t getNumTuplesUpperBound() const;
+  size_t getNumTuplesUpperBound() const { return numTuples; }
 
   size_t getPhysicalNumTuples() const { return numTuples; }
 
   void setPhysicalNumTuples(const size_t physNumTuples) { numTuples = physNumTuples; }
 
-  size_t getFragmentNumTuplesUpperBound() const;
+  size_t getFragmentNumTuplesUpperBound() const {
+    size_t fragment_num_tupples_upper_bound = 0;
+    for (const auto& fragment : fragments) {
+      fragment_num_tupples_upper_bound =
+          std::max(fragment.getNumTuples(), fragment_num_tupples_upper_bound);
+    }
+    return fragment_num_tupples_upper_bound;
+  }
 
   std::vector<int> chunkKeyPrefix;
   std::vector<FragmentInfo> fragments;

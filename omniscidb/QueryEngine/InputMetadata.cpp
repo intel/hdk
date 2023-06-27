@@ -98,36 +98,3 @@ std::vector<InputTableInfo> get_table_infos(const RelAlgExecutionUnit& ra_exe_un
   collect_table_infos(table_infos, ra_exe_unit.input_descs, executor);
   return table_infos;
 }
-
-const ChunkMetadataMap& FragmentInfo::getChunkMetadataMap() const {
-  return chunkMetadataMap;
-}
-
-ChunkMetadataMap FragmentInfo::getChunkMetadataMapPhysicalCopy() const {
-  ChunkMetadataMap metadata_map;
-  for (const auto& [column_id, chunk_metadata] : chunkMetadataMap) {
-    metadata_map[column_id] = std::make_shared<ChunkMetadata>(*chunk_metadata);
-  }
-  return metadata_map;
-}
-
-size_t FragmentInfo::getNumTuples() const {
-  return numTuples;
-}
-
-size_t TableFragmentsInfo::getNumTuples() const {
-  return numTuples;
-}
-
-size_t TableFragmentsInfo::getNumTuplesUpperBound() const {
-  return numTuples;
-}
-
-size_t TableFragmentsInfo::getFragmentNumTuplesUpperBound() const {
-  size_t fragment_num_tupples_upper_bound = 0;
-  for (const auto& fragment : fragments) {
-    fragment_num_tupples_upper_bound =
-        std::max(fragment.getNumTuples(), fragment_num_tupples_upper_bound);
-  }
-  return fragment_num_tupples_upper_bound;
-}
