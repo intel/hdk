@@ -114,6 +114,10 @@ ze_command_list_handle_t L0CommandList::handle() const {
 
 L0CommandList::~L0CommandList() {
   // TODO: maybe return to pool
+  auto status = zeCommandListDestroy(handle_);
+  if (status) {
+    std::cerr << "Non-zero status for command list destructor" << std::endl;
+  }
 }
 
 void L0CommandList::copy(void* dst, const void* src, const size_t num_bytes) {
