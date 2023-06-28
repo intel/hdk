@@ -73,6 +73,9 @@ class FragmentInfo {
   mutable ChunkMetadataMap chunkMetadataMap;
 };
 
+using TableStats = std::map<int, ChunkStats>;
+using TableStatsMaterializeFn = std::function<void(TableStats&)>;
+
 class TableFragmentsInfo {
  public:
   TableFragmentsInfo() : numTuples(0) {}
@@ -94,9 +97,37 @@ class TableFragmentsInfo {
     return fragment_num_tupples_upper_bound;
   }
 
+  const TableStats& getTableStats() const {
+    maybeMaterializeTableStats();
+    return table_stats_;
+  }
+
+  // Check if there are pre-computed tables stats available.
+  // getTableStats can be used in any case but it can be costly
+  // if there are no pre-computed stats.
+  bool hasComputedTableStats() const { return !table_stats_materialize_fn_; }
+
+  void setTableStats(const TableStats& stats) const {
+    TableStatsMaterializeFn().swap(table_stats_materialize_fn_);
+    table_stats_ = stats;
+  }
+
+  void setTableStatsMaterializeFn(TableStatsMaterializeFn stats_materialize_fn) const {
+    table_stats_materialize_fn_ = stats_materialize_fn;
+  }
+
   std::vector<int> chunkKeyPrefix;
   std::vector<FragmentInfo> fragments;
 
  private:
+  void maybeMaterializeTableStats() const {
+    if (table_stats_materialize_fn_) {
+      table_stats_materialize_fn_(table_stats_);
+      TableStatsMaterializeFn().swap(table_stats_materialize_fn_);
+    }
+  }
+
   mutable size_t numTuples;
+  mutable TableStats table_stats_;
+  mutable TableStatsMaterializeFn table_stats_materialize_fn_;
 };

@@ -587,11 +587,29 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
           }
         }
       }
+
+      auto& table_stats = query_info.getTableStats();
+      auto col_stats_it = table_stats.find(col_id);
+      CHECK(col_stats_it != table_stats.end())
+          << query_infos[*ti_idx].db_id << ":" << query_infos[*ti_idx].table_id << ":"
+          << col_id << " " << table_stats.size();
+      if (col_stats_it == table_stats.end()) {
+        return ExpressionRange::makeInvalidRange();
+      }
+
+      auto& col_stats = col_stats_it->second;
+      CHECK_EQ(col_stats.has_nulls || is_outer_join_proj, has_nulls);
+      has_nulls = has_nulls || col_stats.has_nulls;
+
       if (col_type->isFloatingPoint()) {
         const auto min_val =
             extract_min_stat_fp_type(min_it->second->chunkStats(), col_type);
         const auto max_val =
             extract_max_stat_fp_type(max_it->second->chunkStats(), col_type);
+        const auto new_min_val = extract_min_stat_fp_type(col_stats, col_type);
+        const auto new_max_val = extract_max_stat_fp_type(col_stats, col_type);
+        CHECK_EQ(new_min_val, min_val);
+        CHECK_EQ(new_max_val, max_val);
         return col_type->size() == 4
                    ? ExpressionRange::makeFloatRange(min_val, max_val, has_nulls)
                    : ExpressionRange::makeDoubleRange(min_val, max_val, has_nulls);
@@ -600,6 +618,10 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
           extract_min_stat_int_type(min_it->second->chunkStats(), col_type);
       const auto max_val =
           extract_max_stat_int_type(max_it->second->chunkStats(), col_type);
+      const auto new_min_val = extract_min_stat_int_type(col_stats, col_type);
+      const auto new_max_val = extract_max_stat_int_type(col_stats, col_type);
+      CHECK_EQ(new_min_val, min_val);
+      CHECK_EQ(new_max_val, max_val);
       if (max_val < min_val) {
         // The column doesn't contain any non-null values, synthesize an empty range.
         CHECK_GT(min_val, 0);

@@ -163,6 +163,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
     std::vector<DataFragment> fragments;
     size_t row_count = 0;
+    TableStats table_stats;
   };
 
   struct DictionaryData {

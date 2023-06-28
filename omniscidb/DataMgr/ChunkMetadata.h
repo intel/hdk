@@ -190,6 +190,11 @@ class ChunkMetadata {
     return chunk_stats_;
   }
 
+  // Check if there are pre-computed chunk stats available.
+  // chunkStats can be used in any case but it can trigger
+  // stats computation if there are no pre-computed stats.
+  bool hasComputedChunkStats() const { return !stats_materialize_fn_; }
+
 #ifndef __CUDACC__
   std::string dump() const {
     std::string res = "type: " + type_->toString() +
