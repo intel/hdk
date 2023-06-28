@@ -86,6 +86,14 @@ class TestTableData {
 
     auto& frag_info = info_.fragments[data_[col_id - 1].size() - 1];
     frag_info.setChunkMetadata(col_id, chunk_meta);
+
+    if (table_stats_.count(col_id)) {
+      mergeStats(
+          table_stats_.at(col_id), chunk_meta->chunkStats(), col_types_.at(col_id));
+    } else {
+      table_stats_.emplace(col_id, chunk_meta->chunkStats());
+    }
+    info_.setTableStats(table_stats_);
   }
 
   void fetchData(int col_id, int frag_id, int8_t* dst, size_t size) {
@@ -102,6 +110,7 @@ class TestTableData {
   TableRef ref_;
   std::vector<std::vector<std::vector<int8_t>>> data_;
   TableFragmentsInfo info_;
+  TableStats table_stats_;
   std::unordered_map<int, const hdk::ir::Type*> col_types_;
 };
 

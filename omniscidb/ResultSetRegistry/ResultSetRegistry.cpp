@@ -284,6 +284,59 @@ ChunkStats ResultSetRegistry::getChunkStats(int table_id,
   return frag.meta.at(columnId(col_idx))->chunkStats();
 }
 
+TableStats ResultSetRegistry::getTableStats(int table_id) const {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK_EQ(tables_.count(table_id), (size_t)1);
+  auto& table = *tables_.at(table_id);
+  mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
+  data_lock.unlock();
+
+  if (!table.table_stats.empty()) {
+    return table.table_stats;
+  }
+
+  for (auto& frag : table.fragments) {
+    mapd_shared_lock<mapd_shared_mutex> frag_read_lock(*frag.mutex);
+    if (frag.meta.empty()) {
+      frag_read_lock.unlock();
+      mapd_unique_lock<mapd_shared_mutex> frag_write_lock(*frag.mutex);
+      if (frag.meta.empty()) {
+        frag.meta = synthesizeMetadata(frag.rs.get());
+      }
+    }
+  }
+
+  auto table_stats = buildTableStatsNoLock(table_id);
+  table_lock.unlock();
+  mapd_unique_lock<mapd_shared_mutex> table_write_lock(table.mutex);
+  if (table.table_stats.empty()) {
+    table.table_stats = table_stats;
+  }
+  return table_stats;
+}
+
+TableStats ResultSetRegistry::buildTableStatsNoLock(int table_id) const {
+  // This method is only called when all fragments have computed metadata
+  // and table is read-locked.
+  CHECK(tables_.count(table_id));
+  auto& table = *tables_.at(table_id);
+  TableStats table_stats;
+  {
+    auto& first_frag = table.fragments.front();
+    mapd_shared_lock<mapd_shared_mutex> frag_lock(*first_frag.mutex);
+    for (auto& pr : first_frag.meta) {
+      table_stats.emplace(pr.first, pr.second->chunkStats());
+    }
+  }
+  for (size_t frag_idx = 1; frag_idx < table.fragments.size(); ++frag_idx) {
+    mapd_shared_lock<mapd_shared_mutex> frag_lock(*table.fragments[frag_idx].mutex);
+    for (auto& pr : table.fragments[frag_idx].meta) {
+      mergeStats(table_stats.at(pr.first), pr.second->chunkStats(), pr.second->type());
+    }
+  }
+  return table_stats;
+}
+
 void ResultSetRegistry::fetchBuffer(const ChunkKey& key,
                                     Data_Namespace::AbstractBuffer* dest,
                                     const size_t num_bytes) {
@@ -378,6 +431,7 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
 
   TableFragmentsInfo res;
   res.setPhysicalNumTuples(table.row_count);
+  bool has_lazy_stats = false;
   for (size_t frag_idx = 0; frag_idx < table.fragments.size(); ++frag_idx) {
     auto& frag = table.fragments[frag_idx];
     auto& frag_info = res.fragments.emplace_back();
@@ -408,11 +462,32 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
                 stats = this->getChunkStats(table_id, frag_idx, col_idx);
               });
           frag_info.setChunkMetadata(columnId(col_idx), meta);
+          has_lazy_stats = true;
         }
       }
     } else {
       frag_info.setChunkMetadataMap(frag.meta);
     }
+  }
+
+  if (table.table_stats.empty()) {
+    if (has_lazy_stats) {
+      res.setTableStatsMaterializeFn(
+          [this, table_id](TableStats& stats) { stats = this->getTableStats(table_id); });
+    } else {
+      // We can get here if all stats were materialized in the loop above.
+      // In this case, build and assigne table stats.
+      TableStats table_stats = buildTableStatsNoLock(table_id);
+      res.setTableStats(table_stats);
+
+      table_lock.unlock();
+      mapd_unique_lock<mapd_shared_mutex> table_write_lock(table.mutex);
+      if (table.table_stats.empty()) {
+        table.table_stats = std::move(table_stats);
+      }
+    }
+  } else {
+    res.setTableStats(table.table_stats);
   }
 
   return res;

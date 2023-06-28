@@ -319,6 +319,7 @@ TableFragmentsInfo ArrowStorage::getTableMetadata(int db_id, int table_id) const
       frag_info.setChunkMetadata(columnId(col_idx), frag.metadata[col_idx]);
     }
   }
+  res.setTableStats(table.table_stats);
   return res;
 }
 
@@ -656,9 +657,15 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       (static_cast<size_t>(at->num_rows()) + table.fragment_size - 1 - first_frag_size) /
           table.fragment_size +
       1;
+  // Pre-allocate fragment infos and table stats for each column for the following
+  // parallel data import.
   fragments.resize(frag_count);
   for (auto& frag : fragments) {
     frag.metadata.resize(at->columns().size());
+  }
+  TableStats table_stats;
+  for (int col_idx = 0; col_idx < static_cast<int>(at->columns().size()); ++col_idx) {
+    table_stats.emplace(columnId(col_idx), ChunkStats{});
   }
 
   mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
@@ -785,7 +792,17 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                 frag.metadata[col_idx] = meta;
               }
             });  // each fragment
+
+        // Merge fragment stats to the table stats.
+        auto& column_stats = table_stats.at(col_info->column_id);
+        column_stats = fragments[0].metadata[col_idx]->chunkStats();
+        for (size_t frag_idx = 1; frag_idx < frag_count; ++frag_idx) {
+          mergeStats(column_stats,
+                     fragments[frag_idx].metadata[col_idx]->chunkStats(),
+                     col_type);
+        }
       } else {
+        bool has_nulls = false;
         for (size_t frag_idx = 0; frag_idx < frag_count; ++frag_idx) {
           auto& frag = fragments[frag_idx];
           frag.offset =
@@ -801,9 +818,15 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
               frag.row_count);
           meta->fillStringChunkStats(
               col_arr->Slice(frag.offset, frag.row_count)->null_count());
+          has_nulls = has_nulls || meta->chunkStats().has_nulls;
 
           frag.metadata[col_idx] = meta;
         }
+
+        auto& column_stats = table_stats.at(col_info->column_id);
+        column_stats.has_nulls = has_nulls;
+        column_stats.min.stringval = nullptr;
+        column_stats.max.stringval = nullptr;
       }
     }
   });  // each column
@@ -839,6 +862,13 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       start_frag = 1;
     }
 
+    // Merge table stats.
+    for (size_t col_idx = 0; col_idx < at->columns().size(); ++col_idx) {
+      auto col_id = columnId(col_idx);
+      auto col_type = getColumnInfo(db_id_, table_id, col_id)->type;
+      mergeStats(table.table_stats.at(col_id), table_stats.at(col_id), col_type);
+    }
+
     // Copy the rest of fragments adjusting offset.
     table.fragments.reserve(table.fragments.size() + fragments.size() - start_frag);
     for (size_t frag_idx = start_frag; frag_idx < fragments.size(); ++frag_idx) {
@@ -852,7 +882,9 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
     table.col_data = std::move(col_data);
     table.fragments = std::move(fragments);
     table.row_count = at->num_rows();
+    table.table_stats = std::move(table_stats);
   }
+  CHECK_EQ(table.table_stats.size(), at->columns().size());
 
   auto table_info = getTableInfo(db_id_, table_id);
   table_info->fragments = table.fragments.size();

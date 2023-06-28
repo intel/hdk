@@ -58,6 +58,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
 
  private:
   ChunkStats getChunkStats(int table_id, size_t frag_idx, size_t col_idx) const;
+  TableStats getTableStats(int table_id) const;
+  TableStats buildTableStatsNoLock(int table_id) const;
 
   struct DataFragment {
     size_t offset = 0;
@@ -74,6 +76,7 @@ class ResultSetRegistry : public SimpleSchemaProvider,
     size_t row_count;
     bool use_columnar_res;
     bool has_varlen_col;
+    TableStats table_stats;
   };
 
   const int db_id_;

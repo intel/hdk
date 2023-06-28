@@ -22,11 +22,7 @@ InputTableInfoCache::InputTableInfoCache(Executor* executor) : executor_(executo
 namespace {
 
 TableFragmentsInfo copy_table_info(const TableFragmentsInfo& table_info) {
-  TableFragmentsInfo table_info_copy;
-  table_info_copy.chunkKeyPrefix = table_info.chunkKeyPrefix;
-  table_info_copy.fragments = table_info.fragments;
-  table_info_copy.setPhysicalNumTuples(table_info.getPhysicalNumTuples());
-  return table_info_copy;
+  return table_info;
 }
 
 }  // namespace
