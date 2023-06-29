@@ -40,7 +40,7 @@ cdef class Calcite:
   def process(self, string sql, **kwargs):
     cdef string db_name = kwargs.get("db_name", "test-db")
     cdef vector[FilterPushDownInfo] filter_push_down_info = vector[FilterPushDownInfo]()
-    cdef bool legacy_syntax = kwargs.get("legacy_syntax", False)
+    cdef bool legacy_syntax = kwargs.get("legacy_syntax", True)
     cdef bool is_explain = kwargs.get("is_explain", False)
     cdef bool is_view_optimize = kwargs.get("is_view_optimize", False)
     return self.calcite.process(db_name, sql, self.schema_provider.get(), self.config.get(), filter_push_down_info, legacy_syntax, is_explain, is_view_optimize)
