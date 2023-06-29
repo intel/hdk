@@ -49,7 +49,7 @@ L0Driver::L0Driver(ze_driver_handle_t handle) : driver_(handle) {
 L0Driver::~L0Driver() {
   auto status = (zeContextDestroy(context_));
   if (status) {
-    std::cerr << "Non-zero status for context destructor" << std::endl;
+    LOG(ERROR) << "Non-zero status for context destructor";
   }
 }
 
@@ -116,7 +116,7 @@ L0CommandList::~L0CommandList() {
   // TODO: maybe return to pool
   auto status = zeCommandListDestroy(handle_);
   if (status) {
-    std::cerr << "Non-zero status for command list destructor" << std::endl;
+    LOG(ERROR) << "Non-zero status for command list destructor";
   }
 }
 
@@ -201,7 +201,7 @@ ze_command_queue_handle_t L0CommandQueue::handle() const {
 L0CommandQueue::~L0CommandQueue() {
   auto status = (zeCommandQueueDestroy(handle_));
   if (status) {
-    std::cerr << "Non-zero status for command queue destructor" << std::endl;
+    LOG(ERROR) << "Non-zero status for command queue destructor";
   }
 }
 
@@ -253,7 +253,7 @@ ze_module_handle_t L0Module::handle() const {
 L0Module::~L0Module() {
   auto status = zeModuleDestroy(handle_);
   if (status) {
-    std::cerr << "Non-zero status for command module destructor" << std::endl;
+    LOG(ERROR) << "Non-zero status for command module destructor";
   }
 }
 
@@ -305,7 +305,7 @@ std::string L0Kernel::desc() const {
 L0Kernel::~L0Kernel() {
   auto status = zeKernelDestroy(handle_);
   if (status) {
-    std::cerr << "Non-zero status for command kernel destructor" << std::endl;
+    LOG(ERROR) << "Non-zero status for command kernel destructor";
   }
 }
 
