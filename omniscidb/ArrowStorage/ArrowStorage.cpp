@@ -87,6 +87,7 @@ size_t columnIndex(int col_id) {
 void ArrowStorage::fetchBuffer(const ChunkKey& key,
                                Data_Namespace::AbstractBuffer* dest,
                                const size_t num_bytes) {
+  auto timer = DEBUG_TIMER("ArrowStorage Fetch Buffer");
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
   CHECK_EQ(key[CHUNK_KEY_DB_IDX], db_id_);
   CHECK_EQ(tables_.count(key[CHUNK_KEY_TABLE_IDX]), (size_t)1);
