@@ -145,6 +145,29 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.logicalNot()
     return res
 
+  def bw_and(self, value):
+    value = self._process_op_expr(value)
+    res = QueryExpr()
+    res.c_expr = self.c_expr.bwAnd((<QueryExpr>value).c_expr)
+    return res
+
+  def bw_or(self, value):
+    value = self._process_op_expr(value)
+    res = QueryExpr()
+    res.c_expr = self.c_expr.bwOr((<QueryExpr>value).c_expr)
+    return res
+
+  def bw_xor(self, value):
+    value = self._process_op_expr(value)
+    res = QueryExpr()
+    res.c_expr = self.c_expr.bwXor((<QueryExpr>value).c_expr)
+    return res
+
+  def bw_not(self):
+    res = QueryExpr()
+    res.c_expr = self.c_expr.bwNot()
+    return res
+
   def is_null(self):
     res = QueryExpr()
     res.c_expr = self.c_expr.isNull()

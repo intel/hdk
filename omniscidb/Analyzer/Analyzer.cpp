@@ -303,6 +303,14 @@ const hdk::ir::Type* analyze_type_info(hdk::ir::OpType op,
       }
     }
     result_type = common_type;
+  } else if (hdk::ir::isBitwise(op)) {
+    if (!left_type->isInteger() || !right_type->isInteger()) {
+      throw std::runtime_error("non-integer operands in bitwise operation.");
+    }
+    common_type = common_numeric_type(left_type, right_type);
+    *new_left_type = common_type->withNullable(left_type->nullable());
+    *new_right_type = common_type->withNullable(right_type->nullable());
+    result_type = common_type;
   } else {
     throw std::runtime_error("invalid binary operator type.");
   }
@@ -646,6 +654,9 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
       left_expr = left_expr->decompress();
       right_expr = right_expr->decompress();
     }
+  } else if (hdk::ir::isBitwise(optype)) {
+    left_expr = left_expr->cast(new_left_type);
+    right_expr = right_expr->cast(new_right_type);
   } else if (!hdk::ir::isComparison(optype)) {
     left_expr = left_expr->decompress();
     right_expr = right_expr->decompress();

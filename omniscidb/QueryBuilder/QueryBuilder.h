@@ -156,6 +156,20 @@ class BuilderExpr {
   BuilderExpr logicalAnd(const BuilderExpr& rhs) const;
   BuilderExpr logicalOr(const BuilderExpr& rhs) const;
 
+  BuilderExpr bwAnd(const BuilderExpr& rhs) const;
+  BuilderExpr bwAnd(int val) const;
+  BuilderExpr bwAnd(int64_t val) const;
+
+  BuilderExpr bwOr(const BuilderExpr& rhs) const;
+  BuilderExpr bwOr(int val) const;
+  BuilderExpr bwOr(int64_t val) const;
+
+  BuilderExpr bwXor(const BuilderExpr& rhs) const;
+  BuilderExpr bwXor(int val) const;
+  BuilderExpr bwXor(int64_t val) const;
+
+  BuilderExpr bwNot() const;
+
   BuilderExpr eq(const BuilderExpr& rhs) const;
   BuilderExpr eq(int val) const;
   BuilderExpr eq(int64_t val) const;

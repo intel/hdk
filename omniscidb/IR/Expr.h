@@ -293,6 +293,7 @@ class UOper : public Expr {
   OpType opType() const { return op_type_; }
 
   bool isNot() const { return op_type_ == OpType::kNot; }
+  bool isBwNot() const { return op_type_ == OpType::kBwNot; }
   bool isUMinus() const { return op_type_ == OpType::kUMinus; }
   bool isIsNull() const { return op_type_ == OpType::kIsNull; }
   bool isCast() const { return op_type_ == OpType::kCast; }
@@ -342,6 +343,9 @@ class BinOper : public Expr {
   bool isGe() const { return op_type_ == OpType::kGe; }
   bool isAnd() const { return op_type_ == OpType::kAnd; }
   bool isOr() const { return op_type_ == OpType::kOr; }
+  bool isBwAnd() const { return op_type_ == OpType::kBwAnd; }
+  bool isBwOr() const { return op_type_ == OpType::kBwOr; }
+  bool isBwXor() const { return op_type_ == OpType::kBwXor; }
   bool isMinus() const { return op_type_ == OpType::kMinus; }
   bool isPlus() const { return op_type_ == OpType::kPlus; }
   bool isMul() const { return op_type_ == OpType::kMul; }
@@ -353,6 +357,7 @@ class BinOper : public Expr {
   bool isComparison() const { return hdk::ir::isComparison(op_type_); }
   bool isLogic() const { return hdk::ir::isLogic(op_type_); }
   bool isArithmetic() const { return hdk::ir::isArithmetic(op_type_); }
+  bool isBitwise() const { return hdk::ir::isBitwise(op_type_); }
 
   Qualifier qualifier() const { return qualifier_; }
   const Expr* leftOperand() const { return left_operand_.get(); }

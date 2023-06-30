@@ -432,6 +432,37 @@ class QueryBuilderTest : public TestSuite {
         "1,1990-01-01 12:03:17,1990-01-01 12:03:17.123,1990-01-01 12:03:17.001002003\n"
         "2,1950-03-18 22:23:15,1950-03-18 22:23:15.456,1950-03-18 22:23:15.041052063\n"
         "3,NULL,NULL,NULL\n");
+
+    createTable("test_bitwise",
+                {{"col_i8_1", ctx().int8()},
+                 {"col_i8_2", ctx().int8()},
+                 {"col_i8nn_1", ctx().int8(false)},
+                 {"col_i8nn_2", ctx().int8(false)},
+                 {"col_i16_1", ctx().int16()},
+                 {"col_i16_2", ctx().int16()},
+                 {"col_i16nn_1", ctx().int16(false)},
+                 {"col_i16nn_2", ctx().int16(false)},
+                 {"col_i32_1", ctx().int32()},
+                 {"col_i32_2", ctx().int32()},
+                 {"col_i32nn_1", ctx().int32(false)},
+                 {"col_i32nn_2", ctx().int32(false)},
+                 {"col_i64_1", ctx().int64()},
+                 {"col_i64_2", ctx().int64()},
+                 {"col_i64nn_1", ctx().int64(false)},
+                 {"col_i64nn_2", ctx().int64(false)},
+                 {"col_f", ctx().fp32()},
+                 {"col_d", ctx().fp64()},
+                 {"col_dec", ctx().decimal64(10, 2)},
+                 {"col_b", ctx().boolean()},
+                 {"col_str", ctx().text()},
+                 {"col_dict", ctx().extDict(ctx().text(), 0)},
+                 {"col_date", ctx().date32(hdk::ir::TimeUnit::kDay)},
+                 {"col_time", ctx().time64(hdk::ir::TimeUnit::kSecond)}});
+    insertCsvValues("test_bitwise",
+                    "1,,1,4,1,,1,4,1,,1,4,1,,1,4,,,,,,,,\n"
+                    "2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,,,,,,,,\n"
+                    "3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,,,,,,,,\n"
+                    ",1,4,1,,1,4,1,,1,4,1,,1,4,1,,,,,,,,\n");
   }
 
   static void TearDownTestSuite() {
@@ -4783,6 +4814,386 @@ TEST_F(QueryBuilderTest, WindowCount) {
                       0,
                       1,
                       1);
+}
+
+TEST_F(QueryBuilderTest, BwAnd) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  checkBinOper(scan.ref("col_i8_1").bwAnd(scan.ref("col_i8_2")),
+               ctx().int8(),
+               OpType::kBwAnd,
+               scan.ref("col_i8_1"),
+               scan.ref("col_i8_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwAnd(scan.ref("col_i16nn_2")),
+               ctx().int16(false),
+               OpType::kBwAnd,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i16nn_2"));
+  checkBinOper(scan.ref("col_i32nn_1").bwAnd(scan.ref("col_i32_2")),
+               ctx().int32(),
+               OpType::kBwAnd,
+               scan.ref("col_i32nn_1"),
+               scan.ref("col_i32_2"));
+  checkBinOper(scan.ref("col_i64_1").bwAnd(scan.ref("col_i64nn_2")),
+               ctx().int64(),
+               OpType::kBwAnd,
+               scan.ref("col_i64_1"),
+               scan.ref("col_i64nn_2"));
+  checkBinOper(scan.ref("col_i8_1").bwAnd(scan.ref("col_i16_2")),
+               ctx().int16(),
+               OpType::kBwAnd,
+               scan.ref("col_i8_1").cast(ctx().int16()),
+               scan.ref("col_i16_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwAnd(scan.ref("col_i8nn_2")),
+               ctx().int16(false),
+               OpType::kBwAnd,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i8nn_2").cast(ctx().int16(false)));
+  checkBinOper(scan.ref("col_i32nn_1").bwAnd(scan.ref("col_i64_2")),
+               ctx().int64(),
+               OpType::kBwAnd,
+               scan.ref("col_i32nn_1").cast(ctx().int64(false)),
+               scan.ref("col_i64_2"));
+  checkBinOper(scan.ref("col_i32_1").bwAnd(scan.ref("col_i16nn_2")),
+               ctx().int32(),
+               OpType::kBwAnd,
+               scan.ref("col_i32_1"),
+               scan.ref("col_i16nn_2").cast(ctx().int32(false)));
+  checkBinOper(scan.ref("col_i16_1").bwAnd(1),
+               ctx().int32(),
+               OpType::kBwAnd,
+               scan.ref("col_i16_1").cast(ctx().int32()),
+               builder.cst(1, ctx().int32(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwAnd((int64_t)1),
+               ctx().int64(false),
+               OpType::kBwAnd,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwAnd(1),
+               ctx().int64(false),
+               OpType::kBwAnd,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_dec")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_f")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_d")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwAnd(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").bwAnd(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").bwAnd((int64_t)1), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, BwAnd_Exec) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  auto dag = scan.proj({scan.ref("col_i8_1").bwAnd(scan.ref("col_i8_2")),
+                        scan.ref("col_i16nn_1").bwAnd(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i32nn_1").bwAnd(scan.ref("col_i32_2")),
+                        scan.ref("col_i64_1").bwAnd(scan.ref("col_i64nn_2")),
+                        scan.ref("col_i8_1").bwAnd(scan.ref("col_i16_2")),
+                        scan.ref("col_i16nn_1").bwAnd(scan.ref("col_i8nn_2")),
+                        scan.ref("col_i32nn_1").bwAnd(scan.ref("col_i64_2")),
+                        scan.ref("col_i32_1").bwAnd(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i16_1").bwAnd(1),
+                        scan.ref("col_i64nn_1").bwAnd((int64_t)1)})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int8_t>(
+          {inline_null_value<int8_t>(), 2, 2, inline_null_value<int8_t>()}),
+      std::vector<int16_t>({0, 2, 2, 0}),
+      std::vector<int32_t>({inline_null_value<int32_t>(), 2, 2, 0}),
+      std::vector<int64_t>({0, 2, 2, inline_null_value<int64_t>()}),
+      std::vector<int16_t>(
+          {inline_null_value<int16_t>(), 2, 2, inline_null_value<int16_t>()}),
+      std::vector<int16_t>({0, 2, 2, 0}),
+      std::vector<int64_t>({inline_null_value<int64_t>(), 2, 2, 0}),
+      std::vector<int32_t>({0, 2, 2, inline_null_value<int32_t>()}),
+      std::vector<int32_t>({1, 0, 1, inline_null_value<int32_t>()}),
+      std::vector<int64_t>({1, 0, 1, 0}));
+}
+
+TEST_F(QueryBuilderTest, BwOr) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  checkBinOper(scan.ref("col_i8_1").bwOr(scan.ref("col_i8_2")),
+               ctx().int8(),
+               OpType::kBwOr,
+               scan.ref("col_i8_1"),
+               scan.ref("col_i8_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwOr(scan.ref("col_i16nn_2")),
+               ctx().int16(false),
+               OpType::kBwOr,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i16nn_2"));
+  checkBinOper(scan.ref("col_i32nn_1").bwOr(scan.ref("col_i32_2")),
+               ctx().int32(),
+               OpType::kBwOr,
+               scan.ref("col_i32nn_1"),
+               scan.ref("col_i32_2"));
+  checkBinOper(scan.ref("col_i64_1").bwOr(scan.ref("col_i64nn_2")),
+               ctx().int64(),
+               OpType::kBwOr,
+               scan.ref("col_i64_1"),
+               scan.ref("col_i64nn_2"));
+  checkBinOper(scan.ref("col_i8_1").bwOr(scan.ref("col_i16_2")),
+               ctx().int16(),
+               OpType::kBwOr,
+               scan.ref("col_i8_1").cast(ctx().int16()),
+               scan.ref("col_i16_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwOr(scan.ref("col_i8nn_2")),
+               ctx().int16(false),
+               OpType::kBwOr,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i8nn_2").cast(ctx().int16(false)));
+  checkBinOper(scan.ref("col_i32nn_1").bwOr(scan.ref("col_i64_2")),
+               ctx().int64(),
+               OpType::kBwOr,
+               scan.ref("col_i32nn_1").cast(ctx().int64(false)),
+               scan.ref("col_i64_2"));
+  checkBinOper(scan.ref("col_i32_1").bwOr(scan.ref("col_i16nn_2")),
+               ctx().int32(),
+               OpType::kBwOr,
+               scan.ref("col_i32_1"),
+               scan.ref("col_i16nn_2").cast(ctx().int32(false)));
+  checkBinOper(scan.ref("col_i16_1").bwOr(1),
+               ctx().int32(),
+               OpType::kBwOr,
+               scan.ref("col_i16_1").cast(ctx().int32()),
+               builder.cst(1, ctx().int32(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwOr((int64_t)1),
+               ctx().int64(false),
+               OpType::kBwOr,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwOr(1),
+               ctx().int64(false),
+               OpType::kBwOr,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_dec")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_f")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_d")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwOr(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").bwOr(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").bwOr((int64_t)1), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, BwOr_Exec) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  auto dag = scan.proj({scan.ref("col_i8_1").bwOr(scan.ref("col_i8_2")),
+                        scan.ref("col_i16nn_1").bwOr(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i32nn_1").bwOr(scan.ref("col_i32_2")),
+                        scan.ref("col_i64_1").bwOr(scan.ref("col_i64nn_2")),
+                        scan.ref("col_i8_1").bwOr(scan.ref("col_i16_2")),
+                        scan.ref("col_i16nn_1").bwOr(scan.ref("col_i8nn_2")),
+                        scan.ref("col_i32nn_1").bwOr(scan.ref("col_i64_2")),
+                        scan.ref("col_i32_1").bwOr(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i16_1").bwOr(1),
+                        scan.ref("col_i64nn_1").bwOr((int64_t)1)})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int8_t>(
+          {inline_null_value<int8_t>(), 3, 3, inline_null_value<int8_t>()}),
+      std::vector<int16_t>({5, 3, 3, 5}),
+      std::vector<int32_t>({inline_null_value<int32_t>(), 3, 3, 5}),
+      std::vector<int64_t>({5, 3, 3, inline_null_value<int64_t>()}),
+      std::vector<int16_t>(
+          {inline_null_value<int16_t>(), 3, 3, inline_null_value<int16_t>()}),
+      std::vector<int16_t>({5, 3, 3, 5}),
+      std::vector<int64_t>({inline_null_value<int64_t>(), 3, 3, 5}),
+      std::vector<int32_t>({5, 3, 3, inline_null_value<int32_t>()}),
+      std::vector<int32_t>({1, 3, 3, inline_null_value<int32_t>()}),
+      std::vector<int64_t>({1, 3, 3, 5}));
+}
+
+TEST_F(QueryBuilderTest, BwXor) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  checkBinOper(scan.ref("col_i8_1").bwXor(scan.ref("col_i8_2")),
+               ctx().int8(),
+               OpType::kBwXor,
+               scan.ref("col_i8_1"),
+               scan.ref("col_i8_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwXor(scan.ref("col_i16nn_2")),
+               ctx().int16(false),
+               OpType::kBwXor,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i16nn_2"));
+  checkBinOper(scan.ref("col_i32nn_1").bwXor(scan.ref("col_i32_2")),
+               ctx().int32(),
+               OpType::kBwXor,
+               scan.ref("col_i32nn_1"),
+               scan.ref("col_i32_2"));
+  checkBinOper(scan.ref("col_i64_1").bwXor(scan.ref("col_i64nn_2")),
+               ctx().int64(),
+               OpType::kBwXor,
+               scan.ref("col_i64_1"),
+               scan.ref("col_i64nn_2"));
+  checkBinOper(scan.ref("col_i8_1").bwXor(scan.ref("col_i16_2")),
+               ctx().int16(),
+               OpType::kBwXor,
+               scan.ref("col_i8_1").cast(ctx().int16()),
+               scan.ref("col_i16_2"));
+  checkBinOper(scan.ref("col_i16nn_1").bwXor(scan.ref("col_i8nn_2")),
+               ctx().int16(false),
+               OpType::kBwXor,
+               scan.ref("col_i16nn_1"),
+               scan.ref("col_i8nn_2").cast(ctx().int16(false)));
+  checkBinOper(scan.ref("col_i32nn_1").bwXor(scan.ref("col_i64_2")),
+               ctx().int64(),
+               OpType::kBwXor,
+               scan.ref("col_i32nn_1").cast(ctx().int64(false)),
+               scan.ref("col_i64_2"));
+  checkBinOper(scan.ref("col_i32_1").bwXor(scan.ref("col_i16nn_2")),
+               ctx().int32(),
+               OpType::kBwXor,
+               scan.ref("col_i32_1"),
+               scan.ref("col_i16nn_2").cast(ctx().int32(false)));
+  checkBinOper(scan.ref("col_i16_1").bwXor(1),
+               ctx().int32(),
+               OpType::kBwXor,
+               scan.ref("col_i16_1").cast(ctx().int32()),
+               builder.cst(1, ctx().int32(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwXor((int64_t)1),
+               ctx().int64(false),
+               OpType::kBwXor,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  checkBinOper(scan.ref("col_i64nn_1").bwXor(1),
+               ctx().int64(false),
+               OpType::kBwXor,
+               scan.ref("col_i64nn_1"),
+               builder.cst(1, ctx().int64(false)));
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_b")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_dec")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_f")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_d")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_str")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_dict")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_date")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_i32_1").bwXor(scan.ref("col_time")), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").bwXor(1), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").bwXor((int64_t)1), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, BwXor_Exec) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  auto dag = scan.proj({scan.ref("col_i8_1").bwXor(scan.ref("col_i8_2")),
+                        scan.ref("col_i16nn_1").bwXor(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i32nn_1").bwXor(scan.ref("col_i32_2")),
+                        scan.ref("col_i64_1").bwXor(scan.ref("col_i64nn_2")),
+                        scan.ref("col_i8_1").bwXor(scan.ref("col_i16_2")),
+                        scan.ref("col_i16nn_1").bwXor(scan.ref("col_i8nn_2")),
+                        scan.ref("col_i32nn_1").bwXor(scan.ref("col_i64_2")),
+                        scan.ref("col_i32_1").bwXor(scan.ref("col_i16nn_2")),
+                        scan.ref("col_i16_1").bwXor(1),
+                        scan.ref("col_i64nn_1").bwXor((int64_t)1)})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int8_t>(
+          {inline_null_value<int8_t>(), 1, 1, inline_null_value<int8_t>()}),
+      std::vector<int16_t>({5, 1, 1, 5}),
+      std::vector<int32_t>({inline_null_value<int32_t>(), 1, 1, 5}),
+      std::vector<int64_t>({5, 1, 1, inline_null_value<int64_t>()}),
+      std::vector<int16_t>(
+          {inline_null_value<int16_t>(), 1, 1, inline_null_value<int16_t>()}),
+      std::vector<int16_t>({5, 1, 1, 5}),
+      std::vector<int64_t>({inline_null_value<int64_t>(), 1, 1, 5}),
+      std::vector<int32_t>({5, 1, 1, inline_null_value<int32_t>()}),
+      std::vector<int32_t>({0, 3, 2, inline_null_value<int32_t>()}),
+      std::vector<int64_t>({0, 3, 2, 5}));
+}
+
+TEST_F(QueryBuilderTest, BwNot) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  checkUOper(
+      scan.ref("col_i8_1").bwNot(), ctx().int8(), OpType::kBwNot, scan.ref("col_i8_1"));
+  checkUOper(scan.ref("col_i8nn_1").bwNot(),
+             ctx().int8(false),
+             OpType::kBwNot,
+             scan.ref("col_i8nn_1"));
+  checkUOper(scan.ref("col_i16_1").bwNot(),
+             ctx().int16(),
+             OpType::kBwNot,
+             scan.ref("col_i16_1"));
+  checkUOper(scan.ref("col_i16nn_1").bwNot(),
+             ctx().int16(false),
+             OpType::kBwNot,
+             scan.ref("col_i16nn_1"));
+  checkUOper(scan.ref("col_i32_1").bwNot(),
+             ctx().int32(),
+             OpType::kBwNot,
+             scan.ref("col_i32_1"));
+  checkUOper(scan.ref("col_i32nn_1").bwNot(),
+             ctx().int32(false),
+             OpType::kBwNot,
+             scan.ref("col_i32nn_1"));
+  checkUOper(scan.ref("col_i64_1").bwNot(),
+             ctx().int64(),
+             OpType::kBwNot,
+             scan.ref("col_i64_1"));
+  checkUOper(scan.ref("col_i64nn_1").bwNot(),
+             ctx().int64(false),
+             OpType::kBwNot,
+             scan.ref("col_i64nn_1"));
+  checkUOper(scan.ref("col_i64nn_1").bwNot(),
+             ctx().int64(false),
+             OpType::kBwNot,
+             scan.ref("col_i64nn_1"));
+  checkCst(
+      builder.cst(8, ctx().int32(false)).bwNot(), (int)0xfffffff7, ctx().int32(false));
+  checkCst(builder.cst(8, ctx().int64(false)).bwNot(),
+           (int64_t)0xfffffffffffffff7LL,
+           ctx().int64(false));
+  EXPECT_THROW(scan.ref("col_dec").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_b").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_f").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_d").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_str").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_dict").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_date").bwNot(), InvalidQueryError);
+  EXPECT_THROW(scan.ref("col_time").bwNot(), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, BwNot_Exec) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_bitwise");
+  auto dag = scan.proj({scan.ref("col_i8_1").bwNot(),
+                        scan.ref("col_i16nn_1").bwNot(),
+                        scan.ref("col_i32nn_1").bwNot(),
+                        scan.ref("col_i64_1").bwNot()})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int8_t>(
+          {(int8_t)0xfe, (int8_t)0xfd, (int8_t)0xfc, inline_null_value<int8_t>()}),
+      std::vector<int16_t>(
+          {(int16_t)0xfffe, (int16_t)0xfffd, (int16_t)0xfffc, (int16_t)0xfffb}),
+      std::vector<int32_t>({(int32_t)0xfffffffe,
+                            (int32_t)0xfffffffd,
+                            (int32_t)0xfffffffc,
+                            (int32_t)0xfffffffb}),
+      std::vector<int64_t>({(int64_t)0xfffffffffffffffeLL,
+                            (int64_t)0xfffffffffffffffdLL,
+                            (int64_t)0xfffffffffffffffcLL,
+                            inline_null_value<int64_t>()}));
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

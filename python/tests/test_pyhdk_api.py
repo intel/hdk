@@ -1122,6 +1122,25 @@ class TestBuilder(BaseTest):
         ).run()
         check_res(res, {"a_last_value": [1, 2, 3, 4, 5]})
 
+    def test_bitwise(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 2, 3, 4], "b": [4, 3, 2, 1]})
+        res = ht.proj(
+            r1=ht.ref("a").bw_and(ht.ref("b")),
+            r2=ht.ref("a").bw_or(ht.ref("b")),
+            r3=ht.ref("a").bw_xor(ht.ref("b")),
+            r4=ht.ref("a").bw_not(),
+        ).run()
+        check_res(
+            res,
+            {
+                "r1": [0, 2, 2, 0],
+                "r2": [5, 3, 3, 5],
+                "r3": [5, 1, 1, 5],
+                "r4": [-2, -3, -4, -5],
+            },
+        )
+
 
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):

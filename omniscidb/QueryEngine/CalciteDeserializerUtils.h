@@ -74,6 +74,18 @@ inline hdk::ir::OpType to_sql_op(const std::string& op_str) {
   if (op_str == std::string("NOT")) {
     return hdk::ir::OpType::kNot;
   }
+  if (op_str == std::string("BW_AND") || op_str == std::string("BIT_AND")) {
+    return hdk::ir::OpType::kBwAnd;
+  }
+  if (op_str == std::string("BW_OR") || op_str == std::string("BIT_OR")) {
+    return hdk::ir::OpType::kBwOr;
+  }
+  if (op_str == std::string("BW_XOR") || op_str == std::string("BIT_XOR")) {
+    return hdk::ir::OpType::kBwXor;
+  }
+  if (op_str == std::string("BW_NOT") || op_str == std::string("BIT_NOT")) {
+    return hdk::ir::OpType::kBwNot;
+  }
   if (op_str == std::string("IS NULL")) {
     return hdk::ir::OpType::kIsNull;
   }

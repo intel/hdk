@@ -157,6 +157,9 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::BinOper* bin_oper,
   if (bin_oper->isArithmetic()) {
     return codegenArith(bin_oper, co);
   }
+  if (bin_oper->isBitwise()) {
+    return codegenBitwise(bin_oper, co);
+  }
   if (bin_oper->isComparison()) {
     return codegenCmp(bin_oper, co);
   }
@@ -188,6 +191,8 @@ llvm::Value* CodeGenerator::codegen(const hdk::ir::UOper* u_oper,
     }
     case hdk::ir::OpType::kUnnest:
       return codegenUnnest(u_oper, co);
+    case hdk::ir::OpType::kBwNot:
+      return codegenBitwise(u_oper, co);
     default:
       UNREACHABLE();
   }
