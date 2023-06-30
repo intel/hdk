@@ -993,6 +993,121 @@ class QueryExprAPI:
         """
         pass
 
+    def bw_and(self, value):
+        """
+        Create bitwise AND expression.
+
+        Parameters
+        ----------
+        value : QueryExpr or int
+            Right-hand operand for the binary operation.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [1, 2, 3, 4], "y": [4, 3, 2, 1]}
+        ... )
+        >>> ht.proj(ht["x"].bw_and(ht["y"])).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        0
+        2
+        2
+        0
+        """
+        pass
+
+    def bw_or(self, value):
+        """
+        Create bitwise OR expression.
+
+        Parameters
+        ----------
+        value : QueryExpr or int
+            Right-hand operand for the binary operation.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [1, 2, 3, 4], "y": [4, 3, 2, 1]}
+        ... )
+        >>> ht.proj(ht["x"].bw_or(ht["y"])).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        5
+        3
+        3
+        5
+        """
+        pass
+
+    def bw_xor(self, value):
+        """
+        Create bitwise XOR expression.
+
+        Parameters
+        ----------
+        value : QueryExpr or int
+            Right-hand operand for the binary operation.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [1, 2, 3, 4], "y": [4, 3, 2, 1]}
+        ... )
+        >>> ht.proj(ht["x"].bw_xor(ht["y"])).run()
+        Schema:
+          expr_1: INT64
+        Data:
+        5
+        1
+        1
+        5
+        """
+        pass
+
+    def bw_not(self):
+        """
+        Create bitwise NOT expression.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict(
+        ...     {"x": [1, 2, 3, 4]}
+        ... )
+        >>> ht.proj(ht["x"].bw_not().run()
+        Schema:
+          expr_1: INT64
+        Data:
+        -2
+        -3
+        -4
+        -5
+        """
+        pass
+
     def eq(self, value):
         """
         Create EQUAL comparison expression.

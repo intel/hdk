@@ -75,6 +75,11 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr logicalAnd(const CBuilderExpr&) except +
     CBuilderExpr logicalOr(const CBuilderExpr&) except +
 
+    CBuilderExpr bwAnd(const CBuilderExpr&) except +
+    CBuilderExpr bwOr(const CBuilderExpr&) except +
+    CBuilderExpr bwXor(const CBuilderExpr&) except +
+    CBuilderExpr bwNot() except +
+
     CBuilderExpr eq(const CBuilderExpr&) except +
     CBuilderExpr ne(const CBuilderExpr&) except +
     CBuilderExpr lt(const CBuilderExpr&) except +

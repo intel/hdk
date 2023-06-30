@@ -44,6 +44,15 @@
 
 // arithmetic operator implementations
 
+#define DEF_UNARY_NULLABLE(type, null_type, opname, opsym)                 \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE type opname##_##type##_nullable( \
+      const type op, const null_type null_val) {                           \
+    if (op != null_val) {                                                  \
+      return opsym op;                                                     \
+    }                                                                      \
+    return null_val;                                                       \
+  }
+
 #define DEF_ARITH_NULLABLE(type, null_type, opname, opsym)                 \
   extern "C" RUNTIME_EXPORT ALWAYS_INLINE type opname##_##type##_nullable( \
       const type lhs, const type rhs, const null_type null_val) {          \
@@ -186,6 +195,23 @@ DEF_ARITH_NULLABLE_RHS(int32_t, int64_t, mod, %)
 DEF_ARITH_NULLABLE_RHS(int64_t, int64_t, mod, %)
 DEF_SAFE_INF_DIV_NULLABLE(float, float, safe_inf_div)
 DEF_SAFE_INF_DIV_NULLABLE(double, double, safe_inf_div)
+
+#define DEF_ALL_NULLABLE_BW_OPS(type, null_type)     \
+  DEF_ARITH_NULLABLE(type, null_type, bw_and, &)     \
+  DEF_ARITH_NULLABLE_LHS(type, null_type, bw_and, &) \
+  DEF_ARITH_NULLABLE_RHS(type, null_type, bw_and, &) \
+  DEF_ARITH_NULLABLE(type, null_type, bw_or, |)      \
+  DEF_ARITH_NULLABLE_LHS(type, null_type, bw_or, |)  \
+  DEF_ARITH_NULLABLE_RHS(type, null_type, bw_or, |)  \
+  DEF_ARITH_NULLABLE(type, null_type, bw_xor, ^)     \
+  DEF_ARITH_NULLABLE_LHS(type, null_type, bw_xor, ^) \
+  DEF_ARITH_NULLABLE_RHS(type, null_type, bw_xor, ^) \
+  DEF_UNARY_NULLABLE(type, null_type, bw_not, ~)
+
+DEF_ALL_NULLABLE_BW_OPS(int8_t, int64_t)
+DEF_ALL_NULLABLE_BW_OPS(int16_t, int64_t)
+DEF_ALL_NULLABLE_BW_OPS(int32_t, int64_t)
+DEF_ALL_NULLABLE_BW_OPS(int64_t, int64_t)
 
 #undef DEF_BINARY_NULLABLE_ALL_OPS
 #undef DEF_SAFE_DIV_NULLABLE

@@ -68,6 +68,70 @@ llvm::Value* CodeGenerator::codegenArith(const hdk::ir::BinOper* bin_oper,
   return nullptr;
 }
 
+llvm::Value* CodeGenerator::codegenBitwise(const hdk::ir::UOper* uoper,
+                                           const CompilationOptions& co) {
+  CHECK(uoper->opType() == hdk::ir::OpType::kBwNot);
+  auto op = uoper->operand();
+  auto op_type = op->type();
+  CHECK(op_type->isInteger());
+  auto op_lv = codegen(op, true, co).front();
+  const auto int_typename = numeric_or_time_interval_type_name(op->type(), op_type);
+  const auto null_check_suffix = get_null_check_suffix(op->type(), op_type);
+  if (null_check_suffix.empty()) {
+    return cgen_state_->ir_builder_.CreateNot(op_lv);
+  } else {
+    return cgen_state_->emitCall(
+        "bw_not_" + int_typename + null_check_suffix,
+        {op_lv, cgen_state_->llInt(inline_int_null_value(op_type))});
+  }
+}
+
+llvm::Value* CodeGenerator::codegenBitwise(const hdk::ir::BinOper* bin_oper,
+                                           const CompilationOptions& co) {
+  const auto lhs = bin_oper->leftOperand();
+  const auto rhs = bin_oper->rightOperand();
+  const auto& lhs_type = lhs->type();
+  const auto& rhs_type = rhs->type();
+  CHECK(lhs_type->isInteger());
+  CHECK(rhs_type->isInteger());
+  CHECK_EQ(lhs_type->size(), rhs_type->size());
+  auto lhs_lv = codegen(lhs, true, co).front();
+  auto rhs_lv = codegen(rhs, true, co).front();
+  const auto int_typename = numeric_or_time_interval_type_name(lhs_type, rhs_type);
+  const auto null_check_suffix = get_null_check_suffix(lhs_type, rhs_type);
+
+  if (null_check_suffix.empty()) {
+    switch (bin_oper->opType()) {
+      case hdk::ir::OpType::kBwAnd:
+        return cgen_state_->ir_builder_.CreateAnd(lhs_lv, rhs_lv);
+      case hdk::ir::OpType::kBwOr:
+        return cgen_state_->ir_builder_.CreateOr(lhs_lv, rhs_lv);
+      case hdk::ir::OpType::kBwXor:
+        return cgen_state_->ir_builder_.CreateXor(lhs_lv, rhs_lv);
+      default:
+        CHECK(false);
+    }
+  }
+
+  std::string fn_name;
+  switch (bin_oper->opType()) {
+    case hdk::ir::OpType::kBwAnd:
+      fn_name = "bw_and_";
+      break;
+    case hdk::ir::OpType::kBwOr:
+      fn_name = "bw_or_";
+      break;
+    case hdk::ir::OpType::kBwXor:
+      fn_name = "bw_xor_";
+      break;
+    default:
+      CHECK(false);
+  }
+  return cgen_state_->emitCall(
+      fn_name + int_typename + null_check_suffix,
+      {lhs_lv, rhs_lv, cgen_state_->llInt(inline_int_null_value(lhs_type))});
+}
+
 // Handle integer or integer-like (decimal, time, date) operand types.
 llvm::Value* CodeGenerator::codegenIntArith(const hdk::ir::BinOper* bin_oper,
                                             llvm::Value* lhs_lv,

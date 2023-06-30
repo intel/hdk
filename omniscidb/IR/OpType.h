@@ -24,6 +24,10 @@ enum class OpType {
   kAnd,
   kOr,
   kNot,
+  kBwAnd,
+  kBwOr,
+  kBwXor,
+  kBwNot,
   kMinus,
   kPlus,
   kMul,
@@ -60,10 +64,15 @@ inline OpType commuteComparison(OpType op) {
 }
 inline bool isUnary(OpType op) {
   return op == OpType::kNot || op == OpType::kUMinus || op == OpType::kIsNull ||
-         op == OpType::kCast;
+         op == OpType::kCast || op == OpType::kBwNot;
 }
 inline bool isEquivalence(OpType op) {
   return op == OpType::kEq || op == OpType::kBwEq;
+}
+
+inline bool isBitwise(OpType op) {
+  return op == OpType::kBwAnd || op == OpType::kBwOr || op == OpType::kBwXor ||
+         op == OpType::kBwNot;
 }
 
 enum class Qualifier { kOne, kAny, kAll };
@@ -126,6 +135,14 @@ inline std::string toString(hdk::ir::OpType op) {
       return "OR";
     case hdk::ir::OpType::kNot:
       return "NOT";
+    case hdk::ir::OpType::kBwAnd:
+      return "BW_AND";
+    case hdk::ir::OpType::kBwOr:
+      return "BW_OR";
+    case hdk::ir::OpType::kBwXor:
+      return "BW_XOR";
+    case hdk::ir::OpType::kBwNot:
+      return "BW_NOT";
     case hdk::ir::OpType::kMinus:
       return "MINUS";
     case hdk::ir::OpType::kPlus:

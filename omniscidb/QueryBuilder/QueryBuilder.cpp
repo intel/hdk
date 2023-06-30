@@ -1290,6 +1290,84 @@ BuilderExpr BuilderExpr::logicalOr(const BuilderExpr& rhs) const {
   }
 }
 
+BuilderExpr BuilderExpr::bwAnd(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kBwAnd, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply BW_AND operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::bwAnd(int val) const {
+  return bwAnd(builder_->cst(val, builder_->ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::bwAnd(int64_t val) const {
+  return bwAnd(builder_->cst(val, builder_->ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::bwOr(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kBwOr, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply BW_OR operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::bwOr(int val) const {
+  return bwOr(builder_->cst(val, builder_->ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::bwOr(int64_t val) const {
+  return bwOr(builder_->cst(val, builder_->ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::bwXor(const BuilderExpr& rhs) const {
+  try {
+    auto bin_oper = Analyzer::normalizeOperExpr(
+        OpType::kBwXor, Qualifier::kOne, expr_, rhs.expr(), nullptr);
+    return {builder_, bin_oper, "", true};
+  } catch (std::runtime_error& e) {
+    throw InvalidQueryError() << "Cannot apply BW_XOR operation for operand types "
+                              << expr_->type()->toString() << " and "
+                              << rhs.expr()->type()->toString();
+  }
+}
+
+BuilderExpr BuilderExpr::bwXor(int val) const {
+  return bwXor(builder_->cst(val, builder_->ctx_.int32(false)));
+}
+
+BuilderExpr BuilderExpr::bwXor(int64_t val) const {
+  return bwXor(builder_->cst(val, builder_->ctx_.int64(false)));
+}
+
+BuilderExpr BuilderExpr::bwNot() const {
+  if (!expr_->type()->isInteger()) {
+    throw InvalidQueryError("Only integer expressions are allowed for BW_NOT operation.");
+  }
+
+  if (expr_->is<Constant>()) {
+    auto cst_expr = expr_->as<Constant>();
+    if (cst_expr->isNull()) {
+      return *this;
+    }
+    return builder_->cst(~cst_expr->intVal(), cst_expr->type());
+  }
+
+  auto uoper =
+      makeExpr<UOper>(expr_->type(), expr_->containsAgg(), OpType::kBwNot, expr_);
+  return {builder_, uoper, "", true};
+}
+
 BuilderExpr BuilderExpr::eq(const BuilderExpr& rhs) const {
   try {
     auto bin_oper = Analyzer::normalizeOperExpr(

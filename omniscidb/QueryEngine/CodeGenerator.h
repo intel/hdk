@@ -127,6 +127,9 @@ class CodeGenerator {
 
   llvm::Value* codegenArith(const hdk::ir::BinOper*, const CompilationOptions&);
 
+  llvm::Value* codegenBitwise(const hdk::ir::UOper*, const CompilationOptions&);
+  llvm::Value* codegenBitwise(const hdk::ir::BinOper*, const CompilationOptions&);
+
   llvm::Value* codegenUMinus(const hdk::ir::UOper*, const CompilationOptions&);
 
   llvm::Value* codegenCmp(const hdk::ir::BinOper*, const CompilationOptions&);
