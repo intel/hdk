@@ -14,23 +14,11 @@
 #include "QueryEngine/ExpressionRewrite.h"
 #include "QueryEngine/FromTableReordering.h"
 #include "QueryEngine/QueryPlanDagExtractor.h"
+#include "Visitors/UsedInputsCollector.h"
 
 namespace hdk {
 
 namespace {
-
-struct ColumnVarHash {
-  size_t operator()(const ir::ColumnVar& col_var) const { return col_var.hash(); }
-};
-
-using ColumnVarSet = std::unordered_set<ir::ColumnVar, ColumnVarHash>;
-
-class UsedInputsCollector : public ir::ExprCollector<ColumnVarSet, UsedInputsCollector> {
- protected:
-  void visitColumnRef(const ir::ColumnRef* col_ref) override { CHECK(false); }
-
-  void visitColumnVar(const ir::ColumnVar* col_var) override { result_.insert(*col_var); }
-};
 
 class StringGuardForL0 : public ir::ExprVisitor<void> {
  public:
@@ -338,7 +326,7 @@ RelAlgExecutionUnit WorkUnitBuilder::exeUnit() const {
     target_exprs.push_back(expr.get());
   }
   return {input_descs_,
-          input_col_descs_,
+          schema_provider_.get(),
           simple_quals_,
           quals_,
           join_quals_,
@@ -375,7 +363,7 @@ void WorkUnitBuilder::build() {
     reorderTables();
   }
   computeSimpleQuals();
-  computeInputColDescs();
+  verifyInputColDescs();
 }
 
 void WorkUnitBuilder::process(const ir::Node* node) {
@@ -882,16 +870,22 @@ void WorkUnitBuilder::computeInputDescs() {
             });
 }
 
-void WorkUnitBuilder::computeInputColDescs() {
+void WorkUnitBuilder::verifyInputColDescs() {
+  bool is_l0 = co_.device_type == ExecutorDeviceType::GPU && executor_ &&
+               executor_->getDataMgr()->getGpuMgr() &&
+               executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0;
+
+  if (!is_l0) {
+    return;
+  }
+
   // Scan all currently used expressions to determine used columns.
   UsedInputsCollector collector;
   for (auto& expr : simple_quals_) {
     collector.visit(expr.get());
   }
   for (auto& expr : quals_) {
-    if (expr->as<hdk::ir::BinOper>() && co_.device_type == ExecutorDeviceType::GPU &&
-        executor_ && executor_->getDataMgr()->getGpuMgr() &&
-        executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+    if (expr->as<hdk::ir::BinOper>()) {
       StringDictTransGuardForL0 strDictTransGuard;
       strDictTransGuard.visit(expr.get());
       if (strDictTransGuard.isStrDictTranslation()) {
@@ -911,61 +905,12 @@ void WorkUnitBuilder::computeInputColDescs() {
     }
   }
 
-  if (co_.device_type == ExecutorDeviceType::GPU && executor_ &&
-      executor_->getDataMgr()->getGpuMgr() &&
-      executor_->getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
-    ColumnVarSet non_targets_touch = collector.result();
-    for (const auto& col_var : non_targets_touch) {
-      if (col_var.columnInfo()->type->isString()) {
-        throw QueryMustRunOnCpu();
-      }
+  auto non_targets_touch = collector.result();
+  for (const auto& col_var : non_targets_touch) {
+    if (col_var.columnInfo()->type->isString()) {
+      throw QueryMustRunOnCpu();
     }
   }
-
-  for (auto& expr : target_exprs_[0]) {
-    collector.visit(expr.get());
-  }
-
-  if (partition_offsets_col_) {
-    collector.visit(partition_offsets_col_.get());
-  }
-
-  std::vector<std::shared_ptr<const InputColDescriptor>> col_descs;
-  for (auto& col_var : collector.result()) {
-    col_descs.push_back(std::make_shared<const InputColDescriptor>(col_var.columnInfo(),
-                                                                   col_var.rteIdx()));
-  }
-
-  // For UNION we only have column variables for a single table used
-  // in target expressions but should mark all columns as used.
-  if (union_all_ && !col_descs.empty()) {
-    CHECK_EQ(col_descs.front()->getNestLevel(), 0);
-    CHECK_EQ(input_descs_.size(), (size_t)2);
-    TableRef processed_table_ref(col_descs.front()->getDatabaseId(),
-                                 col_descs.front()->getTableId());
-    for (auto tdesc : input_descs_) {
-      if (tdesc.getTableRef() != processed_table_ref) {
-        auto columns = schema_provider_->listColumns(tdesc.getTableRef());
-        for (auto& col_info : columns) {
-          if (!col_info->is_rowid) {
-            col_descs.push_back(std::make_shared<InputColDescriptor>(col_info, 0));
-          }
-        }
-      }
-    }
-  }
-
-  std::sort(
-      col_descs.begin(),
-      col_descs.end(),
-      [](std::shared_ptr<const InputColDescriptor> const& lhs,
-         std::shared_ptr<const InputColDescriptor> const& rhs) {
-        return std::make_tuple(lhs->getNestLevel(), lhs->getColId(), lhs->getTableId()) <
-               std::make_tuple(rhs->getNestLevel(), rhs->getColId(), rhs->getTableId());
-      });
-
-  input_col_descs_.clear();
-  input_col_descs_.insert(input_col_descs_.end(), col_descs.begin(), col_descs.end());
 }
 
 }  // namespace hdk

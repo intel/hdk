@@ -71,7 +71,7 @@ class WorkUnitBuilder {
   int assignNestLevels(const ir::Node* node, int start_idx = 0);
   void computeJoinTypes(const ir::Node* node, bool allow_join = true);
   void computeInputDescs();
-  void computeInputColDescs();
+  void verifyInputColDescs();
 
   class InputRewriter : public ir::ExprRewriter {
    public:
@@ -122,7 +122,6 @@ class WorkUnitBuilder {
   bool is_agg_ = false;
 
   std::vector<InputDescriptor> input_descs_;
-  std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs_;
   std::list<hdk::ir::ExprPtr> simple_quals_;
   std::list<hdk::ir::ExprPtr> quals_;
   JoinQualsPerNestingLevel join_quals_;
