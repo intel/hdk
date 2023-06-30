@@ -473,20 +473,6 @@ void RelAlgExecutor::handleNop(RaExecutionDesc& ed) {
 
 namespace {
 
-struct ColumnRefHash {
-  size_t operator()(const hdk::ir::ColumnRef& col_ref) const { return col_ref.hash(); }
-};
-
-using ColumnRefSet = std::unordered_set<hdk::ir::ColumnRef, ColumnRefHash>;
-
-class UsedInputsCollector
-    : public hdk::ir::ExprCollector<ColumnRefSet, UsedInputsCollector> {
- protected:
-  void visitColumnRef(const hdk::ir::ColumnRef* col_ref) override {
-    result_.insert(*col_ref);
-  }
-};
-
 const hdk::ir::Node* get_data_sink(const hdk::ir::Node* ra_node) {
   if (auto join = dynamic_cast<const hdk::ir::Join*>(ra_node)) {
     CHECK_EQ(size_t(2), join->inputCount());
@@ -1526,8 +1512,8 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
     count_all_agg = builder.count();
   }
 
-  const auto count_all_exe_unit =
-      create_count_all_execution_unit(work_unit.exe_unit, count_all_agg.expr());
+  const auto count_all_exe_unit = create_count_all_execution_unit(
+      work_unit.exe_unit, schema_provider_.get(), count_all_agg.expr());
   size_t one{1};
   hdk::ResultSetTable count_all_result;
   try {

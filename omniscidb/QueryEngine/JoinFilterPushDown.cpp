@@ -18,21 +18,13 @@
 #include "IR/ExprCollector.h"
 #include "IR/ExprRewriter.h"
 #include "RelAlgExecutor.h"
+#include "Visitors/UsedInputsCollector.h"
 
 namespace {
 
 class BindFilterToOutermostVisitor : public hdk::ir::ExprRewriter {
   hdk::ir::ExprPtr visitColumnVar(const hdk::ir::ColumnVar* col_var) override {
     return hdk::ir::makeExpr<hdk::ir::ColumnVar>(col_var->columnInfo(), 0);
-  }
-};
-
-class InputColumnsCollector
-    : public hdk::ir::ExprCollector<std::unordered_set<InputColDescriptor>,
-                                    InputColumnsCollector> {
- protected:
-  void visitColumnVar(const hdk::ir::ColumnVar* col_var) override {
-    result_.insert(InputColDescriptor(col_var->columnInfo(), 0));
   }
 };
 
@@ -49,7 +41,7 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
     const std::vector<hdk::ir::ExprPtr>& filter_expressions,
     const CompilationOptions& co,
     const ExecutionOptions& eo) {
-  InputColumnsCollector input_columns_collector;
+  UsedInputsCollector input_columns_collector;
   std::list<hdk::ir::ExprPtr> quals;
   BindFilterToOutermostVisitor bind_filter_to_outermost;
   for (const auto& filter_expr : filter_expressions) {
@@ -59,7 +51,8 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
   auto& input_column_descriptors = input_columns_collector.result();
   std::vector<InputDescriptor> input_descs;
   std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
-  for (const auto& input_col_desc : input_column_descriptors) {
+  for (const auto& input_col_var : input_column_descriptors) {
+    auto input_col_desc = InputColDescriptor(input_col_var.columnInfo(), 0);
     if (input_descs.empty()) {
       input_descs.push_back(input_col_desc.getScanDesc());
     } else {

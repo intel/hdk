@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Intel Corporation
  * Copyright 2017 MapD Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,8 +24,7 @@
  * Copyright (c) 2016 MapD Technologies, Inc.  All rights reserved.
  **/
 
-#ifndef QUERYENGINE_RELALGEXECUTIONUNIT_H
-#define QUERYENGINE_RELALGEXECUTIONUNIT_H
+#pragma once
 
 #include "CostModel/CostModel.h"
 #include "Descriptors/InputDescriptors.h"
@@ -64,14 +64,15 @@ using QueryPlanHash = size_t;
 // used to detect a correct cached hashtable
 struct HashTableBuildDag {
  public:
-  HashTableBuildDag(const JoinColumnsInfo& in_inner_cols_info,
-                    const JoinColumnsInfo& in_outer_cols_info,
-                    const QueryPlan& in_inner_cols_access_path,
-                    const QueryPlan& in_outer_cols_access_path)
+  explicit HashTableBuildDag(const JoinColumnsInfo& in_inner_cols_info,
+                             const JoinColumnsInfo& in_outer_cols_info,
+                             const QueryPlan& in_inner_cols_access_path,
+                             const QueryPlan& in_outer_cols_access_path)
       : inner_cols_info(in_inner_cols_info)
       , outer_cols_info(in_outer_cols_info)
       , inner_cols_access_path(in_inner_cols_access_path)
       , outer_cols_access_path(in_outer_cols_access_path) {}
+
   JoinColumnsInfo inner_cols_info;
   JoinColumnsInfo outer_cols_info;
   QueryPlan inner_cols_access_path;
@@ -127,7 +128,88 @@ struct JoinCondition {
 
 using JoinQualsPerNestingLevel = std::vector<JoinCondition>;
 
-struct RelAlgExecutionUnit {
+class RelAlgExecutionUnit {
+ public:
+  RelAlgExecutionUnit(
+      std::vector<InputDescriptor> input_descs,
+      std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs,
+      std::list<hdk::ir::ExprPtr> simple_quals,
+      std::list<hdk::ir::ExprPtr> quals,
+      const JoinQualsPerNestingLevel join_quals,
+      std::list<hdk::ir::ExprPtr> groupby_exprs,
+      std::vector<const hdk::ir::Expr*> target_exprs,
+      const std::shared_ptr<hdk::ir::Estimator> estimator,
+      const SortInfo sort_info,
+      size_t scan_limit,
+      QueryPlan query_plan_dag = {EMPTY_QUERY_PLAN},
+      HashTableBuildDagMap hash_table_build_plan_dag = {},
+      TableIdToNodeMap table_id_to_node_map = {},
+      const std::optional<bool> union_all = {},
+      std::optional<hdk::ir::ShuffleFunction> shuffle_fn = {},
+      hdk::ir::ExprPtr partition_offsets_col = nullptr,
+      bool partitioned_aggregation = false,
+      std::shared_ptr<costmodel::CostModel> cost_model = nullptr,
+      std::vector<costmodel::AnalyticalTemplate> templs = {})
+      : input_descs(std::move(input_descs))
+      , input_col_descs(std::move(input_col_descs))
+      , simple_quals(std::move(simple_quals))
+      , quals(std::move(quals))
+      , join_quals(std::move(join_quals))
+      , groupby_exprs(std::move(groupby_exprs))
+      , target_exprs(std::move(target_exprs))
+      , estimator(std::move(estimator))
+      , sort_info(std::move(sort_info))
+      , scan_limit(scan_limit)
+      , query_plan_dag(std::move(query_plan_dag))
+      , hash_table_build_plan_dag(std::move(hash_table_build_plan_dag))
+      , table_id_to_node_map(std::move(table_id_to_node_map))
+      , union_all(union_all)
+      , shuffle_fn(std::move(shuffle_fn))
+      , partition_offsets_col(std::move(partition_offsets_col))
+      , partitioned_aggregation(partitioned_aggregation)
+      , cost_model(std::move(cost_model))
+      , templs(std::move(templs)) {}
+
+  RelAlgExecutionUnit(std::vector<InputDescriptor> input_descs,
+                      const SchemaProvider* schema_provider,
+                      std::list<hdk::ir::ExprPtr> simple_quals,
+                      std::list<hdk::ir::ExprPtr> quals,
+                      const JoinQualsPerNestingLevel join_quals,
+                      std::list<hdk::ir::ExprPtr> groupby_exprs,
+                      std::vector<const hdk::ir::Expr*> target_exprs,
+                      const std::shared_ptr<hdk::ir::Estimator> estimator,
+                      const SortInfo sort_info,
+                      size_t scan_limit,
+                      QueryPlan query_plan_dag = {EMPTY_QUERY_PLAN},
+                      HashTableBuildDagMap hash_table_build_plan_dag = {},
+                      TableIdToNodeMap table_id_to_node_map = {},
+                      const std::optional<bool> union_all = {},
+                      std::optional<hdk::ir::ShuffleFunction> shuffle_fn = {},
+                      hdk::ir::ExprPtr partition_offsets_col = nullptr,
+                      bool partitioned_aggregation = false,
+                      std::shared_ptr<costmodel::CostModel> cost_model = nullptr,
+                      std::vector<costmodel::AnalyticalTemplate> templs = {})
+      : input_descs(std::move(input_descs))
+      , simple_quals(std::move(simple_quals))
+      , quals(std::move(quals))
+      , join_quals(std::move(join_quals))
+      , groupby_exprs(std::move(groupby_exprs))
+      , target_exprs(std::move(target_exprs))
+      , estimator(std::move(estimator))
+      , sort_info(std::move(sort_info))
+      , scan_limit(scan_limit)
+      , query_plan_dag(std::move(query_plan_dag))
+      , hash_table_build_plan_dag(std::move(hash_table_build_plan_dag))
+      , table_id_to_node_map(std::move(table_id_to_node_map))
+      , union_all(union_all)
+      , shuffle_fn(std::move(shuffle_fn))
+      , partition_offsets_col(std::move(partition_offsets_col))
+      , partitioned_aggregation(partitioned_aggregation)
+      , cost_model(std::move(cost_model))
+      , templs(std::move(templs)) {
+    calcInputColDescs(schema_provider);
+  }
+
   std::vector<InputDescriptor> input_descs;
   std::list<std::shared_ptr<const InputColDescriptor>> input_col_descs;
   std::list<hdk::ir::ExprPtr> simple_quals;
@@ -158,9 +240,11 @@ struct RelAlgExecutionUnit {
 
   bool isShuffleCount() const { return shuffle_fn && !partition_offsets_col; }
   bool isShuffle() const { return shuffle_fn && partition_offsets_col; }
+
+ private:
+  // Method used for creation input_col_descs from qualifires and expressions
+  void calcInputColDescs(const SchemaProvider* schema_provider);
 };
 
 std::ostream& operator<<(std::ostream& os, const RelAlgExecutionUnit& ra_exe_unit);
 std::string ra_exec_unit_desc_for_caching(const RelAlgExecutionUnit& ra_exe_unit);
-
-#endif  // QUERYENGINE_RELALGEXECUTIONUNIT_H

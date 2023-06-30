@@ -66,6 +66,7 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
 
 RelAlgExecutionUnit create_count_all_execution_unit(
     const RelAlgExecutionUnit& ra_exe_unit,
+    const SchemaProvider* schema_provider,
     hdk::ir::ExprPtr replacement_target);
 
 ResultSetPtr reduce_estimator_results(

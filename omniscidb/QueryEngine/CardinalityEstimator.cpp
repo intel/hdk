@@ -100,9 +100,10 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
 
 RelAlgExecutionUnit create_count_all_execution_unit(
     const RelAlgExecutionUnit& ra_exe_unit,
+    const SchemaProvider* schema_provider,
     hdk::ir::ExprPtr replacement_target) {
   return {ra_exe_unit.input_descs,
-          ra_exe_unit.input_col_descs,
+          schema_provider,
           ra_exe_unit.simple_quals,
           ra_exe_unit.quals,
           ra_exe_unit.join_quals,
