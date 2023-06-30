@@ -264,6 +264,33 @@ ExecutionResult RelAlgExecutor::executeRelAlgQueryNoRetry(const CompilationOptio
     return registerResultSetTable({rs}, {}, true);
   }
 
+  std::stringstream ss;
+  std::vector<const hdk::ir::Node*> nodes;
+  for (size_t i = 0; i < query_seq.size(); i++) {
+    nodes.emplace_back(query_seq.step(i));
+  }
+  size_t ctr = nodes.size();
+  size_t tab_ctr = 0;
+  for (auto& body : boost::adaptors::reverse(nodes)) {
+    const auto index = ctr--;
+    const auto tabs = std::string(tab_ctr++, '\t');
+    CHECK(body);
+    ss << tabs << std::to_string(index) << " : " << body->toString() << "\n";
+    if (auto sort = dynamic_cast<const hdk::ir::Sort*>(body)) {
+      ss << tabs << "  : " << sort->getInput(0)->toString() << "\n";
+    }
+  }
+  const auto& subqueries = getSubqueries();
+  if (!subqueries.empty()) {
+    ss << "Subqueries: "
+       << "\n";
+    for (const auto& subquery : subqueries) {
+      const auto ra = subquery->node();
+      ss << "\t" << ra->toString() << "\n";
+    }
+  }
+  LOG(ERROR) << " dag?: " << ss.str();
+
   if (eo.find_push_down_candidates) {
     // this extra logic is mainly due to current limitations on multi-step queries
     // and/or subqueries.

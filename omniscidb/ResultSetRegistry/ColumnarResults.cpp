@@ -20,6 +20,7 @@
 #include "Shared/Intervals.h"
 #include "Shared/funcannotations.h"
 #include "Shared/likely.h"
+#include "Shared/measure.h"
 #include "Shared/thread_count.h"
 
 #include <tbb/parallel_for.h>
@@ -135,6 +136,9 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
 std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
     const std::vector<std::unique_ptr<ColumnarResults>>& sub_results) {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(mergeResults);
+
   if (sub_results.empty()) {
     return nullptr;
   }

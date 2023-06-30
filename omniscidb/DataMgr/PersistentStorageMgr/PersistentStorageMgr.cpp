@@ -46,6 +46,11 @@ void PersistentStorageMgr::deleteBuffersWithPrefix(const ChunkKey& chunk_key_pre
 
 AbstractBuffer* PersistentStorageMgr::getBuffer(const ChunkKey& chunk_key,
                                                 const size_t num_bytes) {
+  std::ostringstream ss;
+  ss << __func__ << " PersistentStrg: " << chunk_key.size() << "-" << chunk_key[0]
+     << " b: " << num_bytes;
+  LOG(WARNING) << ss.str();
+  auto timer = DEBUG_TIMER("PersistentStrg getBuffer");
   return getStorageMgrForTableKey(chunk_key)->getBuffer(chunk_key, num_bytes);
 }
 

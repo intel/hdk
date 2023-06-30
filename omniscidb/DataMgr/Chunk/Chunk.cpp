@@ -34,6 +34,10 @@ std::shared_ptr<Chunk> Chunk::getChunk(ColumnInfoPtr col_info,
                                        const int deviceId,
                                        const size_t numBytes,
                                        const size_t numElems) {
+  std::ostringstream ss;
+  ss << __func__ << " getting chunk: " << col_info->toString();
+  LOG(WARNING) << ss.str();
+  auto timer = DEBUG_TIMER("ChunkNS getChunk");
   std::shared_ptr<Chunk> chunkp = std::make_shared<Chunk>(Chunk(col_info));
   chunkp->getChunkBuffer(data_mgr, key, memoryLevel, deviceId, numBytes, numElems);
   return chunkp;

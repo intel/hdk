@@ -2329,6 +2329,7 @@ void Executor::executeWorkUnitPerFragment(
     for (auto fragment_index : fragment_indexes) {
       // We may want to consider in the future allowing this to execute on devices other
       // than CPU
+      LOG(ERROR) << "kernel create and run with fragment_idx: " << fragment_index;
       FragmentsList fragments_list{{db_id, table_id, {fragment_index}}};
       ExecutionKernel kernel(ra_exe_unit,
                              co.device_type,
@@ -2990,6 +2991,8 @@ Executor::getRowCountAndOffsetForAllFrags(
     const CartesianProduct<std::vector<std::vector<size_t>>>& frag_ids_crossjoin,
     const std::vector<InputDescriptor>& input_descs,
     const std::map<TableRef, const TableFragments*>& all_tables_fragments) {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(getRowCountAndOffsetForAllFrags);
   std::vector<std::vector<int64_t>> all_num_rows;
   std::vector<std::vector<uint64_t>> all_frag_offsets;
   const auto tab_id_to_frag_offsets =
@@ -3128,6 +3131,7 @@ FetchResult Executor::fetchChunks(
         memory_level_for_column = Data_Namespace::CPU_LEVEL;
       }
       if (needFetchAllFragments(*col_id, ra_exe_unit, selected_fragments)) {
+        VLOG(1) << "Need to fetch all frags.";
         // determine if we need special treatment to linearlize multi-frag table
         // i.e., a column that is classified as varlen type, i.e., array
         // for now, we can support more types in this way
@@ -3352,6 +3356,8 @@ void Executor::buildSelectedFragsMapping(
     const std::list<std::shared_ptr<const InputColDescriptor>>& col_global_ids,
     const FragmentsList& selected_fragments,
     const RelAlgExecutionUnit& ra_exe_unit) {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(buildSelectedFragsMapping);
   local_col_to_frag_pos.resize(plan_state_->global_to_local_col_ids_.size());
   size_t frag_pos{0};
   const auto& input_descs = ra_exe_unit.input_descs;

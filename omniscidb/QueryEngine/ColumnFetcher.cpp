@@ -173,6 +173,8 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
     const Data_Namespace::MemoryLevel memory_level,
     const int device_id,
     DeviceAllocator* allocator) const {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(getOneTableColumnFragment);
   int db_id = col_info->db_id;
   int table_id = col_info->table_id;
   int col_id = col_info->column_id;
@@ -238,6 +240,8 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
     const int device_id,
     DeviceAllocator* device_allocator,
     const size_t thread_idx) const {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(getAllTableColumnFragments);
   int db_id = col_info->db_id;
   int table_id = col_info->table_id;
   int col_id = col_info->column_id;
@@ -250,6 +254,7 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
   const InputDescriptor table_desc(db_id, table_id, int(0));
   {
     std::lock_guard<std::mutex> columnar_conversion_guard(columnar_fetch_mutex_);
+    auto timer = DEBUG_TIMER("lock taken, execution started");
     auto column_it = columnarized_scan_table_cache_.find({table_id, col_id});
     if (column_it == columnarized_scan_table_cache_.end()) {
       for (size_t frag_id = 0; frag_id < frag_count; ++frag_id) {
