@@ -505,15 +505,6 @@ void DataMgr::copy(AbstractBuffer* destBuffer, AbstractBuffer* srcBuffer) {
 // size_t numBytes, const size_t destOffset, const size_t srcOffset) {
 //} /
 
-void DataMgr::setTableEpoch(const int db_id, const int tb_id, const int start_epoch) {
-  UNREACHABLE();
-}
-
-size_t DataMgr::getTableEpoch(const int db_id, const int tb_id) {
-  UNREACHABLE();
-  return 0;
-}
-
 std::ostream& operator<<(std::ostream& os, const DataMgr::SystemMemoryUsage& mem_info) {
   os << "jsonlog ";
   os << "{";
@@ -531,11 +522,6 @@ std::ostream& operator<<(std::ostream& os, const DataMgr::SystemMemoryUsage& mem
 
 PersistentStorageMgr* DataMgr::getPersistentStorageMgr() const {
   return dynamic_cast<PersistentStorageMgr*>(bufferMgrs_[MemoryLevel::DISK_LEVEL][0]);
-}
-
-Buffer_Namespace::CpuBufferMgr* DataMgr::getCpuBufferMgr() const {
-  return dynamic_cast<Buffer_Namespace::CpuBufferMgr*>(
-      bufferMgrs_[MemoryLevel::CPU_LEVEL][0]);
 }
 
 const DictDescriptor* DataMgr::getDictMetadata(int dict_id, bool load_dict) const {
