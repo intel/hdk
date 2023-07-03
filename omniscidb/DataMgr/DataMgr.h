@@ -196,8 +196,6 @@ class DataMgr {
   void getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunkMetadataVec,
                                        const ChunkKey& keyPrefix);
   inline bool gpusPresent() const { return has_gpus_; }
-  void setTableEpoch(const int db_id, const int tb_id, const int start_epoch);
-  size_t getTableEpoch(const int db_id, const int tb_id);
 
   void setGpuMgrContext(GpuMgrPlatform name);
 
@@ -221,9 +219,6 @@ class DataMgr {
   static size_t getTotalSystemMemory();
 
   PersistentStorageMgr* getPersistentStorageMgr() const;
-
-  // Used for testing.
-  Buffer_Namespace::CpuBufferMgr* getCpuBufferMgr() const;
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) const;
 
