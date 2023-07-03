@@ -25,7 +25,7 @@ define void @sync_threadblock() {
     ret void
 }
 
-define i32 @pos_start_impl(i32* %0)  readnone nounwind alwaysinline {
+define i32 @pos_start_impl(i32 addrspace(4)* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
     %tid = call i64 @__spirv_BuiltInLocalInvocationId(i32 0)
@@ -161,24 +161,18 @@ define void @agg_sum_double_skip_val_shared(i64 addrspace(4)* %agg, double nound
     ret void
 }
 
-
-define i64 @agg_sum_skip_val_shared(i64* %agg, i64 noundef %val, i64 noundef %skip_val) {
+define i64 @agg_sum_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    %old = atomicrmw xchg i64* %agg, i64 0 monotonic
+    %old = atomicrmw xchg i64 addrspace(4)* %agg, i64 0 monotonic
     %isempty = icmp eq i64 %old, -9223372036854775808
     %sel = select i1 %isempty, i64 0, i64 %old
     %new_val = add nsw i64 %val, %sel
-    %old2 = atomicrmw add i64* %agg, i64 %new_val monotonic
+    %old2 = atomicrmw add i64 addrspace(4)* %agg, i64 %new_val monotonic
     ret i64 %old2
 .skip:
     ret i64 0
-}
-
-define void @agg_id_shared(i64* %agg, i64 noundef %val) {
-    store i64 %val, i64* %agg
-    ret void
 }
 
 define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
@@ -275,7 +269,7 @@ define double @atomic_max_double(double addrspace(4)* %addr, double noundef %val
 }
 
 
-define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
+define void @agg_count_distinct_bitmap_gpu(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
     %bitmap_idx = sub nsw i64 %val, %min_val
     %bitmap_idx.i32 = trunc i64 %bitmap_idx to i32
     %byte_idx.i64 = lshr i64 %bitmap_idx, 3
@@ -283,7 +277,7 @@ define void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noun
     %word_idx = lshr i32 %byte_idx, 2
     %word_idx.i64 = zext i32 %word_idx to i64
     %byte_word_idx = and i32 %byte_idx, 3
-    %host_addr = load i64, i64* %agg
+    %host_addr = load i64, i64 addrspace(4)* %agg
     %sub_bm_m1 = sub i64 %sub_bitmap_count, 1
     %tid = call i64 @get_thread_index()
     %sub_tid = and i64 %sub_bm_m1, %tid
@@ -366,11 +360,11 @@ define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 add
     ret void
 }
 
-define void @agg_count_distinct_bitmap_skip_val_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %skip_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
+define void @agg_count_distinct_bitmap_skip_val_gpu(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %skip_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
  %no_skip = icmp ne i64 %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
 .noskip:
-    call void @agg_count_distinct_bitmap_gpu(i64* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes)
+    call void @agg_count_distinct_bitmap_gpu(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes)
     br label %.skip
 .skip:
     ret void
@@ -414,8 +408,8 @@ define void @agg_max_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i
     ret void
 }
 
-define void @agg_min_shared(i64* %agg, i64 noundef %val) {
-    %old = atomicrmw min i64* %agg, i64 %val acq_rel
+define void @agg_min_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
+    %old = atomicrmw min i64 addrspace(4)* %agg, i64 %val acq_rel
     ret void
 }
 
