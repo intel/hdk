@@ -10,6 +10,8 @@
 #include "Shared/funcannotations.h"
 
 extern "C" {
+int64_t get_thread_index();
+
 int64_t atomic_cas_int_64(GENERIC_ADDR_SPACE int64_t*, int64_t, int64_t);
 int32_t atomic_cas_int_32(GENERIC_ADDR_SPACE int32_t*, int32_t, int32_t);
 int64_t atomic_xchg_int_64(GENERIC_ADDR_SPACE int64_t*, int64_t);
@@ -41,6 +43,10 @@ DEF_AGG_ID_INT_SHARED(16)
 DEF_AGG_ID_INT_SHARED(8)
 
 #undef DEF_AGG_ID_INT_SHARED
+
+void agg_id_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val) {
+  *agg = val;
+}
 
 void agg_id_float_shared(GENERIC_ADDR_SPACE int32_t* agg, const float val) {
   *reinterpret_cast<GENERIC_ADDR_SPACE float*>(agg) = val;
