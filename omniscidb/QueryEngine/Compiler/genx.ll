@@ -360,17 +360,6 @@ define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 add
     ret void
 }
 
-define void @agg_count_distinct_bitmap_skip_val_gpu(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %skip_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes) {
- %no_skip = icmp ne i64 %val, %skip_val
-    br i1 %no_skip, label %.noskip, label %.skip
-.noskip:
-    call void @agg_count_distinct_bitmap_gpu(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %min_val, i64 noundef %base_dev_addr, i64 noundef %base_host_addr, i64 noundef %sub_bitmap_count, i64 noundef %bitmap_bytes)
-    br label %.skip
-.skip:
-    ret void
-}
-
-
 define i64 @atomic_cas_int_64(i64 addrspace(4)* %p, i64 %cmp, i64 %val) {
     %val_success = cmpxchg i64 addrspace(4)* %p, i64 %cmp, i64 %val acq_rel monotonic
     %old = extractvalue {i64, i1} %val_success, 0
