@@ -68,15 +68,14 @@ class GpuReductionTester : public GpuSharedMemCodeBuilder {
                      l0::L0Manager* l0_mgr,
                      const compiler::CodegenTraits& traits,
                      Executor* executor)
-      : GpuSharedMemCodeBuilder(
-            module,
-            context,
-            qmd,
-            targets,
-            init_agg_values,
-            config,
-            traits,
-            executor)
+      : GpuSharedMemCodeBuilder(module,
+                                context,
+                                qmd,
+                                targets,
+                                init_agg_values,
+                                config,
+                                traits,
+                                executor)
       , l0_mgr_(l0_mgr)
       , executor_(executor) {
     // CHECK(getReductionFunction());
