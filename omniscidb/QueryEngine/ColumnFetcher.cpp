@@ -198,6 +198,7 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
     if (is_varlen) {
       varlen_chunk_lock.reset(new std::lock_guard<std::mutex>(varlen_chunk_fetch_mutex_));
     }
+    LOG(ERROR) << "DataProvider " << typeid(*data_provider_).name() << " getChunk";
     chunk = data_provider_->getChunk(
         col_info,
         chunk_key,
@@ -214,8 +215,10 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
     chunk_iter_holder.push_back(chunk->begin_iterator(chunk_meta_it->second));
     auto& chunk_iter = chunk_iter_holder.back();
     if (memory_level == Data_Namespace::CPU_LEVEL) {
+      LOG(ERROR) << "[Vrl] cast only";
       return reinterpret_cast<int8_t*>(&chunk_iter);
     } else {
+      LOG(ERROR) << "[Vrl] chunk getChunk";
       auto ab = chunk->getBuffer();
       auto& row_set_mem_owner = executor_->getRowSetMemoryOwner();
       row_set_mem_owner->addVarlenInputBuffer(ab);
@@ -227,6 +230,7 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
       return chunk_iter_gpu;
     }
   } else {
+    LOG(ERROR) << "[No ] chunk getChunk";
     auto ab = chunk->getBuffer();
     CHECK(ab->getMemoryPtr());
     return ab->getMemoryPtr();  // @TODO(alex) change to use ChunkIter

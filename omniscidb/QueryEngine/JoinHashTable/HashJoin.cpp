@@ -380,6 +380,7 @@ int64_t HashJoin::getJoinHashBuffer(const ExecutorDeviceType device_type,
 CompositeKeyInfo HashJoin::getCompositeKeyInfo(
     const std::vector<InnerOuter>& inner_outer_pairs,
     const Executor* executor) {
+  auto timer = DEBUG_TIMER(__func__);
   CHECK(executor);
   std::vector<const void*> sd_inner_proxy_per_key;
   std::vector<const void*> sd_outer_proxy_per_key;
