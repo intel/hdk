@@ -10,8 +10,6 @@
 #include "Shared/funcannotations.h"
 
 extern "C" {
-int64_t get_thread_index();
-
 int64_t atomic_cas_int_64(GENERIC_ADDR_SPACE int64_t*, int64_t, int64_t);
 int32_t atomic_cas_int_32(GENERIC_ADDR_SPACE int32_t*, int32_t, int32_t);
 int64_t atomic_xchg_int_64(GENERIC_ADDR_SPACE int64_t*, int64_t);
@@ -25,28 +23,7 @@ void agg_max_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 int64_t agg_count_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 uint32_t agg_count_int32_shared(GENERIC_ADDR_SPACE uint32_t* agg, const int32_t val);
 
-const GENERIC_ADDR_SPACE int64_t* init_shared_mem_nop(
-    const GENERIC_ADDR_SPACE int64_t* groups_buffer,
-    const int32_t groups_buffer_size) {
-  return groups_buffer;
-}
-
-// TODO: these are almost the same in cuda, move to a single source
-#define DEF_AGG_ID_INT_SHARED(n)                                             \
-  extern "C" void agg_id_int##n##_shared(GENERIC_ADDR_SPACE int##n##_t* agg, \
-                                         const int##n##_t val) {             \
-    *agg = val;                                                              \
-  }
-
-DEF_AGG_ID_INT_SHARED(32)
-DEF_AGG_ID_INT_SHARED(16)
-DEF_AGG_ID_INT_SHARED(8)
-
-#undef DEF_AGG_ID_INT_SHARED
-
-void agg_id_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val) {
-  *agg = val;
-}
+#include "CommonGpuRuntime.cpp"
 
 void agg_id_float_shared(GENERIC_ADDR_SPACE int32_t* agg, const float val) {
   *reinterpret_cast<GENERIC_ADDR_SPACE float*>(agg) = val;
