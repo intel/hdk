@@ -139,17 +139,18 @@ void GpuReductionTester::codegenWrapperKernel() {
                                                      },
                                                      "smem_input_buffer_ptr");
 
-  auto smem_input_buffer_ptr1 =
-      ir_builder.CreatePointerCast(smem_input_buffer_ptr,
-                                   llvm::Type::getInt64PtrTy(context_, 4),
-                                   "smem_input_buffer_ptr");
+  // auto smem_input_buffer_ptr1 =
+  //     ir_builder.CreatePointerCast(smem_input_buffer_ptr,
+  //                                  llvm::Type::getInt64PtrTy(context_, 4),
+  //                                  "smem_input_buffer_ptr");
 
   auto output_buffer_ptr = ir_builder.CreatePointerCast(
       output_buffer, llvm::Type::getInt64PtrTy(context_, 4), "output_buffer_ptr");
+
   // call the reduction function
   CHECK(reduction_func_);
   std::vector<llvm::Value*> reduction_args{
-      output_buffer_ptr, smem_input_buffer_ptr1, buffer_size};
+      output_buffer_ptr, smem_input_buffer_ptr, buffer_size};
   ir_builder.CreateCall(reduction_func_, reduction_args);
   ir_builder.CreateBr(bb_exit);
 
