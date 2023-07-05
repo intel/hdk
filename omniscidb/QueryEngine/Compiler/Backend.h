@@ -234,4 +234,6 @@ void setSharedMemory(ExecutorDeviceType dt,
                      GPUTarget& gpu_target,
                      const std::shared_ptr<compiler::Backend>& backend);
 
+void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname);
+
 }  // namespace compiler
