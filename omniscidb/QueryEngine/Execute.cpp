@@ -1219,7 +1219,9 @@ ReductionCode get_reduction_code(
                                       this_result_set->getTargetInitVals(),
                                       config,
                                       executor);
-  return reduction_jit.codegen();
+  auto reduction_co = CompilationOptions::makeCpuOnly(co);
+  reduction_co.opt_level = ExecutorOptLevel::ReductionJIT;
+  return reduction_jit.codegen(reduction_co);
 };
 
 }  // namespace

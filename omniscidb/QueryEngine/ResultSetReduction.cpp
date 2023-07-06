@@ -994,7 +994,10 @@ ResultSet* ResultSetManager::reduce(std::vector<ResultSet*>& result_sets,
                                       result_rs->getTargetInitVals(),
                                       config,
                                       executor);
-  auto reduction_code = reduction_jit.codegen();
+  CompilationOptions co = {
+      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
+  auto reduction_code = reduction_jit.codegen(co);
   size_t ctr = 1;
   for (auto result_it = result_sets.begin() + 1; result_it != result_sets.end();
        ++result_it) {

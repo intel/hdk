@@ -37,4 +37,17 @@ std::ostream& operator<<(std::ostream& os, const ExecutionOptions& eo) {
      << "preserve_order=" << eo.preserve_order << "\n";
   return os;
 }
+
+std::ostream& operator<<(std::ostream& os, const ExecutorOptLevel& ol) {
+  switch (ol) {
+    case ExecutorOptLevel::Default:
+      return os << "ExecutorOptLevel::Default";
+
+    case ExecutorOptLevel::ReductionJIT:
+      return os << "ExecutorOptLevel::ReductionJIT";
+
+    default:
+      return os << "Unknown ExecutorOptLevel";
+  }
+}
 #endif

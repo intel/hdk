@@ -59,7 +59,7 @@ class ResultSetReductionJIT {
   virtual ~ResultSetReductionJIT() = default;
 
   // Generate the code for the result set reduction loop.
-  virtual ReductionCode codegen() const;
+  virtual ReductionCode codegen(const CompilationOptions& co) const;
 
  protected:
   // Generate a function which checks whether a row is empty.
