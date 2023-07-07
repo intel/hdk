@@ -13,7 +13,7 @@ from libcpp.utility cimport move
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CType, CConfig
-from pyhdk._storage cimport CDataMgr, CBufferProvider, CSchemaProvider, CAbstractDataProvider
+from pyhdk._storage cimport MemoryLevel, DataMgr, CDataMgr, CBufferProvider, CSchemaProvider, CAbstractDataProvider
 
 cdef extern from "omniscidb/QueryEngine/Compiler/CodegenTraitsDescriptor.h" namespace "compiler":
   enum CCallingConvDesc "CallingConvDesc":
@@ -147,7 +147,8 @@ cdef extern from "omniscidb/QueryEngine/Execute.h":
   cdef cppclass CExecutor "Executor":
     @staticmethod
     shared_ptr[CExecutor] getExecutor(CDataMgr*, shared_ptr[CConfig], const string&, const string&)
-
+    @staticmethod
+    void clearMemory(MemoryLevel, CDataMgr*)
     const CConfig &getConfig()
     shared_ptr[CConfig] getConfigPtr()
 

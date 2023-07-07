@@ -14,6 +14,9 @@ cdef class Executor:
     cdef string debug_file = "".encode('UTF-8')
     self.c_executor = CExecutor.getExecutor(data_mgr.c_data_mgr.get(), config.c_config, debug_dir, debug_file)
 
+  def clearMemory(self, DataMgr data_mgr, MemoryLevel memLevel):
+    CExecutor.clearMemory(memLevel, data_mgr.c_data_mgr.get())
+
 cdef class ResultSetRegistry(Storage):
   cdef shared_ptr[CResultSetRegistry] c_registry
 

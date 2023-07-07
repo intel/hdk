@@ -184,6 +184,20 @@ cdef class TypeInfo:
   def __repr__(self):
     return self.c_type_info.toString()
 
+cdef class Config:
+  def setCpuProp(self, cpu_prop):
+    self.c_config.get().exec.heterogeneous.forced_cpu_proportion=cpu_prop
+    self.c_config.get().exec.heterogeneous.forced_gpu_proportion=100-cpu_prop
+
+  def setGpuProp(self, gpu_prop):
+    self.c_config.get().exec.heterogeneous.forced_gpu_proportion=gpu_prop
+    self.c_config.get().exec.heterogeneous.forced_cpu_proportion=100-gpu_prop
+
+  def getCpuProp(self):
+    return self.c_config.get().exec.heterogeneous.forced_cpu_proportion
+
+  def getGpuProp(self):
+    return self.c_config.get().exec.heterogeneous.forced_gpu_proportion
 
 def buildConfig(*, enable_debug_timer=None, enable_union=False, log_dir="hdk_log", **kwargs):
   global g_enable_debug_timer
