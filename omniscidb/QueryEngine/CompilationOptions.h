@@ -168,6 +168,7 @@ struct ExecutionOptions {
 
 #ifndef __CUDACC__
 std::ostream& operator<<(std::ostream& os, const ExecutionOptions& eo);
+std::ostream& operator<<(std::ostream& os, const ExecutorOptLevel& ol);
 #endif
 
 #endif  // QUERYENGINE_COMPILATIONOPTIONS_H

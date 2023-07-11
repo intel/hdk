@@ -2018,7 +2018,10 @@ TEST(MoreReduce, MissingValues) {
                                       rs1->getTargetInitVals(),
                                       config(),
                                       executor.get());
-  const auto reduction_code = reduction_jit.codegen();
+  CompilationOptions co = {
+      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
+  const auto reduction_code = reduction_jit.codegen(co);
   ResultSetReduction::reduce(
       *storage1, *storage2, {}, reduction_code, config(), executor.get());
   {
@@ -2091,7 +2094,10 @@ TEST(MoreReduce, MissingValuesKeyless) {
                                       rs1->getTargetInitVals(),
                                       config(),
                                       executor.get());
-  const auto reduction_code = reduction_jit.codegen();
+  CompilationOptions co = {
+      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
+  const auto reduction_code = reduction_jit.codegen(co);
   ResultSetReduction::reduce(
       *storage1, *storage2, {}, reduction_code, config(), executor.get());
   {
@@ -2183,7 +2189,10 @@ TEST(MoreReduce, OffsetRewrite) {
                                       rs1->getTargetInitVals(),
                                       config(),
                                       executor.get());
-  const auto reduction_code = reduction_jit.codegen();
+  CompilationOptions co = {
+      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
+  const auto reduction_code = reduction_jit.codegen(co);
   ResultSetReduction::reduce(*storage1,
                              *storage2,
                              serialized_varlen_buffer,

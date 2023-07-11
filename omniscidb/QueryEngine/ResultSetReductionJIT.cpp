@@ -554,12 +554,12 @@ ResultSetReductionJIT::ResultSetReductionJIT(const QueryMemoryDescriptor& query_
 //   for that_entry_index in [start_entry_index, end_entry_index):
 //     reduce_func_idx(this_buff, that_buff, that_entry_index)
 
-ReductionCode ResultSetReductionJIT::codegen() const {
+ReductionCode ResultSetReductionJIT::codegen(const CompilationOptions& co) const {
+  CHECK_EQ(co.device_type, ExecutorDeviceType::CPU);
+  CHECK_EQ(co.hoist_literals, false);
+  CHECK_EQ(co.opt_level, ExecutorOptLevel::ReductionJIT);
+  CHECK_EQ(co.allow_lazy_fetch, false);
   const auto hash_type = query_mem_desc_.getQueryDescriptionType();
-  CompilationOptions co{
-      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
-
-  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
 
   if (query_mem_desc_.didOutputColumnar() || !is_aggregate_query(hash_type)) {
     return {};
