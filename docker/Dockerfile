@@ -95,5 +95,5 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get clean
 
-RUN useradd -m --uid 1001 ghrunner
+RUN useradd -m --uid 1002 ghrunner
 

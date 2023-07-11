@@ -71,7 +71,9 @@ jobs:
       - name: Start the container
         run:  |
           mkdir -p build
-          docker run -id --name build.${{ inputs.name }} --network host -v $(pwd):/_work build.${{ inputs.name }}:latest
+          docker run -id --name build.${{ inputs.name }} --network host build.${{ inputs.name }}:latest
+          docker cp . build.${{ inputs.name }}:/_work
+          docker exec build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work
 
       - name: Copy maven cache inside container
         if: steps.maven-cache.cache-hit == 'true'
@@ -85,7 +87,7 @@ jobs:
           docker exec -u ghrunner build.${{ inputs.name }} sh /_work/omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           docker exec -u ghrunner build.${{ inputs.name }} tar -zcf /tmp/build.tgz -C /_work .
           docker cp build.${{ inputs.name }}:/tmp/build.tgz .
-     
+
       - name: Upload build and src files
         uses: actions/upload-artifact@v3
         with:
