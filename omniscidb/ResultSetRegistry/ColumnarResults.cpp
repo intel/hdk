@@ -130,7 +130,30 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
   const auto buf_size = num_rows * target_type->size();
   column_buffers_[0] =
       reinterpret_cast<int8_t*>(row_set_mem_owner->allocate(buf_size, thread_idx_));
+
+  // HERE!!!
+  LOG(ERROR) << "HERE!!!";
   memcpy(((void*)column_buffers_[0]), one_col_buffer, buf_size);
+}
+
+ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+                                 const int8_t* one_col_buffer,
+                                 const size_t num_rows,
+                                 const hdk::ir::Type* target_type,
+                                 const size_t thread_idx,
+                                 bool just_set)
+    : column_buffers_(1)
+    , num_rows_(num_rows)
+    , target_types_{target_type}
+    , parallel_conversion_(false)
+    , direct_columnar_conversion_(false)
+    , thread_idx_(thread_idx) {
+  auto timer = DEBUG_TIMER(__func__);
+  const bool is_varlen = target_type->isArray() || target_type->isString();
+  if (is_varlen) {
+    throw ColumnarConversionNotSupported();
+  }
+  column_buffers_[0] = const_cast<int8_t*>(one_col_buffer);
 }
 
 std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
@@ -159,6 +182,7 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
   if (nonempty_it == sub_results.end()) {
     return nullptr;
   }
+  LOG(ERROR) << "col_count: " << col_count;
   for (size_t col_idx = 0; col_idx < col_count; ++col_idx) {
     const auto byte_width = (*nonempty_it)->columnType(col_idx)->size();
     auto write_ptr = row_set_mem_owner->allocate(byte_width * total_row_count);
@@ -169,11 +193,61 @@ std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
         continue;
       }
       CHECK_EQ(byte_width, rs->columnType(col_idx)->size());
+      // HERE!!!
+      LOG(ERROR) << "HERE!!!";
       memcpy(write_ptr, rs->column_buffers_[col_idx], rs->size() * byte_width);
       write_ptr += rs->size() * byte_width;
     }
   }
   return merged_results;
+}
+
+std::unique_ptr<ColumnarResults> ColumnarResults::mergeResults(
+    std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+    const std::vector<ColumnarDataRefence>& sub_results) {
+  auto timer = DEBUG_TIMER(__func__);
+  INJECT_TIMER(mergeResults);
+
+  if (sub_results.empty()) {
+    return nullptr;
+  }
+  const auto total_row_count =
+      std::accumulate(sub_results.begin(),
+                      sub_results.end(),
+                      size_t(0),
+                      [](const size_t init, const ColumnarDataRefence& result) {
+                        return init + result.num_rows;
+                      });
+
+  // std::unique_ptr<ColumnarResults> merged_results(
+  //     new ColumnarResults(row_set_mem_owner,  total_row_count,
+  //     sub_results[0].target_type));
+  const auto nonempty_it = std::find_if(
+      sub_results.begin(), sub_results.end(), [](const ColumnarDataRefence& needle) {
+        return needle.num_rows;
+      });
+  if (nonempty_it == sub_results.end()) {
+    return nullptr;
+  }
+  const auto byte_width = (*nonempty_it).target_type->size();
+  auto write_ptr = row_set_mem_owner->allocate(byte_width * total_row_count);
+  // merged_results->column_buffers_.push_back(write_ptr);
+  for (auto& rs : sub_results) {
+    if (!rs.num_rows) {
+      continue;
+    }
+    CHECK_EQ(byte_width, rs.target_type->size());
+    // HERE!!!
+    LOG(ERROR) << "HERE!!!";
+    memcpy(write_ptr, rs.one_col_buffer, rs.num_rows * byte_width);
+    write_ptr += rs.num_rows * byte_width;
+  }
+  return std::unique_ptr<ColumnarResults>(new ColumnarResults(row_set_mem_owner,
+                                                              write_ptr,
+                                                              total_row_count,
+                                                              (*nonempty_it).target_type,
+                                                              0,
+                                                              false));
 }
 
 void ColumnarResults::materializeAllGroupbyColumnsThroughIteration(

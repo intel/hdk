@@ -2892,7 +2892,6 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
             &shared_context,
             parent_thread_id = logger::thread_id(),
             crt_kernel_idx = kernel_idx++] {
-      DEBUG_TIMER_NEW_THREAD(parent_thread_id);
       const size_t thread_i = crt_kernel_idx % cpu_threads();
       kernel->run(this, thread_i, shared_context);
     });

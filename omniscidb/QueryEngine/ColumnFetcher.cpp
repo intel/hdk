@@ -16,6 +16,7 @@
 
 #include "QueryEngine/ColumnFetcher.h"
 
+#include <tbb/parallel_for.h>
 #include <memory>
 
 #include "DataMgr/ArrayNoneEncoder.h"
@@ -172,7 +173,8 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
     std::list<ChunkIter>& chunk_iter_holder,
     const Data_Namespace::MemoryLevel memory_level,
     const int device_id,
-    DeviceAllocator* allocator) const {
+    DeviceAllocator* allocator,
+    const size_t thread_idx) const {
   auto timer = DEBUG_TIMER(__func__);
   INJECT_TIMER(getOneTableColumnFragment);
   int db_id = col_info->db_id;
@@ -186,6 +188,10 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
   if (fragment.isEmptyPhysicalFragment()) {
     return nullptr;
   }
+  LOG(ERROR) << __func__ << " lock taken, execution started parent thread: " << thread_idx
+             << "\n logger curr tid: " << logger::thread_id()
+             << "\n scan_table tabid: " << table_id << " colid: " << col_id
+             << "\n col_info: " << col_info->toString();
   std::shared_ptr<Chunk_NS::Chunk> chunk;
   auto chunk_meta_it = fragment.getChunkMetadataMap().find(col_id);
   CHECK(chunk_meta_it != fragment.getChunkMetadataMap().end());
@@ -254,11 +260,17 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
   const auto fragments = fragments_it->second;
   const auto frag_count = fragments->size();
   std::vector<std::unique_ptr<ColumnarResults>> column_frags;
+  std::vector<ColumnarDataRefence> column_frags_raw;
+
   const ColumnarResults* table_column = nullptr;
   const InputDescriptor table_desc(db_id, table_id, int(0));
   {
     std::lock_guard<std::mutex> columnar_conversion_guard(columnar_fetch_mutex_);
     auto timer = DEBUG_TIMER("lock taken, execution started");
+    LOG(ERROR) << __func__
+               << " lock taken, execution started parent thread: " << thread_idx
+               << "\n logger curr tid: " << logger::thread_id()
+               << "\n scan_table tabid: " << table_id << " colid: " << col_id;
     auto column_it = columnarized_scan_table_cache_.find({table_id, col_id});
     if (column_it == columnarized_scan_table_cache_.end()) {
       for (size_t frag_id = 0; frag_id < frag_count; ++frag_id) {
@@ -282,22 +294,28 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
                                                     chunk_iter_holder,
                                                     Data_Namespace::CPU_LEVEL,
                                                     int(0),
-                                                    device_allocator);
-        column_frags.push_back(
-            std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
-                                              col_buffer,
-                                              fragment.getNumTuples(),
-                                              chunk_meta_it->second->type(),
-                                              thread_idx));
+                                                    device_allocator,
+                                                    thread_idx);
+        column_frags_raw.push_back(
+            {col_buffer, fragment.getNumTuples(), chunk_meta_it->second->type()});
+        // column_frags.push_back(
+        //     std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
+        //                                       col_buffer,
+        //                                       fragment.getNumTuples(),
+        //                                       chunk_meta_it->second->type(),
+        //                                       thread_idx));
       }
+      // auto merged_results =
+      //     ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags);
       auto merged_results =
-          ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags);
+          ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags_raw);
       table_column = merged_results.get();
       columnarized_scan_table_cache_.emplace(std::make_pair(table_id, col_id),
                                              std::move(merged_results));
     } else {
       table_column = column_it->second.get();
     }
+    timer.stop();
   }
   return ColumnFetcher::transferColumnIfNeeded(
       table_column, 0, memory_level, device_id, device_allocator);

@@ -73,7 +73,8 @@ class ColumnFetcher {
       std::list<ChunkIter>& chunk_iter_holder,
       const Data_Namespace::MemoryLevel memory_level,
       const int device_id,
-      DeviceAllocator* device_allocator) const;
+      DeviceAllocator* device_allocator,
+      const size_t thread_idx = 0) const;
 
   const int8_t* getAllTableColumnFragments(
       ColumnInfoPtr col_info,

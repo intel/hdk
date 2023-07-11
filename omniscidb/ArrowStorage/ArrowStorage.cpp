@@ -89,10 +89,12 @@ void ArrowStorage::fetchBuffer(const ChunkKey& key,
                                const size_t num_bytes) {
   auto timer = DEBUG_TIMER("ArrowStorage Fetch Buffer");
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  auto timer2 = DEBUG_TIMER("ArrowStorage Data Lock taken");
   CHECK_EQ(key[CHUNK_KEY_DB_IDX], db_id_);
   CHECK_EQ(tables_.count(key[CHUNK_KEY_TABLE_IDX]), (size_t)1);
   auto& table = *tables_.at(key[CHUNK_KEY_TABLE_IDX]);
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
+  auto timer3 = DEBUG_TIMER("ArrowStorage Table Lock taken");
   data_lock.unlock();
 
   size_t col_idx = columnIndex(key[CHUNK_KEY_COLUMN_IDX]);
@@ -108,7 +110,13 @@ void ArrowStorage::fetchBuffer(const ChunkKey& key,
   if (!col_type->isVarLen()) {
     CHECK_EQ(key.size(), (size_t)4);
     size_t elem_size = col_type->size();
-    fetchFixedLenData(table, frag_idx, col_idx, dest, num_bytes, elem_size);
+    if (col_type->isString()) {
+      auto timer4 = DEBUG_TIMER("ArrowStorage   Str  Fix len Fetch");
+      fetchFixedLenData(table, frag_idx, col_idx, dest, num_bytes, elem_size);
+    } else {
+      auto timer4 = DEBUG_TIMER("ArrowStorage NotStr Fix len Fetch");
+      fetchFixedLenData(table, frag_idx, col_idx, dest, num_bytes, elem_size);
+    }
   } else {
     CHECK_EQ(key.size(), (size_t)5);
     if (key[CHUNK_KEY_VARLEN_IDX] == 1) {
@@ -116,9 +124,11 @@ void ArrowStorage::fetchBuffer(const ChunkKey& key,
         dest->initEncoder(col_type);
       }
       if (col_type->isString()) {
+        auto timer4 = DEBUG_TIMER("ArrowStorage Str Var len Fetch");
         fetchVarLenData(table, frag_idx, col_idx, dest, num_bytes);
       } else {
         CHECK(col_type->isVarLenArray());
+        auto timer4 = DEBUG_TIMER("ArrowStorage NotStr Var len Fetch");
         fetchVarLenArrayData(table,
                              frag_idx,
                              col_idx,
@@ -128,6 +138,7 @@ void ArrowStorage::fetchBuffer(const ChunkKey& key,
       }
     } else {
       CHECK_EQ(key[CHUNK_KEY_VARLEN_IDX], 2);
+      auto timer4 = DEBUG_TIMER("ArrowStorage   Off  Var len Fetch");
       fetchVarLenOffsets(table, frag_idx, col_idx, dest, num_bytes);
     }
   }

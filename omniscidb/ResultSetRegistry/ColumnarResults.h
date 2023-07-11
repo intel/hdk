@@ -57,6 +57,12 @@ class ColumnBitmap {
   std::vector<std::vector<bool>> bitmaps_;
 };
 
+struct ColumnarDataRefence {
+  const int8_t* one_col_buffer;
+  const size_t num_rows;
+  const hdk::ir::Type* target_type;
+};
+
 class ColumnarResults {
  public:
   ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
@@ -76,6 +82,10 @@ class ColumnarResults {
   static std::unique_ptr<ColumnarResults> mergeResults(
       const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
       const std::vector<std::unique_ptr<ColumnarResults>>& sub_results);
+
+  static std::unique_ptr<ColumnarResults> mergeResults(
+      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+      const std::vector<ColumnarDataRefence>& sub_results);
 
   const std::vector<int8_t*>& getColumnBuffers() const { return column_buffers_; }
   const std::vector<int8_t*>& getOffsetBuffers() const { return offset_buffers_; }
@@ -115,6 +125,12 @@ class ColumnarResults {
   ColumnarResults(const size_t num_rows,
                   const std::vector<const hdk::ir::Type*>& target_types)
       : num_rows_(num_rows), target_types_(target_types) {}
+  ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
+                  const int8_t* one_col_buffer,
+                  const size_t num_rows,
+                  const hdk::ir::Type* target_type,
+                  const size_t thread_idx,
+                  bool just_set);
   inline void writeBackCell(const TargetValue& col_val,
                             const size_t row_idx,
                             const size_t column_idx);
