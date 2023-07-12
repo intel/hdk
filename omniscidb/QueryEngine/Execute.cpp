@@ -2892,6 +2892,7 @@ void Executor::launchKernels(SharedKernelContext& shared_context,
             &shared_context,
             parent_thread_id = logger::thread_id(),
             crt_kernel_idx = kernel_idx++] {
+      DEBUG_TIMER_NEW_THREAD(parent_thread_id);
       const size_t thread_i = crt_kernel_idx % cpu_threads();
       kernel->run(this, thread_i, shared_context);
     });
@@ -3050,6 +3051,8 @@ bool Executor::needFetchAllFragments(const InputColDescriptor& inner_col_desc,
   CHECK_LT(static_cast<size_t>(nest_level), selected_fragments.size());
   CHECK_EQ(table_id, selected_fragments[nest_level].table_id);
   const auto& fragments = selected_fragments[nest_level].fragment_ids;
+  LOG(WARNING) << "needFetchAllFragments fragments size: " << fragments.size()
+               << " table_id: " << table_id;
   return fragments.size() > 1;
 }
 
@@ -3153,7 +3156,7 @@ FetchResult Executor::fetchChunks(
               device_allocator,
               thread_idx);
         } else {
-          frag_col_buffers[it->second] =
+          x frag_col_buffers[it->second] =
               column_fetcher.getAllTableColumnFragments(col_id->getColInfo(),
                                                         all_tables_fragments,
                                                         memory_level_for_column,

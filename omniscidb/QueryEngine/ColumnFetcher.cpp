@@ -296,26 +296,26 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
                                                     int(0),
                                                     device_allocator,
                                                     thread_idx);
-        column_frags_raw.push_back(
-            {col_buffer, fragment.getNumTuples(), chunk_meta_it->second->type()});
-        // column_frags.push_back(
-        //     std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
-        //                                       col_buffer,
-        //                                       fragment.getNumTuples(),
-        //                                       chunk_meta_it->second->type(),
-        //                                       thread_idx));
+        // column_frags_raw.push_back(
+        //     {col_buffer, fragment.getNumTuples(), chunk_meta_it->second->type()});
+        column_frags.push_back(
+            std::make_unique<ColumnarResults>(executor_->row_set_mem_owner_,
+                                              col_buffer,
+                                              fragment.getNumTuples(),
+                                              chunk_meta_it->second->type(),
+                                              thread_idx));
       }
-      // auto merged_results =
-      //     ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags);
       auto merged_results =
-          ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags_raw);
+          ColumnarResults::mergeResults(executor_->row_set_mem_owner_, column_frags);
+      // auto merged_results =
+      //     ColumnarResults::mergeResults(executor_->row_set_mem_owner_,
+      //     column_frags_raw);
       table_column = merged_results.get();
       columnarized_scan_table_cache_.emplace(std::make_pair(table_id, col_id),
                                              std::move(merged_results));
     } else {
       table_column = column_it->second.get();
     }
-    timer.stop();
   }
   return ColumnFetcher::transferColumnIfNeeded(
       table_column, 0, memory_level, device_id, device_allocator);
