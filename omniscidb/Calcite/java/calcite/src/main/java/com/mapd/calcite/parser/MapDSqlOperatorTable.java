@@ -245,6 +245,12 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
     opTab.addOperator(new is_point_size_in_view());
     opTab.addOperator(new usTimestamp());
     opTab.addOperator(new nsTimestamp());
+    opTab.addOperator(new SqlFunction("BIT_NOT",
+            SqlKind.OTHER_FUNCTION,
+            ReturnTypes.ARG0_NULLABLE,
+            null,
+            OperandTypes.or(OperandTypes.INTEGER, OperandTypes.BINARY),
+            SqlFunctionCategory.NUMERIC));
     if (extSigs == null) {
       return;
     }
