@@ -58,6 +58,7 @@ endif()
 
 # Tests + Microbenchmarks
 add_executable(StringDictionaryBenchmark StringDictionaryBenchmark.cpp)
+add_executable(BitmapGeneratorBenchmark BitmapGeneratorBenchmark.cpp ../ResultSet/BitmapGenerators.cpp)
 
 if(ENABLE_L0)
   add_executable(L0MgrExecuteTest L0MgrExecuteTest.cpp)
@@ -133,6 +134,8 @@ if(ENABLE_FOLLY)
 else()
   target_link_libraries(StringDictionaryBenchmark benchmark gtest StringDictionary Logger Utils $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs> ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
 endif()
+
+target_link_libraries(BitmapGeneratorBenchmark benchmark)
 
 if(ENABLE_CUDA)
   target_link_libraries(GpuSharedMemoryTest gtest Logger QueryEngine)
