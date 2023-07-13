@@ -3156,7 +3156,7 @@ FetchResult Executor::fetchChunks(
               device_allocator,
               thread_idx);
         } else {
-          x frag_col_buffers[it->second] =
+          frag_col_buffers[it->second] =
               column_fetcher.getAllTableColumnFragments(col_id->getColInfo(),
                                                         all_tables_fragments,
                                                         memory_level_for_column,
