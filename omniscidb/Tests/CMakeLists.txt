@@ -58,7 +58,8 @@ endif()
 
 # Tests + Microbenchmarks
 add_executable(StringDictionaryBenchmark StringDictionaryBenchmark.cpp)
-add_executable(BitmapGeneratorBenchmark BitmapGeneratorBenchmark.cpp ../ResultSet/BitmapGenerators.cpp)
+add_executable(BitmapGeneratorBenchmark BitmapGeneratorBenchmark.cpp)
+target_link_libraries(BitmapGeneratorBenchmark ResultSet)
 
 if(ENABLE_L0)
   add_executable(L0MgrExecuteTest L0MgrExecuteTest.cpp)
