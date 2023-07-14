@@ -10,9 +10,14 @@
 
 #include <cstring>
 
-#ifdef __AVX512F__
-size_t __attribute__((target("avx512bw", "avx512f"), optimize("no-tree-vectorize")))
-gen_null_bitmap_8(uint8_t* dst, const uint8_t* src, size_t size, const uint8_t null_val) {
+#include <iostream>
+
+#ifndef _WIN32
+size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+gen_null_bitmap_8_impl(uint8_t* dst,
+                       const uint8_t* src,
+                       size_t size,
+                       const uint8_t null_val) {
   __m512i nulls_mask = _mm512_set1_epi8(reinterpret_cast<const int8_t&>(null_val));
 
   size_t null_count = 0;
@@ -35,11 +40,11 @@ gen_null_bitmap_8(uint8_t* dst, const uint8_t* src, size_t size, const uint8_t n
   return null_count;
 }
 
-size_t __attribute__((target("avx512bw", "avx512f"), optimize("no-tree-vectorize")))
-gen_null_bitmap_16(uint8_t* dst,
-                   const uint16_t* src,
-                   size_t size,
-                   const uint16_t null_val) {
+size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+gen_null_bitmap_16_impl(uint8_t* dst,
+                        const uint16_t* src,
+                        size_t size,
+                        const uint16_t null_val) {
   __m512i nulls_mask = _mm512_set1_epi16(reinterpret_cast<const int16_t&>(null_val));
 
   size_t null_count = 0;
@@ -62,11 +67,11 @@ gen_null_bitmap_16(uint8_t* dst,
   return null_count;
 }
 
-size_t __attribute__((target("avx512bw", "avx512f"), optimize("no-tree-vectorize")))
-gen_null_bitmap_32(uint8_t* dst,
-                   const uint32_t* src,
-                   size_t size,
-                   const uint32_t null_val) {
+size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+gen_null_bitmap_32_impl(uint8_t* dst,
+                        const uint32_t* src,
+                        size_t size,
+                        const uint32_t null_val) {
   __m512i nulls_mask = _mm512_set1_epi32(reinterpret_cast<const int32_t&>(null_val));
 
   size_t null_count = 0;
@@ -88,11 +93,11 @@ gen_null_bitmap_32(uint8_t* dst,
   return null_count;
 }
 
-size_t __attribute__((target("avx512bw", "avx512f"), optimize("no-tree-vectorize")))
-gen_null_bitmap_64(uint8_t* dst,
-                   const uint64_t* src,
-                   size_t size,
-                   const uint64_t null_val) {
+size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+gen_null_bitmap_64_impl(uint8_t* dst,
+                        const uint64_t* src,
+                        size_t size,
+                        const uint64_t null_val) {
   __m512i nulls_mask = _mm512_set1_epi64(reinterpret_cast<const int64_t&>(null_val));
 
   size_t null_count = 0;
@@ -142,35 +147,65 @@ size_t gen_null_bitmap_default(uint8_t* dst,
 }
 
 #if defined(_MSC_VER)
-#define DEFAULT_TARGET_ATTRIBUTE
+#define BITMAP_GEN_TARGET_ATTRS
 #else
-#define DEFAULT_TARGET_ATTRIBUTE __attribute__((target("default")))
+#define BITMAP_GEN_TARGET_ATTRS __attribute__((target("default")))
 #endif
 
-size_t DEFAULT_TARGET_ATTRIBUTE gen_null_bitmap_8(uint8_t* dst,
-                                                  const uint8_t* src,
-                                                  size_t size,
-                                                  const uint8_t null_val) {
+size_t BITMAP_GEN_TARGET_ATTRS gen_null_bitmap_8_impl(uint8_t* dst,
+                                                      const uint8_t* src,
+                                                      size_t size,
+                                                      const uint8_t null_val) {
+  // std::cout << "Using default impl " << std::endl;
   return gen_null_bitmap_default<uint8_t>(dst, src, size, null_val);
 }
 
-size_t DEFAULT_TARGET_ATTRIBUTE gen_null_bitmap_16(uint8_t* dst,
-                                                   const uint16_t* src,
-                                                   size_t size,
-                                                   const uint16_t null_val) {
+size_t BITMAP_GEN_TARGET_ATTRS gen_null_bitmap_16_impl(uint8_t* dst,
+                                                       const uint16_t* src,
+                                                       size_t size,
+                                                       const uint16_t null_val) {
   return gen_null_bitmap_default<uint16_t>(dst, src, size, null_val);
 }
 
-size_t DEFAULT_TARGET_ATTRIBUTE gen_null_bitmap_32(uint8_t* dst,
-                                                   const uint32_t* src,
-                                                   size_t size,
-                                                   const uint32_t null_val) {
+size_t BITMAP_GEN_TARGET_ATTRS gen_null_bitmap_32_impl(uint8_t* dst,
+                                                       const uint32_t* src,
+                                                       size_t size,
+                                                       const uint32_t null_val) {
   return gen_null_bitmap_default<uint32_t>(dst, src, size, null_val);
 }
 
-size_t DEFAULT_TARGET_ATTRIBUTE gen_null_bitmap_64(uint8_t* dst,
-                                                   const uint64_t* src,
-                                                   size_t size,
-                                                   const uint64_t null_val) {
+size_t BITMAP_GEN_TARGET_ATTRS gen_null_bitmap_64_impl(uint8_t* dst,
+                                                       const uint64_t* src,
+                                                       size_t size,
+                                                       const uint64_t null_val) {
   return gen_null_bitmap_default<uint64_t>(dst, src, size, null_val);
+}
+
+// dispatchers
+size_t gen_null_bitmap_8(uint8_t* dst,
+                         const uint8_t* src,
+                         size_t size,
+                         const uint8_t null_val) {
+  return gen_null_bitmap_8_impl(dst, src, size, null_val);
+}
+
+size_t gen_null_bitmap_16(uint8_t* dst,
+                          const uint16_t* src,
+                          size_t size,
+                          const uint16_t null_val) {
+  return gen_null_bitmap_16_impl(dst, src, size, null_val);
+}
+
+size_t gen_null_bitmap_32(uint8_t* dst,
+                          const uint32_t* src,
+                          size_t size,
+                          const uint32_t null_val) {
+  return gen_null_bitmap_32_impl(dst, src, size, null_val);
+}
+
+size_t gen_null_bitmap_64(uint8_t* dst,
+                          const uint64_t* src,
+                          size_t size,
+                          const uint64_t null_val) {
+  return gen_null_bitmap_64_impl(dst, src, size, null_val);
 }
