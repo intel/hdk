@@ -33,7 +33,7 @@ class BaselineHashTable : public HashTable {
                     const size_t hash_table_size)
       : cpu_hash_table_buff_size_(hash_table_size)
       , gpu_hash_table_buff_(nullptr)
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
       , device_id_(0)
       , buffer_provider_(nullptr)
 #endif
@@ -51,14 +51,14 @@ class BaselineHashTable : public HashTable {
                     const size_t hash_table_size,
                     const size_t device_id)
       : gpu_hash_table_buff_(nullptr)
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
       , device_id_(device_id)
       , buffer_provider_(buffer_provider)
 #endif
       , layout_(layout)
       , entry_count_(entry_count)
       , emitted_keys_count_(emitted_keys_count) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     CHECK(buffer_provider_);
     gpu_hash_table_buff_ = GpuAllocator::allocGpuAbstractBuffer(
         buffer_provider_, hash_table_size, device_id_);
@@ -68,7 +68,7 @@ class BaselineHashTable : public HashTable {
   }
 
   ~BaselineHashTable() override {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     if (gpu_hash_table_buff_) {
       CHECK(buffer_provider_);
       buffer_provider_->free(gpu_hash_table_buff_);
@@ -108,7 +108,7 @@ class BaselineHashTable : public HashTable {
   size_t cpu_hash_table_buff_size_;
   Data_Namespace::AbstractBuffer* gpu_hash_table_buff_;
 
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   const size_t device_id_;
   BufferProvider* buffer_provider_;
 #endif

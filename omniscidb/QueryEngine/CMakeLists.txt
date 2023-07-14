@@ -322,6 +322,7 @@ list(APPEND QUERY_ENGINE_LIBS ${llvm_libs} ${ZLIB_LIBRARIES})
 
 add_subdirectory(CostModel)
 list(APPEND QUERY_ENGINE_LIBS CostModel)
+list(APPEND QUERY_ENGINE_LIBS ${libhash_table})
 
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
 

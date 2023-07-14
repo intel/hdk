@@ -56,6 +56,16 @@ struct ExecuteTestBase {
     }
   }
 
+  static void insertSqliteAndHDK(const std::string& table_name,
+                                 const std::vector<std::string>& tuples) {
+    const std::string insert_template{
+        std::string("INSERT INTO ").append(table_name).append(" VALUES(")};
+    for (const std::string& tuple : tuples) {
+      run_sqlite_query(insert_template + tuple + ");");
+      insertCsvValues(table_name, tuple);
+    }
+  }
+
   static void createTestInnerLoopJoinTable() {
     createTable(
         "test_inner_loop_join",
@@ -65,13 +75,13 @@ struct ExecuteTestBase {
     run_sqlite_query(
         "CREATE TABLE test_inner_loop_join(x int not null, y int not null, xx "
         "smallint);");
-
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(7, 43, 12);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(8, 2, 11);");
-    run_sqlite_query("INSERT INTO test_inner_loop_join VALUES(9, 7, 10);");
-    insertCsvValues("test_inner_loop_join", "7,43,2");
-    insertCsvValues("test_inner_loop_join", "8,2,11");
-    insertCsvValues("test_inner_loop_join", "9,7,10");
+    const std::vector<std::string> tuples{
+        "7,43,2",
+        "8,2,11",
+        "9,7,10",
+        "7,9,10",
+    };
+    insertSqliteAndHDK("test_inner_loop_join", tuples);
   }
 
   static void createSmallTestsTable() {
@@ -297,6 +307,13 @@ class JoinTest : public ExecuteTestBase, public ::testing::Test {};
 TEST_F(JoinTest, SimpleJoin) {
   c("SELECT a.x FROM test_inner_loop_join as a, test_inner_loop_join as b WHERE a.x > "
     "b.y ",
+    g_dt);
+}
+
+TEST_F(JoinTest, HashJoin) {
+  // Baseline OneToOne
+  c("SELECT a.x FROM test_inner_loop_join as a, small_tests as b WHERE (a.x = b.x) AND "
+    "(a.y = b.x) ",
     g_dt);
 }
 
