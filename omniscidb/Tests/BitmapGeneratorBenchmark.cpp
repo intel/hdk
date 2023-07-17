@@ -45,8 +45,6 @@ static std::unique_ptr<T[]> gen_data(size_t size, const T null_val, float percen
   return data_buf;
 }
 
-#include <iostream>
-
 static auto alloc_bitmap(size_t input_sz) {
   // allocate extra space to ensure we can align
   size_t crt_sz = input_sz;
@@ -61,7 +59,6 @@ static auto alloc_bitmap(size_t input_sz) {
   return bitmap_buf_owned;
 }
 
-// TODO: get null count and verify
 static void null_bitmap_8(benchmark::State& state) {
   // generate a 4096 element buffer with 25% nulls (+ a few more since the null sentinel
   // will match the max size in the buffer)
