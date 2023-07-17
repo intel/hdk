@@ -10,10 +10,15 @@
 
 #include <cstring>
 
-#include <iostream>
-
 #ifndef _WIN32
-size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+
+#if defined(__clang__)
+#define AVX512_TARGET target("avx512bw")
+#else
+#define AVX512_TARGET target("avx512f", "avx512bw")
+#endif
+
+size_t __attribute__((AVX512_TARGET, optimize("no-tree-vectorize")))
 gen_null_bitmap_8_impl(uint8_t* dst,
                        const uint8_t* src,
                        size_t size,
@@ -40,7 +45,7 @@ gen_null_bitmap_8_impl(uint8_t* dst,
   return null_count;
 }
 
-size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+size_t __attribute__((AVX512_TARGET, optimize("no-tree-vectorize")))
 gen_null_bitmap_16_impl(uint8_t* dst,
                         const uint16_t* src,
                         size_t size,
@@ -67,7 +72,7 @@ gen_null_bitmap_16_impl(uint8_t* dst,
   return null_count;
 }
 
-size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+size_t __attribute__((AVX512_TARGET, optimize("no-tree-vectorize")))
 gen_null_bitmap_32_impl(uint8_t* dst,
                         const uint32_t* src,
                         size_t size,
@@ -93,7 +98,7 @@ gen_null_bitmap_32_impl(uint8_t* dst,
   return null_count;
 }
 
-size_t __attribute__((target("avx512f", "avx512bw"), optimize("no-tree-vectorize")))
+size_t __attribute__((AVX512_TARGET, optimize("no-tree-vectorize")))
 gen_null_bitmap_64_impl(uint8_t* dst,
                         const uint64_t* src,
                         size_t size,
@@ -120,11 +125,15 @@ gen_null_bitmap_64_impl(uint8_t* dst,
 }
 #endif
 
+#if defined(_MSC_VER) || defined(__clang__)
+#define BITMAP_GEN_DEFAULT_TARGET_ATTRS
+#else
+#define BITMAP_GEN_DEFAULT_TARGET_ATTRS __attribute__((target_clones("bmi2", "default")))
+#endif
+
 template <typename TYPE>
-size_t gen_null_bitmap_default(uint8_t* dst,
-                               const TYPE* src,
-                               size_t size,
-                               const TYPE null_val) {
+size_t BITMAP_GEN_DEFAULT_TARGET_ATTRS
+gen_null_bitmap_default(uint8_t* dst, const TYPE* src, size_t size, const TYPE null_val) {
   size_t null_count = 0;
   TYPE loaded_data[8];
 
@@ -156,7 +165,6 @@ size_t BITMAP_GEN_TARGET_ATTRS gen_null_bitmap_8_impl(uint8_t* dst,
                                                       const uint8_t* src,
                                                       size_t size,
                                                       const uint8_t null_val) {
-  // std::cout << "Using default impl " << std::endl;
   return gen_null_bitmap_default<uint8_t>(dst, src, size, null_val);
 }
 
