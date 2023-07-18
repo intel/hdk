@@ -17,6 +17,7 @@
 #include "IR/Context.h"
 #include "Shared/InlineNullValues.h"
 
+#include <arrow/compute/api.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 
@@ -1187,6 +1188,26 @@ std::shared_ptr<arrow::ChunkedArray> createDictionaryEncodedColumn(
   return nullptr;
 }
 
+namespace {
+
+template <typename INDEX_TYPE>
+void convertArrowDictionaryIndices(const std::vector<int>& indices_mapping,
+                                   std::shared_ptr<arrow::Array> indices,
+                                   int32_t* out_indices) {
+  using ArrowType = typename arrow::CTypeTraits<INDEX_TYPE>::ArrowType;
+  using ArrayType = typename arrow::TypeTraits<ArrowType>::ArrayType;
+  auto casted_indices = std::static_pointer_cast<ArrayType>(indices);
+  for (int i = 0; i < casted_indices->length(); i++) {
+    if (casted_indices->IsValid(i)) {
+      out_indices[i] = indices_mapping[casted_indices->Value(i)];
+    } else {
+      out_indices[i] = inline_int_null_value<int32_t>();
+    }
+  }
+}
+
+}  // namespace
+
 std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
     StringDictionary* dict,
     std::shared_ptr<arrow::ChunkedArray> arr,
@@ -1195,35 +1216,67 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
     throw std::runtime_error("Unsupported HDK dictionary for Arrow dictionary import: "s +
                              type->toString());
   }
+
+  // Create new arrow buffer to hold remapped indices
+  std::shared_ptr<arrow::Buffer> dict_indices_buf;
+  auto res = arrow::AllocateBuffer(arr->length() * sizeof(int32_t));
+  CHECK(res.ok());
+  dict_indices_buf = std::move(res).ValueOrDie();
+  auto cur_raw_data = reinterpret_cast<int32_t*>(dict_indices_buf->mutable_data());
+
   // TODO: allocate one big array and split it by fragments as it is done in
   // createDictionaryEncodedColumn
-  std::vector<std::shared_ptr<arrow::Array>> converted_chunks;
   for (auto& chunk : arr->chunks()) {
     auto dict_array = std::static_pointer_cast<arrow::DictionaryArray>(chunk);
     auto values = std::static_pointer_cast<arrow::StringArray>(dict_array->dictionary());
     std::vector<std::string_view> strings(values->length());
+    strings.reserve(values->length());
     for (int i = 0; i < values->length(); i++) {
       auto view = values->GetView(i);
       strings[i] = std::string_view(view.data(), view.length());
     }
-    auto arrow_indices =
-        std::static_pointer_cast<arrow::Int32Array>(dict_array->indices());
     std::vector<int> indices_mapping(values->length());
     dict->getOrAddBulk(strings, indices_mapping.data());
 
-    // create new arrow chunk with remapped indices
-    std::shared_ptr<arrow::Buffer> dict_indices_buf;
-    auto res = arrow::AllocateBuffer(arrow_indices->length() * sizeof(int32_t));
-    CHECK(res.ok());
-    dict_indices_buf = std::move(res).ValueOrDie();
-    auto raw_data = reinterpret_cast<int32_t*>(dict_indices_buf->mutable_data());
-
-    for (int i = 0; i < arrow_indices->length(); i++) {
-      raw_data[i] = indices_mapping[arrow_indices->Value(i)];
+    auto arrow_indices = dict_array->indices();
+    switch (arrow_indices->type_id()) {
+      case arrow::Type::INT8:
+        convertArrowDictionaryIndices<int8_t>(
+            indices_mapping, arrow_indices, cur_raw_data);
+        break;
+      case arrow::Type::INT16:
+        convertArrowDictionaryIndices<int16_t>(
+            indices_mapping, arrow_indices, cur_raw_data);
+        break;
+      case arrow::Type::INT32:
+        convertArrowDictionaryIndices<int32_t>(
+            indices_mapping, arrow_indices, cur_raw_data);
+        break;
+      case arrow::Type::INT64:
+        convertArrowDictionaryIndices<int64_t>(
+            indices_mapping, arrow_indices, cur_raw_data);
+        break;
+      default:
+        throw std::runtime_error("Unsupported Arrow dictionary for import: "s +
+                                 arr->type()->ToString());
     }
 
+    cur_raw_data += chunk->length();
+  }
+  std::vector<std::shared_ptr<arrow::Array>> converted_chunks;
+  converted_chunks.push_back(
+      std::make_shared<arrow::Int32Array>(arr->length(), dict_indices_buf));
+  return std::make_shared<arrow::ChunkedArray>(converted_chunks);
+}
+
+std::shared_ptr<arrow::ChunkedArray> decodeArrowDictionary(
+    std::shared_ptr<arrow::ChunkedArray> arr) {
+  std::vector<std::shared_ptr<arrow::Array>> converted_chunks;
+  for (auto& chunk : arr->chunks()) {
+    auto dict_arr = std::dynamic_pointer_cast<arrow::DictionaryArray>(chunk);
+    CHECK(dict_arr);
     converted_chunks.push_back(
-        std::make_shared<arrow::Int32Array>(arrow_indices->length(), dict_indices_buf));
+        arrow::compute::Take(*dict_arr->dictionary(), *dict_arr->indices()).ValueOrDie());
   }
   return std::make_shared<arrow::ChunkedArray>(converted_chunks);
 }

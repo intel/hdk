@@ -44,3 +44,6 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
     StringDictionary* dict,
     std::shared_ptr<arrow::ChunkedArray> arr,
     const hdk::ir::Type* type);
+
+std::shared_ptr<arrow::ChunkedArray> decodeArrowDictionary(
+    std::shared_ptr<arrow::ChunkedArray> arr);
