@@ -22,9 +22,7 @@ using namespace TestHelpers::ArrowSQLRunner;
 
 // when we want to measure storage latencies, read the csv files before starting the
 // benchmark
-#ifndef USE_HOT_DATA
 std::vector<std::shared_ptr<arrow::Table>> g_taxi_data_files;
-#endif
 
 std::istream& operator>>(std::istream& in, ExecutorDeviceType& device_type) {
   std::string token;
@@ -162,6 +160,7 @@ static void createTaxiTable() {
   }
 }
 
+#ifndef USE_HOT_DATA
 static std::vector<std::shared_ptr<arrow::Table>> readTaxiFilesCsv(
     const ColumnInfoList& col_infos) {
   std::vector<std::shared_ptr<arrow::Table>> taxi_arrow_data;
@@ -198,6 +197,7 @@ static std::vector<std::shared_ptr<arrow::Table>> readTaxiFilesCsv(
   std::cout << "Read taxi csv files in " << time << " ms" << std::endl;
   return taxi_arrow_data;
 }
+#endif
 
 static void loadTaxiArrowData() {
   for (auto& data_file : g_taxi_data_files) {
