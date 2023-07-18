@@ -323,21 +323,28 @@ void checkStringColumnData(ArrowStorage& storage,
   size_t end_row = std::min(row_count, start_row + fragment_size);
   size_t frag_rows = end_row - start_row;
   size_t chunk_size = 0;
+  bool has_nulls = false;
   for (size_t i = start_row; i < end_row; ++i) {
-    chunk_size += vals[i].size();
+    if (vals[i] != "<NULL>") {
+      chunk_size += vals[i].size();
+    } else {
+      has_nulls = true;
+    }
   }
   checkChunkMeta(chunk_meta_map.at(col_id),
                  storage.getColumnInfo(TEST_DB_ID, table_id, col_id)->type,
                  frag_rows,
                  chunk_size,
-                 false);
+                 has_nulls);
   std::vector<int8_t> expected_data(chunk_size);
   std::vector<uint32_t> expected_offset(frag_rows + 1);
   uint32_t data_offset = 0;
   for (size_t i = start_row; i < end_row; ++i) {
     expected_offset[i - start_row] = data_offset;
-    memcpy(expected_data.data() + data_offset, vals[i].data(), vals[i].size());
-    data_offset += vals[i].size();
+    if (vals[i] != "<NULL>") {
+      memcpy(expected_data.data() + data_offset, vals[i].data(), vals[i].size());
+      data_offset += vals[i].size();
+    }
   }
   expected_offset.back() = data_offset;
   checkFetchedData(storage, table_id, col_id, frag_idx + 1, expected_offset, {2});
@@ -361,17 +368,28 @@ void checkStringDictColumnData(ArrowStorage& storage,
   auto& dict = *storage.getDictMetadata(getDictId(col_info->type))->stringDict;
 
   std::vector<IndexType> expected_ids(frag_rows);
+  bool has_nulls = false;
+  IndexType min = std::numeric_limits<IndexType>::max();
+  IndexType max = std::numeric_limits<IndexType>::min();
   for (size_t i = start_row; i < end_row; ++i) {
-    expected_ids[i - start_row] = static_cast<IndexType>(dict.getIdOfString(expected[i]));
+    if (expected[i] == "<NULL>") {
+      expected_ids[i - start_row] = inline_int_null_value<IndexType>();
+      has_nulls = true;
+    } else {
+      expected_ids[i - start_row] =
+          static_cast<IndexType>(dict.getIdOfString(expected[i]));
+      min = std::min(min, expected_ids[i - start_row]);
+      max = std::max(max, expected_ids[i - start_row]);
+    }
   }
 
   checkChunkMeta(chunk_meta_map.at(col_id),
                  col_info->type,
                  frag_rows,
                  frag_rows * sizeof(IndexType),
-                 false,
-                 *std::min_element(expected_ids.begin(), expected_ids.end()),
-                 *std::max_element(expected_ids.begin(), expected_ids.end()));
+                 has_nulls,
+                 min,
+                 max);
 
   checkFetchedData(storage, table_id, col_id, frag_idx + 1, expected_ids);
 }
@@ -1752,6 +1770,109 @@ TEST_F(ArrowStorageTest, ImportParquet) {
             32'000'000,
             std::vector<int64_t>({1, 2, 3, 4, 5}),
             std::vector<double>({1.1, 2.2, 3.3, 4.4, 5.5}));
+}
+
+namespace {
+
+template <typename INDEX_TYPE,
+          bool NULL_INDICES = false,
+          bool NULL_VALUES = false,
+          bool TARGET_DICT = true>
+void TestImportArrowDict(ConfigPtr config) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config);
+  auto tinfo = storage.createTable(
+      "table1",
+      {{"col1",
+        TARGET_DICT ? static_cast<const hdk::ir::Type*>(ctx.extDict(ctx.text(), 0))
+                    : static_cast<const hdk::ir::Type*>(ctx.text())}});
+
+  using IndexArrowType = typename arrow::CTypeTraits<INDEX_TYPE>::ArrowType;
+  using IndexBuilder = typename arrow::TypeTraits<IndexArrowType>::BuilderType;
+
+  std::vector<std::shared_ptr<arrow::Array>> arrays;
+  IndexBuilder index_builder;
+  ARROW_THROW_NOT_OK(index_builder.Append(0));
+  ARROW_THROW_NOT_OK(index_builder.Append(1));
+  ARROW_THROW_NOT_OK(index_builder.Append(0));
+  ARROW_THROW_NOT_OK(index_builder.Append(1));
+  arrow::StringBuilder value_builder;
+  ARROW_THROW_NOT_OK(value_builder.Append("str1"));
+  ARROW_THROW_NOT_OK(value_builder.Append("str2"));
+  arrays.push_back(arrow::DictionaryArray::FromArrays(index_builder.Finish().ValueOrDie(),
+                                                      value_builder.Finish().ValueOrDie())
+                       .ValueOrDie());
+  ARROW_THROW_NOT_OK(index_builder.Append(0));
+  ARROW_THROW_NOT_OK(index_builder.Append(1));
+  if (NULL_INDICES) {
+    ARROW_THROW_NOT_OK(index_builder.AppendNull());
+  } else {
+    ARROW_THROW_NOT_OK(index_builder.Append(1));
+  }
+  ARROW_THROW_NOT_OK(index_builder.Append(2));
+  ARROW_THROW_NOT_OK(index_builder.Append(2));
+  if (NULL_VALUES) {
+    ARROW_THROW_NOT_OK(value_builder.AppendNull());
+  } else {
+    ARROW_THROW_NOT_OK(value_builder.Append("str2"));
+  }
+  ARROW_THROW_NOT_OK(value_builder.Append("str3"));
+  ARROW_THROW_NOT_OK(value_builder.Append("str4"));
+  arrays.push_back(arrow::DictionaryArray::FromArrays(index_builder.Finish().ValueOrDie(),
+                                                      value_builder.Finish().ValueOrDie())
+                       .ValueOrDie());
+  auto chunked_arr = std::make_shared<arrow::ChunkedArray>(arrays);
+
+  arrow::SchemaBuilder schema_builder;
+  ARROW_THROW_NOT_OK(schema_builder.AddField(
+      std::make_shared<arrow::Field>("col1", chunked_arr->type())));
+  auto schema = schema_builder.Finish().ValueOrDie();
+  auto at = arrow::Table::Make(schema, {chunked_arr});
+
+  storage.appendArrowTable(at, "table1");
+
+  checkData(storage,
+            tinfo->table_id,
+            9,
+            32'000'000,
+            std::vector<std::string>({"str1"s,
+                                      "str2"s,
+                                      "str1"s,
+                                      "str2"s,
+                                      NULL_VALUES ? "<NULL>"s : "str2"s,
+                                      "str3"s,
+                                      NULL_INDICES ? "<NULL>"s : "str3"s,
+                                      "str4"s,
+                                      "str4"s}));
+}
+
+}  // namespace
+
+TEST_F(ArrowStorageTest, ImportArrowDict8) {
+  TestImportArrowDict<int8_t>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDict16) {
+  TestImportArrowDict<int16_t>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDict32) {
+  TestImportArrowDict<int32_t>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDict64) {
+  TestImportArrowDict<int64_t>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDict_Null_Indices) {
+  TestImportArrowDict<int32_t, true, false>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDict_Null_Values) {
+  TestImportArrowDict<int32_t, false, true>(config_);
+}
+
+TEST_F(ArrowStorageTest, ImportArrowDictToPlainString) {
+  TestImportArrowDict<int32_t, true, true, false>(config_);
 }
 
 int main(int argc, char** argv) {

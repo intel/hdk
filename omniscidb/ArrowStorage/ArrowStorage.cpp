@@ -730,6 +730,9 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
             CHECK(false);
         }
       } else if (col_type->isString()) {
+        if (col_arr->type()->id() == arrow::Type::DICTIONARY) {
+          col_arr = decodeArrowDictionary(col_arr);
+        }
       } else {
         col_arr =
             replaceNullValues(col_arr,
@@ -1117,6 +1120,19 @@ void ArrowStorage::compareSchemas(std::shared_ptr<arrow::Schema> lhs,
   for (size_t i = 0; i < lhs_fields.size(); ++i) {
     auto lhs_type = lhs_fields[i]->type();
     auto rhs_type = rhs_fields[i]->type();
+
+    // For string and dictionary columns we allow both dictionary and plain strings on
+    // import.
+    if (lhs_type->id() == arrow::Type::DICTIONARY) {
+      lhs_type = static_cast<const arrow::DictionaryType*>(lhs_type.get())->value_type();
+    }
+    if (rhs_type->id() == arrow::Type::DICTIONARY) {
+      rhs_type = static_cast<const arrow::DictionaryType*>(rhs_type.get())->value_type();
+      if (rhs_type->id() != arrow::Type::STRING) {
+        throw std::runtime_error("Unsupported dictionary type: "s +
+                                 rhs_fields[i]->type()->ToString());
+      }
+    }
 
     if (!lhs_type->Equals(rhs_type) && (lhs_type->id() != arrow::Type::NA) &&
         (rhs_type->id() != arrow::Type::NA)) {
