@@ -370,7 +370,7 @@ class ArrowSQLRunnerImpl {
   std::shared_ptr<ArrowStorage> storage_;
   std::shared_ptr<hdk::ResultSetRegistry> rs_registry_;
   std::shared_ptr<SchemaMgr> schema_mgr_;
-  CalciteMgr* calcite_;
+  CalciteMgr* calcite_ = nullptr;
   std::shared_ptr<RelAlgCache> rel_alg_cache_;
 
   SQLiteComparator sqlite_comparator_;
