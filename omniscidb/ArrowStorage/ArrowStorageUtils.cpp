@@ -1231,7 +1231,7 @@ std::shared_ptr<arrow::ChunkedArray> convertArrowDictionary(
 }
 
 #if 1  // ndef _MSC_VER
-__attribute__((target("avx512f"), optimize("no-tree-vectorize"))) void
+void __attribute__((target("avx512f"), optimize("no-tree-vectorize")))
 encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
                          const int32_t* indices_buf,
                          const size_t num_elems) {
@@ -1239,7 +1239,7 @@ encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
   constexpr int vector_window_bytes = (512 / 8);
   constexpr int vector_window =
       vector_window_bytes / sizeof(int32_t);  // elements in a vector
-  const size_t encoded_buf_size_bytes = num_elems * sizeof(int16_t);
+  // const size_t encoded_buf_size_bytes = num_elems * sizeof(int16_t);
   std::memset(encoded_indices_buf, std::numeric_limits<uint16_t>::max(), num_elems);
 
   __m512i null_vals =
@@ -1281,10 +1281,10 @@ encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
   }
 }
 
-__attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
-    int8_t* encoded_indices_buf,
-    const int32_t* indices_buf,
-    const size_t num_elems) {
+void __attribute__((target("avx512f")))
+encodeStrDictIndicesImpl(int8_t* encoded_indices_buf,
+                         const int32_t* indices_buf,
+                         const size_t num_elems) {
   VLOG(2) << "Running vectorized 8-bit conversion";
   constexpr int vector_window_bytes = (512 / 8);
   constexpr int vector_window =
@@ -1342,7 +1342,7 @@ __attribute__((target("avx512f"))) void encodeStrDictIndicesImpl(
 #define DEFAULT_TARGET_ATTRIBUTE __attribute__((target("default")))
 #endif
 
-DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
+void DEFAULT_TARGET_ATTRIBUTE encodeStrDictIndicesImpl(int16_t* encoded_indices_buf,
                                                        const int32_t* indices_buf,
                                                        const size_t num_elems) {
   for (size_t i = 0; i < num_elems; i++) {
@@ -1353,7 +1353,7 @@ DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int16_t* encoded_indices_
   }
 }
 
-DEFAULT_TARGET_ATTRIBUTE void encodeStrDictIndicesImpl(int8_t* encoded_indices_buf,
+void DEFAULT_TARGET_ATTRIBUTE encodeStrDictIndicesImpl(int8_t* encoded_indices_buf,
                                                        const int32_t* indices_buf,
                                                        const size_t num_elems) {
   for (size_t i = 0; i < num_elems; i++) {
