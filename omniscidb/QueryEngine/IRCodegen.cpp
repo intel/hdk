@@ -1169,83 +1169,32 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
     const bool thread_mem_shared) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CHECK_GE(col_width, sizeof(int32_t));
+  llvm::Value* group_key;
+  llvm::Value* key_to_cache;
   CodeGenerator code_generator(this, co.codegen_traits_desc);
-  auto group_key = code_generator.codegen(group_by_col, true, co).front();
-  auto key_to_cache = group_key;
   if (group_by_col && group_by_col->is<hdk::ir::UOper>() &&
       group_by_col->as<hdk::ir::UOper>()->isUnnest()) {
-    auto preheader = cgen_state_->ir_builder_.GetInsertBlock();
-    auto array_loop_head = llvm::BasicBlock::Create(cgen_state_->context_,
-                                                    "array_loop_head",
-                                                    cgen_state_->current_func_,
-                                                    preheader->getNextNode());
-    diamond_codegen.setFalseTarget(array_loop_head);
-    const auto ret_ty = get_int_type(32, cgen_state_->context_);
-    llvm::Value* array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
-    if (array_idx_ptr->getType()->getPointerAddressSpace() !=
-        co.codegen_traits_desc.local_addr_space_) {
-      array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-          array_idx_ptr,
-          llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
-                                 co.codegen_traits_desc.local_addr_space_),
-          "array.idx.ptrcast");
-    }
-    CHECK(array_idx_ptr);
-    cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
     const auto arr_expr = group_by_col->as<hdk::ir::UOper>()->operand();
     auto array_type = arr_expr->type();
     CHECK(array_type->isArray());
     auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
-    auto array_len =
-        (array_type->size() > 0)
-            ? cgen_state_->llInt(array_type->size() / elem_type->size())
-            : cgen_state_->emitExternalCall(
-                  "array_size",
-                  ret_ty,
-                  {group_key,
-                   code_generator.posArg(arr_expr),
-                   cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))});
-    cgen_state_->ir_builder_.CreateBr(array_loop_head);
-    cgen_state_->ir_builder_.SetInsertPoint(array_loop_head);
-    CHECK(array_len);
-    auto array_idx = cgen_state_->ir_builder_.CreateLoad(
-        array_idx_ptr->getType()->getPointerElementType(), array_idx_ptr);
-    auto bound_check = cgen_state_->ir_builder_.CreateICmp(
-        llvm::ICmpInst::ICMP_SLT, array_idx, array_len);
-    auto array_loop_body = llvm::BasicBlock::Create(
-        cgen_state_->context_, "array_loop_body", cgen_state_->current_func_);
-    cgen_state_->ir_builder_.CreateCondBr(
-        bound_check,
-        array_loop_body,
-        array_loops.empty() ? diamond_codegen.orig_cond_false_ : array_loops.top());
-    cgen_state_->ir_builder_.SetInsertPoint(array_loop_body);
-    cgen_state_->ir_builder_.CreateStore(
-        cgen_state_->ir_builder_.CreateAdd(array_idx, cgen_state_->llInt(int32_t(1))),
-        array_idx_ptr);
-    auto array_at_fname = "array_at_" + numeric_type_name(elem_type);
-    if (array_type->size() < 0) {
-      if (!array_type->nullable()) {
-        array_at_fname = "notnull_" + array_at_fname;
-      }
-      array_at_fname = "varlen_" + array_at_fname;
-    }
     const auto ar_ret_ty =
         elem_type->isFloatingPoint()
             ? (elem_type->isFp64() ? llvm::Type::getDoubleTy(cgen_state_->context_)
                                    : llvm::Type::getFloatTy(cgen_state_->context_))
             : get_int_type(elem_type->canonicalSize() * 8, cgen_state_->context_);
-    group_key = cgen_state_->emitExternalCall(
-        array_at_fname,
-        ar_ret_ty,
-        {group_key, code_generator.posArg(arr_expr), array_idx});
+
+    group_key = arrayLoopCodegen(arr_expr, array_loops, diamond_codegen, co);
+
     if (need_patch_unnest_double(
             elem_type, isArchMaxwell(co.device_type), thread_mem_shared)) {
       key_to_cache = spillDoubleElement(group_key, ar_ret_ty);
     } else {
       key_to_cache = group_key;
     }
-    CHECK(array_loop_head);
-    array_loops.push(array_loop_head);
+  } else {
+    group_key = code_generator.codegen(group_by_col, true, co).front();
+    key_to_cache = group_key;
   }
   cgen_state_->group_by_expr_cache_.push_back(key_to_cache);
   llvm::Value* orig_group_key{nullptr};
@@ -1272,6 +1221,88 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
         get_int_type(col_width * 8, cgen_state_->context_));
   }
   return {group_key, orig_group_key};
+}
+
+llvm::Value* Executor::arrayLoopCodegen(const hdk::ir::Expr* array_expr,
+                                        std::stack<llvm::BasicBlock*>& array_loops,
+                                        DiamondCodegen& diamond_codegen,
+                                        const CompilationOptions& co) {
+  AUTOMATIC_IR_METADATA(cgen_state_.get());
+  CodeGenerator code_generator(this, co.codegen_traits_desc);
+  auto array_lv = code_generator.codegen(array_expr, true, co).front();
+
+  if (cgen_state_->unnest_cache_.count(array_lv)) {
+    return cgen_state_->unnest_cache_.at(array_lv);
+  }
+
+  auto preheader = cgen_state_->ir_builder_.GetInsertBlock();
+  auto array_loop_head = llvm::BasicBlock::Create(cgen_state_->context_,
+                                                  "array_loop_head",
+                                                  cgen_state_->current_func_,
+                                                  preheader->getNextNode());
+  diamond_codegen.setFalseTarget(array_loop_head);
+  const auto ret_ty = get_int_type(32, cgen_state_->context_);
+  llvm::Value* array_idx_ptr = cgen_state_->ir_builder_.CreateAlloca(ret_ty);
+  if (array_idx_ptr->getType()->getPointerAddressSpace() !=
+      co.codegen_traits_desc.local_addr_space_) {
+    array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
+        array_idx_ptr,
+        llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
+                               co.codegen_traits_desc.local_addr_space_),
+        "array.idx.ptrcast");
+  }
+  CHECK(array_idx_ptr);
+  cgen_state_->ir_builder_.CreateStore(cgen_state_->llInt(int32_t(0)), array_idx_ptr);
+  auto array_type = array_expr->type();
+  CHECK(array_type->isArray());
+  auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  auto array_len =
+      (array_type->size() > 0)
+          ? cgen_state_->llInt(array_type->size() / elem_type->size())
+          : cgen_state_->emitExternalCall(
+                "array_size",
+                ret_ty,
+                {array_lv,
+                 code_generator.posArg(array_expr),
+                 cgen_state_->llInt(log2_bytes(elem_type->canonicalSize()))});
+  cgen_state_->ir_builder_.CreateBr(array_loop_head);
+  cgen_state_->ir_builder_.SetInsertPoint(array_loop_head);
+  CHECK(array_len);
+  auto array_idx = cgen_state_->ir_builder_.CreateLoad(
+      array_idx_ptr->getType()->getPointerElementType(), array_idx_ptr);
+  auto bound_check =
+      cgen_state_->ir_builder_.CreateICmp(llvm::ICmpInst::ICMP_SLT, array_idx, array_len);
+  auto array_loop_body = llvm::BasicBlock::Create(
+      cgen_state_->context_, "array_loop_body", cgen_state_->current_func_);
+  cgen_state_->ir_builder_.CreateCondBr(
+      bound_check,
+      array_loop_body,
+      array_loops.empty() ? diamond_codegen.orig_cond_false_ : array_loops.top());
+  cgen_state_->ir_builder_.SetInsertPoint(array_loop_body);
+  array_loops.push(array_loop_head);
+  cgen_state_->ir_builder_.CreateStore(
+      cgen_state_->ir_builder_.CreateAdd(array_idx, cgen_state_->llInt(int32_t(1))),
+      array_idx_ptr);
+  auto array_at_fname = "array_at_" + numeric_type_name(elem_type);
+  if (array_type->size() < 0) {
+    if (!array_type->nullable()) {
+      array_at_fname = "notnull_" + array_at_fname;
+    }
+    array_at_fname = "varlen_" + array_at_fname;
+  }
+  const auto ar_ret_ty =
+      elem_type->isFloatingPoint()
+          ? (elem_type->isFp64() ? llvm::Type::getDoubleTy(cgen_state_->context_)
+                                 : llvm::Type::getFloatTy(cgen_state_->context_))
+          : get_int_type(elem_type->canonicalSize() * 8, cgen_state_->context_);
+  auto res = cgen_state_->emitExternalCall(
+      array_at_fname,
+      ar_ret_ty,
+      {array_lv, code_generator.posArg(array_expr), array_idx});
+
+  cgen_state_->unnest_cache_.emplace(array_lv, res);
+
+  return res;
 }
 
 CodeGenerator::NullCheckCodegen::NullCheckCodegen(CgenState* cgen_state,

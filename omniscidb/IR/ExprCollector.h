@@ -34,6 +34,15 @@ class ExprCollector : public ExprVisitor<void> {
     return std::move(collector.result_);
   }
 
+  template <typename... Ts>
+  static ResultType collect(const std::vector<const Expr*>& exprs, Ts&&... args) {
+    CollectorType collector(std::forward<Ts>(args)...);
+    for (auto& expr : exprs) {
+      collector.visit(expr);
+    }
+    return std::move(collector.result_);
+  }
+
   ResultType& result() { return result_; }
   const ResultType& result() const { return result_; }
 

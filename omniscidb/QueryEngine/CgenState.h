@@ -389,6 +389,7 @@ struct CgenState {
       str_dict_translation_mgrs_;
   std::map<std::pair<llvm::Value*, llvm::Value*>, ArrayLoadCodegen>
       array_load_cache_;  // byte stream to array info
+  std::unordered_map<llvm::Value*, llvm::Value*> unnest_cache_;
   bool needs_error_check_;
   bool automatic_ir_metadata_;
 
