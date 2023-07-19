@@ -70,6 +70,7 @@ jobs:
 
       - name: Start the container
         run:  |
+          set -vx
           mkdir -p build
           docker run -id --name build.${{ inputs.name }} --network host build.${{ inputs.name }}:latest
           docker cp . build.${{ inputs.name }}:/_work

@@ -1,0 +1,8 @@
+# Conda
+RUN curl -o Miniconda3-latest-Linux-x86_64.sh -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    sh Miniconda3-latest-Linux-x86_64.sh -u -b -p /usr/share/miniconda && \
+    chown -R ghrunner:ghrunner /usr/share/miniconda && \
+    rm -f Miniconda3-latest-Linux-x86_64.sh
+
+ENV PATH /usr/share/miniconda/envs/omnisci-dev/bin:/usr/share/miniconda/bin:$PATH
+
