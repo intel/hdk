@@ -444,7 +444,7 @@ class BaselineJoinHashTableBuilder {
                                                   layout == HashType::OneToOne,
                                                   -1);
 #else
-        init_baseline_hash_join_buff_on_l0_32(gpu_hash_table_buff,
+        init_baseline_hash_join_buff_on_l0<int32_t>(gpu_hash_table_buff,
                                               keyspace_entry_count,
                                               key_component_count,
                                               layout == HashType::OneToOne,
@@ -459,7 +459,11 @@ class BaselineJoinHashTableBuilder {
                                                   layout == HashType::OneToOne,
                                                   -1);
 #else
-        UNREACHABLE();
+        init_baseline_hash_join_buff_on_l0<int64_t>(gpu_hash_table_buff,
+                                                  keyspace_entry_count,
+                                                  key_component_count,
+                                                  layout == HashType::OneToOne,
+                                                  -1);
 #endif
         break;
       default:
@@ -479,7 +483,7 @@ class BaselineJoinHashTableBuilder {
             key_handler_gpu,
             join_columns.front().num_elems);
 #else
-        fill_baseline_hash_join_buff_on_l0_32(gpu_hash_table_buff,
+        fill_baseline_hash_join_buff_on_l0<int32_t>(gpu_hash_table_buff,
                                               keyspace_entry_count,
                                               -1,
                                               for_semi_join,
@@ -508,7 +512,16 @@ class BaselineJoinHashTableBuilder {
             key_handler_gpu,
             join_columns.front().num_elems);
 #else
-        UNREACHABLE();
+        fill_baseline_hash_join_buff_on_l0<int64_t>(
+            gpu_hash_table_buff,
+            keyspace_entry_count,
+            -1,
+            for_semi_join,
+            key_component_count,
+            layout == HashType::OneToOne,
+            reinterpret_cast<int*>(dev_err_buff),
+            key_handler_gpu,
+            join_columns.front().num_elems);
 #endif
         buffer_provider->copyFromDevice(reinterpret_cast<int8_t*>(&err),
                                         reinterpret_cast<const int8_t*>(dev_err_buff),
@@ -546,7 +559,7 @@ class BaselineJoinHashTableBuilder {
               key_handler_gpu,
               join_columns.front().num_elems);
 #else
-          fill_one_to_many_baseline_hash_table_on_l0_32(one_to_many_buff,
+          fill_one_to_many_baseline_hash_table_on_l0<int32_t>(one_to_many_buff,
                                                         composite_key_dict,
                                                         keyspace_entry_count,
                                                         -1,
@@ -567,7 +580,12 @@ class BaselineJoinHashTableBuilder {
               key_handler_gpu,
               join_columns.front().num_elems);
 #else
-          UNREACHABLE();
+          fill_one_to_many_baseline_hash_table_on_l0<int64_t>(one_to_many_buff,
+                                                        composite_key_dict,
+                                                        keyspace_entry_count,
+                                                        -1,
+                                                        key_handler_gpu,
+                                                        join_columns.front().num_elems);
 #endif
           break;
         }
