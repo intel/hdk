@@ -20,7 +20,11 @@
 llvm::Value* CodeGenerator::codegenUnnest(const hdk::ir::UOper* uoper,
                                           const CompilationOptions& co) {
   AUTOMATIC_IR_METADATA(cgen_state_);
-  return codegen(uoper->operand(), true, co).front();
+  auto array_lv = codegen(uoper->operand(), true, co).front();
+  if (!cgen_state_->unnest_cache_.count(array_lv)) {
+    throw std::runtime_error("Unsupported context for UNNEST operation.");
+  }
+  return cgen_state_->unnest_cache_.at(array_lv);
 }
 
 llvm::Value* CodeGenerator::codegenArrayAt(const hdk::ir::BinOper* array_at,
