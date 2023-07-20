@@ -234,7 +234,8 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
 
   const size_t num_dest_transients = dest_proxy->transientEntryCountUnlocked();
   const size_t num_persisted_strings_not_translated =
-      generation_ > 0 ? string_dict_->buildDictionaryTranslationMap(
+      generation_ > 0 ? StringDictionaryTranslator::buildDictionaryTranslationMap(
+                            string_dict_.get(),
                             dest_proxy->string_dict_.get(),
                             translation_map_stored_entries_ptr,
                             generation_,

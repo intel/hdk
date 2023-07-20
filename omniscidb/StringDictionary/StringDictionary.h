@@ -31,7 +31,29 @@
 
 extern bool g_enable_stringdict_parallel;
 
+class StringDictionary;
+
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
+
+class StringDictionaryTranslator {
+ public:
+  static std::vector<int32_t> buildDictionaryTranslationMap(
+      const std::shared_ptr<StringDictionary> source_dict,
+      const std::shared_ptr<StringDictionary> dest_dict,
+      StringLookupCallback const& dest_transient_lookup_callback);
+
+  static size_t buildDictionaryTranslationMap(
+      const StringDictionary* source_dict,
+      const StringDictionary* dest_dict,
+      int32_t* translated_ids,
+      const int64_t source_generation,
+      const int64_t dest_generation,
+      const bool dest_has_transients,
+      StringLookupCallback const& dest_transient_lookup_callback);
+
+ private:
+  StringDictionaryTranslator() {}
+};
 
 class StringDictionary {
  public:
@@ -88,18 +110,6 @@ class StringDictionary {
                                      const size_t generation) const;
 
   std::vector<std::string> copyStrings() const;
-
-  std::vector<int32_t> buildDictionaryTranslationMap(
-      const std::shared_ptr<StringDictionary> dest_dict,
-      StringLookupCallback const& dest_transient_lookup_callback) const;
-
-  size_t buildDictionaryTranslationMap(
-      const StringDictionary* dest_dict,
-      int32_t* translated_ids,
-      const int64_t source_generation,
-      const int64_t dest_generation,
-      const bool dest_has_transients,
-      StringLookupCallback const& dest_transient_lookup_callback) const;
 
   static constexpr int32_t INVALID_STR_ID = -1;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
@@ -205,6 +215,8 @@ class StringDictionary {
 
   char* CANARY_BUFFER{nullptr};
   size_t canary_buffer_size = 0;
+
+  friend class StringDictionaryTranslator;
 };
 
 int32_t truncate_to_generation(const int32_t id, const size_t generation);
