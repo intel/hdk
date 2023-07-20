@@ -141,11 +141,6 @@ void GpuReductionTester::codegenWrapperKernel() {
                                                      },
                                                      "smem_input_buffer_ptr");
 
-  // auto smem_input_buffer_ptr1 =
-  //     ir_builder.CreatePointerCast(smem_input_buffer_ptr,
-  //                                  llvm::Type::getInt64PtrTy(context_, 4),
-  //                                  "smem_input_buffer_ptr");
-
   auto output_buffer_ptr = ir_builder.CreatePointerCast(
       output_buffer, llvm::Type::getInt64PtrTy(context_, 4), "output_buffer_ptr");
 
@@ -159,7 +154,7 @@ void GpuReductionTester::codegenWrapperKernel() {
   ir_builder.SetInsertPoint(bb_exit);
   ir_builder.CreateRet(nullptr);
 
-  wrapper_kernel_->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
+  // wrapper_kernel_->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
 }
 
 namespace {
