@@ -43,6 +43,7 @@
 #include "QueryEngine/StreamingTopN.h"
 #include "QueryEngine/TargetExprBuilder.h"
 #include "QueryEngine/TopKSort.h"
+#include "QueryEngine/UnnestedVarsCollector.h"
 #include "QueryEngine/WindowContext.h"
 #include "ResultSet/QueryMemoryDescriptor.h"
 #include "Shared/MathUtils.h"
@@ -143,17 +144,32 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
       can_return_error = codegenShuffle(
           agg_out_ptr_w_idx, query_mem_desc, co, gpu_smem_context, filter_cfg);
     } else if (is_group_by) {
+      auto unnested_vars = UnnestedVarsCollector::collect(ra_exe_unit_.target_exprs);
+      std::vector<llvm::Value*> array_sizes;
+      llvm::Value* matched_cnt = LL_INT(int32_t(1));
+      // If we have UNNEST target expression then number of matched rows is computed
+      // as a multiplication of all unnested arrays' sizes.
+      if (!unnested_vars.empty()) {
+        CHECK(query_mem_desc.getQueryDescriptionType() ==
+              QueryDescriptionType::Projection);
+        for (auto& var : unnested_vars) {
+          array_sizes.push_back(genArraySize(var, co));
+          matched_cnt = LL_BUILDER.CreateMul(matched_cnt, array_sizes.back());
+        }
+        matched_cnt->setName("matched_cnt");
+      }
+
       if (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection &&
           !query_mem_desc.useStreamingTopN()) {
         const auto crt_matched = get_arg_by_name(ROW_FUNC, "crt_matched");
-        LL_BUILDER.CreateStore(LL_INT(int32_t(1)), crt_matched);
+        LL_BUILDER.CreateStore(matched_cnt, crt_matched);
         auto total_matched_ptr = get_arg_by_name(ROW_FUNC, "total_matched");
         llvm::Value* old_total_matched_val{nullptr};
         if (co.device_type == ExecutorDeviceType::GPU) {
           old_total_matched_val =
               LL_BUILDER.CreateAtomicRMW(llvm::AtomicRMWInst::Add,
                                          total_matched_ptr,
-                                         LL_INT(int32_t(1)),
+                                         matched_cnt,
 #if LLVM_VERSION_MAJOR > 12
                                          LLVM_ALIGN(8),
 #endif
@@ -161,15 +177,48 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
         } else {
           old_total_matched_val = LL_BUILDER.CreateLoad(
               total_matched_ptr->getType()->getPointerElementType(), total_matched_ptr);
-          LL_BUILDER.CreateStore(
-              LL_BUILDER.CreateAdd(old_total_matched_val, LL_INT(int32_t(1))),
-              total_matched_ptr);
+          LL_BUILDER.CreateStore(LL_BUILDER.CreateAdd(old_total_matched_val, matched_cnt),
+                                 total_matched_ptr);
         }
         auto old_total_matched_ptr = get_arg_by_name(ROW_FUNC, "old_total_matched");
         LL_BUILDER.CreateStore(old_total_matched_val, old_total_matched_ptr);
       }
 
-      auto agg_out_ptr_w_idx = codegenGroupBy(query_mem_desc, co, filter_cfg);
+      llvm::Value* cur_total_matched = get_arg_by_name(ROW_FUNC, "old_total_matched");
+      // Generate unnested arrays loops. New var is created to hold the current output
+      // row index which is incremented in the innermost loop.
+      if (!unnested_vars.empty()) {
+        const auto int32_ty = get_int_type(32, LL_CONTEXT);
+        llvm::Value* cur_unnest_total_matched =
+            LL_BUILDER.CreateAlloca(int32_ty, nullptr, "cur_unnest_total_matched");
+        LL_BUILDER.CreateStore(LL_BUILDER.CreateLoad(int32_ty, cur_total_matched),
+                               cur_unnest_total_matched);
+        cur_total_matched = cur_unnest_total_matched;
+        std::stack<llvm::BasicBlock*> array_loops;
+        for (size_t arr_idx = 0; arr_idx < unnested_vars.size(); ++arr_idx) {
+          executor_->arrayLoopCodegen(
+              unnested_vars[arr_idx], array_loops, filter_cfg, co, array_sizes[arr_idx]);
+        }
+      }
+
+      std::tuple<llvm::Value*, llvm::Value*> agg_out_ptr_w_idx;
+      if (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) {
+        auto groups_buffer = ROW_FUNC->arg_begin();
+        if (query_mem_desc.didOutputColumnar()) {
+          agg_out_ptr_w_idx = std::make_tuple(
+              &*groups_buffer,
+              codegenOutputSlot(
+                  &*groups_buffer, cur_total_matched, query_mem_desc, co, filter_cfg));
+        } else {
+          agg_out_ptr_w_idx = std::make_tuple(
+              codegenOutputSlot(
+                  &*groups_buffer, cur_total_matched, query_mem_desc, co, filter_cfg),
+              nullptr);
+        }
+      } else {
+        agg_out_ptr_w_idx = codegenGroupBy(query_mem_desc, co, filter_cfg);
+      }
+
       auto varlen_output_buffer = codegenVarlenOutputBuffer(query_mem_desc, co);
       if (query_mem_desc.usesGetGroupValueFast() ||
           query_mem_desc.getQueryDescriptionType() ==
@@ -207,6 +256,15 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
                           co,
                           gpu_smem_context,
                           filter_cfg);
+
+          // Increment current output row index if there is an unnest loop.
+          if (!unnested_vars.empty()) {
+            const auto int32_ty = get_int_type(32, LL_CONTEXT);
+            LL_BUILDER.CreateStore(
+                LL_BUILDER.CreateAdd(LL_BUILDER.CreateLoad(int32_ty, cur_total_matched),
+                                     LL_INT((int32_t)1)),
+                cur_total_matched);
+          }
         }
         can_return_error = true;
         if (query_mem_desc.getQueryDescriptionType() ==
@@ -257,6 +315,7 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
 
 llvm::Value* RowFuncBuilder::codegenOutputSlot(
     llvm::Value* groups_buffer,
+    llvm::Value* cur_total_match_ptr,
     const QueryMemoryDescriptor& query_mem_desc,
     const CompilationOptions& co,
     DiamondCodegen& diamond_codegen) {
@@ -325,8 +384,7 @@ llvm::Value* RowFuncBuilder::codegenOutputSlot(
          order_entry_lv});
   } else {
     const auto group_expr_lv =
-        LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT),
-                              get_arg_by_name(ROW_FUNC, "old_total_matched"));
+        LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT), cur_total_match_ptr);
     std::vector<llvm::Value*> args{groups_buffer,
                                    get_arg_by_name(ROW_FUNC, "max_matched"),
                                    group_expr_lv,
@@ -350,19 +408,6 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
   auto groups_buffer = arg_it++;
 
   std::stack<llvm::BasicBlock*> array_loops;
-
-  // TODO(Saman): move this logic outside of this function.
-  if (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) {
-    if (query_mem_desc.didOutputColumnar()) {
-      return std::make_tuple(
-          &*groups_buffer,
-          codegenOutputSlot(&*groups_buffer, query_mem_desc, co, diamond_codegen));
-    } else {
-      return std::make_tuple(
-          codegenOutputSlot(&*groups_buffer, query_mem_desc, co, diamond_codegen),
-          nullptr);
-    }
-  }
 
   CHECK(query_mem_desc.getQueryDescriptionType() ==
             QueryDescriptionType::GroupByBaselineHash ||
@@ -862,7 +907,11 @@ llvm::Value* RowFuncBuilder::codegenWindowRowPointer(
     args.push_back(LL_INT(row_size_quad));
     return emitCall("get_scan_output_slot", args);
   }
-  return codegenOutputSlot(groups_buffer, query_mem_desc, co, diamond_codegen);
+  return codegenOutputSlot(groups_buffer,
+                           get_arg_by_name(ROW_FUNC, "old_total_matched"),
+                           query_mem_desc,
+                           co,
+                           diamond_codegen);
 }
 
 bool RowFuncBuilder::codegenAggCalls(
@@ -1456,6 +1505,38 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::genLoadHashDesc(
       LL_BUILDER.CreateLoad(llvm::Type::getInt32Ty(LL_CONTEXT), hash_size_ptr);
 
   return {hash_ptr, hash_size};
+}
+
+llvm::Value* RowFuncBuilder::genArraySize(const hdk::ir::Expr* array_expr,
+                                          const CompilationOptions& co) {
+  auto cgen_state = executor_->cgen_state_.get();
+  AUTOMATIC_IR_METADATA(cgen_state);
+  CodeGenerator code_generator(executor_, co.codegen_traits_desc);
+  auto array_lv = code_generator.codegen(array_expr, true, co).front();
+  auto array_type = array_expr->type();
+  CHECK(array_type->isArray());
+  auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  llvm::Value* array_size;
+  if (array_type->nullable()) {
+    array_size =
+        cgen_state->emitExternalCall("array_size_nullable",
+                                     get_int_type(32, cgen_state->context_),
+                                     {array_lv,
+                                      code_generator.posArg(array_expr),
+                                      LL_INT(log2_bytes(elem_type->canonicalSize())),
+                                      LL_INT((int32_t)0)});
+  } else if (array_type->size() > 0) {
+    array_size = LL_INT(array_type->size() / elem_type->size());
+  } else {
+    array_size =
+        cgen_state->emitExternalCall("array_size",
+                                     get_int_type(32, cgen_state->context_),
+                                     {array_lv,
+                                      code_generator.posArg(array_expr),
+                                      LL_INT(log2_bytes(elem_type->canonicalSize()))});
+  }
+  array_size->setName("array_size");
+  return array_size;
 }
 
 #undef CUR_FUNC

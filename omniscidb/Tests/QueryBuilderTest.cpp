@@ -481,6 +481,19 @@ class QueryBuilderTest : public TestSuite {
               {"col_arr_i32": null, "col_arr_i32x2": null, "col_arr_i32nn": [1], "col_arr_i32x2nn": [3, 4]}
               {"col_arr_i32": [], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [], "col_arr_i32x2nn": [3, 4]}
               {"col_arr_i32": [1, 2], "col_arr_i32x2": null, "col_arr_i32nn": [null], "col_arr_i32x2nn": [3, 4]})___");
+
+    createTable("test_unnest",
+                {{"col_i", ctx().int32()},
+                 {"col_arr_i32", ctx().arrayVarLen(ctx().int32())},
+                 {"col_arr_i32x2", ctx().arrayFixed(2, ctx().int32())},
+                 {"col_arr_i32nn", ctx().arrayVarLen(ctx().int32(), 4, false)},
+                 {"col_arr_i32x2nn", ctx().arrayFixed(2, ctx().int32(), false)}});
+    insertJsonValues(
+        "test_unnest",
+        R"___({"col_i": 1, "col_arr_i32": [1], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [1, 2], "col_arr_i32x2nn": [3, 4]}
+              {"col_i": 2, "col_arr_i32": null, "col_arr_i32x2": [null, null], "col_arr_i32nn": [1], "col_arr_i32x2nn": [5, 6]}
+              {"col_i": 3, "col_arr_i32": [], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [], "col_arr_i32x2nn": [7, 8]}
+              {"col_i": 4, "col_arr_i32": [1, 2], "col_arr_i32x2": null, "col_arr_i32nn": [null], "col_arr_i32x2nn": [9, 10]})___");
   }
 
   static void TearDownTestSuite() {
@@ -6261,6 +6274,182 @@ TEST_F(QueryBuilderTest, FixedArrayInRes) {
             {std::vector<int32_t>({1, inline_null_value<int32_t>()}),
              std::vector<int32_t>({1, 2})}),
         std::vector<int32_t>({3, 4}));
+  }
+}
+
+TEST_F(QueryBuilderTest, ProjUnnest) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+    auto scan = builder.scan("test_unnest");
+    {
+      auto dag =
+          scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res, std::vector<int32_t>({1, 4, 4}), std::vector<int32_t>({1, 1, 2}));
+    }
+
+    {
+      auto dag =
+          scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32x2").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 1, 2, 2, 3, 3}),
+          std::vector<int32_t>(
+              {0, 1, inline_null_value<int32_t>(), inline_null_value<int32_t>(), 0, 1}));
+    }
+
+    {
+      auto dag =
+          scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32nn").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 2, 4}),
+                       std::vector<int32_t>({1, 2, 1, inline_null_value<int32_t>()}));
+    }
+
+    {
+      auto dag =
+          scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32x2nn").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 2, 2, 3, 3, 4, 4}),
+                       std::vector<int32_t>({3, 4, 5, 6, 7, 8, 9, 10}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, ProjUnnestMultiCol) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+    auto scan = builder.scan("test_unnest");
+    {
+      auto dag = scan.proj({scan.ref("col_i"),
+                            scan.ref("col_arr_i32").unnest(),
+                            scan.ref("col_arr_i32nn").unnest()})
+                     .sort({0, 1, 2})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 1, 4, 4}),
+          std::vector<int32_t>({1, 1, 1, 2}),
+          std::vector<int32_t>(
+              {1, 2, inline_null_value<int32_t>(), inline_null_value<int32_t>()}));
+    }
+
+    {
+      auto dag = scan.proj({scan.ref("col_i"),
+                            scan.ref("col_arr_i32x2").unnest(),
+                            scan.ref("col_arr_i32x2nn").unnest()})
+                     .sort({0, 1, 2})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3}),
+                       std::vector<int32_t>({0,
+                                             0,
+                                             1,
+                                             1,
+                                             inline_null_value<int32_t>(),
+                                             inline_null_value<int32_t>(),
+                                             inline_null_value<int32_t>(),
+                                             inline_null_value<int32_t>(),
+                                             0,
+                                             0,
+                                             1,
+                                             1}),
+                       std::vector<int32_t>({3, 4, 3, 4, 5, 5, 6, 6, 7, 8, 7, 8}));
+    }
+
+    {
+      auto dag = scan.proj({scan.ref("col_i"),
+                            scan.ref("col_arr_i32nn").unnest(),
+                            scan.ref("col_arr_i32x2").unnest()})
+                     .sort({0, 1, 2})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 1, 1, 1, 2, 2}),
+          std::vector<int32_t>({1, 1, 2, 2, 1, 1}),
+          std::vector<int32_t>(
+              {0, 1, 0, 1, inline_null_value<int32_t>(), inline_null_value<int32_t>()}));
+    }
+
+    {
+      auto dag = scan.proj({scan.ref("col_i"),
+                            scan.ref("col_arr_i32x2nn").unnest(),
+                            scan.ref("col_arr_i32nn").unnest()})
+                     .sort({0, 1, 2})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 1, 1, 2, 2, 4, 4}),
+                       std::vector<int32_t>({3, 3, 4, 4, 5, 6, 9, 10}),
+                       std::vector<int32_t>({1,
+                                             2,
+                                             1,
+                                             2,
+                                             1,
+                                             1,
+                                             inline_null_value<int32_t>(),
+                                             inline_null_value<int32_t>()}));
+    }
+
+    {
+      auto dag = scan.proj({scan.ref("col_i"),
+                            scan.ref("col_arr_i32").unnest(),
+                            scan.ref("col_arr_i32x2").unnest(),
+                            scan.ref("col_arr_i32nn").unnest(),
+                            scan.ref("col_arr_i32x2nn").unnest()})
+                     .sort({0, 1, 2, 3, 4})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 1, 1, 1, 1, 1, 1}),
+                       std::vector<int32_t>({1, 1, 1, 1, 1, 1, 1, 1}),
+                       std::vector<int32_t>({0, 0, 0, 0, 1, 1, 1, 1}),
+                       std::vector<int32_t>({1, 1, 2, 2, 1, 1, 2, 2}),
+                       std::vector<int32_t>({3, 4, 3, 4, 3, 4, 3, 4}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, ProjUnnestMultiStep) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+
+  auto scan = builder.scan("test_unnest");
+  {
+    auto dag = scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32").unnest()})
+                   .proj({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res, std::vector<int32_t>({1, 4, 4}));
+  }
+
+  {
+    auto dag = scan.proj({scan.ref("col_i"), scan.ref("col_arr_i32").unnest()})
+                   .agg({0}, "count"s)
+                   .sort({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res, std::vector<int32_t>({1, 4}), std::vector<int32_t>({1, 2}));
   }
 }
 

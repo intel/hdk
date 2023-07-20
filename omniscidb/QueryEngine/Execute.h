@@ -825,7 +825,8 @@ class Executor : public StringDictionaryProxyProvider {
   llvm::Value* arrayLoopCodegen(const hdk::ir::Expr* array_expr,
                                 std::stack<llvm::BasicBlock*>& array_loops,
                                 DiamondCodegen& diamond_codegen,
-                                const CompilationOptions& co);
+                                const CompilationOptions& co,
+                                llvm::Value* array_size = nullptr);
 
   llvm::Value* castToFP(llvm::Value*,
                         const hdk::ir::Type* from_type,

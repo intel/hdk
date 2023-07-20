@@ -69,6 +69,7 @@
 #include "QueryEngine/RuntimeFunctions.h"
 #include "QueryEngine/SpeculativeTopN.h"
 #include "QueryEngine/StringDictionaryGenerations.h"
+#include "QueryEngine/UnnestedVarsCollector.h"
 #include "QueryEngine/Visitors/TransientStringLiteralsVisitor.h"
 #include "ResultSet/ColRangeInfo.h"
 #include "Shared/checked_alloc.h"
@@ -1759,10 +1760,12 @@ hdk::ResultSetTable Executor::executeWorkUnit(
     }
   };
 
+  bool has_proj_unnest =
+      !UnnestedVarsCollector::collect(ra_exe_unit_in.target_exprs).empty();
   try {
     auto result = executeWorkUnitImpl(max_groups_buffer_entry_guess,
                                       is_agg,
-                                      true,
+                                      !has_proj_unnest,
                                       query_infos,
                                       ra_exe_unit_in,
                                       co,

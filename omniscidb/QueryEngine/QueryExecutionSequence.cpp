@@ -7,6 +7,8 @@
 #include "QueryExecutionSequence.h"
 #include "ScalarExprVisitor.h"
 
+#include "IR/UnnestDetector.h"
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topological_sort.hpp>
 
@@ -115,6 +117,40 @@ class QueryExecutionSequenceImpl {
       execution_points_.insert(node->getInput(0));
     }
 
+    // Similar limitation applies to the UNNEST operation. We support
+    // only column references as an unnest operand in projections and
+    // therefore have to execution its input. Also, we don't have any
+    // special unnesting expression in the execution unit and rely on
+    // target expression. So, subsequent nodes that drop unnested arrays
+    // can completely remove unnesting from execution units, so all
+    // projections with UNNEST operation should be executed directly.
+    // We also support UNNEST operation in aggregation keys. So, allow
+    // to merge a projection with appropriate aggregate node.
+    // TODO: add unnest_exprs to execution unit to enable merge with
+    // other nodes.
+    if (node->is<ir::Project>() && node->as<ir::Project>()->hasUnnestExpr()) {
+      execution_points_.insert(node->getInput(0));
+      bool can_be_merged = false;
+      auto [start, end] = boost::in_edges(node_to_vertex_[node], graph_);
+      if (start != end) {
+        auto parent_node = graph_[start->m_source];
+        if (parent_node->is<ir::Aggregate>()) {
+          size_t keys_count = parent_node->as<ir::Aggregate>()->getGroupByCount();
+          auto proj = node->as<ir::Project>();
+          can_be_merged = true;
+          for (size_t i = keys_count; i < proj->size(); ++i) {
+            if (ir::UnnestDetector::collect(proj->getExpr(i))) {
+              can_be_merged = false;
+              break;
+            }
+          }
+        }
+      }
+      if (!can_be_merged) {
+        execution_points_.insert(node);
+      }
+    }
+
     // Currently, we cannot merge union code into any other execution
     // module. Therefore, mark it and all its inputs as execution points.
     // TODO: UNION ALL should be able to be merged into other execution
@@ -175,7 +211,8 @@ class QueryExecutionSequenceImpl {
       CHECK(start != end);
       auto node = graph_[start->m_source];
 
-      if (node->is<ir::Project>() && !node->as<ir::Project>()->hasWindowFunctionExpr()) {
+      if (node->is<ir::Project>() && !node->as<ir::Project>()->hasWindowFunctionExpr() &&
+          !node->as<ir::Project>()->hasUnnestExpr()) {
         // In case of aggregation we allow only 'simple' projections which
         // don't have complex expressions referencing aggregate exprs.
         bool is_simple = true;

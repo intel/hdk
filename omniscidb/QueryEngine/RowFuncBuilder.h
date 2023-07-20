@@ -52,6 +52,7 @@ class RowFuncBuilder {
 
  private:
   llvm::Value* codegenOutputSlot(llvm::Value* groups_buffer,
+                                 llvm::Value* cur_total_match_ptr,
                                  const QueryMemoryDescriptor& query_mem_desc,
                                  const CompilationOptions& co,
                                  DiamondCodegen& diamond_codegen);
@@ -156,6 +157,9 @@ class RowFuncBuilder {
 
   std::tuple<llvm::Value*, llvm::Value*> genLoadHashDesc(llvm::Value* groups_buffer,
                                                          const CompilationOptions& co);
+
+  llvm::Value* genArraySize(const hdk::ir::Expr* array_expr,
+                            const CompilationOptions& co);
 
   Executor* executor_;
   const Config& config_;

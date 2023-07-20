@@ -1226,7 +1226,8 @@ Executor::GroupColLLVMValue Executor::groupByColumnCodegen(
 llvm::Value* Executor::arrayLoopCodegen(const hdk::ir::Expr* array_expr,
                                         std::stack<llvm::BasicBlock*>& array_loops,
                                         DiamondCodegen& diamond_codegen,
-                                        const CompilationOptions& co) {
+                                        const CompilationOptions& co,
+                                        llvm::Value* array_size) {
   AUTOMATIC_IR_METADATA(cgen_state_.get());
   CodeGenerator code_generator(this, co.codegen_traits_desc);
   auto array_lv = code_generator.codegen(array_expr, true, co).front();
@@ -1257,7 +1258,8 @@ llvm::Value* Executor::arrayLoopCodegen(const hdk::ir::Expr* array_expr,
   CHECK(array_type->isArray());
   auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
   auto array_len =
-      (array_type->size() > 0)
+      array_size ? array_size
+      : (array_type->size() > 0)
           ? cgen_state_->llInt(array_type->size() / elem_type->size())
           : cgen_state_->emitExternalCall(
                 "array_size",

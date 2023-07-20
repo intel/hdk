@@ -507,10 +507,6 @@ void TargetExprCodegenBuilder::operator()(const hdk::ir::Expr* target_expr,
     ++target_index_counter;
     return;
   }
-  if (dynamic_cast<const hdk::ir::UOper*>(target_expr) &&
-      static_cast<const hdk::ir::UOper*>(target_expr)->isUnnest()) {
-    throw std::runtime_error("UNNEST not supported in the projection list yet.");
-  }
   if ((executor->plan_state_->isLazyFetchColumn(target_expr) || !is_group_by) &&
       (static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index_counter)) <
        sizeof(int64_t)) &&
