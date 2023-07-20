@@ -31,8 +31,6 @@
 
 extern bool g_enable_stringdict_parallel;
 
-using string_dict_hash_t = uint32_t;
-
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
 
 class StringDictionary {
@@ -136,10 +134,10 @@ class StringDictionary {
       const size_t storage_high_water_mark,
       const std::vector<String>& input_strings,
       const std::vector<size_t>& string_memory_ids,
-      const std::vector<string_dict_hash_t>& input_strings_hashes) noexcept;
+      const std::vector<uint32_t>& input_strings_hashes) noexcept;
   template <class String>
   void hashStrings(const std::vector<String>& string_vec,
-                   std::vector<string_dict_hash_t>& hashes) const noexcept;
+                   std::vector<uint32_t>& hashes) const noexcept;
 
   int32_t getUnlocked(const std::string_view sv) const noexcept;
   std::string getStringUnlocked(int32_t string_id) const noexcept;
@@ -147,20 +145,20 @@ class StringDictionary {
   std::pair<char*, size_t> getStringBytesChecked(const int string_id) const noexcept;
   template <class String>
   uint32_t computeBucket(
-      const string_dict_hash_t hash,
+      const uint32_t hash,
       const String& input_string,
-      const std::vector<int32_t>& string_id_string_dict_hash_table) const noexcept;
+      const std::vector<int32_t>& string_id_uint32_table) const noexcept;
   template <class String>
   uint32_t computeBucketFromStorageAndMemory(
-      const string_dict_hash_t input_string_hash,
+      const uint32_t input_string_hash,
       const String& input_string,
-      const std::vector<int32_t>& string_id_string_dict_hash_table,
+      const std::vector<int32_t>& string_id_uint32_table,
       const size_t storage_high_water_mark,
       const std::vector<String>& input_strings,
       const std::vector<size_t>& string_memory_ids) const noexcept;
   uint32_t computeUniqueBucketWithHash(
-      const string_dict_hash_t hash,
-      const std::vector<int32_t>& string_id_string_dict_hash_table) noexcept;
+      const uint32_t hash,
+      const std::vector<int32_t>& string_id_uint32_table) noexcept;
   void checkAndConditionallyIncreasePayloadCapacity(const size_t write_length);
   void checkAndConditionallyIncreaseOffsetCapacity(const size_t write_length);
 
@@ -188,8 +186,8 @@ class StringDictionary {
   const DictRef dict_ref_;
   size_t str_count_;
   size_t collisions_;
-  std::vector<int32_t> string_id_string_dict_hash_table_;
-  std::vector<string_dict_hash_t> hash_cache_;
+  std::vector<int32_t> string_id_uint32_table_;
+  std::vector<uint32_t> hash_cache_;
   std::vector<int32_t> sorted_cache;
   bool materialize_hashes_;
   StringIdxEntry* offset_map_;
