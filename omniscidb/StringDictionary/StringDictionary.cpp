@@ -50,8 +50,8 @@ namespace {
 
 const int SYSTEM_PAGE_SIZE = omnisci::get_page_size();
 
-string_dict_hash_t hash_string(const std::string_view& str) {
-  string_dict_hash_t str_hash = 1;
+uint32_t hash_string(const std::string_view& str) {
+  uint32_t str_hash = 1;
   // rely on fact that unsigned overflow is defined and wraps
   for (size_t i = 0; i < str.size(); ++i) {
     str_hash = str_hash * 997 + str[i];
@@ -86,7 +86,7 @@ StringDictionary::StringDictionary(const DictRef& dict_ref,
                                    size_t initial_capacity)
     : dict_ref_(dict_ref)
     , str_count_(0)
-    , string_id_string_dict_hash_table_(initial_capacity, INVALID_STR_ID)
+    , string_id_uint32_table_(initial_capacity, INVALID_STR_ID)
     , hash_cache_(initial_capacity)
     , materialize_hashes_(materializeHashes)
     , offset_map_(nullptr)
@@ -149,12 +149,12 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
     return inline_int_null_value<int32_t>();
   }
   CHECK(str.size() <= MAX_STRLEN);
-  const string_dict_hash_t hash = hash_string(str);
+  const uint32_t hash = hash_string(str);
   {
     mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-    const uint32_t bucket = computeBucket(hash, str, string_id_string_dict_hash_table_);
-    if (string_id_string_dict_hash_table_[bucket] != INVALID_STR_ID) {
-      return string_id_string_dict_hash_table_[bucket];
+    const uint32_t bucket = computeBucket(hash, str, string_id_uint32_table_);
+    if (string_id_uint32_table_[bucket] != INVALID_STR_ID) {
+      return string_id_uint32_table_[bucket];
     }
   }
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
@@ -164,20 +164,20 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
   }
   // need to recalculate the bucket in case it changed before
   // we got the lock
-  const uint32_t bucket = computeBucket(hash, str, string_id_string_dict_hash_table_);
-  if (string_id_string_dict_hash_table_[bucket] == INVALID_STR_ID) {
+  const uint32_t bucket = computeBucket(hash, str, string_id_uint32_table_);
+  if (string_id_uint32_table_[bucket] == INVALID_STR_ID) {
     CHECK_LT(str_count_, MAX_STRCOUNT)
         << "Maximum number (" << str_count_
         << ") of Dictionary encoded Strings reached for this column";
     appendToStorage(str);
-    string_id_string_dict_hash_table_[bucket] = static_cast<int32_t>(str_count_);
+    string_id_uint32_table_[bucket] = static_cast<int32_t>(str_count_);
     if (materialize_hashes_) {
       hash_cache_[str_count_] = hash;
     }
     ++str_count_;
     invalidateInvertedIndex();
   }
-  return string_id_string_dict_hash_table_[bucket];
+  return string_id_uint32_table_[bucket];
 }
 
 namespace {
@@ -233,9 +233,8 @@ void throw_string_too_long_error(std::string_view str, const DictRef& dict_ref) 
  * @param hashes space for the output - should be pre-sized to match string_vec size
  */
 template <class String>
-void StringDictionary::hashStrings(
-    const std::vector<String>& string_vec,
-    std::vector<string_dict_hash_t>& hashes) const noexcept {
+void StringDictionary::hashStrings(const std::vector<String>& string_vec,
+                                   std::vector<uint32_t>& hashes) const noexcept {
   CHECK_EQ(string_vec.size(), hashes.size());
 
   tbb::parallel_for(tbb::blocked_range<size_t>(0, string_vec.size()),
@@ -316,11 +315,11 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
             if (input_string.size() > StringDictionary::MAX_STRLEN) {
               throw_string_too_long_error(input_string, dict_ref_);
             }
-            const string_dict_hash_t input_string_hash = hash_string(input_string);
-            uint32_t hash_bucket = computeBucket(
-                input_string_hash, input_string, string_id_string_dict_hash_table_);
+            const uint32_t input_string_hash = hash_string(input_string);
+            uint32_t hash_bucket =
+                computeBucket(input_string_hash, input_string, string_id_uint32_table_);
             // Will either be legit id or INVALID_STR_ID
-            const auto string_id = string_id_string_dict_hash_table_[hash_bucket];
+            const auto string_id = string_id_uint32_table_[hash_bucket];
             if (string_id == StringDictionary::INVALID_STR_ID ||
                 string_id >= num_dict_strings) {
               encoded_vec[string_idx] = StringDictionary::INVALID_STR_ID;
@@ -371,11 +370,11 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
     }
     CHECK(input_string.size() <= MAX_STRLEN);
 
-    const string_dict_hash_t input_string_hash = hash_string(input_string);
+    const uint32_t input_string_hash = hash_string(input_string);
     uint32_t hash_bucket =
-        computeBucket(input_string_hash, input_string, string_id_string_dict_hash_table_);
-    if (string_id_string_dict_hash_table_[hash_bucket] != INVALID_STR_ID) {
-      output_string_ids[idx++] = string_id_string_dict_hash_table_[hash_bucket];
+        computeBucket(input_string_hash, input_string, string_id_uint32_table_);
+    if (string_id_uint32_table_[hash_bucket] != INVALID_STR_ID) {
+      output_string_ids[idx++] = string_id_uint32_table_[hash_bucket];
       continue;
     }
     // need to add record to dictionary
@@ -389,8 +388,8 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
     if (fillRateIsHigh(str_count_)) {
       // resize when more than 50% is full
       increaseHashTableCapacity();
-      hash_bucket = computeBucket(
-          input_string_hash, input_string, string_id_string_dict_hash_table_);
+      hash_bucket =
+          computeBucket(input_string_hash, input_string, string_id_uint32_table_);
     }
     appendToStorage(input_string);
 
@@ -398,7 +397,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
       hash_cache_[str_count_] = input_string_hash;
     }
     const int32_t string_id = static_cast<int32_t>(str_count_);
-    string_id_string_dict_hash_table_[hash_bucket] = string_id;
+    string_id_uint32_table_[hash_bucket] = string_id;
     output_string_ids[idx++] = string_id;
     ++str_count_;
   }
@@ -413,7 +412,7 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
                                             T* output_string_ids) {
   // Compute hashes of the input strings up front, and in parallel,
   // as the string hashing does not need to be behind the subsequent write_lock
-  std::vector<string_dict_hash_t> input_strings_hashes(input_strings.size());
+  std::vector<uint32_t> input_strings_hashes(input_strings.size());
   hashStrings(input_strings, input_strings_hashes);
 
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
@@ -442,12 +441,12 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
                                                     input_strings_hashes);
     }
     // Compute the hash for this input_string
-    const string_dict_hash_t input_string_hash = input_strings_hashes[input_string_idx];
+    const uint32_t input_string_hash = input_strings_hashes[input_string_idx];
 
     const uint32_t hash_bucket =
         computeBucketFromStorageAndMemory(input_string_hash,
                                           input_string,
-                                          string_id_string_dict_hash_table_,
+                                          string_id_uint32_table_,
                                           storage_high_water_mark,
                                           input_strings,
                                           string_memory_ids);
@@ -455,9 +454,8 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
     // If the hash bucket is not empty, that is our string id
     // (computeBucketFromStorageAndMemory) already checked to ensure the input string and
     // bucket string are equal)
-    if (string_id_string_dict_hash_table_[hash_bucket] != INVALID_STR_ID) {
-      output_string_ids[input_string_idx++] =
-          string_id_string_dict_hash_table_[hash_bucket];
+    if (string_id_uint32_table_[hash_bucket] != INVALID_STR_ID) {
+      output_string_ids[input_string_idx++] = string_id_uint32_table_[hash_bucket];
       continue;
     }
     // Did not find string, so need to add record to dictionary
@@ -470,8 +468,7 @@ void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_str
         << ") of Dictionary encoded Strings reached for this column";
     string_memory_ids.push_back(input_string_idx);
     sum_new_string_lengths += input_string.size();
-    string_id_string_dict_hash_table_[hash_bucket] =
-        static_cast<int32_t>(shadow_str_count);
+    string_id_uint32_table_[hash_bucket] = static_cast<int32_t>(shadow_str_count);
     if (materialize_hashes_) {
       hash_cache_[shadow_str_count] = input_string_hash;
     }
@@ -511,9 +508,8 @@ template int32_t StringDictionary::getIdOfString(const std::string&) const;
 template int32_t StringDictionary::getIdOfString(const std::string_view&) const;
 
 int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
-  const string_dict_hash_t hash = hash_string(sv);
-  auto str_id = string_id_string_dict_hash_table_[computeBucket(
-      hash, sv, string_id_string_dict_hash_table_)];
+  const uint32_t hash = hash_string(sv);
+  auto str_id = string_id_uint32_table_[computeBucket(hash, sv, string_id_uint32_table_)];
   return str_id;
 }
 
@@ -926,16 +922,15 @@ std::vector<std::string> StringDictionary::copyStrings() const {
 }
 
 bool StringDictionary::fillRateIsHigh(const size_t num_strings) const noexcept {
-  return string_id_string_dict_hash_table_.size() <= num_strings * 2;
+  return string_id_uint32_table_.size() <= num_strings * 2;
 }
 
 void StringDictionary::increaseHashTableCapacity() noexcept {
-  std::vector<int32_t> new_str_ids(string_id_string_dict_hash_table_.size() * 2,
-                                   INVALID_STR_ID);
+  std::vector<int32_t> new_str_ids(string_id_uint32_table_.size() * 2, INVALID_STR_ID);
 
   if (materialize_hashes_) {
     for (size_t i = 0; i != str_count_; ++i) {
-      const string_dict_hash_t hash = hash_cache_[i];
+      const uint32_t hash = hash_cache_[i];
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
       new_str_ids[bucket] = i;
     }
@@ -943,12 +938,12 @@ void StringDictionary::increaseHashTableCapacity() noexcept {
   } else {
     for (size_t i = 0; i != str_count_; ++i) {
       const auto str = getStringChecked(i);
-      const string_dict_hash_t hash = hash_string(str);
+      const uint32_t hash = hash_string(str);
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
       new_str_ids[bucket] = i;
     }
   }
-  string_id_string_dict_hash_table_.swap(new_str_ids);
+  string_id_uint32_table_.swap(new_str_ids);
 }
 
 template <class String>
@@ -958,12 +953,11 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
     const size_t storage_high_water_mark,
     const std::vector<String>& input_strings,
     const std::vector<size_t>& string_memory_ids,
-    const std::vector<string_dict_hash_t>& input_strings_hashes) noexcept {
-  std::vector<int32_t> new_str_ids(string_id_string_dict_hash_table_.size() * 2,
-                                   INVALID_STR_ID);
+    const std::vector<uint32_t>& input_strings_hashes) noexcept {
+  std::vector<int32_t> new_str_ids(string_id_uint32_table_.size() * 2, INVALID_STR_ID);
   if (materialize_hashes_) {
     for (size_t i = 0; i != str_count; ++i) {
-      const string_dict_hash_t hash = hash_cache_[i];
+      const uint32_t hash = hash_cache_[i];
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
       new_str_ids[bucket] = i;
     }
@@ -971,7 +965,7 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
   } else {
     for (size_t storage_idx = 0; storage_idx != storage_high_water_mark; ++storage_idx) {
       const auto storage_string = getStringChecked(storage_idx);
-      const string_dict_hash_t hash = hash_string(storage_string);
+      const uint32_t hash = hash_string(storage_string);
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
       new_str_ids[bucket] = storage_idx;
     }
@@ -982,7 +976,7 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
       new_str_ids[bucket] = storage_high_water_mark + memory_idx;
     }
   }
-  string_id_string_dict_hash_table_.swap(new_str_ids);
+  string_id_uint32_table_.swap(new_str_ids);
 }
 
 std::string StringDictionary::getStringChecked(const int string_id) const noexcept {
@@ -1000,13 +994,13 @@ std::pair<char*, size_t> StringDictionary::getStringBytesChecked(
 
 template <class String>
 uint32_t StringDictionary::computeBucket(
-    const string_dict_hash_t hash,
+    const uint32_t hash,
     const String& input_string,
-    const std::vector<int32_t>& string_id_string_dict_hash_table) const noexcept {
-  const size_t string_dict_hash_table_size = string_id_string_dict_hash_table.size();
-  uint32_t bucket = hash & (string_dict_hash_table_size - 1);
+    const std::vector<int32_t>& string_id_uint32_table) const noexcept {
+  const size_t uint32_table_size = string_id_uint32_table.size();
+  uint32_t bucket = hash & (uint32_table_size - 1);
   while (true) {
-    const int32_t candidate_string_id = string_id_string_dict_hash_table[bucket];
+    const int32_t candidate_string_id = string_id_uint32_table[bucket];
     if (candidate_string_id ==
         INVALID_STR_ID) {  // In this case it means the slot is available for use
       break;
@@ -1021,7 +1015,7 @@ uint32_t StringDictionary::computeBucket(
       }
     }
     // wrap around
-    if (++bucket == string_dict_hash_table_size) {
+    if (++bucket == uint32_table_size) {
       bucket = 0;
     }
   }
@@ -1030,15 +1024,15 @@ uint32_t StringDictionary::computeBucket(
 
 template <class String>
 uint32_t StringDictionary::computeBucketFromStorageAndMemory(
-    const string_dict_hash_t input_string_hash,
+    const uint32_t input_string_hash,
     const String& input_string,
-    const std::vector<int32_t>& string_id_string_dict_hash_table,
+    const std::vector<int32_t>& string_id_uint32_table,
     const size_t storage_high_water_mark,
     const std::vector<String>& input_strings,
     const std::vector<size_t>& string_memory_ids) const noexcept {
-  uint32_t bucket = input_string_hash & (string_id_string_dict_hash_table.size() - 1);
+  uint32_t bucket = input_string_hash & (string_id_uint32_table.size() - 1);
   while (true) {
-    const int32_t candidate_string_id = string_id_string_dict_hash_table[bucket];
+    const int32_t candidate_string_id = string_id_uint32_table[bucket];
     if (candidate_string_id ==
         INVALID_STR_ID) {  // In this case it means the slot is available for use
       break;
@@ -1071,7 +1065,7 @@ uint32_t StringDictionary::computeBucketFromStorageAndMemory(
         }
       }
     }
-    if (++bucket == string_id_string_dict_hash_table.size()) {
+    if (++bucket == string_id_uint32_table.size()) {
       bucket = 0;
     }
   }
@@ -1079,18 +1073,18 @@ uint32_t StringDictionary::computeBucketFromStorageAndMemory(
 }
 
 uint32_t StringDictionary::computeUniqueBucketWithHash(
-    const string_dict_hash_t hash,
-    const std::vector<int32_t>& string_id_string_dict_hash_table) noexcept {
-  const size_t string_dict_hash_table_size = string_id_string_dict_hash_table.size();
-  uint32_t bucket = hash & (string_dict_hash_table_size - 1);
+    const uint32_t hash,
+    const std::vector<int32_t>& string_id_uint32_table) noexcept {
+  const size_t uint32_table_size = string_id_uint32_table.size();
+  uint32_t bucket = hash & (uint32_table_size - 1);
   while (true) {
-    if (string_id_string_dict_hash_table[bucket] ==
+    if (string_id_uint32_table[bucket] ==
         INVALID_STR_ID) {  // In this case it means the slot is available for use
       break;
     }
     collisions_++;
     // wrap around
-    if (++bucket == string_dict_hash_table_size) {
+    if (++bucket == uint32_table_size) {
       bucket = 0;
     }
   }
@@ -1375,13 +1369,12 @@ size_t StringDictionary::buildDictionaryTranslationMap(
               // Todo(todd): Remove option to turn string hash cache off or at least
               // make a constexpr to avoid these branches when we expect it to be always
               // on going forward
-              const string_dict_hash_t hash = materialize_hashes_
-                                                  ? hash_cache_[source_string_id]
-                                                  : hash_string(source_str);
+              const uint32_t hash = materialize_hashes_ ? hash_cache_[source_string_id]
+                                                        : hash_string(source_str);
               uint32_t hash_bucket = dest_dict->computeBucket(
-                  hash, source_str, dest_dict->string_id_string_dict_hash_table_);
+                  hash, source_str, dest_dict->string_id_uint32_table_);
               const auto translated_string_id =
-                  dest_dict->string_id_string_dict_hash_table_[hash_bucket];
+                  dest_dict->string_id_uint32_table_[hash_bucket];
               translated_ids[source_string_id] = translated_string_id;
 
               if (translated_string_id == StringDictionary::INVALID_STR_ID ||
