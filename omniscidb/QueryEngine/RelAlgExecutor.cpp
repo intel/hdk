@@ -17,6 +17,7 @@
 #include "RelAlgExecutor.h"
 #include "DataMgr/DataMgr.h"
 #include "IR/TypeUtils.h"
+#include "QueryBuilder/QueryBuilder.h"
 #include "QueryEngine/CalciteDeserializerUtils.h"
 #include "QueryEngine/CardinalityEstimator.h"
 #include "QueryEngine/ColumnFetcher.h"
@@ -35,6 +36,7 @@
 #include "QueryEngine/RelAlgVisitor.h"
 #include "QueryEngine/ResultSetBuilder.h"
 #include "QueryEngine/ResultSetSort.h"
+#include "QueryEngine/UnnestedVarsCollector.h"
 #include "QueryEngine/WindowContext.h"
 #include "QueryEngine/WorkUnitBuilder.h"
 #include "QueryOptimizer/CanonicalizeQuery.h"
@@ -1505,14 +1507,27 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
                                                           const bool is_agg,
                                                           const CompilationOptions& co,
                                                           const ExecutionOptions& eo) {
-  const auto count = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-      hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
-      hdk::ir::AggType::kCount,
-      nullptr,
-      false,
-      nullptr);
+  auto unnested_vars = UnnestedVarsCollector::collect(work_unit.exe_unit.target_exprs);
+  hdk::ir::QueryBuilder builder(
+      hdk::ir::Context::defaultCtx(), schema_provider_, executor_->getConfigPtr());
+  hdk::ir::BuilderExpr count_all_agg;
+  if (!unnested_vars.empty()) {
+    hdk::ir::BuilderExpr total_count;
+    for (auto var : unnested_vars) {
+      hdk::ir::BuilderExpr var_expr(&builder, var->shared());
+      if (!total_count.expr()) {
+        total_count = var_expr.cardinality();
+      } else {
+        total_count = total_count.mul(var_expr.cardinality());
+      }
+    }
+    count_all_agg = total_count.sum();
+  } else {
+    count_all_agg = builder.count();
+  }
+
   const auto count_all_exe_unit =
-      create_count_all_execution_unit(work_unit.exe_unit, count);
+      create_count_all_execution_unit(work_unit.exe_unit, count_all_agg.expr());
   size_t one{1};
   hdk::ResultSetTable count_all_result;
   try {

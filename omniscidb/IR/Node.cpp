@@ -6,7 +6,9 @@
  */
 
 #include "Node.h"
+#include "ExprCollector.h"
 #include "InputRewriter.h"
+#include "UnnestDetector.h"
 
 namespace hdk::ir {
 
@@ -122,6 +124,15 @@ void Project::appendInput(std::string new_field_name, ExprPtr expr) {
 bool Project::hasWindowFunctionExpr() const {
   for (auto& expr : exprs_) {
     if (isWindowFunctionExpr(expr.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Project::hasUnnestExpr() const {
+  for (auto& expr : exprs_) {
+    if (UnnestDetector::collect(expr.get())) {
       return true;
     }
   }
