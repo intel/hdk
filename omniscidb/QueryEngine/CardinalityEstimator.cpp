@@ -115,24 +115,53 @@ RelAlgExecutionUnit create_count_all_execution_unit(
     const RelAlgExecutionUnit& ra_exe_unit,
     hdk::ir::ExprPtr replacement_target) {
   InputColumnsCollector input_columns_collector;
-
   std::list<std::shared_ptr<const InputColDescriptor>> join_input_col_descs;
   std::stringstream os{};
-  if (!ra_exe_unit.join_quals.empty()) {
-    os << "\n[Count all] Join Quals: ";
+  os << "\n[Count all] Join Quals: ";
 
-    for (size_t i = 0; i < ra_exe_unit.join_quals.size(); i++) {
-      const auto& join_condition = ra_exe_unit.join_quals[i];
-      os << "\t" << std::to_string(i) << " " << ::toString(join_condition.type);
-      for (const auto& q : join_condition.quals) {
-        input_columns_collector.visit(q.get());
-        os << q->toString() << ", ";
-      }
+  for (const auto& join_condition : ra_exe_unit.join_quals) {
+    // const auto& join_condition = ra_exe_unit.join_quals[i];
+    os << "\t" << ::toString(join_condition.type);
+    for (const auto& q : join_condition.quals) {
+      if (!q)
+        break;
+      LOG(ERROR) << "jq visit";
+      input_columns_collector.visit(q.get());
+      os << q->toString() << ", ";
     }
   }
+  LOG(ERROR) << "join quals: " << os.str();
+
+  for (const auto& q : ra_exe_unit.quals) {
+    if (!q)
+      break;
+    LOG(ERROR) << " q visit";
+    input_columns_collector.visit(q.get());
+    os << q->toString() << ", ";
+  }
+  LOG(ERROR) << "quals: " << os.str();
+
+  for (const auto& q : ra_exe_unit.simple_quals) {
+    if (!q)
+      break;
+    LOG(ERROR) << "sq visit";
+    input_columns_collector.visit(q.get());
+    os << q->toString() << ", ";
+  }
+  LOG(ERROR) << "simple quals: " << os.str();
+
+  for (const auto& q : ra_exe_unit.groupby_exprs) {
+    if (!q)
+      break;
+    LOG(ERROR) << "gb visit";
+    input_columns_collector.visit(q.get());
+    os << q->toString() << ", ";
+  }
+  LOG(ERROR) << "groupby quals: " << os.str();
+
   auto& input_column_descriptors = input_columns_collector.result();
   for (auto& col_var : input_column_descriptors) {
-    LOG(INFO) << "col_vars: " << col_var;
+    LOG(ERROR) << "col_vars: " << col_var;
     for (auto& icol : ra_exe_unit.input_col_descs) {
       if (icol->getColId() == col_var.getColId() &&
           icol->getTableId() == col_var.getTableId()) {
@@ -141,14 +170,19 @@ RelAlgExecutionUnit create_count_all_execution_unit(
     }
   }
 
-  LOG(INFO) << "join quals: " << os.str();
+  if (join_input_col_descs.empty()) {
+    join_input_col_descs.insert(join_input_col_descs.end(),
+                                ra_exe_unit.input_col_descs.begin(),
+                                ra_exe_unit.input_col_descs.end());
+  }
+
   std::stringstream js{};
   js << "\n\t[Only Join] Table/Col/Levels: ";
   for (const auto& input_col_desc : join_input_col_descs) {
     js << "(" << input_col_desc->getTableId() << ", " << input_col_desc->getColId()
        << ", " << input_col_desc->getNestLevel() << ") ";
   }
-  LOG(INFO) << "join in cols: " << js.str();
+  LOG(ERROR) << "join in cols: " << js.str();
   return {ra_exe_unit.input_descs,
           join_input_col_descs,
           ra_exe_unit.simple_quals,
