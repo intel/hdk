@@ -210,8 +210,8 @@ TEST(StringDictionary, BuildTranslationMap) {
     // First try to translate to empty dictionary.
     // Should get back all INVALID_STR_IDs
 
-    const auto translated_ids = source_string_dict->buildDictionaryTranslationMap(
-        dest_string_dict, dummy_callback);
+    const auto translated_ids = StringDictionaryTranslator::buildDictionaryTranslationMap(
+        source_string_dict, dest_string_dict, dummy_callback);
     const size_t num_ids = translated_ids.size();
     ASSERT_EQ(num_ids, source_string_dict->storageEntryCount());
     for (size_t idx = 0; idx < num_ids; ++idx) {
@@ -233,8 +233,8 @@ TEST(StringDictionary, BuildTranslationMap) {
     }
     dest_string_dict->getOrAddBulk(reversed_strings, reversed_string_ids.data());
     ASSERT_EQ(dest_string_dict->storageEntryCount(), reversed_strings.size());
-    const auto translated_ids = source_string_dict->buildDictionaryTranslationMap(
-        dest_string_dict, dummy_callback);
+    const auto translated_ids = StringDictionaryTranslator::buildDictionaryTranslationMap(
+        source_string_dict, dest_string_dict, dummy_callback);
     const size_t num_ids = translated_ids.size();
     ASSERT_EQ(num_ids, static_cast<size_t>(g_op_count));
     ASSERT_EQ(num_ids,

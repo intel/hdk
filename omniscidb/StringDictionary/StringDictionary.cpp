@@ -1256,30 +1256,34 @@ void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache)
   sorted_cache.swap(updated_cache);
 }
 
-std::vector<int32_t> StringDictionary::buildDictionaryTranslationMap(
+std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(
+    const std::shared_ptr<StringDictionary> source_dict,
     const std::shared_ptr<StringDictionary> dest_dict,
-    StringLookupCallback const& dest_transient_lookup_callback) const {
+    StringLookupCallback const& dest_transient_lookup_callback) {
   auto timer = DEBUG_TIMER(__func__);
-  const size_t num_source_strings = storageEntryCount();
+  const size_t num_source_strings = source_dict->storageEntryCount();
   const size_t num_dest_strings = dest_dict->storageEntryCount();
   std::vector<int32_t> translated_ids(num_source_strings);
-  buildDictionaryTranslationMap(dest_dict.get(),
-                                translated_ids.data(),
-                                num_source_strings,
-                                num_dest_strings,
-                                true,  // Just assume true for dest_has_transients as this
-                                       // function is only used for testing currently
-                                dest_transient_lookup_callback);
+  StringDictionaryTranslator::buildDictionaryTranslationMap(
+      source_dict.get(),
+      dest_dict.get(),
+      translated_ids.data(),
+      num_source_strings,
+      num_dest_strings,
+      true,  // Just assume true for dest_has_transients as this
+             // function is only used for testing currently
+      dest_transient_lookup_callback);
   return translated_ids;
 }
 
-size_t StringDictionary::buildDictionaryTranslationMap(
+size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
+    const StringDictionary* source_dict,
     const StringDictionary* dest_dict,
     int32_t* translated_ids,
     const int64_t source_generation,
     const int64_t dest_generation,
     const bool dest_has_transients,
-    StringLookupCallback const& dest_transient_lookup_callback) const {
+    StringLookupCallback const& dest_transient_lookup_callback) {
   auto timer = DEBUG_TIMER(__func__);
   CHECK_GE(source_generation, 0L);
   CHECK_GE(dest_generation, 0L);
@@ -1293,23 +1297,24 @@ size_t StringDictionary::buildDictionaryTranslationMap(
 
   const int32_t dest_db_id = dest_dict->getDbId();
   const int32_t dest_dict_id = dest_dict->getDictId();
-  if (getDbId() == dest_db_id && getDictId() == dest_dict_id) {
+  if (source_dict->getDbId() == dest_db_id && source_dict->getDictId() == dest_dict_id) {
     throw std::runtime_error("Cannot translate between a string dictionary and itself.");
   }
   const bool this_dict_is_locked_first =
-      getDbId() < dest_db_id || (getDbId() == dest_db_id && getDictId() < dest_dict_id);
+      source_dict->getDbId() < dest_db_id ||
+      (source_dict->getDbId() == dest_db_id && source_dict->getDictId() < dest_dict_id);
 
   mapd_shared_lock<mapd_shared_mutex> first_read_lock(
-      this_dict_is_locked_first ? rw_mutex_ : dest_dict->rw_mutex_);
+      this_dict_is_locked_first ? source_dict->rw_mutex_ : dest_dict->rw_mutex_);
   mapd_shared_lock<mapd_shared_mutex> second_read_lock(
-      this_dict_is_locked_first ? dest_dict->rw_mutex_ : rw_mutex_);
+      this_dict_is_locked_first ? dest_dict->rw_mutex_ : source_dict->rw_mutex_);
 
   // For both source and destination dictionaries we cap the max
   // entries to be translated/translated to at the supplied
   // generation arguments, if valid (i.e. >= 0), otherwise just the
   // size of each dictionary
 
-  CHECK_LE(num_source_strings, static_cast<int64_t>(str_count_));
+  CHECK_LE(num_source_strings, static_cast<int64_t>(source_dict->str_count_));
   CHECK_LE(num_dest_strings, static_cast<int64_t>(dest_dict->str_count_));
   const bool dest_dictionary_is_empty = (num_dest_strings == 0);
 
@@ -1338,7 +1343,7 @@ size_t StringDictionary::buildDictionaryTranslationMap(
             const int32_t start_idx = r.begin();
             const int32_t end_idx = r.end();
             for (int32_t string_idx = start_idx; string_idx != end_idx; ++string_idx) {
-              translated_ids[string_idx] = INVALID_STR_ID;
+              translated_ids[string_idx] = source_dict->INVALID_STR_ID;
             }
           },
           tbb::simple_partitioner());
@@ -1362,15 +1367,16 @@ size_t StringDictionary::buildDictionaryTranslationMap(
             for (int32_t source_string_id = start_idx; source_string_id != end_idx;
                  ++source_string_id) {
               const std::string_view source_str =
-                  getStringFromStorageFast(source_string_id);
+                  source_dict->getStringFromStorageFast(source_string_id);
               // Get the hash from this/the source dictionary's cache, as the function
               // will be the same for the dest_dict, sparing us having to recompute it
 
               // Todo(todd): Remove option to turn string hash cache off or at least
               // make a constexpr to avoid these branches when we expect it to be always
               // on going forward
-              const uint32_t hash = materialize_hashes_ ? hash_cache_[source_string_id]
-                                                        : hash_string(source_str);
+              const uint32_t hash = source_dict->materialize_hashes_
+                                        ? source_dict->hash_cache_[source_string_id]
+                                        : hash_string(source_str);
               uint32_t hash_bucket = dest_dict->computeBucket(
                   hash, source_str, dest_dict->string_id_uint32_table_);
               const auto translated_string_id =

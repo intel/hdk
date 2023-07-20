@@ -225,12 +225,13 @@ BENCHMARK_DEFINE_F(StringDictionaryFixture, BulkTranslation_10M_Unique)
   auto dummy_callback = [](const std::string_view& source_string,
                            const int32_t source_string_id) { return true; };
   for (auto _ : state) {
-    source_string_dict->buildDictionaryTranslationMap(dest_string_dict.get(),
-                                                      string_ids.data(),
-                                                      num_source_strings,
-                                                      num_dest_strings,
-                                                      false,
-                                                      dummy_callback);
+    StringDictionaryTranslator::buildDictionaryTranslationMap(source_string_dict.get(),
+                                                              dest_string_dict.get(),
+                                                              string_ids.data(),
+                                                              num_source_strings,
+                                                              num_dest_strings,
+                                                              false,
+                                                              dummy_callback);
   }
 }
 
