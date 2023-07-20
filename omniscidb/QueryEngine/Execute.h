@@ -472,7 +472,8 @@ class Executor : public StringDictionaryProxyProvider {
   getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
                                const ExecutorDeviceType requested_device_type,
                                const std::vector<InputTableInfo>& query_infos,
-                               size_t& max_groups_buffer_entry_guess);
+                               size_t& max_groups_buffer_entry_guess,
+                               const ExecutionOptions& eo);
 
   hdk::ResultSetTable collectAllDeviceResults(
       SharedKernelContext& shared_context,

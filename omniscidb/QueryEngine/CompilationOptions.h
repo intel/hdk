@@ -108,6 +108,8 @@ struct ExecutionOptions {
   bool allow_runtime_query_interrupt;
   double running_query_interrupt_freq;
   unsigned pending_query_interrupt_freq;
+  unsigned forced_gpu_proportion;
+  unsigned forced_cpu_proportion;
   ExecutorType executor_type = ExecutorType::Native;
   std::vector<size_t> outer_fragment_indices{};
   bool multifrag_result = false;
@@ -134,6 +136,8 @@ struct ExecutionOptions {
 
     eo.multifrag_result = config.exec.enable_multifrag_rs;
     eo.preserve_order = false;
+    eo.forced_gpu_proportion = config.exec.heterogeneous.forced_gpu_proportion;
+    eo.forced_cpu_proportion = config.exec.heterogeneous.forced_cpu_proportion;
 
     return eo;
   }
