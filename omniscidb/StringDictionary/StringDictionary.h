@@ -31,7 +31,11 @@
 
 extern bool g_enable_stringdict_parallel;
 
+namespace legacy {
 class StringDictionary;
+}
+
+using StringDictionary = legacy::StringDictionary;
 
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
 
@@ -55,6 +59,10 @@ class StringDictionaryTranslator {
   StringDictionaryTranslator() {}
 };
 
+class StringLocalCallback;
+
+namespace legacy {
+
 class StringDictionary {
  public:
   StringDictionary(const DictRef& dict_ref,
@@ -76,7 +84,7 @@ class StringDictionary {
   // Each std::string const& (if isClient()) or std::string_view (if !isClient())
   // plus string_id is passed to the callback functor.
   void eachStringSerially(int64_t const generation, StringCallback&) const;
-  friend class StringLocalCallback;
+  friend class ::StringLocalCallback;
 
   int32_t getOrAdd(const std::string_view& str) noexcept;
   template <class T, class String>
@@ -216,8 +224,10 @@ class StringDictionary {
   char* CANARY_BUFFER{nullptr};
   size_t canary_buffer_size = 0;
 
-  friend class StringDictionaryTranslator;
+  friend class ::StringDictionaryTranslator;
 };
+
+}  // namespace legacy
 
 int32_t truncate_to_generation(const int32_t id, const size_t generation);
 

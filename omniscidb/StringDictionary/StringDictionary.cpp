@@ -77,6 +77,9 @@ struct ThreadInfo {
 }  // namespace
 
 bool g_enable_stringdict_parallel{false};
+
+namespace legacy {
+
 constexpr int32_t StringDictionary::INVALID_STR_ID;
 constexpr size_t StringDictionary::MAX_STRLEN;
 constexpr size_t StringDictionary::MAX_STRCOUNT;
@@ -1255,6 +1258,8 @@ void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache)
   }
   sorted_cache.swap(updated_cache);
 }
+
+}  // namespace legacy
 
 std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(
     const std::shared_ptr<StringDictionary> source_dict,
