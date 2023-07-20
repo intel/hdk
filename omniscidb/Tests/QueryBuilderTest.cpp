@@ -302,6 +302,12 @@ void checkWindowCollation(const BuilderExpr& expr,
   ASSERT_EQ(wnd_fn->collation()[idx].nulls_first, null_pos == NullSortedPosition::First);
 }
 
+void checkCardinality(const BuilderExpr& expr, const BuilderExpr& op) {
+  auto cardinality_expr = expr.expr()->as<CardinalityExpr>();
+  ASSERT_TRUE(cardinality_expr);
+  ASSERT_TRUE(cardinality_expr->arg()->equal(op.expr().get()));
+}
+
 }  // anonymous namespace
 
 class QueryBuilderTest : public TestSuite {
@@ -463,6 +469,18 @@ class QueryBuilderTest : public TestSuite {
                     "2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,,,,,,,,\n"
                     "3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,,,,,,,,\n"
                     ",1,4,1,,1,4,1,,1,4,1,,1,4,1,,,,,,,,\n");
+
+    createTable("test_cardinality",
+                {{"col_arr_i32", ctx().arrayVarLen(ctx().int32())},
+                 {"col_arr_i32x2", ctx().arrayFixed(2, ctx().int32())},
+                 {"col_arr_i32nn", ctx().arrayVarLen(ctx().int32(), 4, false)},
+                 {"col_arr_i32x2nn", ctx().arrayFixed(2, ctx().int32(), false)}});
+    insertJsonValues(
+        "test_cardinality",
+        R"___({"col_arr_i32": [1], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [1, 2], "col_arr_i32x2nn": [3, 4]}
+              {"col_arr_i32": null, "col_arr_i32x2": null, "col_arr_i32nn": [1], "col_arr_i32x2nn": [3, 4]}
+              {"col_arr_i32": [], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [], "col_arr_i32x2nn": [3, 4]}
+              {"col_arr_i32": [1, 2], "col_arr_i32x2": null, "col_arr_i32nn": [null], "col_arr_i32x2nn": [3, 4]})___");
   }
 
   static void TearDownTestSuite() {
@@ -479,6 +497,8 @@ class QueryBuilderTest : public TestSuite {
     dropTable("withNull");
     dropTable("test_tmstmp");
     dropTable("test_tmstmp_nullable");
+    dropTable("test_bitwise");
+    dropTable("test_cardinality");
   }
 
   void compare_res_fields(const ExecutionResult& res,
@@ -5194,6 +5214,42 @@ TEST_F(QueryBuilderTest, BwNot_Exec) {
                             (int64_t)0xfffffffffffffffdLL,
                             (int64_t)0xfffffffffffffffcLL,
                             inline_null_value<int64_t>()}));
+}
+
+TEST_F(QueryBuilderTest, Cardinality) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_cardinality");
+  checkCardinality(scan.ref("col_arr_i32").cardinality(), scan.ref("col_arr_i32"));
+  checkCardinality(scan.ref("col_arr_i32x2").cardinality(), scan.ref("col_arr_i32x2"));
+  checkCardinality(scan.ref("col_arr_i32nn").cardinality(), scan.ref("col_arr_i32nn"));
+  checkCst(scan.ref("col_arr_i32x2nn").cardinality(), 2, ctx().int32(false));
+  checkCst(builder.cst({1, 2, 3, 4}, "array(int8)").cardinality(), 4, ctx().int32(false));
+  checkNullCst(builder.nullCst("array(int8)").cardinality(), ctx().int32());
+  auto scan2 = builder.scan("test3");
+  EXPECT_THROW(scan2.ref("col_i").cardinality(), InvalidQueryError);
+  EXPECT_THROW(scan2.ref("col_d").cardinality(), InvalidQueryError);
+  EXPECT_THROW(scan2.ref("col_dec").cardinality(), InvalidQueryError);
+  EXPECT_THROW(scan2.ref("col_time").cardinality(), InvalidQueryError);
+  EXPECT_THROW(scan2.ref("col_str").cardinality(), InvalidQueryError);
+  EXPECT_THROW(builder.cst(1).cardinality(), InvalidQueryError);
+}
+
+TEST_F(QueryBuilderTest, Cardinality_Exec) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_cardinality");
+  auto dag = scan.proj({scan.ref("col_arr_i32").cardinality(),
+                        scan.ref("col_arr_i32x2").cardinality(),
+                        scan.ref("col_arr_i32nn").cardinality(),
+                        scan.ref("col_arr_i32x2nn").cardinality()})
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(
+      res,
+      std::vector<int32_t>({1, inline_null_value<int32_t>(), 0, 2}),
+      std::vector<int32_t>(
+          {2, inline_null_value<int32_t>(), 2, inline_null_value<int32_t>()}),
+      std::vector<int32_t>({2, 1, 0, 1}),
+      std::vector<int32_t>({2, 2, 2, 2}));
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

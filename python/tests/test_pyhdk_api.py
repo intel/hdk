@@ -917,6 +917,18 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_cardinality(self, exe_cfg):
+        hdk = pyhdk.init()
+        ht = hdk.create_table("test_arr", [("a", "array(int)")])
+        hdk.import_pydict({"a": [[1, 2], [2, 3, 4], None, []]}, ht)
+
+        check_res(
+            ht.proj(len=ht["a"].cardinality()).run(device_type=exe_cfg.device_type),
+            {"len": [2, 3, "null", 0]},
+        )
+
+        hdk.drop_table(ht)
+
     def test_run_on_res(self, exe_cfg):
         hdk = pyhdk.init()
         ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})

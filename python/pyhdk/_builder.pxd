@@ -88,6 +88,7 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr ge(const CBuilderExpr&) except +
 
     CBuilderExpr at(const CBuilderExpr&) except +
+    CBuilderExpr cardinality() except +
 
     CBuilderExpr over(const vector[CBuilderExpr]&) except +
     CBuilderExpr orderBy(const vector[CBuilderOrderByKey]&) except +

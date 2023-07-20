@@ -308,6 +308,11 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.at((<QueryExpr>value).c_expr)
     return res
 
+  def cardinality(self):
+    res = QueryExpr()
+    res.c_expr = self.c_expr.cardinality()
+    return res
+
   def over(self, *args):
     cdef vector[CBuilderExpr] keys
     for arg in args:

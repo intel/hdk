@@ -216,6 +216,8 @@ class BuilderExpr {
   BuilderExpr at(int idx) const;
   BuilderExpr at(int64_t idx) const;
 
+  BuilderExpr cardinality() const;
+
   BuilderExpr over() const;
   BuilderExpr over(const BuilderExpr& key) const;
   BuilderExpr over(const std::vector<BuilderExpr>& keys) const;
