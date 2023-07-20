@@ -83,6 +83,8 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     double gpu_input_mem_limit_percent
     bool allow_runtime_query_interrupt
     double running_query_interrupt_freq
+    unsigned forced_gpu_proportion
+    unsigned forced_cpu_proportion
     unsigned pending_query_interrupt_freq
     CExecutorType executor_type
     vector[size_t] outer_fragment_indices

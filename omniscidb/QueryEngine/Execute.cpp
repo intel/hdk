@@ -1936,7 +1936,8 @@ std::pair<std::unique_ptr<policy::ExecutionPolicy>, ExecutorDeviceType>
 Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
                                        const ExecutorDeviceType requested_device_type,
                                        const std::vector<InputTableInfo>& query_infos,
-                                       size_t& max_groups_buffer_entry_guess) {
+                                       size_t& max_groups_buffer_entry_guess,
+                                       const ExecutionOptions& eo) {
   if (needFallbackOnCPU(ra_exe_unit, requested_device_type)) {
     LOG(DEBUG1) << "Devices Restricted, falling back on CPU";
     return {std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
@@ -1995,8 +1996,8 @@ Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
   if (cfg.enable_heterogeneous_execution) {
     if (cfg.forced_heterogeneous_distribution) {
       std::map<ExecutorDeviceType, unsigned> distribution{
-          {ExecutorDeviceType::CPU, cfg.forced_cpu_proportion},
-          {ExecutorDeviceType::GPU, cfg.forced_gpu_proportion}};
+          {ExecutorDeviceType::CPU, eo.forced_cpu_proportion},
+          {ExecutorDeviceType::GPU, eo.forced_gpu_proportion}};
       exe_policy = std::make_unique<policy::ProportionBasedExecutionPolicy>(
           std::move(distribution));
     } else {
@@ -2110,7 +2111,7 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     ColumnCacheMap& column_cache) {
   INJECT_TIMER(Exec_executeWorkUnit);
   auto [exe_policy, fallback_device] = getExecutionPolicyForTargets(
-      ra_exe_unit, co.device_type, query_infos, max_groups_buffer_entry_guess);
+      ra_exe_unit, co.device_type, query_infos, max_groups_buffer_entry_guess, eo);
 
   int8_t crt_min_byte_width{MAX_BYTE_WIDTH_SUPPORTED};
   do {

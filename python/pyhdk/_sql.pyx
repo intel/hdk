@@ -204,6 +204,8 @@ cdef class RelAlgExecutor:
     c_eo.get().with_watchdog = kwargs.get("enable_watchdog", config.exec.watchdog.enable)
     c_eo.get().with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     c_eo.get().just_explain = kwargs.get("just_explain", False)
+    c_eo.get().forced_gpu_proportion = kwargs.get("forced_gpu_proportion", config.exec.heterogeneous.forced_gpu_proportion)
+    c_eo.get().forced_cpu_proportion = 100 - c_eo.get().forced_gpu_proportion
     cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, dereference(c_eo.get()), False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)

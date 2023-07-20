@@ -184,56 +184,6 @@ cdef class TypeInfo:
   def __repr__(self):
     return self.c_type_info.toString()
 
-cdef class Config:
-  @property
-  def gpu_prop(self):
-    return self.c_config.get().exec.heterogeneous.forced_gpu_proportion
-  
-  @gpu_prop.setter
-  def gpu_prop(self, gpu_prop):
-    self.c_config.get().exec.heterogeneous.forced_gpu_proportion=gpu_prop
-    self.c_config.get().exec.heterogeneous.forced_cpu_proportion=100-gpu_prop
-  
-  @property
-  def allow_cpu_retry(self):
-    return self.c_config.get().exec.heterogeneous.allow_cpu_retry
-
-  @allow_cpu_retry.setter
-  def allow_cpu_retry(self, allowed):
-    self.c_config.get().exec.heterogeneous.allow_cpu_retry=allowed
-
-  @property
-  def allow_query_step_cpu_retry(self):
-    return self.c_config.get().exec.heterogeneous.allow_query_step_cpu_retry
-
-  @allow_query_step_cpu_retry.setter
-  def allow_query_step_cpu_retry(self, allowed):
-    self.c_config.get().exec.heterogeneous.allow_query_step_cpu_retry=allowed
-  
-  @property
-  def enable_heterogeneous_execution(self):
-    return self.c_config.get().exec.heterogeneous.enable_heterogeneous_execution
-
-  @enable_heterogeneous_execution.setter
-  def enable_heterogeneous_execution(self, enabled):
-    self.c_config.get().exec.heterogeneous.enable_heterogeneous_execution=enabled
-  
-  @property
-  def forced_heterogeneous_distribution(self):
-    return self.c_config.get().exec.heterogeneous.forced_heterogeneous_distribution
-
-  @forced_heterogeneous_distribution.setter
-  def forced_heterogeneous_distribution(self, enabled):
-    self.c_config.get().exec.heterogeneous.forced_heterogeneous_distribution=enabled
- 
-  @property
-  def enable_multifrag_heterogeneous_execution(self):
-    return self.c_config.get().exec.heterogeneous.enable_multifrag_heterogeneous_execution
-
-  @enable_multifrag_heterogeneous_execution.setter
-  def enable_multifrag_heterogeneous_execution(self, enabled):
-    self.c_config.get().exec.heterogeneous.enable_multifrag_heterogeneous_execution=enabled
-
 def buildConfig(*, enable_debug_timer=None, enable_union=False, log_dir="hdk_log", **kwargs):
   global g_enable_debug_timer
   if enable_debug_timer is not None:
