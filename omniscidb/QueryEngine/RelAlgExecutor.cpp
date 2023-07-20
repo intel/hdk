@@ -1532,6 +1532,7 @@ std::optional<size_t> RelAlgExecutor::getFilteredCountAll(const WorkUnit& work_u
                                                           const bool is_agg,
                                                           const CompilationOptions& co,
                                                           const ExecutionOptions& eo) {
+  LOG(INFO) << "[getFilteredCountAll] Should add count* here.";
   const auto count = hdk::ir::makeExpr<hdk::ir::AggExpr>(
       hdk::ir::Context::defaultCtx().integer(config_.exec.group_by.bigint_count ? 8 : 4),
       hdk::ir::AggType::kCount,

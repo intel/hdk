@@ -19,6 +19,19 @@
 #include "ExpressionRewrite.h"
 #include "RelAlgExecutor.h"
 
+namespace {
+
+class InputColumnsCollector
+    : public hdk::ir::ExprCollector<std::unordered_set<InputColDescriptor>,
+                                    InputColumnsCollector> {
+ protected:
+  void visitColumnVar(const hdk::ir::ColumnVar* col_var) override {
+    result_.insert(InputColDescriptor(col_var->columnInfo(), 0));
+  }
+};
+
+}  // namespace
+
 size_t RelAlgExecutor::getNDVEstimation(const WorkUnit& work_unit,
                                         const int64_t range,
                                         const bool is_agg,
@@ -101,8 +114,43 @@ RelAlgExecutionUnit create_ndv_execution_unit(const RelAlgExecutionUnit& ra_exe_
 RelAlgExecutionUnit create_count_all_execution_unit(
     const RelAlgExecutionUnit& ra_exe_unit,
     hdk::ir::ExprPtr replacement_target) {
+  InputColumnsCollector input_columns_collector;
+
+  std::list<std::shared_ptr<const InputColDescriptor>> join_input_col_descs;
+  std::stringstream os{};
+  if (!ra_exe_unit.join_quals.empty()) {
+    os << "\n[Count all] Join Quals: ";
+
+    for (size_t i = 0; i < ra_exe_unit.join_quals.size(); i++) {
+      const auto& join_condition = ra_exe_unit.join_quals[i];
+      os << "\t" << std::to_string(i) << " " << ::toString(join_condition.type);
+      for (const auto& q : join_condition.quals) {
+        input_columns_collector.visit(q.get());
+        os << q->toString() << ", ";
+      }
+    }
+  }
+  auto& input_column_descriptors = input_columns_collector.result();
+  for (auto& col_var : input_column_descriptors) {
+    LOG(INFO) << "col_vars: " << col_var;
+    for (auto& icol : ra_exe_unit.input_col_descs) {
+      if (icol->getColId() == col_var.getColId() &&
+          icol->getTableId() == col_var.getTableId()) {
+        join_input_col_descs.emplace_back(icol);
+      }
+    }
+  }
+
+  LOG(INFO) << "join quals: " << os.str();
+  std::stringstream js{};
+  js << "\n\t[Only Join] Table/Col/Levels: ";
+  for (const auto& input_col_desc : join_input_col_descs) {
+    js << "(" << input_col_desc->getTableId() << ", " << input_col_desc->getColId()
+       << ", " << input_col_desc->getNestLevel() << ") ";
+  }
+  LOG(INFO) << "join in cols: " << js.str();
   return {ra_exe_unit.input_descs,
-          ra_exe_unit.input_col_descs,
+          join_input_col_descs,
           ra_exe_unit.simple_quals,
           ra_exe_unit.quals,
           ra_exe_unit.join_quals,

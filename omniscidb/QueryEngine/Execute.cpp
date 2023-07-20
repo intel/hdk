@@ -2497,6 +2497,7 @@ ResultSetPtr build_row_for_empty_input(
     const ExecutorDeviceType device_type) {
   std::vector<hdk::ir::ExprPtr> target_exprs_owned_copies;
   std::vector<const hdk::ir::Expr*> target_exprs;
+  LOG(INFO) << "Building row for empty input.";
   for (const auto target_expr : target_exprs_in) {
     auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
     CHECK(agg_expr);

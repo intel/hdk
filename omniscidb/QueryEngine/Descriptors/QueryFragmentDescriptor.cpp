@@ -151,7 +151,9 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     }
 
     ExecutionKernelDescriptor execution_kernel_desc{
-        device_id, {}, fragment.getNumTuples()};
+        .device_id = device_id,
+        .fragments = {},
+        .outer_tuple_count = fragment.getNumTuples()};
     if (table_desc_offset) {
       const auto frag_ids =
           executor->getTableFragmentIndices(ra_exe_unit,
