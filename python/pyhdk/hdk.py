@@ -1347,6 +1347,29 @@ class QueryExprAPI:
         """
         pass
 
+    def cardinality(self):
+        """
+        Create cardinality expression to access array size.
+
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.create_table("test_arr", [("a", "array(int)")])
+        >>> hdk.import_pydict({"a": [[1, 2], [2, 3, 4], None, []]}, ht)
+        >>> ht.proj(len=ht["a"].cardinality()).run()
+        Schema:
+          len: INT32
+        Data:
+        2
+        3
+        null
+        0
+        """
+        pass
+
     def over(self, *args):
         """
         Add partition keys to window function expression. Also, transforms min, max, sum, avg, and count

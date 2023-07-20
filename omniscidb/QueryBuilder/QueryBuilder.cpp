@@ -1587,6 +1587,30 @@ BuilderExpr BuilderExpr::at(int64_t idx) const {
   return at(builder_->cst(idx, builder_->ctx_.int64(false)));
 }
 
+BuilderExpr BuilderExpr::cardinality() const {
+  if (!expr_->type()->isArray()) {
+    throw InvalidQueryError() << "Non-array type used for CARDINALITY operator: "
+                              << expr_->type()->toString();
+  }
+
+  if (expr_->is<Constant>()) {
+    if (expr_->as<Constant>()->isNull()) {
+      return builder_->nullCst(builder_->ctx_.int32());
+    }
+    return builder_->cst(static_cast<int32_t>(expr_->as<Constant>()->valueList().size()),
+                         builder_->ctx_.int32(false));
+  }
+
+  if (expr_->type()->size() > 0 && !expr_->type()->nullable()) {
+    auto elem_type = expr_->type()->as<hdk::ir::ArrayBaseType>()->elemType();
+    return builder_->cst(expr_->type()->size() / elem_type->size(),
+                         builder_->ctx_.int32(false));
+  }
+
+  auto cardinality_expr = makeExpr<CardinalityExpr>(expr_);
+  return {builder_, cardinality_expr, "", true};
+}
+
 BuilderExpr BuilderExpr::over() const {
   return over(std::vector<BuilderExpr>());
 }
