@@ -29,9 +29,23 @@
 #include <tuple>
 #include <vector>
 
+#define USE_LEGACY_STR_DICT
+
 extern bool g_enable_stringdict_parallel;
 
+namespace legacy {
 class StringDictionary;
+}
+
+namespace fast {
+class StringDictionary;
+}
+
+#ifdef USE_LEGACY_STR_DICT
+using StringDictionary = legacy::StringDictionary;
+#else
+using StringDictionary = fast::StringDictionary;
+#endif
 
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
 
@@ -55,6 +69,10 @@ class StringDictionaryTranslator {
   StringDictionaryTranslator() {}
 };
 
+class StringLocalCallback;
+
+namespace legacy {
+
 class StringDictionary {
  public:
   StringDictionary(const DictRef& dict_ref,
@@ -76,7 +94,7 @@ class StringDictionary {
   // Each std::string const& (if isClient()) or std::string_view (if !isClient())
   // plus string_id is passed to the callback functor.
   void eachStringSerially(int64_t const generation, StringCallback&) const;
-  friend class StringLocalCallback;
+  friend class ::StringLocalCallback;
 
   int32_t getOrAdd(const std::string_view& str) noexcept;
   template <class T, class String>
@@ -216,9 +234,142 @@ class StringDictionary {
   char* CANARY_BUFFER{nullptr};
   size_t canary_buffer_size = 0;
 
-  friend class StringDictionaryTranslator;
+  friend class ::StringDictionaryTranslator;
 };
 
+}  // namespace legacy
+
 int32_t truncate_to_generation(const int32_t id, const size_t generation);
+
+namespace fast {
+
+class StringDictionary {
+ public:
+  StringDictionary(const DictRef& dict_ref,
+                   const bool materializeHashes = false,
+                   size_t initial_capacity = 256)
+      : dict_ref_(dict_ref), hash_to_id_map(initial_capacity) {
+    strings.reserve(initial_capacity);
+  }
+
+  int32_t getDbId() const noexcept { return dict_ref_.dbId; }
+  int32_t getDictId() const noexcept { return dict_ref_.dictId; }
+
+  class StringCallback {
+   public:
+    virtual ~StringCallback() = default;
+    virtual void operator()(std::string const&, int32_t const string_id) = 0;
+    virtual void operator()(std::string_view const, int32_t const string_id) = 0;
+  };
+
+  // Functors passed to eachStringSerially() must derive from StringCallback.
+  // Each std::string const& (if isClient()) or std::string_view (if !isClient())
+  // plus string_id is passed to the callback functor.
+  void eachStringSerially(int64_t const generation, StringCallback&) const;
+  friend class ::StringLocalCallback;
+
+  int32_t getOrAdd(const std::string_view& str) noexcept;
+  template <class T, class String>
+  size_t getBulk(const std::vector<String>& string_vec, T* encoded_vec) const;
+  template <class T, class String>
+  size_t getBulk(const std::vector<String>& string_vec,
+                 T* encoded_vec,
+                 const int64_t generation) const;
+  template <class T, class String>
+  void getOrAddBulk(const std::vector<String>& string_vec, T* encoded_vec);
+  template <class String>
+  int32_t getIdOfString(const String&) const;
+  std::string getString(int32_t string_id) const;
+  std::pair<char*, size_t> getStringBytes(int32_t string_id) const noexcept;
+  size_t storageEntryCount() const;
+
+  std::vector<int32_t> getLike(const std::string& pattern,
+                               const bool icase,
+                               const bool is_simple,
+                               const char escape,
+                               const size_t generation) const;
+
+  std::vector<int32_t> getCompare(const std::string& pattern,
+                                  const std::string& comp_operator,
+                                  const size_t generation);
+
+  std::vector<int32_t> getRegexpLike(const std::string& pattern,
+                                     const char escape,
+                                     const size_t generation) const;
+
+  std::vector<std::string> copyStrings() const;
+
+  static constexpr int32_t INVALID_STR_ID = -1;
+  static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
+  static constexpr size_t MAX_STRCOUNT = (1U << 31) - 1;
+
+ private:
+  int32_t getUnlocked(const std::string_view sv) const noexcept;
+  std::string_view getStringFromStorageFast(const int string_id) const noexcept;
+  template <class String>
+  uint32_t computeBucket(
+      const uint32_t hash,
+      const String& input_string,
+      const std::vector<int32_t>& string_id_uint32_table) const noexcept;
+
+  template <class String>
+  int32_t addString(const uint32_t hash, const String& input_string);
+
+  const DictRef dict_ref_;
+  size_t str_count_;
+
+  struct HashMapPayload {
+    int32_t string_id;
+    uint32_t hash;
+    std::string_view string;
+
+    void set(const int32_t string_id_in,
+             const uint32_t hash_in,
+             std::string_view string_in) {
+      string_id = string_id_in;
+      hash = hash_in;
+      string = string_in;
+    }
+
+    HashMapPayload() : string_id(INVALID_STR_ID), hash(INVALID_STR_ID) {}
+  };
+
+  std::vector<HashMapPayload> hash_to_id_map;
+  std::vector<std::unique_ptr<std::string>> strings;
+
+  // returns added string ID
+  template <class String>
+  int32_t addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
+    strings.emplace_back(std::make_unique<std::string>(str));
+    CHECK_LT(bucket, hash_to_id_map.size());
+    hash_to_id_map[bucket].set(
+        static_cast<int32_t>(numStrings()) - 1, hash, *strings.back());
+    return hash_to_id_map[bucket].string_id;
+  }
+
+  size_t computeBucket(const uint32_t hash, const std::string_view str) const;
+
+  // returns ID for a given bucket
+  int32_t id(const size_t bucket) const { return hash_to_id_map[bucket].string_id; }
+
+  void resize(const size_t new_size);
+
+  // returns string for a given ID
+  const std::string& str(const size_t id) const { return *strings[id].get(); }
+
+  size_t numStrings() const { return strings.size(); }
+
+  size_t size() const { return hash_to_id_map.size(); }
+
+  bool full() const { return strings.size() == hash_to_id_map.size(); }
+
+  mutable mapd_shared_mutex rw_mutex_;
+
+  // TODO: legacy, direct access outside of this class
+  std::vector<uint32_t> hash_cache_;
+  friend class ::StringDictionaryTranslator;
+};
+
+}  // namespace fast
 
 #endif  // STRINGDICTIONARY_STRINGDICTIONARY_H
