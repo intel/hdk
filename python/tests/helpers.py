@@ -24,5 +24,7 @@ def check_res(res, expected):
         for expected_val, actual_val in zip(expected[col], vals):
             if type(expected_val) is float:
                 assert abs(expected_val - actual_val) < 0.0001
+            elif type(expected_val) is list:
+                assert (expected_val == actual_val).all()
             else:
                 assert expected_val == actual_val

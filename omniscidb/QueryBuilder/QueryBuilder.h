@@ -76,6 +76,8 @@ class BuilderExpr {
   BuilderExpr approxQuantile(double val) const;
   BuilderExpr sample() const;
   BuilderExpr singleValue() const;
+  BuilderExpr topK(int count) const;
+  BuilderExpr bottomK(int count) const;
   BuilderExpr stdDev() const;
   BuilderExpr corr(const BuilderExpr& arg) const;
 
@@ -84,10 +86,12 @@ class BuilderExpr {
   BuilderExpr firstValue() const;
   BuilderExpr lastValue() const;
 
-  BuilderExpr agg(const std::string& agg_str, const BuilderExpr& arg) const;
+  BuilderExpr agg(const std::string& agg_str, BuilderExpr arg) const;
   BuilderExpr agg(const std::string& agg_str, double val = HUGE_VAL) const;
+  BuilderExpr agg(const std::string& agg_str, int val) const;
   BuilderExpr agg(AggType agg_kind, const BuilderExpr& arg) const;
   BuilderExpr agg(AggType agg_kind, double val) const;
+  BuilderExpr agg(AggType agg_kind, int val) const;
   BuilderExpr agg(AggType agg_kind, bool is_dinstinct, const BuilderExpr& arg) const;
   BuilderExpr agg(AggType agg_kind,
                   bool is_dinstinct = false,

@@ -125,6 +125,13 @@ class ResultSetReductionJIT {
                                    const size_t target_logical_idx,
                                    Function* ir_reduce_one_entry) const;
 
+  void reduceOneTopKSlot(Value* this_ptr1,
+                         Value* that_ptr1,
+                         const hdk::ir::Type* arg_type,
+                         int topk_param,
+                         bool inline_bufer,
+                         Function* ir_reduce_one_entry) const;
+
   void finalizeReductionCode(ReductionCode& reduction_code,
                              const llvm::Function* ir_is_empty,
                              const llvm::Function* ir_reduce_one_entry,
@@ -169,3 +176,10 @@ class GpuReductionHelperJIT : public ResultSetReductionJIT {
  private:
   const QueryMemoryDescriptor& query_mem_desc_;
 };
+
+extern "C" RUNTIME_EXPORT void topk_reduce_jit_rt(const int64_t new_heap_handle,
+                                                  const int64_t old_heap_handle,
+                                                  int elem_size,
+                                                  bool is_fp,
+                                                  int topk_param,
+                                                  bool inline_buffer);

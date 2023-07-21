@@ -1453,7 +1453,11 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
 
     size_t row_size_bytes = 0;
     for (size_t i = 0; i < col_count; i++) {
-      row_size_bytes += results_->colType(i)->size();
+      if (results_->colType(i)->isVarLen()) {
+        row_size_bytes += 8;
+      } else {
+        row_size_bytes += results_->colType(i)->size();
+      }
     }
     CHECK_GT(row_size_bytes, (size_t)0);
 

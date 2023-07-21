@@ -23,8 +23,10 @@
 #include "Execute.h"
 #include "IRCodegenUtils.h"
 #include "LLVMFunctionAttributesUtil.h"
+#include "TopKAggRuntime.h"
 
 #include "ResultSet/CountDistinct.h"
+#include "Shared/InlineNullValues.h"
 #include "Shared/likely.h"
 #include "Shared/quantile.h"
 
@@ -467,6 +469,65 @@ extern "C" RUNTIME_EXPORT void approx_quantile_jit_rt(const int64_t new_set_hand
     auto* accumulator = reinterpret_cast<quantile::TDigest*>(old_set_handle);
     accumulator->allocate();
     accumulator->mergeTDigest(*incoming);
+  }
+}
+
+template <typename T>
+void topk_agg_reduce(int64_t new_heap_handle,
+                     int64_t old_heap_handle,
+                     int topk_param,
+                     bool inline_buffer) {
+  T null_val = inline_null_value<T>();
+  const T* old_heap_ptr = inline_buffer ? reinterpret_cast<const T*>(old_heap_handle)
+                                        : *reinterpret_cast<const T**>(old_heap_handle);
+  int count = std::abs(topk_param);
+  for (int i = 0; i < count; ++i) {
+    if (old_heap_ptr[i] != null_val) {
+      agg_topk_impl<T>(reinterpret_cast<int64_t*>(new_heap_handle),
+                       old_heap_ptr[i],
+                       null_val,
+                       topk_param,
+                       inline_buffer);
+    } else {
+      break;
+    }
+  }
+}
+
+extern "C" RUNTIME_EXPORT void topk_reduce_jit_rt(const int64_t new_slot_ptr,
+                                                  const int64_t old_slot_ptr,
+                                                  int elem_size,
+                                                  bool is_fp,
+                                                  int topk_param,
+                                                  bool inline_buffer) {
+  if (is_fp) {
+    switch (elem_size) {
+      case 4:
+        return topk_agg_reduce<float>(
+            new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+      case 8:
+        return topk_agg_reduce<double>(
+            new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+      default:
+        abort();
+    }
+  }
+
+  switch (elem_size) {
+    case 1:
+      return topk_agg_reduce<int8_t>(
+          new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+    case 2:
+      return topk_agg_reduce<int16_t>(
+          new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+    case 4:
+      return topk_agg_reduce<int32_t>(
+          new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+    case 8:
+      return topk_agg_reduce<int64_t>(
+          new_slot_ptr, old_slot_ptr, topk_param, inline_buffer);
+    default:
+      abort();
   }
 }
 
@@ -1207,6 +1268,15 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
                                         ir_reduce_one_entry);
       break;
     }
+    case hdk::ir::AggType::kTopK:
+      CHECK_EQ(chosen_bytes, static_cast<int8_t>(sizeof(int64_t)));
+      reduceOneTopKSlot(this_ptr1,
+                        that_ptr1,
+                        target_info.agg_arg_type,
+                        target_info.topk_param,
+                        target_info.topk_inline_buffer,
+                        ir_reduce_one_entry);
+      break;
     default:
       LOG(FATAL) << "Invalid aggregate type";
   }
@@ -1256,6 +1326,28 @@ void ResultSetReductionJIT::reduceOneApproxQuantileSlot(
       "");
 }
 
+void ResultSetReductionJIT::reduceOneTopKSlot(Value* this_ptr1,
+                                              Value* that_ptr1,
+                                              const hdk::ir::Type* arg_type,
+                                              int topk_param,
+                                              bool inline_buffer,
+                                              Function* ir_reduce_one_entry) const {
+  ir_reduce_one_entry->add<ExternalCall>(
+      "topk_reduce_jit_rt",
+      Type::Void,
+      std::vector<const Value*>{
+          this_ptr1,
+          that_ptr1,
+          ir_reduce_one_entry->addConstant<ConstantInt>(arg_type->canonicalSize(),
+                                                        Type::Int32),
+          ir_reduce_one_entry->addConstant<ConstantInt>(arg_type->isFloatingPoint(),
+                                                        Type::Int1),
+          ir_reduce_one_entry->addConstant<ConstantInt>(topk_param, Type::Int32),
+          ir_reduce_one_entry->addConstant<ConstantInt>(inline_buffer, Type::Int1),
+      },
+      "");
+}
+
 void ResultSetReductionJIT::finalizeReductionCode(
     ReductionCode& reduction_code,
     const llvm::Function* ir_is_empty,
@@ -1292,7 +1384,9 @@ std::string target_info_key(const TargetInfo& target_info) {
          (target_info.agg_arg_type ? target_info.agg_arg_type->toString()
                                    : std::string("null")) +
          "\n" + std::to_string(target_info.skip_null_val) + "\n" +
-         std::to_string(target_info.is_distinct);
+         std::to_string(target_info.is_distinct) + "\n" +
+         std::to_string(target_info.topk_param) + "\n" +
+         std::to_string(target_info.topk_inline_buffer);
 }
 
 }  // namespace

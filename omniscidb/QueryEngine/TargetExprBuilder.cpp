@@ -32,7 +32,7 @@
 
 #define LL_CONTEXT executor->cgen_state_->context_
 #define LL_BUILDER executor->cgen_state_->ir_builder_
-#define LL_BOOL(v) executor->ll_bool(v)
+#define LL_BOOL(v) executor->cgen_state_->llBool(v)
 #define LL_INT(v) executor->cgen_state_->llInt(v)
 #define LL_FP(v) executor->cgen_state_->llFp(v)
 #define ROW_FUNC executor->cgen_state_->row_func_
@@ -68,6 +68,8 @@ std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info) {
       return {"checked_single_agg_id"};
     case hdk::ir::AggType::kSample:
       return {"agg_id"};
+    case hdk::ir::AggType::kTopK:
+      return {"agg_topk"};
     default:
       UNREACHABLE() << "Unrecognized agg kind: " << toString(target_info.agg_kind);
   }
@@ -82,6 +84,23 @@ inline bool is_columnar_projection(const QueryMemoryDescriptor& query_mem_desc) 
 bool is_simple_count(const TargetInfo& target_info) {
   return target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kCount &&
          !target_info.is_distinct;
+}
+
+std::string_view getAggFnSuffix(size_t arg_size, bool is_fp_arg) {
+  switch (arg_size) {
+    case 1:
+      return "_int8";
+    case 2:
+      return "_int16";
+    case 4:
+      return is_fp_arg ? "_float" : "_int32";
+    case 8:
+      return is_fp_arg ? "_double" : "_int64";
+    default:
+      CHECK(false);
+  }
+  CHECK(false);
+  return "";
 }
 
 }  // namespace
@@ -322,8 +341,12 @@ void TargetExprCodegen::codegenAggregate(
     }
 
     llvm::Value* agg_col_ptr{nullptr};
-    const auto chosen_bytes =
+    auto chosen_bytes =
         static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index));
+    if (target_info.agg_kind == hdk::ir::AggType::kTopK) {
+      CHECK_EQ(chosen_bytes, (size_t)8);
+      chosen_bytes = target_info.agg_arg_type->canonicalSize();
+    }
     auto chosen_type = get_compact_type(target_info);
     auto arg_type =
         ((arg_expr && !arg_expr->type()->isNull()) && !target_info.is_distinct)
@@ -376,8 +399,11 @@ void TargetExprCodegen::codegenAggregate(
       str_target_lv = target_lvs.front();
     }
     std::vector<llvm::Value*> agg_args{
-        executor->castToIntPtrTyIn((is_group_by ? agg_col_ptr : agg_out_vec[slot_index]),
-                                   (agg_chosen_bytes << 3)),
+        executor->castToIntPtrTyIn(
+            (is_group_by ? agg_col_ptr : agg_out_vec[slot_index]),
+            (target_info.is_agg && target_info.type->isArray() ? sizeof(void*)
+                                                               : agg_chosen_bytes)
+                << 3),
         (is_simple_count_target && !arg_expr)
             ? (agg_chosen_bytes == sizeof(int32_t) ? LL_INT(int32_t(0))
                                                    : LL_INT(int64_t(0)))
@@ -390,23 +416,11 @@ void TargetExprCodegen::codegenAggregate(
       }
     }
     std::string agg_fname{agg_base_name};
-    if (is_fp_arg) {
-      if (!lazy_fetched) {
-        if (agg_chosen_bytes == sizeof(float)) {
-          CHECK(arg_type->isFp32());
-          agg_fname += "_float";
-        } else {
-          CHECK_EQ(agg_chosen_bytes, sizeof(double));
-          agg_fname += "_double";
-        }
-      }
-    } else if (agg_chosen_bytes == sizeof(int32_t)) {
-      agg_fname += "_int32";
-    } else if (agg_chosen_bytes == sizeof(int16_t) &&
-               query_mem_desc.didOutputColumnar()) {
-      agg_fname += "_int16";
-    } else if (agg_chosen_bytes == sizeof(int8_t) && query_mem_desc.didOutputColumnar()) {
-      agg_fname += "_int8";
+    if ((is_fp_arg && !lazy_fetched) ||
+        (target_info.agg_kind == hdk::ir::AggType::kTopK) ||
+        (agg_chosen_bytes == sizeof(int32_t)) ||
+        (agg_chosen_bytes < sizeof(int32_t) && query_mem_desc.didOutputColumnar())) {
+      agg_fname += getAggFnSuffix(agg_chosen_bytes, is_fp_arg);
     }
 
     if (is_distinct_target(target_info)) {
@@ -424,21 +438,30 @@ void TargetExprCodegen::codegenAggregate(
         agg_fname += "_skip_val";
       }
 
-      if (target_info.agg_kind == hdk::ir::AggType::kSingleValue || need_skip_null) {
+      if (target_info.agg_kind == hdk::ir::AggType::kSingleValue ||
+          target_info.agg_kind == hdk::ir::AggType::kTopK || need_skip_null) {
         llvm::Value* null_in_lv{nullptr};
         if (arg_type->isFloatingPoint()) {
           null_in_lv =
               static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(arg_type));
         } else {
           null_in_lv = static_cast<llvm::Value*>(executor->cgen_state_->inlineIntNull(
-              is_agg_domain_range_equivalent(target_info.agg_kind) ? arg_type
-                                                                   : target_info.type));
+              is_agg_domain_range_equivalent(target_info.agg_kind) ||
+                      target_info.agg_kind == hdk::ir::AggType::kTopK
+                  ? arg_type
+                  : target_info.type));
         }
         CHECK(null_in_lv);
         auto null_lv =
             executor->cgen_state_->castToTypeIn(null_in_lv, (agg_chosen_bytes << 3));
         agg_args.push_back(null_lv);
       }
+
+      if (target_info.agg_kind == hdk::ir::AggType::kTopK) {
+        agg_args.push_back(LL_INT(target_info.topk_param));
+        agg_args.push_back(LL_BOOL(target_info.topk_inline_buffer));
+      }
+
       if (!target_info.is_distinct) {
         if (co.device_type == ExecutorDeviceType::GPU &&
             query_mem_desc.threadsShareMemory()) {

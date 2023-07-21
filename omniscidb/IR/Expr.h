@@ -791,7 +791,7 @@ class AggExpr : public Expr {
       : Expr(type, true), agg_type_(a), arg_(arg), is_distinct_(d), arg1_(arg1) {
     if (arg1) {
       if (agg_type_ == AggType::kApproxCountDistinct ||
-          agg_type_ == AggType::kApproxQuantile) {
+          agg_type_ == AggType::kApproxQuantile || agg_type_ == AggType::kTopK) {
         CHECK(arg1_->is<Constant>());
       } else {
         CHECK(agg_type_ == AggType::kCorr);

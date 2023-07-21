@@ -831,6 +831,7 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
         executor->getConfigPtr(),
         query_infos,
         false,
+        false,
         allow_multifrag,
         false,
         false,
@@ -968,10 +969,12 @@ std::unique_ptr<QueryMemoryDescriptor> build_query_memory_descriptor(
 
   auto approx_quantile =
       anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kApproxQuantile);
+  auto topk_agg = anyOf(ra_exe_unit.target_exprs, hdk::ir::AggType::kTopK);
   return std::make_unique<QueryMemoryDescriptor>(executor->getDataMgr(),
                                                  executor->getConfigPtr(),
                                                  query_infos,
                                                  approx_quantile,
+                                                 topk_agg,
                                                  allow_multifrag,
                                                  keyless_hash,
                                                  interleaved_bins_on_gpu,

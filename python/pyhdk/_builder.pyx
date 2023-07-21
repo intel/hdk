@@ -96,6 +96,20 @@ cdef class QueryExpr:
     res.c_expr = self.c_expr.singleValue()
     return res
 
+  def top_k(self, count):
+    if not isinstance(count, int) or count == 0:
+      raise TypeError(f"Expected non-zero integer value as count arg. Provided: {type(count)}.")
+    res = QueryExpr()
+    res.c_expr = self.c_expr.topK(count)
+    return res
+
+  def bottom_k(self, count):
+    if not isinstance(count, int) or count == 0:
+      raise TypeError(f"Expected non-zero integer value as count arg. Provided: {type(count)}.")
+    res = QueryExpr()
+    res.c_expr = self.c_expr.bottomK(count)
+    return res
+
   def stddev(self):
     res = QueryExpr();
     res.c_expr = self.c_expr.stdDev()

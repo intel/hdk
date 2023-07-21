@@ -234,6 +234,8 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
 
   quantile::TDigest* nullTDigest(double const q);
 
+  int8_t* topKBuffer(size_t size);
+
  private:
   struct CountDistinctBitmapBuffer {
     int8_t* ptr;

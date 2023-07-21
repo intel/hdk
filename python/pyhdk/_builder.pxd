@@ -40,6 +40,8 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr approxQuantile(double) except +
     CBuilderExpr sample() except +
     CBuilderExpr singleValue() except +
+    CBuilderExpr topK(int) except +
+    CBuilderExpr bottomK(int) except +
     CBuilderExpr stdDev() except +
     CBuilderExpr corr(const CBuilderExpr&) except +
 

@@ -105,6 +105,12 @@ class ResultSetReduction {
                                          int8_t* this_ptr1,
                                          const int8_t* that_ptr1,
                                          const size_t target_logical_idx);
+  static void reduceOneTopKSlot(int8_t* this_ptr,
+                                const int8_t* that_ptr,
+                                int elem_size,
+                                bool is_fp,
+                                int topk_param,
+                                bool inline_buffer);
 };
 
 class ResultSetManager {

@@ -81,6 +81,19 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
     , thread_idx_(thread_idx) {
   auto timer = DEBUG_TIMER(__func__);
   column_buffers_.resize(num_columns);
+
+  // Currently, we don't support varlen columns in direct groupby buffers
+  // materialization. Use iteration instead.
+  if (direct_columnar_conversion_ &&
+      rows.getQueryDescriptionType() != QueryDescriptionType::Projection) {
+    for (auto type : target_types) {
+      if (type->isVarLen()) {
+        direct_columnar_conversion_ = false;
+        break;
+      }
+    }
+  }
+
   for (size_t i = 0; i < num_columns; ++i) {
     if (target_types[i]->isVarLen()) {
       // Allocate and fill offsets buffer.

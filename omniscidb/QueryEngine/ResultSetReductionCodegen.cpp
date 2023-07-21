@@ -403,6 +403,11 @@ void translate_function(const Function* function,
   for (const auto& constant : function->constants()) {
     llvm::Value* constant_llvm{nullptr};
     switch (constant->type()) {
+      case Type::Int1: {
+        constant_llvm =
+            cgen_state->llBool(static_cast<ConstantInt*>(constant.get())->value());
+        break;
+      }
       case Type::Int8: {
         constant_llvm =
             cgen_state->llInt<int8_t>(static_cast<ConstantInt*>(constant.get())->value());

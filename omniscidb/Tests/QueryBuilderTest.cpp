@@ -96,6 +96,19 @@ void checkAgg(const BuilderExpr& expr,
   }
 }
 
+void checkAgg(const BuilderExpr& expr,
+              const Type* type,
+              AggType kind,
+              bool is_distinct,
+              const std::string& name,
+              int val) {
+  checkAgg(expr, type, kind, is_distinct, name);
+  auto agg = expr.expr()->as<hdk::ir::AggExpr>();
+  ASSERT_TRUE(agg->arg1());
+  ASSERT_TRUE(agg->arg1()->type()->isInteger());
+  ASSERT_NEAR(agg->arg1()->as<hdk::ir::Constant>()->intVal(), val, 0.001);
+}
+
 void checkExtract(const BuilderExpr& expr, DateExtractField field, bool cast = false) {
   ASSERT_TRUE(expr.expr()->is<hdk::ir::ExtractExpr>());
   auto extract = expr.expr()->as<ExtractExpr>();
@@ -494,6 +507,40 @@ class QueryBuilderTest : public TestSuite {
               {"col_i": 2, "col_arr_i32": null, "col_arr_i32x2": [null, null], "col_arr_i32nn": [1], "col_arr_i32x2nn": [5, 6]}
               {"col_i": 3, "col_arr_i32": [], "col_arr_i32x2": [0, 1], "col_arr_i32nn": [], "col_arr_i32x2nn": [7, 8]}
               {"col_i": 4, "col_arr_i32": [1, 2], "col_arr_i32x2": null, "col_arr_i32nn": [null], "col_arr_i32x2nn": [9, 10]})___");
+
+    createTable("test_topk",
+                {{"id1", ctx().int32()},
+                 {"id2", ctx().int64()},
+                 {"i8", ctx().int8()},
+                 {"i8nn", ctx().int8()},
+                 {"i16", ctx().int16()},
+                 {"i16nn", ctx().int16()},
+                 {"i32", ctx().int32()},
+                 {"i32nn", ctx().int32()},
+                 {"i64", ctx().int64()},
+                 {"i64nn", ctx().int64()},
+                 {"f32", ctx().fp32()},
+                 {"f32nn", ctx().fp32()},
+                 {"f64", ctx().fp64()},
+                 {"f64nn", ctx().fp64()}},
+                {8});
+    insertCsvValues("test_topk",
+                    "1,10000000000,2,0,20,00,200,000,2000,0000,2.2,0.0,2.22,0.00\n"
+                    "1,10000000000,1,2,10,20,100,200,1000,2000,1.1,2.2,1.11,2.22\n"
+                    "1,10000000000,4,1,40,10,400,100,4000,1000,4.4,1.1,4.44,1.11\n"
+                    "2,20000000000,,0,,00,,000,,0000,,0.0,,0.00\n"
+                    "2,20000000000,4,4,40,40,400,400,4000,4000,4.4,4.4,4.44,4.44\n"
+                    "3,30000000000,1,5,10,50,100,500,1000,5000,1.1,5.5,1.11,5.55\n"
+                    "3,30000000000,3,0,30,00,300,000,3000,0000,3.3,0.0,3.33,0.00\n"
+                    "4,40000000000,2,1,20,10,200,100,2000,1000,2.2,1.1,2.22,1.11\n"
+                    "1,10000000000,,1,,10,,100,,1000,,1.1,,1.11\n"
+                    "1,10000000000,5,2,50,20,500,200,5000,2000,5.5,2.2,5.55,2.22\n"
+                    "2,20000000000,5,5,50,50,500,500,5000,5000,5.5,5.5,5.55,5.55\n"
+                    "2,20000000000,1,1,10,10,100,100,1000,1000,1.1,1.1,1.11,1.11\n"
+                    "3,30000000000,4,4,40,40,400,400,4000,4000,4.4,4.4,4.44,4.44\n"
+                    "3,30000000000,,3,,30,,300,,3000,,3.3,,3.33\n"
+                    "5,50000000000,3,1,30,10,300,100,3000,1000,3.3,1.1,3.33,1.11\n"
+                    "6,60000000000,,2,,20,,200,,2000,,2.2,,2.22\n");
   }
 
   static void TearDownTestSuite() {
@@ -1285,6 +1332,55 @@ TEST_F(QueryBuilderTest, AggExpr) {
            "col_arr_i32x3_single_value");
   EXPECT_THROW(ref_str.singleValue(), InvalidQueryError);
   EXPECT_THROW(ref_arr.singleValue(), InvalidQueryError);
+  // TOP_K
+  checkAgg(ref_i32.topK(2),
+           ctx().arrayVarLen(ref_i32.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_i_top_2",
+           2);
+  checkAgg(ref_i64.topK(1),
+           ctx().arrayVarLen(ref_i64.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_bi_top_1",
+           1);
+  checkAgg(ref_f32.topK(2),
+           ctx().arrayVarLen(ref_f32.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_f_top_2");
+  checkAgg(ref_f64.topK(3),
+           ctx().arrayVarLen(ref_f64.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_d_top_3");
+  checkAgg(ref_dec.topK(2),
+           ctx().arrayVarLen(ref_dec.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_dec_top_2");
+  checkAgg(ref_time.topK(-5),
+           ctx().arrayVarLen(ref_time.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_time_bottom_5");
+  checkAgg(ref_date.topK(6),
+           ctx().arrayVarLen(ref_date.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_date_top_6");
+  checkAgg(ref_timestamp.topK(3),
+           ctx().arrayVarLen(ref_timestamp.expr()->type(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_timestamp_top_3");
+  EXPECT_THROW(ref_i32.topK(0), InvalidQueryError);
+  EXPECT_THROW(ref_b.topK(2), InvalidQueryError);
+  EXPECT_THROW(ref_dict.topK(2), InvalidQueryError);
+  EXPECT_THROW(ref_str.topK(2), InvalidQueryError);
+  EXPECT_THROW(ref_arr.topK(2), InvalidQueryError);
+  EXPECT_THROW(ref_arr_3.topK(2), InvalidQueryError);
   // STDDEV_SAMP
   checkAgg(ref_i32.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_i_stddev");
   checkAgg(ref_i64.stdDev(), ctx().fp64(), AggType::kStdDevSamp, false, "col_bi_stddev");
@@ -1491,6 +1587,38 @@ TEST_F(QueryBuilderTest, ParseAgg) {
   EXPECT_THROW(node.parseAgg("single_value"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("single_value(1)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("single_value(col_i, 0.5)"), InvalidQueryError);
+  // TOP_K
+  checkAgg(node.parseAgg("topk(col_i, 2)"),
+           ctx().arrayVarLen(ctx().int32(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_i_top_2",
+           2);
+  checkAgg(node.parseAgg(" top_K ( col_i, -4)"),
+           ctx().arrayVarLen(ctx().int32(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_i_bottom_4",
+           -4);
+  EXPECT_THROW(node.parseAgg("topk"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("topk(col_i)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("topk(col_i, 0.5)"), InvalidQueryError);
+  // BOTTOM_K
+  checkAgg(node.parseAgg("bottomk(col_i, 2)"),
+           ctx().arrayVarLen(ctx().int32(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_i_bottom_2",
+           -2);
+  checkAgg(node.parseAgg(" bottom_K ( col_i, -4)"),
+           ctx().arrayVarLen(ctx().int32(), 4, false),
+           AggType::kTopK,
+           false,
+           "col_i_top_4",
+           4);
+  EXPECT_THROW(node.parseAgg("bottomk"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("bottomk(col_i)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("bottomk(col_i, 0.5)"), InvalidQueryError);
   // STDDEV_SAMP
   checkAgg(node.parseAgg("stddev(col_i)"),
            ctx().fp64(),
@@ -5263,6 +5391,411 @@ TEST_F(QueryBuilderTest, Cardinality_Exec) {
           {2, inline_null_value<int32_t>(), 2, inline_null_value<int32_t>()}),
       std::vector<int32_t>({2, 1, 0, 1}),
       std::vector<int32_t>({2, 2, 2, 2}));
+}
+
+TEST_F(QueryBuilderTest, TopK_Exec_PerfectHash) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg({"id1"s},
+                        {"topk(i8, 2)"s,
+                         "topk(i8nn, 2)"s,
+                         "topk(i16, 2)"s,
+                         "topk(i16nn, 2)"s,
+                         "topk(i32, 2)"s,
+                         "topk(i32nn, 2)"s,
+                         "topk(i64, 2)"s,
+                         "topk(i64nn, 2)"s,
+                         "topk(f32, 2)"s,
+                         "topk(f32nn, 2)"s,
+                         "topk(f64, 2)"s,
+                         "topk(f64nn, 2)"s})
+                   .sort({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(
+        res,
+        std::vector<int32_t>({1, 2, 3, 4, 5, 6}),
+        std::vector<std::vector<int8_t>>({{5, 4}, {5, 4}, {4, 3}, {2}, {3}, {}}),
+        std::vector<std::vector<int8_t>>({{2, 2}, {5, 4}, {5, 4}, {1}, {1}, {2}}),
+        std::vector<std::vector<int16_t>>({{50, 40}, {50, 40}, {40, 30}, {20}, {30}, {}}),
+        std::vector<std::vector<int16_t>>(
+            {{20, 20}, {50, 40}, {50, 40}, {10}, {10}, {20}}),
+        std::vector<std::vector<int32_t>>(
+            {{500, 400}, {500, 400}, {400, 300}, {200}, {300}, {}}),
+        std::vector<std::vector<int32_t>>(
+            {{200, 200}, {500, 400}, {500, 400}, {100}, {100}, {200}}),
+        std::vector<std::vector<int64_t>>(
+            {{5000, 4000}, {5000, 4000}, {4000, 3000}, {2000}, {3000}, {}}),
+        std::vector<std::vector<int64_t>>(
+            {{2000, 2000}, {5000, 4000}, {5000, 4000}, {1000}, {1000}, {2000}}),
+        std::vector<std::vector<float>>(
+            {{5.5, 4.4}, {5.5, 4.4}, {4.4, 3.3}, {2.2}, {3.3}, {}}),
+        std::vector<std::vector<float>>(
+            {{2.2, 2.2}, {5.5, 4.4}, {5.5, 4.4}, {1.1}, {1.1}, {2.2}}),
+        std::vector<std::vector<double>>(
+            {{5.55, 4.44}, {5.55, 4.44}, {4.44, 3.33}, {2.22}, {3.33}, {}}),
+        std::vector<std::vector<double>>(
+            {{2.22, 2.22}, {5.55, 4.44}, {5.55, 4.44}, {1.11}, {1.11}, {2.22}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, TopK_Exec_BaselineHash) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg({"id2"s},
+                        {"topk(i8, 3)"s,
+                         "topk(i8nn, 3)"s,
+                         "topk(i16, 3)"s,
+                         "topk(i16nn, 3)"s,
+                         "topk(i32, 3)"s,
+                         "topk(i32nn, 3)"s,
+                         "topk(i64, 3)"s,
+                         "topk(i64nn, 3)"s,
+                         "topk(f32, 3)"s,
+                         "topk(f32nn, 3)"s,
+                         "topk(f64, 3)"s,
+                         "topk(f64nn, 3)"s})
+                   .sort({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(
+        res,
+        std::vector<int64_t>({10000000000ULL,
+                              20000000000ULL,
+                              30000000000ULL,
+                              40000000000ULL,
+                              50000000000ULL,
+                              60000000000ULL}),
+        std::vector<std::vector<int8_t>>({{5, 4, 2}, {5, 4, 1}, {4, 3, 1}, {2}, {3}, {}}),
+        std::vector<std::vector<int8_t>>(
+            {{2, 2, 1}, {5, 4, 1}, {5, 4, 3}, {1}, {1}, {2}}),
+        std::vector<std::vector<int16_t>>(
+            {{50, 40, 20}, {50, 40, 10}, {40, 30, 10}, {20}, {30}, {}}),
+        std::vector<std::vector<int16_t>>(
+            {{20, 20, 10}, {50, 40, 10}, {50, 40, 30}, {10}, {10}, {20}}),
+        std::vector<std::vector<int32_t>>(
+            {{500, 400, 200}, {500, 400, 100}, {400, 300, 100}, {200}, {300}, {}}),
+        std::vector<std::vector<int32_t>>(
+            {{200, 200, 100}, {500, 400, 100}, {500, 400, 300}, {100}, {100}, {200}}),
+        std::vector<std::vector<int64_t>>({{5000, 4000, 2000},
+                                           {5000, 4000, 1000},
+                                           {4000, 3000, 1000},
+                                           {2000},
+                                           {3000},
+                                           {}}),
+        std::vector<std::vector<int64_t>>({{2000, 2000, 1000},
+                                           {5000, 4000, 1000},
+                                           {5000, 4000, 3000},
+                                           {1000},
+                                           {1000},
+                                           {2000}}),
+        std::vector<std::vector<float>>(
+            {{5.5, 4.4, 2.2}, {5.5, 4.4, 1.1}, {4.4, 3.3, 1.1}, {2.2}, {3.3}, {}}),
+        std::vector<std::vector<float>>(
+            {{2.2, 2.2, 1.1}, {5.5, 4.4, 1.1}, {5.5, 4.4, 3.3}, {1.1}, {1.1}, {2.2}}),
+        std::vector<std::vector<double>>({{5.55, 4.44, 2.22},
+                                          {5.55, 4.44, 1.11},
+                                          {4.44, 3.33, 1.11},
+                                          {2.22},
+                                          {3.33},
+                                          {}}),
+        std::vector<std::vector<double>>({{2.22, 2.22, 1.11},
+                                          {5.55, 4.44, 1.11},
+                                          {5.55, 4.44, 3.33},
+                                          {1.11},
+                                          {1.11},
+                                          {2.22}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, TopK_Exec_NoGroupBy) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg(std::vector<int>(),
+                        {"topk(i8, 5)"s,
+                         "topk(i8nn, 5)"s,
+                         "topk(i16, 5)"s,
+                         "topk(i16nn, 5)"s,
+                         "topk(i32, 5)"s,
+                         "topk(i32nn, 5)"s,
+                         "topk(i64, 5)"s,
+                         "topk(i64nn, 5)"s,
+                         "topk(f32, 5)"s,
+                         "topk(f32nn, 5)"s,
+                         "topk(f64, 5)"s,
+                         "topk(f64nn, 5)"s})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<std::vector<int8_t>>({{5, 5, 4, 4, 4}}),
+                     std::vector<std::vector<int8_t>>({{5, 5, 4, 4, 3}}),
+                     std::vector<std::vector<int16_t>>({{50, 50, 40, 40, 40}}),
+                     std::vector<std::vector<int16_t>>({{50, 50, 40, 40, 30}}),
+                     std::vector<std::vector<int32_t>>({{500, 500, 400, 400, 400}}),
+                     std::vector<std::vector<int32_t>>({{500, 500, 400, 400, 300}}),
+                     std::vector<std::vector<int64_t>>({{5000, 5000, 4000, 4000, 4000}}),
+                     std::vector<std::vector<int64_t>>({{5000, 5000, 4000, 4000, 3000}}),
+                     std::vector<std::vector<float>>({{5.5, 5.5, 4.4, 4.4, 4.4}}),
+                     std::vector<std::vector<float>>({{5.5, 5.5, 4.4, 4.4, 3.3}}),
+                     std::vector<std::vector<double>>({{5.55, 5.55, 4.44, 4.44, 4.44}}),
+                     std::vector<std::vector<double>>({{5.55, 5.55, 4.44, 4.44, 3.33}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, BottomK_Exec_PerfectHash) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg({"id1"s},
+                        {"bottomk(i8, 2)"s,
+                         "bottomk(i8nn, 2)"s,
+                         "bottomk(i16, 2)"s,
+                         "bottomk(i16nn, 2)"s,
+                         "bottomk(i32, 2)"s,
+                         "bottomk(i32nn, 2)"s,
+                         "bottomk(i64, 2)"s,
+                         "bottomk(i64nn, 2)"s,
+                         "bottomk(f32, 2)"s,
+                         "bottomk(f32nn, 2)"s,
+                         "bottomk(f64, 2)"s,
+                         "bottomk(f64nn, 2)"s})
+                   .sort({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(
+        res,
+        std::vector<int32_t>({1, 2, 3, 4, 5, 6}),
+        std::vector<std::vector<int8_t>>({{1, 2}, {1, 4}, {1, 3}, {2}, {3}, {}}),
+        std::vector<std::vector<int8_t>>({{0, 1}, {0, 1}, {0, 3}, {1}, {1}, {2}}),
+        std::vector<std::vector<int16_t>>({{10, 20}, {10, 40}, {10, 30}, {20}, {30}, {}}),
+        std::vector<std::vector<int16_t>>({{0, 10}, {0, 10}, {0, 30}, {10}, {10}, {20}}),
+        std::vector<std::vector<int32_t>>(
+            {{100, 200}, {100, 400}, {100, 300}, {200}, {300}, {}}),
+        std::vector<std::vector<int32_t>>(
+            {{0, 100}, {0, 100}, {0, 300}, {100}, {100}, {200}}),
+        std::vector<std::vector<int64_t>>(
+            {{1000, 2000}, {1000, 4000}, {1000, 3000}, {2000}, {3000}, {}}),
+        std::vector<std::vector<int64_t>>(
+            {{0, 1000}, {0, 1000}, {0, 3000}, {1000}, {1000}, {2000}}),
+        std::vector<std::vector<float>>(
+            {{1.1, 2.2}, {1.1, 4.4}, {1.1, 3.3}, {2.2}, {3.3}, {}}),
+        std::vector<std::vector<float>>(
+            {{0.0, 1.1}, {0.0, 1.1}, {0.0, 3.3}, {1.1}, {1.1}, {2.2}}),
+        std::vector<std::vector<double>>(
+            {{1.11, 2.22}, {1.11, 4.44}, {1.11, 3.33}, {2.22}, {3.33}, {}}),
+        std::vector<std::vector<double>>(
+            {{0.00, 1.11}, {0.00, 1.11}, {0.00, 3.33}, {1.11}, {1.11}, {2.22}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, BottomK_Exec_BaselineHash) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg({"id2"s},
+                        {"bottomk(i8, 3)"s,
+                         "bottomk(i8nn, 3)"s,
+                         "bottomk(i16, 3)"s,
+                         "bottomk(i16nn, 3)"s,
+                         "bottomk(i32, 3)"s,
+                         "bottomk(i32nn, 3)"s,
+                         "bottomk(i64, 3)"s,
+                         "bottomk(i64nn, 3)"s,
+                         "bottomk(f32, 3)"s,
+                         "bottomk(f32nn, 3)"s,
+                         "bottomk(f64, 3)"s,
+                         "bottomk(f64nn, 3)"s})
+                   .sort({0})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(
+        res,
+        std::vector<int64_t>({10000000000ULL,
+                              20000000000ULL,
+                              30000000000ULL,
+                              40000000000ULL,
+                              50000000000ULL,
+                              60000000000ULL}),
+        std::vector<std::vector<int8_t>>({{1, 2, 4}, {1, 4, 5}, {1, 3, 4}, {2}, {3}, {}}),
+        std::vector<std::vector<int8_t>>(
+            {{0, 1, 1}, {0, 1, 4}, {0, 3, 4}, {1}, {1}, {2}}),
+        std::vector<std::vector<int16_t>>(
+            {{10, 20, 40}, {10, 40, 50}, {10, 30, 40}, {20}, {30}, {}}),
+        std::vector<std::vector<int16_t>>(
+            {{0, 10, 10}, {0, 10, 40}, {0, 30, 40}, {10}, {10}, {20}}),
+        std::vector<std::vector<int32_t>>(
+            {{100, 200, 400}, {100, 400, 500}, {100, 300, 400}, {200}, {300}, {}}),
+        std::vector<std::vector<int32_t>>(
+            {{0, 100, 100}, {0, 100, 400}, {0, 300, 400}, {100}, {100}, {200}}),
+        std::vector<std::vector<int64_t>>({{1000, 2000, 4000},
+                                           {1000, 4000, 5000},
+                                           {1000, 3000, 4000},
+                                           {2000},
+                                           {3000},
+                                           {}}),
+        std::vector<std::vector<int64_t>>(
+            {{0, 1000, 1000}, {0, 1000, 4000}, {0, 3000, 4000}, {1000}, {1000}, {2000}}),
+        std::vector<std::vector<float>>(
+            {{1.1, 2.2, 4.4}, {1.1, 4.4, 5.5}, {1.1, 3.3, 4.4}, {2.2}, {3.3}, {}}),
+        std::vector<std::vector<float>>(
+            {{0.0, 1.1, 1.1}, {0.0, 1.1, 4.4}, {0.0, 3.3, 4.4}, {1.1}, {1.1}, {2.2}}),
+        std::vector<std::vector<double>>({{1.11, 2.22, 4.44},
+                                          {1.11, 4.44, 5.55},
+                                          {1.11, 3.33, 4.44},
+                                          {2.22},
+                                          {3.33},
+                                          {}}),
+        std::vector<std::vector<double>>({{0.00, 1.11, 1.11},
+                                          {0.00, 1.11, 4.44},
+                                          {0.00, 3.33, 4.44},
+                                          {1.11},
+                                          {1.11},
+                                          {2.22}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, BottomK_Exec_NoGroupBy) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+    auto dag = builder.scan("test_topk")
+                   .agg(std::vector<int>(),
+                        {"bottomk(i8, 5)"s,
+                         "bottomk(i8nn, 5)"s,
+                         "bottomk(i16, 5)"s,
+                         "bottomk(i16nn, 5)"s,
+                         "bottomk(i32, 5)"s,
+                         "bottomk(i32nn, 5)"s,
+                         "bottomk(i64, 5)"s,
+                         "bottomk(i64nn, 5)"s,
+                         "bottomk(f32, 5)"s,
+                         "bottomk(f32nn, 5)"s,
+                         "bottomk(f64, 5)"s,
+                         "bottomk(f64nn, 5)"s})
+                   .finalize();
+    auto res = runQuery(std::move(dag));
+    compare_res_data(res,
+                     std::vector<std::vector<int8_t>>({{1, 1, 1, 2, 2}}),
+                     std::vector<std::vector<int8_t>>({{0, 0, 0, 1, 1}}),
+                     std::vector<std::vector<int16_t>>({{10, 10, 10, 20, 20}}),
+                     std::vector<std::vector<int16_t>>({{0, 0, 0, 10, 10}}),
+                     std::vector<std::vector<int32_t>>({{100, 100, 100, 200, 200}}),
+                     std::vector<std::vector<int32_t>>({{0, 0, 0, 100, 100}}),
+                     std::vector<std::vector<int64_t>>({{1000, 1000, 1000, 2000, 2000}}),
+                     std::vector<std::vector<int64_t>>({{0, 0, 0, 1000, 1000}}),
+                     std::vector<std::vector<float>>({{1.1, 1.1, 1.1, 2.2, 2.2}}),
+                     std::vector<std::vector<float>>({{0.0, 0.0, 0.0, 1.1, 1.1}}),
+                     std::vector<std::vector<double>>({{1.11, 1.11, 1.11, 2.22, 2.22}}),
+                     std::vector<std::vector<double>>({{0.00, 0.00, 0.00, 1.11, 1.11}}));
+  }
+}
+
+TEST_F(QueryBuilderTest, TopK_Unnest) {
+  for (bool enable_columnar : {true, false}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto sort = builder.scan("test_topk").agg({"id1"s}, {"topk(i32, 2)"s}).sort({0});
+      auto dag = sort.proj({sort.ref("id1"), sort.ref("i32_top_2").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 2, 2, 3, 3, 4, 5}),
+                       std::vector<int32_t>({500, 400, 500, 400, 400, 300, 200, 300}));
+    }
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto sort = builder.scan("test_topk").agg({"id2"s}, {"topk(i64, 2)"s}).sort({0});
+      auto dag = sort.proj({sort.ref("id2"), sort.ref("i64_top_2").unnest()}).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int64_t>({10000000000ULL,
+                                10000000000ULL,
+                                20000000000ULL,
+                                20000000000ULL,
+                                30000000000ULL,
+                                30000000000ULL,
+                                40000000000ULL,
+                                50000000000ULL}),
+          std::vector<int64_t>({5000, 4000, 5000, 4000, 4000, 3000, 2000, 3000}));
+    }
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto agg = builder.scan("test_topk").agg({"id1"s}, {"topk(i32, 2)"s});
+      auto dag = agg.proj({agg.ref("id1"), agg.ref("i32_top_2").unnest()})
+                     .sort({BuilderSortField{0, "asc"}, BuilderSortField{1, "desc"}})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({1, 1, 2, 2, 3, 3, 4, 5}),
+                       std::vector<int32_t>({500, 400, 500, 400, 400, 300, 200, 300}));
+    }
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto agg = builder.scan("test_topk").agg({"id2"s}, {"topk(i64, 2)"s});
+      auto dag = agg.proj({agg.ref("id2"), agg.ref("i64_top_2").unnest()})
+                     .sort({BuilderSortField{0, "asc"}, BuilderSortField{1, "desc"}})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int64_t>({10000000000ULL,
+                                10000000000ULL,
+                                20000000000ULL,
+                                20000000000ULL,
+                                30000000000ULL,
+                                30000000000ULL,
+                                40000000000ULL,
+                                50000000000ULL}),
+          std::vector<int64_t>({5000, 4000, 5000, 4000, 4000, 3000, 2000, 3000}));
+    }
+  }
 }
 
 TEST_F(QueryBuilderTest, SimpleProjection) {

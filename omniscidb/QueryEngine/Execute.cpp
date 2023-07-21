@@ -509,6 +509,10 @@ quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
       .get();
 }
 
+int8_t* RowSetMemoryOwner::topKBuffer(size_t size) {
+  return allocate(size);
+}
+
 bool Executor::isCPUOnly() const {
   CHECK(data_mgr_);
   return !data_mgr_->getCudaMgr();
@@ -2037,6 +2041,7 @@ void Executor::allocateShuffleBuffers(
       getConfigPtr(),
       query_infos,
       false /*approx_quantile*/,
+      false /*topk_agg*/,
       false /*allow_multifrag*/,
       false /*keyless_hash*/,
       false /*interleaved_bins_on_gpu*/,

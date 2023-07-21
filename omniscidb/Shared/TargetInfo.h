@@ -43,6 +43,8 @@ struct TargetInfo {
   const hdk::ir::Type* agg_arg_type;
   bool skip_null_val;
   bool is_distinct;
+  int topk_param;
+  bool topk_inline_buffer;
 #ifndef __CUDACC__
  public:
   inline std::string toString() const {
@@ -53,7 +55,10 @@ struct TargetInfo {
     result += "agg_arg_type=" +
               (agg_arg_type ? agg_arg_type->toString() : std::string("null")) + ", ";
     result += "skip_null_val=" + std::string(skip_null_val ? "true" : "false") + ", ";
-    result += "is_distinct=" + std::string(is_distinct ? "true" : "false") + ")";
+    result += "is_distinct=" + std::string(is_distinct ? "true" : "false") + ", ";
+    result += "topk_param=" + ::toString(topk_param) + ", ";
+    result +=
+        "topk_inline_buffer=" + std::string(topk_inline_buffer ? "true" : "false") + ")";
     return result;
   }
 #endif
@@ -80,7 +85,7 @@ template <class PointerType>
 inline TargetInfo get_target_info(const PointerType target_expr,
                                   const bool bigint_count) {
   auto& ctx = target_expr->type()->ctx();
-  const auto agg_expr = cast_to_agg_expr(target_expr);
+  const hdk::ir::AggExpr* agg_expr = cast_to_agg_expr(target_expr);
   bool nullable = target_expr->type()->nullable();
   if (!agg_expr) {
     auto target_type = target_expr->type()->canonicalize();
@@ -96,6 +101,8 @@ inline TargetInfo get_target_info(const PointerType target_expr,
             ctx.integer(bigint_count ? 8 : 4, nullable),
             nullptr,
             false,
+            false,
+            0,
             false};
   }
 
@@ -114,9 +121,18 @@ inline TargetInfo get_target_info(const PointerType target_expr,
         agg_arg_type->isInteger() ? ctx.int64(agg_arg_type->nullable()) : agg_arg_type,
         agg_arg_type,
         agg_arg_type->nullable(),
-        is_distinct};
+        is_distinct,
+        0,
+        false};
   }
 
+  int topk_param =
+      agg_type == hdk::ir::AggType::kTopK
+          ? static_cast<int>(agg_expr->arg1()->as<hdk::ir::Constant>()->intVal())
+          : 0;
+  bool topk_inline_buffer =
+      topk_param && (agg_expr->arg()->type()->canonicalSize() * std::abs(topk_param) <=
+                     sizeof(int64_t*));
   return {true,
           agg_expr->aggType(),
           agg_type == hdk::ir::AggType::kCount
@@ -127,7 +143,9 @@ inline TargetInfo get_target_info(const PointerType target_expr,
                   (agg_arg_type->isString() || agg_arg_type->isArray())
               ? false
               : agg_arg_type->nullable(),
-          is_distinct};
+          is_distinct,
+          topk_param,
+          topk_inline_buffer};
 }
 
 inline bool is_distinct_target(const TargetInfo& target_info) {

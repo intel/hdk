@@ -126,7 +126,9 @@ class QueryMemoryInitializer {
                          int8_t* row_ptr,
                          const std::vector<int64_t>& init_vals,
                          const std::vector<int64_t>& bitmap_sizes,
-                         const std::vector<QuantileParam>& quantile_params);
+                         const std::vector<QuantileParam>& quantile_params,
+                         const std::vector<int>& topk_params,
+                         size_t entry_idx);
 
   void allocateCountDistinctGpuMem(const QueryMemoryDescriptor& query_mem_desc);
 
@@ -142,6 +144,18 @@ class QueryMemoryInitializer {
   std::vector<QuantileParam> allocateTDigests(const QueryMemoryDescriptor& query_mem_desc,
                                               const bool deferred,
                                               const Executor* executor);
+
+  std::vector<int> allocateTopKBuffers(const QueryMemoryDescriptor& query_mem_desc,
+                                       const bool deferred,
+                                       const Executor* executor);
+
+  void allocateAndInitTopKBuffers(const QueryMemoryDescriptor& query_mem_desc,
+                                  const Executor* executor,
+                                  size_t entry_count);
+
+  int8_t* allocateAndInitTopKBuffer(const hdk::ir::Type* elem_type,
+                                    int elem_count,
+                                    size_t entry_count);
 
   GpuGroupByBuffers prepareTopNHeapsDevBuffer(const QueryMemoryDescriptor& query_mem_desc,
                                               const int8_t* init_agg_vals_dev_ptr,
@@ -206,6 +220,8 @@ class QueryMemoryInitializer {
   size_t count_distinct_bitmap_mem_bytes_;
   int8_t* count_distinct_bitmap_crt_ptr_;
   int8_t* count_distinct_bitmap_host_mem_;
+
+  std::vector<int8_t*> topk_buffers_;
 
   DeviceAllocator* device_allocator_{nullptr};
   std::vector<Data_Namespace::AbstractBuffer*> temporary_buffers_;

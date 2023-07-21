@@ -858,6 +858,64 @@ inline std::pair<int64_t, int64_t> get_frag_id_and_local_idx(
   return {-1, -1};
 }
 
+template <typename T, typename Comp>
+TargetValue buildSortedArrayTargetValueFromTopKHeap(const int8_t* heap_ptr,
+                                                    int max_size) {
+  std::unique_ptr<T[]> tmp(new T[max_size]);
+  // Heap is built using reversed order, so reverse elements on copy before sort.
+  int start_pos = max_size;
+  const T* heap_elems = reinterpret_cast<const T*>(heap_ptr);
+  T null_value = inline_null_value<T>();
+  for (int i = 0; i < max_size; ++i) {
+    auto val = heap_elems[i];
+    if (val == null_value) {
+      break;
+    } else {
+      tmp[--start_pos] = val;
+    }
+  }
+  // TODO: use heap sort for big arrays?
+  std::sort(tmp.get() + start_pos, tmp.get() + max_size, Comp());
+
+  return build_array_target_value<T>(
+      reinterpret_cast<const int8_t*>(tmp.get() + start_pos),
+      (max_size - start_pos) * sizeof(T),
+      nullptr);
+}
+
+template <template <typename> class Comp>
+TargetValue buildSortedArrayTargetValueFromTopKHeap(const hdk::ir::Type* elem_type,
+                                                    const int8_t* heap_ptr,
+                                                    int max_size) {
+  switch (elem_type->canonicalSize()) {
+    case 1:
+      return buildSortedArrayTargetValueFromTopKHeap<int8_t, Comp<int8_t>>(heap_ptr,
+                                                                           max_size);
+    case 2:
+      return buildSortedArrayTargetValueFromTopKHeap<int16_t, Comp<int16_t>>(heap_ptr,
+                                                                             max_size);
+    case 4:
+      if (elem_type->isFloatingPoint()) {
+        return buildSortedArrayTargetValueFromTopKHeap<float, Comp<float>>(heap_ptr,
+                                                                           max_size);
+      } else {
+        return buildSortedArrayTargetValueFromTopKHeap<int32_t, Comp<int32_t>>(heap_ptr,
+                                                                               max_size);
+      }
+    case 8:
+      if (elem_type->isFloatingPoint()) {
+        return buildSortedArrayTargetValueFromTopKHeap<double, Comp<double>>(heap_ptr,
+                                                                             max_size);
+      } else {
+        return buildSortedArrayTargetValueFromTopKHeap<int64_t, Comp<int64_t>>(heap_ptr,
+                                                                               max_size);
+      }
+    default:
+      CHECK(false);
+  }
+  return TargetValue(nullptr);
+}
+
 }  // namespace
 
 const std::vector<const int8_t*>& ResultSet::getColumnFrag(const size_t storage_idx,
@@ -1176,6 +1234,23 @@ TargetValue ResultSet::makeVarlenTargetValue(const int8_t* ptr1,
   return std::string(reinterpret_cast<char*>(varlen_ptr), length);
 }
 
+TargetValue ResultSet::makeVarlenTargetValueFromTopKHeap(
+    const int8_t* slot_ptr,
+    int8_t slot_size,
+    const TargetInfo& target_info) const {
+  CHECK_EQ(static_cast<int>(slot_size), 8);
+  const int8_t* heap_ptr = target_info.topk_inline_buffer
+                               ? slot_ptr
+                               : *reinterpret_cast<const int8_t* const*>(slot_ptr);
+  if (target_info.topk_param > 0) {
+    return buildSortedArrayTargetValueFromTopKHeap<std::greater>(
+        target_info.agg_arg_type, heap_ptr, target_info.topk_param);
+  } else {
+    return buildSortedArrayTargetValueFromTopKHeap<std::less>(
+        target_info.agg_arg_type, heap_ptr, -target_info.topk_param);
+  }
+}
+
 // Reads an integer or a float from ptr based on the type and the byte width.
 TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
                                        const int8_t compact_sz,
@@ -1344,6 +1419,11 @@ TargetValue ResultSet::getTargetValueFromBufferColwise(
           : 0;
 
   const auto ptr1 = columnar_elem_ptr(local_entry_idx, col1_ptr, compact_sz1);
+
+  if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kTopK) {
+    return makeVarlenTargetValueFromTopKHeap(ptr1, compact_sz1, target_info);
+  }
+
   if (target_info.agg_kind == hdk::ir::AggType::kAvg ||
       is_real_str_or_array(target_info)) {
     CHECK(col2_ptr);
@@ -1428,6 +1508,10 @@ TargetValue ResultSet::getTargetValueFromBufferRowwise(
     // this case. If they don't, the target value should be 8 bytes, so we can still use
     // the actual size rather than the compact size.
     compact_sz1 = query_mem_desc_.getLogicalSlotWidthBytes(slot_idx);
+  }
+
+  if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kTopK) {
+    return makeVarlenTargetValueFromTopKHeap(ptr1, compact_sz1, target_info);
   }
 
   // logic for deciding width of column

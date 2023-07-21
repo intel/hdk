@@ -87,6 +87,7 @@ enum class AggType {
   kApproxQuantile,
   kSample,
   kSingleValue,
+  kTopK,
   // Compound aggregates
   kStdDevSamp,
   kCorr,
@@ -205,6 +206,8 @@ inline std::string toString(hdk::ir::AggType agg) {
       return "SAMPLE";
     case hdk::ir::AggType::kSingleValue:
       return "SINGLE_VALUE";
+    case hdk::ir::AggType::kTopK:
+      return "TOP_K";
     case hdk::ir::AggType::kStdDevSamp:
       return "STDDEV";
     case hdk::ir::AggType::kCorr:

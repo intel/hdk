@@ -77,6 +77,7 @@ class QueryMemoryDescriptor {
                         ConfigPtr config,
                         const std::vector<InputTableInfo>& query_infos,
                         const bool approx_quantile,
+                        const bool topk_agg,
                         const bool allow_multifrag,
                         const bool keyless_hash,
                         const bool interleaved_bins_on_gpu,
