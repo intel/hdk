@@ -1424,7 +1424,15 @@ void StringDictionary::eachStringSerially(int64_t const generation,
 }
 
 int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
-  CHECK(false);
+  if (str.size() == 0) {
+    return inline_int_null_value<int32_t>();
+  }
+  CHECK(str.size() <= MAX_STRLEN);
+  const uint32_t hash = hash_string(str);
+
+  mapd_unique_lock<mapd_shared_mutex> rw_lock(rw_mutex_);
+  const int32_t string_id = addString(hash, str);
+  return string_id;
 }
 
 // can't we just do a default argument here?
@@ -1458,7 +1466,7 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                           }
 
                           const auto hash = hash_string(str);
-                          const auto bucket = computeBucket(hash, str);
+                          const auto bucket = storage_->computeBucket(hash, str);
                           const auto string_id = storage_->hash_to_id_map[bucket];
                           if (string_id == StringDictionary::INVALID_STR_ID ||
                               string_id > storage_->strings.size()) {
@@ -1511,7 +1519,6 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
 
     // add string to storage and store id
     const auto& hash = hashes[i];
-    // TODO: move addStrng up here
     const auto string_id = addString(hash, input_string);
     if (string_id != INVALID_STR_ID) {
       output_string_ids[i] = string_id;
@@ -1540,23 +1547,38 @@ template void StringDictionary::getOrAddBulk(
     int32_t* encoded_vec);
 
 template <class String>
-int32_t StringDictionary::getIdOfString(const String&) const {
-  CHECK(false);
+int32_t StringDictionary::getIdOfString(const String& str) const {
+  if (str.size() == 0) {
+    return inline_int_null_value<int32_t>();
+  }
+  CHECK(str.size() <= MAX_STRLEN);
+  const uint32_t hash = hash_string(str);
+
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  CHECK(storage_);
+  const auto bucket = storage_->computeBucket(hash, str);
+  return (*storage_)[bucket];
 }
 
 template int32_t StringDictionary::getIdOfString(const std::string&) const;
 template int32_t StringDictionary::getIdOfString(const std::string_view&) const;
 
 std::string StringDictionary::getString(int32_t string_id) const {
-  CHECK(false);
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  CHECK(storage_);
+  CHECK_LT(string_id, static_cast<int32_t>(storage_->numStrings()));
+  return storage_->str(string_id);
 }
+
 std::pair<char*, size_t> StringDictionary::getStringBytes(
     int32_t string_id) const noexcept {
   CHECK(false);
 }
 
 size_t StringDictionary::storageEntryCount() const {
-  CHECK(false);
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  CHECK(storage_);
+  return storage_->numStrings();
 }
 
 std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
@@ -1589,39 +1611,9 @@ int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept 
 
 std::string_view StringDictionary::getStringFromStorageFast(
     const int string_id) const noexcept {
-  CHECK(false);
-}
-
-template <class String>
-uint32_t StringDictionary::computeBucket(const uint32_t hash,
-                                         const String& str) const noexcept {
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
   CHECK(storage_);
-  auto& hash_table = *storage_.get();
-  const size_t hash_table_size = hash_table.size();
-  uint32_t bucket = hash & (hash_table_size - 1);
-  // find an empty slot in the hash map
-  while (true) {
-    const int32_t candidate_string_id = hash_table[bucket];
-    if (candidate_string_id == INVALID_STR_ID) {
-      // found an open slot - add the string to the strings payload
-      break;
-    }
-    // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, int32_t(hash_table.numStrings()));
-    const auto& existing_string = hash_table.str(candidate_string_id);
-
-    if (existing_string == str) {
-      // found existing string, no string inserted
-      break;
-    }
-
-    // wrap around
-    if (++bucket == hash_table_size) {
-      bucket = 0;
-    }
-  }
-
-  return bucket;
+  return storage_->str(string_id);
 }
 
 template <class String>
@@ -1629,56 +1621,32 @@ int32_t StringDictionary::addString(const uint32_t hash,
                                     const String& input_string) noexcept {
   CHECK(storage_);
   if (storage_->fillRateIsHigh()) {
-    resize(2 * storage_->size());
+    storage_->resize(2 * storage_->size());
     LOG(ERROR) << "Resized to " << storage_->size() << " (holds "
                << storage_->numStrings() << ")";
   }
-  const size_t hash_table_size = storage_->size();
-  uint32_t bucket = hash & (hash_table_size - 1);
-
-  // find an empty slot in the hash map
-  while (true) {
-    const int32_t candidate_string_id = (*storage_)[bucket];
-    if (candidate_string_id == INVALID_STR_ID) {
-      // found an open slot - add the string to the strings payload
-      storage_->strings.push_back(std::string(input_string));
-      (*storage_)[bucket] = static_cast<int32_t>(storage_->numStrings()) - 1;
-      break;
-    }
-    // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, int32_t(storage_->numStrings()));
-    const auto& existing_string = storage_->str(candidate_string_id);
-
-    if (existing_string == input_string) {
-      // found existing string, no string inserted
-      break;
-    }
-
-    // wrap around
-    if (++bucket == hash_table_size) {
-      bucket = 0;
-    }
+  const auto bucket = storage_->computeBucket(hash, input_string);
+  if ((*storage_)[bucket] == INVALID_STR_ID) {
+    // found an open slot - add the string to the strings payload
+    storage_->addStringToMaps(bucket, input_string);
   }
-
   return (*storage_)[bucket];
 }
 
 // on resize we need to re-hash the strings, as the hash is based on the total hash table
 // size
-void StringDictionary::resize(const size_t new_size) {
-  CHECK(storage_);
-  auto& hash_table = *storage_.get();
-  CHECK_GT(new_size, hash_table.size());
-  hash_table.strings.reserve(new_size);
+void StringDictionary::StringDictStorage::resize(const size_t new_size) {
+  CHECK_GT(new_size, size());
+  strings.reserve(new_size);
 
   std::vector<int32_t> new_hash_map(new_size, INVALID_STR_ID);
-  hash_table.hash_to_id_map.swap(new_hash_map);
+  hash_to_id_map.swap(new_hash_map);
 
-  for (size_t i = 0; i < hash_table.numStrings(); i++) {
-    const auto& str = hash_table.str(i);
-    const auto hash = hash_string(str);
-    const auto bucket = computeBucket(hash, str);
-    hash_table[bucket] = i;
+  for (size_t i = 0; i < numStrings(); i++) {
+    const auto& crt_str = str(i);
+    const auto hash = hash_string(crt_str);
+    const auto bucket = computeBucket(hash, crt_str);
+    hash_to_id_map[bucket] = i;
   }
 }
 
@@ -1688,7 +1656,41 @@ uint32_t StringDictionary::computeBucket(
     const String& input_string,
     const std::vector<int32_t>& string_id_uint32_table) const noexcept {
   // TODO: this isn't quite right for translations, but we can fix that up later
-  return computeBucket(hash, input_string);
+  CHECK(storage_);
+  auto bucket = storage_->computeBucket(hash, input_string);
+  // TODO: HACK
+  string_id_uint32_table_ = storage_->hash_to_id_map;
+  return bucket;
+}
+
+template <class String>
+size_t StringDictionary::StringDictStorage::computeBucket(
+    const uint32_t hash,
+    const String& input_string) const noexcept {
+  const size_t hash_table_size = hash_to_id_map.size();
+  uint32_t bucket = hash & (hash_table_size - 1);
+  // find an empty slot in the hash map
+  while (true) {
+    const int32_t candidate_string_id = hash_to_id_map[bucket];
+    if (candidate_string_id == INVALID_STR_ID) {
+      // found an open slot
+      break;
+    }
+    // slot is full, check for a collision
+    CHECK_LT(candidate_string_id, int32_t(numStrings()));
+    const auto& existing_string = str(candidate_string_id);
+
+    if (existing_string == input_string) {
+      // found an existing string that matches
+      break;
+    }
+
+    // wrap around
+    if (++bucket == hash_table_size) {
+      bucket = 0;
+    }
+  }
+  return bucket;
 }
 
 }  // namespace fast

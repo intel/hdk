@@ -307,10 +307,6 @@ class StringDictionary {
       const String& input_string,
       const std::vector<int32_t>& string_id_uint32_table) const noexcept;
 
-  // TODO: clean these two up
-  template <class String>
-  uint32_t computeBucket(const uint32_t hash, const String& str) const noexcept;
-
   // why noexcept?
   template <class String>
   int32_t addString(const uint32_t hash, const String& input_string) noexcept;
@@ -331,8 +327,20 @@ class StringDictionary {
       strings.reserve(initial_size);
     }
 
-    // returns ID for a given hash (truncated to hash table size)
-    int32_t& operator[](const uint32_t bucket) { return hash_to_id_map[bucket]; }
+    template <class String>
+    void addStringToMaps(const size_t bucket, const String& str) {
+      strings.push_back(std::string(str));
+      CHECK_LT(bucket, hash_to_id_map.size());
+      hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
+    }
+
+    template <class String>
+    size_t computeBucket(const uint32_t hash, const String& str) const noexcept;
+
+    // returns ID for a given bucket
+    int32_t operator[](const size_t bucket) const { return hash_to_id_map[bucket]; }
+
+    void resize(const size_t new_size);
 
     // returns string for a given ID
     const std::string& str(const size_t id) const { return strings[id]; }
@@ -353,7 +361,7 @@ class StringDictionary {
   mutable mapd_shared_mutex rw_mutex_;  // let's not make this mutable...
 
   // TODO: legacy, direct access outside of this class
-  std::vector<int32_t> string_id_uint32_table_;
+  mutable std::vector<int32_t> string_id_uint32_table_;
   std::vector<uint32_t> hash_cache_;
   friend class ::StringDictionaryTranslator;
 };
