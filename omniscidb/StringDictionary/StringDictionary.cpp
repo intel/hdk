@@ -1445,7 +1445,32 @@ template <class T, class String>
 size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                                  T* encoded_vec,
                                  const int64_t generation) const {
-  CHECK(false);
+  std::atomic<size_t> num_strings_not_found;
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, string_vec.size()),
+                    [&](const tbb::blocked_range<size_t>& r) {
+                      for (size_t i = r.begin(); i != r.end(); ++i) {
+                        const auto& str = string_vec[i];
+                        if (str.empty()) {
+                          encoded_vec[i] = inline_int_null_value<T>();
+                        } else {
+                          if (str.size() > StringDictionary::MAX_STRLEN) {
+                            legacy::throw_string_too_long_error(str, dict_ref_);
+                          }
+
+                          const auto hash = hash_string(str);
+                          const auto bucket = storage_->computeBucket(hash, str);
+                          const auto string_id = storage_->hash_to_id_map[bucket];
+                          if (string_id == StringDictionary::INVALID_STR_ID ||
+                              string_id > storage_->strings.size()) {
+                            encoded_vec[i] = StringDictionary::INVALID_STR_ID;
+                            num_strings_not_found++;
+                          }
+                          encoded_vec[i] = string_id;
+                        }
+                      }
+                    });
+
+  return num_strings_not_found.load();
 }
 
 template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
