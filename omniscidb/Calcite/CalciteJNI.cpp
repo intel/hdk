@@ -24,6 +24,10 @@
 #include <jni.h>
 #include <filesystem>
 
+#ifndef _WIN32
+#include <signal.h>
+#endif
+
 using namespace std::string_literals;
 
 namespace {
@@ -677,7 +681,6 @@ void CalciteMgr::setRuntimeExtensionFunctions(const std::vector<ExtensionFunctio
 CalciteMgr::CalciteMgr(const std::string& udf_filename,
                        size_t calcite_max_mem_mb,
                        const std::string& log_dir) {
-  // todo: should register an exit handler for ctrl + c
   worker_ =
       std::thread(&CalciteMgr::worker, this, udf_filename, calcite_max_mem_mb, log_dir);
 }
@@ -685,8 +688,19 @@ CalciteMgr::CalciteMgr(const std::string& udf_filename,
 void CalciteMgr::worker(const std::string& udf_filename,
                         size_t calcite_max_mem_mb,
                         const std::string& log_dir) {
+  // Don't allow JVM to override SIGINT handler to have proper Ctrl + C behavior.
+  // Store the current handler and restore it after JVM initialization.
+#ifndef _WIN32
+  struct sigaction old_sigint_action;
+  sigaction(SIGINT, nullptr, &old_sigint_action);
+#endif
+
   auto calcite_jni =
       std::make_unique<CalciteJNI>(udf_filename, calcite_max_mem_mb, log_dir);
+
+#ifndef _WIN32
+  sigaction(SIGINT, &old_sigint_action, nullptr);
+#endif
 
   std::unique_lock<std::mutex> lock(queue_mutex_);
   while (true) {
