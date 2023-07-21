@@ -17,7 +17,7 @@
 #pragma once
 
 #include "QueryEngine/JoinHashTable/PerfectHashTable.h"
-#include "SOME_PATH/hdk_/l0_physops/hash_table/hash_builder.h"
+#include "SOME_PATH/l0_physops/hash_table/PerfectHashTable/PerfectHashTableBuilder.h"
 
 #include "Shared/scope.h"
 

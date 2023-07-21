@@ -21,7 +21,7 @@
 #include "QueryEngine/JoinHashTable/BaselineJoinHashTable.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinKeyHandlers.h"
 #include "QueryEngine/JoinHashTable/Runtime/JoinHashTableGpuUtils.h"
-#include "SOME_PATH/l0_physops/hash_table/hash_builder.h"
+#include "SOME_PATH/l0_physops/hash_table/BaselineHashTable/BaselineHashTableBuilder.h"
 #include "Shared/thread_count.h"
 
 template <typename SIZE,
