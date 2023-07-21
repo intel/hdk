@@ -361,7 +361,6 @@ class StringDictionary {
   mutable mapd_shared_mutex rw_mutex_;  // let's not make this mutable...
 
   // TODO: legacy, direct access outside of this class
-  mutable std::vector<int32_t> string_id_uint32_table_;
   std::vector<uint32_t> hash_cache_;
   friend class ::StringDictionaryTranslator;
 };

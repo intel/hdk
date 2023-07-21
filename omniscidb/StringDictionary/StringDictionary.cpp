@@ -1373,9 +1373,12 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
                  ++source_string_id) {
               const std::string_view source_str =
                   source_dict->getStringFromStorageFast(source_string_id);
-              // Get the hash from this/the source dictionary's cache, as the function
-              // will be the same for the dest_dict, sparing us having to recompute it
+          // Get the hash from this/the source dictionary's cache, as the function
+          // will be the same for the dest_dict, sparing us having to recompute it
 
+#if 1
+              const auto translated_string_id = dest_dict->getIdOfString(source_str);
+#else
               // Todo(todd): Remove option to turn string hash cache off or at least
               // make a constexpr to avoid these branches when we expect it to be always
               // on going forward
@@ -1387,6 +1390,7 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
               const auto translated_string_id =
                   dest_dict->string_id_uint32_table_[hash_bucket];
               translated_ids[source_string_id] = translated_string_id;
+#endif
 
               if (translated_string_id == StringDictionary::INVALID_STR_ID ||
                   translated_string_id >= num_dest_strings) {
@@ -1419,8 +1423,12 @@ namespace fast {
 // Each std::string const& (if isClient()) or std::string_view (if !isClient())
 // plus string_id is passed to the callback functor.
 void StringDictionary::eachStringSerially(int64_t const generation,
-                                          StringCallback&) const {
-  CHECK(false);
+                                          StringCallback& serial_callback) const {
+  // TODO: generation support
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  for (size_t i = 0; i < storage_->numStrings(); i++) {
+    serial_callback(storage_->str(i), i);
+  }
 }
 
 int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
@@ -1606,7 +1614,10 @@ std::vector<std::string> StringDictionary::copyStrings() const {
 }
 
 int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
-  CHECK(false);
+  const uint32_t hash = hash_string(sv);
+  CHECK(storage_);
+  const auto bucket = storage_->computeBucket(hash, sv);
+  return (*storage_)[bucket];
 }
 
 std::string_view StringDictionary::getStringFromStorageFast(
@@ -1659,7 +1670,7 @@ uint32_t StringDictionary::computeBucket(
   CHECK(storage_);
   auto bucket = storage_->computeBucket(hash, input_string);
   // TODO: HACK
-  string_id_uint32_table_ = storage_->hash_to_id_map;
+  // string_id_uint32_table_ = storage_->hash_to_id_map;
   return bucket;
 }
 
