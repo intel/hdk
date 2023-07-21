@@ -1153,6 +1153,16 @@ class TestBuilder(BaseTest):
             },
         )
 
+    def test_top_k(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [1, 1, 1, 2, 2, 2], "b": [1, 3, 2, 4, 6, 5]})
+
+        res = ht.agg(["a"], ht["b"].top_k(2)).sort("a").run()
+        check_res(res, {"a": [1, 2], "b_top_2": [[3, 2], [6, 5]]})
+
+        res = ht.agg(["a"], ht["b"].bottom_k(2)).sort("a").run()
+        check_res(res, {"a": [1, 2], "b_bottom_2": [[1, 2], [4, 5]]})
+
 
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):

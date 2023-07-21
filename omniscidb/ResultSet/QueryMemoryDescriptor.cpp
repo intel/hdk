@@ -28,6 +28,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     ConfigPtr config,
     const std::vector<InputTableInfo>& query_infos,
     const bool approx_quantile,
+    const bool topk_agg,
     const bool allow_multifrag,
     const bool keyless_hash,
     const bool interleaved_bins_on_gpu,
@@ -81,7 +82,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
         output_columnar_ = output_columnar_hint &&
                            QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
                                count_distinct_descriptors_) &&
-                           !approx_quantile;
+                           !approx_quantile && !topk_agg;
         break;
       default:
         output_columnar_ = false;
@@ -211,7 +212,7 @@ bool QueryMemoryDescriptor::operator==(const QueryMemoryDescriptor& other) const
   if (has_nulls_ != other.has_nulls_) {
     return false;
   }
-  if (count_distinct_descriptors_.size() != count_distinct_descriptors_.size()) {
+  if (count_distinct_descriptors_.size() != other.count_distinct_descriptors_.size()) {
     return false;
   } else {
     // Count distinct descriptors can legitimately differ in device only.

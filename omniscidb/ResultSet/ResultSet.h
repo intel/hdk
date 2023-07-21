@@ -719,6 +719,10 @@ class ResultSet {
                                     const bool translate_strings,
                                     const size_t entry_buff_idx) const;
 
+  TargetValue makeVarlenTargetValueFromTopKHeap(const int8_t* slot_ptr,
+                                                int8_t slot_size,
+                                                const TargetInfo& target_info) const;
+
   struct VarlenTargetPtrPair {
     int8_t* ptr1;
     int8_t compact_sz1;

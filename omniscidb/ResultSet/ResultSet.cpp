@@ -26,6 +26,7 @@
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
 #include "ResultSet/ResultSet.h"
+#include "ResultSet/TopKAggAccessors.h"
 #include "Shared/InlineNullValues.h"
 #include "Shared/Intervals.h"
 #include "Shared/SqlTypesLayout.h"
@@ -1041,7 +1042,10 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
     data_slot_idx =
         advance_slot(data_slot_idx, targets_[i], separate_varlen_storage_valid_);
   }
-  if (!separate_varlen_storage_valid_ && !lazy_fetch) {
+
+  auto& target_info = targets_[col_idx];
+  if (!separate_varlen_storage_valid_ && !lazy_fetch &&
+      target_info.agg_kind != hdk::ir::AggType::kTopK) {
     size_slot_offs =
         data_slot_offs + query_mem_desc_.getPaddedSlotWidthBytes(data_slot_idx);
     size_slot_idx = data_slot_idx + 1;
@@ -1051,7 +1055,7 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
   }
 
   // Translate varlen value to its length. Return -1 for NULLs.
-  auto slot_val_to_length = [this, lazy_fetch, col_idx, type](
+  auto slot_val_to_length = [this, lazy_fetch, col_idx, type, target_info](
                                 size_t storage_idx,
                                 int64_t val,
                                 const int8_t* size_slot_ptr,
@@ -1089,6 +1093,12 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
       }
     }
 
+    if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kTopK) {
+      return getTopKHeapSize(reinterpret_cast<const int8_t*>(val),
+                             target_info.agg_arg_type,
+                             std::abs(target_info.topk_param));
+    }
+
     if (val)
       return read_int_from_buff(size_slot_ptr, size_slot_sz);
     return -1;
@@ -1122,7 +1132,9 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
       size_ptr = keys_ptr + key_bytes_with_padding + size_slot_offs;
     }
 
-    auto val = read_int_from_buff(elem_ptr, data_elem_size);
+    auto val = target_info.topk_inline_buffer
+                   ? reinterpret_cast<int64_t>(elem_ptr)
+                   : read_int_from_buff(elem_ptr, data_elem_size);
     auto elem_length = slot_val_to_length(
         storage_lookup_result.storage_idx, val, size_ptr, size_elem_size);
     if (elem_length < 0) {

@@ -10,6 +10,7 @@ set(result_set_source_files
     RowSetMemoryOwner.cpp
     StreamingTopN.cpp
     TargetValue.cpp
+    TopKAggAccessors.cpp
 )
 
 add_library(ResultSet ${result_set_source_files})

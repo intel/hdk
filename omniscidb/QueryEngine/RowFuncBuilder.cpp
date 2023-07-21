@@ -811,6 +811,10 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
   AUTOMATIC_IR_METADATA(executor_->cgen_state_.get());
 
   auto agg_type = agg_info.type;
+  if (agg_type->isArray()) {
+    CHECK(agg_info.agg_kind == hdk::ir::AggType::kTopK);
+    agg_type = agg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  }
   const size_t chosen_bytes = agg_type->size();
 
   bool need_conversion{false};
@@ -1364,7 +1368,8 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
   if (target_expr) {
     auto target_type = target_expr->type();
     if (target_type->isBuffer() &&
-        !executor_->plan_state_->isLazyFetchColumn(target_expr)) {
+        !executor_->plan_state_->isLazyFetchColumn(target_expr) &&
+        (!agg_expr || agg_expr->aggType() != hdk::ir::AggType::kTopK)) {
       const auto target_lvs =
           agg_expr ? code_generator.codegen(agg_expr->arg(), true, co)
                    : code_generator.codegen(

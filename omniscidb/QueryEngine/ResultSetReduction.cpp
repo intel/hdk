@@ -1309,6 +1309,15 @@ void ResultSetReduction::reduceOneSlot(
         reduceOneApproxQuantileSlot(
             query_mem_desc, this_ptr1, that_ptr1, target_logical_idx);
         break;
+      case hdk::ir::AggType::kTopK:
+        CHECK_EQ(static_cast<int8_t>(sizeof(int64_t)), chosen_bytes);
+        reduceOneTopKSlot(this_ptr1,
+                          that_ptr1,
+                          target_info.agg_arg_type->canonicalSize(),
+                          target_info.agg_arg_type->isFloatingPoint(),
+                          target_info.topk_param,
+                          target_info.topk_inline_buffer);
+        break;
       default:
         UNREACHABLE() << toString(target_info.agg_kind);
     }
@@ -1417,6 +1426,18 @@ void ResultSetReduction::reduceOneCountDistinctSlot(const ResultSetStorage& this
   auto new_set_ptr = reinterpret_cast<const int64_t*>(that_ptr1);
   count_distinct_set_union(
       *new_set_ptr, *old_set_ptr, new_count_distinct_desc, old_count_distinct_desc);
+}
+
+void ResultSetReduction::reduceOneTopKSlot(int8_t* this_ptr,
+                                           const int8_t* that_ptr,
+                                           int elem_size,
+                                           bool is_fp,
+                                           int topk_param,
+                                           bool inline_buffer) {
+  auto this_handle = reinterpret_cast<int64_t>(this_ptr);
+  auto that_handle = reinterpret_cast<int64_t>(that_ptr);
+  topk_reduce_jit_rt(
+      this_handle, that_handle, elem_size, is_fp, topk_param, inline_buffer);
 }
 
 bool ResultSetReduction::reduceSingleRow(const int8_t* row_ptr,

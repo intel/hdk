@@ -162,6 +162,7 @@ int64_t get_agg_initial_val(hdk::ir::AggType agg,
     case hdk::ir::AggType::kAvg:
     case hdk::ir::AggType::kCount:
     case hdk::ir::AggType::kApproxCountDistinct:
+    case hdk::ir::AggType::kTopK:
       return 0;
     case hdk::ir::AggType::kApproxQuantile:
       return {};  // Init value is a quantile::TDigest* set elsewhere.

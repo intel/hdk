@@ -269,6 +269,60 @@ class QueryExprAPI:
         """
         pass
 
+    def top_k(self, count):
+        """
+        Create TOP_K aggregate expression with the current expression as its argument.
+
+        Parameters
+        ----------
+        count : int
+            Maximum number of top elements to collect.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 1, 1, 2, 2, 2], "b": [1, 3, 2, 4, 6, 5]})
+        >>> ht.agg(["a"], ht["b"].top_k(2)).run()
+        Schema:
+          a: INT64
+          b_top_2: ARRAY32(INT64)[NN]
+        Data:
+        1|[3,2,]
+        2|[6,5,]
+        """
+        pass
+
+    def bottom_k(self, count):
+        """
+        Create BOTTOM_K aggregate expression with the current expression as its argument.
+
+        Parameters
+        ----------
+        count : int
+            Maximum number of bottom elements to collect.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [1, 1, 1, 2, 2, 2], "b": [1, 3, 2, 4, 6, 5]})
+        >>> ht.agg(["a"], ht["b"].bottom_k(2)).run()
+        Schema:
+          a: INT64
+          b_top_2: ARRAY32(INT64)[NN]
+        Data:
+        1|[1,2,]
+        2|[4,5,]
+        """
+        pass
+
     def stddev(self):
         """
         Create sample standard deviation aggregate expression for the current expression.

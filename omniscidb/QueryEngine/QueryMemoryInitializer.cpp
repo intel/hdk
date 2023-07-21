@@ -232,6 +232,51 @@ DEFAULT_TARGET_ATTRIBUTE void spread_vec_sample(int8_t* dst,
   memcpy(dst, sample_ptr, rem);
 }
 
+template <typename T>
+void scalar_fill_with_nulls(int8_t* buffer_ptr, size_t entry_count) {
+  T* casted_buffer = reinterpret_cast<T*>(buffer_ptr);
+  T null_val = inline_null_value<T>();
+  for (size_t i = 0; i < entry_count; ++i) {
+    casted_buffer[i] = null_val;
+  }
+}
+
+void scalar_fill_with_nulls(int8_t* buffer_ptr,
+                            const hdk::ir::Type* elem_type,
+                            size_t entry_count) {
+  switch (elem_type->id()) {
+    case hdk::ir::Type::kInteger:
+    case hdk::ir::Type::kDecimal:
+    case hdk::ir::Type::kDate:
+    case hdk::ir::Type::kTime:
+    case hdk::ir::Type::kTimestamp:
+    case hdk::ir::Type::kInterval:
+      switch (elem_type->size()) {
+        case 1:
+          return scalar_fill_with_nulls<int8_t>(buffer_ptr, entry_count);
+        case 2:
+          return scalar_fill_with_nulls<int16_t>(buffer_ptr, entry_count);
+        case 4:
+          return scalar_fill_with_nulls<int32_t>(buffer_ptr, entry_count);
+        case 8:
+          return scalar_fill_with_nulls<int64_t>(buffer_ptr, entry_count);
+        default:
+          CHECK(false);
+      }
+    case hdk::ir::Type::kFloatingPoint:
+      switch (elem_type->as<hdk::ir::FloatingPointType>()->precision()) {
+        case hdk::ir::FloatingPointType::kFloat:
+          return scalar_fill_with_nulls<float>(buffer_ptr, entry_count);
+        case hdk::ir::FloatingPointType::kDouble:
+          return scalar_fill_with_nulls<double>(buffer_ptr, entry_count);
+        default:
+          CHECK(false);
+      }
+    default:
+      CHECK(false);
+  }
+}
+
 }  // namespace
 
 // Row-based execution constructor
@@ -282,6 +327,7 @@ QueryMemoryInitializer::QueryMemoryInitializer(
   if (!query_mem_desc.isGroupBy()) {
     allocateCountDistinctBuffers(query_mem_desc, false, executor);
     allocateTDigests(query_mem_desc, false, executor);
+    allocateTopKBuffers(query_mem_desc, false, executor);
   }
 
   if (ra_exe_unit.estimator) {
@@ -464,6 +510,7 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
 
   auto agg_bitmap_size = allocateCountDistinctBuffers(query_mem_desc, true, executor);
   auto quantile_params = allocateTDigests(query_mem_desc, true, executor);
+  auto topk_params = allocateTopKBuffers(query_mem_desc, true, executor);
   auto buffer_ptr = reinterpret_cast<int8_t*>(groups_buffer);
 
   const auto query_mem_desc_fixedup =
@@ -474,6 +521,7 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
   // we fallback to default implementation in that cases
   if (!std::any_of(agg_bitmap_size.begin(), agg_bitmap_size.end(), is_true) &&
       !std::any_of(quantile_params.begin(), quantile_params.end(), is_true) &&
+      !std::any_of(topk_params.begin(), topk_params.end(), is_true) &&
       executor->getConfig().rs.optimize_row_initialization &&
       useVectorRowGroupsInit(row_size, groups_buffer_entry_count * warp_size)) {
     auto rows_per_sample = get_num_rows_for_vec_sample<64>(row_size);
@@ -492,7 +540,9 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
                         sample_ptr + row_size * i + col_base_off,
                         init_vals,
                         agg_bitmap_size,
-                        quantile_params);
+                        quantile_params,
+                        topk_params,
+                        i);
     }
 
     size_t rows_count = groups_buffer_entry_count;
@@ -513,6 +563,14 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
 
     spread_vec_sample(buffer_ptr, rows_count * row_size, sample_ptr, sample_size);
   } else {
+    if (std::any_of(topk_params.begin(), topk_params.end(), is_true)) {
+      size_t rows_count = groups_buffer_entry_count;
+      if (query_mem_desc.hasKeylessHash()) {
+        rows_count *= warp_size;
+      }
+      allocateAndInitTopKBuffers(query_mem_desc_fixedup, executor, rows_count);
+    }
+
     if (query_mem_desc.hasKeylessHash()) {
       CHECK(warp_size >= 1);
       CHECK(key_count == 1 || warp_size == 1);
@@ -523,7 +581,9 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
                             &buffer_ptr[col_base_off],
                             init_vals,
                             agg_bitmap_size,
-                            quantile_params);
+                            quantile_params,
+                            topk_params,
+                            warp_idx * groups_buffer_entry_count + bin);
         }
       }
       return;
@@ -537,7 +597,9 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
                         &buffer_ptr[col_base_off],
                         init_vals,
                         agg_bitmap_size,
-                        quantile_params);
+                        quantile_params,
+                        topk_params,
+                        bin);
     }
   }
 }
@@ -624,7 +686,9 @@ void QueryMemoryInitializer::initColumnsPerRow(
     int8_t* row_ptr,
     const std::vector<int64_t>& init_vals,
     const std::vector<int64_t>& bitmap_sizes,
-    const std::vector<QuantileParam>& quantile_params) {
+    const std::vector<QuantileParam>& quantile_params,
+    const std::vector<int>& topk_params,
+    size_t entry_idx) {
   int8_t* col_ptr = row_ptr;
   size_t init_vec_idx = 0;
   for (size_t col_idx = 0; col_idx < query_mem_desc.getSlotCount();
@@ -642,6 +706,12 @@ void QueryMemoryInitializer::initColumnsPerRow(
       auto const q = *quantile_params[col_idx];
       // allocate for APPROX_QUANTILE only when slot is used
       init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
+      ++init_vec_idx;
+    } else if (query_mem_desc.isGroupBy() && topk_params[col_idx]) {
+      CHECK(topk_buffers_[col_idx]);
+      auto buffer_size = topk_params[col_idx];
+      init_val =
+          reinterpret_cast<int64_t>(topk_buffers_[col_idx] + entry_idx * buffer_size);
       ++init_vec_idx;
     } else {
       if (query_mem_desc.getPaddedSlotWidthBytes(col_idx) > 0) {
@@ -799,6 +869,96 @@ QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_
     }
   }
   return quantile_params;
+}
+
+std::vector<int> QueryMemoryInitializer::allocateTopKBuffers(
+    const QueryMemoryDescriptor& query_mem_desc,
+    const bool deferred,
+    const Executor* executor) {
+  size_t const slot_count = query_mem_desc.getSlotCount();
+  size_t const ntargets = executor->plan_state_->target_exprs_.size();
+  CHECK_GE(slot_count, ntargets);
+  std::vector<int> topk_params(deferred ? slot_count : 0);
+  size_t init_val_idx = 0;
+  for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
+    auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
+    if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kTopK) {
+        size_t const agg_col_idx =
+            query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
+        CHECK_LT(agg_col_idx, slot_count);
+        CHECK_EQ(
+            static_cast<size_t>(query_mem_desc.getLogicalSlotWidthBytes(agg_col_idx)),
+            sizeof(int64_t));
+        auto elem_count = std::abs(agg_expr->arg1()->as<hdk::ir::Constant>()->intVal());
+        auto heap_size = elem_count * agg_expr->arg()->type()->canonicalSize();
+        if (heap_size > static_cast<int>(sizeof(int64_t*))) {
+          if (deferred) {
+            topk_params[agg_col_idx] = heap_size;
+          } else {
+            init_agg_vals_[init_val_idx] = reinterpret_cast<int64_t>(
+                allocateAndInitTopKBuffer(agg_expr->arg()->type(), elem_count, 1));
+          }
+        } else {
+          scalar_fill_with_nulls(
+              reinterpret_cast<int8_t*>(&init_agg_vals_[init_val_idx]),
+              agg_expr->arg()->type()->canonicalize(),
+              sizeof(int64_t*) / agg_expr->arg()->type()->canonicalSize());
+        }
+      }
+    }
+
+    if (query_mem_desc.getPaddedSlotWidthBytes(target_idx)) {
+      ++init_val_idx;
+    }
+  }
+  return topk_params;
+}
+
+void QueryMemoryInitializer::allocateAndInitTopKBuffers(
+    const QueryMemoryDescriptor& query_mem_desc,
+    const Executor* executor,
+    size_t entry_count) {
+  size_t const slot_count = query_mem_desc.getSlotCount();
+  size_t const ntargets = executor->plan_state_->target_exprs_.size();
+  CHECK_GE(slot_count, ntargets);
+  topk_buffers_.resize(slot_count, nullptr);
+  for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
+    auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
+    if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kTopK) {
+        size_t const agg_col_idx =
+            query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
+        auto k = std::abs(agg_expr->arg1()->as<hdk::ir::Constant>()->intVal());
+        topk_buffers_[agg_col_idx] =
+            allocateAndInitTopKBuffer(agg_expr->arg()->type(), k, entry_count);
+      }
+    }
+  }
+}
+
+int8_t* QueryMemoryInitializer::allocateAndInitTopKBuffer(const hdk::ir::Type* elem_type,
+                                                          int elem_count,
+                                                          size_t entry_count) {
+  auto canonical_elem_type = elem_type->canonicalize();
+  auto elem_size = canonical_elem_type->size();
+  auto total_size = entry_count * elem_count * elem_size;
+  auto buffer_ptr = row_set_mem_owner_->topKBuffer(total_size);
+  if (useVectorRowGroupsInit(elem_size, entry_count * elem_count)) {
+    // 64 bytes for sample, 64 for alignment, 64 for tail
+    std::array<int8_t, 192> vec_sample;
+    int8_t* sample_ptr = vec_sample.data();
+    sample_ptr += (reinterpret_cast<uint64_t>(buffer_ptr) -
+                   reinterpret_cast<uint64_t>(sample_ptr)) &
+                  0x3F;
+    scalar_fill_with_nulls(sample_ptr, canonical_elem_type, 64 / elem_size);
+    memcpy(sample_ptr + 64, sample_ptr, 64);
+    spread_vec_sample(buffer_ptr, total_size, sample_ptr, 64);
+  } else {
+    scalar_fill_with_nulls(buffer_ptr, canonical_elem_type, elem_count * entry_count);
+  }
+
+  return buffer_ptr;
 }
 
 GpuGroupByBuffers QueryMemoryInitializer::prepareTopNHeapsDevBuffer(

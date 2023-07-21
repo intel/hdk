@@ -17,6 +17,10 @@
 #include "JoinHashTable/Runtime/JoinHashImpl.h"
 #include "MurmurHash.h"
 
+#ifndef __CUDACC__
+#include "TopKAggRuntime.h"
+#endif
+
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE uint32_t
 key_hash(GENERIC_ADDR_SPACE const int64_t* key,
          const uint32_t key_count,
@@ -376,3 +380,36 @@ DEF_TRANSLATE_NULL_KEY(int32_t)
 DEF_TRANSLATE_NULL_KEY(int64_t)
 
 #undef DEF_TRANSLATE_NULL_KEY
+
+#ifndef __CUDACC__
+
+#define DEF_AGG_TOPK(val_type, suffix)                                             \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_topk_##suffix(           \
+      int64_t* agg, val_type val, val_type empty_val, int k, bool inline_buffer) { \
+    agg_topk_impl<val_type>(agg, val, empty_val, k, inline_buffer);                \
+  }
+
+#define DEF_AGG_TOPK_SKIP_VAL(val_type, suffix)                                     \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_topk_##suffix##_skip_val( \
+      int64_t* agg, val_type val, val_type skip_val, int k, bool inline_buffer) {   \
+    if (val != skip_val) {                                                          \
+      agg_topk_##suffix(agg, val, skip_val, k, inline_buffer);                      \
+    }                                                                               \
+  }
+
+#define DEF_AGG_TOPK_ALL(val_type, suffix) \
+  DEF_AGG_TOPK(val_type, suffix)           \
+  DEF_AGG_TOPK_SKIP_VAL(val_type, suffix)
+
+DEF_AGG_TOPK_ALL(int8_t, int8)
+DEF_AGG_TOPK_ALL(int16_t, int16)
+DEF_AGG_TOPK_ALL(int32_t, int32)
+DEF_AGG_TOPK_ALL(int64_t, int64)
+DEF_AGG_TOPK_ALL(float, float)
+DEF_AGG_TOPK_ALL(double, double)
+
+#undef DEF_AGG_TOPK_ALL
+#undef DEF_AGG_TOPK_SKIP_VAL
+#undef DEF_AGG_TOPK
+
+#endif

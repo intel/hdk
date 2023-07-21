@@ -55,6 +55,12 @@ ColSlotContext::ColSlotContext(const std::vector<const hdk::ir::Expr*>& col_expr
       const auto agg_info = get_target_info(col_expr, bigint_count);
       const auto chosen_type = get_compact_type(agg_info);
 
+      if (agg_info.agg_kind == hdk::ir::AggType::kTopK) {
+        addSlotForColumn(sizeof(int64_t), col_expr_idx);
+        ++col_expr_idx;
+        continue;
+      }
+
       if (chosen_type->isString() || chosen_type->isArray()) {
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
