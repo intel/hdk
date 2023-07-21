@@ -885,6 +885,8 @@ int main(int argc, char** argv) {
   po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
   po::notify(vm);
 
+  logger::init(log_options);
+
   int err{0};
   try {
     err = RUN_ALL_TESTS();
