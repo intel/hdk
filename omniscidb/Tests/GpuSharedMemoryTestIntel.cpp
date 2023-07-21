@@ -82,7 +82,7 @@ void init_storage_buffer(int8_t* buffer,
 }  // namespace
 
 void GpuReductionTester::codegenWrapperKernel() {
-  const unsigned address_space = 0;
+  const unsigned address_space = 1;
   auto pi8_type = llvm::Type::getInt8PtrTy(context_, address_space);
   std::vector<llvm::Type*> input_arguments;
   input_arguments.push_back(llvm::PointerType::get(pi8_type, address_space));
@@ -136,7 +136,7 @@ void GpuReductionTester::codegenWrapperKernel() {
       context_);
 
   // initializing shared memory and copy input buffer into shared memory buffer:
-  auto init_smem_func = getFunction("init_shared_mem");
+  auto init_smem_func = getFunction("init_smem_func");
   auto smem_input_buffer_ptr = ir_builder.CreateCall(init_smem_func,
                                                      {
                                                          input_buffer_ptr,
@@ -159,52 +159,16 @@ void GpuReductionTester::codegenWrapperKernel() {
 }
 
 namespace {
-void prepare_generated_gpu_kernel(llvm::Module* module,
-                                  llvm::LLVMContext& context,
-                                  llvm::Function* kernel) {
-  // might be extra, remove and clean up
-  module->setDataLayout(
-      "e-p:64:64:64-i1:8:8-i8:8:8-"
-      "i16:16:16-i32:32:32-i64:64:64-"
-      "f32:32:32-f64:64:64-v16:16:16-"
-      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
-  module->setTargetTriple("spir64-unknown-unknown");
-
-  llvm::NamedMDNode* md = module->getOrInsertNamedMetadata("nvvm.annotations");
-
-  llvm::Metadata* md_vals[] = {llvm::ConstantAsMetadata::get(kernel),
-                               llvm::MDString::get(context, "kernel"),
-                               llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-                                   llvm::Type::getInt32Ty(context), 1))};
-
-  // Append metadata to nvvm.annotations
-  md->addOperand(llvm::MDNode::get(context, md_vals));
-}
 
 std::unique_ptr<L0DeviceCompilationContext> compile_and_link_gpu_code(
     const std::string& l0_llir,
     llvm::Module* module,
     l0::L0Manager* l0_mgr,
     const std::string& kernel_name,
-    const size_t gpu_block_size = 1024,
+    const size_t gpu_block_size = 256,  // 256 for iGPU, 1024 for PVC
     const size_t gpu_device_idx = 0) {
   CHECK(module);
   CHECK(l0_mgr);
-
-  // wrapper_func->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
-
-  module->setTargetTriple("spir64-unknown-unknown");
-
-  llvm::LLVMContext& ctx = module->getContext();
-  // set metadata -- pretend we're opencl (see
-  // https://github.com/KhronosGroup/SPIRV-LLVM-Translator/blob/master/docs/SPIRVRepresentationInLLVM.rst#spir-v-instructions-mapped-to-llvm-metadata)
-  llvm::Metadata* spirv_src_ops[] = {
-      llvm::ConstantAsMetadata::get(
-          llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 3 /*OpenCL_C*/)),
-      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx),
-                                                           102000 /*OpenCL ver 1.2*/))};
-  llvm::NamedMDNode* spirv_src = module->getOrInsertNamedMetadata("spirv.Source");
-  spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
 
   SPIRV::TranslatorOpts opts;
   opts.enableAllExtensions();
@@ -432,8 +396,10 @@ void perform_test_and_verify_results(TestInputData input) {
   std::cout << "GpuSharedMemoryTestIntel codegen END" << std::endl;
 
   std::cout << "GpuSharedMemoryTestIntel codegenWrapperKernel START" << std::endl;
+  DUMP_MODULE(module, "before.codegenWrapperKernel.ll")
   gpu_smem_tester.codegenWrapperKernel();
   std::cout << "GpuSharedMemoryTestIntel codegenWrapperKernel END" << std::endl;
+  DUMP_MODULE(module, "after.codegenWrapperKernel.ll")
 
   std::cout << "GpuSharedMemoryTestIntel performReductionTest START" << std::endl;
   gpu_smem_tester.performReductionTest(
@@ -483,45 +449,23 @@ void GpuReductionTester::performReductionTest(
     const ResultSetStorage* gpu_result_storage,
     const size_t device_id) {
   DUMP_MODULE(module_, "gen.ll");
-  prepare_generated_gpu_kernel(module_, context_, getWrapperKernel());
 
   auto& ext_module = executor_->getExtensionModuleContext()->getSpirvHelperFuncModule();
 
   DUMP_MODULE(module_, "after.linking.before.insert_declaration.spirv.ll")
 
+  insert_globals(ext_module.get(), module_);
   for (auto& F : *ext_module) {
     insert_declaration_tmp(ext_module.get(), module_, F.getName().str());
   }
 
-  insert_globals(ext_module.get(), module_);
   DUMP_MODULE(module_, "after.insert_global.spirv.ll")
-
-  // Initialize shared memory buffer
-  const auto slm_buffer = module_->getNamedGlobal("slm.buf.i64");
-  CHECK(slm_buffer);
-  llvm::ArrayType* ArrayTy_0 =
-      llvm::ArrayType::get(llvm::IntegerType::get(module_->getContext(), 64), 1024);
-  llvm::ConstantAggregateZero* const_array = llvm::ConstantAggregateZero::get(ArrayTy_0);
-  slm_buffer->setInitializer(const_array);
-
-#ifdef DEBUG
-  // Check global string name
-  for (llvm::GlobalVariable& G : module_->getGlobalList()) {
-    // std::ostringstream oss;
-    std::cerr << " global var =  " << G.getName().str() << std::endl;
-  }
-#endif
-
-  DUMP_MODULE(module_, "after.linking.before.replace_function.spirv.ll")
 
   for (auto& F : *ext_module) {
     if (!F.isDeclaration()) {
       compiler::replace_function(ext_module.get(), module_, F.getName().str());
     }
   }
-
-  DUMP_MODULE(module_, "after.linking.spirv.ll")
-  std::cout << "PerformReductionTest - after linking" << std::endl;
 
   // set proper calling conv & mangle spirv built-ins
   for (auto& Fn : *module_) {
@@ -541,7 +485,63 @@ void GpuReductionTester::performReductionTest(
       }
     }
   }
-  std::cout << "PerformReductionTest - after calling conv" << std::endl;
+
+  // wrapper_func->setCallingConv(llvm::CallingConv::SPIR_KERNEL);// todo fix
+
+  // Initialize shared memory buffer
+  const auto slm_buffer = module_->getNamedGlobal("slm.buf.i64");
+  CHECK(slm_buffer);
+  llvm::ArrayType* ArrayTy_0 =
+      llvm::ArrayType::get(llvm::IntegerType::get(module_->getContext(), 64), 1024);
+  llvm::ConstantAggregateZero* const_array = llvm::ConstantAggregateZero::get(ArrayTy_0);
+  slm_buffer->setInitializer(const_array);
+
+#ifdef DEBUG
+  // Check global string name
+  for (llvm::GlobalVariable& G : module_->getGlobalList()) {
+    // std::ostringstream oss;
+    std::cerr << " global var =  " << G.getName().str() << std::endl;
+  }
+#endif
+
+  DUMP_MODULE(module_, "after.linking.spirv.ll")
+  std::cout << "PerformReductionTest - after linking" << std::endl;
+
+  // Fix wrapper_kernel calling convention
+  auto fn = module_->getFunction("wrapper_kernel");
+  fn->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
+
+  DUMP_MODULE(module_, "after.fixing.callingconv.ll")
+
+  llvm::LLVMContext& ctx = module_->getContext();
+  // set metadata -- pretend we're opencl (see
+  // https://github.com/KhronosGroup/SPIRV-LLVM-Translator/blob/master/docs/SPIRVRepresentationInLLVM.rst#spir-v-instructions-mapped-to-llvm-metadata)
+  llvm::Metadata* spirv_src_ops[] = {
+      llvm::ConstantAsMetadata::get(
+          llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 3 /*OpenCL_C*/)),
+      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx),
+                                                           102000 /*OpenCL ver 1.2*/))};
+  llvm::NamedMDNode* spirv_src = module_->getOrInsertNamedMetadata("spirv.Source");
+  spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
+  std::cout << "after add metadata" << std::endl;
+
+  // TODO add optimize?
+  // for (auto& Fn : *module_) {
+  //     cgen_state_->query_func_ = query_func
+  // auto module = cgen_state->module_;
+
+  auto cgen_state = std::unique_ptr<CgenState>(
+      new CgenState({}, false, false, executor_->getExtensionModuleContext(), ctx));
+  cgen_state->set_module_shallow_copy(
+      executor_->getExtensionModuleContext()->getRTModule(/*is_l0=*/true));
+
+  // if optimize = remove wrapper_kernel function
+  // compiler::optimize_ir(cgen_state->query_func_,
+  //                       module_,
+  //                       {},
+  //                       true /*smem_used*/,
+  //                       CompilationOptions::defaults(ExecutorDeviceType::GPU, true));
+  // DUMP_MODULE(module_, "after.optimize_ir.ll")
 
   std::stringstream ss;
   llvm::raw_os_ostream os(ss);
@@ -554,6 +554,11 @@ void GpuReductionTester::performReductionTest(
   std::unique_ptr<L0DeviceCompilationContext> gpu_context(compile_and_link_gpu_code(
       module_str, module_, l0_mgr_, getWrapperKernel()->getName().str()));
   std::cout << "PerformReductionTest - after compile_and_link_gpu_code" << std::endl;
+
+  DUMP_MODULE(module_, "after.compile_link_gpu_code.ll")
+
+  CHECK_EQ(getWrapperKernel()->getName().str(), "wrapper_kernel");
+  // Code generation done
 
   const auto buffer_size = query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU);
   const size_t num_buffers = result_sets.size();
@@ -604,16 +609,14 @@ void GpuReductionTester::performReductionTest(
       reinterpret_cast<L0deviceptr>(d_result_buffer)};
 
   // casting each kernel parameter to be a void* device ptr itself:
-  std::vector<void*> kernel_param_ptrs;
+  std::vector<int8_t*> kernel_param_ptrs;
   kernel_param_ptrs.reserve(num_kernel_params);
-  std::transform(h_kernel_params.begin(),
-                 h_kernel_params.end(),
-                 std::back_inserter(kernel_param_ptrs),
-                 [](L0deviceptr& param) { return &param; });
+  // std::transform(h_kernel_params.begin(),
+  //                h_kernel_params.end(),
+  //                std::back_inserter(kernel_param_ptrs),
+  //                [](L0deviceptr& param) { return &param; });
 
   // launching a kernel:
-  typedef void* L0function;
-  auto l0_func = static_cast<L0function>(gpu_context->kernel());
   // we launch as many threadblocks as there are input buffers:
   // in other words, each input buffer is handled by a single threadblock.
 
@@ -628,12 +631,12 @@ void GpuReductionTester::performReductionTest(
   auto q = device->command_queue();
   auto q_list = device->create_command_list();
   // l0::GroupCount gc = {ko.gridDimX, ko.gridDimY, ko.gridDimZ};
-  l0::GroupCount gc = {1, 1, 1024};
+  l0::GroupCount gc = {1, 1, 1};
   // LOG(INFO) << "Launching L0 kernel with group size: {" << ko.gridDimX << ","
   //           << ko.gridDimY << "," << ko.gridDimZ << "}\n";
   // q_list->launch(kernel, kernel_param_ptrs.data(), gc); //<< here is the problem
 
-  q_list->launch(*kernel, gc);
+  q_list->launch(kernel, h_kernel_params, gc);
   q_list->submit(*q.get());
 
   // transfer back the results:

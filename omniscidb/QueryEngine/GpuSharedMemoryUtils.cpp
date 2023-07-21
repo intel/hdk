@@ -65,6 +65,7 @@ void GpuSharedMemCodeBuilder::codegen(const CompilationOptions& co) {
   CHECK(init_func_);
   codegenInitialization();
   compiler::verify_function_ir(init_func_);
+  DUMP_MODULE(init_func_->getParent(), "after.codegenInitialization.ll");
 
   // codegen the reduction function:
   reduction_func_ = createReductionFunction(co);
