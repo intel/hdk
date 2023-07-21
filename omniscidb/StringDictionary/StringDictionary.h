@@ -35,7 +35,11 @@ namespace legacy {
 class StringDictionary;
 }
 
-using StringDictionary = legacy::StringDictionary;
+namespace fast {
+class StringDictionary;
+}
+
+using StringDictionary = fast::StringDictionary;
 
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
 
@@ -230,5 +234,119 @@ class StringDictionary {
 }  // namespace legacy
 
 int32_t truncate_to_generation(const int32_t id, const size_t generation);
+
+namespace fast {
+
+class StringDictionary {
+ public:
+  StringDictionary(const DictRef& dict_ref,
+                   const bool materializeHashes = false,
+                   size_t initial_capacity = 256)
+      : dict_ref_(dict_ref)
+      , storage_(std::make_unique<StringDictStorage>(initial_capacity)) {
+    CHECK_EQ(initial_capacity, size_t(256));
+  }
+
+  int32_t getDbId() const noexcept { return dict_ref_.dbId; }
+  int32_t getDictId() const noexcept { return dict_ref_.dictId; }
+
+  class StringCallback {
+   public:
+    virtual ~StringCallback() = default;
+    virtual void operator()(std::string const&, int32_t const string_id) = 0;
+    virtual void operator()(std::string_view const, int32_t const string_id) = 0;
+  };
+
+  // Functors passed to eachStringSerially() must derive from StringCallback.
+  // Each std::string const& (if isClient()) or std::string_view (if !isClient())
+  // plus string_id is passed to the callback functor.
+  void eachStringSerially(int64_t const generation, StringCallback&) const;
+  friend class ::StringLocalCallback;
+
+  int32_t getOrAdd(const std::string_view& str) noexcept;
+  template <class T, class String>
+  size_t getBulk(const std::vector<String>& string_vec, T* encoded_vec) const;
+  template <class T, class String>
+  size_t getBulk(const std::vector<String>& string_vec,
+                 T* encoded_vec,
+                 const int64_t generation) const;
+  template <class T, class String>
+  void getOrAddBulk(const std::vector<String>& string_vec, T* encoded_vec);
+  template <class String>
+  int32_t getIdOfString(const String&) const;
+  std::string getString(int32_t string_id) const;
+  std::pair<char*, size_t> getStringBytes(int32_t string_id) const noexcept;
+  size_t storageEntryCount() const;
+
+  std::vector<int32_t> getLike(const std::string& pattern,
+                               const bool icase,
+                               const bool is_simple,
+                               const char escape,
+                               const size_t generation) const;
+
+  std::vector<int32_t> getCompare(const std::string& pattern,
+                                  const std::string& comp_operator,
+                                  const size_t generation);
+
+  std::vector<int32_t> getRegexpLike(const std::string& pattern,
+                                     const char escape,
+                                     const size_t generation) const;
+
+  std::vector<std::string> copyStrings() const;
+
+  static constexpr int32_t INVALID_STR_ID = -1;
+  static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
+  static constexpr size_t MAX_STRCOUNT = (1U << 31) - 1;
+
+ private:
+  int32_t getUnlocked(const std::string_view sv) const noexcept;
+  std::string_view getStringFromStorageFast(const int string_id) const noexcept;
+  template <class String>
+  uint32_t computeBucket(
+      const uint32_t hash,
+      const String& input_string,
+      const std::vector<int32_t>& string_id_uint32_table) const noexcept;
+
+  const DictRef dict_ref_;
+  size_t str_count_;
+
+  // need a data structure for the actual dictionary
+  // maybe this doesn't need to be separate
+  struct StringDictStorage {
+    std::vector<int32_t> hash_to_id_map;
+    std::vector<std::string> strings;
+
+    StringDictStorage(const size_t initial_size)
+        : hash_to_id_map(initial_size, INVALID_STR_ID) {
+      strings.reserve(initial_size);
+    }
+
+    template <class String>
+    uint32_t computeBucket(const uint32_t hash, const String& str) noexcept;
+
+    // why noexcept?
+    template <class String>
+    int32_t addString(const uint32_t hash, const String& input_string) noexcept;
+
+    bool full() const { return strings.size() == hash_to_id_map.size(); }
+    bool fillRateIsHigh() const { return 2 * strings.size() > hash_to_id_map.size(); }
+    size_t size() const { return hash_to_id_map.size(); }
+    size_t num_strings() const { return strings.size(); }
+    void resize(const size_t new_size);
+  };
+
+  std::unique_ptr<StringDictStorage> storage_;
+
+  const bool materialize_hashes_{false};  // TODO: do we want this?
+
+  mutable mapd_shared_mutex rw_mutex_;  // let's not make this mutable...
+
+  // TODO: legacy, direct access outside of this class
+  std::vector<int32_t> string_id_uint32_table_;
+  std::vector<uint32_t> hash_cache_;
+  friend class ::StringDictionaryTranslator;
+};
+
+}  // namespace fast
 
 #endif  // STRINGDICTIONARY_STRINGDICTIONARY_H

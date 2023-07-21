@@ -1412,3 +1412,252 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
   }
   return total_num_strings_not_translated;
 }
+
+namespace fast {
+
+// Functors passed to eachStringSerially() must derive from StringCallback.
+// Each std::string const& (if isClient()) or std::string_view (if !isClient())
+// plus string_id is passed to the callback functor.
+void StringDictionary::eachStringSerially(int64_t const generation,
+                                          StringCallback&) const {
+  CHECK(false);
+}
+
+int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
+  CHECK(false);
+}
+
+// can't we just do a default argument here?
+template <class T, class String>
+size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
+                                 T* encoded_vec) const {
+  return getBulk(string_vec, encoded_vec, -1L /* generation */);
+}
+
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          uint8_t* encoded_vec) const;
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          uint16_t* encoded_vec) const;
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          int32_t* encoded_vec) const;
+
+template <class T, class String>
+size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
+                                 T* encoded_vec,
+                                 const int64_t generation) const {
+  CHECK(false);
+}
+
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          uint8_t* encoded_vec,
+                                          const int64_t generation) const;
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          uint16_t* encoded_vec,
+                                          const int64_t generation) const;
+template size_t StringDictionary::getBulk(const std::vector<std::string>& string_vec,
+                                          int32_t* encoded_vec,
+                                          const int64_t generation) const;
+
+template <class T, class String>
+void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
+                                    T* output_string_ids) {
+  CHECK(storage_);
+  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
+
+  // compute hash
+  std::vector<uint32_t> hashes(string_vec.size());
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, string_vec.size()),
+                    [&string_vec, &hashes](const tbb::blocked_range<size_t>& r) {
+                      for (size_t curr_id = r.begin(); curr_id != r.end(); ++curr_id) {
+                        if (string_vec[curr_id].empty()) {
+                          continue;
+                        }
+                        hashes[curr_id] = hash_string(string_vec[curr_id]);
+                      }
+                    });
+
+  for (size_t i = 0; i < string_vec.size(); i++) {
+    // LOG(ERROR) << "Processing string " << i;
+    const auto& input_string = string_vec[i];
+    if (input_string.empty()) {
+      output_string_ids[i] = inline_int_null_value<T>();
+      continue;
+    }
+
+    // add string to storage and store id
+    const auto& hash = hashes[i];
+    const auto string_id = storage_->addString(hash, input_string);
+    if (string_id != INVALID_STR_ID) {
+      output_string_ids[i] = string_id;
+    } else {
+      CHECK(false);  // why would we ever get here?
+    }
+  }
+  LOG(ERROR) << "done";
+}
+
+template void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
+                                             uint8_t* encoded_vec);
+template void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
+                                             uint16_t* encoded_vec);
+template void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
+                                             int32_t* encoded_vec);
+
+template void StringDictionary::getOrAddBulk(
+    const std::vector<std::string_view>& string_vec,
+    uint8_t* encoded_vec);
+template void StringDictionary::getOrAddBulk(
+    const std::vector<std::string_view>& string_vec,
+    uint16_t* encoded_vec);
+template void StringDictionary::getOrAddBulk(
+    const std::vector<std::string_view>& string_vec,
+    int32_t* encoded_vec);
+
+template <class String>
+int32_t StringDictionary::getIdOfString(const String&) const {
+  CHECK(false);
+}
+
+template int32_t StringDictionary::getIdOfString(const std::string&) const;
+template int32_t StringDictionary::getIdOfString(const std::string_view&) const;
+
+std::string StringDictionary::getString(int32_t string_id) const {
+  CHECK(false);
+}
+std::pair<char*, size_t> StringDictionary::getStringBytes(
+    int32_t string_id) const noexcept {
+  CHECK(false);
+}
+
+size_t StringDictionary::storageEntryCount() const {
+  CHECK(false);
+}
+
+std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
+                                               const bool icase,
+                                               const bool is_simple,
+                                               const char escape,
+                                               const size_t generation) const {
+  CHECK(false);
+}
+
+std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
+                                                  const std::string& comp_operator,
+                                                  const size_t generation) {
+  CHECK(false);
+}
+
+std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
+                                                     const char escape,
+                                                     const size_t generation) const {
+  CHECK(false);
+}
+
+std::vector<std::string> StringDictionary::copyStrings() const {
+  CHECK(false);
+}
+
+int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
+  CHECK(false);
+}
+
+std::string_view StringDictionary::getStringFromStorageFast(
+    const int string_id) const noexcept {
+  CHECK(false);
+}
+
+template <class String>
+uint32_t StringDictionary::StringDictStorage::computeBucket(const uint32_t hash,
+                                                            const String& str) noexcept {
+  const size_t hash_table_size = hash_to_id_map.size();
+  uint32_t bucket = hash & (hash_table_size - 1);
+  // find an empty slot in the hash map
+  while (true) {
+    const int32_t candidate_string_id = hash_to_id_map[bucket];
+    if (candidate_string_id == INVALID_STR_ID) {
+      // found an open slot - add the string to the strings payload
+      break;
+    }
+    // slot is full, check for a collision
+    CHECK_LT(candidate_string_id, int32_t(strings.size()));
+    const auto& existing_string = strings[candidate_string_id];
+
+    if (existing_string == str) {
+      // found existing string, no string inserted
+      break;
+    }
+
+    // wrap around
+    if (++bucket == hash_table_size) {
+      bucket = 0;
+    }
+  }
+
+  return bucket;
+}
+
+template <class String>
+int32_t StringDictionary::StringDictStorage::addString(
+    const uint32_t hash,
+    const String& input_string) noexcept {
+  if (fillRateIsHigh()) {
+    resize(2 * size());
+    LOG(ERROR) << "Resized to " << size() << " (holds " << num_strings() << ")";
+  }
+  const size_t hash_table_size = hash_to_id_map.size();
+  uint32_t bucket = hash & (hash_table_size - 1);
+
+  // find an empty slot in the hash map
+  while (true) {
+    const int32_t candidate_string_id = hash_to_id_map[bucket];
+    if (candidate_string_id == INVALID_STR_ID) {
+      // found an open slot - add the string to the strings payload
+      strings.push_back(std::string(input_string));
+      hash_to_id_map[bucket] = static_cast<int32_t>(strings.size()) - 1;
+      break;
+    }
+    // slot is full, check for a collision
+    CHECK_LT(candidate_string_id, int32_t(strings.size()));
+    const auto& existing_string = strings[candidate_string_id];
+
+    if (existing_string == input_string) {
+      // found existing string, no string inserted
+      break;
+    }
+
+    // wrap around
+    if (++bucket == hash_table_size) {
+      bucket = 0;
+    }
+  }
+
+  return hash_to_id_map[bucket];
+}
+
+// on resize we need to re-hash the strings, as the hash is based on the total hash table
+// size
+void StringDictionary::StringDictStorage::resize(const size_t new_size) {
+  CHECK_GT(new_size, hash_to_id_map.size());
+  strings.reserve(new_size);
+
+  std::vector<int32_t> new_hash_map(new_size, INVALID_STR_ID);
+  hash_to_id_map.swap(new_hash_map);
+
+  for (size_t i = 0; i < strings.size(); i++) {
+    const auto& str = strings[i];
+    const auto hash = hash_string(str);
+    const auto bucket = computeBucket(hash, str);
+    hash_to_id_map[bucket] = i;
+  }
+}
+
+template <class String>
+uint32_t StringDictionary::computeBucket(
+    const uint32_t hash,
+    const String& input_string,
+    const std::vector<int32_t>& string_id_uint32_table) const noexcept {
+  // TODO: this isn't quite right for translations, but we can fix that up later
+  return storage_->addString(hash, input_string);
+}
+
+}  // namespace fast
