@@ -25,6 +25,7 @@
 #include <ostream>
 #endif
 
+#include <iostream>
 #include "Compiler/CodegenTraitsDescriptor.h"
 #include "Shared/Config.h"
 #include "Shared/DeviceType.h"
@@ -68,6 +69,7 @@ struct CompilationOptions {
       case ExecutorDeviceType::CPU:
         return compiler::cpu_cgen_traits_desc;
       case ExecutorDeviceType::GPU:
+        std::cout << "Check is_l0?" << is_l0 << std::endl;
         return (is_l0 ? compiler::l0_cgen_traits_desc : compiler::cuda_cgen_traits_desc);
     }
     return {};

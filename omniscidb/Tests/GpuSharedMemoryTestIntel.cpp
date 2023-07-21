@@ -94,6 +94,8 @@ void GpuReductionTester::codegenWrapperKernel() {
   wrapper_kernel_ = llvm::Function::Create(
       ft, llvm::Function::ExternalLinkage, "wrapper_kernel", module_);
 
+  wrapper_kernel_->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
+
   auto arg_it = wrapper_kernel_->arg_begin();
   auto input_ptrs = &*arg_it;
   input_ptrs->setName("input_pointers");
@@ -126,6 +128,7 @@ void GpuReductionTester::codegenWrapperKernel() {
       block_index);
   auto input_buffer = ir_builder.CreateLoad(
       llvm::Type::getInt8PtrTy(context_, address_space), input_buffer_gep);
+  std::cout << "Addr space input_buffer_ptr=" << address_space << std::endl;
   auto input_buffer_ptr = ir_builder.CreatePointerCast(
       input_buffer, llvm::Type::getInt64PtrTy(context_, 4), "input_buffer_ptr");
   const auto buffer_size = ll_int(
@@ -153,8 +156,6 @@ void GpuReductionTester::codegenWrapperKernel() {
 
   ir_builder.SetInsertPoint(bb_exit);
   ir_builder.CreateRet(nullptr);
-
-  // wrapper_kernel_->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
 }
 
 namespace {
@@ -189,6 +190,21 @@ std::unique_ptr<L0DeviceCompilationContext> compile_and_link_gpu_code(
     const size_t gpu_device_idx = 0) {
   CHECK(module);
   CHECK(l0_mgr);
+
+  // wrapper_func->setCallingConv(llvm::CallingConv::SPIR_KERNEL);
+
+  module->setTargetTriple("spir64-unknown-unknown");
+
+  llvm::LLVMContext& ctx = module->getContext();
+  // set metadata -- pretend we're opencl (see
+  // https://github.com/KhronosGroup/SPIRV-LLVM-Translator/blob/master/docs/SPIRVRepresentationInLLVM.rst#spir-v-instructions-mapped-to-llvm-metadata)
+  llvm::Metadata* spirv_src_ops[] = {
+      llvm::ConstantAsMetadata::get(
+          llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 3 /*OpenCL_C*/)),
+      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx),
+                                                           102000 /*OpenCL ver 1.2*/))};
+  llvm::NamedMDNode* spirv_src = module->getOrInsertNamedMetadata("spirv.Source");
+  spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
 
   SPIRV::TranslatorOpts opts;
   opts.enableAllExtensions();

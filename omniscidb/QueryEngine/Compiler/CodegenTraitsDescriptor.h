@@ -12,19 +12,22 @@ namespace compiler {
 enum class CallingConvDesc { C, SPIR_FUNC };
 struct CodegenTraitsDescriptor {
   CodegenTraitsDescriptor(unsigned local_addr_space,
-                          unsigned smem_addr_space,
+                          unsigned shared_addr_space,
                           unsigned global_addr_space,
                           CallingConvDesc calling_conv,
                           std::string_view triple)
       : local_addr_space_(local_addr_space)
-      , smem_addr_space_(smem_addr_space)
+      , shared_addr_space_(shared_addr_space)
       , global_addr_space_(global_addr_space)
       , conv_(calling_conv)
       , triple_(triple) {}
-  CodegenTraitsDescriptor(){};
+  CodegenTraitsDescriptor() {
+    std::cout << "CodegenTraitsDescriptor shared_addr_space=" << shared_addr_space_
+              << std::endl;
+  };
 
   unsigned local_addr_space_{0};
-  unsigned smem_addr_space_{0};
+  unsigned shared_addr_space_{0};
   unsigned global_addr_space_{0};
   CallingConvDesc conv_;
   std::string_view triple_{"DUMMY"};

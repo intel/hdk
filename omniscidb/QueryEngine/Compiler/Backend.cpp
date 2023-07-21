@@ -63,7 +63,7 @@ CodegenTraits CodegenTraits::get(CodegenTraitsDescriptor codegen_traits_desc) {
   CHECK(descCallingConvToLLVM.find(codegen_traits_desc.conv_) !=
         descCallingConvToLLVM.end());
   return CodegenTraits(codegen_traits_desc.local_addr_space_,
-                       codegen_traits_desc.smem_addr_space_,
+                       codegen_traits_desc.shared_addr_space_,
                        codegen_traits_desc.global_addr_space_,
                        descCallingConvToLLVM.at(codegen_traits_desc.conv_),
                        codegen_traits_desc.triple_);
@@ -1014,6 +1014,7 @@ std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
   spirv_src->addOperand(llvm::MDNode::get(ctx, spirv_src_ops));
 
   compiler::optimize_ir(func, module, live_funcs, false /*smem_used*/, co);
+  std::cout << "GenerateNativeGPUCode" << std::endl;
 
   // Remove the remaining freeze instruction after the optimization
   std::vector<llvm::Instruction*> to_erase;
