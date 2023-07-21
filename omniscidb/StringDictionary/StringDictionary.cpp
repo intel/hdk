@@ -1458,7 +1458,7 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                           }
 
                           const auto hash = hash_string(str);
-                          const auto bucket = storage_->computeBucket(hash, str);
+                          const auto bucket = computeBucket(hash, str);
                           const auto string_id = storage_->hash_to_id_map[bucket];
                           if (string_id == StringDictionary::INVALID_STR_ID ||
                               string_id > storage_->strings.size()) {
@@ -1511,7 +1511,8 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
 
     // add string to storage and store id
     const auto& hash = hashes[i];
-    const auto string_id = storage_->addString(hash, input_string);
+    // TODO: move addStrng up here
+    const auto string_id = addString(hash, input_string);
     if (string_id != INVALID_STR_ID) {
       output_string_ids[i] = string_id;
     } else {
@@ -1592,20 +1593,22 @@ std::string_view StringDictionary::getStringFromStorageFast(
 }
 
 template <class String>
-uint32_t StringDictionary::StringDictStorage::computeBucket(const uint32_t hash,
-                                                            const String& str) noexcept {
-  const size_t hash_table_size = hash_to_id_map.size();
+uint32_t StringDictionary::computeBucket(const uint32_t hash,
+                                         const String& str) const noexcept {
+  CHECK(storage_);
+  auto& hash_table = *storage_.get();
+  const size_t hash_table_size = hash_table.size();
   uint32_t bucket = hash & (hash_table_size - 1);
   // find an empty slot in the hash map
   while (true) {
-    const int32_t candidate_string_id = hash_to_id_map[bucket];
+    const int32_t candidate_string_id = hash_table[bucket];
     if (candidate_string_id == INVALID_STR_ID) {
       // found an open slot - add the string to the strings payload
       break;
     }
     // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, int32_t(strings.size()));
-    const auto& existing_string = strings[candidate_string_id];
+    CHECK_LT(candidate_string_id, int32_t(hash_table.numStrings()));
+    const auto& existing_string = hash_table.str(candidate_string_id);
 
     if (existing_string == str) {
       // found existing string, no string inserted
@@ -1622,28 +1625,29 @@ uint32_t StringDictionary::StringDictStorage::computeBucket(const uint32_t hash,
 }
 
 template <class String>
-int32_t StringDictionary::StringDictStorage::addString(
-    const uint32_t hash,
-    const String& input_string) noexcept {
-  if (fillRateIsHigh()) {
-    resize(2 * size());
-    LOG(ERROR) << "Resized to " << size() << " (holds " << num_strings() << ")";
+int32_t StringDictionary::addString(const uint32_t hash,
+                                    const String& input_string) noexcept {
+  CHECK(storage_);
+  if (storage_->fillRateIsHigh()) {
+    resize(2 * storage_->size());
+    LOG(ERROR) << "Resized to " << storage_->size() << " (holds "
+               << storage_->numStrings() << ")";
   }
-  const size_t hash_table_size = hash_to_id_map.size();
+  const size_t hash_table_size = storage_->size();
   uint32_t bucket = hash & (hash_table_size - 1);
 
   // find an empty slot in the hash map
   while (true) {
-    const int32_t candidate_string_id = hash_to_id_map[bucket];
+    const int32_t candidate_string_id = (*storage_)[bucket];
     if (candidate_string_id == INVALID_STR_ID) {
       // found an open slot - add the string to the strings payload
-      strings.push_back(std::string(input_string));
-      hash_to_id_map[bucket] = static_cast<int32_t>(strings.size()) - 1;
+      storage_->strings.push_back(std::string(input_string));
+      (*storage_)[bucket] = static_cast<int32_t>(storage_->numStrings()) - 1;
       break;
     }
     // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, int32_t(strings.size()));
-    const auto& existing_string = strings[candidate_string_id];
+    CHECK_LT(candidate_string_id, int32_t(storage_->numStrings()));
+    const auto& existing_string = storage_->str(candidate_string_id);
 
     if (existing_string == input_string) {
       // found existing string, no string inserted
@@ -1656,23 +1660,25 @@ int32_t StringDictionary::StringDictStorage::addString(
     }
   }
 
-  return hash_to_id_map[bucket];
+  return (*storage_)[bucket];
 }
 
 // on resize we need to re-hash the strings, as the hash is based on the total hash table
 // size
-void StringDictionary::StringDictStorage::resize(const size_t new_size) {
-  CHECK_GT(new_size, hash_to_id_map.size());
-  strings.reserve(new_size);
+void StringDictionary::resize(const size_t new_size) {
+  CHECK(storage_);
+  auto& hash_table = *storage_.get();
+  CHECK_GT(new_size, hash_table.size());
+  hash_table.strings.reserve(new_size);
 
   std::vector<int32_t> new_hash_map(new_size, INVALID_STR_ID);
-  hash_to_id_map.swap(new_hash_map);
+  hash_table.hash_to_id_map.swap(new_hash_map);
 
-  for (size_t i = 0; i < strings.size(); i++) {
-    const auto& str = strings[i];
+  for (size_t i = 0; i < hash_table.numStrings(); i++) {
+    const auto& str = hash_table.str(i);
     const auto hash = hash_string(str);
     const auto bucket = computeBucket(hash, str);
-    hash_to_id_map[bucket] = i;
+    hash_table[bucket] = i;
   }
 }
 
@@ -1682,7 +1688,7 @@ uint32_t StringDictionary::computeBucket(
     const String& input_string,
     const std::vector<int32_t>& string_id_uint32_table) const noexcept {
   // TODO: this isn't quite right for translations, but we can fix that up later
-  return storage_->addString(hash, input_string);
+  return computeBucket(hash, input_string);
 }
 
 }  // namespace fast

@@ -307,6 +307,16 @@ class StringDictionary {
       const String& input_string,
       const std::vector<int32_t>& string_id_uint32_table) const noexcept;
 
+  // TODO: clean these two up
+  template <class String>
+  uint32_t computeBucket(const uint32_t hash, const String& str) const noexcept;
+
+  // why noexcept?
+  template <class String>
+  int32_t addString(const uint32_t hash, const String& input_string) noexcept;
+
+  void resize(const size_t new_size);
+
   const DictRef dict_ref_;
   size_t str_count_;
 
@@ -321,18 +331,19 @@ class StringDictionary {
       strings.reserve(initial_size);
     }
 
-    template <class String>
-    uint32_t computeBucket(const uint32_t hash, const String& str) noexcept;
+    // returns ID for a given hash (truncated to hash table size)
+    int32_t& operator[](const uint32_t bucket) { return hash_to_id_map[bucket]; }
 
-    // why noexcept?
-    template <class String>
-    int32_t addString(const uint32_t hash, const String& input_string) noexcept;
+    // returns string for a given ID
+    const std::string& str(const size_t id) const { return strings[id]; }
+
+    size_t numStrings() const { return strings.size(); }
+
+    size_t size() const { return hash_to_id_map.size(); }
 
     bool full() const { return strings.size() == hash_to_id_map.size(); }
     bool fillRateIsHigh() const { return 2 * strings.size() > hash_to_id_map.size(); }
-    size_t size() const { return hash_to_id_map.size(); }
     size_t num_strings() const { return strings.size(); }
-    void resize(const size_t new_size);
   };
 
   std::unique_ptr<StringDictStorage> storage_;
