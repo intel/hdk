@@ -335,12 +335,14 @@ class StringDictionary {
       string_hashes.reserve(initial_size);
     }
 
+    // returns added string ID
     template <class String>
-    void addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
+    int32_t addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
       strings.push_back(std::string(str));
       string_hashes.push_back(hash);
       CHECK_LT(bucket, hash_to_id_map.size());
       hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
+      return hash_to_id_map[bucket];
     }
 
     template <class String>

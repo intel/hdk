@@ -1636,16 +1636,18 @@ template <class String>
 int32_t StringDictionary::addString(const uint32_t hash,
                                     const String& input_string) noexcept {
   CHECK(storage_);
-  if (storage_->fillRateIsHigh()) {
-    storage_->resize(2 * storage_->size());
-    VLOG(3) << "Resized to " << storage_->size() << " (holds " << storage_->numStrings()
-            << ")";
-  }
 
   const auto bucket = storage_->computeBucket(hash, input_string);
   if ((*storage_)[bucket] == INVALID_STR_ID) {
     // found an open slot - add the string to the strings payload
-    storage_->addStringToMaps(bucket, hash, input_string);
+    const auto str_id = storage_->addStringToMaps(bucket, hash, input_string);
+    if (storage_->fillRateIsHigh()) {
+      storage_->resize(2 * storage_->size());
+      VLOG(3) << "Resized to " << storage_->size() << " (holds " << storage_->numStrings()
+              << ")";
+    }
+
+    return str_id;
   }
   return (*storage_)[bucket];
 }
