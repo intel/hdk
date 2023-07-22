@@ -326,6 +326,7 @@ class StringDictionary {
     std::vector<int32_t> hash_to_id_map;
     std::vector<uint32_t> string_hashes;
     std::vector<std::string> strings;
+    bool materialize_hashes{false};
 
     StringDictStorage(const size_t initial_size)
         : hash_to_id_map(initial_size, INVALID_STR_ID) {
@@ -336,8 +337,10 @@ class StringDictionary {
     // returns added string ID
     template <class String>
     int32_t addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
-      strings.push_back(std::string(str));
-      string_hashes.push_back(hash);
+      strings.emplace_back(str);
+      if (materialize_hashes) {
+        string_hashes.push_back(hash);
+      }
       CHECK_LT(bucket, hash_to_id_map.size());
       hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
       return hash_to_id_map[bucket];

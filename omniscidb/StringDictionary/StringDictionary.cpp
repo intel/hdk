@@ -50,7 +50,7 @@ namespace {
 
 const int SYSTEM_PAGE_SIZE = omnisci::get_page_size();
 
-uint32_t hash_string(const std::string_view& str) {
+uint32_t hash_string(const std::string_view str) {
   uint32_t str_hash = 1;
   // rely on fact that unsigned overflow is defined and wraps
   for (size_t i = 0; i < str.size(); ++i) {
@@ -1506,7 +1506,8 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
 
   // compute hashes
-  std::vector<uint32_t> hashes(string_vec.size());
+  auto hashes = std::make_unique<uint32_t[]>(string_vec.size());
+  // std::vector<uint32_t> hashes(string_vec.size());
   tbb::parallel_for(tbb::blocked_range<size_t>(0, string_vec.size()),
                     [&string_vec, &hashes](const tbb::blocked_range<size_t>& r) {
                       for (size_t curr_id = r.begin(); curr_id != r.end(); ++curr_id) {
@@ -1647,23 +1648,38 @@ int32_t StringDictionary::addString(const uint32_t hash,
 
 // on resize we need to re-hash the strings, as the hash is based on the total hash table
 // size
+// NOTE: in taxi this never gets called b/c the dictionaries are so small
 void StringDictionary::StringDictStorage::resize(const size_t new_size) {
   CHECK_GT(new_size, size());
-  CHECK_EQ(strings.size(), string_hashes.size());
+  // TODO: centralize this magic number
+  if (!materialize_hashes && (new_size > 1024)) {
+    materialize_hashes = true;
+  }
+
   strings.reserve(new_size);
-  string_hashes.reserve(new_size);
+  if (materialize_hashes) {
+    string_hashes.reserve(new_size);
+  }
 
   std::vector<int32_t> new_hash_map(new_size, INVALID_STR_ID);
   hash_to_id_map.swap(new_hash_map);
 
   for (size_t i = 0; i < numStrings(); i++) {
     const auto& crt_str = strings[i];
-    const auto hash = string_hashes[i];
+    if (materialize_hashes && string_hashes.size() <= i) {
+      string_hashes.push_back(hash_string(crt_str));
+    }
+    const auto hash = materialize_hashes ? string_hashes[i] : hash_string(crt_str);
     const auto bucket = computeBucket(hash, crt_str);
     hash_to_id_map[bucket] = i;
   }
+
+  if (materialize_hashes) {
+    CHECK_EQ(strings.size(), string_hashes.size());
+  }
 }
 
+// TODO: count slot misses
 template <class String>
 size_t StringDictionary::StringDictStorage::computeBucket(
     const uint32_t hash,
@@ -1679,9 +1695,17 @@ size_t StringDictionary::StringDictStorage::computeBucket(
     }
 
     // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, string_hashes.size());
-    const auto existing_hash = string_hashes[candidate_string_id];
-    if (existing_hash == hash) {
+    if (materialize_hashes) {
+      CHECK_LT(candidate_string_id, string_hashes.size());
+      const auto existing_hash = string_hashes[candidate_string_id];
+      if (existing_hash == hash) {
+        const auto& existing_string = strings[candidate_string_id];
+        if (existing_string == input_string) {
+          // found an existing string that matches
+          break;
+        }
+      }
+    } else {
       const auto& existing_string = strings[candidate_string_id];
       if (existing_string == input_string) {
         // found an existing string that matches
