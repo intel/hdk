@@ -1517,13 +1517,6 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
                       }
                     });
 
-#if 0
-  // sort of assumes a sparse hash table 
-  if (storage_->size() < 2 * string_vec.size()) {
-    storage_->resize(2 * string_vec.size());
-  }
-#endif
-
   for (size_t i = 0; i < string_vec.size(); i++) {
     const auto& input_string = string_vec[i];
     if (input_string.empty()) {
@@ -1669,19 +1662,6 @@ void StringDictionary::StringDictStorage::resize(const size_t new_size) {
     const auto bucket = computeBucket(hash, crt_str);
     hash_to_id_map[bucket] = i;
   }
-}
-
-template <class String>
-uint32_t StringDictionary::computeBucket(
-    const uint32_t hash,
-    const String& input_string,
-    const std::vector<int32_t>& string_id_uint32_table) const noexcept {
-  // TODO: this isn't quite right for translations, but we can fix that up later
-  CHECK(storage_);
-  auto bucket = storage_->computeBucket(hash, input_string);
-  // TODO: HACK
-  // string_id_uint32_table_ = storage_->hash_to_id_map;
-  return bucket;
 }
 
 template <class String>

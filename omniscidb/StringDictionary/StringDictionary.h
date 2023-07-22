@@ -249,9 +249,7 @@ class StringDictionary {
                    const bool materializeHashes = false,
                    size_t initial_capacity = 256)
       : dict_ref_(dict_ref)
-      , storage_(std::make_unique<StringDictStorage>(initial_capacity)) {
-    CHECK_EQ(initial_capacity, size_t(256));
-  }
+      , storage_(std::make_unique<StringDictStorage>(initial_capacity)) {}
 
   int32_t getDbId() const noexcept { return dict_ref_.dbId; }
   int32_t getDictId() const noexcept { return dict_ref_.dictId; }
@@ -326,7 +324,7 @@ class StringDictionary {
   // maybe this doesn't need to be separate
   struct StringDictStorage {
     std::vector<int32_t> hash_to_id_map;
-    std::vector<uint32_t> string_hashes;  // TODO: let's remove the pair, keep it simple
+    std::vector<uint32_t> string_hashes;
     std::vector<std::string> strings;
 
     StringDictStorage(const size_t initial_size)
@@ -366,8 +364,6 @@ class StringDictionary {
   };
 
   std::unique_ptr<StringDictStorage> storage_;
-
-  const bool materialize_hashes_{false};  // TODO: do we want this?
 
   mutable mapd_shared_mutex rw_mutex_;  // let's not make this mutable...
 
