@@ -1376,7 +1376,7 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
           // Get the hash from this/the source dictionary's cache, as the function
           // will be the same for the dest_dict, sparing us having to recompute it
 
-#if 1
+#ifndef USE_LEGACY_STR_DICT
               const auto translated_string_id = dest_dict->getIdOfString(source_str);
 #else
               // Todo(todd): Remove option to turn string hash cache off or at least
@@ -1505,7 +1505,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
   CHECK(storage_);
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
 
-  // compute hash
+  // compute hashes
   std::vector<uint32_t> hashes(string_vec.size());
   tbb::parallel_for(tbb::blocked_range<size_t>(0, string_vec.size()),
                     [&string_vec, &hashes](const tbb::blocked_range<size_t>& r) {
@@ -1517,8 +1517,14 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
                       }
                     });
 
+#if 0
+  // sort of assumes a sparse hash table 
+  if (storage_->size() < 2 * string_vec.size()) {
+    storage_->resize(2 * string_vec.size());
+  }
+#endif
+
   for (size_t i = 0; i < string_vec.size(); i++) {
-    // LOG(ERROR) << "Processing string " << i;
     const auto& input_string = string_vec[i];
     if (input_string.empty()) {
       output_string_ids[i] = inline_int_null_value<T>();
@@ -1534,7 +1540,6 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
       CHECK(false);  // why would we ever get here?
     }
   }
-  LOG(ERROR) << "done";
 }
 
 template void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
@@ -1633,13 +1638,14 @@ int32_t StringDictionary::addString(const uint32_t hash,
   CHECK(storage_);
   if (storage_->fillRateIsHigh()) {
     storage_->resize(2 * storage_->size());
-    LOG(ERROR) << "Resized to " << storage_->size() << " (holds "
-               << storage_->numStrings() << ")";
+    VLOG(3) << "Resized to " << storage_->size() << " (holds " << storage_->numStrings()
+            << ")";
   }
+
   const auto bucket = storage_->computeBucket(hash, input_string);
   if ((*storage_)[bucket] == INVALID_STR_ID) {
     // found an open slot - add the string to the strings payload
-    storage_->addStringToMaps(bucket, input_string);
+    storage_->addStringToMaps(bucket, hash, input_string);
   }
   return (*storage_)[bucket];
 }
@@ -1648,14 +1654,16 @@ int32_t StringDictionary::addString(const uint32_t hash,
 // size
 void StringDictionary::StringDictStorage::resize(const size_t new_size) {
   CHECK_GT(new_size, size());
+  CHECK_EQ(strings.size(), string_hashes.size());
   strings.reserve(new_size);
+  string_hashes.reserve(new_size);
 
   std::vector<int32_t> new_hash_map(new_size, INVALID_STR_ID);
   hash_to_id_map.swap(new_hash_map);
 
   for (size_t i = 0; i < numStrings(); i++) {
-    const auto& crt_str = str(i);
-    const auto hash = hash_string(crt_str);
+    const auto& crt_str = strings[i];
+    const auto hash = string_hashes[i];
     const auto bucket = computeBucket(hash, crt_str);
     hash_to_id_map[bucket] = i;
   }
@@ -1687,13 +1695,16 @@ size_t StringDictionary::StringDictStorage::computeBucket(
       // found an open slot
       break;
     }
-    // slot is full, check for a collision
-    CHECK_LT(candidate_string_id, int32_t(numStrings()));
-    const auto& existing_string = str(candidate_string_id);
 
-    if (existing_string == input_string) {
-      // found an existing string that matches
-      break;
+    // slot is full, check for a collision
+    CHECK_LT(candidate_string_id, string_hashes.size());
+    const auto existing_hash = string_hashes[candidate_string_id];
+    if (existing_hash == hash) {
+      const auto& existing_string = strings[candidate_string_id];
+      if (existing_string == input_string) {
+        // found an existing string that matches
+        break;
+      }
     }
 
     // wrap around

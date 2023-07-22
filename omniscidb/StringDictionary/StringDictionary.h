@@ -29,6 +29,8 @@
 #include <tuple>
 #include <vector>
 
+// #define USE_LEGACY_STR_DICT
+
 extern bool g_enable_stringdict_parallel;
 
 namespace legacy {
@@ -39,7 +41,11 @@ namespace fast {
 class StringDictionary;
 }
 
+#ifdef USE_LEGACY_STR_DICT
+using StringDictionary = legacy::StringDictionary;
+#else
 using StringDictionary = fast::StringDictionary;
+#endif
 
 using StringLookupCallback = std::function<bool(std::string_view, int32_t string_id)>;
 
@@ -320,16 +326,19 @@ class StringDictionary {
   // maybe this doesn't need to be separate
   struct StringDictStorage {
     std::vector<int32_t> hash_to_id_map;
+    std::vector<uint32_t> string_hashes;  // TODO: let's remove the pair, keep it simple
     std::vector<std::string> strings;
 
     StringDictStorage(const size_t initial_size)
         : hash_to_id_map(initial_size, INVALID_STR_ID) {
       strings.reserve(initial_size);
+      string_hashes.reserve(initial_size);
     }
 
     template <class String>
-    void addStringToMaps(const size_t bucket, const String& str) {
+    void addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
       strings.push_back(std::string(str));
+      string_hashes.push_back(hash);
       CHECK_LT(bucket, hash_to_id_map.size());
       hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
     }
