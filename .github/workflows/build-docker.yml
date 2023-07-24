@@ -7,7 +7,7 @@ on:
         default: None
       name:
         type: string
-        default: cpu
+        default: None
       options:
         type: string
         default: -DENABLE_CUDA=off
@@ -24,10 +24,25 @@ jobs:
           sudo rm -rf /usr/local/lib/android/sdk /opt/hostedtoolcache /usr/share/swift /opt/az
           sudo apt-get purge -y gcc llvm-12 llvm-13 llvm-14
 
+      - name: Choose Dockerfiles
+        if: inputs.name == 'clang-cpu'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.clang >>$GITHUB_ENV
+     
+      - name: Choose Dockerfiles
+        if: inputs.name == 'cuda'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.cuda >>$GITHUB_ENV
+      
+      - name: Choose Dockerfiles
+        if: inputs.name == 'l0'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.l0 >>$GITHUB_ENV
+
       - name: Set env context
         run: |
           echo RUN_STAMP=docker-${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
-          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
+          cat docker/Dockerfile ${{ env.Additional_Dockerfile }} >Dockerfile
 
       - name: Set up Docker Buildx
         id: buildx

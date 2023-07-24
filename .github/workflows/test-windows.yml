@@ -4,7 +4,7 @@ on:
     inputs:
       name:
         type: string
-        default: cpu
+        default: 'gcc-cpu'
       cache-suffix:
         type: string
         required: true

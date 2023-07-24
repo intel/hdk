@@ -7,7 +7,7 @@ on:
         default: None
       name:
         type: string
-        default: cpu
+        default: None
       build-name:
         type: string
         default: build
@@ -19,7 +19,7 @@ on:
         default: docker
 
 jobs:
-  build:
+  test:
     name: Test (Linux - Docker - ${{ inputs.name }})
     runs-on: [self-hosted, linux, "${{ inputs.runner }}"]
     steps:
@@ -37,10 +37,25 @@ jobs:
         with:
           name: ${{ env.RUN_STAMP }}-${{ inputs.build-name }}
 
+      - name: Choose Dockerfiles
+        if: inputs.name == 'clang-cpu'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.clang >>$GITHUB_ENV
+     
+      - name: Choose Dockerfiles
+        if: inputs.name == 'cuda'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.cuda >>$GITHUB_ENV
+      
+      - name: Choose Dockerfiles
+        if: inputs.name == 'l0'
+        run: |
+          echo Additional_Dockerfile=docker/Dockerfile.l0 >>$GITHUB_ENV
+
       - name: Unpack build files, create Dockerfile
         run: |
           tar -zxf build.tgz
-          cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
+          cat docker/Dockerfile ${{ env.Additional_Dockerfile }} >Dockerfile
 
       - name: Start the container
         if: inputs.name != 'l0'
@@ -65,7 +80,7 @@ jobs:
           docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
 
       - name: Sanity test
-        if: inputs.name == 'cuda'
+        if: inputs.name == 'cuda'|| inputs.name == 'clang-cpu'
         run: |
           docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l
           docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/test.sh

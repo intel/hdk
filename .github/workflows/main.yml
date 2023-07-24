@@ -16,36 +16,17 @@ jobs:
   build:
     name: Build
     uses: ./.github/workflows/build.yml
-
-  build-cuda:
-    name: Build
-    uses: ./.github/workflows/build.yml
     with:
-      name: cuda
-      cuda_compiler_version: 12-0
-      options: -DENABLE_CUDA=on
+      name: 'gcc-cpu'
 
-  build-clang:
-    name: Build Clang
-    uses: ./.github/workflows/build.yml
+  test:
+    name: Gtests (Sanity)
+    needs: build
+    uses: ./.github/workflows/test.yml
     with:
-      name: clang
-      options: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-
-  build-l0:
-    name: Build
-    uses: ./.github/workflows/build.yml
-    with:
-      name: l0
-      options: -DENABLE_L0=on
-
-  build-both-l0-cuda:
-    name: Build
-    uses: ./.github/workflows/build.yml
-    with:
-      name: 'all-gpus'
-      cuda_compiler_version: 12-0
-      options: -DENABLE_L0=on -DENABLE_CUDA=on
+      name: 'gcc-cpu'
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: sanity
 
   style:
     name: Style-check
@@ -55,32 +36,6 @@ jobs:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: style
 
-  sanity:
-    name: Sanity test (Gtests)
-    needs: build
-    uses: ./.github/workflows/test.yml
-    with:
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: sanity
-
-  sanity-cpu:
-    name: CPU-only Sanity tests (Gtests)
-    needs: build-l0
-    uses: ./.github/workflows/test.yml
-    with:
-      name: l0
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: sanity_cpu
-      
-  sanity-clang:
-    name: Sanity test (Gtests, Clang)
-    needs: build-clang
-    uses: ./.github/workflows/test.yml
-    with:
-      name: clang
-      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
-      test: sanity
-
   asan:
     name: Asan test (Gtests)
     needs: build
@@ -89,13 +44,69 @@ jobs:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: asan
 
-#  test-asan-docker:
-#    needs: [build-asan, asan]
-#    uses: ./.github/workflows/test-docker.yml
-#    with:
-#      build-name: asan
-#      reset-cache: ${{ !!inputs.reset-cache }}
+  build-clang:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      name: 'clang-cpu'
+      options: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
+  test-clang:
+    name: Gtests (Sanity)
+    needs: build-clang
+    uses: ./.github/workflows/test.yml
+    with:
+      name: 'clang-cpu'
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: sanity
+
+  build-cuda:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      name: cuda
+      cuda_compiler_version: 12-0
+      options: -DENABLE_CUDA=on
+
+  build-l0:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      name: l0
+      options: -DENABLE_L0=on
+
+  test-l0:
+    name: CPU-only Gtests (Sanity)
+    needs: build-l0
+    uses: ./.github/workflows/test.yml
+    with:
+      name: l0
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: sanity_cpu
+
+  build-both-l0-cuda:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      name: 'all-gpus'
+      cuda_compiler_version: 12-0
+      options: -DENABLE_L0=on -DENABLE_CUDA=on
+
+  build-clang-docker:
+    name: Build
+    uses: ./.github/workflows/build-docker.yml
+    with:
+      name: 'clang-cpu'
+      options: -DENABLE_PYTHON=off -DENABLE_CUDA=on -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
+  test-clang-docker:
+    name: Gtests (Sanity)
+    needs: build-clang-docker
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      name: 'clang-cpu'
+      # input for a push event is an empty string, convert it to boolean
+      reset-cache: ${{ !!inputs.reset-cache }}
 
   build-cuda-docker:
     name: Build
@@ -104,28 +115,12 @@ jobs:
       name: cuda
       options: -DENABLE_PYTHON=off -DENABLE_CUDA=on
 
-  build-clang-docker:
-    name: Build Clang
-    uses: ./.github/workflows/build-docker.yml
-    with:
-      name: clang
-      options: -DENABLE_PYTHON=off -DENABLE_CUDA=on -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-
   test-cuda-docker:
-    name: Sanity test (Gtests)
+    name: Gtests (Sanity)
     needs: build-cuda-docker
     uses: ./.github/workflows/test-docker.yml
     with:
       name: cuda
-      # input for a push event is an empty string, convert it to boolean
-      reset-cache: ${{ !!inputs.reset-cache }}
-
-  test-clang-docker:
-    name: Sanity test (Gtests)
-    needs: build-cuda-docker
-    uses: ./.github/workflows/test-docker.yml
-    with:
-      name: clang
       # input for a push event is an empty string, convert it to boolean
       reset-cache: ${{ !!inputs.reset-cache }}
 
@@ -137,7 +132,7 @@ jobs:
       options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
 
   test-l0-docker:
-    name: Sanity test (Gtests) 
+    name: Gtests (Sanity) 
     needs: build-l0-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -145,19 +140,19 @@ jobs:
       reset-cache: ${{ !!inputs.reset-cache }}
       runner: intel-ai.hdk.l0
 
-  windows-build:
+  build-windows:
     name: Build
     uses: ./.github/workflows/build-windows.yml
     with:
-      name: cpu
+      name: 'gcc-cpu'
       options: -DCMAKE_BUILD_TYPE=Release -DENABLE_FOLLY=off -G "Visual Studio 17 2022"
 
-  windows-sanity:
-    name: Sanity test (Gtests)
-    needs: windows-build
+  test-windows:
+    name: Gtests (Sanity)
+    needs: build-windows
     uses: ./.github/workflows/test-windows.yml
     with:
-      cache-suffix: ${{ needs.windows-build.outputs.cache-suffix }}
+      cache-suffix: ${{ needs.build-windows.outputs.cache-suffix }}
       test: sanity
 
   modin:
@@ -168,3 +163,9 @@ jobs:
     name: PyHDK (Pytest)
     uses: ./.github/workflows/pytest.yml
 
+#  test-asan-docker:
+#    needs: [build-asan, asan]
+#    uses: ./.github/workflows/test-docker.yml
+#    with:
+#      build-name: asan
+#      reset-cache: ${{ !!inputs.reset-cache }}
