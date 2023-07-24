@@ -7,7 +7,7 @@ on:
         default: None
       name:
         type: string
-        default: cpu
+        default: None
       options:
         type: string
         default: -DENABLE_CUDA=off

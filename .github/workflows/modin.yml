@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test (Linux - Conda - cpu)
+    name: Build and Test (Linux - Conda - gcc-cpu)
     runs-on: ubuntu-latest
 
     env:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Set env context
         run: |
-          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'cpu' }} >>$GITHUB_ENV
+          echo RUN_STAMP=${{ runner.os }}-${{ (env.cuda_compiler_version != 'None') && format('cuda{0}', env.cuda_compiler_version) || 'gcc-cpu' }} >>$GITHUB_ENV
           echo CONDA_ENV_PATH=$CONDA/envs/${{ env.CONDA_ENV }} >>$GITHUB_ENV
 
       - name: Update Conda

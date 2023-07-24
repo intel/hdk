@@ -4,7 +4,7 @@ on:
     inputs:
       name:
         type: string
-        default: cpu
+        default: 'gcc-cpu'
       cache-suffix:
         type: string
         required: true
@@ -73,7 +73,7 @@ jobs:
 
       - name: Run sanity tests
         if: inputs.test == 'sanity_cpu'
-        # skip large buffer tests due to limited memory on ghrunnners instances
+        # Runs in cpu-only mode
         run: |
           conda run --no-capture-output -n omnisci-dev bash omniscidb/scripts/conda/test.sh -s -c
 
