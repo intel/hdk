@@ -4,10 +4,8 @@ on:
     inputs:
       name:
         type: string
-        default: cpu
       options:
         type: string
-        default:
       cuda_compiler_version:
         type: string
 
@@ -81,7 +79,7 @@ jobs:
           conda install -n omnisci-dev -c conda-forge level-zero-devel pkg-config
 
       - name: Install clang
-        if: inputs.name == 'clang'
+        if: inputs.name == 'clang-cpu'
         run: |
           conda install -n omnisci-dev -c conda-forge compiler-rt
 
@@ -93,11 +91,14 @@ jobs:
           key: maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: maven-
 
-      - name: Configure and build
+      - name: Debug conda list
         run: |
-          set -vx
           conda info
           conda list -n omnisci-dev
+
+      - name: Configure and build
+        run: |
+          conda info --env
           conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           tar -zcf /tmp/build.tgz .
 

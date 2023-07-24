@@ -7,7 +7,7 @@ on:
         default: None
       name:
         type: string
-        default: cpu
+        default: None
       build-name:
         type: string
         default: build
@@ -19,7 +19,7 @@ on:
         default: docker
 
 jobs:
-  build:
+  test:
     name: Test (Linux - Docker - ${{ inputs.name }})
     runs-on: [self-hosted, linux, "${{ inputs.runner }}"]
     steps:
@@ -76,7 +76,7 @@ jobs:
           docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/build.tgz -C /_work/
 
       - name: Sanity test
-        if: inputs.name == 'cuda'
+        if: inputs.name == 'cuda'|| inputs.name == 'clang-cpu'
         run: |
           docker exec -u ghrunner hdk-build.${{ inputs.name }} dpkg -l
           docker exec -u ghrunner hdk-build.${{ inputs.name }} bash /_work/omniscidb/scripts/conda/test.sh
