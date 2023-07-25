@@ -394,6 +394,11 @@ if(ENABLE_STANDALONE_CALCITE)
   add_definitions("-DSTANDALONE_CALCITE")
 endif()
 
+option(WERROR "Add Werror flag" OFF)
+if(WERROR)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+endif()
+
 # OmniSciDB submodule
 include_directories(${CMAKE_SOURCE_DIR}/omniscidb)
 

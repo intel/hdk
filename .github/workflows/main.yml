@@ -168,3 +168,17 @@ jobs:
     name: PyHDK (Pytest)
     uses: ./.github/workflows/pytest.yml
 
+  build-clang-werror:
+    name: Werror
+    uses: ./.github/workflows/build.yml
+    with:
+      name: clang
+      options: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DWERROR=on
+
+  build-werror:
+    name: Werror
+    uses: ./.github/workflows/build.yml
+    with:
+      name: cpu
+      options: -DWERROR=on
+
