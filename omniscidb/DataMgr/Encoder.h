@@ -60,28 +60,24 @@ class DecimalOverflowValidator {
   }
 
   template <typename T>
-  void validate(T value) const {
+  bool validate(T value) const {
     if (std::is_integral<T>::value) {
-      do_validate(static_cast<int64_t>(value));
+      return do_validate(static_cast<int64_t>(value));
     }
+    // return true if data is not supported by this validator
+    return true;
   }
 
-  void do_validate(int64_t value) const {
+  // returns is valid
+  bool do_validate(int64_t value) const {
     if (!do_check_) {
-      return;
+      return true;
     }
 
-    if (value >= max_) {
-      throw std::runtime_error("Decimal overflow: value is greater than 10^" +
-                               std::to_string(pow10_) + " max " + std::to_string(max_) +
-                               " value " + std::to_string(value));
+    if (value >= max_ || value <= min_) {
+      return false;
     }
-
-    if (value <= min_) {
-      throw std::runtime_error("Decimal overflow: value is less than -10^" +
-                               std::to_string(pow10_) + " min " + std::to_string(min_) +
-                               " value " + std::to_string(value));
-    }
+    return true;
   }
 
  private:

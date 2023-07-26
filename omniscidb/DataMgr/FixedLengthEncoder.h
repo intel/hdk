@@ -91,9 +91,10 @@ class FixedLengthEncoder : public Encoder {
           for (size_t i = range.begin(); i < range.end(); i++) {
             if (data[i] != inline_null_value<V>()) {
               if (!fixlen_array || data[i] != inline_null_array_value<V>()) {
-                decimal_overflow_validator_.validate(data[i]);
-                min = std::min(min, data[i]);
-                max = std::max(max, data[i]);
+                if (decimal_overflow_validator_.validate(data[i])) {
+                  min = std::min(min, data[i]);
+                  max = std::max(max, data[i]);
+                }
               }
             } else {
               nulls = true;
@@ -189,7 +190,10 @@ class FixedLengthEncoder : public Encoder {
   V encodeDataAndUpdateStats(const T& unencoded_data) {
     V encoded_data = static_cast<V>(unencoded_data);
     if (unencoded_data != encoded_data) {
-      decimal_overflow_validator_.validate(unencoded_data);
+      if (!decimal_overflow_validator_.validate(unencoded_data)) {
+        throw std::runtime_error("Decimal validation failed, cannot convert " +
+                                 std::to_string(unencoded_data) + " to decimal.");
+      }
       LOG(ERROR) << "Fixed encoding failed, Unencoded: " +
                         std::to_string(unencoded_data) +
                         " encoded: " + std::to_string(encoded_data);
@@ -198,9 +202,10 @@ class FixedLengthEncoder : public Encoder {
       if (data == std::numeric_limits<V>::min()) {
         has_nulls = true;
       } else {
-        decimal_overflow_validator_.validate(data);
-        dataMin = std::min(dataMin, data);
-        dataMax = std::max(dataMax, data);
+        if (decimal_overflow_validator_.validate(data)) {
+          dataMin = std::min(dataMin, data);
+          dataMax = std::max(dataMax, data);
+        }
       }
     }
     return encoded_data;
