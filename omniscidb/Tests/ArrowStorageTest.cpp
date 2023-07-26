@@ -1734,6 +1734,16 @@ TEST_F(ArrowStorageTest, AppendCsvData_Decimals) {
             std::vector<int64_t>({22200, 22222, 20000, inline_null_value<int64_t>()}));
 }
 
+TEST_F(ArrowStorageTest, AppendCsvData_Decimals_OutOfRange) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.header = false;
+  TableInfoPtr tinfo = storage.createTable(
+      "table1", {{"d1", ctx.decimal64(10, 4)}, {"d2", ctx.decimal64(10, 6)}});
+  EXPECT_ANY_THROW(storage.appendCsvData(
+      "12345678910.12345,12345678910.1234567", tinfo->table_id, parse_options));
+}
+
 TEST_F(ArrowStorageTest, AppendJsonData_DecimalArrays) {
   ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
   auto decimal_3 = ctx.arrayFixed(3, ctx.decimal64(10, 2));

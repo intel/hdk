@@ -325,11 +325,9 @@ class FixedLengthArrayNoneEncoder : public Encoder {
               if (bigint_array[i] == NULL_BIGINT) {
                 has_nulls = true;
               } else if (initialized) {
-                decimal_overflow_validator_.validate(bigint_array[i]);
                 elem_min.bigintval = std::min(elem_min.bigintval, bigint_array[i]);
                 elem_max.bigintval = std::max(elem_max.bigintval, bigint_array[i]);
               } else {
-                decimal_overflow_validator_.validate(bigint_array[i]);
                 elem_min.bigintval = bigint_array[i];
                 elem_max.bigintval = bigint_array[i];
                 initialized = true;

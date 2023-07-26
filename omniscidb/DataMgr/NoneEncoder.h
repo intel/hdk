@@ -94,7 +94,6 @@ class NoneEncoder : public Encoder {
           for (size_t i = range.begin(); i < range.end(); i++) {
             if (data[i] != inline_null_value<T>()) {
               if (!fixlen_array || data[i] != inline_null_array_value<T>()) {
-                decimal_overflow_validator_.validate(data[i]);
                 min = std::min(min, data[i]);
                 max = std::max(max, data[i]);
               }
@@ -192,7 +191,6 @@ class NoneEncoder : public Encoder {
     if (unencoded_data == none_encoded_null_value<T>()) {
       has_nulls = true;
     } else {
-      decimal_overflow_validator_.validate(unencoded_data);
       dataMin = std::min(dataMin, unencoded_data);
       dataMax = std::max(dataMax, unencoded_data);
     }
