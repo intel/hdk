@@ -36,61 +36,6 @@ class AbstractBuffer;
 // default max input buffer size to 1MB
 #define MAX_INPUT_BUF_SIZE 1048576
 
-class DecimalOverflowValidator {
- public:
-  DecimalOverflowValidator(const hdk::ir::Type* type) {
-    if (type && type->isArray()) {
-      type = type->as<hdk::ir::ArrayBaseType>()->elemType();
-    }
-
-    if (type && type->isDecimal()) {
-      do_check_ = true;
-      int precision = type->as<hdk::ir::DecimalType>()->precision();
-      int scale = type->as<hdk::ir::DecimalType>()->scale();
-      max_ = (int64_t)std::pow((double)10.0, precision);
-      min_ = -max_;
-      pow10_ = precision - scale;
-
-    } else {
-      do_check_ = false;
-      max_ = 1;
-      min_ = -1;
-      pow10_ = 0;
-    }
-  }
-
-  template <typename T>
-  void validate(T value) const {
-    if (std::is_integral<T>::value) {
-      do_validate(static_cast<int64_t>(value));
-    }
-  }
-
-  void do_validate(int64_t value) const {
-    if (!do_check_) {
-      return;
-    }
-
-    if (value >= max_) {
-      throw std::runtime_error("Decimal overflow: value is greater than 10^" +
-                               std::to_string(pow10_) + " max " + std::to_string(max_) +
-                               " value " + std::to_string(value));
-    }
-
-    if (value <= min_) {
-      throw std::runtime_error("Decimal overflow: value is less than -10^" +
-                               std::to_string(pow10_) + " min " + std::to_string(min_) +
-                               " value " + std::to_string(value));
-    }
-  }
-
- private:
-  bool do_check_;
-  int64_t max_;
-  int64_t min_;
-  int pow10_;
-};
-
 template <typename INNER_VALIDATOR>
 class NullAwareValidator {
  public:
@@ -253,7 +198,6 @@ class Encoder {
 
   Data_Namespace::AbstractBuffer* buffer_;
 
-  DecimalOverflowValidator decimal_overflow_validator_;
   DateDaysOverflowValidator date_days_overflow_validator_;
 };
 
