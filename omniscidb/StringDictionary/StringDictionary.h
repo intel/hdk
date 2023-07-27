@@ -313,7 +313,7 @@ class StringDictionary {
 
   // why noexcept?
   template <class String>
-  int32_t addString(const uint32_t hash, const String& input_string) noexcept;
+  int32_t addString(const uint32_t hash, const String& input_string);
 
   void resize(const size_t new_size);
 

@@ -1522,16 +1522,10 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
     const auto& input_string = string_vec[i];
     if (input_string.empty()) {
       output_string_ids[i] = inline_int_null_value<T>();
-      continue;
-    }
-
-    // add string to storage and store id
-    const auto& hash = hashes[i];
-    const auto string_id = addString(hash, input_string);
-    if (string_id != INVALID_STR_ID) {
-      output_string_ids[i] = string_id;
     } else {
-      CHECK(false);  // why would we ever get here?
+      // add string to storage and store id
+      const auto& hash = hashes[i];
+      output_string_ids[i] = addString(hash, input_string);
     }
   }
 }
@@ -1627,8 +1621,7 @@ std::string_view StringDictionary::getStringFromStorageFast(
 }
 
 template <class String>
-int32_t StringDictionary::addString(const uint32_t hash,
-                                    const String& input_string) noexcept {
+int32_t StringDictionary::addString(const uint32_t hash, const String& input_string) {
   CHECK(storage_);
 
   const auto bucket = storage_->computeBucket(hash, input_string);
@@ -1697,7 +1690,7 @@ size_t StringDictionary::StringDictStorage::computeBucket(
     // slot is full, check for a collision
     if (materialize_hashes) {
       CHECK_LT(candidate_string_id, string_hashes.size());
-      const auto existing_hash = string_hashes[candidate_string_id];
+      const auto& existing_hash = string_hashes[candidate_string_id];
       if (existing_hash == hash) {
         const auto& existing_string = strings[candidate_string_id];
         if (existing_string == input_string) {
