@@ -49,6 +49,10 @@ class ArrowSQLRunnerImpl {
 
   bool gpusPresent() { return data_mgr_->gpusPresent(); }
 
+  bool isGPUPlatformL0() {
+    return gpusPresent() && data_mgr_->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0;
+  }
+
   void printStats() {
     std::cout << "Total Calcite parsing time: " << (calcite_time_ / 1000) << "ms."
               << std::endl;
@@ -141,7 +145,7 @@ class ArrowSQLRunnerImpl {
   }
 
   CompilationOptions getCompilationOptions(ExecutorDeviceType device_type) {
-    auto co = CompilationOptions::defaults(device_type);
+    auto co = CompilationOptions::defaults(device_type, isGPUPlatformL0());
     co.hoist_literals = config_->exec.codegen.hoist_literals;
     return co;
   }
