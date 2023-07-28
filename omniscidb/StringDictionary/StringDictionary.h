@@ -267,15 +267,18 @@ class StringDictionary {
   void eachStringSerially(int64_t const generation, StringCallback&) const;
   friend class ::StringLocalCallback;
 
-  int32_t getOrAdd(const std::string_view& str) noexcept;
+  int32_t getOrAdd(const std::string& str) noexcept;
   template <class T, class String>
   size_t getBulk(const std::vector<String>& string_vec, T* encoded_vec) const;
   template <class T, class String>
   size_t getBulk(const std::vector<String>& string_vec,
                  T* encoded_vec,
                  const int64_t generation) const;
-  template <class T, class String>
-  void getOrAddBulk(const std::vector<String>& string_vec, T* encoded_vec);
+  template <class T>
+  void getOrAddBulk(const std::vector<std::string>& string_vec, T* encoded_vec);
+  template <class T>
+  void getOrAddBulk(const std::vector<std::string_view> string_vec, T* encoded_vec);
+
   template <class String>
   int32_t getIdOfString(const String&) const;
   std::string getString(int32_t string_id) const;
@@ -310,10 +313,11 @@ class StringDictionary {
       const uint32_t hash,
       const String& input_string,
       const std::vector<int32_t>& string_id_uint32_table) const noexcept;
+  template <class T>
+  void getOrAddBulkUnlocked(const std::vector<std::string_view> string_vec,
+                            T* encoded_vec);
 
-  // why noexcept?
-  template <class String>
-  int32_t addString(const uint32_t hash, const String& input_string);
+  int32_t addString(const uint32_t hash, const std::string_view input_string);
 
   void resize(const size_t new_size);
 
@@ -325,7 +329,10 @@ class StringDictionary {
   struct StringDictStorage {
     std::vector<int32_t> hash_to_id_map;
     std::vector<uint32_t> string_hashes;
-    std::vector<std::string> strings;
+    // TODO: what if we made this a container of string views, and kept the original arrow
+    // string data?
+    std::vector<std::string_view> strings;
+    std::vector<std::unique_ptr<std::string>> strings_owned;
     bool materialize_hashes{false};
 
     StringDictStorage(const size_t initial_size)
@@ -335,27 +342,27 @@ class StringDictionary {
     }
 
     // returns added string ID
-    template <class String>
-    int32_t addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
-      strings.emplace_back(str);
+    int32_t addStringToMaps(const size_t bucket,
+                            const uint32_t hash,
+                            const std::string_view str) {
+      strings.push_back(str);
       if (materialize_hashes) {
         string_hashes.push_back(hash);
       }
       CHECK_LT(bucket, hash_to_id_map.size());
       hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
+      // LOG(ERROR) << "Added string " << str << " with id " << hash_to_id_map[bucket];
       return hash_to_id_map[bucket];
     }
 
-    template <class String>
-    size_t computeBucket(const uint32_t hash, const String& str) const noexcept;
+    size_t computeBucket(const uint32_t hash, const std::string_view str) const noexcept;
 
     // returns ID for a given bucket
     int32_t operator[](const size_t bucket) const { return hash_to_id_map[bucket]; }
 
     void resize(const size_t new_size);
 
-    // returns string for a given ID
-    const std::string& str(const size_t id) const { return strings[id]; }
+    const auto str(const size_t id) const { return strings[id]; }
 
     size_t numStrings() const { return strings.size(); }
 

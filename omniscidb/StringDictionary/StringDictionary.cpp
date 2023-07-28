@@ -1431,15 +1431,28 @@ void StringDictionary::eachStringSerially(int64_t const generation,
   }
 }
 
-int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
+int32_t StringDictionary::getOrAdd(const std::string& str) noexcept {
+  mapd_unique_lock<mapd_shared_mutex> rw_lock(rw_mutex_);
+  CHECK(storage_);
+
   if (str.size() == 0) {
     return inline_int_null_value<int32_t>();
   }
   CHECK(str.size() <= MAX_STRLEN);
-  const uint32_t hash = hash_string(str);
 
-  mapd_unique_lock<mapd_shared_mutex> rw_lock(rw_mutex_);
-  const int32_t string_id = addString(hash, str);
+  storage_->strings_owned.emplace_back(std::make_unique<std::string>(str));
+  const auto& str_owned = storage_->strings_owned.back();
+  auto str_view_owned = std::string_view(str_owned->c_str());
+#if 0
+  // LOG(ERROR) << "str: " << str_view_owned;
+  printf("str: %s, sv data: %p sv size: %d str own ptr: %p\n",
+         str_view_owned.data(),
+         str_view_owned.data(),
+         str_view_owned.size(),
+         storage_->strings_owned[storage_->strings_owned.size() - 1]->data());
+#endif
+  const uint32_t hash = hash_string(str_view_owned);
+  const int32_t string_id = addString(hash, str_view_owned);
   return string_id;
 }
 
@@ -1477,7 +1490,7 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                           const auto bucket = storage_->computeBucket(hash, str);
                           const auto string_id = storage_->hash_to_id_map[bucket];
                           if (string_id == StringDictionary::INVALID_STR_ID ||
-                              string_id > storage_->strings.size()) {
+                              size_t(string_id) > storage_->strings.size()) {
                             encoded_vec[i] = StringDictionary::INVALID_STR_ID;
                             num_strings_not_found++;
                           }
@@ -1499,12 +1512,42 @@ template size_t StringDictionary::getBulk(const std::vector<std::string>& string
                                           int32_t* encoded_vec,
                                           const int64_t generation) const;
 
-template <class T, class String>
-void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
+template <class T>
+void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
                                     T* output_string_ids) {
   CHECK(storage_);
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
 
+  const auto str_offset = storage_->strings_owned.size();
+  storage_->strings_owned.reserve(str_offset + string_vec.size());
+  std::transform(
+      string_vec.cbegin(),
+      string_vec.cend(),
+      std::back_inserter(storage_->strings_owned),
+      [](const std::string& str) { return std::make_unique<std::string>(str); });
+
+  std::vector<std::string_view> strings_for_hash;
+  strings_for_hash.reserve(string_vec.size());
+  for (size_t i = str_offset; i < string_vec.size(); ++i) {
+    strings_for_hash.emplace_back(storage_->strings_owned[i]->data());
+  }
+
+  getOrAddBulkUnlocked(strings_for_hash, output_string_ids);
+}
+
+template <class T>
+void StringDictionary::getOrAddBulk(const std::vector<std::string_view> string_vec,
+                                    T* output_string_ids) {
+  CHECK(storage_);
+  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
+
+  getOrAddBulkUnlocked(string_vec, output_string_ids);
+}
+
+template <class T>
+void StringDictionary::getOrAddBulkUnlocked(
+    const std::vector<std::string_view> string_vec,
+    T* output_string_ids) {
   // compute hashes
   auto hashes = std::make_unique<uint32_t[]>(string_vec.size());
   // std::vector<uint32_t> hashes(string_vec.size());
@@ -1538,13 +1581,13 @@ template void StringDictionary::getOrAddBulk(const std::vector<std::string>& str
                                              int32_t* encoded_vec);
 
 template void StringDictionary::getOrAddBulk(
-    const std::vector<std::string_view>& string_vec,
+    const std::vector<std::string_view> string_vec,
     uint8_t* encoded_vec);
 template void StringDictionary::getOrAddBulk(
-    const std::vector<std::string_view>& string_vec,
+    const std::vector<std::string_view> string_vec,
     uint16_t* encoded_vec);
 template void StringDictionary::getOrAddBulk(
-    const std::vector<std::string_view>& string_vec,
+    const std::vector<std::string_view> string_vec,
     int32_t* encoded_vec);
 
 template <class String>
@@ -1568,12 +1611,13 @@ std::string StringDictionary::getString(int32_t string_id) const {
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
   CHECK(storage_);
   CHECK_LT(string_id, static_cast<int32_t>(storage_->numStrings()));
-  return storage_->str(string_id);
+  return std::string(storage_->str(string_id));
 }
 
 std::pair<char*, size_t> StringDictionary::getStringBytes(
     int32_t string_id) const noexcept {
   CHECK(false);
+  return std::make_pair(nullptr, 0);
 }
 
 size_t StringDictionary::storageEntryCount() const {
@@ -1588,22 +1632,26 @@ std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
                                                const char escape,
                                                const size_t generation) const {
   CHECK(false);
+  return {};
 }
 
 std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
                                                   const std::string& comp_operator,
                                                   const size_t generation) {
   CHECK(false);
+  return {};
 }
 
 std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
                                                      const char escape,
                                                      const size_t generation) const {
   CHECK(false);
+  return {};
 }
 
 std::vector<std::string> StringDictionary::copyStrings() const {
   CHECK(false);
+  return {};
 }
 
 int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
@@ -1620,12 +1668,13 @@ std::string_view StringDictionary::getStringFromStorageFast(
   return storage_->str(string_id);
 }
 
-template <class String>
-int32_t StringDictionary::addString(const uint32_t hash, const String& input_string) {
+int32_t StringDictionary::addString(const uint32_t hash,
+                                    const std::string_view input_string) {
   CHECK(storage_);
 
   const auto bucket = storage_->computeBucket(hash, input_string);
   if ((*storage_)[bucket] == INVALID_STR_ID) {
+    // LOG(ERROR) << "Adding string! " << input_string;
     // found an open slot - add the string to the strings payload
     const auto str_id = storage_->addStringToMaps(bucket, hash, input_string);
     if (storage_->fillRateIsHigh()) {
@@ -1643,11 +1692,16 @@ int32_t StringDictionary::addString(const uint32_t hash, const String& input_str
 // size
 // NOTE: in taxi this never gets called b/c the dictionaries are so small
 void StringDictionary::StringDictStorage::resize(const size_t new_size) {
+  // LOG(ERROR) << "resizing";
+  // printf("resizing %d to %d\n", size(), new_size);
   CHECK_GT(new_size, size());
-  // TODO: centralize this magic number
+// TODO: centralize this magic number
+#if 0
   if (!materialize_hashes && (new_size > 1024)) {
+    LOG(ERROR) << "enable materialized hashes";
     materialize_hashes = true;
   }
+#endif
 
   strings.reserve(new_size);
   if (materialize_hashes) {
@@ -1658,7 +1712,9 @@ void StringDictionary::StringDictStorage::resize(const size_t new_size) {
   hash_to_id_map.swap(new_hash_map);
 
   for (size_t i = 0; i < numStrings(); i++) {
-    const auto& crt_str = strings[i];
+    // printf("Resizing %d str %s %p\n", i, strings[i], strings[i].data());
+    // LOG(ERROR) << "Resizing " << i << " str " << strings[i];
+    const auto crt_str = strings[i];  // this is WRONG!
     if (materialize_hashes && string_hashes.size() <= i) {
       string_hashes.push_back(hash_string(crt_str));
     }
@@ -1673,10 +1729,9 @@ void StringDictionary::StringDictStorage::resize(const size_t new_size) {
 }
 
 // TODO: count slot misses
-template <class String>
 size_t StringDictionary::StringDictStorage::computeBucket(
     const uint32_t hash,
-    const String& input_string) const noexcept {
+    const std::string_view input_string) const noexcept {
   const size_t hash_table_size = hash_to_id_map.size();
   uint32_t bucket = hash & (hash_table_size - 1);
   // find an empty slot in the hash map
@@ -1689,8 +1744,8 @@ size_t StringDictionary::StringDictStorage::computeBucket(
 
     // slot is full, check for a collision
     if (materialize_hashes) {
-      CHECK_LT(candidate_string_id, string_hashes.size());
-      const auto& existing_hash = string_hashes[candidate_string_id];
+      CHECK_LT(size_t(candidate_string_id), string_hashes.size());
+      const auto existing_hash = string_hashes[candidate_string_id];
       if (existing_hash == hash) {
         const auto& existing_string = strings[candidate_string_id];
         if (existing_string == input_string) {
@@ -1699,6 +1754,7 @@ size_t StringDictionary::StringDictStorage::computeBucket(
         }
       }
     } else {
+      CHECK_LT(size_t(candidate_string_id), strings.size());
       const auto& existing_string = strings[candidate_string_id];
       if (existing_string == input_string) {
         // found an existing string that matches
