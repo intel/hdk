@@ -1372,7 +1372,7 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
                                  ? results_->entryCount()
                                  : std::min(size_t(top_n_), results_->entryCount());
 
-  CHECK_GT(entry_count, 0);
+  CHECK_GT(entry_count, (size_t)0);
 
   std::vector<ColumnBuilder> builders(col_count);
   for (size_t col_idx = 0; col_idx < col_count; ++col_idx) {
@@ -1455,7 +1455,7 @@ std::shared_ptr<arrow::Table> ArrowResultSetConverter::getArrowTable(
     for (size_t i = 0; i < col_count; i++) {
       row_size_bytes += results_->colType(i)->size();
     }
-    CHECK_GT(row_size_bytes, 0);
+    CHECK_GT(row_size_bytes, (size_t)0);
 
     const size_t stride = std::clamp(entry_count / cpu_threads() / 2,
                                      65536 / row_size_bytes,
@@ -1797,7 +1797,7 @@ void ArrowResultSetConverter::initializeColumnBuilder(
       const auto& unique_strings = unique_ids_and_strings.second;
       ARROW_THROW_NOT_OK(str_array_builder.AppendValues(unique_strings));
       const int32_t num_unique_strings = unique_strings.size();
-      CHECK_EQ(num_unique_strings, unique_ids.size());
+      CHECK_EQ(static_cast<size_t>(num_unique_strings), unique_ids.size());
       // We need to remap ALL string id values given the Arrow dictionary
       // will have "holes", i.e. it is a sparse representation of the underlying
       // StringDictionary
