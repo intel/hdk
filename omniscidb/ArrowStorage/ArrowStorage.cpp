@@ -478,7 +478,7 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
       VLOG(1) << "Materialized string dictionary for column " << col_id << " in table "
               << table_id;
       for (auto& frag : table.fragments) {
-        CHECK_LT(col_id, frag.metadata.size());
+        CHECK_LT(static_cast<size_t>(col_id), frag.metadata.size());
         auto& meta = frag.metadata[col_id];
         // compute chunk stats is multi threaded, so we single thread this
         meta->fillChunkStats(

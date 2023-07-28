@@ -60,45 +60,6 @@ using namespace ArrowTestHelpers;
 //  HELPERS
 namespace {
 
-// Processes command line args
-void parse_cli_args(int argc, char* argv[], ConfigPtr config) {
-  namespace po = boost::program_options;
-
-  po::options_description desc("Options");
-
-  desc.add_options()("help,h", "Print help messages ");
-  desc.add_options()("enable-columnar-output",
-                     po::value<bool>(&config->rs.enable_columnar_output)
-                         ->default_value(config->rs.enable_columnar_output),
-                     "Enable columnar_output");
-  desc.add_options()("cpu-only",
-                     po::value<bool>(&config->exec.cpu_only)
-                         ->default_value(config->exec.cpu_only)
-                         ->implicit_value(true));
-
-  logger::LogOptions log_options(argv[0]);
-  log_options.severity_ = logger::Severity::FATAL;
-  log_options.set_options();  // update default values
-  desc.add(log_options.get_options());
-
-  try {
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-      std::cout << desc;
-      std::exit(EXIT_SUCCESS);
-    }
-
-    logger::init(log_options);
-  } catch (boost::program_options::error& e) {
-    std::cerr << "Usage Error: " << e.what() << std::endl;
-    std::cout << desc;
-    std::exit(EXIT_FAILURE);
-  }
-}
-
 std::string getFilePath(const std::string& file_name) {
   return TEST_SOURCE_PATH + std::string("/EmbeddedDataFiles/") + file_name;
 }

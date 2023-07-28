@@ -188,10 +188,8 @@ DEVICE void SUFFIX(init_hash_join_buff)(int32_t* groups_buffer,
                     [=](const tbb::blocked_range<int64_t>& r) {
                       const auto start_idx = r.begin();
                       const auto end_idx = r.end();
-                      for (auto entry_idx = start_idx; entry_idx != end_idx;
-                           ++entry_idx) {
-                        groups_buffer[entry_idx] = invalid_slot_val;
-                      }
+                      init_hash_join_buff_cpu(
+                          groups_buffer, invalid_slot_val, start_idx, end_idx);
                     });
 #endif
 }

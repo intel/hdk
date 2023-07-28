@@ -993,7 +993,6 @@ bool RowFuncBuilder::codegenShuffle(
                                                      partition_byte_streams,
                                                      LL_INT(target_idx)),
                                 "target_byte_stream_" + std::to_string(target_idx));
-      size_t chosen_bytes = query_mem_desc.getPaddedSlotWidthBytes(target_idx);
 
       target_builder(target_expr, executor_, query_mem_desc, co);
       target_builder.codegenSingleTarget(this,
