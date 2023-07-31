@@ -446,39 +446,6 @@ ExpressionRange getExpressionRange(const hdk::ir::Constant* constant_expr) {
   return ExpressionRange::makeInvalidRange();
 }
 
-#define FIND_STAT_FRAG(stat_name)                                                      \
-  const auto stat_name##_frag_index = std::stat_name##_element(                        \
-      nonempty_fragment_indices.begin(),                                               \
-      nonempty_fragment_indices.end(),                                                 \
-      [&fragments, &has_nulls, col_id, col_type](const size_t lhs_idx,                 \
-                                                 const size_t rhs_idx) {               \
-        const auto& lhs = fragments[lhs_idx];                                          \
-        const auto& rhs = fragments[rhs_idx];                                          \
-        auto lhs_meta_it = lhs.getChunkMetadataMap().find(col_id);                     \
-        if (lhs_meta_it == lhs.getChunkMetadataMap().end()) {                          \
-          return false;                                                                \
-        }                                                                              \
-        auto rhs_meta_it = rhs.getChunkMetadataMap().find(col_id);                     \
-        CHECK(rhs_meta_it != rhs.getChunkMetadataMap().end());                         \
-        if (lhs_meta_it->second->chunkStats().has_nulls ||                             \
-            rhs_meta_it->second->chunkStats().has_nulls) {                             \
-          has_nulls = true;                                                            \
-        }                                                                              \
-        if (col_type->isFloatingPoint()) {                                             \
-          return extract_##stat_name##_stat_fp_type(lhs_meta_it->second->chunkStats(), \
-                                                    col_type) <                        \
-                 extract_##stat_name##_stat_fp_type(rhs_meta_it->second->chunkStats(), \
-                                                    col_type);                         \
-        }                                                                              \
-        return extract_##stat_name##_stat_int_type(lhs_meta_it->second->chunkStats(),  \
-                                                   col_type) <                         \
-               extract_##stat_name##_stat_int_type(rhs_meta_it->second->chunkStats(),  \
-                                                   col_type);                          \
-      });                                                                              \
-  if (stat_name##_frag_index == nonempty_fragment_indices.end()) {                     \
-    return ExpressionRange::makeInvalidRange();                                        \
-  }
-
 namespace {
 
 int64_t get_conservative_datetrunc_bucket(const hdk::ir::DateTruncField datetrunc_field) {
@@ -546,7 +513,6 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       }
       CHECK(ti_idx);
       const auto& query_info = query_infos[*ti_idx].info;
-      const auto& fragments = query_info.fragments;
       if (query_info.getNumTuples() == 0) {
         // The column doesn't contain any values, synthesize an empty range.
         if (col_type->isFloatingPoint()) {
@@ -561,67 +527,25 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
         return ExpressionRange::makeIntRange(
             0, std::max(num_tuples - 1, int64_t(0)), 0, has_nulls);
       }
-      std::vector<size_t> nonempty_fragment_indices;
-      for (size_t i = 0; i < fragments.size(); ++i) {
-        const auto& fragment = fragments[i];
-        if (!fragment.isEmptyPhysicalFragment()) {
-          nonempty_fragment_indices.push_back(i);
-        }
-      }
-      FIND_STAT_FRAG(min);
-      FIND_STAT_FRAG(max);
-      const auto& min_frag = fragments[*min_frag_index];
-      const auto min_it = min_frag.getChunkMetadataMap().find(col_id);
-      if (min_it == min_frag.getChunkMetadataMap().end()) {
-        return ExpressionRange::makeInvalidRange();
-      }
-      const auto& max_frag = fragments[*max_frag_index];
-      const auto max_it = max_frag.getChunkMetadataMap().find(col_id);
-      CHECK(max_it != max_frag.getChunkMetadataMap().end());
-      for (const auto& fragment : fragments) {
-        const auto it = fragment.getChunkMetadataMap().find(col_id);
-        if (it != fragment.getChunkMetadataMap().end()) {
-          if (it->second->chunkStats().has_nulls) {
-            has_nulls = true;
-            break;
-          }
-        }
-      }
 
       auto& table_stats = query_info.getTableStats();
       auto col_stats_it = table_stats.find(col_id);
       CHECK(col_stats_it != table_stats.end())
           << query_infos[*ti_idx].db_id << ":" << query_infos[*ti_idx].table_id << ":"
           << col_id << " " << table_stats.size();
-      if (col_stats_it == table_stats.end()) {
-        return ExpressionRange::makeInvalidRange();
-      }
 
       auto& col_stats = col_stats_it->second;
-      CHECK_EQ(col_stats.has_nulls || is_outer_join_proj, has_nulls);
       has_nulls = has_nulls || col_stats.has_nulls;
 
       if (col_type->isFloatingPoint()) {
-        const auto min_val =
-            extract_min_stat_fp_type(min_it->second->chunkStats(), col_type);
-        const auto max_val =
-            extract_max_stat_fp_type(max_it->second->chunkStats(), col_type);
-        const auto new_min_val = extract_min_stat_fp_type(col_stats, col_type);
-        const auto new_max_val = extract_max_stat_fp_type(col_stats, col_type);
-        CHECK_EQ(new_min_val, min_val);
-        CHECK_EQ(new_max_val, max_val);
+        const auto min_val = extract_min_stat_fp_type(col_stats, col_type);
+        const auto max_val = extract_max_stat_fp_type(col_stats, col_type);
         return col_type->size() == 4
                    ? ExpressionRange::makeFloatRange(min_val, max_val, has_nulls)
                    : ExpressionRange::makeDoubleRange(min_val, max_val, has_nulls);
       }
-      const auto min_val =
-          extract_min_stat_int_type(min_it->second->chunkStats(), col_type);
-      const auto max_val =
-          extract_max_stat_int_type(max_it->second->chunkStats(), col_type);
-      const auto new_min_val = extract_min_stat_int_type(col_stats, col_type);
-      const auto new_max_val = extract_max_stat_int_type(col_stats, col_type);
-      CHECK_EQ(new_min_val, min_val);
-      CHECK_EQ(new_max_val, max_val);
+      const auto min_val = extract_min_stat_int_type(col_stats, col_type);
+      const auto max_val = extract_max_stat_int_type(col_stats, col_type);
       if (max_val < min_val) {
         // The column doesn't contain any non-null values, synthesize an empty range.
         CHECK_GT(min_val, 0);
@@ -638,8 +562,6 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
   }
   return ExpressionRange::makeInvalidRange();
 }
-
-#undef FIND_STAT_FRAG
 
 ExpressionRange getExpressionRange(
     const hdk::ir::ColumnVar* col_expr,
