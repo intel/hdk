@@ -8210,7 +8210,6 @@ TEST_F(Select, UnsupportedMultipleArgAggregate) {
 TEST_F(Select, ArrayUnnest) {
   for (auto dt : testedDevices()) {
     unsigned power10 = 1;
-    /*
     for (const unsigned int_width : {16, 32, 64}) {
       auto result_rows =
           run_multiple_agg("SELECT COUNT(*), UNNEST(arr_i" + std::to_string(int_width) +
@@ -8301,7 +8300,7 @@ TEST_F(Select, ArrayUnnest) {
       ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 1, true, true)));
       ASSERT_EQ(0, v<int64_t>(fixed_result_rows->getRowAt(1, 1, true, true)));
     }
-*/
+
     // unnest groupby, force estimator run
     const auto big_group_threshold = config().exec.group_by.big_group_threshold;
     ScopeGuard reset_big_group_threshold = [&big_group_threshold] {
