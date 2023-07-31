@@ -184,11 +184,7 @@ cdef class TypeInfo:
   def __repr__(self):
     return self.c_type_info.toString()
 
-def buildConfig(*, enable_debug_timer=None, enable_union=False, log_dir="hdk_log", **kwargs):
-  global g_enable_debug_timer
-  if enable_debug_timer is not None:
-    g_enable_debug_timer = enable_debug_timer
-
+def buildConfig(*, log_dir="hdk_log", **kwargs):
   # Remove legacy params to provide better compatibility with PyOmniSciDbe
   kwargs.pop("enable_union", None)
   kwargs.pop("enable_thrift_logs", None)
