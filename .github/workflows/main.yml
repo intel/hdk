@@ -37,7 +37,6 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       name: asan
-      cuda_compiler_version: 12-0
       options: -DENABLE_ASAN=on
 
   build-l0:
