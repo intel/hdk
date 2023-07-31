@@ -176,6 +176,17 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
   SimpleSchemaProvider::dropTable(token.dbId(), token.tableId());
 }
 
+void ResultSetRegistry::setTableStats(const ResultSetTableToken& token,
+                                      TableStats stats) {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK(tables_.count(token.tableId()));
+  auto* table = tables_.at(token.tableId()).get();
+  data_lock.unlock();
+
+  mapd_unique_lock<mapd_shared_mutex> table_lock(table->mutex);
+  table->table_stats = std::move(stats);
+}
+
 ResultSetTableTokenPtr ResultSetRegistry::head(const ResultSetTableToken& token,
                                                size_t n) {
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);

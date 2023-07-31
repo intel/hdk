@@ -38,6 +38,10 @@ void ResultSetTableToken::reset() {
   }
 }
 
+void ResultSetTableToken::setTableStats(TableStats stats) const {
+  registry_->setTableStats(*this, std::move(stats));
+}
+
 ResultSetTableTokenPtr ResultSetTableToken::head(size_t n) const {
   return registry_->head(*this, n);
 }
