@@ -637,6 +637,13 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
       "time. This option can be used to split data import and execution for performance "
       "measurements.");
 
+  // external
+  opt_desc.add_options()("enable-debug-timer",
+                         po::value<bool>(&g_enable_debug_timer)
+                             ->default_value(g_enable_debug_timer)
+                             ->implicit_value(true),
+                         "Enable debug timers in logger.");
+
   if (allow_gtest_flags) {
     opt_desc.add_options()("gtest_list_tests", "list all test");
     opt_desc.add_options()("gtest_filter", "filters tests, use --help for details");
