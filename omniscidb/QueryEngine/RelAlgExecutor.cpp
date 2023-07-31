@@ -804,6 +804,10 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
     proj.reset();
   }
 
+  // Currently, we merge shuffle node with simple projections only. Therefore, we can
+  // assign original table stats to shuffling results to avoid metadata computation.
+  maybeCopyTableStatsFromInput(shuffle_node.get());
+
   // Create new aggregation node and execute it.
   auto part_agg = std::make_shared<hdk::ir::Aggregate>(
       agg->getGroupByCount(), agg->getAggs(), agg->getFields(), agg_input_shared);
@@ -838,6 +842,74 @@ void RelAlgExecutor::executeStepWithPartitionedAggregation(const hdk::ir::Node* 
   temporary_tables_.erase(-shuffle_node->getId());
   temporary_tables_.erase(-part_agg->getId());
   temporary_tables_.erase(-new_root->getId());
+}
+
+void RelAlgExecutor::maybeCopyTableStatsFromInput(const hdk::ir::Node* node) {
+  std::vector<int> col_mapping;
+  col_mapping.reserve(node->size());
+  // Stats copy is supported for shuffle and simple projections only.
+  if (node->is<hdk::ir::Project>()) {
+    auto proj = node->as<hdk::ir::Project>();
+    if (!proj->isSimple()) {
+      VLOG(1) << "Cannot copy table stats for non-simple projection.";
+      return;
+    }
+    for (auto& expr : proj->getExprs()) {
+      col_mapping.push_back(expr->as<hdk::ir::ColumnRef>()->index());
+    }
+  } else if (node->is<hdk::ir::Shuffle>()) {
+    for (auto& expr : node->as<hdk::ir::Shuffle>()->exprs()) {
+      CHECK(expr->is<hdk::ir::ColumnRef>());
+      col_mapping.push_back(expr->as<hdk::ir::ColumnRef>()->index());
+    }
+  } else {
+    VLOG(1) << "Cannot copy table stats for node " << node->toString();
+    return;
+  }
+
+  // We can traverse through a chain of simple projections to the original data source.
+  auto data_source = node->getInput(0);
+  while (!data_source->getResult() && !data_source->is<hdk::ir::Scan>()) {
+    auto proj = data_source->as<hdk::ir::Project>();
+    if (!proj || !proj->isSimple()) {
+      VLOG(1) << "Cannot copy table stats due to non-simple projection. "
+              << node->toString();
+      return;
+    }
+    for (size_t i = 0; i < col_mapping.size(); ++i) {
+      auto idx = static_cast<size_t>(col_mapping[i]);
+      CHECK_LT(idx, proj->size());
+      col_mapping[i] = proj->getExpr(idx)->as<hdk::ir::ColumnRef>()->index();
+    }
+    data_source = data_source->getInput(0);
+  }
+
+  auto input_token =
+      data_source->getResult() ? data_source->getResult()->getToken().get() : nullptr;
+  auto input_scan = data_source->getResult() ? nullptr : data_source->as<hdk::ir::Scan>();
+  int input_db_id = input_token ? input_token->dbId() : input_scan->getDatabaseId();
+  int input_table_id = input_token ? input_token->tableId() : input_scan->getTableId();
+  auto input_meta = data_provider_->getTableMetadata(input_db_id, input_table_id);
+  if (input_meta.hasComputedTableStats()) {
+    auto& orig_stats = input_meta.getTableStats();
+    auto target_token = node->getResult()->getToken();
+    TableStats stats;
+    for (size_t i = 0; i < col_mapping.size(); ++i) {
+      auto target_col_id = target_token->columnId(i);
+      auto input_col_id = input_token
+                              ? input_token->columnId(col_mapping[i])
+                              : input_scan->getColumnInfo(col_mapping[i])->column_id;
+      CHECK(orig_stats.count(input_col_id))
+          << "Cannot find stats for column " << input_col_id
+          << ". data_source=" << data_source->toString();
+      stats.emplace(target_col_id, orig_stats.at(input_col_id));
+    }
+    target_token->setTableStats(std::move(stats));
+    VLOG(1) << "Copy table stats from " << input_db_id << ":" << input_table_id << " to "
+            << target_token->dbId() << ":" << target_token->tableId();
+  } else {
+    VLOG(1) << "Cannot copy table stats because original table stats are unavailable.";
+  }
 }
 
 void RelAlgExecutor::executeStep(const hdk::ir::Node* step_root,

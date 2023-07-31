@@ -9,6 +9,7 @@
 #include "ResultSetTable.h"
 
 #include "DataMgr/ChunkMetadata.h"
+#include "DataProvider/TableFragmentsInfo.h"
 #include "SchemaMgr/TableInfo.h"
 
 #include "arrow/api.h"
@@ -53,6 +54,8 @@ class ResultSetTableToken : public std::enable_shared_from_this<ResultSetTableTo
   ResultSetPtr resultSet(size_t idx) const;
 
   const std::string& tableName() const { return tinfo_->name; }
+
+  void setTableStats(TableStats stats) const;
 
   ResultSetTableTokenPtr head(size_t n) const;
   ResultSetTableTokenPtr tail(size_t n) const;

@@ -39,6 +39,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
   ResultSetPtr get(const ResultSetTableToken& token, size_t frag_id) const;
   void drop(const ResultSetTableToken& token);
 
+  void setTableStats(const ResultSetTableToken& token, TableStats stats);
+
   ResultSetTableTokenPtr head(const ResultSetTableToken& token, size_t n);
   ResultSetTableTokenPtr tail(const ResultSetTableToken& token, size_t n);
 

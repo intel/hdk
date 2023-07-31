@@ -131,6 +131,7 @@ class RelAlgExecutor {
                                              const ExecutionOptions& eo,
                                              size_t estimated_buffer_size,
                                              const int64_t queue_time_ms);
+  void maybeCopyTableStatsFromInput(const hdk::ir::Node* node);
   ExecutionResult executeStep(const hdk::ir::Node* step_root,
                               const CompilationOptions& co,
                               const ExecutionOptions& eo,
