@@ -45,6 +45,13 @@ class AbstractDataProvider : public Data_Namespace::AbstractBufferMgr {
     return nullptr;
   }
 
+  // TODO(dmitriim) remove this method after enabling
+  // of hashtable, that takes into a count frag_id and offset
+  std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) override {
+    return nullptr;
+  }
+
   void deleteBuffer(const ChunkKey& key, const bool purge = true) override {
     UNREACHABLE();
   }

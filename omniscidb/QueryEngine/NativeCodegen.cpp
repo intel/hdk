@@ -711,9 +711,8 @@ std::vector<std::string> get_agg_fnames(
     CHECK(target_expr);
     auto target_type = target_expr->type();
     const auto agg_expr = target_expr->as<hdk::ir::AggExpr>();
-    const bool is_varlen =
-        target_type->isString() ||
-        target_type->isArray();  // TODO: should it use is_varlen_array() ?
+    // Fixed length arrays are also included here.
+    const bool is_varlen = target_type->isString() || target_type->isArray();
     if (!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample) {
       result.emplace_back(target_type->isFloatingPoint() ? "agg_id_double" : "agg_id");
       if (is_varlen) {

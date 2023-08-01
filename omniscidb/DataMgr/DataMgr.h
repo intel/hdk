@@ -167,6 +167,8 @@ class DataMgr {
                                  const MemoryLevel memoryLevel,
                                  const int deviceId = 0,
                                  const size_t numBytes = 0);
+  // TODO(dmitriim) remove this method after enabling of hashtable
+  std::unique_ptr<AbstractDataToken> getZeroCopyColumnData(const ColumnRef& col_ref);
   void deleteChunksWithPrefix(const ChunkKey& keyPrefix);
   void deleteChunksWithPrefix(const ChunkKey& keyPrefix, const MemoryLevel memLevel);
   AbstractBuffer* alloc(const MemoryLevel memoryLevel,

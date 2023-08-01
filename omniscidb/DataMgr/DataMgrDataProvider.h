@@ -35,6 +35,9 @@ class DataMgrDataProvider : public DataProvider {
       const size_t num_bytes,
       const size_t num_elems) override;
 
+  std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) override;
+
   TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
 
   const DictDescriptor* getDictMetadata(int dict_id,

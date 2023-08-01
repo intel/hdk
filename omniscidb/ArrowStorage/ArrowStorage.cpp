@@ -187,6 +187,51 @@ std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyBufferMemory(
   return nullptr;
 }
 
+std::unique_ptr<AbstractDataToken> ArrowStorage::getZeroCopyColumnData(
+    const ColumnRef& col_ref) {
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK_EQ(col_ref.db_id, db_id_);
+  CHECK_EQ(tables_.count(col_ref.table_id), (size_t)1);
+  auto& table = *tables_.at(col_ref.table_id);
+  mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
+  data_lock.unlock();
+
+  auto col_type = getColumnInfo(col_ref.db_id, col_ref.table_id, col_ref.column_id)->type;
+
+  if (col_type->isExtDictionary()) {
+    auto dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
+    auto dict_descriptor = getDictMetadata(
+        dict_id);  // this will force materialize the dictionary. it is thread safe
+    CHECK(dict_descriptor);
+  }
+
+  if (!col_type->isVarLen()) {
+    size_t col_idx = columnIndex(col_ref.column_id);
+    if (col_idx >= table.col_data.size()) {
+      return nullptr;
+    }
+    size_t elem_size = col_type->size();
+    const auto* fixed_type =
+        dynamic_cast<const arrow::FixedWidthType*>(table.col_data[col_idx]->type().get());
+    CHECK(fixed_type) << table.col_data[col_idx]->type()->ToString() << " (table "
+                      << col_ref.table_id << ", column " << col_idx << ")";
+    size_t arrow_elem_size = fixed_type->bit_width() / 8;
+    size_t elems = elem_size / arrow_elem_size;
+    CHECK_GT(elems, (size_t)0);
+    const auto& data_to_fetch = table.col_data[col_idx];
+    if (data_to_fetch->num_chunks() == 1) {
+      auto chunk = data_to_fetch->chunk(0);
+      const int8_t* ptr =
+          chunk->data()->GetValues<int8_t>(1, chunk->data()->offset * arrow_elem_size);
+      size_t chunk_size = chunk->length() * arrow_elem_size;
+      return std::make_unique<ArrowChunkDataToken>(
+          std::move(chunk), col_type, ptr, chunk_size);
+    }
+  }
+
+  return nullptr;
+}
+
 void ArrowStorage::fetchFixedLenData(const TableData& table,
                                      size_t frag_idx,
                                      size_t col_idx,

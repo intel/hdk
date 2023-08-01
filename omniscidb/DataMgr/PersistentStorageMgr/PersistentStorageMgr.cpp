@@ -55,6 +55,11 @@ std::unique_ptr<AbstractDataToken> PersistentStorageMgr::getZeroCopyBufferMemory
   return getStorageMgrForTableKey(key)->getZeroCopyBufferMemory(key, numBytes);
 }
 
+std::unique_ptr<AbstractDataToken> PersistentStorageMgr::getZeroCopyColumnData(
+    const ColumnRef& col_ref) {
+  return getStorageMgr(col_ref.db_id)->getZeroCopyColumnData(col_ref);
+}
+
 void PersistentStorageMgr::fetchBuffer(const ChunkKey& chunk_key,
                                        AbstractBuffer* destination_buffer,
                                        const size_t num_bytes) {

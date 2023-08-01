@@ -70,6 +70,9 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
       const ChunkKey& key,
       size_t num_bytes) override;
 
+  std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) override;
+
   TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
