@@ -1526,10 +1526,11 @@ void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
       std::back_inserter(storage_->strings_owned),
       [](const std::string& str) { return std::make_unique<std::string>(str); });
 
+  // note: could probably set this in the lambda
   std::vector<std::string_view> strings_for_hash;
   strings_for_hash.reserve(string_vec.size());
-  for (size_t i = str_offset; i < string_vec.size(); ++i) {
-    strings_for_hash.emplace_back(storage_->strings_owned[i]->data());
+  for (size_t i = 0; i < string_vec.size(); ++i) {
+    strings_for_hash.emplace_back(storage_->strings_owned[str_offset + i]->data());
   }
 
   getOrAddBulkUnlocked(strings_for_hash, output_string_ids);
