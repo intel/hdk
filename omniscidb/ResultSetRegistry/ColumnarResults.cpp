@@ -122,28 +122,6 @@ ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_
   }
 }
 
-ColumnarResults::ColumnarResults(std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-                                 const int8_t* one_col_buffer,
-                                 const size_t num_rows,
-                                 const hdk::ir::Type* target_type,
-                                 const size_t thread_idx)
-    : column_buffers_(1)
-    , num_rows_(num_rows)
-    , target_types_{target_type}
-    , parallel_conversion_(false)
-    , direct_columnar_conversion_(false)
-    , thread_idx_(thread_idx) {
-  auto timer = DEBUG_TIMER(__func__);
-
-  if (target_type->isVarLen()) {
-    throw ColumnarConversionNotSupported();
-  }
-  const auto buf_size = num_rows * target_type->size();
-  column_buffers_[0] =
-      reinterpret_cast<int8_t*>(row_set_mem_owner->allocate(buf_size, thread_idx_));
-  memcpy(((void*)column_buffers_[0]), one_col_buffer, buf_size);
-}
-
 ColumnarResults::ColumnarResults(const std::vector<int8_t*> one_col_buffer,
                                  const size_t num_rows,
                                  const hdk::ir::Type* target_type,

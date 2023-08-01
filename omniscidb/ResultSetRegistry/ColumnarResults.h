@@ -67,12 +67,6 @@ class ColumnarResults {
                   const Config& config,
                   const bool is_parallel_execution_enforced = false);
 
-  ColumnarResults(const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
-                  const int8_t* one_col_buffer,
-                  const size_t num_rows,
-                  const hdk::ir::Type* target_type,
-                  const size_t thread_idx);
-
   ColumnarResults(const std::vector<int8_t*> one_col_buffer,
                   const size_t num_rows,
                   const hdk::ir::Type* target_type,
