@@ -51,7 +51,14 @@ class Chunk {
       : buffer_(nullptr), index_buf_(nullptr), column_info_(col_info) {}
 
   Chunk(AbstractBuffer* b, AbstractBuffer* ib, ColumnInfoPtr col_info)
-      : buffer_(b), index_buf_(ib), column_info_(col_info) {}
+      : buffer_(b), index_buf_(ib), column_info_(col_info) {
+    if (buffer_) {
+      buffer_->pin();
+    }
+    if (index_buf_) {
+      index_buf_->pin();
+    }
+  }
 
   ~Chunk() { unpinBuffer(); }
 

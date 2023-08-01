@@ -166,4 +166,37 @@ int8_t* Buffer::getMemoryPtr() {
 void Buffer::setMemoryPtr(int8_t* new_ptr) {
   mem_ = new_ptr;
 }
+
+void Buffer::deleteSelf() {
+  // ZeroCopy buffers don't have correct iterators by design.
+  // To delete it we are detecting them and delete explicitly without removing segment as
+  // it done in deleteBuffer(...)
+  if (seg_it_ == BufferList::iterator()) {
+    delete this;
+    return;
+  }
+
+  bm_->deleteBuffer(seg_it_->chunk_key);
+}
+
+int Buffer::unPin() {
+  std::unique_lock<std::mutex> pin_lock(pin_mutex_);
+  int res = (--pin_count_);
+  if (!res && delete_on_unpin_) {
+    pin_lock.unlock();
+    // deleteSelf
+    deleteSelf();
+  }
+  return res;
+}
+
+void Buffer::deleteWhenUnpinned() {
+  std::unique_lock<std::mutex> pin_lock(pin_mutex_);
+  if (pin_count_) {
+    delete_on_unpin_ = true;
+  } else {
+    pin_lock.unlock();
+    deleteSelf();
+  }
+}
 }  // namespace Buffer_Namespace

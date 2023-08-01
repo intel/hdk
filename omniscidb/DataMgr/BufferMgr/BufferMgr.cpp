@@ -103,6 +103,12 @@ void BufferMgr::clear() {
   // for removal to have them deleted when unpinned.
   for (auto& buf : chunk_index_) {
     if (buf.second->buffer) {
+      // WARN !!!!!!!!!!!!!!!!!!
+      // deleteWhenUnpinned(...) will call free(...) that will call deleteBuffer(...) in
+      // case when segment iterator is valid. That method will try to acquire
+      // chunk_index_mutex_ that already acquired here. To avoid deadlock and remove all
+      // the stuff, we are cleaning segments later we are removing segment iterator.
+      buf.second->buffer->seg_it_ = BufferList::iterator();
       buf.second->buffer->deleteWhenUnpinned();
       buf.second->buffer = nullptr;
     }
@@ -623,6 +629,7 @@ void BufferMgr::deleteBuffer(const ChunkKey& key, const bool) {
   chunk_index_lock.unlock();
   std::lock_guard<std::mutex> sized_segs_lock(sized_segs_mutex_);
   if (seg_it->buffer) {
+    CHECK_EQ(seg_it->buffer->getPinCount(), 0);
     delete seg_it->buffer;  // Delete Buffer for segment
     seg_it->buffer = 0;
   }
@@ -826,12 +833,15 @@ AbstractBuffer* BufferMgr::alloc(const size_t num_bytes) {
   return createBuffer(chunk_key, page_size_, num_bytes);
 }
 
+// all buffer deletions should be done via free(...)
 void BufferMgr::free(AbstractBuffer* buffer) {
   Buffer* casted_buffer = dynamic_cast<Buffer*>(buffer);
   if (casted_buffer == 0) {
     LOG(FATAL) << "Wrong buffer type - expects base class pointer to Buffer type.";
   }
-  deleteBuffer(casted_buffer->seg_it_->chunk_key);
+  CHECK_EQ(casted_buffer->getPinCount(), 1);
+  casted_buffer->deleteWhenUnpinned();
+  casted_buffer->unPin();
 }
 
 size_t BufferMgr::getNumChunks() {

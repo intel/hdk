@@ -37,6 +37,32 @@ class ColumnFetcher {
   ColumnFetcher(Executor* executor,
                 DataProvider* data_provider,
                 const ColumnCacheMap& column_cache);
+  ~ColumnFetcher() {
+    if (!linearized_data_buf_cache_.empty()) {
+      for (auto& kv : linearized_data_buf_cache_) {
+        for (auto& kv2 : kv.second) {
+          kv2.second->deleteWhenUnpinned();
+          kv2.second->unPin();
+        }
+      }
+    }
+
+    if (!linearized_idx_buf_cache_.empty()) {
+      for (auto& kv : linearized_idx_buf_cache_) {
+        for (auto& kv2 : kv.second) {
+          kv2.second->deleteWhenUnpinned();
+          kv2.second->unPin();
+        }
+      }
+    }
+
+    if (!linearlized_temporary_cpu_index_buf_cache_.empty()) {
+      for (auto& kv : linearlized_temporary_cpu_index_buf_cache_) {
+        kv.second->deleteWhenUnpinned();
+        kv.second->unPin();
+      }
+    }
+  };
 
   //! Gets one chunk's pointer and element count on either CPU or GPU.
   static std::pair<const int8_t*, size_t> getOneColumnFragment(
@@ -92,9 +118,6 @@ class ColumnFetcher {
       const int device_id,
       DeviceAllocator* device_allocator,
       const size_t thread_idx) const;
-
-  void freeTemporaryCpuLinearizedIdxBuf();
-  void freeLinearizedBuf();
 
   DataProvider* getDataProvider() const { return data_provider_; }
 

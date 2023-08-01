@@ -670,6 +670,85 @@ TEST(Other, Regression) {
   dropTable("table_b");
 }
 
+TEST(Other, FixedLenArr) {
+  createTable("table_a",
+              {{"si", ctx().int16()}, {"FixedLen", ctx().arrayFixed(2, ctx().int64())}},
+              {2});
+
+  std::ostringstream oss;
+  oss << "{\"si\": 1, \"FixedLen\": [" << 7 << ", " << 233 << "]}" << std::endl;
+  oss << "{\"si\": 1, \"FixedLen\": [" << 5 << ", " << 47 << "]}" << std::endl;
+  oss << "{\"si\": 2, \"FixedLen\": [" << 6 << ", " << 48 << "]}" << std::endl;
+  oss << "{\"si\": 3, \"FixedLen\": [" << 7 << ", " << 49 << "]}" << std::endl;
+  oss << "{\"si\": 4, \"FixedLen\": [" << 8 << ", " << 67 << "]}" << std::endl;
+  oss << "{\"si\": 5, \"FixedLen\": [" << 9 << ", " << 68 << "]}" << std::endl;
+  oss << "{\"si\": 6, \"FixedLen\": [" << 10 << ", " << 69 << "]}" << std::endl;
+  insertJsonValues("table_a", oss.str());
+
+  createTable("table_b",
+              {{"si", ctx().int8()}, {"FixedLen", ctx().arrayFixed(2, ctx().int32())}},
+              {2});
+
+  std::ostringstream oss_2;
+  oss_2 << "{\"si\": 1, \"FixedLen\": [" << 2 << ", " << 33 << "]}" << std::endl;
+  oss_2 << "{\"si\": 2, \"FixedLen\": [" << 1 << ", " << 17 << "]}" << std::endl;
+  oss_2 << "{\"si\": 2, \"FixedLen\": [" << 6 << ", " << 48 << "]}" << std::endl;
+  oss_2 << "{\"si\": 3, \"FixedLen\": [" << 7 << ", " << 49 << "]}" << std::endl;
+  oss_2 << "{\"si\": 4, \"FixedLen\": [" << 8 << ", " << 67 << "]}" << std::endl;
+  oss_2 << "{\"si\": 5, \"FixedLen\": [" << 9 << ", " << 68 << "]}" << std::endl;
+  oss_2 << "{\"si\": 6, \"FixedLen\": [" << 10 << ", " << 69 << "]}" << std::endl;
+  insertJsonValues("table_b", oss_2.str());
+
+  EXPECT_NO_THROW(run_multiple_agg(R"(
+        SELECT * FROM table_a, table_b WHERE table_a.si = table_b.si;
+      )",
+                                   ExecutorDeviceType::CPU));
+
+  dropTable("table_a");
+  dropTable("table_b");
+}
+
+TEST(Other, FixedLenArr2) {
+  config().rs.enable_lazy_fetch = false;
+
+  createTable("table_a",
+              {{"si", ctx().int16()}, {"FixedLen", ctx().arrayFixed(2, ctx().int16())}},
+              {1});
+
+  std::ostringstream oss;
+  oss << "{\"si\": 1, \"FixedLen\": [" << 7 << ", " << 233 << "]}" << std::endl;
+  oss << "{\"si\": 1, \"FixedLen\": [" << 5 << ", " << 47 << "]}" << std::endl;
+  oss << "{\"si\": 2, \"FixedLen\": [" << 6 << ", " << 48 << "]}" << std::endl;
+  oss << "{\"si\": 3, \"FixedLen\": [" << 7 << ", " << 49 << "]}" << std::endl;
+  oss << "{\"si\": 4, \"FixedLen\": [" << 8 << ", " << 67 << "]}" << std::endl;
+  oss << "{\"si\": 5, \"FixedLen\": [" << 9 << ", " << 68 << "]}" << std::endl;
+  oss << "{\"si\": 6, \"FixedLen\": [" << 10 << ", " << 69 << "]}" << std::endl;
+  insertJsonValues("table_a", oss.str());
+
+  createTable("table_b",
+              {{"si", ctx().int8()}, {"FixedLen", ctx().arrayFixed(2, ctx().int32())}},
+              {2});
+
+  std::ostringstream oss_2;
+  oss_2 << "{\"si\": 1, \"FixedLen\": [" << 2 << ", " << 33 << "]}" << std::endl;
+  oss_2 << "{\"si\": 2, \"FixedLen\": [" << 1 << ", " << 17 << "]}" << std::endl;
+  oss_2 << "{\"si\": 2, \"FixedLen\": [" << 6 << ", " << 48 << "]}" << std::endl;
+  oss_2 << "{\"si\": 3, \"FixedLen\": [" << 7 << ", " << 49 << "]}" << std::endl;
+  oss_2 << "{\"si\": 4, \"FixedLen\": [" << 8 << ", " << 67 << "]}" << std::endl;
+  oss_2 << "{\"si\": 5, \"FixedLen\": [" << 9 << ", " << 68 << "]}" << std::endl;
+  oss_2 << "{\"si\": 6, \"FixedLen\": [" << 10 << ", " << 69 << "]}" << std::endl;
+  insertJsonValues("table_b", oss_2.str());
+
+  EXPECT_NO_THROW(run_multiple_agg(R"(
+        SELECT * FROM table_a INNER JOIN table_b ON table_a.FixedLen[1] =
+        table_b.FixedLen[1];
+      )",
+                                   ExecutorDeviceType::CPU));
+
+  dropTable("table_a");
+  dropTable("table_b");
+}
+
 int main(int argc, char** argv) {
   TestHelpers::init_logger_stderr_only(argc, argv);
   testing::InitGoogleTest(&argc, argv);
