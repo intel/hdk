@@ -29,9 +29,16 @@ std::shared_ptr<Chunk_NS::Chunk> DataMgrDataProvider::getChunk(
   return Chunk_NS::Chunk::getChunk(
       col_info, data_mgr_, key, memory_level, device_id, num_bytes, num_elems);
 }
+
+std::unique_ptr<Data_Namespace::AbstractDataToken>
+DataMgrDataProvider::getZeroCopyColumnData(const ColumnRef& col_ref) {
+  return data_mgr_->getZeroCopyColumnData(col_ref);
+}
+
 TableFragmentsInfo DataMgrDataProvider::getTableMetadata(int db_id, int table_id) const {
   return data_mgr_->getTableMetadata(db_id, table_id);
 }
+
 const DictDescriptor* DataMgrDataProvider::getDictMetadata(int dict_id,
                                                            bool load_dict) const {
   return data_mgr_->getDictMetadata(dict_id, load_dict);

@@ -36,6 +36,11 @@ class DataProvider {
       const size_t num_bytes,
       const size_t num_elems) = 0;
 
+  // CPU only
+  // TODO(dmitriim) remove this method after enabling of hashtable
+  virtual std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) = 0;
+
   virtual TableFragmentsInfo getTableMetadata(int db_id, int table_id) const = 0;
 
   virtual const DictDescriptor* getDictMetadata(int dict_id,

@@ -162,6 +162,9 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   std::unique_ptr<AbstractDataToken> getZeroCopyBufferMemory(const ChunkKey& key,
                                                              size_t numBytes) override;
 
+  std::unique_ptr<AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) override;
+
   /**
    * @brief Puts the contents of d into the Buffer with ChunkKey key.
    * @param key - Unique identifier for a Chunk.

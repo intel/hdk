@@ -213,22 +213,20 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
     auto& chunk_iter = chunk_iter_holder.back();
     if (memory_level == Data_Namespace::CPU_LEVEL) {
       return reinterpret_cast<int8_t*>(&chunk_iter);
-    } else {
-      auto ab = chunk->getBuffer();
-      auto& row_set_mem_owner = executor_->getRowSetMemoryOwner();
-      row_set_mem_owner->addVarlenInputBuffer(ab);
-      CHECK_EQ(Data_Namespace::GPU_LEVEL, memory_level);
-      CHECK(allocator);
-      auto chunk_iter_gpu = allocator->alloc(sizeof(ChunkIter));
-      allocator->copyToDevice(
-          chunk_iter_gpu, reinterpret_cast<int8_t*>(&chunk_iter), sizeof(ChunkIter));
-      return chunk_iter_gpu;
     }
-  } else {
     auto ab = chunk->getBuffer();
-    CHECK(ab->getMemoryPtr());
-    return ab->getMemoryPtr();  // @TODO(alex) change to use ChunkIter
+    auto& row_set_mem_owner = executor_->getRowSetMemoryOwner();
+    row_set_mem_owner->addVarlenInputBuffer(ab);
+    CHECK_EQ(Data_Namespace::GPU_LEVEL, memory_level);
+    CHECK(allocator);
+    auto chunk_iter_gpu = allocator->alloc(sizeof(ChunkIter));
+    allocator->copyToDevice(
+        chunk_iter_gpu, reinterpret_cast<int8_t*>(&chunk_iter), sizeof(ChunkIter));
+    return chunk_iter_gpu;
   }
+  auto ab = chunk->getBuffer();
+  CHECK(ab->getMemoryPtr());
+  return ab->getMemoryPtr();  // @TODO(alex) change to use ChunkIter
 }
 
 const int8_t* ColumnFetcher::getAllTableColumnFragments(
@@ -250,6 +248,19 @@ const int8_t* ColumnFetcher::getAllTableColumnFragments(
   const InputDescriptor table_desc(db_id, table_id, int(0));
   {
     std::lock_guard<std::mutex> columnar_conversion_guard(columnar_fetch_mutex_);
+
+    auto col_token = data_provider_->getZeroCopyColumnData(*col_info);
+    if (col_token != nullptr) {
+      size_t num_rows = col_token->getSize() / col_token->getType()->size();
+      auto raw_mem_ptr =
+          executor_->row_set_mem_owner_->saveDataToken(std::move(col_token));
+      ColumnarResults res(
+          {const_cast<int8_t*>(raw_mem_ptr)}, num_rows, col_info->type, thread_idx);
+
+      return ColumnFetcher::transferColumnIfNeeded(
+          &res, 0, memory_level, device_id, device_allocator);
+    }
+
     auto column_it = columnarized_scan_table_cache_.find({table_id, col_id});
     if (column_it == columnarized_scan_table_cache_.end()) {
       for (size_t frag_id = 0; frag_id < frag_count; ++frag_id) {

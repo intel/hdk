@@ -865,6 +865,11 @@ std::unique_ptr<AbstractDataToken> BufferMgr::getZeroCopyBufferMemory(const Chun
   return parent_mgr_->getZeroCopyBufferMemory(key, numBytes);
 }
 
+std::unique_ptr<AbstractDataToken> BufferMgr::getZeroCopyColumnData(
+    const ColumnRef& col_ref) {
+  return parent_mgr_->getZeroCopyColumnData(col_ref);
+}
+
 MemoryInfo BufferMgr::getMemoryInfo() {
   std::unique_lock<std::mutex> sized_segs_lock(sized_segs_mutex_);
   MemoryInfo mi;

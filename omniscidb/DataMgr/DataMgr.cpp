@@ -458,6 +458,13 @@ AbstractBuffer* DataMgr::getChunkBuffer(const ChunkKey& key,
   return bufferMgrs_[level][deviceId]->getBuffer(key, numBytes);
 }
 
+std::unique_ptr<AbstractDataToken> DataMgr::getZeroCopyColumnData(
+    const ColumnRef& col_ref) {
+  const auto level = static_cast<size_t>(Data_Namespace::CPU_LEVEL);
+  CHECK_LT(level, levelSizes_.size());  // make sure we have a legit buffermgr
+  return bufferMgrs_[level][0]->getZeroCopyColumnData(col_ref);
+}
+
 void DataMgr::deleteChunksWithPrefix(const ChunkKey& keyPrefix) {
   int numLevels = bufferMgrs_.size();
   for (int level = numLevels - 1; level >= 0; --level) {

@@ -73,6 +73,11 @@ class ColumnarResults {
                   const hdk::ir::Type* target_type,
                   const size_t thread_idx);
 
+  ColumnarResults(const std::vector<int8_t*> one_col_buffer,
+                  const size_t num_rows,
+                  const hdk::ir::Type* target_type,
+                  const size_t thread_idx);
+
   static std::unique_ptr<ColumnarResults> mergeResults(
       const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
       const std::vector<std::unique_ptr<ColumnarResults>>& sub_results);

@@ -97,6 +97,16 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     varlen_buffers_.push_back(varlen_buffer);
   }
 
+  const int8_t* saveDataToken(std::unique_ptr<AbstractDataToken> token) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    auto mem_ptr = token->getMemoryPtr();
+    if (data_tokens_.count(mem_ptr) == 0) {
+      data_tokens_.insert({mem_ptr, std::move(token)});
+    }
+
+    return data_tokens_[mem_ptr]->getMemoryPtr();
+  }
+
   /**
    * Adds a GPU buffer containing a variable length input column. Variable length inputs
    * on GPU are referenced in output projected targets and should not be freed until the
@@ -258,6 +268,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   std::vector<void*> col_buffers_;
   std::vector<Data_Namespace::AbstractBuffer*> varlen_input_buffers_;
   std::vector<std::unique_ptr<quantile::TDigest>> t_digests_;
+  std::unordered_map<const int8_t*, std::unique_ptr<AbstractDataToken>> data_tokens_;
 
   DataProvider* data_provider_;  // for metadata lookups
   size_t arena_block_size_;      // for cloning

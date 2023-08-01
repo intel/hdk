@@ -86,6 +86,8 @@ class AbstractBufferMgr {
   virtual AbstractBuffer* getBuffer(const ChunkKey& key, const size_t numBytes = 0) = 0;
   virtual std::unique_ptr<AbstractDataToken> getZeroCopyBufferMemory(const ChunkKey& key,
                                                                      size_t numBytes) = 0;
+  virtual std::unique_ptr<AbstractDataToken> getZeroCopyColumnData(
+      const ColumnRef& col_ref) = 0;
   virtual void fetchBuffer(const ChunkKey& key,
                            AbstractBuffer* destBuffer,
                            const size_t numBytes = 0) = 0;
