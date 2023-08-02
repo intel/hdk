@@ -157,7 +157,7 @@ cdef extern from "omniscidb/DataMgr/GpuMgr.h":
     L0,
 
   cdef cppclass CGpuMgr "GpuMgr":
-    pass
+    CGpuMgrPlatform getPlatform()
 
 cdef extern from "omniscidb/DataMgr/PersistentStorageMgr/PersistentStorageMgr.h":
   cdef cppclass CPersistentStorageMgr "PersistentStorageMgr"(CAbstractBufferMgr):
@@ -170,6 +170,8 @@ cdef extern from "omniscidb/DataMgr/DataMgr.h" namespace "Data_Namespace":
     CPersistentStorageMgr* getPersistentStorageMgr() except +;
     CBufferProvider* getBufferProvider() except +;
     CDataProvider* getDataProvider() except +;
+
+    CGpuMgr* getGpuMgr()
 
 cdef class DataMgr:
   cdef shared_ptr[CDataMgr] c_data_mgr

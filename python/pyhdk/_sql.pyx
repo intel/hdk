@@ -6,16 +6,18 @@
 from libc.stdint cimport int64_t
 from libcpp.memory cimport make_shared, make_unique
 from libcpp.utility cimport move
+from libcpp.optional cimport optional
 from cython.operator cimport dereference, preincrement, address
 
 from pyarrow.lib cimport pyarrow_wrap_table
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CConfig, Config, boost_get, CType, CArrayBaseType
-from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr
+from pyhdk._storage cimport SchemaProvider, CDataMgr, DataMgr, CGpuMgrPlatform
 from pyhdk._execute cimport Executor, CExecutorDeviceType, CArrowResultSetConverter, CResultSet
 from pyhdk._execute cimport CNullableString, CScalarTargetValue, CArrayTargetValue, CTargetValue, isNull
 from pyhdk._execute cimport isNull, isInt, getInt, isFloat, getFloat, isDouble, getDouble, isString, getString
+from pyhdk._execute cimport CCompilationOptionsDefaultBuilder
 
 cdef class Calcite:
   cdef CalciteMgr* calcite
@@ -192,11 +194,14 @@ cdef class RelAlgExecutor:
 
   def execute(self, **kwargs):
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
-    cdef CCompilationOptions c_co
+    cdef optional[CGpuMgrPlatform] platform = self.c_data_mgr.get().getGpuMgr().getPlatform()
+    cdef CCompilationOptionsDefaultBuilder builder = CCompilationOptionsDefaultBuilder(dereference(config), platform)
+    cdef CExecutorDeviceType dt
     if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
-      c_co = CCompilationOptions.defaults(CExecutorDeviceType.GPU, False)
+      dt = CExecutorDeviceType.GPU
     else:
-      c_co = CCompilationOptions.defaults(CExecutorDeviceType.CPU, False)
+      dt = CExecutorDeviceType.CPU
+    cdef CCompilationOptions c_co = builder.build(dt)
     c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))

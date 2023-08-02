@@ -89,6 +89,9 @@ struct CompilationOptions {
         /*use_groupby_buffer_desc=*/false,
         /*codegen_traits_desc=*/getCgenTraitsDesc(device_type, is_l0)};
   }
+
+  //  private:
+  //   CompilationOptions() = default;
 };
 
 enum class ExecutorType { Native, Extern };

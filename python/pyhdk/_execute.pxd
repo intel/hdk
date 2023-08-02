@@ -9,11 +9,12 @@ from libcpp.memory cimport shared_ptr, make_shared, unique_ptr, make_unique
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.utility cimport move
+from libcpp.optional cimport optional
 
 from pyarrow.lib cimport CTable as CArrowTable
 
 from pyhdk._common cimport CType, CConfig
-from pyhdk._storage cimport MemoryLevel, DataMgr, CDataMgr, CBufferProvider, CSchemaProvider, CAbstractDataProvider
+from pyhdk._storage cimport MemoryLevel, DataMgr, CDataMgr, CBufferProvider, CSchemaProvider, CAbstractDataProvider, CGpuMgrPlatform
 
 cdef extern from "omniscidb/QueryEngine/Compiler/CodegenTraitsDescriptor.h" namespace "compiler":
   enum CCallingConvDesc "CallingConvDesc":
@@ -94,6 +95,12 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
     @staticmethod
     CExecutionOptions fromConfig(const CConfig)
 
+cdef extern from "omniscidb/QueryEngine/CompilationOptionsBuilder.h":
+  cdef cppclass CCompilationOptionsDefaultBuilder "CompilationOptionsDefaultBuilder":
+    CCompilationOptionsDefaultBuilder()
+    CCompilationOptionsDefaultBuilder(const CConfig, const optional[CGpuMgrPlatform])
+    CCompilationOptions build(const CExecutorDeviceType)
+
 cdef extern from "omniscidb/ResultSet/TargetValue.h":
   cdef cppclass CNullableString "NullableString":
     pass
@@ -153,6 +160,7 @@ cdef extern from "omniscidb/QueryEngine/Execute.h":
     void clearMemory(MemoryLevel, CDataMgr*)
     const CConfig &getConfig()
     shared_ptr[CConfig] getConfigPtr()
+    CDataMgr* getDataMgr()
 
 cdef class Executor:
   cdef shared_ptr[CExecutor] c_executor

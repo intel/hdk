@@ -23,6 +23,7 @@ set(query_engine_source_files
     ColumnIR.cpp
     CompareIR.cpp
     CompilationOptions.cpp
+    CompilationOptionsBuilder.cpp
     Compiler/Backend.cpp
     Compiler/HelperFunctions.cpp
     ConstantIR.cpp
