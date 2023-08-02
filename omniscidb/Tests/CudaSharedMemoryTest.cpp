@@ -33,8 +33,16 @@ auto double_type = hdk::ir::Context::defaultCtx().fp64();
 
 namespace {
 
-compiler::CodegenTraits get_codegen_traits() {
-  return compiler::CodegenTraits::get(compiler::cuda_cgen_traits_desc);
+compiler::CodegenTraits get_codegen_traits(const GpuMgrPlatform p) {
+  switch (p) {
+    case GpuMgrPlatform::CUDA:
+      return compiler::CodegenTraits::get(compiler::cuda_cgen_traits_desc);
+    case GpuMgrPlatform::L0:
+      return compiler::CodegenTraits::get(compiler::l0_cgen_traits_desc);
+
+    default:
+      throw std::runtime_error("Unsupported GPU platform");
+  }
 }
 
 void init_storage_buffer(int8_t* buffer,
@@ -392,7 +400,7 @@ void perform_test_and_verify_results(TestInputData input) {
       input.target_infos,
       init_agg_val_vec(input.target_infos, query_mem_desc),
       cuda_mgr.get(),
-      get_codegen_traits(),
+      get_codegen_traits(GpuMgrPlatform::CUDA),
       executor.get());
   gpu_smem_tester.codegen(CompilationOptions::defaults(
       ExecutorDeviceType::GPU,
