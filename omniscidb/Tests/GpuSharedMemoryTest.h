@@ -57,9 +57,9 @@ class StrideNumberGenerator : public NumberGenerator {
   int64_t start_;
 };
 
-class GpuReductionTester : public GpuSharedMemCodeBuilder {
+class CudaReductionTester : public GpuSharedMemCodeBuilder {
  public:
-  GpuReductionTester(const Config& config,
+  CudaReductionTester(const Config& config,
                      llvm::Module* module,
                      llvm::LLVMContext& context,
                      const QueryMemoryDescriptor& qmd,

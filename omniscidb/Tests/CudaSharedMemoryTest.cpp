@@ -77,7 +77,7 @@ void init_storage_buffer(int8_t* buffer,
 
 }  // namespace
 
-void GpuReductionTester::codegenWrapperKernel() {
+void CudaReductionTester::codegenWrapperKernel() {
   const unsigned address_space = 0;
   auto pi8_type = llvm::Type::getInt8PtrTy(context_, address_space);
   std::vector<llvm::Type*> input_arguments;
@@ -131,8 +131,8 @@ void GpuReductionTester::codegenWrapperKernel() {
       context_);
 
   // initializing shared memory and copy input buffer into shared memory buffer:
-  auto init_smem_func = getFunction("init_shared_mem");
-  auto smem_input_buffer_ptr = ir_builder.CreateCall(init_smem_func,
+  auto init_shared_mem_func = getFunction("init_shared_mem");
+  auto smem_input_buffer_ptr = ir_builder.CreateCall(init_shared_mem_func,
                                                      {
                                                          input_buffer_ptr,
                                                          buffer_size,
@@ -155,9 +155,9 @@ void GpuReductionTester::codegenWrapperKernel() {
 }
 
 namespace {
-void prepare_generated_gpu_kernel(llvm::Module* module,
-                                  llvm::LLVMContext& context,
-                                  llvm::Function* kernel) {
+void prepare_generated_cuda_kernel(llvm::Module* module,
+                                   llvm::LLVMContext& context,
+                                   llvm::Function* kernel) {
   // might be extra, remove and clean up
   module->setDataLayout(
       "e-p:64:64:64-i1:8:8-i8:8:8-"
@@ -177,7 +177,7 @@ void prepare_generated_gpu_kernel(llvm::Module* module,
   md->addOperand(llvm::MDNode::get(context, md_vals));
 }
 
-std::unique_ptr<CudaDeviceCompilationContext> compile_and_link_gpu_code(
+std::unique_ptr<CudaDeviceCompilationContext> compile_and_link_cuda_code(
     const std::string& cuda_llir,
     llvm::Module* module,
     CudaMgr_Namespace::CudaMgr* cuda_mgr,
@@ -265,6 +265,7 @@ create_and_init_output_result_sets(std::shared_ptr<RowSetMemoryOwner> row_set_me
       gpu_storage_result->getUnderlyingBuffer(), target_infos, query_mem_desc);
   return std::make_pair(std::move(cpu_result_set), std::move(gpu_result_set));
 }
+
 void perform_reduction_on_cpu(std::vector<std::unique_ptr<ResultSet>>& result_sets,
                               const ResultSetStorage* cpu_result_storage) {
   CHECK(result_sets.size() > 0);
@@ -383,15 +384,16 @@ void perform_test_and_verify_results(TestInputData input) {
 
   // performing reduciton using the GPU reduction code:
   Config config;
-  GpuReductionTester gpu_smem_tester(config,
-                                     module,
-                                     context,
-                                     query_mem_desc,
-                                     input.target_infos,
-                                     init_agg_val_vec(input.target_infos, query_mem_desc),
-                                     cuda_mgr.get(),
-                                     get_codegen_traits(),
-                                     executor.get());
+  CudaReductionTester gpu_smem_tester(
+      config,
+      module,
+      context,
+      query_mem_desc,
+      input.target_infos,
+      init_agg_val_vec(input.target_infos, query_mem_desc),
+      cuda_mgr.get(),
+      get_codegen_traits(),
+      executor.get());
   gpu_smem_tester.codegen(CompilationOptions::defaults(
       ExecutorDeviceType::GPU,
       false));  // generate code for gpu reduciton and initialization
@@ -411,11 +413,11 @@ void perform_test_and_verify_results(TestInputData input) {
 
 }  // namespace
 
-void GpuReductionTester::performReductionTest(
+void CudaReductionTester::performReductionTest(
     const std::vector<std::unique_ptr<ResultSet>>& result_sets,
     const ResultSetStorage* gpu_result_storage,
     const size_t device_id) {
-  prepare_generated_gpu_kernel(module_, context_, getWrapperKernel());
+  prepare_generated_cuda_kernel(module_, context_, getWrapperKernel());
 
   std::stringstream ss;
   llvm::raw_os_ostream os(ss);
@@ -423,7 +425,7 @@ void GpuReductionTester::performReductionTest(
   os.flush();
   std::string module_str(ss.str());
 
-  std::unique_ptr<CudaDeviceCompilationContext> gpu_context(compile_and_link_gpu_code(
+  std::unique_ptr<CudaDeviceCompilationContext> gpu_context(compile_and_link_cuda_code(
       module_str, module_, cuda_mgr_, getWrapperKernel()->getName().str()));
 
   const auto buffer_size = query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU);

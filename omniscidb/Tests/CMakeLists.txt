@@ -53,7 +53,7 @@ if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_executable(UdfTest UdfTest.cpp)
 endif()
 if(ENABLE_CUDA)
-  add_executable(GpuSharedMemoryTest GpuSharedMemoryTest.cpp ResultSetTestUtils.cpp)
+  add_executable(CudaSharedMemoryTest CudaSharedMemoryTest.cpp ResultSetTestUtils.cpp)
 endif()
 
 # Tests + Microbenchmarks
@@ -140,7 +140,7 @@ else()
 endif()
 
 if(ENABLE_CUDA)
-  target_link_libraries(GpuSharedMemoryTest gtest Logger QueryEngine)
+  target_link_libraries(CudaSharedMemoryTest gtest Logger QueryEngine)
 endif()
 
 set(TEST_ARGS "--gtest_output=xml:../")
@@ -182,7 +182,7 @@ add_test(NAME StringDictionaryHashTestCpuOnly COMMAND StringDictionaryTest ${TES
 set_tests_properties(StringDictionaryHashTestCpuOnly PROPERTIES LABELS "cpu_only")
 
 if(ENABLE_CUDA)
-  add_test(GpuSharedMemoryTest GpuSharedMemoryTest ${TEST_ARGS})
+  add_test(CudaSharedMemoryTest CudaSharedMemoryTest ${TEST_ARGS})
 endif()
 if(ENABLE_L0)
   set(arrow_based_execute_skip_tests
@@ -247,7 +247,7 @@ set(TEST_PROGRAMS
 )
 
 if(ENABLE_CUDA)
-  list(APPEND TEST_PROGRAMS GpuSharedMemoryTest)
+  list(APPEND TEST_PROGRAMS CudaSharedMemoryTest)
 endif()
 
 #if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
