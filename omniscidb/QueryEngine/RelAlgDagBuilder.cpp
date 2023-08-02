@@ -2043,6 +2043,9 @@ class RelAlgDispatcher {
                                     root_dag_builder,
                                     getNodeColumnRefs(inputs[0].get())));
     }
+    if (!exprs.size()) {
+      throw hdk::ir::QueryNotSupported("Empty projections are not allowed.");
+    }
     const auto& fields = field(proj_ra, "fields");
     return std::make_shared<hdk::ir::Project>(
         std::move(exprs), strings_from_json_array(fields), inputs.front());
