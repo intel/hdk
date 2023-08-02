@@ -196,14 +196,12 @@ cdef class RelAlgExecutor:
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
     cdef optional[CGpuMgrPlatform] platform = self.c_data_mgr.get().getGpuMgr().getPlatform()
     cdef CCompilationOptionsDefaultBuilder builder = CCompilationOptionsDefaultBuilder(dereference(config), platform)
-    cdef CExecutorDeviceType dt
+    cdef CExecutorDeviceType dt = CExecutorDeviceType.CPU
     if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
       dt = CExecutorDeviceType.GPU
-    else:
-      dt = CExecutorDeviceType.CPU
-    cdef CCompilationOptions c_co = builder.build(dt)
-    c_co.allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
-    c_co.with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
+    cdef unique_ptr[CCompilationOptions] c_co = make_unique[CCompilationOptions](builder.build(dt))
+    c_co.get().allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
+    c_co.get().with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))
     c_eo.get().output_columnar_hint = kwargs.get("enable_columnar_output", config.rs.enable_columnar_output)
     c_eo.get().with_watchdog = kwargs.get("enable_watchdog", config.exec.watchdog.enable)
@@ -211,7 +209,7 @@ cdef class RelAlgExecutor:
     c_eo.get().just_explain = kwargs.get("just_explain", False)
     c_eo.get().forced_gpu_proportion = kwargs.get("forced_gpu_proportion", config.exec.heterogeneous.forced_gpu_proportion)
     c_eo.get().forced_cpu_proportion = 100 - c_eo.get().forced_gpu_proportion
-    cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(c_co, dereference(c_eo.get()), False)
+    cdef CExecutionResult c_res = self.c_rel_alg_executor.get().executeRelAlgQuery(dereference(c_co.get()), dereference(c_eo.get()), False)
     cdef ExecutionResult res = ExecutionResult()
     res.c_result = move(c_res)
     res.c_data_mgr = self.c_data_mgr
