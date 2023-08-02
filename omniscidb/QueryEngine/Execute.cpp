@@ -1248,9 +1248,12 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
 
   const auto& first = results_per_device.front().first;
 
+  if (results_per_device.size() == 1) {
+    return first;
+  }
+
   if (query_mem_desc.getQueryDescriptionType() ==
-          QueryDescriptionType::GroupByBaselineHash &&
-      results_per_device.size() > 1) {
+      QueryDescriptionType::GroupByBaselineHash) {
     const auto total_entry_count = std::accumulate(
         results_per_device.begin(),
         results_per_device.end(),
@@ -1291,6 +1294,7 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
     }
   } else {
     reduced_results = first;
+    reduced_results->invalidateCachedRowCount();
   }
 
   int64_t compilation_queue_time = 0;
