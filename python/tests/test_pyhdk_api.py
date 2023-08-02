@@ -1163,6 +1163,31 @@ class TestBuilder(BaseTest):
         res = ht.agg(["a"], ht["b"].bottom_k(2)).sort("a").run()
         check_res(res, {"a": [1, 2], "b_bottom_2": [[1, 2], [4, 5]]})
 
+    def test_if_then_else(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [True, False, True], "b": [1, 2, 3]})
+        res = ht.proj(
+            r1=hdk.if_then_else(ht.ref("a"), ht.ref("b"), 3),
+            r2=hdk.if_then_else(ht.ref("a"), 3, ht.ref("b")),
+            r3=hdk.if_then_else(ht.ref("a"), 1.0, 2.0),
+            r4=hdk.if_then_else(ht.ref("a"), "str1", "str2"),
+            r5=hdk.if_then_else(ht.ref("a"), False, True),
+            r6=hdk.if_then_else(False, 1.0, 2.0),
+        ).run()
+        check_res(
+            res,
+            {
+                "r1": [1, 3, 3],
+                "r2": [3, 2, 3],
+                "r3": [1.0, 2.0, 1.0],
+                "r4": ["str1", "str2", "str1"],
+                "r5": [False, True, False],
+                "r6": [2.0, 2.0, 2.0],
+            },
+        )
+
+        hdk.drop_table(ht)
+
 
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):
