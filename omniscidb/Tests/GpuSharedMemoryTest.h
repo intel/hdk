@@ -16,46 +16,14 @@
 
 #pragma once
 
-#include "CudaMgr/CudaMgr.h"
-#include "Logger/Logger.h"
-#include "QueryEngine/CodeGenerator.h"
-#include "QueryEngine/GpuSharedMemoryUtils.h"
+#include "GpuSharedMemoryTestHelpers.h"
 #include "QueryEngine/LLVMFunctionAttributesUtil.h"
-#include "QueryEngine/NvidiaKernel.h"
-#include "QueryEngine/OutputBufferInitialization.h"
-#include "ResultSetTestUtils.h"
 #include "Shared/TargetInfo.h"
-#include "TestHelpers.h"
 
-#include <gtest/gtest.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/IntrinsicInst.h>
-#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/Value.h>
-#include <llvm/Support/raw_os_ostream.h>
-#include <iostream>
+
 #include <memory>
-
-class StrideNumberGenerator : public NumberGenerator {
- public:
-  StrideNumberGenerator(const int64_t start, const int64_t stride)
-      : crt_(start), stride_(stride), start_(start) {}
-
-  int64_t getNextValue() override {
-    const auto crt = crt_;
-    crt_ += stride_;
-    return crt;
-  }
-
-  void reset() override { crt_ = start_; }
-
- private:
-  int64_t crt_;
-  int64_t stride_;
-  int64_t start_;
-};
 
 class CudaReductionTester : public GpuSharedMemCodeBuilder {
  public:
@@ -76,9 +44,7 @@ class CudaReductionTester : public GpuSharedMemCodeBuilder {
                                 config,
                                 traits,
                                 executor)
-      , gpu_mgr_(gpu_mgr) {
-    // CHECK(getReductionFunction());
-  }
+      , gpu_mgr_(gpu_mgr) {}
   void codegenWrapperKernel();
   llvm::Function* getWrapperKernel() const { return wrapper_kernel_; }
   void performReductionTest(const std::vector<std::unique_ptr<ResultSet>>& result_sets,
