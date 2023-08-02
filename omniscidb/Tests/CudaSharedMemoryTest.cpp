@@ -15,16 +15,21 @@
  */
 
 #include "CudaMgr/CudaMgr.h"
-#include "GpuSharedMemoryTest.h"
+#include "GpuSharedMemoryTestHelpers.h"
 #include "QueryEngine/CompilationOptions.h"
 #include "QueryEngine/Compiler/CodegenTraitsDescriptor.h"
+#include "QueryEngine/LLVMFunctionAttributesUtil.h"
 #include "QueryEngine/LLVMGlobalContext.h"
 #include "QueryEngine/NvidiaKernel.h"
 #include "QueryEngine/OutputBufferInitialization.h"
+#include "Shared/TargetInfo.h"
+#include "TestHelpers.h"
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_os_ostream.h>
 
@@ -39,81 +44,30 @@ auto int64_type = hdk::ir::Context::defaultCtx().int64();
 auto float_type = hdk::ir::Context::defaultCtx().fp32();
 auto double_type = hdk::ir::Context::defaultCtx().fp64();
 
-void CudaReductionTester::codegenWrapperKernel() {
-  auto i8_type = llvm::Type::getInt8Ty(context_);
-  auto i64_type = llvm::Type::getInt64Ty(context_);
-  auto pi8_type = traits_.globalPointerType(i8_type);
-  auto pi64_type = traits_.globalPointerType(i64_type);
-  auto ppi8_type = traits_.globalPointerType(pi8_type);
-
-  std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(ppi8_type);
-  input_arguments.push_back(i64_type);  // num input buffers
-  input_arguments.push_back(pi8_type);
-
-  llvm::FunctionType* ft =
-      llvm::FunctionType::get(llvm::Type::getVoidTy(context_), input_arguments, false);
-  wrapper_kernel_ = llvm::Function::Create(
-      ft, llvm::Function::ExternalLinkage, "wrapper_kernel", module_);
-
-  auto arg_it = wrapper_kernel_->arg_begin();
-  auto input_ptrs = &*arg_it;
-  input_ptrs->setName("input_pointers");
-  arg_it++;
-  auto num_buffers = &*arg_it;
-  num_buffers->setName("num_buffers");
-  arg_it++;
-  auto output_buffer = &*arg_it;
-  output_buffer->setName("output_buffer");
-
-  llvm::IRBuilder<> ir_builder(context_);
-
-  auto bb_entry = llvm::BasicBlock::Create(context_, ".entry", wrapper_kernel_);
-  auto bb_body = llvm::BasicBlock::Create(context_, ".body", wrapper_kernel_);
-  auto bb_exit = llvm::BasicBlock::Create(context_, ".exit", wrapper_kernel_);
-
-  // return if blockIdx.x > num_buffers
-  ir_builder.SetInsertPoint(bb_entry);
-  auto get_block_index_func = getFunction("get_block_index");
-  auto block_index = ir_builder.CreateCall(get_block_index_func, {}, "block_index");
-  const auto is_block_inbound =
-      ir_builder.CreateICmpSLT(block_index, num_buffers, "is_block_inbound");
-  ir_builder.CreateCondBr(is_block_inbound, bb_body, bb_exit);
-
-  // locate the corresponding input buffer:
-  ir_builder.SetInsertPoint(bb_body);
-  auto input_buffer_gep = ir_builder.CreateGEP(
-      input_ptrs->getType()->getScalarType()->getPointerElementType(),
-      input_ptrs,
-      block_index);
-  auto input_buffer = ir_builder.CreateLoad(pi8_type, input_buffer_gep);
-  auto input_buffer_ptr =
-      ir_builder.CreatePointerCast(input_buffer, pi64_type, "input_buffer_ptr");
-  const auto buffer_size = ll_int(
-      static_cast<int32_t>(query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU)),
-      context_);
-
-  // initializing shared memory and copy input buffer into shared memory buffer:
-  auto init_shared_mem_func = getFunction("init_shared_mem");
-  auto smem_input_buffer_ptr = ir_builder.CreateCall(init_shared_mem_func,
-                                                     {
-                                                         input_buffer_ptr,
-                                                         buffer_size,
-                                                     },
-                                                     "smem_input_buffer_ptr");
-
-  auto output_buffer_ptr =
-      ir_builder.CreatePointerCast(output_buffer, pi64_type, "output_buffer_ptr");
-  // call the reduction function
-  CHECK(reduction_func_);
-  std::vector<llvm::Value*> reduction_args{
-      output_buffer_ptr, smem_input_buffer_ptr, buffer_size};
-  ir_builder.CreateCall(reduction_func_, reduction_args);
-  ir_builder.CreateBr(bb_exit);
-
-  ir_builder.SetInsertPoint(bb_exit);
-  ir_builder.CreateRet(nullptr);
-}
+class CudaReductionTester : public GpuReductionTester {
+ public:
+  CudaReductionTester(const Config& config,
+                      llvm::Module* module,
+                      llvm::LLVMContext& context,
+                      const QueryMemoryDescriptor& qmd,
+                      const std::vector<TargetInfo>& targets,
+                      const std::vector<int64_t>& init_agg_values,
+                      GpuMgr* gpu_mgr,
+                      const compiler::CodegenTraits& traits,
+                      Executor* executor)
+      : GpuReductionTester(config,
+                           module,
+                           context,
+                           qmd,
+                           targets,
+                           init_agg_values,
+                           gpu_mgr,
+                           traits,
+                           executor) {}
+  void performReductionTest(const std::vector<std::unique_ptr<ResultSet>>& result_sets,
+                            const ResultSetStorage* gpu_result_storage,
+                            const size_t device_id);
+};
 
 namespace {
 void prepare_generated_cuda_kernel(llvm::Module* module,

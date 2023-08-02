@@ -24,9 +24,36 @@
 #include "QueryEngine/ResultSetReductionJIT.h"
 #include "ResultSetTestUtils.h"
 #include "Shared/GpuPlatform.h"
-#include "TestHelpers.h"
 
 #include <vector>
+
+class GpuReductionTester : public GpuSharedMemCodeBuilder {
+ public:
+  GpuReductionTester(const Config& config,
+                     llvm::Module* module,
+                     llvm::LLVMContext& context,
+                     const QueryMemoryDescriptor& qmd,
+                     const std::vector<TargetInfo>& targets,
+                     const std::vector<int64_t>& init_agg_values,
+                     GpuMgr* gpu_mgr,
+                     const compiler::CodegenTraits& traits,
+                     Executor* executor)
+      : GpuSharedMemCodeBuilder(module,
+                                context,
+                                qmd,
+                                targets,
+                                init_agg_values,
+                                config,
+                                traits,
+                                executor)
+      , gpu_mgr_(gpu_mgr) {}
+  void codegenWrapperKernel();
+  llvm::Function* getWrapperKernel() const { return wrapper_kernel_; }
+
+ protected:
+  GpuMgr* gpu_mgr_;
+  llvm::Function* wrapper_kernel_;
+};
 
 class StrideNumberGenerator : public NumberGenerator {
  public:
@@ -47,55 +74,11 @@ class StrideNumberGenerator : public NumberGenerator {
   int64_t start_;
 };
 
-compiler::CodegenTraits get_codegen_traits(const GpuMgrPlatform p) {
-  switch (p) {
-    case GpuMgrPlatform::CUDA:
-      return compiler::CodegenTraits::get(compiler::cuda_cgen_traits_desc);
-    case GpuMgrPlatform::L0:
-      return compiler::CodegenTraits::get(compiler::l0_cgen_traits_desc);
-
-    default:
-      throw std::runtime_error("Unsupported GPU platform");
-  }
-}
+compiler::CodegenTraits get_codegen_traits(const GpuMgrPlatform p);
 
 void init_storage_buffer(int8_t* buffer,
                          const std::vector<TargetInfo>& targets,
-                         const QueryMemoryDescriptor& query_mem_desc) {
-  // get the initial values for all the aggregate columns
-  const auto init_agg_vals = init_agg_val_vec(targets, query_mem_desc);
-  CHECK(!query_mem_desc.didOutputColumnar());
-  CHECK(query_mem_desc.getQueryDescriptionType() ==
-        QueryDescriptionType::GroupByPerfectHash);
-
-  const auto row_size = query_mem_desc.getRowSize();
-  CHECK(query_mem_desc.hasKeylessHash());
-  for (size_t entry_idx = 0; entry_idx < query_mem_desc.getEntryCount(); ++entry_idx) {
-    const auto row_ptr = buffer + entry_idx * row_size;
-    size_t init_agg_idx{0};
-    int64_t init_val{0};
-    // initialize each row's aggregate columns:
-    auto col_ptr = row_ptr + query_mem_desc.getColOffInBytes(0);
-    for (size_t slot_idx = 0; slot_idx < query_mem_desc.getSlotCount(); slot_idx++) {
-      if (query_mem_desc.getPaddedSlotWidthBytes(slot_idx) > 0) {
-        init_val = init_agg_vals[init_agg_idx++];
-      }
-      switch (query_mem_desc.getPaddedSlotWidthBytes(slot_idx)) {
-        case 4:
-          *reinterpret_cast<int32_t*>(col_ptr) = static_cast<int32_t>(init_val);
-          break;
-        case 8:
-          *reinterpret_cast<int64_t*>(col_ptr) = init_val;
-          break;
-        case 0:
-          break;
-        default:
-          UNREACHABLE();
-      }
-      col_ptr += query_mem_desc.getNextColOffInBytes(col_ptr, entry_idx, slot_idx);
-    }
-  }
-}
+                         const QueryMemoryDescriptor& query_mem_desc);
 
 std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
     const size_t num_input_buffers,
@@ -103,77 +86,15 @@ std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
     const QueryMemoryDescriptor& query_mem_desc,
     const std::vector<TargetInfo>& target_infos,
     std::vector<StrideNumberGenerator>& generators,
-    const std::vector<size_t>& steps) {
-  std::vector<std::unique_ptr<ResultSet>> result_sets;
-  for (size_t i = 0; i < num_input_buffers; i++) {
-    result_sets.push_back(std::make_unique<ResultSet>(target_infos,
-                                                      ExecutorDeviceType::CPU,
-                                                      query_mem_desc,
-                                                      row_set_mem_owner,
-                                                      nullptr,
-                                                      0,
-                                                      0));
-    const auto storage = result_sets.back()->allocateStorage();
-    fill_storage_buffer(storage->getUnderlyingBuffer(),
-                        target_infos,
-                        query_mem_desc,
-                        generators[i],
-                        steps[i]);
-  }
-  return result_sets;
-}
+    const std::vector<size_t>& steps);
 
 std::pair<std::unique_ptr<ResultSet>, std::unique_ptr<ResultSet>>
 create_and_init_output_result_sets(std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                                    const QueryMemoryDescriptor& query_mem_desc,
-                                   const std::vector<TargetInfo>& target_infos) {
-  // CPU result set, will eventually host CPU reduciton results for validations
-  auto cpu_result_set = std::make_unique<ResultSet>(target_infos,
-                                                    ExecutorDeviceType::CPU,
-                                                    query_mem_desc,
-                                                    row_set_mem_owner,
-                                                    nullptr,
-                                                    0,
-                                                    0);
-  auto cpu_storage_result = cpu_result_set->allocateStorage();
-  init_storage_buffer(
-      cpu_storage_result->getUnderlyingBuffer(), target_infos, query_mem_desc);
-
-  // GPU result set, will eventually host GPU reduction results
-  auto gpu_result_set = std::make_unique<ResultSet>(target_infos,
-                                                    ExecutorDeviceType::GPU,
-                                                    query_mem_desc,
-                                                    row_set_mem_owner,
-                                                    nullptr,
-                                                    0,
-                                                    0);
-  auto gpu_storage_result = gpu_result_set->allocateStorage();
-  init_storage_buffer(
-      gpu_storage_result->getUnderlyingBuffer(), target_infos, query_mem_desc);
-  return std::make_pair(std::move(cpu_result_set), std::move(gpu_result_set));
-}
+                                   const std::vector<TargetInfo>& target_infos);
 
 void perform_reduction_on_cpu(std::vector<std::unique_ptr<ResultSet>>& result_sets,
-                              const ResultSetStorage* cpu_result_storage) {
-  CHECK(result_sets.size() > 0);
-  Config config;
-  // for codegen only
-  auto executor = Executor::getExecutor(nullptr);
-  ResultSetReductionJIT reduction_jit(result_sets.front()->getQueryMemDesc(),
-                                      result_sets.front()->getTargetInfos(),
-                                      result_sets.front()->getTargetInitVals(),
-                                      config,
-                                      executor.get());
-  const auto reduction_code = reduction_jit.codegen();
-  for (auto& result_set : result_sets) {
-    ResultSetReduction::reduce(*cpu_result_storage,
-                               *(result_set->getStorage()),
-                               {},
-                               reduction_code,
-                               config,
-                               executor.get());
-  }
-}
+                              const ResultSetStorage* cpu_result_storage);
 
 struct TestInputData {
   size_t device_id;
