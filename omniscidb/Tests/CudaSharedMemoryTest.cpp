@@ -165,14 +165,6 @@ namespace {
 void prepare_generated_cuda_kernel(llvm::Module* module,
                                    llvm::LLVMContext& context,
                                    llvm::Function* kernel) {
-  // might be extra, remove and clean up
-  module->setDataLayout(
-      "e-p:64:64:64-i1:8:8-i8:8:8-"
-      "i16:16:16-i32:32:32-i64:64:64-"
-      "f32:32:32-f64:64:64-v16:16:16-"
-      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
-  module->setTargetTriple("nvptx64-nvidia-cuda");
-
   llvm::NamedMDNode* md = module->getOrInsertNamedMetadata("nvvm.annotations");
 
   llvm::Metadata* md_vals[] = {llvm::ConstantAsMetadata::get(kernel),
@@ -353,19 +345,17 @@ struct TestInputData {
 };
 
 void perform_test_and_verify_results(TestInputData input) {
+  auto platform = GpuMgrPlatform::CUDA;
   auto executor = Executor::getExecutor(nullptr, nullptr);
   auto& context = executor->getContext();
   auto cgen_state = std::unique_ptr<CgenState>(
       new CgenState({}, false, false, executor->getExtensionModuleContext(), context));
   cgen_state->set_module_shallow_copy(
-      executor->getExtensionModuleContext()->getRTModule(/*is_l0=*/false));
+      executor->getExtensionModuleContext()->getRTModule(platform == GpuMgrPlatform::L0));
   auto module = cgen_state->module_;
-  module->setDataLayout(
-      "e-p:64:64:64-i1:8:8-i8:8:8-"
-      "i16:16:16-i32:32:32-i64:64:64-"
-      "f32:32:32-f64:64:64-v16:16:16-"
-      "v32:32:32-v64:64:64-v128:128:128-n16:32:64");
-  module->setTargetTriple("nvptx64-nvidia-cuda");
+  auto cgen_traits = get_codegen_traits(platform);
+  module->setDataLayout(cgen_traits.dataLayout());
+  module->setTargetTriple(cgen_traits.triple());
   auto cuda_mgr = std::make_unique<CudaMgr_Namespace::CudaMgr>(1);
   const auto row_set_mem_owner =
       std::make_shared<RowSetMemoryOwner>(nullptr, Executor::getArenaBlockSize());
@@ -399,7 +389,7 @@ void perform_test_and_verify_results(TestInputData input) {
       input.target_infos,
       init_agg_val_vec(input.target_infos, query_mem_desc),
       cuda_mgr.get(),
-      get_codegen_traits(GpuMgrPlatform::CUDA),
+      cgen_traits,
       executor.get());
   gpu_smem_tester.codegen(CompilationOptions::defaults(
       ExecutorDeviceType::GPU,
