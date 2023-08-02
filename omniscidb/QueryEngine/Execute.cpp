@@ -530,8 +530,8 @@ TableFragmentsInfo Executor::getTableInfo(const int db_id, const int table_id) c
   return input_table_info_cache_.getTableInfo(db_id, table_id);
 }
 
-const TableGeneration& Executor::getTableGeneration(const int table_id) const {
-  return table_generations_.getGeneration(table_id);
+const TableGeneration& Executor::getTableGeneration(int db_id, int table_id) const {
+  return table_generations_.getGeneration(db_id, table_id);
 }
 
 ExpressionRange Executor::getColRange(const PhysicalInput& phys_input) const {
@@ -4056,6 +4056,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     const std::vector<uint64_t>& frag_offsets,
     const size_t frag_idx,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
+  const int db_id = table_desc.getDatabaseId();
   const int table_id = table_desc.getTableId();
 
   for (const auto& simple_qual : simple_quals) {
@@ -4116,7 +4117,7 @@ std::pair<bool, int64_t> Executor::skipFragment(
     size_t start_rowid{0};
     if (chunk_meta_it == fragment.getChunkMetadataMap().end()) {
       if (lhs_col->isVirtual()) {
-        const auto& table_generation = getTableGeneration(table_id);
+        const auto& table_generation = getTableGeneration(db_id, table_id);
         start_rowid = table_generation.start_rowid;
         chunk_min = frag_offsets[frag_idx] + start_rowid;
         chunk_max = frag_offsets[frag_idx + 1] - 1 + start_rowid;
@@ -4325,6 +4326,7 @@ TableGenerations Executor::computeTableGenerations(
   for (auto [db_id, table_id] : phys_table_ids) {
     const auto table_info = getTableInfo(db_id, table_id);
     table_generations.setGeneration(
+        db_id,
         table_id,
         TableGeneration{static_cast<int64_t>(table_info.getPhysicalNumTuples()), 0});
   }
