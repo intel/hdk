@@ -53,7 +53,7 @@ if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_executable(UdfTest UdfTest.cpp)
 endif()
 if(ENABLE_CUDA)
-  add_executable(CudaSharedMemoryTest CudaSharedMemoryTest.cpp ResultSetTestUtils.cpp)
+  add_executable(CudaSharedMemoryTest CudaSharedMemoryTest.cpp GpuSharedMemoryTestHelpers.cpp ResultSetTestUtils.cpp)
 endif()
 
 # Tests + Microbenchmarks
