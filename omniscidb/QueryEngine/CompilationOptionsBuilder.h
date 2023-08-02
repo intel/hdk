@@ -23,14 +23,12 @@ class CompilationOptionsBuilder {
 
 class CompilationOptionsDefaultBuilder : public CompilationOptionsBuilder {
  private:
-  const Config* config_;
-  const std::optional<GpuMgrPlatform>* platform_;
+  const Config& config_;
+  const std::optional<GpuMgrPlatform> platform_;
 
  public:
-  // The default constructor exists to satisfy cython's limitaion for stack allocation
-  CompilationOptionsDefaultBuilder() {}
   CompilationOptionsDefaultBuilder(const Config& cfg,
-                                   const std::optional<GpuMgrPlatform>& p = std::nullopt)
-      : config_(&cfg), platform_(&p) {}
+                                   const std::optional<GpuMgrPlatform> p = std::nullopt)
+      : config_(cfg), platform_(p) {}
   CompilationOptions build(const ExecutorDeviceType dt) override;
 };

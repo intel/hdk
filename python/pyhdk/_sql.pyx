@@ -194,12 +194,14 @@ cdef class RelAlgExecutor:
 
   def execute(self, **kwargs):
     cdef const CConfig *config = self.c_rel_alg_executor.get().getExecutor().getConfigPtr().get()
-    cdef optional[CGpuMgrPlatform] platform = self.c_data_mgr.get().getGpuMgr().getPlatform()
-    cdef CCompilationOptionsDefaultBuilder builder = CCompilationOptionsDefaultBuilder(dereference(config), platform)
+    cdef optional[CGpuMgrPlatform] platform
+    if self.c_data_mgr.get().getGpuMgr():
+      platform = self.c_data_mgr.get().getGpuMgr().getPlatform()
+    cdef unique_ptr[CCompilationOptionsDefaultBuilder] builder = make_unique[CCompilationOptionsDefaultBuilder](CCompilationOptionsDefaultBuilder(dereference(config), platform))
     cdef CExecutorDeviceType dt = CExecutorDeviceType.CPU
     if kwargs.get("device_type", "auto") == "GPU" and not config.exec.cpu_only:
       dt = CExecutorDeviceType.GPU
-    cdef unique_ptr[CCompilationOptions] c_co = make_unique[CCompilationOptions](builder.build(dt))
+    cdef unique_ptr[CCompilationOptions] c_co = make_unique[CCompilationOptions](builder.get().build(dt))
     c_co.get().allow_lazy_fetch = kwargs.get("enable_lazy_fetch", config.rs.enable_lazy_fetch)
     c_co.get().with_dynamic_watchdog = kwargs.get("enable_dynamic_watchdog", config.exec.watchdog.enable_dynamic)
     cdef unique_ptr[CExecutionOptions] c_eo = make_unique[CExecutionOptions](CExecutionOptions.fromConfig(dereference(config)))

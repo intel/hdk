@@ -97,7 +97,6 @@ cdef extern from "omniscidb/QueryEngine/CompilationOptions.h":
 
 cdef extern from "omniscidb/QueryEngine/CompilationOptionsBuilder.h":
   cdef cppclass CCompilationOptionsDefaultBuilder "CompilationOptionsDefaultBuilder":
-    CCompilationOptionsDefaultBuilder()
     CCompilationOptionsDefaultBuilder(const CConfig, const optional[CGpuMgrPlatform])
     CCompilationOptions build(const CExecutorDeviceType)
 

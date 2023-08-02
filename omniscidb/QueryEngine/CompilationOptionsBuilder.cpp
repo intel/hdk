@@ -37,9 +37,8 @@ void CompilationOptionsBuilder::applyConfigSettings(CompilationOptions& co,
 }
 
 CompilationOptions CompilationOptionsDefaultBuilder::build(const ExecutorDeviceType dt) {
-  CHECK(config_);
   auto co = makeCompilationOptions(dt);
-  applyConfigSettings(co, *config_);
-  setCodegenTraits(co, *platform_);
+  applyConfigSettings(co, config_);
+  setCodegenTraits(co, platform_);
   return co;
 }
