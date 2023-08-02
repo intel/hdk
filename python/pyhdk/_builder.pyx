@@ -879,3 +879,13 @@ cdef class QueryBuilder:
     res = QueryExpr()
     res.c_expr = self.c_builder.get().timestamp(value)
     return res
+
+  def if_then_else(self, cond, true_val, false_val):
+    helper = self.cst(None)
+    cond = helper._process_op_expr(cond)
+    true_val = helper._process_op_expr(true_val)
+    false_val = helper._process_op_expr(false_val)
+
+    res = QueryExpr()
+    res.c_expr = self.c_builder.get().ifThenElse((<QueryExpr>cond).c_expr, (<QueryExpr>true_val).c_expr, (<QueryExpr>false_val).c_expr)
+    return res

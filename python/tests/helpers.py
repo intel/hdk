@@ -19,6 +19,8 @@ def check_res(res, expected):
     actual_cols = df.columns.to_list()
     assert actual_cols == expected_cols
     for col in actual_cols:
+        if df[col].dtype.name == "category":
+            df[col] = df[col].astype(str)
         vals = df[col].fillna("null").to_list()
         assert len(vals) == len(expected[col])
         for expected_val, actual_val in zip(expected[col], vals):

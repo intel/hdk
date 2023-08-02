@@ -152,3 +152,5 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr date(const string&) except +
     CBuilderExpr time(const string&) except +
     CBuilderExpr timestamp(const string&) except +
+
+    CBuilderExpr ifThenElse(const CBuilderExpr&, const CBuilderExpr&, const CBuilderExpr&) except +

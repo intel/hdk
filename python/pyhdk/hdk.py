@@ -2635,6 +2635,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> hdk.date("2001-02-03")
         (Const 2001-02-03)
@@ -2653,6 +2656,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> hdk.time("15:00:00")
         (Const 15:00:00)
@@ -2671,6 +2677,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> hdk.timestamp("2001-02-03 15:00:00")
         (Const 2001-02-03 15:00:00.000000)
@@ -2684,6 +2693,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [1, 2, 3, 4, 5]})
         >>> ht.agg([], hdk.count()).run()
@@ -2701,6 +2713,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1]})
         >>> ht.proj("a", hdk.row_number().over(ht.ref("a"))).run()
@@ -2724,6 +2739,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b":[2, 2, 1, 3, 1]})
         >>> ht.proj("a", "b", hdk.rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
@@ -2747,6 +2765,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1], "b":[2, 2, 1, 3, 1]})
         >>> ht.proj("a", "b", hdk.dense_rank().over(ht.ref("a")).order_by(ht.ref("b"))).run()
@@ -2770,6 +2791,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [4, 2, 1, 3, 5]})
         >>> ht.proj("a", hdk.percent_rank().order_by(ht.ref("a"))).run()
@@ -2797,6 +2821,9 @@ class HDK:
         Returns
         -------
         QueryExpr
+
+        Examples
+        --------
         >>> hdk = pyhdk.init()
         >>> ht = hdk.import_pydict({"a": [1, 2, 1, 2, 1]})
         >>> ht.proj("a", hdk.ntile(2).over(ht.ref("a"))).run()
@@ -2811,6 +2838,37 @@ class HDK:
         1|2
         """
         return self._builder.ntile(tile_count)
+
+    def if_then_else(self, cond, true_val, false_val):
+        """
+        Create an expression to select between two values of the same type depending on a condition.
+
+        Parameters
+        ----------
+        cond: QueryExpr
+            Condition.
+        true_val: bool, int, float, str or QueryExpr
+            Value to use if condtion is True.
+        false_val: bool, int, float, str or QueryExpr
+            Value to use if condition is False.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"a": [True, False, True], "b": [1, 2, 3], "c": [10, 20, 30]})
+        >>> ht.proj(r=hdk.if_then_else(ht.ref("a"), ht.ref("b"), ht.ref("c"))).run()
+        Schema:
+          r: INT64
+        Data:
+        1
+        20
+        3
+        """
+        return self._builder.if_then_else(cond, true_val, false_val)
 
 
 def init(**kwargs):
