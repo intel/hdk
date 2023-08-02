@@ -6020,6 +6020,46 @@ TEST_F(Issue513, Reproducer) {
   compare_res_data(res, std::vector<int32_t>({3}));
 }
 
+class Issue588 : public TestSuite {
+ protected:
+  static void SetUpTestSuite() {
+    createTable("test_588_1", {{"id", ctx().int64()}, {"A", ctx().int64()}});
+    insertCsvValues("test_588_1", "1,1\n2,2\n3,3");
+    createTable("test_588_2", {{"id", ctx().int64()}, {"B", ctx().int64()}});
+    insertCsvValues("test_588_2", "1,2\n2,3\n3,3");
+    createTable("test_588_3", {{"id", ctx().int64()}, {"C", ctx().int64()}});
+    insertCsvValues("test_588_3", "1,1\n2,2\n3,3");
+    createTable("test_588_4", {{"id", ctx().int64()}, {"D", ctx().int64()}});
+    insertCsvValues("test_588_4", "1,2\n2,3\n3,3");
+  }
+
+  static void TearDownTestSuite() {
+    dropTable("test_588_1");
+    dropTable("test_588_2");
+    dropTable("test_588_3");
+    dropTable("test_588_4");
+  }
+};
+
+TEST_F(Issue588, Reproducer1) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto scan1 = builder.scan("test_588_1");
+  auto scan2 = builder.scan("test_588_2");
+  auto scan3 = builder.scan("test_588_3");
+  auto scan4 = builder.scan("test_588_4");
+
+  auto dag1 = scan1.proj({0, 1}).join(scan2.proj({0, 1})).finalize();
+  auto res1 = runQuery(std::move(dag1));
+
+  auto dag2 =
+      builder.scan(res1.tableName()).proj({0, 1}).join(scan3.proj({0, 1})).finalize();
+  auto res2 = runQuery(std::move(dag2));
+
+  auto dag3 =
+      builder.scan(res2.tableName()).proj({0, 1}).join(scan4.proj({0, 1})).finalize();
+  auto res3 = runQuery(std::move(dag3));
+}
+
 TEST_F(QueryBuilderTest, RunOnResult) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
 

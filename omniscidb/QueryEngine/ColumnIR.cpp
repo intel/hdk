@@ -254,7 +254,8 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
   AUTOMATIC_IR_METADATA(cgen_state_);
   const auto offset_lv = cgen_state_->frag_offsets_[adjusted_range_table_index(col_var)];
   llvm::Value* start_rowid_lv{nullptr};
-  const auto& table_generation = executor()->getTableGeneration(col_var->tableId());
+  const auto& table_generation =
+      executor()->getTableGeneration(col_var->dbId(), col_var->tableId());
   if (table_generation.start_rowid > 0) {
     // Handle the multi-node case: each leaf receives a start rowid used
     // to offset the local rowid and generate a cluster-wide unique rowid.

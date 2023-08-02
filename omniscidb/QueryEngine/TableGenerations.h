@@ -27,16 +27,16 @@ struct TableGeneration {
 
 class TableGenerations {
  public:
-  void setGeneration(const uint32_t id, const TableGeneration& generation);
+  void setGeneration(int db_id, int table_id, const TableGeneration& generation);
 
-  const TableGeneration& getGeneration(const uint32_t id) const;
+  const TableGeneration& getGeneration(int db_id, int table_id) const;
 
-  const std::unordered_map<uint32_t, TableGeneration>& asMap() const;
+  const std::unordered_map<std::pair<int, int>, TableGeneration>& asMap() const;
 
   void clear();
 
  private:
-  std::unordered_map<uint32_t, TableGeneration> id_to_generation_;
+  std::unordered_map<std::pair<int, int>, TableGeneration> id_to_generation_;
 };
 
 #endif  // QUERYENGINE_TABLEGENERATIONS_H
