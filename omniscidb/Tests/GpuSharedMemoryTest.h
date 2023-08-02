@@ -60,14 +60,14 @@ class StrideNumberGenerator : public NumberGenerator {
 class CudaReductionTester : public GpuSharedMemCodeBuilder {
  public:
   CudaReductionTester(const Config& config,
-                     llvm::Module* module,
-                     llvm::LLVMContext& context,
-                     const QueryMemoryDescriptor& qmd,
-                     const std::vector<TargetInfo>& targets,
-                     const std::vector<int64_t>& init_agg_values,
-                     CudaMgr_Namespace::CudaMgr* cuda_mgr,
-                     const compiler::CodegenTraits& traits,
-                     Executor* executor)
+                      llvm::Module* module,
+                      llvm::LLVMContext& context,
+                      const QueryMemoryDescriptor& qmd,
+                      const std::vector<TargetInfo>& targets,
+                      const std::vector<int64_t>& init_agg_values,
+                      GpuMgr* gpu_mgr,
+                      const compiler::CodegenTraits& traits,
+                      Executor* executor)
       : GpuSharedMemCodeBuilder(module,
                                 context,
                                 qmd,
@@ -76,7 +76,7 @@ class CudaReductionTester : public GpuSharedMemCodeBuilder {
                                 config,
                                 traits,
                                 executor)
-      , cuda_mgr_(cuda_mgr) {
+      , gpu_mgr_(gpu_mgr) {
     // CHECK(getReductionFunction());
   }
   void codegenWrapperKernel();
@@ -86,6 +86,6 @@ class CudaReductionTester : public GpuSharedMemCodeBuilder {
                             const size_t device_id);
 
  private:
-  CudaMgr_Namespace::CudaMgr* cuda_mgr_;
+  GpuMgr* gpu_mgr_;
   llvm::Function* wrapper_kernel_;
 };

@@ -422,18 +422,21 @@ void CudaReductionTester::performReductionTest(
   os.flush();
   std::string module_str(ss.str());
 
-  std::unique_ptr<CudaDeviceCompilationContext> gpu_context(compile_and_link_cuda_code(
-      module_str, module_, cuda_mgr_, getWrapperKernel()->getName().str()));
+  std::unique_ptr<CudaDeviceCompilationContext> gpu_context(
+      compile_and_link_cuda_code(module_str,
+                                 module_,
+                                 dynamic_cast<CudaMgr_Namespace::CudaMgr*>(gpu_mgr_),
+                                 getWrapperKernel()->getName().str()));
 
   const auto buffer_size = query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU);
   const size_t num_buffers = result_sets.size();
   std::vector<int8_t*> d_input_buffers;
   for (size_t i = 0; i < num_buffers; i++) {
-    d_input_buffers.push_back(cuda_mgr_->allocateDeviceMem(buffer_size, device_id));
-    cuda_mgr_->copyHostToDevice(d_input_buffers[i],
-                                result_sets[i]->getStorage()->getUnderlyingBuffer(),
-                                buffer_size,
-                                device_id);
+    d_input_buffers.push_back(gpu_mgr_->allocateDeviceMem(buffer_size, device_id));
+    gpu_mgr_->copyHostToDevice(d_input_buffers[i],
+                               result_sets[i]->getStorage()->getUnderlyingBuffer(),
+                               buffer_size,
+                               device_id);
   }
 
   constexpr size_t num_kernel_params = 3;
@@ -448,22 +451,22 @@ void CudaReductionTester::performReductionTest(
                  [](int8_t* dptr) { return reinterpret_cast<CUdeviceptr>(dptr); });
 
   auto d_input_buffer_dptrs =
-      cuda_mgr_->allocateDeviceMem(num_buffers * sizeof(CUdeviceptr), device_id);
-  cuda_mgr_->copyHostToDevice(d_input_buffer_dptrs,
-                              reinterpret_cast<int8_t*>(h_input_buffer_dptrs.data()),
-                              num_buffers * sizeof(CUdeviceptr),
-                              device_id);
+      gpu_mgr_->allocateDeviceMem(num_buffers * sizeof(CUdeviceptr), device_id);
+  gpu_mgr_->copyHostToDevice(d_input_buffer_dptrs,
+                             reinterpret_cast<int8_t*>(h_input_buffer_dptrs.data()),
+                             num_buffers * sizeof(CUdeviceptr),
+                             device_id);
 
   // parameter 2: number of buffers
-  auto d_num_buffers = cuda_mgr_->allocateDeviceMem(sizeof(int64_t), device_id);
-  cuda_mgr_->copyHostToDevice(d_num_buffers,
-                              reinterpret_cast<const int8_t*>(&num_buffers),
-                              sizeof(int64_t),
-                              device_id);
+  auto d_num_buffers = gpu_mgr_->allocateDeviceMem(sizeof(int64_t), device_id);
+  gpu_mgr_->copyHostToDevice(d_num_buffers,
+                             reinterpret_cast<const int8_t*>(&num_buffers),
+                             sizeof(int64_t),
+                             device_id);
 
   // parameter 3: device pointer to the output buffer
-  auto d_result_buffer = cuda_mgr_->allocateDeviceMem(buffer_size, device_id);
-  cuda_mgr_->copyHostToDevice(
+  auto d_result_buffer = gpu_mgr_->allocateDeviceMem(buffer_size, device_id);
+  gpu_mgr_->copyHostToDevice(
       d_result_buffer, gpu_result_storage->getUnderlyingBuffer(), buffer_size, device_id);
 
   // collecting all kernel parameters:
@@ -498,16 +501,16 @@ void CudaReductionTester::performReductionTest(
                                  nullptr));
 
   // transfer back the results:
-  cuda_mgr_->copyDeviceToHost(
+  gpu_mgr_->copyDeviceToHost(
       gpu_result_storage->getUnderlyingBuffer(), d_result_buffer, buffer_size, device_id);
 
   // release the gpu memory used:
   for (auto& d_buffer : d_input_buffers) {
-    cuda_mgr_->freeDeviceMem(d_buffer);
+    gpu_mgr_->freeDeviceMem(d_buffer);
   }
-  cuda_mgr_->freeDeviceMem(d_input_buffer_dptrs);
-  cuda_mgr_->freeDeviceMem(d_num_buffers);
-  cuda_mgr_->freeDeviceMem(d_result_buffer);
+  gpu_mgr_->freeDeviceMem(d_input_buffer_dptrs);
+  gpu_mgr_->freeDeviceMem(d_num_buffers);
+  gpu_mgr_->freeDeviceMem(d_result_buffer);
 }
 
 TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
