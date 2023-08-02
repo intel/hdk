@@ -32,6 +32,13 @@ jobs:
       name: clang
       options: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
+  build-asan:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      name: asan
+      options: -DENABLE_ASAN=on
+
   build-l0:
     name: Build
     uses: ./.github/workflows/build.yml
@@ -82,20 +89,21 @@ jobs:
       test: sanity
 
   asan:
-    name: Asan test (Gtests)
+    name: ASAN generate cache (Gtests)
     needs: build
     uses: ./.github/workflows/test.yml
     with:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: asan
 
-#  test-asan-docker:
-#    needs: [build-asan, asan]
-#    uses: ./.github/workflows/test-docker.yml
-#    with:
-#      build-name: asan
-#      reset-cache: ${{ !!inputs.reset-cache }}
-
+  test-asan-docker:
+    name: ASAN docker test (Gtests)
+    needs: [build-asan, asan]
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      name: conda
+      build-name: asan
+      reset-cache: ${{ !!inputs.reset-cache }}
 
   build-cuda-docker:
     name: Build
@@ -167,4 +175,5 @@ jobs:
   pytest:
     name: PyHDK (Pytest)
     uses: ./.github/workflows/pytest.yml
+
 

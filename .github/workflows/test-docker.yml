@@ -34,8 +34,19 @@ jobs:
           echo RUN_STAMP=docker-${{ runner.os }}-${{ inputs.name }} >>$GITHUB_ENV
 
       - uses: actions/download-artifact@v3
+        if: inputs.build-name != 'asan'
         with:
           name: ${{ env.RUN_STAMP }}-${{ inputs.build-name }}
+
+      - uses: actions/download-artifact@v3
+        if: inputs.build-name == 'asan'
+        with:
+          name: ${{ runner.os }}-asan-build
+
+      - uses: actions/download-artifact@v3
+        if: inputs.build-name == 'asan'
+        with:
+          name: ${{ runner.os }}-asan-cache
 
       - name: Unpack build files, create Dockerfile
         run: |
@@ -73,7 +84,13 @@ jobs:
       - name: ASAN test
         if: inputs.build-name == 'asan'
         run: |
-          echo FIXME docker exec -u ghrunner hdk-build.${{ inputs.name }} bash -c 'cd /_work/omniscidb/build/Tests && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
+          docker cp cache.tgz hdk-build.${{ inputs.name }}:/_work/
+          docker exec hdk-build.${{ inputs.name }} chown -R ghrunner:ghrunner /_work/
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} tar -zxf /_work/cache.tgz -C /_work/build/omniscidb/Tests 
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} conda update conda
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} conda env update -f /_work/omniscidb/scripts/mapd-deps-conda-dev-env.yml
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} conda install -n omnisci-dev -c conda-forge gtest
+          docker exec -u ghrunner hdk-build.${{ inputs.name }} conda run --no-capture-output -n omnisci-dev bash -cvx 'export LD_LIBRARY_PATH=$(find /_work -name "*.so" -exec dirname {} \; | sort -u | tr "\n" :)$LD_LIBRARY_PATH; cd /_work/build/omniscidb/Tests && ldd ./ArrowBasedExecuteTest && ./ArrowBasedExecuteTest --use-rel-alg-cache=cache.txt'
 
       - name: L0 Sanity test
         if: inputs.name == 'l0'
@@ -84,5 +101,4 @@ jobs:
       - name: Stop the container
         if: always()
         run: docker stop hdk-build.${{ inputs.name }} || true
-
 

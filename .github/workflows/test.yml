@@ -91,6 +91,6 @@ jobs:
         if: inputs.test == 'asan'
         uses: actions/upload-artifact@v3
         with:
-          name: docker-${{ env.RUN_STAMP }}-asan
+          name: ${{ runner.os }}-asan-cache
           path: /tmp/cache.tgz
 
