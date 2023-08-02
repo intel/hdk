@@ -329,8 +329,6 @@ class StringDictionary {
   struct StringDictStorage {
     std::vector<int32_t> hash_to_id_map;
     std::vector<uint32_t> string_hashes;
-    // TODO: what if we made this a container of string views, and kept the original arrow
-    // string data?
     std::vector<std::string_view> strings;
     std::vector<std::unique_ptr<std::string>> strings_owned;
     bool materialize_hashes{false};
@@ -351,7 +349,6 @@ class StringDictionary {
       }
       CHECK_LT(bucket, hash_to_id_map.size());
       hash_to_id_map[bucket] = static_cast<int32_t>(numStrings()) - 1;
-      // LOG(ERROR) << "Added string " << str << " with id " << hash_to_id_map[bucket];
       return hash_to_id_map[bucket];
     }
 
@@ -370,12 +367,11 @@ class StringDictionary {
 
     bool full() const { return strings.size() == hash_to_id_map.size(); }
     bool fillRateIsHigh() const { return 2 * strings.size() > hash_to_id_map.size(); }
-    size_t num_strings() const { return strings.size(); }
   };
 
   std::unique_ptr<StringDictStorage> storage_;
 
-  mutable mapd_shared_mutex rw_mutex_;  // let's not make this mutable...
+  mutable mapd_shared_mutex rw_mutex_;
 
   // TODO: legacy, direct access outside of this class
   std::vector<uint32_t> hash_cache_;

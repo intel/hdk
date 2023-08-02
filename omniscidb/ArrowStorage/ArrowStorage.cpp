@@ -379,7 +379,7 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
       // skip empty tables
       continue;
     }
-    auto col_ids = dict->table_ids_to_column_ids.at(table_id);
+    const auto& col_ids = dict->table_ids_to_column_ids.at(table_id);
     CHECK(!col_ids.empty());
 
     for (const auto col_id : col_ids) {
@@ -393,6 +393,8 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
                 << col_id << " in table " << table_id;
         continue;
       }
+
+      // TODO: store min/max data per chunk and use that instead of update stats
 
       arrow::ArrayVector col_indices_data;
       const auto& chunks = col_data->chunks();
@@ -485,6 +487,11 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
             computeStats(new_col_data->Slice(frag.offset, frag.row_count), dict->type));
       }
 
+      // copy the strings pointer into the dict encoded str owned map
+      CHECK(table.dict_encoded_str_owned
+                .insert(std::make_pair(col_id, table.col_data[col_id]))
+                .second);
+      // overwrite the strings data with the indices data
       table.col_data[col_id] = new_col_data;
     }  // per column
   }    // per table

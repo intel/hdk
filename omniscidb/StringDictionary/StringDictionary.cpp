@@ -1518,6 +1518,8 @@ void StringDictionary::getOrAddBulk(const std::vector<std::string>& string_vec,
   CHECK(storage_);
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
 
+  LOG(ERROR) << "Running string copy!";
+
   const auto str_offset = storage_->strings_owned.size();
   storage_->strings_owned.reserve(str_offset + string_vec.size());
   std::transform(
@@ -1568,8 +1570,7 @@ void StringDictionary::getOrAddBulkUnlocked(
       output_string_ids[i] = inline_int_null_value<T>();
     } else {
       // add string to storage and store id
-      const auto& hash = hashes[i];
-      output_string_ids[i] = addString(hash, input_string);
+      output_string_ids[i] = addString(hashes[i], input_string);
     }
   }
 }
@@ -1729,7 +1730,6 @@ void StringDictionary::StringDictStorage::resize(const size_t new_size) {
   }
 }
 
-// TODO: count slot misses
 size_t StringDictionary::StringDictStorage::computeBucket(
     const uint32_t hash,
     const std::string_view input_string) const noexcept {
@@ -1745,7 +1745,6 @@ size_t StringDictionary::StringDictStorage::computeBucket(
 
     // slot is full, check for a collision
     if (materialize_hashes) {
-      CHECK_LT(size_t(candidate_string_id), string_hashes.size());
       const auto existing_hash = string_hashes[candidate_string_id];
       if (existing_hash == hash) {
         const auto& existing_string = strings[candidate_string_id];
@@ -1755,7 +1754,6 @@ size_t StringDictionary::StringDictStorage::computeBucket(
         }
       }
     } else {
-      CHECK_LT(size_t(candidate_string_id), strings.size());
       const auto& existing_string = strings[candidate_string_id];
       if (existing_string == input_string) {
         // found an existing string that matches

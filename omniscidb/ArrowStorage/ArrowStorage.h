@@ -161,6 +161,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     size_t fragment_size = 32'000'000;
     std::shared_ptr<arrow::Schema> schema;
     std::vector<std::shared_ptr<arrow::ChunkedArray>> col_data;
+    std::unordered_map<int, std::shared_ptr<arrow::ChunkedArray>> dict_encoded_str_owned;
     std::vector<DataFragment> fragments;
     size_t row_count = 0;
   };
