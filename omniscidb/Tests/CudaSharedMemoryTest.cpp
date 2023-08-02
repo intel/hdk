@@ -86,12 +86,16 @@ void init_storage_buffer(int8_t* buffer,
 }  // namespace
 
 void CudaReductionTester::codegenWrapperKernel() {
-  const unsigned address_space = 0;
-  auto pi8_type = llvm::Type::getInt8PtrTy(context_, address_space);
+  auto i8_type = llvm::Type::getInt8Ty(context_);
+  auto i64_type = llvm::Type::getInt64Ty(context_);
+  auto pi8_type = traits_.globalPointerType(i8_type);
+  auto pi64_type = traits_.globalPointerType(i64_type);
+  auto ppi8_type = traits_.globalPointerType(pi8_type);
+
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(llvm::PointerType::get(pi8_type, address_space));
-  input_arguments.push_back(llvm::Type::getInt64Ty(context_));  // num input buffers
-  input_arguments.push_back(llvm::Type::getInt8PtrTy(context_, address_space));
+  input_arguments.push_back(ppi8_type);
+  input_arguments.push_back(i64_type);  // num input buffers
+  input_arguments.push_back(pi8_type);
 
   llvm::FunctionType* ft =
       llvm::FunctionType::get(llvm::Type::getVoidTy(context_), input_arguments, false);
@@ -128,12 +132,9 @@ void CudaReductionTester::codegenWrapperKernel() {
       input_ptrs->getType()->getScalarType()->getPointerElementType(),
       input_ptrs,
       block_index);
-  auto input_buffer = ir_builder.CreateLoad(
-      llvm::Type::getInt8PtrTy(context_, address_space), input_buffer_gep);
+  auto input_buffer = ir_builder.CreateLoad(pi8_type, input_buffer_gep);
   auto input_buffer_ptr =
-      ir_builder.CreatePointerCast(input_buffer,
-                                   llvm::Type::getInt64PtrTy(context_, address_space),
-                                   "input_buffer_ptr");
+      ir_builder.CreatePointerCast(input_buffer, pi64_type, "input_buffer_ptr");
   const auto buffer_size = ll_int(
       static_cast<int32_t>(query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU)),
       context_);
@@ -148,9 +149,7 @@ void CudaReductionTester::codegenWrapperKernel() {
                                                      "smem_input_buffer_ptr");
 
   auto output_buffer_ptr =
-      ir_builder.CreatePointerCast(output_buffer,
-                                   llvm::Type::getInt64PtrTy(context_, address_space),
-                                   "output_buffer_ptr");
+      ir_builder.CreatePointerCast(output_buffer, pi64_type, "output_buffer_ptr");
   // call the reduction function
   CHECK(reduction_func_);
   std::vector<llvm::Value*> reduction_args{
