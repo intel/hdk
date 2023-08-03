@@ -527,9 +527,6 @@ class ResultSet {
 
   static double calculateQuantile(quantile::TDigest* const t_digest);
 
-  void translateDictEncodedColumns(std::vector<TargetInfo> const&,
-                                   size_t const start_idx);
-
   unsigned getBlockSize() const { return block_size_; }
   unsigned getGridSize() const { return grid_size_; }
 
