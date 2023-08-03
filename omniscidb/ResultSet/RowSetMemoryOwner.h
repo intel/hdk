@@ -232,6 +232,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
 
   StringDictionary* getOrAddStringDictProxy(const int dict_id_in,
                                             const int64_t generation = -1);
+  std::shared_ptr<StringDictionary> getStringDictProxyOwned(const int dict_id);
 
   void addLiteralStringDictProxy(std::shared_ptr<StringDictionary> lit_str_dict_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);

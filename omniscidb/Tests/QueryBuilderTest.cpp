@@ -7020,6 +7020,11 @@ class Issue588 : public TestSuite {
     insertCsvValues("test_588_3", "1,1\n2,2\n3,3");
     createTable("test_588_4", {{"id", ctx().int64()}, {"D", ctx().int64()}});
     insertCsvValues("test_588_4", "1,2\n2,3\n3,3");
+    createTable("test_588_5",
+                {{"id", ctx().int32()},
+                 {"s1", ctx().extDict(ctx().text(), 0)},
+                 {"s2", ctx().extDict(ctx().text(), 0)}});
+    insertCsvValues("test_588_5", "1,str1,str22\n2,str2,str22\n3,str3,str33");
   }
 
   static void TearDownTestSuite() {
@@ -7027,6 +7032,7 @@ class Issue588 : public TestSuite {
     dropTable("test_588_2");
     dropTable("test_588_3");
     dropTable("test_588_4");
+    dropTable("test_588_5");
   }
 };
 
@@ -7047,6 +7053,89 @@ TEST_F(Issue588, Reproducer1) {
   auto dag3 =
       builder.scan(res2.tableName()).proj({0, 1}).join(scan4.proj({0, 1})).finalize();
   auto res3 = runQuery(std::move(dag3));
+}
+
+TEST_F(Issue588, Reproducer2) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto scan1 = builder.scan("test_588_1");
+  auto dag1 = scan1.proj({scan1.ref("A"), builder.cst("str")}).finalize();
+  auto res1 = runQuery(std::move(dag1));
+
+  auto scan2 = builder.scan(res1.tableName());
+  auto dag2 = scan2.proj({0, 1}).finalize();
+  auto res2 = runQuery(std::move(dag2));
+}
+
+TEST_F(Issue588, Reproducer3) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto scan1 = builder.scan("test_588_5");
+  auto dict1_type = scan1.ref("s1").type();
+  auto dag1 = scan1
+                  .proj({scan1.ref("id"),
+                         builder.ifThenElse(scan1.ref("id").gt(2),
+                                            scan1.ref("s1"),
+                                            builder.cst("str").cast(dict1_type))})
+                  .finalize();
+  auto res1 = runQuery(std::move(dag1));
+
+  auto scan2 = builder.scan(res1.tableName());
+  auto dag2 = scan2.proj({0, 1}).finalize();
+  auto res2 = runQuery(std::move(dag2));
+}
+
+TEST_F(Issue588, Reproducer4) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto scan1 = builder.scan("test_588_5");
+  auto dict1_type = scan1.ref("s1").type();
+  auto dag1 = scan1
+                  .proj({scan1.ref("id"),
+                         builder.ifThenElse(scan1.ref("id").gt(2),
+                                            scan1.ref("s1"),
+                                            scan1.ref("s2").cast(dict1_type))})
+                  .finalize();
+  auto res1 = runQuery(std::move(dag1));
+
+  auto scan2 = builder.scan(res1.tableName());
+  auto dag2 = scan2.proj({0, 1}).finalize();
+  auto res2 = runQuery(std::move(dag2));
+}
+
+TEST_F(Issue588, Reproducer5) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto scan1 = builder.scan("test_588_5");
+  auto dict1_type = scan1.ref("s1").type();
+  auto dag1 = scan1
+                  .proj({scan1.ref("id"),
+                         builder.ifThenElse(
+                             scan1.ref("id").gt(2),
+                             scan1.ref("s1"),
+                             builder.ifThenElse(scan1.ref("id").gt(1),
+                                                scan1.ref("s2").cast(dict1_type),
+                                                builder.cst("str").cast(dict1_type)))})
+                  .finalize();
+  auto res1 = runQuery(std::move(dag1));
+
+  auto scan2 = builder.scan(res1.tableName());
+  auto dag2 = scan2.proj({0, 1}).finalize();
+  auto res2 = runQuery(std::move(dag2));
+}
+
+class Issue667 : public TestSuite {
+ protected:
+  static void SetUpTestSuite() {
+    createTable("test_667", {{"str", ctx().extDict(ctx().text(), 0)}});
+    insertCsvValues("test_667", "1\n2\n3");
+  }
+
+  static void TearDownTestSuite() {}
+};
+
+TEST_F(Issue667, DropInputThenConvertResult) {
+  QueryBuilder builder(ctx(), getSchemaProvider(), configPtr());
+  auto dag = builder.scan("test_667").proj("str").finalize();
+  auto res = runQuery(std::move(dag));
+  dropTable("test_667");
+  compare_res_data(res, std::vector<std::string>({"1"s, "2"s, "3"s}));
 }
 
 TEST_F(QueryBuilderTest, RunOnResult) {

@@ -81,10 +81,17 @@ class ResultSetRegistry : public SimpleSchemaProvider,
     TableStats table_stats;
   };
 
+  struct DictionaryData {
+    std::unique_ptr<DictDescriptor> dict_descriptor;
+    std::set<int> table_ids;
+  };
+
   const int db_id_;
   const int schema_id_;
   int next_table_id_ = 1;
+  int next_dict_id_ = 1;
   std::unordered_map<int, std::unique_ptr<TableData>> tables_;
+  std::unordered_map<int, std::unique_ptr<DictionaryData>> dicts_;
   const ConfigPtr config_;
   mutable mapd_shared_mutex data_mutex_;
 };

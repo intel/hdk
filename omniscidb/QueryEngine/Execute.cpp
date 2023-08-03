@@ -1175,7 +1175,7 @@ ResultSetPtr Executor::reduceMultiDeviceResults(
     return std::make_shared<ResultSet>(targets,
                                        ExecutorDeviceType::CPU,
                                        QueryMemoryDescriptor(),
-                                       nullptr,
+                                       row_set_mem_owner,
                                        data_mgr_,
                                        blockSize(),
                                        gridSize());

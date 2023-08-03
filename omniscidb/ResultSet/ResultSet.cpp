@@ -493,6 +493,11 @@ StringDictionary* ResultSet::getStringDictionaryProxy(int const dict_id) const {
   return row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
 }
 
+std::shared_ptr<StringDictionary> ResultSet::getStringDictionaryProxyOwned(
+    int const dict_id) const {
+  return row_set_mem_owner_->getStringDictProxyOwned(dict_id);
+}
+
 class ResultSet::CellCallback {
   std::vector<int32_t> const id_map_;
   int64_t const null_int_;

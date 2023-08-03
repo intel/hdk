@@ -517,6 +517,8 @@ class ResultSet {
   getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const;
 
   StringDictionary* getStringDictionaryProxy(int const dict_id) const;
+  std::shared_ptr<StringDictionary> getStringDictionaryProxyOwned(
+      int const dict_id) const;
 
   template <typename ENTRY_TYPE, QueryDescriptionType QUERY_TYPE, bool COLUMNAR_FORMAT>
   ENTRY_TYPE getEntryAt(const size_t row_idx,

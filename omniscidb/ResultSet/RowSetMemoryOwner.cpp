@@ -48,6 +48,14 @@ StringDictionary* RowSetMemoryOwner::getOrAddStringDictProxy(const int dict_id_i
     CHECK_LE(dd->dictNBits, 32);
     return addStringDict(dd->stringDict, dict_id, generation);
   }
+  // It's possible the original dictionary has been removed from its storage
+  // but we still have it in a proxy.
+  if (dict_id != DictRef::literalsDictId) {
+    auto res = getStringDictProxyOwned(dict_id_in);
+    CHECK(res) << "Cannot find dict or proxy " << dict_id_in;
+    CHECK(generation < 0 || res->getBaseGeneration() == generation);
+    return res.get();
+  }
   CHECK_EQ(dict_id, DictRef::literalsDictId);
   if (!lit_str_dict_proxy_) {
     DictRef literal_dict_ref(DictRef::invalidDbId, DictRef::literalsDictId);
@@ -56,6 +64,19 @@ StringDictionary* RowSetMemoryOwner::getOrAddStringDictProxy(const int dict_id_i
     lit_str_dict_proxy_ = std::make_shared<StringDictionary>(tsd, 0);
   }
   return lit_str_dict_proxy_.get();
+}
+
+std::shared_ptr<StringDictionary> RowSetMemoryOwner::getStringDictProxyOwned(
+    const int dict_id) {
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  if (dict_id == DictRef::literalsDictId) {
+    return lit_str_dict_proxy_;
+  }
+  auto it = str_dict_proxy_owned_.find(dict_id);
+  if (it != str_dict_proxy_owned_.end()) {
+    return it->second;
+  }
+  return nullptr;
 }
 
 quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
