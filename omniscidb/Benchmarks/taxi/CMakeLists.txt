@@ -4,4 +4,5 @@ add_executable(${bench_name} taxi_reduced_bench.cpp)
 target_link_libraries(${bench_name} ${EXECUTE_TEST_LIBS} benchmark)
 
 add_executable(taxi_full taxi_full_bench.cpp)
-target_link_libraries(taxi_full ${EXECUTE_TEST_LIBS} benchmark)
+target_link_options(taxi_full PUBLIC "LINKER:--no-as-needed")
+target_link_libraries(taxi_full ${PROFILER_LIBS} ${EXECUTE_TEST_LIBS} benchmark)
