@@ -31,6 +31,17 @@ string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
 # Force -O0 optimization level for debug builds.
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
+set(PROFILER_LIBS "")
+option(ENABLE_PROFILER "Enable Gperftools linking" OFF)
+if(ENABLE_PROFILER)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer  -fPIC")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fPIC")
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
+  find_package(Gperftools REQUIRED COMPONENTS TCMALLOC PROFILER)
+  set(PROFILER_LIBS ${Gperftools_TCMALLOC} ${Gperftools_PROFILER})
+  add_definitions("-DHAVE_PROFILER")
+endif()
+
 if("${CMAKE_VERSION}" VERSION_GREATER 3.11.999)
   cmake_policy(SET CMP0074 NEW)
 endif()
@@ -608,14 +619,6 @@ if(TIME_LIMITED_BUILD)
   set(MAPD_PACKAGE_FLAGS "${MAPD_PACKAGE_FLAGS}-${TIME_LIMITED_NUMBER_OF_DAYS}d")
 endif()
 
-option(ENABLE_PROFILER "Enable google perftools" OFF)
-if(ENABLE_PROFILER)
-  find_package(Gperftools REQUIRED COMPONENTS TCMALLOC PROFILER)
-  set(PROFILER_LIBS ${Gperftools_TCMALLOC} ${Gperftools_PROFILER})
-  add_definitions("-DHAVE_PROFILER")
-else()
-  set(PROFILER_LIBS "")
-endif()
 
 add_subdirectory(SqliteConnector)
 
