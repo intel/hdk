@@ -113,14 +113,55 @@ ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
   bool has_varlen = false;
   bool has_array = false;
   for (size_t col_idx = 0; col_idx < first_rs->colCount(); ++col_idx) {
-    addColumnInfo(db_id_,
-                  table_id,
-                  columnId(col_idx),
-                  first_rs->colName(col_idx),
-                  first_rs->colType(col_idx),
-                  false);
-    has_varlen = has_varlen || first_rs->colType(col_idx)->isVarLen();
-    has_array = has_array || first_rs->colType(col_idx)->isArray();
+    auto col_type = first_rs->colType(col_idx);
+    if (col_type->isExtDictionary()) {
+      auto dict_type = col_type->as<hdk::ir::ExtDictionaryType>();
+      auto dict_proxy = first_rs->getStringDictionaryProxyOwned(dict_type->dictId());
+      // If there is no proxy and dictionary is owned by the registry then simply
+      // re-use it.
+      if (!dict_proxy && getSchemaId(dict_type->dictId()) == schema_id_) {
+        CHECK(dicts_.count(dict_type->dictId()));
+        dict_proxy = dicts_.at(dict_type->dictId())->dict_descriptor->stringDict;
+      }
+      // If we have a dictionary with no proxy then it's not safe to use because it can
+      // simply be removed from its storage. To avoid this, we create a proxy dictionary.
+      // We require result set to have a row set memory owner for that.
+      if (!dict_proxy) {
+        CHECK(dict_type->dictId() > 0) << dict_type->toString();
+        CHECK(first_rs->getRowSetMemOwner());
+        CHECK(first_rs->getStringDictionaryProxy(dict_type->dictId()));
+        dict_proxy = first_rs->getStringDictionaryProxyOwned(dict_type->dictId());
+        CHECK(dict_proxy);
+      }
+      // Add proxy as a new dictionary if it exists and is not registered yet.
+      if (dict_proxy->getDictId() <= 0) {
+        auto dict_id = addSchemaIdChecked(next_dict_id_++, schema_id_);
+        dict_proxy->setDictId(dict_id);
+        auto dict_desc = std::make_unique<DictDescriptor>(db_id_,
+                                                          dict_id,
+                                                          first_rs->colName(col_idx),
+                                                          /*nbits=*/dict_type->size() * 8,
+                                                          /*is_shared=*/true,
+                                                          /*refcount=*/1,
+                                                          table_name,
+                                                          /*temp=*/true);
+        dict_desc->stringDict = dict_proxy;
+        auto dict_data = std::make_unique<DictionaryData>();
+        dict_data->dict_descriptor = std::move(dict_desc);
+        CHECK(!dicts_.count(dict_id));
+        dicts_.emplace(dict_id, std::move(dict_data));
+      }
+      // Register table as a dictionary user and fix-up dictionary type.
+      auto dict_id = dict_proxy->getDictId();
+      CHECK_EQ(getSchemaId(dict_id), schema_id_);
+      CHECK(dicts_.count(dict_id));
+      dicts_.at(dict_id)->table_ids.insert(table_id);
+      col_type = hdk::ir::Context::defaultCtx().extDict(dict_type->elemType(), dict_id);
+    }
+    addColumnInfo(
+        db_id_, table_id, columnId(col_idx), first_rs->colName(col_idx), col_type, false);
+    has_varlen = has_varlen || col_type->isVarLen();
+    has_array = has_array || col_type->isArray();
   }
   addRowidColumn(db_id_, table_id, columnId(first_rs->colCount()));
 
@@ -169,11 +210,31 @@ void ResultSetRegistry::drop(const ResultSetTableToken& token) {
   mapd_unique_lock<mapd_shared_mutex> schema_lock(schema_mutex_);
   mapd_unique_lock<mapd_shared_mutex> data_lock(data_mutex_);
 
+  // Drop data.
   CHECK(tables_.count(token.tableId()));
   std::unique_ptr<TableData> table = std::move(tables_.at(token.tableId()));
   mapd_unique_lock<mapd_shared_mutex> table_lock(table->mutex);
   tables_.erase(token.tableId());
 
+  // Drop dicts.
+  auto cols = listColumnsNoLock(db_id_, token.tableId());
+  std::unordered_set<int> used_dicts;
+  for (auto& col : cols) {
+    if (auto dict_type = col->type->as<hdk::ir::ExtDictionaryType>()) {
+      used_dicts.insert(dict_type->dictId());
+    }
+  }
+  for (int dict_id : used_dicts) {
+    CHECK_EQ(getSchemaId(dict_id), schema_id_);
+    CHECK(dicts_.count(dict_id));
+    auto& desc = *dicts_.at(dict_id);
+    desc.table_ids.erase(token.tableId());
+    if (desc.table_ids.empty()) {
+      dicts_.erase(dict_id);
+    }
+  }
+
+  // Drop schema.
   SimpleSchemaProvider::dropTable(token.dbId(), token.tableId());
 }
 
@@ -514,8 +575,11 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
 }
 
 const DictDescriptor* ResultSetRegistry::getDictMetadata(int dict_id, bool load_dict) {
-  // Currently, we don't hold any dictionaries in the registry.
-  UNREACHABLE();
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  CHECK_EQ(getSchemaId(dict_id), schema_id_);
+  if (dicts_.count(dict_id)) {
+    return dicts_.at(dict_id)->dict_descriptor.get();
+  }
   return nullptr;
 }
 
