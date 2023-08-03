@@ -89,6 +89,11 @@ class StringDictionary {
 
   int32_t getDbId() const noexcept;
   int32_t getDictId() const noexcept;
+  void setDictId(int32_t new_id) {
+    CHECK_EQ(dict_ref_.dictId, -1);
+    CHECK_GT(new_id, 0);
+    dict_ref_.dictId = new_id;
+  }
 
   StringDictionary* getBaseDictionary() const noexcept { return base_dict_.get(); }
   int64_t getBaseGeneration() const noexcept { return base_generation_; }
@@ -249,7 +254,7 @@ class StringDictionary {
   uint32_t hashById(int string_id) const { return hashByIndex(idToIndex(string_id)); }
   uint32_t hashByIndex(int string_idx) const { return hash_cache_[string_idx]; }
 
-  const DictRef dict_ref_;
+  DictRef dict_ref_;
   const std::shared_ptr<StringDictionary> base_dict_;
   const int64_t base_generation_;
   size_t str_count_;
