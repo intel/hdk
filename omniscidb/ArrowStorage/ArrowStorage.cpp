@@ -478,12 +478,15 @@ void ArrowStorage::materializeDictionary(DictionaryData* dict) {
 
       VLOG(1) << "Materialized string dictionary for column " << col_id << " in table "
               << table_id;
+      auto& crt_stats = table.table_stats.at(columnId(col_id));
       for (auto& frag : table.fragments) {
         CHECK_LT(static_cast<size_t>(col_id), frag.metadata.size());
         auto& meta = frag.metadata[col_id];
         // compute chunk stats is multi threaded, so we single thread this
-        meta->fillChunkStats(
-            computeStats(new_col_data->Slice(frag.offset, frag.row_count), dict->type));
+        mergeStats(
+            crt_stats,
+            computeStats(new_col_data->Slice(frag.offset, frag.row_count), dict->type),
+            meta->type());
       }
 
       table.col_data[col_id] = new_col_data;
