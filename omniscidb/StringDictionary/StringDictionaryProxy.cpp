@@ -128,17 +128,6 @@ int32_t StringDictionaryProxy::getIdOfStringFromClient(const String& str) const 
   return truncate_to_generation(string_dict_->getIdOfString(str), generation_);
 }
 
-int32_t StringDictionaryProxy::getIdOfStringNoGeneration(const std::string& str) const {
-  std::shared_lock<std::shared_mutex> read_lock(rw_mutex_);
-  auto str_id = string_dict_->getIdOfString(str);
-  if (str_id != StringDictionary::INVALID_STR_ID || transient_str_to_int_.empty()) {
-    return str_id;
-  }
-  auto it = transient_str_to_int_.find(str);
-  return it != transient_str_to_int_.end() ? it->second
-                                           : StringDictionary::INVALID_STR_ID;
-}
-
 std::string StringDictionaryProxy::getString(int32_t string_id) const {
   if (inline_int_null_value<int32_t>() == string_id) {
     return "";
@@ -453,10 +442,6 @@ std::vector<int32_t> StringDictionaryProxy::getRegexpLike(const std::string& pat
   return result;
 }
 
-int32_t StringDictionaryProxy::getOrAdd(const std::string& str) noexcept {
-  return string_dict_->getOrAdd(str);
-}
-
 std::pair<const char*, size_t> StringDictionaryProxy::getStringBytes(
     int32_t string_id) const noexcept {
   if (string_id >= 0) {
@@ -533,19 +518,6 @@ class StringLocalCallback : public StringDictionary::StringCallback {
                           : new_id;
   }
 };
-
-// Union strings from both StringDictionaryProxies into *this as transients.
-// Return id_map: sdp_rhs:string_id -> this:string_id for each string in sdp_rhs.
-StringDictionaryProxy::IdMap StringDictionaryProxy::transientUnion(
-    StringDictionaryProxy const& sdp_rhs) {
-  IdMap id_map = sdp_rhs.initIdMap();
-  // serial_callback cannot be parallelized due to calling getOrAddTransientUnlocked().
-  std::unique_ptr<StringDictionary::StringCallback> serial_callback =
-      std::make_unique<StringLocalCallback>(this, id_map);
-  // Import all non-duplicate strings (transient and non-transient) and add to id_map.
-  sdp_rhs.eachStringSerially(*serial_callback);
-  return id_map;
-}
 
 std::ostream& operator<<(std::ostream& os, StringDictionaryProxy::IdMap const& id_map) {
   return os << "IdMap(offset_(" << id_map.offset_ << ") vector_map_"

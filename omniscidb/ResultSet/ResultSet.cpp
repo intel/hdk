@@ -504,38 +504,6 @@ class ResultSet::CellCallback {
   }
 };
 
-void ResultSet::translateDictEncodedColumns(std::vector<TargetInfo> const& targets,
-                                            size_t const start_idx) {
-  if (storage_) {
-    CHECK_EQ(targets.size(), storage_->targets_.size());
-    RowIterationState state;
-    for (size_t target_idx = start_idx; target_idx < targets.size(); ++target_idx) {
-      auto type_lhs = targets[target_idx].type;
-      if (type_lhs->isExtDictionary()) {
-        auto type_rhs = storage_->targets_[target_idx].type;
-        CHECK(type_rhs->isExtDictionary());
-        auto lhs_dict_id = type_lhs->as<hdk::ir::ExtDictionaryType>()->dictId();
-        auto rhs_dict_id = type_rhs->as<hdk::ir::ExtDictionaryType>()->dictId();
-        if (lhs_dict_id != rhs_dict_id) {
-          auto* const sdp_lhs = getStringDictionaryProxy(lhs_dict_id);
-          CHECK(sdp_lhs);
-          auto const* const sdp_rhs = getStringDictionaryProxy(rhs_dict_id);
-          CHECK(sdp_rhs);
-          state.cur_target_idx_ = target_idx;
-          CellCallback const translate_string_ids(sdp_lhs->transientUnion(*sdp_rhs),
-                                                  inline_int_null_value(type_rhs));
-          eachCellInColumn(state, translate_string_ids);
-          const_cast<TargetInfo&>(storage_->targets_[target_idx]).type =
-              type_rhs->ctx().extDict(
-                  type_rhs->as<hdk::ir::ExtDictionaryType>()->elemType(),
-                  lhs_dict_id,
-                  type_rhs->size());
-        }
-      }
-    }
-  }
-}
-
 // For each cell in column target_idx, callback func with pointer to datum.
 // This currently assumes the column type is a dictionary-encoded string, but this logic
 // can be generalized to other types.

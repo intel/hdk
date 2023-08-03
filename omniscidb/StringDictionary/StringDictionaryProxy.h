@@ -50,7 +50,6 @@ class StringDictionaryProxy {
 
   // enum SetOp { kUnion = 0, kIntersection };
 
-  int32_t getOrAdd(const std::string& str) noexcept;
   StringDictionary* getDictionary() const noexcept;
   int64_t getGeneration() const noexcept;
 
@@ -79,8 +78,6 @@ class StringDictionaryProxy {
   // Not currently used
   std::vector<int32_t> getOrAddTransientBulk(const std::vector<std::string>& strings);
   int32_t getIdOfString(const std::string& str) const;
-  int32_t getIdOfStringNoGeneration(
-      const std::string& str) const;  // disregard generation, only used by QueryRenderer
   std::string getString(int32_t string_id) const;
   std::vector<std::string> getStrings(const std::vector<int32_t>& string_ids) const;
   std::pair<const char*, size_t> getStringBytes(int32_t string_id) const noexcept;
@@ -216,10 +213,6 @@ class StringDictionaryProxy {
 
   // Iterate over transient strings, then non-transients.
   void eachStringSerially(StringDictionary::StringCallback&) const;
-
-  // Union strings from both StringDictionaryProxies into *this as transients.
-  // Return map of old string_ids to new string_ids.
-  IdMap transientUnion(StringDictionaryProxy const&);
 
  private:
   std::string getStringUnlocked(const int32_t string_id) const;

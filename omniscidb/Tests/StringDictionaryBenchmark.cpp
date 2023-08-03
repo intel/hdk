@@ -401,31 +401,6 @@ BENCHMARK_DEFINE_F(
   }
 }
 
-BENCHMARK_DEFINE_F(StringDictionaryProxyFixture,
-                   TransientUnion_10M_Unique_8M_Overlap_100_Transients)
-(benchmark::State& state) {
-  const auto source_proxy =
-      create_and_populate_str_proxy(1, true, append_strings_10M_10M_10);
-  const size_t num_elems = 10000000UL;
-  const size_t first_n_elems = 8000000UL;
-  const size_t last_n_elems = 100;
-  std::vector<std::string> append_strings_10M_10M_10_randomized_truncated_8M(
-      first_n_elems);
-  std::vector<std::string> append_strings_10M_10M_10_randomized_truncated_100(100);
-  std::copy(append_strings_10M_10M_10_randomized.begin(),
-            append_strings_10M_10M_10_randomized.begin() + first_n_elems,
-            append_strings_10M_10M_10_randomized_truncated_8M.begin());
-  std::copy(append_strings_10M_10M_10_randomized.begin() + (num_elems - last_n_elems),
-            append_strings_10M_10M_10_randomized.end(),
-            append_strings_10M_10M_10_randomized_truncated_100.begin());
-  auto dest_proxy = create_and_populate_str_proxy(
-      2, true, append_strings_10M_10M_10_randomized_truncated_8M);
-  dest_proxy->getOrAddTransientBulk(append_strings_10M_10M_10_randomized_truncated_100);
-  for (auto _ : state) {
-    auto id_map = dest_proxy->transientUnion(*(source_proxy.get()));
-  }
-}
-
 BENCHMARK_REGISTER_F(StringDictionaryProxyFixture, GetOrAddTransientBulk_1M_Unique)
     ->MeasureProcessCPUTime()
     ->UseRealTime()
@@ -465,12 +440,6 @@ BENCHMARK_REGISTER_F(
 BENCHMARK_REGISTER_F(
     StringDictionaryProxyFixture,
     BuildUnionTranlsatationMapToOtherProxy_10M_Unique_8M_Overlap_100_Transients)
-    ->MeasureProcessCPUTime()
-    ->UseRealTime()
-    ->Unit(benchmark::kMillisecond);
-
-BENCHMARK_REGISTER_F(StringDictionaryProxyFixture,
-                     TransientUnion_10M_Unique_8M_Overlap_100_Transients)
     ->MeasureProcessCPUTime()
     ->UseRealTime()
     ->Unit(benchmark::kMillisecond);
