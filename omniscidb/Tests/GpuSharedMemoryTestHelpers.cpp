@@ -20,7 +20,7 @@ void GpuReductionTester::codegenWrapperKernel() {
   auto i8_type = llvm::Type::getInt8Ty(context_);
   auto i64_type = llvm::Type::getInt64Ty(context_);
   auto pi8_type = traits_.globalPointerType(i8_type);
-  auto pi64_type = traits_.globalPointerType(i64_type);
+  auto pi64_type = traits_.localPointerType(i64_type);
   auto ppi8_type = traits_.globalPointerType(pi8_type);
 
   std::vector<llvm::Type*> input_arguments;
