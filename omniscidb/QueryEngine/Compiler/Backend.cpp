@@ -29,8 +29,6 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Utils/BasicBlockUtils.h>
-#include <llvm/Transforms/Utils/Cloning.h>
 
 #ifdef HAVE_L0
 #include "LLVMSPIRVLib/LLVMSPIRVLib.h"
@@ -871,81 +869,6 @@ std::shared_ptr<CompilationContext> L0Backend::generateNativeCode(
     const std::unordered_set<llvm::Function*>& live_funcs,
     const CompilationOptions& co) {
   return generateNativeGPUCode(exts_, func, wrapper_func, live_funcs, co, gpu_target_);
-}
-
-void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string& fname) {
-  auto fn = from->getFunction(fname);
-  CHECK(fn);
-
-  llvm::Function::Create(
-      fn->getFunctionType(), llvm::GlobalValue::ExternalLinkage, fn->getName(), *to);
-}
-
-void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname) {
-  auto target_fn = to->getFunction(fname);
-  auto from_fn = from->getFunction(fname);
-  CHECK(target_fn);
-  CHECK(from_fn);
-  CHECK(!from_fn->isDeclaration());
-
-  target_fn->deleteBody();
-
-  llvm::ValueToValueMapTy vmap;
-  llvm::Function::arg_iterator pos_fn_arg_it = target_fn->arg_begin();
-  for (llvm::Function::const_arg_iterator j = from_fn->arg_begin();
-       j != from_fn->arg_end();
-       ++j) {
-    pos_fn_arg_it->setName(j->getName());
-    vmap[&*j] = &*pos_fn_arg_it++;
-  }
-  llvm::SmallVector<llvm::ReturnInst*, 8> returns;
-#if LLVM_VERSION_MAJOR > 12
-  llvm::CloneFunctionInto(
-      target_fn, from_fn, vmap, llvm::CloneFunctionChangeType::DifferentModule, returns);
-#else
-  llvm::CloneFunctionInto(target_fn, from_fn, vmap, true, returns);
-#endif
-
-  for (auto& BB : *target_fn) {
-    for (llvm::BasicBlock::iterator bbi = BB.begin(); bbi != BB.end();) {
-      llvm::Instruction* inst = &*bbi++;
-      if (auto* call = llvm::dyn_cast<llvm::CallInst>(&*inst)) {
-        auto local_callee = to->getFunction(call->getCalledFunction()->getName());
-        CHECK(local_callee);
-        std::vector<llvm::Value*> args;
-        std::copy(call->arg_begin(), call->arg_end(), std::back_inserter(args));
-
-        auto new_call = llvm::CallInst::Create(local_callee, args, call->getName());
-
-        llvm::ReplaceInstWithInst(call, new_call);
-        inst = new_call;
-      }
-      for (unsigned op_idx = 0; op_idx < inst->getNumOperands(); ++op_idx) {
-        auto op = inst->getOperand(op_idx);
-        if (auto* global = llvm::dyn_cast<llvm::GlobalVariable>(op)) {
-          auto local_global = to->getGlobalVariable(global->getName(), true);
-          CHECK(local_global);
-          inst->setOperand(op_idx, local_global);
-        }
-      }
-    }
-  }
-}
-
-void insert_globals(llvm::Module* from, llvm::Module* to) {
-  for (const llvm::GlobalVariable& I : from->globals()) {
-    llvm::GlobalVariable* new_gv =
-        new llvm::GlobalVariable(*to,
-                                 I.getValueType(),
-                                 I.isConstant(),
-                                 I.getLinkage(),
-                                 (llvm::Constant*)nullptr,
-                                 I.getName(),
-                                 (llvm::GlobalVariable*)nullptr,
-                                 I.getThreadLocalMode(),
-                                 I.getType()->getAddressSpace());
-    new_gv->copyAttributesFrom(&I);
-  }
 }
 
 std::shared_ptr<L0CompilationContext> L0Backend::generateNativeGPUCode(
