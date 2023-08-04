@@ -72,6 +72,7 @@ using NodeInputs = std::vector<NodePtr>;
 class Node {
  public:
   Node(NodeInputs inputs = {});
+  Node(const Node& other);
 
   virtual ~Node() {}
 
