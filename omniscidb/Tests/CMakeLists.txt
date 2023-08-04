@@ -273,7 +273,7 @@ function(add_default_cpu_only_tests TEST_LIST)
   endforeach()
 endfunction()
 add_default_cpu_only_tests("${TEST_PROGRAMS}")
-set(EXCLUDE_PLATFORM_SPECIFIC_TESTS CodeGeneratorTest)
+set(EXCLUDE_PLATFORM_SPECIFIC_TESTS CodeGeneratorTest L0SharedMemoryTest)
 
 
 set(SANITY_TESTS ${TEST_PROGRAMS})
