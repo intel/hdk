@@ -1474,10 +1474,11 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                           }
 
                           const auto hash = hash_string(str);
-                          const auto bucket = computeBucket(hash, str);
-                          const auto string_id = hash_to_id_map[bucket].string_id;
+                          const auto bucket =
+                              computeBucket(hash, str);  // computeBucketReadOnly
+                          const auto string_id = hash_to_id_map[bucket].string_id.load();
                           if (string_id == StringDictionary::INVALID_STR_ID ||
-                              string_id > strings.size()) {
+                              string_id > int32_t(numStrings())) {
                             encoded_vec[i] = StringDictionary::INVALID_STR_ID;
                             num_strings_not_found++;
                           }
@@ -1522,8 +1523,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
       output_string_ids[i] = inline_int_null_value<T>();
     } else {
       // add string to storage and store id
-      const auto& hash = hashes[i];
-      output_string_ids[i] = addString(hash, input_string);
+      output_string_ids[i] = addString(hashes[i], input_string);
     }
   }
 }
@@ -1554,7 +1554,7 @@ int32_t StringDictionary::getIdOfString(const String& str) const {
   const uint32_t hash = hash_string(str);
 
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-  const auto bucket = computeBucket(hash, str);
+  const auto bucket = computeBucket(hash, str);  // computeBucketReadOnly
   return id(bucket);
 }
 
@@ -1608,7 +1608,7 @@ std::vector<std::string> StringDictionary::copyStrings() const {
 
 int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
   const uint32_t hash = hash_string(sv);
-  const auto bucket = computeBucket(hash, sv);
+  const auto bucket = computeBucket(hash, sv);  // computeBucketReadOnly
   return id(bucket);
 }
 
@@ -1618,20 +1618,58 @@ std::string_view StringDictionary::getStringFromStorageFast(
   return str(string_id);
 }
 
-template <class String>
-int32_t StringDictionary::addString(const uint32_t hash, const String& input_string) {
-  const auto bucket = computeBucket(hash, input_string);
-  if (id(bucket) == INVALID_STR_ID) {
-    // found an open slot - add the string to the strings payload
-    const auto str_id = addStringToMaps(bucket, hash, input_string);
-    if (2 * str_id > size()) {
-      resize(2 * size());
-      VLOG(3) << "Resized to " << size() << " (holds " << numStrings() << ")";
+int32_t StringDictionary::addString(const uint32_t hash,
+                                    const std::string_view input_string,
+                                    const int32_t string_id_in) {
+  int32_t candidate_string_id = -1;
+  // const auto bucket = computeBucket(hash, input_string);  // computeBucketAdd
+
+  const size_t hash_table_size = hash_to_id_map.size();
+  uint32_t bucket = hash & (hash_table_size - 1);
+  // find an empty slot in the hash map
+  while (true) {
+    // TODO: need to use CAS here. designate -1 as invalid string ID, -2 as taken
+    auto expected = INVALID_STR_ID;
+    if (hash_to_id_map[bucket].string_id.compare_exchange_strong(expected,
+                                                                 WRITE_PENDING_ID)) {
+      // found an open slot - add the string to the strings payload and replace the
+      // pending write ID with the string ID
+      const auto str_id = addStringToMaps(bucket, hash, input_string, string_id_in);
+      if (2 * str_id > int32_t(size())) {
+        resize(2 * size());
+        LOG(ERROR) << "Resized to " << size() << " (holds " << numStrings() << ")";
+      }
+
+      return str_id;
+    }
+    if (expected == -2) {
+      // current slot is taken pending write -- continue until the other thread writes
+      // CHECK(false) << input_string << " : " << hash << " : "
+      //              << hash_to_id_map[bucket].string_id.load();
+      continue;
+    }
+    CHECK_NE(expected, INVALID_STR_ID);
+    candidate_string_id = expected;
+
+    if (string_id_in == candidate_string_id) {
+      CHECK(false);
     }
 
-    return str_id;
+    // slot is full, check for a collision
+    if (hash == hash_to_id_map[bucket].hash) {
+      const auto& existing_string = hash_to_id_map[bucket].string;
+      if (existing_string == input_string) {
+        // found an existing string that matches
+        break;
+      }
+    }
+
+    // wrap around
+    if (++bucket == hash_table_size) {
+      bucket = 0;
+    }
   }
-  return id(bucket);
+  return candidate_string_id;
 }
 
 // on resize we need to re-hash the strings, as the hash is based on the total hash table
@@ -1640,7 +1678,7 @@ int32_t StringDictionary::addString(const uint32_t hash, const String& input_str
 void StringDictionary::resize(const size_t new_size) {
   CHECK_GT(new_size, size());
 
-  strings.reserve(new_size);
+  strings.resize(new_size);
 
   std::vector<HashMapPayload> new_hash_map(new_size);
   hash_to_id_map.swap(new_hash_map);
@@ -1648,8 +1686,9 @@ void StringDictionary::resize(const size_t new_size) {
   for (size_t i = 0; i < numStrings(); i++) {
     const auto& crt_str = *strings[i].get();
     const auto hash = hash_string(crt_str);
-    const auto bucket = computeBucket(hash, crt_str);
-    hash_to_id_map[bucket].set(i, hash, crt_str);
+    addString(hash, crt_str, i);
+    // const auto bucket = computeBucket(hash, crt_str);  // computeBucketAdd
+    // hash_to_id_map[bucket].set(i, hash, crt_str);
   }
 }
 

@@ -29,7 +29,7 @@
 #include <tuple>
 #include <vector>
 
-#define USE_LEGACY_STR_DICT
+// #define USE_LEGACY_STR_DICT
 
 extern bool g_enable_stringdict_parallel;
 
@@ -248,9 +248,9 @@ class StringDictionary {
   StringDictionary(const DictRef& dict_ref,
                    const bool materializeHashes = false,
                    size_t initial_capacity = 256)
-      : dict_ref_(dict_ref), hash_to_id_map(initial_capacity) {
-    strings.reserve(initial_capacity);
-  }
+      : dict_ref_(dict_ref)
+      , hash_to_id_map(initial_capacity)
+      , strings(initial_capacity) {}
 
   int32_t getDbId() const noexcept { return dict_ref_.dbId; }
   int32_t getDictId() const noexcept { return dict_ref_.dictId; }
@@ -300,6 +300,7 @@ class StringDictionary {
   std::vector<std::string> copyStrings() const;
 
   static constexpr int32_t INVALID_STR_ID = -1;
+  static constexpr int32_t WRITE_PENDING_ID = -2;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
   static constexpr size_t MAX_STRCOUNT = (1U << 31) - 1;
 
@@ -312,14 +313,17 @@ class StringDictionary {
       const String& input_string,
       const std::vector<int32_t>& string_id_uint32_table) const noexcept;
 
-  template <class String>
-  int32_t addString(const uint32_t hash, const String& input_string);
+  // string id in allows us to reset the hash value of a string already in the dictionary
+  // on resize
+  int32_t addString(const uint32_t hash,
+                    const std::string_view input_string,
+                    const int32_t string_id_in = INVALID_STR_ID);
 
   const DictRef dict_ref_;
   size_t str_count_;
 
   struct HashMapPayload {
-    int32_t string_id;
+    std::atomic<int32_t> string_id;
     uint32_t hash;
     std::string_view string;
 
@@ -334,30 +338,44 @@ class StringDictionary {
     HashMapPayload() : string_id(INVALID_STR_ID), hash(INVALID_STR_ID) {}
   };
 
-  std::vector<HashMapPayload> hash_to_id_map;
+  std::vector<HashMapPayload>
+      hash_to_id_map;  // TODO: undo mutable after parallelizing computeBucket
   std::vector<std::unique_ptr<std::string>> strings;
+
+  // for concurrent hash map impl
+  std::atomic<size_t> crt_string_index{0};
 
   // returns added string ID
   template <class String>
-  int32_t addStringToMaps(const size_t bucket, const uint32_t hash, const String& str) {
-    strings.emplace_back(std::make_unique<std::string>(str));
+  int32_t addStringToMaps(const size_t bucket,
+                          const uint32_t hash,
+                          const String& str,
+                          const int32_t string_id_in) {
+    auto this_string_index = string_id_in;
+    if (this_string_index == INVALID_STR_ID) {
+      // new string, add it to the dictionary
+      this_string_index = crt_string_index.fetch_add(1);
+      strings[this_string_index] = std::make_unique<std::string>(str);
+    }
     CHECK_LT(bucket, hash_to_id_map.size());
     hash_to_id_map[bucket].set(
-        static_cast<int32_t>(numStrings()) - 1, hash, *strings.back());
-    return hash_to_id_map[bucket].string_id;
+        static_cast<int32_t>(this_string_index), hash, *strings[this_string_index]);
+    return hash_to_id_map[bucket].string_id.load();
   }
 
   size_t computeBucket(const uint32_t hash, const std::string_view str) const;
 
   // returns ID for a given bucket
-  int32_t id(const size_t bucket) const { return hash_to_id_map[bucket].string_id; }
+  int32_t id(const size_t bucket) const {
+    return hash_to_id_map[bucket].string_id.load();
+  }
 
   void resize(const size_t new_size);
 
   // returns string for a given ID
   const std::string& str(const size_t id) const { return *strings[id].get(); }
 
-  size_t numStrings() const { return strings.size(); }
+  size_t numStrings() const { return crt_string_index; }
 
   size_t size() const { return hash_to_id_map.size(); }
 
