@@ -75,6 +75,12 @@ Node::Node(NodeInputs inputs)
     , context_data_(nullptr)
     , is_nop_(false) {}
 
+Node::Node(const Node& other)
+    : inputs_(other.inputs_)
+    , id_(crt_id_.fetch_add(1))
+    , context_data_(nullptr)
+    , is_nop_(other.is_nop_) {}
+
 void Node::replaceInput(
     NodePtr old_input,
     NodePtr input,
