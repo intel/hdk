@@ -54,4 +54,16 @@ void optimize_ir(llvm::Function* query_func,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co);
 
+// Copies a function declaration between "from" and "to" modules found by name
+void insert_declaration(llvm::Module* from, llvm::Module* to, const std::string& fname);
+
+// Inserts all globals from "from" to "to" module
+void insert_globals(llvm::Module* from, llvm::Module* to);
+
+// Clones a function body in "from" module to the same function in "to" module. The "from"
+// module must contain a definition, the "to" module must contain at least a declaration.
+// All the calls and global variable accesses in the copied function are retargeted to
+// point to those in the "to" module.
+void replace_function(llvm::Module* from, llvm::Module* to, const std::string& fname);
+
 }  // namespace compiler
