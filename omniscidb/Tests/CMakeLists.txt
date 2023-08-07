@@ -258,9 +258,6 @@ set(TEST_PROGRAMS
 if(ENABLE_CUDA)
   list(APPEND TEST_PROGRAMS CudaSharedMemoryTest)
 endif()
-if(ENABLE_L0)
-  list(APPEND TEST_PROGRAMS L0SharedMemoryTest)
-endif()
 
 #if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 #  list(APPEND TEST_PROGRAMS UdfTest)
@@ -352,6 +349,7 @@ if(ENABLE_L0)
     ArrowStorageSqlTest # taxi queries
     SpirvBuildTest
     L0MgrExecuteTest
+    L0SharedMemoryTest
     IntelGPUEnablingTest
   )
   set_tests_properties(${ENABLING_TESTS} PROPERTIES LABELS "enabling")
