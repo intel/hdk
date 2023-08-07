@@ -18,6 +18,7 @@ double atomic_min_double(GENERIC_ADDR_SPACE double* addr, const double val);
 double atomic_min_float(GENERIC_ADDR_SPACE float* addr, const float val);
 double atomic_max_double(GENERIC_ADDR_SPACE double* addr, const double val);
 double atomic_max_float(GENERIC_ADDR_SPACE float* addr, const float val);
+void atomic_or(GENERIC_ADDR_SPACE int32_t* addr, const int32_t val);
 GENERIC_ADDR_SPACE int64_t* declare_dynamic_shared_memory();
 
 void sync_threadblock();
@@ -104,5 +105,39 @@ const GENERIC_ADDR_SPACE int64_t* init_shared_mem(
   }
   sync_threadblock();
   return shared_groups_buffer;
+}
+
+void agg_count_distinct_bitmap_gpu(GENERIC_ADDR_SPACE int64_t* agg,
+                                   const int64_t val,
+                                   const int64_t min_val,
+                                   const int64_t base_dev_addr,
+                                   const int64_t base_host_addr,
+                                   const uint64_t sub_bitmap_count,
+                                   const uint64_t bitmap_bytes) {
+  const uint64_t bitmap_idx = val - min_val;
+  const uint32_t byte_idx = bitmap_idx >> 3;
+  const uint32_t word_idx = byte_idx >> 2;
+  const uint32_t byte_word_idx = byte_idx & 3;
+  const int64_t host_addr = *agg;
+  GENERIC_ADDR_SPACE int32_t* bitmap =
+      (GENERIC_ADDR_SPACE int32_t*)(base_dev_addr + host_addr - base_host_addr +
+                                    (get_thread_index() & (sub_bitmap_count - 1)) *
+                                        bitmap_bytes);
+  switch (byte_word_idx) {
+    case 0:
+      atomic_or(&bitmap[word_idx], 1 << (bitmap_idx & 7));
+      break;
+    case 1:
+      atomic_or(&bitmap[word_idx], 1 << ((bitmap_idx & 7) + 8));
+      break;
+    case 2:
+      atomic_or(&bitmap[word_idx], 1 << ((bitmap_idx & 7) + 16));
+      break;
+    case 3:
+      atomic_or(&bitmap[word_idx], 1 << ((bitmap_idx & 7) + 24));
+      break;
+    default:
+      break;
+  }
 }
 }
