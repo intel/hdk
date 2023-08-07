@@ -690,7 +690,7 @@ std::vector<TargetInfo> generate_custom_agg_target_infos(
   // creating proper TargetInfo for aggregate columns:
   for (size_t i = 0; i < num_targets; i++) {
     target_infos.push_back(
-        TargetInfo{true, sql_aggs[i], agg_types[i], agg_types[i], true, false});
+        TargetInfo{true, sql_aggs[i], agg_types[i], arg_types[i], true, false});
   }
   return target_infos;
 }
