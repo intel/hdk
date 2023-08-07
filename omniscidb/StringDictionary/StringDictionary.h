@@ -317,6 +317,7 @@ class StringDictionary {
   // on resize
   int32_t addString(const uint32_t hash,
                     const std::string_view input_string,
+                    const bool is_parallel,
                     const int32_t string_id_in = INVALID_STR_ID);
 
   const DictRef dict_ref_;
@@ -370,7 +371,8 @@ class StringDictionary {
     return hash_to_id_map[bucket].string_id.load();
   }
 
-  void resize(const size_t new_size);
+  // TODO: need to know if we're in parallel mode or not
+  void resize(const size_t new_size, const bool is_parallel);
 
   // returns string for a given ID
   const std::string& str(const size_t id) const { return *strings[id].get(); }
@@ -382,6 +384,13 @@ class StringDictionary {
   bool full() const { return strings.size() == hash_to_id_map.size(); }
 
   mutable mapd_shared_mutex rw_mutex_;
+
+  // parallel resize without a latch
+  std::mutex mutex;
+  std::condition_variable cv;
+  const size_t num_threads = std::thread::hardware_concurrency();
+  std::atomic<size_t> resize_threads_remaining = num_threads;
+  bool resize_done = false;
 
   // TODO: legacy, direct access outside of this class
   std::vector<uint32_t> hash_cache_;

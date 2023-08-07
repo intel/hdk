@@ -39,6 +39,7 @@
 
 #include "Logger/Logger.h"
 #include "OSDependent/omnisci_fs.h"
+#include "Shared/Intervals.h"
 #include "Shared/sqltypes.h"
 #include "Shared/thread_count.h"
 #include "Utils/Regexp.h"
@@ -1439,7 +1440,7 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
   const uint32_t hash = hash_string(str);
 
   mapd_unique_lock<mapd_shared_mutex> rw_lock(rw_mutex_);
-  const int32_t string_id = addString(hash, str);
+  const int32_t string_id = addString(hash, str, /*is_parallel=*/false);
   return string_id;
 }
 
@@ -1517,14 +1518,29 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& string_vec,
                       }
                     });
 
-  for (size_t i = 0; i < string_vec.size(); i++) {
-    const auto& input_string = string_vec[i];
-    if (input_string.empty()) {
-      output_string_ids[i] = inline_int_null_value<T>();
-    } else {
-      // add string to storage and store id
-      output_string_ids[i] = addString(hashes[i], input_string);
-    }
+  std::vector<std::future<void>> workers;
+  for (auto interval : makeIntervals(size_t(0), string_vec.size(), num_threads)) {
+    workers.push_back(std::async(
+        std::launch::async,
+        [this, &hashes, &string_vec, output_string_ids](const size_t start,
+                                                        const size_t end) {
+          for (size_t i = start; i != end; ++i) {
+            const auto& input_string = string_vec[i];
+            if (input_string.empty()) {
+              output_string_ids[i] = inline_int_null_value<T>();
+            } else {
+              // add string to storage and store id
+              output_string_ids[i] =
+                  addString(hashes[i], input_string, /*is_parallel=*/true);
+            }
+          }
+        },
+        interval.begin,
+        interval.end));
+  }
+
+  for (auto& worker : workers) {
+    worker.wait();
   }
 }
 
@@ -1620,6 +1636,7 @@ std::string_view StringDictionary::getStringFromStorageFast(
 
 int32_t StringDictionary::addString(const uint32_t hash,
                                     const std::string_view input_string,
+                                    const bool is_parallel,
                                     const int32_t string_id_in) {
   int32_t candidate_string_id = -1;
   // const auto bucket = computeBucket(hash, input_string);  // computeBucketAdd
@@ -1636,7 +1653,9 @@ int32_t StringDictionary::addString(const uint32_t hash,
       // pending write ID with the string ID
       const auto str_id = addStringToMaps(bucket, hash, input_string, string_id_in);
       if (2 * str_id > int32_t(size())) {
-        resize(2 * size());
+        // putting this here is problematic, because not all threads will hit this path
+        // because some may be done adding strings, etc.
+        resize(2 * size(), is_parallel);
         LOG(ERROR) << "Resized to " << size() << " (holds " << numStrings() << ")";
       }
 
@@ -1675,7 +1694,20 @@ int32_t StringDictionary::addString(const uint32_t hash,
 // on resize we need to re-hash the strings, as the hash is based on the total hash table
 // size
 // NOTE: in taxi this never gets called b/c the dictionaries are so small
-void StringDictionary::resize(const size_t new_size) {
+void StringDictionary::resize(const size_t new_size, const bool is_parallel) {
+  if (is_parallel) {
+    auto threads_remaining = resize_threads_remaining.fetch_add(-1);
+    LOG(ERROR) << threads_remaining << " vs " << resize_threads_remaining.load();
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock,
+            [this, threads_remaining] { return threads_remaining == 1 || resize_done; });
+
+    if (resize_done) {
+      return;
+    }
+  }
+  LOG(ERROR) << "Is parallel? " << std::to_string(is_parallel) << " Threads remaining "
+             << resize_threads_remaining.load();
   CHECK_GT(new_size, size());
 
   strings.resize(new_size);
@@ -1686,10 +1718,18 @@ void StringDictionary::resize(const size_t new_size) {
   for (size_t i = 0; i < numStrings(); i++) {
     const auto& crt_str = *strings[i].get();
     const auto hash = hash_string(crt_str);
-    addString(hash, crt_str, i);
+    addString(hash, crt_str, is_parallel, i);
     // const auto bucket = computeBucket(hash, crt_str);  // computeBucketAdd
     // hash_to_id_map[bucket].set(i, hash, crt_str);
   }
+
+  if (is_parallel) {
+    resize_threads_remaining = num_threads;
+    resize_done = true;
+    // wait for the last thread to do the resize
+    cv.notify_all();
+  }
+  return;
 }
 
 size_t StringDictionary::computeBucket(const uint32_t hash,
