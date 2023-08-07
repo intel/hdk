@@ -282,8 +282,8 @@ TEST(Smoke, Simple) {
 }
 
 TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
-  GTEST_SKIP();
-  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
+  // Gen9 has a max group size of 256
+  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241 /*, 511, 1021*/}) {
     TestInputData input;
     input.setDeviceId(0)
         .setNumInputBuffers(4)
@@ -300,8 +300,8 @@ TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
 }
 
 TEST(SingleColumn, VariableEntries_CountQuery_8B_Group) {
-  GTEST_SKIP();
-  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241, 511, 1021}) {
+  // Gen9 has a max group size of 256
+  for (auto num_entries : {1, 2, 3, 5, 13, 31, 63, 126, 241 /*, 511, 1021*/}) {
     TestInputData input;
     input.setDeviceId(0)
         .setNumInputBuffers(4)
