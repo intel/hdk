@@ -25,6 +25,11 @@ define void @sync_threadblock() {
     ret void
 }
 
+define i64 @get_block_dim() {
+    %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
+    ret i64 %gsize
+}
+
 define i32 @pos_start_impl(i32 addrspace(4)* %0)  readnone nounwind alwaysinline {
     %gid = call i64 @__spirv_BuiltInWorkgroupId(i32 0)
     %gsize = call i64 @__spirv_BuiltInWorkgroupSize(i32 0)
@@ -320,30 +325,6 @@ define void @agg_count_distinct_bitmap_gpu(i64 addrspace(4)* %agg, i64 noundef %
     br label %.exit
 .exit:
     ret void
-}
-
-define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 noundef %groups_buffer_size) {
-.entry:
-    %buf.units = ashr i32 %groups_buffer_size, 3
-    %buf.units.i64 = sext i32 %buf.units to i64
-    %pos = call i64 @get_thread_index()
-    %wgnum = call i64 @__spirv_BuiltInNumWorkgroups(i32 0)
-    %loop.cond = icmp slt i64 %pos, %buf.units.i64
-    br i1 %loop.cond, label %.for_body, label %.exit
-.for_body:
-    %pos.idx = phi i64 [ %pos, %.entry ], [ %pos.idx.new, %.for_body ]
-    %agg_init_val.idx = getelementptr inbounds i64, i64 addrspace(4)* %agg_init_val, i64 %pos.idx
-    %slm.idx = getelementptr inbounds [4096 x i64], [4096 x i64] addrspace(3)* @slm.buf.i64, i64 0, i64 %pos.idx
-    %val = load i64, i64 addrspace(4)* %agg_init_val.idx
-    store i64 %val, i64 addrspace(3)* %slm.idx
-    %pos.idx.new = add nsw i64 %pos.idx, %wgnum
-    %cond = icmp slt i64 %pos.idx.new, %buf.units.i64
-    br i1 %cond, label %.for_body, label %.exit
-.exit:
-    call void @sync_threadblock()
-    %res.ptr = bitcast [4096 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
-    %res.ptr.casted = addrspacecast i64 addrspace(3)* %res.ptr to i64 addrspace(4)*
-    ret i64 addrspace(4)* %res.ptr.casted
 }
 
 define void @write_back_non_grouped_agg(i64 addrspace(4)* %input_buffer, i64 addrspace(4)* %output_buffer, i32 noundef %agg_idx) {
