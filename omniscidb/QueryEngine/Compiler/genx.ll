@@ -12,10 +12,10 @@ declare i64 @__spirv_BuiltInSubgroupSize(i32 %dimention)
 
 declare void @__spirv_ControlBarrier(i32 %execution_scope, i32 %memory_scope, i32 %memory_semantics)
 
-@slm.buf.i64 = internal local_unnamed_addr addrspace(3) global [1024 x i64] zeroinitializer, align 4
+@slm.buf.i64 = internal local_unnamed_addr addrspace(3) global [4096 x i64] zeroinitializer, align 4
 
 define i64 addrspace(4)* @declare_dynamic_shared_memory() {
-    %res.share = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    %res.share = bitcast [4096 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
     %res = addrspacecast i64 addrspace(3)* %res.share to i64 addrspace(4)*
     ret i64 addrspace(4)* %res
 }
@@ -333,7 +333,7 @@ define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 n
 .for_body:
     %pos.idx = phi i64 [ %pos, %.entry ], [ %pos.idx.new, %.for_body ]
     %agg_init_val.idx = getelementptr inbounds i64, i64 addrspace(4)* %agg_init_val, i64 %pos.idx
-    %slm.idx = getelementptr inbounds [1024 x i64], [1024 x i64] addrspace(3)* @slm.buf.i64, i64 0, i64 %pos.idx
+    %slm.idx = getelementptr inbounds [4096 x i64], [4096 x i64] addrspace(3)* @slm.buf.i64, i64 0, i64 %pos.idx
     %val = load i64, i64 addrspace(4)* %agg_init_val.idx
     store i64 %val, i64 addrspace(3)* %slm.idx
     %pos.idx.new = add nsw i64 %pos.idx, %wgnum
@@ -341,7 +341,7 @@ define i64 addrspace(4)* @init_shared_mem(i64 addrspace(4)* %agg_init_val, i32 n
     br i1 %cond, label %.for_body, label %.exit
 .exit:
     call void @sync_threadblock()
-    %res.ptr = bitcast [1024 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
+    %res.ptr = bitcast [4096 x i64] addrspace(3)* @slm.buf.i64 to i64 addrspace(3)*
     %res.ptr.casted = addrspacecast i64 addrspace(3)* %res.ptr to i64 addrspace(4)*
     ret i64 addrspace(4)* %res.ptr.casted
 }
