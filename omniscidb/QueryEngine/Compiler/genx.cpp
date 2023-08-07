@@ -18,6 +18,11 @@ double atomic_min_double(GENERIC_ADDR_SPACE double* addr, const double val);
 double atomic_min_float(GENERIC_ADDR_SPACE float* addr, const float val);
 double atomic_max_double(GENERIC_ADDR_SPACE double* addr, const double val);
 double atomic_max_float(GENERIC_ADDR_SPACE float* addr, const float val);
+GENERIC_ADDR_SPACE int64_t* declare_dynamic_shared_memory();
+
+void sync_threadblock();
+int64_t get_thread_index();
+int64_t get_block_dim();
 
 void agg_max_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 int64_t agg_count_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
@@ -86,5 +91,18 @@ void agg_max_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
   if (val != skip_val) {
     agg_max_double_shared(agg, val);
   }
+}
+
+const GENERIC_ADDR_SPACE int64_t* init_shared_mem(
+    const GENERIC_ADDR_SPACE int64_t* global_groups_buffer,
+    const int32_t groups_buffer_size) {
+  auto shared_groups_buffer = declare_dynamic_shared_memory();
+  const int32_t buffer_units = groups_buffer_size >> 3;
+
+  for (int32_t pos = get_thread_index(); pos < buffer_units; pos += get_block_dim()) {
+    shared_groups_buffer[pos] = global_groups_buffer[pos];
+  }
+  sync_threadblock();
+  return shared_groups_buffer;
 }
 }
