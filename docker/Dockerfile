@@ -24,13 +24,8 @@ RUN apt-get update && apt-get install -y \
 
 # Toolchains
 RUN apt-get update && apt-get install -y \
-    gcc-9 \
-    g++-9 \
     openjdk-11-jdk \
-    -- && \
-    update-alternatives \
-        --install /usr/bin/gcc gcc /usr/bin/gcc-9 800 \
-        --slave /usr/bin/g++ g++ /usr/bin/g++-9
+    --
 
 # LLVM
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
