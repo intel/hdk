@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 # Toolchains
 RUN apt-get update && apt-get install -y \
+    g++-12 \
     openjdk-11-jdk \
     --
 
