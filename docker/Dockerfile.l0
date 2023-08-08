@@ -1,14 +1,14 @@
 # Intel GPU stack
 RUN mkdir /intel-gpu-drivers && cd /intel-gpu-drivers && \
-    wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero-devel_1.9.4+u18.04_amd64.deb && \
-    wget https://github.com/oneapi-src/level-zero/releases/download/v1.9.4/level-zero_1.9.4+u18.04_amd64.deb && \
-    wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-core_1.0.12812.24_amd64.deb && \
-    wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.12812.24/intel-igc-opencl_1.0.12812.24_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-level-zero-gpu-dbgsym_1.3.25018.24_amd64.ddeb && \
-    wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-level-zero-gpu_1.3.25018.24_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-opencl-icd-dbgsym_22.49.25018.24_amd64.ddeb && \
-    wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/intel-opencl-icd_22.49.25018.24_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/22.49.25018.24/libigdgmm12_22.3.0_amd64.deb
+    wget https://github.com/oneapi-src/level-zero/releases/download/v1.11.0/level-zero-devel_1.11.0+u22.04_amd64.deb && \
+    wget https://github.com/oneapi-src/level-zero/releases/download/v1.11.0/level-zero_1.11.0+u22.04_amd64.deb && \
+    wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.14062.11/intel-igc-core_1.0.14062.11_amd64.deb && \
+    wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.14062.11/intel-igc-opencl_1.0.14062.11_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/23.22.26516.18/intel-level-zero-gpu-dbgsym_1.3.26516.18_amd64.ddeb && \
+    wget https://github.com/intel/compute-runtime/releases/download/23.22.26516.18/intel-level-zero-gpu_1.3.26516.18_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/23.22.26516.18/intel-opencl-icd-dbgsym_23.22.26516.18_amd64.ddeb && \
+    wget https://github.com/intel/compute-runtime/releases/download/23.22.26516.18/intel-opencl-icd_23.22.26516.18_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/23.22.26516.18/libigdgmm12_22.3.0_amd64.deb
 
 RUN cd /intel-gpu-drivers && dpkg -i *.deb
 
