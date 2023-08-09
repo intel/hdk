@@ -1324,7 +1324,11 @@ void RowFuncBuilder::codegenApproxQuantile(const size_t target_idx,
     calc = llvm::BasicBlock::Create(cs->context_, "calc_approx_quantile");
     skip = llvm::BasicBlock::Create(cs->context_, "skip_approx_quantile");
     irb.CreateCondBr(skip_cond, skip, calc);
+#if LLVM_VERSION_MAJOR > 15
+    cs->current_func_->insert(cs->current_func_->end(), calc);
+#else
     cs->current_func_->getBasicBlockList().push_back(calc);
+#endif
     irb.SetInsertPoint(calc);
   }
   if (!arg_type->isFloatingPoint()) {
@@ -1336,7 +1340,11 @@ void RowFuncBuilder::codegenApproxQuantile(const size_t target_idx,
       "agg_approx_quantile", llvm::Type::getVoidTy(cs->context_), agg_args);
   if (nullable) {
     irb.CreateBr(skip);
+#if LLVM_VERSION_MAJOR > 15
+    cs->current_func_->insert(cs->current_func_->end(), skip);
+#else
     cs->current_func_->getBasicBlockList().push_back(skip);
+#endif
     irb.SetInsertPoint(skip);
   }
 }

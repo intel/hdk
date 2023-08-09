@@ -299,8 +299,7 @@ std::vector<std::string> CgenState::gpuFunctionsToReplace(llvm::Function* fn) {
   CHECK(!fn->isDeclaration());
 
   for (auto& basic_block : *fn) {
-    auto& inst_list = basic_block.getInstList();
-    for (auto inst_itr = inst_list.begin(); inst_itr != inst_list.end(); ++inst_itr) {
+    for (auto inst_itr = basic_block.begin(); inst_itr != basic_block.end(); ++inst_itr) {
       if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(inst_itr)) {
         auto called_fcn = call_inst->getCalledFunction();
         CHECK(called_fcn);
@@ -332,8 +331,7 @@ void CgenState::replaceFunctionForGpu(const std::string& fcn_to_replace,
           << " for parent function " << fn->getName().str();
 
   for (auto& basic_block : *fn) {
-    auto& inst_list = basic_block.getInstList();
-    for (auto inst_itr = inst_list.begin(); inst_itr != inst_list.end(); ++inst_itr) {
+    for (auto inst_itr = basic_block.begin(); inst_itr != basic_block.end(); ++inst_itr) {
       if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(inst_itr)) {
         auto called_fcn = call_inst->getCalledFunction();
         CHECK(called_fcn);
