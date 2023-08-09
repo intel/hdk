@@ -182,7 +182,7 @@ int64_t lazy_decode(const ColumnLazyFetchInfo& col_lazy_fetch,
 void fill_empty_key(void* key_ptr, const size_t key_count, const size_t key_width);
 
 int8_t get_width_for_slot(const size_t target_slot_idx,
-                          const bool float_argument_input,
+                          const TargetInfo& target_info,
                           const QueryMemoryDescriptor& query_mem_desc);
 
 size_t get_byteoff_of_slot(const size_t slot_idx,

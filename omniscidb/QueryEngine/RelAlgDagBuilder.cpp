@@ -1305,6 +1305,9 @@ bool isAggSupportedForType(hdk::ir::AggType agg_kind, const hdk::ir::Type* arg_t
       !(arg_type->isNumber() || arg_type->isBoolean() || arg_type->isDateTime())) {
     return false;
   }
+  if (agg_kind == hdk::ir::AggType::kQuantile) {
+    return arg_type->isNumber() || arg_type->isDateTime();
+  }
 
   return true;
 }
@@ -1323,6 +1326,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
   if (operands.size() > 1 &&
       (operands.size() != 2 || (agg_kind != hdk::ir::AggType::kApproxCountDistinct &&
                                 agg_kind != hdk::ir::AggType::kApproxQuantile &&
+                                agg_kind != hdk::ir::AggType::kQuantile &&
                                 agg_kind != hdk::ir::AggType::kTopK))) {
     throw hdk::ir::QueryNotSupported(
         "Multiple arguments for aggregates aren't supported");
@@ -1330,6 +1334,7 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
 
   hdk::ir::ExprPtr arg_expr;
   std::shared_ptr<const hdk::ir::Constant> arg1;  // 2nd aggregate parameter
+  hdk::ir::Interpolation interpolation = hdk::ir::Interpolation::kLinear;
   if (operands.size() > 0) {
     const auto operand = operands[0];
     CHECK_LT(operand, sources.size());
@@ -1363,6 +1368,20 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
         throw std::runtime_error(
             "TOP_K's second parameter should be non-zero integer literal");
       }
+    } else if (agg_kind == hdk::ir::AggType::kQuantile) {
+      if (operands.size() < 2) {
+        throw std::runtime_error("Missing parameter for QUANTILE aggregate.");
+      }
+      arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(sources[operands[1]]);
+      if (!arg1 || !arg1->type()->isFloatingPoint() || arg1->fpVal() < 0.0 ||
+          arg1->fpVal() > 1.0) {
+        throw std::runtime_error(
+            "QUANTILE's second parameter should be fp literal in [0, 1] range");
+      }
+      if (json_expr.HasMember("interpolation")) {
+        auto interpolation_str = json_str(field(json_expr, "interpolation"));
+        interpolation = to_interpolation(interpolation_str);
+      }
     }
     auto arg_type = arg_expr->type();
     if (!isAggSupportedForType(agg_kind, arg_type)) {
@@ -1370,10 +1389,12 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
                                " is not supported yet.");
     }
   }
-  auto agg_type = get_agg_type(
-      agg_kind, arg_expr.get(), root_dag_builder.config().exec.group_by.bigint_count);
+  auto agg_type = get_agg_type(agg_kind,
+                               arg_expr.get(),
+                               root_dag_builder.config().exec.group_by.bigint_count,
+                               interpolation);
   return hdk::ir::makeExpr<hdk::ir::AggExpr>(
-      agg_type, agg_kind, arg_expr, is_distinct, arg1);
+      agg_type, agg_kind, arg_expr, is_distinct, arg1, interpolation);
 }
 
 hdk::ir::ExprPtr parse_operator_expr(const rapidjson::Value& json_expr,

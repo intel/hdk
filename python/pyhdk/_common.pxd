@@ -26,6 +26,14 @@ cdef extern from "omniscidb/IR/Type.h":
       kColumn "hdk::ir::Type::Id::kColumn" = 14,
       kColumnList "hdk::ir::Type::Id::kColumnList" = 15,
 
+cdef extern from "omniscidb/IR/OpTypeEnums.h":
+  enum CInterpolation "hdk::ir::Interpolation":
+    kLower "hdk::ir::Interpolation::kLower" = 0,
+    kHigher "hdk::ir::Interpolation::kHigher" = 1,
+    kNearest "hdk::ir::Interpolation::kNearest" = 2,
+    kMidpoint "hdk::ir::Interpolation::kMidpoint" = 3,
+    kLinear "hdk::ir::Interpolation::kLinear" = 4,
+
 cdef extern from "omniscidb/IR/Type.h":
   cdef cppclass CType "hdk::ir::Type":
     

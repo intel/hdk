@@ -814,6 +814,10 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
   if (agg_type->isArray()) {
     CHECK(agg_info.agg_kind == hdk::ir::AggType::kTopK);
     agg_type = agg_type->as<hdk::ir::ArrayBaseType>()->elemType();
+  } else if (agg_info.agg_kind == hdk::ir::AggType::kQuantile) {
+    // Quantile collects orginal values and we don't care about the
+    // result type at the moment.
+    agg_type = arg_type;
   }
   const size_t chosen_bytes = agg_type->size();
 

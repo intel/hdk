@@ -26,7 +26,8 @@
 
 const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
                                   const hdk::ir::Expr* arg_expr,
-                                  bool bigint_count) {
+                                  bool bigint_count,
+                                  hdk::ir::Interpolation interpolation) {
   auto& ctx = arg_expr ? arg_expr->type()->ctx() : hdk::ir::Context::defaultCtx();
   switch (agg_kind) {
     case hdk::ir::AggType::kCount:
@@ -51,6 +52,14 @@ const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
       return arg_expr->type();
     case hdk::ir::AggType::kTopK:
       return ctx.arrayVarLen(arg_expr->type(), 4, false);
+    case hdk::ir::AggType::kQuantile:
+      if (interpolation == hdk::ir::Interpolation::kMidpoint ||
+          interpolation == hdk::ir::Interpolation::kLinear) {
+        if (arg_expr->type()->isInteger()) {
+          return ctx.fp64();
+        }
+      }
+      return arg_expr->type()->canonicalize();
     default:
       CHECK(false);
   }

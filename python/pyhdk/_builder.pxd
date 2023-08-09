@@ -9,7 +9,7 @@ from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr, unique_ptr
 
-from pyhdk._common cimport CContext, CConfigPtr, CType, TypeInfo
+from pyhdk._common cimport CContext, CConfigPtr, CType, TypeInfo, CInterpolation
 from pyhdk._ir cimport CExpr, CExprPtr, CNode, CNodePtr
 from pyhdk._storage cimport CSchemaProviderPtr, CColumnInfoPtr
 from pyhdk._sql cimport CExecutionResult, CQueryDag
@@ -38,6 +38,7 @@ cdef extern from "omniscidb/QueryBuilder/QueryBuilder.h":
     CBuilderExpr count(bool) except +
     CBuilderExpr approxCountDist() except +
     CBuilderExpr approxQuantile(double) except +
+    CBuilderExpr quantile(double, CInterpolation) except +
     CBuilderExpr sample() except +
     CBuilderExpr singleValue() except +
     CBuilderExpr topK(int) except +

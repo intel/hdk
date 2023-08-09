@@ -1884,9 +1884,9 @@ void appendToColumnBuilder<arrow::Decimal128Builder, int64_t>(
   std::vector<int64_t> vals = boost::get<std::vector<int64_t>>(values);
   auto typed_builder = dynamic_cast<arrow::Decimal128Builder*>(arrow_builder);
   CHECK(typed_builder);
-  CHECK_EQ(is_valid->size(), vals.size());
   if (column_builder.field->nullable()) {
     CHECK(is_valid.get());
+    CHECK_EQ(is_valid->size(), vals.size());
     for (size_t i = 0; i < vals.size(); i++) {
       const auto v = vals[i];
       const auto valid = (*is_valid)[i];

@@ -558,7 +558,7 @@ BuilderExpr BuilderExpr::approxCountDist() const {
 
 BuilderExpr BuilderExpr::approxQuantile(double val) const {
   if (!expr_->type()->isNumber()) {
-    throw InvalidQueryError() << "Unsupported type for sum aggregate: "
+    throw InvalidQueryError() << "Unsupported type for ApproxQuantile aggregate: "
                               << expr_->type()->toString();
   }
   if (val < 0.0 || val > 1.0) {
@@ -611,6 +611,33 @@ BuilderExpr BuilderExpr::topK(int count) const {
 
 BuilderExpr BuilderExpr::bottomK(int count) const {
   return topK(-count);
+}
+
+BuilderExpr BuilderExpr::quantile(double val, Interpolation interpolation) const {
+  if (!expr_->type()->isNumber() && !expr_->type()->isDateTime() &&
+      !expr_->type()->isInterval()) {
+    throw InvalidQueryError() << "Unsupported type for quantile aggregate: "
+                              << expr_->type()->toString();
+  }
+  if (val < 0.0 || val > 1.0) {
+    throw InvalidQueryError() << "Quantile expects argument between 0.0 and 1.0 but got "
+                              << val;
+  }
+  Datum d;
+  d.doubleval = val;
+  auto cst = makeExpr<Constant>(builder_->ctx_.fp64(), false, d);
+  auto res_type = expr_->type();
+  if (interpolation == Interpolation::kMidpoint ||
+      interpolation == Interpolation::kLinear) {
+    if (res_type->isInteger()) {
+      res_type = builder_->ctx_.fp64();
+    }
+  }
+  res_type = res_type->canonicalize();
+  auto agg =
+      makeExpr<AggExpr>(res_type, AggType::kQuantile, expr_, false, cst, interpolation);
+  auto name = name_.empty() ? "quantile" : name_ + "_quantile";
+  return {builder_, agg, name, true};
 }
 
 BuilderExpr BuilderExpr::stdDev() const {
@@ -704,6 +731,7 @@ BuilderExpr BuilderExpr::agg(const std::string& agg_str, BuilderExpr arg) const 
       {"top_k", AggType::kTopK},
       {"bottomk", AggType::kTopK},
       {"bottom_k", AggType::kTopK},
+      {"quantile", AggType::kQuantile},
       {"stddev", AggType::kStdDevSamp},
       {"stddev_samp", AggType::kStdDevSamp},
       {"stddev samp", AggType::kStdDevSamp},
@@ -716,8 +744,8 @@ BuilderExpr BuilderExpr::agg(const std::string& agg_str, BuilderExpr arg) const 
   }
 
   auto kind = agg_names.at(agg_str_lower);
-  if (kind == AggType::kApproxQuantile && !arg.expr()) {
-    throw InvalidQueryError("Missing argument for approximate quantile aggregate.");
+  if ((kind == AggType::kApproxQuantile || kind == AggType::kQuantile) && !arg.expr()) {
+    throw InvalidQueryError("Missing argument for quantile aggregate.");
   }
   if (kind == AggType::kTopK) {
     if (!arg.expr()) {
@@ -751,8 +779,10 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind, const BuilderExpr& arg) const {
   return agg(agg_kind, false, arg);
 }
 
-BuilderExpr BuilderExpr::agg(AggType agg_kind, double val) const {
-  return agg(agg_kind, false, val);
+BuilderExpr BuilderExpr::agg(AggType agg_kind,
+                             double val,
+                             Interpolation interpolation) const {
+  return agg(agg_kind, false, val, interpolation);
 }
 
 BuilderExpr BuilderExpr::agg(AggType agg_kind, int val) const {
@@ -761,21 +791,21 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind, int val) const {
 
 BuilderExpr BuilderExpr::agg(AggType agg_kind,
                              bool is_distinct,
-                             const BuilderExpr& arg) const {
+                             const BuilderExpr& arg,
+                             Interpolation interpolation) const {
   if (is_distinct && agg_kind != AggType::kCount) {
     throw InvalidQueryError() << "Distinct property cannot be set to true for "
                               << agg_kind << " aggregate.";
   }
   if (arg.expr() && agg_kind != AggType::kApproxQuantile && agg_kind != AggType::kCorr &&
-      agg_kind != AggType::kTopK) {
+      agg_kind != AggType::kTopK && agg_kind != AggType::kQuantile) {
     throw InvalidQueryError() << "Aggregate argument is supported for approximate "
                                  "quantile and corr only but provided for "
                               << agg_kind;
   }
-  if (agg_kind == AggType::kApproxQuantile) {
+  if (agg_kind == AggType::kApproxQuantile || agg_kind == AggType::kQuantile) {
     if (!arg.expr()->is<Constant>() || !arg.type()->isFloatingPoint()) {
-      throw InvalidQueryError() << "Expected fp constant argumnt for approximate "
-                                   "quantile. Provided: "
+      throw InvalidQueryError() << "Expected fp constant argumnt for quantile. Provided: "
                                 << arg.expr()->toString();
     }
   }
@@ -808,6 +838,8 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind,
       return singleValue();
     case AggType::kTopK:
       return topK(arg.expr()->as<Constant>()->intVal());
+    case AggType::kQuantile:
+      return quantile(arg.expr()->as<Constant>()->fpVal(), interpolation);
     case AggType::kStdDevSamp:
       return stdDev();
     case AggType::kCorr:
@@ -818,12 +850,15 @@ BuilderExpr BuilderExpr::agg(AggType agg_kind,
   throw InvalidQueryError() << "Unsupported aggregate type: " << agg_kind;
 }
 
-BuilderExpr BuilderExpr::agg(AggType agg_kind, bool is_distinct, double val) const {
+BuilderExpr BuilderExpr::agg(AggType agg_kind,
+                             bool is_distinct,
+                             double val,
+                             Interpolation interpolation) const {
   BuilderExpr arg;
   if (val != HUGE_VAL) {
     arg = builder_->cst(val);
   }
-  return agg(agg_kind, is_distinct, arg);
+  return agg(agg_kind, is_distinct, arg, interpolation);
 }
 
 BuilderExpr BuilderExpr::extract(DateExtractField field) const {

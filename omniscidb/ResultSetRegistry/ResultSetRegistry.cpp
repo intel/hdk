@@ -99,6 +99,7 @@ std::shared_ptr<ResultSetRegistry> ResultSetRegistry::getOrCreate(
 }
 
 ResultSetTableTokenPtr ResultSetRegistry::put(ResultSetTable table) {
+  auto timer = DEBUG_TIMER(__func__);
   CHECK(!table.empty());
 
   mapd_unique_lock<mapd_shared_mutex> schema_lock(schema_mutex_);

@@ -8,6 +8,7 @@
 #include "RowSetMemoryOwner.h"
 
 #include "Shared/approx_quantile.h"
+#include "Shared/quantile.h"
 
 EXTERN extern bool g_cache_string_hash;
 EXTERN extern size_t g_approx_quantile_buffer;
@@ -41,6 +42,11 @@ quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
       .emplace_back(std::make_unique<quantile::TDigest>(
           q, this, g_approx_quantile_buffer, g_approx_quantile_centroids))
       .get();
+}
+
+hdk::quantile::Quantile* RowSetMemoryOwner::quantile() {
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  return quantiles_.emplace_back(std::make_unique<hdk::quantile::Quantile>(this)).get();
 }
 
 int8_t* RowSetMemoryOwner::topKBuffer(size_t size) {

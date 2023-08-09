@@ -472,6 +472,15 @@ extern "C" RUNTIME_EXPORT void approx_quantile_jit_rt(const int64_t new_set_hand
   }
 }
 
+extern "C" RUNTIME_EXPORT void quantile_jit_rt(const int64_t new_set_handle,
+                                               const int64_t old_set_handle) {
+  auto* incoming = reinterpret_cast<hdk::quantile::Quantile*>(new_set_handle);
+  if (!incoming->empty()) {
+    auto* accumulator = reinterpret_cast<hdk::quantile::Quantile*>(old_set_handle);
+    accumulator->merge(*incoming);
+  }
+}
+
 template <typename T>
 void topk_agg_reduce(int64_t new_heap_handle,
                      int64_t old_heap_handle,
@@ -1141,9 +1150,8 @@ void ResultSetReductionJIT::reduceOneSlot(Value* this_ptr1,
       return;
     }
   }
-  const bool float_argument_input = takes_float_argument(target_info);
-  const auto chosen_bytes = result_set::get_width_for_slot(
-      target_slot_idx, float_argument_input, query_mem_desc_);
+  const auto chosen_bytes =
+      result_set::get_width_for_slot(target_slot_idx, target_info, query_mem_desc_);
   CHECK_LT(init_agg_val_idx, target_init_vals_.size());
   auto init_val = target_init_vals_[init_agg_val_idx];
   if (target_info.is_agg && (target_info.agg_kind != hdk::ir::AggType::kSingleValue &&
@@ -1227,6 +1235,11 @@ void ResultSetReductionJIT::reduceOneAggregateSlot(Value* this_ptr1,
       reduceOneApproxQuantileSlot(
           this_ptr1, that_ptr1, target_logical_idx, ir_reduce_one_entry);
       break;
+    case hdk::ir::AggType::kQuantile:
+      CHECK_EQ(chosen_bytes, static_cast<int8_t>(sizeof(int64_t)));
+      reduceOneQuantileSlot(
+          this_ptr1, that_ptr1, target_logical_idx, ir_reduce_one_entry);
+      break;
     case hdk::ir::AggType::kAvg: {
       // Ignore float argument compaction for count component for fear of its overflow
       emit_aggregate_one_count(this_ptr2,
@@ -1306,7 +1319,6 @@ void ResultSetReductionJIT::reduceOneApproxQuantileSlot(
     Value* that_ptr1,
     const size_t target_logical_idx,
     Function* ir_reduce_one_entry) const {
-  CHECK_LT(target_logical_idx, query_mem_desc_.getCountDistinctDescriptorsSize());
   const auto old_set_handle = emit_load_i64(this_ptr1, ir_reduce_one_entry);
   const auto new_set_handle = emit_load_i64(that_ptr1, ir_reduce_one_entry);
   const auto this_qmd_arg = ir_reduce_one_entry->arg(2);
@@ -1320,6 +1332,19 @@ void ResultSetReductionJIT::reduceOneApproxQuantileSlot(
           that_qmd_arg,
           this_qmd_arg,
           ir_reduce_one_entry->addConstant<ConstantInt>(target_logical_idx, Type::Int64)},
+      "");
+}
+
+void ResultSetReductionJIT::reduceOneQuantileSlot(Value* this_ptr1,
+                                                  Value* that_ptr1,
+                                                  const size_t target_logical_idx,
+                                                  Function* ir_reduce_one_entry) const {
+  const auto old_set_handle = emit_load_i64(this_ptr1, ir_reduce_one_entry);
+  const auto new_set_handle = emit_load_i64(that_ptr1, ir_reduce_one_entry);
+  ir_reduce_one_entry->add<ExternalCall>(
+      "quantile_jit_rt",
+      Type::Void,
+      std::vector<const Value*>{new_set_handle, old_set_handle},
       "");
 }
 
@@ -1382,7 +1407,9 @@ std::string target_info_key(const TargetInfo& target_info) {
          "\n" + std::to_string(target_info.skip_null_val) + "\n" +
          std::to_string(target_info.is_distinct) + "\n" +
          std::to_string(target_info.topk_param) + "\n" +
-         std::to_string(target_info.topk_inline_buffer);
+         std::to_string(target_info.topk_inline_buffer) + "\n" +
+         std::to_string(target_info.quantile_param) + "\n" +
+         ::toString(target_info.interpolation);
 }
 
 }  // namespace

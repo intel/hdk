@@ -125,6 +125,11 @@ class ResultSetReductionJIT {
                                    const size_t target_logical_idx,
                                    Function* ir_reduce_one_entry) const;
 
+  void reduceOneQuantileSlot(Value* this_ptr1,
+                             Value* that_ptr1,
+                             const size_t target_logical_idx,
+                             Function* ir_reduce_one_entry) const;
+
   void reduceOneTopKSlot(Value* this_ptr1,
                          Value* that_ptr1,
                          const hdk::ir::Type* arg_type,

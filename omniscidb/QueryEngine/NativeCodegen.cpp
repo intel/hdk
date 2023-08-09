@@ -786,6 +786,9 @@ std::vector<std::string> get_agg_fnames(
       case hdk::ir::AggType::kTopK:
         result.emplace_back("agg_topk");
         break;
+      case hdk::ir::AggType::kQuantile:
+        result.emplace_back("agg_quantile");
+        break;
       default:
         CHECK(false);
     }

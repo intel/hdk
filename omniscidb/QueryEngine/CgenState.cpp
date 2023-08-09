@@ -200,7 +200,10 @@ void CgenState::maybeCloneFunctionRecursive(llvm::Function* fn, bool is_l0) {
   for (auto it = llvm::inst_begin(fn), e = llvm::inst_end(fn); it != e; ++it) {
     if (llvm::isa<llvm::CallInst>(*it)) {
       auto& call = llvm::cast<llvm::CallInst>(*it);
-      maybeCloneFunctionRecursive(call.getCalledFunction(), is_l0);
+      // Ignore indirect calls (e.g. virtual function calls).
+      if (call.getCalledFunction()) {
+        maybeCloneFunctionRecursive(call.getCalledFunction(), is_l0);
+      }
     }
   }
 }

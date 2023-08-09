@@ -223,6 +223,35 @@ class QueryExprAPI:
         """
         pass
 
+    def quantile(self, prob, interpolation="linear"):
+        """
+        Create QUANTILE aggregate expression with the current expression as its argument.
+
+        Parameters
+        ----------
+        prob : float
+            Quantile probability. Should be in [0, 1] range.
+        interpolation : str, default: 'linear'
+            Interpolation method to be used when quantile is between two data points.
+            Supported values: 'lower', 'higher', 'nearest', 'midpoint', 'linear'.
+
+        Returns
+        -------
+        QueryExpr
+
+        Examples
+        --------
+        >>> hdk = pyhdk.init()
+        >>> ht = hdk.import_pydict({"x": [4, 0, 2, 8, 6, 10]})
+        >>> ht.agg([], ht["x"].quantile(0.25), ht["x"].quantile(0.25, 'nearest')).run()
+        Schema:
+          x_quantile: FP64
+          x_quantile_1: INT64
+        Data:
+        2.5|2
+        """
+        pass
+
     def sample(self):
         """
         Create SAMPLE aggregate expression with the current expression as its

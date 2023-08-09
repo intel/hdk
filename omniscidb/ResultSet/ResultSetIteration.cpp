@@ -23,6 +23,7 @@
  */
 
 #include "CountDistinct.h"
+#include "QuantileAccessors.h"
 #include "ResultSet.h"
 #include "RowSetMemoryOwner.h"
 
@@ -432,6 +433,9 @@ InternalTargetValue ResultSet::RowWiseTargetAccessor::getColumnInternal(
         rowwise_target_ptr + reinterpret_cast<size_t>(offsets_for_target.ptr2);
     const auto i2 = read_int_from_buff(ptr2, offsets_for_target.compact_sz2);
     return InternalTargetValue(i1, i2);
+  } else if (agg_info.is_agg && agg_info.agg_kind == hdk::ir::AggType::kQuantile) {
+    auto* quantile = reinterpret_cast<hdk::quantile::Quantile*>(i1);
+    return getQuantileInternal(quantile, agg_info);
   } else {
     if (type->isString()) {
       CHECK(!agg_info.is_agg);
@@ -1314,6 +1318,10 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
         }
       }
     }
+  }
+  if (target_info.agg_kind == hdk::ir::AggType::kQuantile) {
+    return getQuantile(*reinterpret_cast<hdk::quantile::Quantile* const*>(ptr),
+                       target_info);
   }
   if (chosen_type->isFloatingPoint()) {
     if (target_info.agg_kind == hdk::ir::AggType::kApproxQuantile) {

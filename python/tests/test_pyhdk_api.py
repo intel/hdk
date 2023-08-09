@@ -1188,6 +1188,34 @@ class TestBuilder(BaseTest):
 
         hdk.drop_table(ht)
 
+    def test_quantile(self):
+        hdk = pyhdk.init()
+        ht = hdk.import_pydict({"a": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]})
+
+        res = ht.agg([], r=ht["a"].quantile(0.3)).run()
+        check_res(res, {"r": [2.7]})
+
+        res = ht.agg([], r=ht["a"].quantile(0.3, "lower")).run()
+        check_res(res, {"r": [2]})
+
+        res = ht.agg([], r=ht["a"].quantile(0.3, "higher")).run()
+        check_res(res, {"r": [3]})
+
+        res = ht.agg([], r=ht["a"].quantile(0.3, "nearest")).run()
+        check_res(res, {"r": [3]})
+
+        res = ht.agg([], r=ht["a"].quantile(0.3, "midpoint")).run()
+        check_res(res, {"r": [2.5]})
+
+        with pytest.raises(ValueError) as e:
+            ht.agg([], r=ht["a"].quantile(-0.3))
+        with pytest.raises(ValueError) as e:
+            ht.agg([], r=ht["a"].quantile(1.3))
+        with pytest.raises(ValueError) as e:
+            ht.agg([], r=ht["a"].quantile(0.3, "some val"))
+
+        hdk.drop_table(ht)
+
 
 class TestSql(BaseTest):
     def test_no_alias(self, exe_cfg):

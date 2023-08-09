@@ -7,7 +7,7 @@ from libcpp.memory cimport unique_ptr, make_unique
 from libcpp.utility cimport move
 
 from pyhdk._storage cimport SchemaProvider, CColumnInfoPtr, ColumnInfo
-from pyhdk._common cimport Config, TypeInfo, CContext
+from pyhdk._common cimport Config, TypeInfo, CContext, CInterpolation
 from pyhdk._ir cimport CNode, CScan, CExpr, CColumnRefExpr
 from pyhdk._sql cimport CExecutionResult, ExecutionResult, CQueryDag, QueryDag, RelAlgExecutor
 
@@ -84,6 +84,29 @@ cdef class QueryExpr:
       raise ValueError(f"Expected 'prob' to be in [0, 1] range. Provided: {prob}.")
     res = QueryExpr();
     res.c_expr = self.c_expr.approxQuantile(prob)
+    return res
+
+  def quantile(self, prob, interpolation='linear'):
+    if not isinstance(prob, (float, int)):
+      raise TypeError(f"Float number expected for 'prob' argument. Provided: {type(prob)}.")
+    prob = float(prob)
+    if prob < 0.0 or prob > 1.0:
+      raise ValueError(f"Expected 'prob' to be in [0, 1] range. Provided: {prob}.")
+    cdef CInterpolation c_interpolation
+    if interpolation == 'linear':
+      c_interpolation = CInterpolation.kLinear
+    elif interpolation == 'midpoint':
+      c_interpolation = CInterpolation.kMidpoint
+    elif interpolation == 'lower':
+      c_interpolation = CInterpolation.kLower
+    elif interpolation == 'higher':
+      c_interpolation = CInterpolation.kHigher
+    elif interpolation == 'nearest':
+      c_interpolation = CInterpolation.kNearest
+    else:
+      raise ValueError(f"Unsupported interpolation method: {interpolation}")
+    res = QueryExpr();
+    res.c_expr = self.c_expr.quantile(prob, c_interpolation)
     return res
 
   def sample(self):

@@ -86,6 +86,7 @@ enum class AggType {
   kSample,
   kSingleValue,
   kTopK,
+  kQuantile,
   // Compound aggregates
   kStdDevSamp,
   kCorr,
@@ -109,5 +110,7 @@ enum class WindowFunctionKind {
   Count,
   SumInternal  // For deserialization from Calcite only. Gets rewritten to a regular SUM.
 };
+
+enum class Interpolation { kLower, kHigher, kNearest, kMidpoint, kLinear };
 
 }  // namespace hdk::ir

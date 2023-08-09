@@ -55,7 +55,8 @@ ColSlotContext::ColSlotContext(const std::vector<const hdk::ir::Expr*>& col_expr
       const auto agg_info = get_target_info(col_expr, bigint_count);
       const auto chosen_type = get_compact_type(agg_info);
 
-      if (agg_info.agg_kind == hdk::ir::AggType::kTopK) {
+      if (agg_info.agg_kind == hdk::ir::AggType::kTopK ||
+          agg_info.agg_kind == hdk::ir::AggType::kQuantile) {
         addSlotForColumn(sizeof(int64_t), col_expr_idx);
         ++col_expr_idx;
         continue;

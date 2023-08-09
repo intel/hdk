@@ -134,7 +134,29 @@ inline hdk::ir::AggType to_agg_kind(const std::string& agg_name) {
   if (agg_name == std::string("TOP_K")) {
     return hdk::ir::AggType::kTopK;
   }
+  if (agg_name == std::string("QUANTILE")) {
+    return hdk::ir::AggType::kQuantile;
+  }
   throw std::runtime_error("Aggregate function " + agg_name + " not supported");
+}
+
+inline hdk::ir::Interpolation to_interpolation(const std::string& interpolation) {
+  if (interpolation == std::string("LOWER")) {
+    return hdk::ir::Interpolation::kLower;
+  }
+  if (interpolation == std::string("HIGHER")) {
+    return hdk::ir::Interpolation::kHigher;
+  }
+  if (interpolation == std::string("NEAREST")) {
+    return hdk::ir::Interpolation::kNearest;
+  }
+  if (interpolation == std::string("MIDPOINT")) {
+    return hdk::ir::Interpolation::kMidpoint;
+  }
+  if (interpolation == std::string("LINEAR")) {
+    return hdk::ir::Interpolation::kLinear;
+  }
+  throw std::runtime_error("Interpolation " + interpolation + " is not supported");
 }
 
 namespace hdk::ir {
@@ -145,9 +167,11 @@ class Type;
 
 }  // namespace hdk::ir
 
-const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
-                                  const hdk::ir::Expr* arg_expr,
-                                  bool bigint_count);
+const hdk::ir::Type* get_agg_type(
+    hdk::ir::AggType agg_kind,
+    const hdk::ir::Expr* arg_expr,
+    bool bigint_count,
+    hdk::ir::Interpolation interpolation = hdk::ir::Interpolation::kLower);
 
 hdk::ir::DateExtractField to_datepart_field(const std::string&);
 

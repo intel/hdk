@@ -326,7 +326,7 @@ QueryMemoryInitializer::QueryMemoryInitializer(
 
   if (!query_mem_desc.isGroupBy()) {
     allocateCountDistinctBuffers(query_mem_desc, false, executor);
-    allocateTDigests(query_mem_desc, false, executor);
+    allocateQuantiles(query_mem_desc, false, executor);
     allocateTopKBuffers(query_mem_desc, false, executor);
   }
 
@@ -509,7 +509,7 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
   const size_t col_base_off{query_mem_desc.getColOffInBytes(0)};
 
   auto agg_bitmap_size = allocateCountDistinctBuffers(query_mem_desc, true, executor);
-  auto quantile_params = allocateTDigests(query_mem_desc, true, executor);
+  auto quantile_params = allocateQuantiles(query_mem_desc, true, executor);
   auto topk_params = allocateTopKBuffers(query_mem_desc, true, executor);
   auto buffer_ptr = reinterpret_cast<int8_t*>(groups_buffer);
 
@@ -703,9 +703,14 @@ void QueryMemoryInitializer::initColumnsPerRow(
           bm_sz > 0 ? allocateCountDistinctBitmap(bm_sz) : allocateCountDistinctSet();
       ++init_vec_idx;
     } else if (query_mem_desc.isGroupBy() && quantile_params[col_idx]) {
-      auto const q = *quantile_params[col_idx];
-      // allocate for APPROX_QUANTILE only when slot is used
-      init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
+      auto agg_type = quantile_params[col_idx]->first;
+      if (agg_type == hdk::ir::AggType::kApproxQuantile) {
+        // allocate for APPROX_QUANTILE only when slot is used
+        auto const q = quantile_params[col_idx]->second;
+        init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
+      } else {
+        init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->quantile());
+      }
       ++init_vec_idx;
     } else if (query_mem_desc.isGroupBy() && topk_params[col_idx]) {
       CHECK(topk_buffers_[col_idx]);
@@ -840,9 +845,9 @@ int64_t QueryMemoryInitializer::allocateCountDistinctSet() {
 }
 
 std::vector<QueryMemoryInitializer::QuantileParam>
-QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_desc,
-                                         const bool deferred,
-                                         const Executor* executor) {
+QueryMemoryInitializer::allocateQuantiles(const QueryMemoryDescriptor& query_mem_desc,
+                                          const bool deferred,
+                                          const Executor* executor) {
   size_t const slot_count = query_mem_desc.getSlotCount();
   size_t const ntargets = executor->plan_state_->target_exprs_.size();
   CHECK_GE(slot_count, ntargets);
@@ -851,7 +856,8 @@ QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_
   for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
     auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
     if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
-      if (agg_expr->aggType() == hdk::ir::AggType::kApproxQuantile) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kApproxQuantile ||
+          agg_expr->aggType() == hdk::ir::AggType::kQuantile) {
         size_t const agg_col_idx =
             query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
         CHECK_LT(agg_col_idx, slot_count);
@@ -859,11 +865,14 @@ QueryMemoryInitializer::allocateTDigests(const QueryMemoryDescriptor& query_mem_
                  static_cast<int8_t>(sizeof(int64_t)));
         auto const q = agg_expr->arg1()->as<hdk::ir::Constant>()->value().doubleval;
         if (deferred) {
-          quantile_params[agg_col_idx] = q;
-        } else {
+          quantile_params[agg_col_idx] = std::make_pair(agg_expr->aggType(), q);
+        } else if (agg_expr->aggType() == hdk::ir::AggType::kApproxQuantile) {
           // allocate for APPROX_QUANTILE only when slot is used
           init_agg_vals_[agg_col_idx] =
               reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
+        } else {
+          init_agg_vals_[agg_col_idx] =
+              reinterpret_cast<int64_t>(row_set_mem_owner_->quantile());
         }
       }
     }

@@ -182,6 +182,7 @@ set(hdk_default_runtime_functions_module_dependencies
     DecodersImpl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/ExtractFromTime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../Utils/StringLike.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Shared/quantile.h
     GroupByRuntime.cpp
     TopKRuntime.cpp)
 

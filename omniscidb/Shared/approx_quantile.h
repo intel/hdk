@@ -15,7 +15,7 @@
  */
 
 /*
- * @file    quantile.h
+ * @file    approx_quantile.h
  * @author  Matt Pulver <matt.pulver@omnisci.com>
  * @description Calculate approximate median and general quantiles, based on
  *   "Computing Extremely Accurate Quantiles Using t-Digests" by T. Dunning et al.
