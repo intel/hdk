@@ -239,12 +239,13 @@ class L0Manager : public GpuMgr {
   size_t getMaxAllocationSize(const int device_num) const;
   size_t getPageSize(const int device_num) const { return 4096u; }
 
-  virtual uint32_t getMaxBlockSize() const override;
-  virtual int8_t getSubGroupSize() const override;
-  virtual uint32_t getGridSize() const override;
-  virtual uint32_t getMinEUNumForAllDevices() const override;
-  virtual bool hasSharedMemoryAtomicsSupport() const override;
-  virtual size_t getMinSharedMemoryPerBlockForAllDevices() const override;
+  uint32_t getMaxBlockSize() const override;
+  int8_t getSubGroupSize() const override;
+  uint32_t getGridSize() const override;
+  uint32_t getMinEUNumForAllDevices() const override;
+  bool hasSharedMemoryAtomicsSupport() const override;
+  bool hasFP64Support() const override;
+  size_t getMinSharedMemoryPerBlockForAllDevices() const override;
 
   const std::vector<std::shared_ptr<L0Driver>>& drivers() const;
 

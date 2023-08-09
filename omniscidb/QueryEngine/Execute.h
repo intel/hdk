@@ -431,8 +431,6 @@ class Executor : public StringDictionaryProxyProvider {
 
   GpuMgr* gpuMgr() const;
 
-  bool isArchPascalOrLater(const ExecutorDeviceType dt) const;
-
   bool deviceSupportsFP64(const ExecutorDeviceType dt) const;
 
   bool needFetchAllFragments(const InputColDescriptor& col_desc,
