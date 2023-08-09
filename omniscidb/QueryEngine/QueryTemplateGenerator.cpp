@@ -634,7 +634,9 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
                                         group_buff_idx,
                                         "",
                                         bb_entry);
-    col_buffer = new llvm::LoadInst(group_by_buffers_gep->getSourceElementType(),
+    // TODO(adb): use central constant for address space for load
+    // NOTE: address spaces must match for function arguments (no surprise)
+    col_buffer = new llvm::LoadInst(llvm::PointerType::get(mod->getContext(), 0),
                                     group_by_buffers_gep,
                                     "col_buffer",
                                     false,
@@ -646,6 +648,8 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
         llvm::ConstantInt::get(i32_type, gpu_smem_context.getSharedMemorySize());
     // TODO(Saman): change this further, normal path should not go through this
     // TODO(adb): this could be directly assigned in row func args?
+    auto fcn_arg = func_init_shared_mem->getArg(0);
+    fcn_arg->print(llvm::errs(), true);
     result_buffer =
         llvm::CallInst::Create(func_init_shared_mem,
                                std::vector<llvm::Value*>{col_buffer, shared_mem_bytes_lv},
