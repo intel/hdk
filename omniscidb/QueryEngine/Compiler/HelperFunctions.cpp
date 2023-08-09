@@ -134,7 +134,11 @@ void optimize_ir(llvm::Function* query_func,
   CGPM.addPass(AnnotateInternalFunctionsPass());
   MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
 
+#if LLVM_VERSION_MAJOR > 15
+  FPM.addPass(llvm::SROAPass(llvm::SROAOptions::PreserveCFG));
+#else
   FPM.addPass(llvm::SROAPass());
+#endif
   // mem ssa drops unused load and store instructions, e.g. passing variables directly
   // where possible
   FPM.addPass(llvm::EarlyCSEPass(/*enable_mem_ssa=*/true));  // Catch trivial redundancies
@@ -152,7 +156,11 @@ void optimize_ir(llvm::Function* query_func,
   FPM.addPass(llvm::GVNPass());
 
   FPM.addPass(llvm::DSEPass());  // DeadStoreEliminationPass
+#if LLVM_VERSION_MAJOR > 14
+  LPM.addPass(llvm::LICMPass(llvm::LICMOptions()));
+#else
   LPM.addPass(llvm::LICMPass());
+#endif
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM), /*UseMemorySSA=*/true));
 
   FPM.addPass(llvm::InstCombinePass());

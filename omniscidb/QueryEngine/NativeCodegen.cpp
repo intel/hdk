@@ -272,8 +272,12 @@ std::map<std::string, std::string> get_device_parameters(bool cpu_only) {
 
   result.insert(std::make_pair("cpu_name", llvm::sys::getHostCPUName()));
   result.insert(std::make_pair("cpu_triple", llvm::sys::getProcessTriple()));
+#if LLVM_VERSION_MAJOR > 15
+  result.insert(std::make_pair("cpu_cores", std::to_string(llvm::get_physical_cores())));
+#else
   result.insert(
       std::make_pair("cpu_cores", std::to_string(llvm::sys::getHostNumPhysicalCores())));
+#endif
   result.insert(std::make_pair("cpu_threads", std::to_string(cpu_threads())));
 
   // https://en.cppreference.com/w/cpp/language/types
@@ -1222,12 +1226,17 @@ std::vector<llvm::Value*> Executor::inlineHoistedLiterals() {
     query_func_literal_loads_function_arguments2[element.first] = argument_values2;
   }
 
-  // copy the row_func function body over
-  // see
-  // https://stackoverflow.com/questions/12864106/move-function-body-avoiding-full-cloning/18751365
+// copy the row_func function body over
+// see
+// https://stackoverflow.com/questions/12864106/move-function-body-avoiding-full-cloning/18751365
+#if LLVM_VERSION_MAJOR > 15
+  row_func_with_hoisted_literals->splice(row_func_with_hoisted_literals->begin(),
+                                         cgen_state_->row_func_);
+#else
   row_func_with_hoisted_literals->getBasicBlockList().splice(
       row_func_with_hoisted_literals->begin(),
       cgen_state_->row_func_->getBasicBlockList());
+#endif
 
   // also replace row_func arguments with the arguments from row_func_hoisted_literals
   for (llvm::Function::arg_iterator I = cgen_state_->row_func_->arg_begin(),
@@ -1271,10 +1280,14 @@ std::vector<llvm::Value*> Executor::inlineHoistedLiterals() {
     // copy the filter_func function body over
     // see
     // https://stackoverflow.com/questions/12864106/move-function-body-avoiding-full-cloning/18751365
+#if LLVM_VERSION_MAJOR > 15
+    filter_func_with_hoisted_literals->splice(filter_func_with_hoisted_literals->begin(),
+                                              cgen_state_->filter_func_);
+#else
     filter_func_with_hoisted_literals->getBasicBlockList().splice(
         filter_func_with_hoisted_literals->begin(),
         cgen_state_->filter_func_->getBasicBlockList());
-
+#endif
     // also replace filter_func arguments with the arguments from
     // filter_func_hoisted_literals
     for (llvm::Function::arg_iterator I = cgen_state_->filter_func_->arg_begin(),
