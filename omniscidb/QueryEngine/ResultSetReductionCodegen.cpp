@@ -222,15 +222,18 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
     llvm::Value* translated{nullptr};
     if (auto gep = dynamic_cast<const GetElementPtr*>(instr_ptr)) {
       auto* base = mapped_value(gep->base(), m);
-      translated = cgen_state->ir_builder_.CreateGEP(
-          base->getType()->getScalarType()->getPointerElementType(),
-          base,
-          mapped_value(gep->index(), m),
-          gep->label());
+      auto base_pointee_type = pointee_type(gep->base()->type());
+      translated =
+          cgen_state->ir_builder_.CreateGEP(llvm_type(base_pointee_type, ctx, co),
+                                            base,
+                                            mapped_value(gep->index(), m),
+                                            gep->label());
     } else if (auto load = dynamic_cast<const Load*>(instr_ptr)) {
       auto* value = mapped_value(load->source(), m);
+      // LLVM doesn't allow pointer types anymore, but our reduction JIT still uses them
+      auto value_pointee_type = pointee_type(load->source()->type());
       translated = cgen_state->ir_builder_.CreateLoad(
-          value->getType()->getPointerElementType(), value, load->label());
+          llvm_type(value_pointee_type, ctx, co), value, load->label());
     } else if (auto icmp = dynamic_cast<const ICmp*>(instr_ptr)) {
       translated = cgen_state->ir_builder_.CreateICmp(llvm_predicate(icmp->predicate()),
                                                       mapped_value(icmp->lhs(), m),

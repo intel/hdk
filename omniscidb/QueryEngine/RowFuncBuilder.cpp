@@ -176,7 +176,7 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
                                          llvm::AtomicOrdering::Monotonic);
         } else {
           old_total_matched_val = LL_BUILDER.CreateLoad(
-              total_matched_ptr->getType()->getPointerElementType(), total_matched_ptr);
+              get_int_type(32, executor_->cgen_state_->context_), total_matched_ptr);
           LL_BUILDER.CreateStore(LL_BUILDER.CreateAdd(old_total_matched_val, matched_cnt),
                                  total_matched_ptr);
         }
@@ -1142,14 +1142,11 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
     CHECK_EQ(size_t(0), col_off % chosen_bytes);
     col_off /= chosen_bytes;
-    auto* bit_cast = LL_BUILDER.CreateBitCast(
-        std::get<0>(agg_out_ptr_w_idx),
-        llvm::PointerType::get(
-            get_int_type((chosen_bytes << 3), LL_CONTEXT),
-            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
     agg_col_ptr = LL_BUILDER.CreateGEP(
-        bit_cast->getType()->getScalarType()->getPointerElementType(),
-        bit_cast,
+        llvm::PointerType::get(
+            LL_CONTEXT,
+            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()),
+        std::get<0>(agg_out_ptr_w_idx),
         LL_INT(col_off));
   }
   CHECK(agg_col_ptr);

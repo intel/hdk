@@ -649,7 +649,6 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     // TODO(Saman): change this further, normal path should not go through this
     // TODO(adb): this could be directly assigned in row func args?
     auto fcn_arg = func_init_shared_mem->getArg(0);
-    fcn_arg->print(llvm::errs(), true);
     result_buffer =
         llvm::CallInst::Create(func_init_shared_mem,
                                std::vector<llvm::Value*>{col_buffer, shared_mem_bytes_lv},
