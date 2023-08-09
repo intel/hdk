@@ -1322,7 +1322,8 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
   auto operands = indices_from_json_array(field(json_expr, "operands"));
   if (operands.size() > 1 &&
       (operands.size() != 2 || (agg_kind != hdk::ir::AggType::kApproxCountDistinct &&
-                                agg_kind != hdk::ir::AggType::kApproxQuantile))) {
+                                agg_kind != hdk::ir::AggType::kApproxQuantile &&
+                                agg_kind != hdk::ir::AggType::kTopK))) {
     throw hdk::ir::QueryNotSupported(
         "Multiple arguments for aggregates aren't supported");
   }
@@ -1352,6 +1353,15 @@ hdk::ir::ExprPtr parseAggregateExpr(const rapidjson::Value& json_expr,
         Datum median;
         median.doubleval = 0.5;
         arg1 = std::make_shared<hdk::ir::Constant>(ctx.fp64(), false, median);
+      }
+    } else if (agg_kind == hdk::ir::AggType::kTopK) {
+      if (operands.size() < 2) {
+        throw std::runtime_error("Missing parameter for TOP_K aggregate.");
+      }
+      arg1 = std::dynamic_pointer_cast<const hdk::ir::Constant>(sources[operands[1]]);
+      if (!arg1 || !arg1->type()->isInteger() || arg1->value().intval == 0) {
+        throw std::runtime_error(
+            "TOP_K's second parameter should be non-zero integer literal");
       }
     }
     auto arg_type = arg_expr->type();
