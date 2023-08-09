@@ -164,6 +164,8 @@ class CudaMgr : public GpuMgr {
     return getMinNumMPsForAllDevices();
   };
 
+  bool hasFP64Support() const override { return isArchPascalOrLater(); }
+
   bool hasSharedMemoryAtomicsSupport() const override {
     /*
      * From CUDA Toolkit documentation:

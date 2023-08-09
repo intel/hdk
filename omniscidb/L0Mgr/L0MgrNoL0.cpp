@@ -148,6 +148,12 @@ size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
   return 0u;
 };
 
+
+bool L0Manager::hasFP64Support() const {
+  CHECK(false);
+  return false;
+}
+
 const std::vector<std::shared_ptr<L0Driver>>& L0Manager::drivers() const {
   return drivers_;
 }

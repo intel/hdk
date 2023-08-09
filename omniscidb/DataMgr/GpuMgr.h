@@ -62,5 +62,7 @@ struct GpuMgr {
   virtual uint32_t getGridSize() const = 0;
   virtual uint32_t getMinEUNumForAllDevices() const = 0;
   virtual bool hasSharedMemoryAtomicsSupport() const = 0;
+  // TODO: hasFP64Support implementations do not account for different device capabilities
+  virtual bool hasFP64Support() const { return true; };
   virtual size_t getMinSharedMemoryPerBlockForAllDevices() const = 0;
 };

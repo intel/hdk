@@ -451,6 +451,14 @@ bool L0Manager::hasSharedMemoryAtomicsSupport() const {
   return true;
 }
 
+bool L0Manager::hasFP64Support() const {
+  CHECK_GT(drivers_[0]->devices().size(), size_t(0));
+  ze_device_module_properties_t module_props;
+  L0_SAFE_CALL(
+      zeDeviceGetModuleProperties(drivers_[0]->devices()[0]->device(), &module_props));
+  return module_props.fp64flags;
+}
+
 size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
   auto comp = [](const auto& a, const auto& b) {
     return a->maxSharedLocalMemory() < b->maxSharedLocalMemory();
