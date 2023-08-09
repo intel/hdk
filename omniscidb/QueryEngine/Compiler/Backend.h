@@ -15,6 +15,7 @@
 #pragma once
 
 #include <llvm/IR/Value.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <memory>
 
 #include "QueryEngine/ExtensionModules.h"
