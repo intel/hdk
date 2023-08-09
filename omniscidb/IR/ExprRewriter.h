@@ -320,8 +320,12 @@ class ExprRewriter : public ExprVisitor<ExprPtr> {
     ExprPtr new_arg = agg->arg() ? visit(agg->arg()) : nullptr;
     ExprPtr new_arg1 = agg->arg1() ? visit(agg->arg1()) : nullptr;
     if (new_arg.get() != agg->arg() || new_arg1.get() != agg->arg1()) {
-      return hdk::ir::makeExpr<hdk::ir::AggExpr>(
-          agg->type(), agg->aggType(), new_arg, agg->isDistinct(), new_arg1);
+      return hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
+                                                 agg->aggType(),
+                                                 new_arg,
+                                                 agg->isDistinct(),
+                                                 new_arg1,
+                                                 agg->interpolation());
     }
     return defaultResult(agg);
   }

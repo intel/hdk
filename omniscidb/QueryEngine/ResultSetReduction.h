@@ -100,6 +100,10 @@ class ResultSetReduction {
                                           int8_t* this_ptr1,
                                           const int8_t* that_ptr1,
                                           const size_t target_logical_idx);
+  static void reduceOneQuantileSlot(const QueryMemoryDescriptor& query_mem_desc,
+                                    int8_t* this_ptr1,
+                                    const int8_t* that_ptr1,
+                                    const size_t target_logical_idx);
   static void reduceOneCountDistinctSlot(const ResultSetStorage& this_,
                                          const ResultSetStorage& that,
                                          int8_t* this_ptr1,

@@ -27,7 +27,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
     Data_Namespace::DataMgr* data_mgr,
     ConfigPtr config,
     const std::vector<InputTableInfo>& query_infos,
-    const bool approx_quantile,
+    const bool any_quantile,
     const bool topk_agg,
     const bool allow_multifrag,
     const bool keyless_hash,
@@ -82,7 +82,7 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
         output_columnar_ = output_columnar_hint &&
                            QueryMemoryDescriptor::countDescriptorsLogicallyEmpty(
                                count_distinct_descriptors_) &&
-                           !approx_quantile && !topk_agg;
+                           !any_quantile && !topk_agg;
         break;
       default:
         output_columnar_ = false;

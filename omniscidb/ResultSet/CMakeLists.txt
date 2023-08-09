@@ -3,6 +3,7 @@ set(result_set_source_files
     ArrowResultSetConverter.cpp
     BitmapGenerators.cpp
     ColSlotContext.cpp
+    QuantileAccessors.cpp
     QueryMemoryDescriptor.cpp
     ResultSet.cpp
     ResultSetIteration.cpp

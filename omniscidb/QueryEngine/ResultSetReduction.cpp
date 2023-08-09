@@ -1172,9 +1172,12 @@ void ResultSetManager::rewriteVarlenAggregates(ResultSet* result_rs) {
   } while (0)
 
 int8_t result_set::get_width_for_slot(const size_t target_slot_idx,
-                                      const bool float_argument_input,
+                                      const TargetInfo& target_info,
                                       const QueryMemoryDescriptor& query_mem_desc) {
-  if (float_argument_input) {
+  if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kQuantile) {
+    return query_mem_desc.getPaddedSlotWidthBytes(target_slot_idx);
+  }
+  if (takes_float_argument(target_info)) {
     return sizeof(float);
   }
   return query_mem_desc.getPaddedSlotWidthBytes(target_slot_idx);
@@ -1187,9 +1190,8 @@ void ResultSetReduction::reduceOneSlotSingleValue(
     const size_t target_slot_idx,
     const int64_t init_val,
     const int8_t* that_ptr1) {
-  const bool float_argument_input = takes_float_argument(target_info);
-  const auto chosen_bytes = result_set::get_width_for_slot(
-      target_slot_idx, float_argument_input, query_mem_desc);
+  const auto chosen_bytes =
+      result_set::get_width_for_slot(target_slot_idx, target_info, query_mem_desc);
 
   auto reduce = [&](auto const& size_tag) {
     using CastTarget = std::decay_t<decltype(size_tag)>;
@@ -1249,9 +1251,8 @@ void ResultSetReduction::reduceOneSlot(
     }
   }
   CHECK_LT(init_agg_val_idx, this_.getInitValsCount());
-  const bool float_argument_input = takes_float_argument(target_info);
-  const auto chosen_bytes = result_set::get_width_for_slot(
-      target_slot_idx, float_argument_input, query_mem_desc);
+  const auto chosen_bytes =
+      result_set::get_width_for_slot(target_slot_idx, target_info, query_mem_desc);
   int64_t init_val = this_.getInitVal(init_agg_val_idx);  // skip_val for nullable types
 
   if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kSingleValue) {
@@ -1308,6 +1309,10 @@ void ResultSetReduction::reduceOneSlot(
         CHECK_EQ(static_cast<int8_t>(sizeof(int64_t)), chosen_bytes);
         reduceOneApproxQuantileSlot(
             query_mem_desc, this_ptr1, that_ptr1, target_logical_idx);
+        break;
+      case hdk::ir::AggType::kQuantile:
+        CHECK_EQ(static_cast<int8_t>(sizeof(int64_t)), chosen_bytes);
+        reduceOneQuantileSlot(query_mem_desc, this_ptr1, that_ptr1, target_logical_idx);
         break;
       case hdk::ir::AggType::kTopK:
         CHECK_EQ(static_cast<int8_t>(sizeof(int64_t)), chosen_bytes);
@@ -1391,7 +1396,6 @@ void ResultSetReduction::reduceOneApproxQuantileSlot(
     int8_t* this_ptr1,
     const int8_t* that_ptr1,
     const size_t target_logical_idx) {
-  CHECK_LT(target_logical_idx, query_mem_desc.getCountDistinctDescriptorsSize());
   static_assert(sizeof(int64_t) == sizeof(quantile::TDigest*));
   auto* incoming = *reinterpret_cast<quantile::TDigest* const*>(that_ptr1);
   CHECK(incoming) << "this_ptr1=" << (void*)this_ptr1
@@ -1404,6 +1408,24 @@ void ResultSetReduction::reduceOneApproxQuantileSlot(
                        << ", target_logical_idx=" << target_logical_idx;
     accumulator->allocate();
     accumulator->mergeTDigest(*incoming);
+  }
+}
+
+void ResultSetReduction::reduceOneQuantileSlot(
+    const QueryMemoryDescriptor& query_mem_desc,
+    int8_t* this_ptr1,
+    const int8_t* that_ptr1,
+    const size_t target_logical_idx) {
+  auto* incoming = *reinterpret_cast<hdk::quantile::Quantile* const*>(that_ptr1);
+  CHECK(incoming) << "this_ptr1=" << (void*)this_ptr1
+                  << ", that_ptr1=" << (void const*)that_ptr1
+                  << ", target_logical_idx=" << target_logical_idx;
+  if (!incoming->empty()) {
+    auto* accumulator = *reinterpret_cast<hdk::quantile::Quantile**>(this_ptr1);
+    CHECK(accumulator) << "this_ptr1=" << (void*)this_ptr1
+                       << ", that_ptr1=" << (void const*)that_ptr1
+                       << ", target_logical_idx=" << target_logical_idx;
+    accumulator->merge(*incoming);
   }
 }
 

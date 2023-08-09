@@ -533,7 +533,8 @@ ExprPtr AggExpr::withType(const Type* new_type) const {
   if (type_->equal(new_type)) {
     return shared_from_this();
   }
-  return makeExpr<AggExpr>(new_type, agg_type_, arg_, is_distinct_, arg1_);
+  return makeExpr<AggExpr>(
+      new_type, agg_type_, arg_, is_distinct_, arg1_, interpolation_);
 }
 
 ExprPtr CaseExpr::withType(const Type* new_type) const {
@@ -1193,7 +1194,8 @@ bool AggExpr::operator==(const Expr& rhs) const {
     return false;
   }
   const AggExpr& rhs_ae = dynamic_cast<const AggExpr&>(rhs);
-  if (agg_type_ != rhs_ae.aggType() || is_distinct_ != rhs_ae.isDistinct()) {
+  if (agg_type_ != rhs_ae.aggType() || is_distinct_ != rhs_ae.isDistinct() ||
+      interpolation_ != rhs_ae.interpolation_) {
     return false;
   }
   if (arg_.get() == rhs_ae.arg()) {
@@ -1597,6 +1599,9 @@ std::string AggExpr::toString() const {
   }
   if (arg1_) {
     ss << arg1_->toString();
+  }
+  if (agg_type_ == AggType::kQuantile) {
+    ss << " " << interpolation_;
   }
   ss << ")";
   return ss.str();
@@ -2058,6 +2063,9 @@ size_t AggExpr::hash() const {
     boost::hash_combine(*hash_, is_distinct_);
     if (arg1_) {
       boost::hash_combine(*hash_, arg1_->hash());
+    }
+    if (agg_type_ == AggType::kQuantile) {
+      boost::hash_combine(*hash_, static_cast<int>(interpolation_));
     }
   }
   return *hash_;

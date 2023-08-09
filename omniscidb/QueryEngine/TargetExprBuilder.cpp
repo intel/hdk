@@ -64,6 +64,8 @@ std::vector<std::string> agg_fn_base_names(const TargetInfo& target_info) {
       return {"agg_approximate_count_distinct"};
     case hdk::ir::AggType::kApproxQuantile:
       return {"agg_approx_quantile"};
+    case hdk::ir::AggType::kQuantile:
+      return {"agg_quantile"};
     case hdk::ir::AggType::kSingleValue:
       return {"checked_single_agg_id"};
     case hdk::ir::AggType::kSample:
@@ -343,11 +345,12 @@ void TargetExprCodegen::codegenAggregate(
     llvm::Value* agg_col_ptr{nullptr};
     auto chosen_bytes =
         static_cast<size_t>(query_mem_desc.getPaddedSlotWidthBytes(slot_index));
-    if (target_info.agg_kind == hdk::ir::AggType::kTopK) {
-      CHECK_EQ(chosen_bytes, (size_t)8);
-      chosen_bytes = target_info.agg_arg_type->canonicalSize();
-    }
     auto chosen_type = get_compact_type(target_info);
+    // Some aggregates collect original data for further processing. For these
+    // aggregates we have 8-byte slot but runtime function and arg value are
+    // chosen basing on the original arg type.
+    bool data_collect_agg = target_info.agg_kind == hdk::ir::AggType::kTopK ||
+                            target_info.agg_kind == hdk::ir::AggType::kQuantile;
     auto arg_type =
         ((arg_expr && !arg_expr->type()->isNull()) && !target_info.is_distinct)
             ? target_info.agg_arg_type
@@ -370,8 +373,9 @@ void TargetExprCodegen::codegenAggregate(
     const bool is_count_in_avg =
         target_info.agg_kind == hdk::ir::AggType::kAvg && target_lv_idx == 1;
     // The count component of an average should never be compacted.
-    const auto agg_chosen_bytes =
-        float_argument_input && !is_count_in_avg ? sizeof(float) : chosen_bytes;
+    auto agg_chosen_bytes = float_argument_input && !is_count_in_avg ? sizeof(float)
+                            : data_collect_agg ? target_info.agg_arg_type->canonicalSize()
+                                               : chosen_bytes;
     if (float_argument_input) {
       CHECK_GE(chosen_bytes, sizeof(float));
     }
@@ -399,11 +403,9 @@ void TargetExprCodegen::codegenAggregate(
       str_target_lv = target_lvs.front();
     }
     std::vector<llvm::Value*> agg_args{
-        executor->castToIntPtrTyIn(
-            (is_group_by ? agg_col_ptr : agg_out_vec[slot_index]),
-            (target_info.is_agg && target_info.type->isArray() ? sizeof(void*)
-                                                               : agg_chosen_bytes)
-                << 3),
+        executor->castToIntPtrTyIn((is_group_by ? agg_col_ptr : agg_out_vec[slot_index]),
+                                   (data_collect_agg ? sizeof(void*) : agg_chosen_bytes)
+                                       << 3),
         (is_simple_count_target && !arg_expr)
             ? (agg_chosen_bytes == sizeof(int32_t) ? LL_INT(int32_t(0))
                                                    : LL_INT(int64_t(0)))
@@ -416,8 +418,7 @@ void TargetExprCodegen::codegenAggregate(
       }
     }
     std::string agg_fname{agg_base_name};
-    if ((is_fp_arg && !lazy_fetched) ||
-        (target_info.agg_kind == hdk::ir::AggType::kTopK) ||
+    if ((is_fp_arg && !lazy_fetched) || data_collect_agg ||
         (agg_chosen_bytes == sizeof(int32_t)) ||
         (agg_chosen_bytes < sizeof(int32_t) && query_mem_desc.didOutputColumnar())) {
       agg_fname += getAggFnSuffix(agg_chosen_bytes, is_fp_arg);
@@ -446,8 +447,7 @@ void TargetExprCodegen::codegenAggregate(
               static_cast<llvm::Value*>(executor->cgen_state_->inlineFpNull(arg_type));
         } else {
           null_in_lv = static_cast<llvm::Value*>(executor->cgen_state_->inlineIntNull(
-              is_agg_domain_range_equivalent(target_info.agg_kind) ||
-                      target_info.agg_kind == hdk::ir::AggType::kTopK
+              is_agg_domain_range_equivalent(target_info.agg_kind) || data_collect_agg
                   ? arg_type
                   : target_info.type));
         }

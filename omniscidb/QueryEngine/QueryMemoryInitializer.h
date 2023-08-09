@@ -121,7 +121,7 @@ class QueryMemoryInitializer {
                           const std::vector<int64_t>& init_vals,
                           const Executor* executor);
 
-  using QuantileParam = std::optional<double>;
+  using QuantileParam = std::optional<std::pair<hdk::ir::AggType, double>>;
   void initColumnsPerRow(const QueryMemoryDescriptor& query_mem_desc,
                          int8_t* row_ptr,
                          const std::vector<int64_t>& init_vals,
@@ -141,9 +141,10 @@ class QueryMemoryInitializer {
 
   int64_t allocateCountDistinctSet();
 
-  std::vector<QuantileParam> allocateTDigests(const QueryMemoryDescriptor& query_mem_desc,
-                                              const bool deferred,
-                                              const Executor* executor);
+  std::vector<QuantileParam> allocateQuantiles(
+      const QueryMemoryDescriptor& query_mem_desc,
+      const bool deferred,
+      const Executor* executor);
 
   std::vector<int> allocateTopKBuffers(const QueryMemoryDescriptor& query_mem_desc,
                                        const bool deferred,

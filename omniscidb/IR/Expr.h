@@ -787,11 +787,22 @@ class LikelihoodExpr : public Expr {
  */
 class AggExpr : public Expr {
  public:
-  AggExpr(const Type* type, AggType a, ExprPtr arg, bool d, ExprPtr arg1)
-      : Expr(type, true), agg_type_(a), arg_(arg), is_distinct_(d), arg1_(arg1) {
+  AggExpr(const Type* type,
+          AggType a,
+          ExprPtr arg,
+          bool d,
+          ExprPtr arg1,
+          Interpolation interpolation = Interpolation::kLinear)
+      : Expr(type, true)
+      , agg_type_(a)
+      , arg_(arg)
+      , is_distinct_(d)
+      , arg1_(arg1)
+      , interpolation_(interpolation) {
     if (arg1) {
       if (agg_type_ == AggType::kApproxCountDistinct ||
-          agg_type_ == AggType::kApproxQuantile || agg_type_ == AggType::kTopK) {
+          agg_type_ == AggType::kApproxQuantile || agg_type_ == AggType::kTopK ||
+          agg_type_ == AggType::kQuantile) {
         CHECK(arg1_->is<Constant>());
       } else {
         CHECK(agg_type_ == AggType::kCorr);
@@ -804,6 +815,7 @@ class AggExpr : public Expr {
   bool isDistinct() const { return is_distinct_; }
   const Expr* arg1() const { return arg1_.get(); }
   ExprPtr arg1Shared() const { return arg1_; }
+  Interpolation interpolation() const { return interpolation_; }
   ExprPtr withType(const Type* new_type) const override;
   bool operator==(const Expr& rhs) const override;
   std::string toString() const override;
@@ -817,6 +829,8 @@ class AggExpr : public Expr {
   // APPROX_COUNT_DISTINCT error_rate, APPROX_QUANTILE quantile,
   // CORR second arg
   ExprPtr arg1_;
+  // QUANTILE interpolation
+  Interpolation interpolation_;
 };
 
 /*

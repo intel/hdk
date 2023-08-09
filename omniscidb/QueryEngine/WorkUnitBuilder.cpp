@@ -452,7 +452,8 @@ void WorkUnitBuilder::processAggregate(const ir::Aggregate* agg) {
     target_expr = fold_expr(target_expr.get());
     new_target_exprs.emplace_back(target_expr);
     if (co_.device_type == ExecutorDeviceType::GPU && expr->is<ir::AggExpr>() &&
-        expr->as<ir::AggExpr>()->aggType() == ir::AggType::kTopK) {
+        (expr->as<ir::AggExpr>()->aggType() == ir::AggType::kTopK ||
+         expr->as<ir::AggExpr>()->aggType() == ir::AggType::kQuantile)) {
       throw QueryMustRunOnCpu();
     }
   }

@@ -78,6 +78,8 @@ class BuilderExpr {
   BuilderExpr singleValue() const;
   BuilderExpr topK(int count) const;
   BuilderExpr bottomK(int count) const;
+  BuilderExpr quantile(double val,
+                       Interpolation interpolation = Interpolation::kLinear) const;
   BuilderExpr stdDev() const;
   BuilderExpr corr(const BuilderExpr& arg) const;
 
@@ -90,12 +92,18 @@ class BuilderExpr {
   BuilderExpr agg(const std::string& agg_str, double val = HUGE_VAL) const;
   BuilderExpr agg(const std::string& agg_str, int val) const;
   BuilderExpr agg(AggType agg_kind, const BuilderExpr& arg) const;
-  BuilderExpr agg(AggType agg_kind, double val) const;
+  BuilderExpr agg(AggType agg_kind,
+                  double val,
+                  Interpolation interpolation = Interpolation::kLinear) const;
   BuilderExpr agg(AggType agg_kind, int val) const;
-  BuilderExpr agg(AggType agg_kind, bool is_dinstinct, const BuilderExpr& arg) const;
+  BuilderExpr agg(AggType agg_kind,
+                  bool is_dinstinct,
+                  const BuilderExpr& arg,
+                  Interpolation interpolation = Interpolation::kLinear) const;
   BuilderExpr agg(AggType agg_kind,
                   bool is_dinstinct = false,
-                  double val = HUGE_VAL) const;
+                  double val = HUGE_VAL,
+                  Interpolation interpolation = Interpolation::kLinear) const;
 
   BuilderExpr extract(DateExtractField field) const;
   BuilderExpr extract(const std::string& field) const;

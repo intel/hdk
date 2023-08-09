@@ -30,6 +30,7 @@
 #include "DataProvider/DataProvider.h"
 #include "Logger/Logger.h"
 #include "Shared/approx_quantile.h"
+#include "Shared/quantile.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 #include "ThirdParty/robin_hood.h"
 
@@ -243,6 +244,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   }
 
   quantile::TDigest* nullTDigest(double const q);
+  hdk::quantile::Quantile* quantile();
 
   int8_t* topKBuffer(size_t size);
 
@@ -269,6 +271,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   std::vector<Data_Namespace::AbstractBuffer*> varlen_input_buffers_;
   std::vector<std::unique_ptr<quantile::TDigest>> t_digests_;
   std::unordered_map<const int8_t*, std::unique_ptr<AbstractDataToken>> data_tokens_;
+  std::vector<std::unique_ptr<hdk::quantile::Quantile>> quantiles_;
 
   DataProvider* data_provider_;  // for metadata lookups
   size_t arena_block_size_;      // for cloning

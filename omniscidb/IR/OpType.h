@@ -105,6 +105,8 @@ inline std::string toString(hdk::ir::AggType agg) {
       return "SINGLE_VALUE";
     case hdk::ir::AggType::kTopK:
       return "TOP_K";
+    case hdk::ir::AggType::kQuantile:
+      return "QUANTILE";
     case hdk::ir::AggType::kStdDevSamp:
       return "STDDEV";
     case hdk::ir::AggType::kCorr:
@@ -153,6 +155,23 @@ inline std::string toString(hdk::ir::WindowFunctionKind kind) {
   return "";
 }
 
+inline std::string toString(hdk::ir::Interpolation interpolation) {
+  switch (interpolation) {
+    case hdk::ir::Interpolation::kLower:
+      return "LOWER";
+    case hdk::ir::Interpolation::kHigher:
+      return "HIGHER";
+    case hdk::ir::Interpolation::kNearest:
+      return "NEAREST";
+    case hdk::ir::Interpolation::kMidpoint:
+      return "MIDPOINT";
+    case hdk::ir::Interpolation::kLinear:
+      return "LINEAR";
+  }
+  LOG(FATAL) << "Invalid interpolation kind " << (int)interpolation;
+  return "";
+}
+
 namespace hdk::ir {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::OpType op) {
@@ -169,6 +188,10 @@ inline std::ostream& operator<<(std::ostream& os, hdk::ir::AggType agg) {
 
 inline std::ostream& operator<<(std::ostream& os, hdk::ir::WindowFunctionKind kind) {
   return os << toString(kind);
+}
+
+inline std::ostream& operator<<(std::ostream& os, hdk::ir::Interpolation interpolation) {
+  return os << toString(interpolation);
 }
 
 }  // namespace hdk::ir

@@ -45,6 +45,8 @@ struct TargetInfo {
   bool is_distinct;
   int topk_param;
   bool topk_inline_buffer;
+  double quantile_param;
+  hdk::ir::Interpolation interpolation;
 #ifndef __CUDACC__
  public:
   inline std::string toString() const {
@@ -58,7 +60,9 @@ struct TargetInfo {
     result += "is_distinct=" + std::string(is_distinct ? "true" : "false") + ", ";
     result += "topk_param=" + ::toString(topk_param) + ", ";
     result +=
-        "topk_inline_buffer=" + std::string(topk_inline_buffer ? "true" : "false") + ")";
+        "topk_inline_buffer=" + std::string(topk_inline_buffer ? "true" : "false") + ", ";
+    result += "quantile_param=" + ::toString(quantile_param) + ", ";
+    result += "interpolation=" + ::toString(interpolation) + ")";
     return result;
   }
 #endif
@@ -103,7 +107,9 @@ inline TargetInfo get_target_info(const PointerType target_expr,
             false,
             false,
             0,
-            false};
+            false,
+            0,
+            hdk::ir::Interpolation::kLower};
   }
 
   auto agg_arg_type = agg_arg->type();
@@ -123,7 +129,9 @@ inline TargetInfo get_target_info(const PointerType target_expr,
         agg_arg_type->nullable(),
         is_distinct,
         0,
-        false};
+        false,
+        0,
+        hdk::ir::Interpolation::kLower};
   }
 
   int topk_param =
@@ -132,7 +140,11 @@ inline TargetInfo get_target_info(const PointerType target_expr,
           : 0;
   bool topk_inline_buffer =
       topk_param && (agg_expr->arg()->type()->canonicalSize() * std::abs(topk_param) <=
-                     sizeof(int64_t*));
+                     static_cast<int>(sizeof(int64_t*)));
+  double quantile_param = agg_type == hdk::ir::AggType::kQuantile
+                              ? agg_expr->arg1()->as<hdk::ir::Constant>()->fpVal()
+                              : 0.0;
+  hdk::ir::Interpolation interpolation = agg_expr->interpolation();
   return {true,
           agg_expr->aggType(),
           agg_type == hdk::ir::AggType::kCount
@@ -145,7 +157,9 @@ inline TargetInfo get_target_info(const PointerType target_expr,
               : agg_arg_type->nullable(),
           is_distinct,
           topk_param,
-          topk_inline_buffer};
+          topk_inline_buffer,
+          quantile_param,
+          interpolation};
 }
 
 inline bool is_distinct_target(const TargetInfo& target_info) {
@@ -159,7 +173,8 @@ inline bool takes_float_argument(const TargetInfo& target_info) {
           target_info.agg_kind == hdk::ir::AggType::kSum ||
           target_info.agg_kind == hdk::ir::AggType::kMin ||
           target_info.agg_kind == hdk::ir::AggType::kMax ||
-          target_info.agg_kind == hdk::ir::AggType::kSingleValue) &&
+          target_info.agg_kind == hdk::ir::AggType::kSingleValue ||
+          target_info.agg_kind == hdk::ir::AggType::kQuantile) &&
          target_info.agg_arg_type->isFp32();
 }
 

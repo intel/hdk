@@ -84,7 +84,8 @@ void checkAgg(const BuilderExpr& expr,
               AggType kind,
               bool is_distinct,
               const std::string& name,
-              double val = HUGE_VAL) {
+              double val = HUGE_VAL,
+              Interpolation interpolation = Interpolation::kLinear) {
   ASSERT_TRUE(expr.expr()->is<hdk::ir::AggExpr>());
   auto agg = expr.expr()->as<hdk::ir::AggExpr>();
   ASSERT_EQ(agg->type()->toString(), type->toString());
@@ -94,6 +95,10 @@ void checkAgg(const BuilderExpr& expr,
   if (val != HUGE_VAL) {
     ASSERT_TRUE(agg->arg1());
     ASSERT_NEAR(agg->arg1()->as<hdk::ir::Constant>()->fpVal(), val, 0.001);
+
+    if (kind == AggType::kQuantile) {
+      ASSERT_EQ(agg->interpolation(), interpolation);
+    }
   }
 }
 
@@ -542,6 +547,87 @@ class QueryBuilderTest : public TestSuite {
                     "3,30000000000,,3,,30,,300,,3000,,3.3,,3.33\n"
                     "5,50000000000,3,1,30,10,300,100,3000,1000,3.3,1.1,3.33,1.11\n"
                     "6,60000000000,,2,,20,,200,,2000,,2.2,,2.22\n");
+
+    createTable("test_quantile",
+                {{"id1", ctx().int32()},
+                 {"id2", ctx().int64()},
+                 {"i8", ctx().int8()},
+                 {"i8nn", ctx().int8(false)},
+                 {"i16", ctx().int16()},
+                 {"i16nn", ctx().int16(false)},
+                 {"i32", ctx().int32()},
+                 {"i32nn", ctx().int32(false)},
+                 {"i64", ctx().int64()},
+                 {"i64nn", ctx().int64(false)},
+                 {"f32", ctx().fp32()},
+                 {"f32nn", ctx().fp32(false)},
+                 {"f64", ctx().fp64()},
+                 {"f64nn", ctx().fp64(false)},
+                 {"dec", ctx().decimal64(10, 2)},
+                 {"decnn", ctx().decimal64(10, 2, false)}},
+                {2});
+    insertCsvValues(
+        "test_quantile",
+        "1,10000000000,1,1,10,10,100,100,1000,1000,1.0,1.0,10.0,10.0,100.0,100.0\n"
+        "1,10000000000,2,2,20,20,200,200,2000,2000,2.0,2.0,20.0,20.0,200.0,200.0\n"
+        "1,10000000000,3,3,30,30,300,300,3000,3000,3.0,3.0,30.0,30.0,300.0,300.0\n"
+        "1,10000000000,4,4,40,40,400,400,4000,4000,4.0,4.0,40.0,40.0,400.0,400.0\n"
+        "1,10000000000,5,5,50,50,500,500,5000,5000,5.0,5.0,50.0,50.0,500.0,500.0\n"
+        "2,20000000000,1,1,10,10,100,100,1000,1000,1.0,1.0,10.0,10.0,100.0,100.0\n"
+        "2,20000000000,2,2,20,20,200,200,2000,2000,2.0,2.0,20.0,20.0,200.0,200.0\n"
+        "2,20000000000,3,3,30,30,300,300,3000,3000,3.0,3.0,30.0,30.0,300.0,300.0\n"
+        "2,20000000000,,4,,40,,400,,4000,,4.0,,40.0,,400.0\n"
+        "1,10000000000,6,6,60,60,600,600,6000,6000,6.0,6.0,60.0,60.0,600.0,600.0\n"
+        "1,10000000000,7,7,70,70,700,700,7000,7000,7.0,7.0,70.0,70.0,700.0,700.0\n"
+        "1,10000000000,8,8,80,80,800,800,8000,8000,8.0,8.0,80.0,80.0,800.0,800.0\n"
+        "1,10000000000,9,9,90,90,900,900,9000,9000,9.0,9.0,90.0,90.0,900.0,900.0\n"
+        "3,30000000000,1,1,10,10,100,100,1000,1000,1.0,1.0,10.0,10.0,100.0,100.0\n"
+        "3,30000000000,2,2,20,20,200,200,2000,2000,2.0,2.0,20.0,20.0,200.0,200.0\n"
+        "3,30000000000,,3,,30,,300,,3000,,3.0,,30.0,,300.0\n"
+        "4,40000000000,,1,,10,,100,,1000,,1.0,,10.0,,100.0\n");
+
+    createTable("test_quantile_dt",
+                {{"id1", ctx().int32()},
+                 {"id2", ctx().int64()},
+                 {"t64s", ctx().time64(hdk::ir::TimeUnit::kSecond)},
+                 {"t64s2", ctx().time64(hdk::ir::TimeUnit::kSecond)},
+                 {"d32", ctx().date32(hdk::ir::TimeUnit::kDay)},
+                 {"d64", ctx().date64(hdk::ir::TimeUnit::kDay)},
+                 {"ts64", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
+                 {"ts64nn", ctx().timestamp(hdk::ir::TimeUnit::kMilli, false)}},
+                {2});
+    insertCsvValues("test_quantile_dt",
+                    "1,10000000000,00:00:01,00:00:10,1970-01-02,1970-01-11,1970-01-01 "
+                    "00:00:01,1970-01-01 00:00:10\n"
+                    "1,10000000000,00:00:02,00:00:20,1970-01-03,1970-01-21,1970-01-01 "
+                    "00:00:02,1970-01-01 00:00:20\n"
+                    "1,10000000000,00:00:03,00:00:30,1970-01-04,1970-01-31,1970-01-01 "
+                    "00:00:03,1970-01-01 00:00:30\n"
+                    "1,10000000000,00:00:04,00:00:40,1970-01-05,1970-02-10,1970-01-01 "
+                    "00:00:04,1970-01-01 00:00:40\n"
+                    "1,10000000000,00:00:05,00:00:50,1970-01-06,1970-02-20,1970-01-01 "
+                    "00:00:05,1970-01-01 00:00:50\n"
+                    "2,20000000000,00:00:01,00:00:10,1970-01-02,1970-01-11,1970-01-01 "
+                    "00:00:01,1970-01-01 00:00:10\n"
+                    "2,20000000000,00:00:02,00:00:20,1970-01-03,1970-01-21,1970-01-01 "
+                    "00:00:02,1970-01-01 00:00:20\n"
+                    "2,20000000000,00:00:03,00:00:30,1970-01-04,1970-01-31,1970-01-01 "
+                    "00:00:03,1970-01-01 00:00:30\n"
+                    "2,20000000000,,00:00:40,,1970-02-10,,1970-01-01 00:00:40\n"
+                    "1,10000000000,00:00:06,00:01:00,1970-01-07,1970-03-02,1970-01-01 "
+                    "00:00:06,1970-01-01 00:01:00\n"
+                    "1,10000000000,00:00:07,00:01:10,1970-01-08,1970-03-12,1970-01-01 "
+                    "00:00:07,1970-01-01 00:01:10\n"
+                    "1,10000000000,00:00:08,00:01:20,1970-01-09,1970-03-22,1970-01-01 "
+                    "00:00:08,1970-01-01 00:01:20\n"
+                    "1,10000000000,00:00:09,00:01:30,1970-01-10,1970-04-01,1970-01-01 "
+                    "00:00:09,1970-01-01 00:01:30\n"
+                    "3,30000000000,00:00:01,00:00:10,1970-01-02,1970-01-11,1970-01-01 "
+                    "00:00:01,1970-01-01 00:00:10\n"
+                    "3,30000000000,00:00:02,00:00:20,1970-01-03,1970-01-21,1970-01-01 "
+                    "00:00:02,1970-01-01 00:00:20\n"
+                    "3,30000000000,,00:00:30,,1970-01-31,,1970-01-01 00:00:30\n"
+                    "4,40000000000,,00:00:10,,1970-01-11,,1970-01-01 00:00:10\n");
   }
 
   static void TearDownTestSuite() {
@@ -1225,6 +1311,77 @@ TEST_F(QueryBuilderTest, AggExpr) {
   EXPECT_THROW(ref_i32.agg("approximate quantile"), InvalidQueryError);
   EXPECT_THROW(ref_i32.approxQuantile(-1.0), InvalidQueryError);
   EXPECT_THROW(ref_i32.approxQuantile(1.5), InvalidQueryError);
+  // QUANTILE
+  checkAgg(ref_i32.quantile(0.0),
+           ctx().fp64(),
+           AggType::kQuantile,
+           false,
+           "col_i_quantile",
+           0.0,
+           Interpolation::kLinear);
+  checkAgg(ref_i32.quantile(0.5, Interpolation::kLower),
+           ctx().int32(),
+           AggType::kQuantile,
+           false,
+           "col_i_quantile",
+           0.5,
+           Interpolation::kLower);
+  checkAgg(ref_i64.quantile(0.5, Interpolation::kHigher),
+           ctx().int64(),
+           AggType::kQuantile,
+           false,
+           "col_bi_quantile",
+           0.5,
+           Interpolation::kHigher);
+  checkAgg(ref_i64.quantile(0.5, Interpolation::kNearest),
+           ctx().int64(),
+           AggType::kQuantile,
+           false,
+           "col_bi_quantile",
+           0.5,
+           Interpolation::kNearest);
+  checkAgg(ref_i64.quantile(0.5, Interpolation::kMidpoint),
+           ctx().fp64(),
+           AggType::kQuantile,
+           false,
+           "col_bi_quantile",
+           0.5,
+           Interpolation::kMidpoint);
+  for (auto interpolation : {Interpolation::kLower,
+                             Interpolation::kHigher,
+                             Interpolation::kNearest,
+                             Interpolation::kMidpoint,
+                             Interpolation::kLinear}) {
+    checkAgg(ref_date.quantile(0.5, interpolation),
+             ctx().date64(TimeUnit::kSecond),
+             AggType::kQuantile,
+             false,
+             "col_date_quantile",
+             0.5,
+             interpolation);
+    checkAgg(ref_time.quantile(0.5, interpolation),
+             ctx().time64(TimeUnit::kSecond),
+             AggType::kQuantile,
+             false,
+             "col_time_quantile",
+             0.5,
+             interpolation);
+    checkAgg(ref_timestamp.quantile(0.5, interpolation),
+             ctx().timestamp(TimeUnit::kSecond),
+             AggType::kQuantile,
+             false,
+             "col_timestamp_quantile",
+             0.5,
+             interpolation);
+  }
+  EXPECT_THROW(ref_b.quantile(0.5), InvalidQueryError);
+  EXPECT_THROW(ref_str.quantile(0.5), InvalidQueryError);
+  EXPECT_THROW(ref_dict.quantile(0.5), InvalidQueryError);
+  EXPECT_THROW(ref_arr.quantile(0.5), InvalidQueryError);
+  EXPECT_THROW(ref_arr_3.quantile(0.5), InvalidQueryError);
+  EXPECT_THROW(ref_i32.agg("quantile"), InvalidQueryError);
+  EXPECT_THROW(ref_i32.quantile(-1.0), InvalidQueryError);
+  EXPECT_THROW(ref_i32.quantile(1.5), InvalidQueryError);
   // SAMPLE
   checkAgg(
       ref_i32.sample(), ref_i32.expr()->type(), AggType::kSample, false, "col_i_sample");
@@ -1560,6 +1717,28 @@ TEST_F(QueryBuilderTest, ParseAgg) {
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, 1.5)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, 1..5)"), InvalidQueryError);
   EXPECT_THROW(node.parseAgg("approx_quantile(col_i, 0.5, 1.5)"), InvalidQueryError);
+  // QUANTILE
+  checkAgg(node.parseAgg("quantile(col_i, 0.5)"),
+           ctx().fp64(),
+           AggType::kQuantile,
+           false,
+           "col_i_quantile",
+           0.5,
+           Interpolation::kLinear);
+  checkAgg(node.parseAgg("  QUANtile (col_i, 0.1)"),
+           ctx().fp64(),
+           AggType::kQuantile,
+           false,
+           "col_i_quantile",
+           0.1,
+           Interpolation::kLinear);
+  EXPECT_THROW(node.parseAgg("quantile"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i, col_f)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i, -0.5)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i, 1.5)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i, 1..5)"), InvalidQueryError);
+  EXPECT_THROW(node.parseAgg("quantile(col_i, 0.5, 1.5)"), InvalidQueryError);
   // SAMPLE
   checkAgg(node.parseAgg("sample(col_i)"),
            ctx().int32(),
@@ -5795,6 +5974,244 @@ TEST_F(QueryBuilderTest, TopK_Unnest) {
                                 40000000000ULL,
                                 50000000000ULL}),
           std::vector<int64_t>({5000, 4000, 5000, 4000, 4000, 3000, 2000, 3000}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, Quantile_Exec) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag = scan.agg({"id1"s},
+                          {scan.ref("i8").quantile(0.5),
+                           scan.ref("i8nn").quantile(0.5, Interpolation::kLower),
+                           scan.ref("i16").quantile(0.4),
+                           scan.ref("i16nn").quantile(0.5, Interpolation::kHigher),
+                           scan.ref("i32").quantile(0.6),
+                           scan.ref("i32nn").quantile(0.4, Interpolation::kNearest),
+                           scan.ref("i64").quantile(0.3),
+                           scan.ref("i64nn").quantile(0.4, Interpolation::kMidpoint),
+                           scan.ref("f32").quantile(0.5),
+                           scan.ref("f32nn").quantile(0.5, Interpolation::kLinear),
+                           scan.ref("f64").quantile(0.0),
+                           scan.ref("f64nn").quantile(1.0),
+                           scan.ref("dec").quantile(0.6),
+                           scan.ref("decnn").quantile(0.5, Interpolation::kLower)})
+                     .sort(0)
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 2, 3, 4}),
+          std::vector<double>({5.0, 2.0, 1.5, inline_null_value<double>()}),
+          std::vector<int8_t>({5, 2, 2, 1}),
+          std::vector<double>({42.0, 18.0, 14.0, inline_null_value<double>()}),
+          std::vector<int16_t>({50, 30, 20, 10}),
+          std::vector<double>({580.0, 220.0, 160.0, inline_null_value<double>()}),
+          std::vector<int32_t>({400, 200, 200, 100}),
+          std::vector<double>({3400.0, 1600.0, 1300.0, inline_null_value<double>()}),
+          std::vector<double>({4500.0, 2500.0, 1500.0, 1000.0}),
+          std::vector<float>({5.0, 2.0, 1.5, inline_null_value<float>()}),
+          std::vector<float>({5.0, 2.5, 2.0, 1.0}),
+          std::vector<double>({10.0, 10.0, 10.0, inline_null_value<double>()}),
+          std::vector<double>({90.0, 40.0, 30.0, 10.0}),
+          std::vector<int64_t>({58000, 22000, 16000, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({50000, 20000, 20000, 10000}));
+    }
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag = scan.agg({"id2"s},
+                          {scan.ref("i8").quantile(0.5),
+                           scan.ref("i8nn").quantile(0.5, Interpolation::kLower),
+                           scan.ref("i16").quantile(0.4),
+                           scan.ref("i16nn").quantile(0.5, Interpolation::kHigher),
+                           scan.ref("i32").quantile(0.6),
+                           scan.ref("i32nn").quantile(0.4, Interpolation::kNearest),
+                           scan.ref("i64").quantile(0.3),
+                           scan.ref("i64nn").quantile(0.4, Interpolation::kMidpoint),
+                           scan.ref("f32").quantile(0.5),
+                           scan.ref("f32nn").quantile(0.5, Interpolation::kLinear),
+                           scan.ref("f64").quantile(0.0),
+                           scan.ref("f64nn").quantile(1.0),
+                           scan.ref("dec").quantile(0.6),
+                           scan.ref("decnn").quantile(0.5, Interpolation::kLower)})
+                     .sort(0)
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int64_t>(
+              {10000000000LL, 20000000000LL, 30000000000LL, 40000000000LL}),
+          std::vector<double>({5.0, 2.0, 1.5, inline_null_value<double>()}),
+          std::vector<int8_t>({5, 2, 2, 1}),
+          std::vector<double>({42.0, 18.0, 14.0, inline_null_value<double>()}),
+          std::vector<int16_t>({50, 30, 20, 10}),
+          std::vector<double>({580.0, 220.0, 160.0, inline_null_value<double>()}),
+          std::vector<int32_t>({400, 200, 200, 100}),
+          std::vector<double>({3400.0, 1600.0, 1300.0, inline_null_value<double>()}),
+          std::vector<double>({4500.0, 2500.0, 1500.0, 1000.0}),
+          std::vector<float>({5.0, 2.0, 1.5, inline_null_value<float>()}),
+          std::vector<float>({5.0, 2.5, 2.0, 1.0}),
+          std::vector<double>({10.0, 10.0, 10.0, inline_null_value<double>()}),
+          std::vector<double>({90.0, 40.0, 30.0, 10.0}),
+          std::vector<int64_t>({58000, 22000, 16000, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({50000, 20000, 20000, 10000}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, Quantile_Exec_No_GroupBy) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag = scan.agg(std::vector<std::string>(),
+                          {scan.ref("i8").quantile(0.5),
+                           scan.ref("i16").quantile(0.4, Interpolation::kLower),
+                           scan.ref("i32").quantile(0.6, Interpolation::kHigher),
+                           scan.ref("i32").quantile(0.2, Interpolation::kLinear),
+                           scan.ref("i64").quantile(0.3, Interpolation::kNearest),
+                           scan.ref("f32").quantile(0.7, Interpolation::kMidpoint),
+                           scan.ref("f64").quantile(0.0),
+                           scan.ref("dec").quantile(1.0)})
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<double>({3.0}),
+                       std::vector<int16_t>({20}),
+                       std::vector<int32_t>({400}),
+                       std::vector<double>({160.0}),
+                       std::vector<int64_t>({2000}),
+                       std::vector<float>({5.5}),
+                       std::vector<double>({10.0}),
+                       std::vector<int64_t>({90000}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, Quantile_Datetime_Exec) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile_dt");
+      auto dag = scan.agg({"id1"s},
+                          {scan.ref("t64s").quantile(0.5),
+                           scan.ref("t64s2").quantile(0.5, Interpolation::kLower),
+                           scan.ref("d32").quantile(0.4, Interpolation::kHigher),
+                           scan.ref("d64").quantile(0.4, Interpolation::kMidpoint),
+                           scan.ref("ts64").quantile(0.6, Interpolation::kNearest),
+                           scan.ref("ts64nn").quantile(0.6, Interpolation::kLinear)})
+                     .sort(0)
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      int64_t ms_per_day = 86400 * 1000;
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 2, 3, 4}),
+          std::vector<int64_t>({5, 2, 1, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({50, 20, 20, 10}),
+          std::vector<int64_t>({5 * ms_per_day,
+                                2 * ms_per_day,
+                                2 * ms_per_day,
+                                inline_null_value<int64_t>()}),
+          std::vector<int64_t>(
+              {45 * ms_per_day, 25 * ms_per_day, 15 * ms_per_day, 10 * ms_per_day}),
+          std::vector<int64_t>({6, 2, 2, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({58000, 28000, 22000, 10000}));
+    }
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile_dt");
+      auto dag = scan.agg({"id2"s},
+                          {scan.ref("t64s").quantile(0.5),
+                           scan.ref("t64s2").quantile(0.5, Interpolation::kLower),
+                           scan.ref("d32").quantile(0.4, Interpolation::kHigher),
+                           scan.ref("d64").quantile(0.4, Interpolation::kMidpoint),
+                           scan.ref("ts64").quantile(0.6, Interpolation::kNearest),
+                           scan.ref("ts64nn").quantile(0.6, Interpolation::kLinear)})
+                     .sort(0)
+                     .finalize();
+      auto res = runQuery(std::move(dag));
+      int64_t ms_per_day = 86400 * 1000;
+      compare_res_data(
+          res,
+          std::vector<int64_t>(
+              {10000000000LL, 20000000000LL, 30000000000LL, 40000000000LL}),
+          std::vector<int64_t>({5, 2, 1, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({50, 20, 20, 10}),
+          std::vector<int64_t>({5 * ms_per_day,
+                                2 * ms_per_day,
+                                2 * ms_per_day,
+                                inline_null_value<int64_t>()}),
+          std::vector<int64_t>(
+              {45 * ms_per_day, 25 * ms_per_day, 15 * ms_per_day, 10 * ms_per_day}),
+          std::vector<int64_t>({6, 2, 2, inline_null_value<int64_t>()}),
+          std::vector<int64_t>({58000, 28000, 22000, 10000}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, Quantile_Exec_Sort) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag = scan.agg({"id1"s}, {scan.ref("f32").quantile(0.5)}).sort(1).finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(res,
+                       std::vector<int32_t>({3, 2, 1, 4}),
+                       std::vector<float>({1.5, 2.0, 5.0, inline_null_value<float>()}));
+    }
+  }
+}
+
+TEST_F(QueryBuilderTest, Quantile_Exec_Fetch) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag1 = scan.agg({"id1"s}, {scan.ref("f32").quantile(0.5)}).sort(0).finalize();
+      auto res1 = runQuery(std::move(dag1));
+
+      auto dag2 = builder.scan(res1.tableName()).proj({0, 1}).finalize();
+      auto res2 = runQuery(std::move(dag2));
+      compare_res_data(res2,
+                       std::vector<int32_t>({1, 2, 3, 4}),
+                       std::vector<float>({5.0, 2.0, 1.5, inline_null_value<float>()}));
     }
   }
 }
