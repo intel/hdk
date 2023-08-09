@@ -148,7 +148,6 @@ size_t L0Manager::getMinSharedMemoryPerBlockForAllDevices() const {
   return 0u;
 };
 
-
 bool L0Manager::hasFP64Support() const {
   CHECK(false);
   return false;
