@@ -1498,6 +1498,8 @@ Executor::compileWorkUnit(const std::vector<InputTableInfo>& query_infos,
 
   CompilationOptions co_codegen_traits = co;
   co_codegen_traits.codegen_traits_desc = backend->traitsDesc();
+  co_codegen_traits.dump_llvm_ir_after_each_pass =
+      config_->debug.dump_llvm_ir_after_each_pass;
 
   if (is_gpu) {
     cgen_state_->module_->setDataLayout(traits.dataLayout());

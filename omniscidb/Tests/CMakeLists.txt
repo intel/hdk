@@ -73,7 +73,7 @@ if(ENABLE_L0)
   target_link_libraries(L0MgrExecuteTest L0Mgr gtest ${llvm_libs} Logger OSDependent)
   target_link_libraries(SpirvBuildTest gtest ${llvm_libs})
   target_link_libraries(DataMgrWithL0Test DataMgr gtest)
-  target_link_libraries(IntelGPUEnablingTest gtest QueryEngine ArrowQueryRunner)
+  target_link_libraries(IntelGPUEnablingTest gtest QueryEngine ArrowQueryRunner ConfigBuilder)
 
   add_test(L0MgrExecuteTest L0MgrExecuteTest ${TEST_ARGS})
   add_test(SpirvBuildTest SpirvBuildTest ${TEST_ARGS})
