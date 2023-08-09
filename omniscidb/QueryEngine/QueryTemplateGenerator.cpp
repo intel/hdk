@@ -32,15 +32,6 @@
 
 namespace {
 
-inline llvm::Type* get_pointer_element_type(llvm::Value* value) {
-  CHECK(value);
-  auto type = value->getType();
-  CHECK(type && type->isPointerTy());
-  auto pointer_type = llvm::dyn_cast<llvm::PointerType>(type);
-  CHECK(pointer_type);
-  return pointer_type->getPointerElementType();
-}
-
 template <class Attributes>
 llvm::Function* default_func_builder(llvm::Module* mod, const std::string& name) {
   using namespace llvm;
@@ -372,29 +363,29 @@ class QueryTemplateGenerator {
     query_func_ptr->setAttributes(query_func_pal);
 
     llvm::Function::arg_iterator query_arg_it = query_func_ptr->arg_begin();
-    byte_stream = &*query_arg_it;
+    byte_stream = &*query_arg_it;  // i8**
     byte_stream->setName("byte_stream");
     if (hoist_literals) {
-      literals = &*(++query_arg_it);
+      literals = &*(++query_arg_it);  // i8*
       literals->setName("literals");
     }
-    row_count_ptr = &*(++query_arg_it);
+    row_count_ptr = &*(++query_arg_it);  // i64*
     row_count_ptr->setName("row_count_ptr");
-    frag_row_off_ptr = &*(++query_arg_it);
+    frag_row_off_ptr = &*(++query_arg_it);  // i64*
     frag_row_off_ptr->setName("frag_row_off_ptr");
-    max_matched_ptr = &*(++query_arg_it);
+    max_matched_ptr = &*(++query_arg_it);  // i32*
     max_matched_ptr->setName("max_matched_ptr");
-    agg_init_val = &*(++query_arg_it);
+    agg_init_val = &*(++query_arg_it);  // i64*
     agg_init_val->setName("agg_init_val");
-    output_buffers = &*(++query_arg_it);
+    output_buffers = &*(++query_arg_it);  // i64**
     output_buffers->setName("result_buffers");
-    frag_idx = &*(++query_arg_it);
+    frag_idx = &*(++query_arg_it);  // i32
     frag_idx->setName("frag_idx");
-    join_hash_tables = &*(++query_arg_it);
+    join_hash_tables = &*(++query_arg_it);  // i64*
     join_hash_tables->setName("join_hash_tables");
-    total_matched = &*(++query_arg_it);
+    total_matched = &*(++query_arg_it);  // i32*
     total_matched->setName("total_matched");
-    error_code = &*(++query_arg_it);
+    error_code = &*(++query_arg_it);  // i32*
     error_code->setName("error_code");
 
     bb_entry = llvm::BasicBlock::Create(mod->getContext(), ".entry", query_func_ptr, 0);
@@ -409,7 +400,7 @@ class QueryTemplateGenerator {
 
   virtual void generateEntryBlock() {
     CHECK(!row_count);
-    row_count = new llvm::LoadInst(get_pointer_element_type(row_count_ptr),
+    row_count = new llvm::LoadInst(get_int_type(64, mod->getContext()),
                                    row_count_ptr,
                                    "row_count",
                                    false,
@@ -551,7 +542,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
 
     CHECK(row_func_call_args && !row_func_call_args->max_matched);
     row_func_call_args->max_matched =
-        new llvm::LoadInst(get_pointer_element_type(max_matched_ptr),
+        new llvm::LoadInst(get_int_type(32, mod->getContext()),
                            max_matched_ptr,
                            "max_matched",
                            false,
@@ -561,6 +552,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     auto crt_matched_uncasted_ptr =
         new llvm::AllocaInst(i32_type, 0, "crt_matched", bb_entry);
     if (crt_matched_uncasted_ptr->getType() != pi32_type) {
+      // can this ever happen?
       crt_matched_ptr = new llvm::AddrSpaceCastInst(
           crt_matched_uncasted_ptr, pi32_type, "crt_matched.casted", bb_entry);
     } else {
@@ -605,22 +597,18 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     group_buff_idx_call->setAttributes(group_buff_idx_pal);
     llvm::Value* group_buff_idx = group_buff_idx_call;
 
-    const llvm::PointerType* Ty =
-        llvm::dyn_cast<llvm::PointerType>(output_buffers->getType());
-    CHECK(Ty);
-
     CHECK(row_func_call_args && !row_func_call_args->varlen_output_buffer);
     if (query_mem_desc.hasVarlenOutput()) {
       // make the varlen buffer the _first_ 8 byte value in the group by buffers double
       // ptr, and offset the group by buffers index by 8 bytes
       auto varlen_output_buffer_gep = llvm::GetElementPtrInst::Create(
-          Ty->getPointerElementType(),
+          get_int_type(64, mod->getContext()),
           output_buffers,
           llvm::ConstantInt::get(llvm::Type::getInt32Ty(mod->getContext()), 0),
           "",
           bb_entry);
       row_func_call_args->varlen_output_buffer =
-          new llvm::LoadInst(get_pointer_element_type(varlen_output_buffer_gep),
+          new llvm::LoadInst(varlen_output_buffer_gep->getSourceElementType(),
                              varlen_output_buffer_gep,
                              "varlen_output_buffer",
                              false,
@@ -640,9 +628,13 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
 
     CHECK(!pos_start_i64);
     pos_start_i64 = new llvm::SExtInst(pos_start, i64_type, "pos_start_i64", bb_entry);
-    llvm::GetElementPtrInst* group_by_buffers_gep = llvm::GetElementPtrInst::Create(
-        Ty->getPointerElementType(), output_buffers, group_buff_idx, "", bb_entry);
-    col_buffer = new llvm::LoadInst(get_pointer_element_type(group_by_buffers_gep),
+    llvm::GetElementPtrInst* group_by_buffers_gep =
+        llvm::GetElementPtrInst::Create(get_int_type(64, mod->getContext()),
+                                        output_buffers,
+                                        group_buff_idx,
+                                        "",
+                                        bb_entry);
+    col_buffer = new llvm::LoadInst(group_by_buffers_gep->getSourceElementType(),
                                     group_by_buffers_gep,
                                     "col_buffer",
                                     false,
@@ -719,7 +711,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     llvm::ICmpInst* loop_or_exit = new llvm::ICmpInst(
         *bb_forbody, llvm::ICmpInst::ICMP_SLT, pos_inc, row_count, "loop_or_exit");
     if (check_scan_limit) {
-      auto crt_matched = new llvm::LoadInst(get_pointer_element_type(crt_matched_ptr),
+      auto crt_matched = new llvm::LoadInst(get_int_type(32, mod->getContext()),
                                             crt_matched_ptr,
                                             "crt_matched",
                                             false,
@@ -727,12 +719,12 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
       auto filter_match = llvm::BasicBlock::Create(
           mod->getContext(), "filter_match", query_func_ptr, bb_crit_edge);
       CHECK(row_func_call_args && row_func_call_args->old_total_matched_ptr);
-      llvm::Value* new_total_matched = new llvm::LoadInst(
-          get_pointer_element_type(row_func_call_args->old_total_matched_ptr),
-          row_func_call_args->old_total_matched_ptr,
-          "old_total_matched",
-          false,
-          filter_match);
+      llvm::Value* new_total_matched =
+          new llvm::LoadInst(get_int_type(32, mod->getContext()),
+                             row_func_call_args->old_total_matched_ptr,
+                             "old_total_matched",
+                             false,
+                             filter_match);
       new_total_matched = llvm::BinaryOperator::CreateAdd(
           new_total_matched, crt_matched, "new_total_matched", filter_match);
       CHECK(new_total_matched);
@@ -870,14 +862,14 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
 
       for (size_t i = 0; i < aggr_col_count; ++i) {
         auto idx_lv = llvm::ConstantInt::get(i32_type, i);
-        auto agg_init_gep = llvm::GetElementPtrInst::CreateInBounds(
-            agg_init_val->getType()->getPointerElementType(),
-            agg_init_val,
-            idx_lv,
-            "agg_init_val_" + std::to_string(i),
-            bb_entry);
+        auto agg_init_gep =
+            llvm::GetElementPtrInst::CreateInBounds(get_int_type(64, mod->getContext()),
+                                                    agg_init_val,
+                                                    idx_lv,
+                                                    "agg_init_val_" + std::to_string(i),
+                                                    bb_entry);
         auto agg_init_val = new llvm::LoadInst(
-            get_pointer_element_type(agg_init_gep), agg_init_gep, "", false, bb_entry);
+            agg_init_gep->getSourceElementType(), agg_init_gep, "", false, bb_entry);
         agg_init_val->setAlignment(LLVM_ALIGN(8));
         agg_init_val_vec.push_back(agg_init_val);
         auto init_val_st =
@@ -930,12 +922,11 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
     row_process_params.insert(
         row_process_params.end(), result_ptr_vec.begin(), result_ptr_vec.end());
     if (is_estimate_query) {
-      row_process_params.push_back(
-          new llvm::LoadInst(get_pointer_element_type(output_buffers),
-                             output_buffers,
-                             "max_matched",
-                             false,
-                             bb_forbody));
+      row_process_params.push_back(new llvm::LoadInst(get_int_type(64, mod->getContext()),
+                                                      output_buffers,
+                                                      "max_matched",
+                                                      false,
+                                                      bb_forbody));
     }
     row_process_params.push_back(agg_init_val);
     row_process_params.push_back(pos);
@@ -966,7 +957,8 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
   virtual void generateCriticalEdgeBlock() override {
     if (!is_estimate_query) {
       for (size_t i = 0; i < aggr_col_count; ++i) {
-        auto result = new llvm::LoadInst(get_pointer_element_type(result_ptr_vec[i]),
+        // stores agg_init_val result, so 64 bits
+        auto result = new llvm::LoadInst(get_int_type(64, mod->getContext()),
                                          result_ptr_vec[i],
                                          ".pre.result",
                                          false,
@@ -1005,7 +997,7 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
         auto col_idx = llvm::ConstantInt::get(i32_type, i);
         if (gpu_smem_context.isSharedMemoryUsed()) {
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
-              smem_output_buffer->getType()->getPointerElementType(),
+              smem_output_buffer->getFunctionType(),
               smem_output_buffer,
               col_idx,
               "",
@@ -1019,14 +1011,17 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
                                  "",
                                  bb_exit);
         } else {
+          // TODO(adb): (1) need to set address space on this opaque pointer properly
+          //            (2) need to make sure this sequence is correct w/r/t opague
+          //            pointer types
           auto out_gep = llvm::GetElementPtrInst::CreateInBounds(
-              output_buffers->getType()->getPointerElementType(),
-              output_buffers,
-              col_idx,
-              "",
-              bb_exit);
+              get_int_type(64, mod->getContext()), output_buffers, col_idx, "", bb_exit);
           auto col_buffer = new llvm::LoadInst(
-              get_pointer_element_type(out_gep), out_gep, "", false, bb_exit);
+              llvm::PointerType::get(mod->getContext(), /*AddressSpace=*/0),
+              out_gep,
+              "",
+              false,
+              bb_exit);
           col_buffer->setAlignment(LLVM_ALIGN(8));
           auto slot_idx = llvm::BinaryOperator::CreateAdd(
               group_buff_idx,
@@ -1034,11 +1029,7 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
               "",
               bb_exit);
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
-              col_buffer->getType()->getPointerElementType(),
-              col_buffer,
-              slot_idx,
-              "",
-              bb_exit);
+              col_buffer->getType(), col_buffer, slot_idx, "", bb_exit);
           llvm::StoreInst* result_st =
               new llvm::StoreInst(result_vec[i], target_addr, false, bb_exit);
           result_st->setAlignment(LLVM_ALIGN(8));
@@ -1056,14 +1047,14 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
         // If there are more targets than threads we do not currently use shared memory
         // optimization. This can be relaxed if necessary
         for (size_t i = 0; i < aggr_col_count; i++) {
-          auto out_gep = llvm::GetElementPtrInst::CreateInBounds(
-              output_buffers->getType()->getPointerElementType(),
-              output_buffers,
-              llvm::ConstantInt::get(i32_type, i),
-              "",
-              bb_exit);
+          auto out_gep =
+              llvm::GetElementPtrInst::CreateInBounds(get_int_type(64, mod->getContext()),
+                                                      output_buffers,
+                                                      llvm::ConstantInt::get(i32_type, i),
+                                                      "",
+                                                      bb_exit);
           auto gmem_output_buffer =
-              new llvm::LoadInst(get_pointer_element_type(out_gep),
+              new llvm::LoadInst(out_gep->getSourceElementType(),
                                  out_gep,
                                  "gmem_output_buffer_" + std::to_string(i),
                                  false,
