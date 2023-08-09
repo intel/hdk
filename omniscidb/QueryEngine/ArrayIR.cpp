@@ -143,7 +143,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenArrayExpr(
       allocated_target_buffer = ir_builder.CreateAddrSpaceCast(
           allocated_target_buffer,
           llvm::PointerType::get(
-              allocated_target_buffer->getType()->getPointerElementType(),
+              cgen_state_->context_,
               co.codegen_traits_desc.local_addr_space_),
           "allocated.target.buffer.cast");
     }

@@ -444,8 +444,7 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
         co.codegen_traits_desc.local_addr_space_) {
       group_key = LL_BUILDER.CreateAddrSpaceCast(
           group_key,
-          llvm::PointerType::get(group_key->getType()->getPointerElementType(),
-                                 co.codegen_traits_desc.local_addr_space_),
+          llvm::PointerType::get(LL_CONTEXT, co.codegen_traits_desc.local_addr_space_),
           "group.key.cast");
     }
   }
@@ -1172,8 +1171,7 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
       co.codegen_traits_desc.local_addr_space_) {
     estimator_key_lv = LL_BUILDER.CreateAddrSpaceCast(
         estimator_key_lv,
-        llvm::PointerType::get(estimator_key_lv->getType()->getPointerElementType(),
-                               cgen_traits.getLocalAddrSpace()),
+        llvm::PointerType::get(LL_CONTEXT, cgen_traits.getLocalAddrSpace()),
         "estimator.key.lv.cast");
   }
 

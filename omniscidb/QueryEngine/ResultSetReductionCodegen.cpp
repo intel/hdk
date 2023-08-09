@@ -279,7 +279,7 @@ void translate_body(const std::vector<std::unique_ptr<Instruction>>& body,
           co.codegen_traits_desc.local_addr_space_) {
         translated = cgen_state->ir_builder_.CreateAddrSpaceCast(
             translated,
-            llvm::PointerType::get(translated->getType()->getPointerElementType(),
+            llvm::PointerType::get(cgen_state->context_,
                                    co.codegen_traits_desc.local_addr_space_),
             "translated.cast");
       }

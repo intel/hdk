@@ -883,8 +883,7 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
       co.codegen_traits_desc.local_addr_space_) {
     key_buff_lv = LL_BUILDER.CreateAddrSpaceCast(
         key_buff_lv,
-        llvm::PointerType::get(key_buff_lv->getType()->getPointerElementType(),
-                               co.codegen_traits_desc.local_addr_space_),
+        llvm::PointerType::get(LL_CONTEXT, co.codegen_traits_desc.local_addr_space_),
         "key.buff.lv.cast");
   }
 
