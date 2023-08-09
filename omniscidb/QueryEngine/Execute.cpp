@@ -880,19 +880,9 @@ GpuMgr* Executor::gpuMgr() const {
   return gpu_mgr;
 }
 
-bool Executor::isArchPascalOrLater(const ExecutorDeviceType dt) const {
-  if (dt == ExecutorDeviceType::GPU) {
-    return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA
-               ? cudaMgr()->isArchPascalOrLater()
-               : false;
-  }
-  return false;
-}
-
 bool Executor::deviceSupportsFP64(const ExecutorDeviceType dt) const {
   if (dt == ExecutorDeviceType::GPU) {
-    return gpuMgr()->getPlatform() == GpuMgrPlatform::CUDA ? isArchPascalOrLater(dt)
-                                                           : true;
+    return gpuMgr()->hasFP64Support();
   }
   return true;
 }
