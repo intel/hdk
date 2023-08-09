@@ -613,6 +613,13 @@ bool ConfigBuilder::parseCommandLineArgs(int argc,
                              ->default_value(config_->debug.enable_automatic_ir_metadata)
                              ->implicit_value(true),
                          "Enable automatic IR metadata (debug builds only).");
+  opt_desc.add_options()("dump-after-all",
+                         po::value<short>(&config_->debug.dump_llvm_ir_after_each_pass)
+                             ->default_value(config_->debug.dump_llvm_ir_after_each_pass)
+                             ->implicit_value(1),
+                         "Dump LLVM IR modules' optimizations(0: no dump, 1: "
+                         "before/after opt, 2: dump after _every_ "
+                         "pass (likely more than you need)).");
   opt_desc.add_options()(
       "enable-gpu-code-compilation-cache",
       po::value<bool>(&config_->debug.enable_gpu_code_compilation_cache)

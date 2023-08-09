@@ -15,6 +15,7 @@
 #include "HelperFunctions.h"
 
 #include <llvm/Analysis/MemorySSA.h>
+#include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/PassBuilder.h>
@@ -35,6 +36,8 @@
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Utils/Mem2Reg.h>
 #include "llvm/IR/PassManager.h"
+#include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/Path.h"
 
 #include "QueryEngine/Compiler/Exceptions.h"
 #include "QueryEngine/Optimization/AnnotateInternalFunctionsPass.h"
@@ -102,15 +105,84 @@ void eliminate_dead_self_recursive_funcs(
 }
 #endif
 
+std::string legalizePassName(const llvm::StringRef pass_name) {
+  std::string legal_name = pass_name.str();
+  constexpr std::string_view illegal_word = "w/";
+  const size_t illegal_word_pos = legal_name.find(illegal_word);
+  if (illegal_word_pos != std::string::npos) {
+    std::string replacement =
+        "with" + legal_name.substr(illegal_word_pos + illegal_word.size());
+    legal_name.replace(illegal_word_pos, replacement.size(), replacement);
+  }
+  return legal_name;
+}
+
+const llvm::Module* unwrapModule(llvm::Any IR) {
+  if (const auto** M = llvm::any_cast<const llvm::Module*>(&IR))
+    return *M;
+
+  if (const auto** F = llvm::any_cast<const llvm::Function*>(&IR)) {
+    return (*F)->getParent();
+  }
+
+  if (const auto** C = llvm::any_cast<const llvm::LazyCallGraph::SCC*>(&IR)) {
+    for (const llvm::LazyCallGraph::Node& N : **C) {
+      const llvm::Function& F = N.getFunction();
+      return F.getParent();
+    }
+  }
+
+  if (const auto** L = llvm::any_cast<const llvm::Loop*>(&IR)) {
+    const llvm::Function* F = (*L)->getHeader()->getParent();
+    return F->getParent();
+  }
+  return nullptr;
+}
+
+std::string getStrTStamp(const llvm::Module* llvm_module) {
+  char t_stamp_str[100];
+  const std::time_t time = llvm::sys::toTimeT(std::chrono::system_clock::now());
+  std::strftime(t_stamp_str, sizeof(t_stamp_str), "%F_%T", std::localtime(&time));
+  return std::string{t_stamp_str}.append(".").append(std::to_string(time % 1000));
+}
+
 void optimize_ir(llvm::Function* query_func,
                  llvm::Module* llvm_module,
                  const std::unordered_set<llvm::Function*>& live_funcs,
                  const bool is_gpu_smem_used,
                  const CompilationOptions& co) {
   auto timer = DEBUG_TIMER(__func__);
+  llvm::PassInstrumentationCallbacks PIC;
+  size_t pass_counter{1};
+  std::string ir_dump_dir{};
+  if (co.dump_llvm_ir_after_each_pass) {
+    ir_dump_dir = std::string("IR_DUMPS").append(llvm::sys::path::get_separator().str());
+    llvm::sys::fs::create_directory(ir_dump_dir);
+    ir_dump_dir.append(getStrTStamp(llvm_module))
+        .append("_")
+        .append(llvm_module->getTargetTriple())
+        .append("_")
+        .append(std::to_string(w_unit_counter++))
+        .append(llvm::sys::path::get_separator().str());
+    llvm::sys::fs::create_directory(ir_dump_dir);
+  }
 
-  llvm::PassBuilder PB;
+  PIC.registerAfterPassCallback(
+      [&pass_counter, &ir_dump_dir](
+          llvm::StringRef PassID, llvm::Any IR, const llvm::PreservedAnalyses&) -> void {
+        std::error_code ec;
+        llvm::raw_fd_ostream os(ir_dump_dir + std::string("IR_AFTER_")
+                                                  .append(std::to_string(pass_counter++))
+                                                  .append("_")
+                                                  .append(legalizePassName(PassID.str())),
+                                ec);
+        unwrapModule(IR)->print(os, nullptr);
+      });
 
+  llvm::PassBuilder PB(nullptr,
+                       llvm::PipelineTuningOptions(),
+                       llvm::None,
+                       (co.dump_llvm_ir_after_each_pass == 2) ? &PIC : nullptr);
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
@@ -126,6 +198,11 @@ void optimize_ir(llvm::Function* query_func,
 
   llvm::ModulePassManager MPM;
   llvm::FunctionPassManager FPM;
+  if (co.dump_llvm_ir_after_each_pass) {
+    llvm::StandardInstrumentations SI(false);
+    SI.registerCallbacks(PIC);
+    DUMP_MODULE(llvm_module, ir_dump_dir + "IR_UNOPT");
+  }
 
   // the always inliner legacy pass must always run first
   FPM.addPass(llvm::VerifierPass());
@@ -168,5 +245,8 @@ void optimize_ir(llvm::Function* query_func,
 #if defined(HAVE_CUDA) || defined(HAVE_L0) || !defined(WITH_JIT_DEBUG)
   eliminate_dead_self_recursive_funcs(*llvm_module, live_funcs);
 #endif
+  if (co.dump_llvm_ir_after_each_pass) {
+    DUMP_MODULE(llvm_module, ir_dump_dir + "IR_OPT");
+  }
 }
 }  // namespace compiler

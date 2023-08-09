@@ -22,6 +22,8 @@
 #include "QueryEngine/CompilationOptions.h"
 
 namespace compiler {
+static std::atomic<size_t> w_unit_counter{0};
+static const std::string_view tstamp_module_varname{"ModuleTstamp"};
 
 #define MODULE_DUMP_ENABLE 1
 #ifdef MODULE_DUMP_ENABLE

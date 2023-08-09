@@ -47,6 +47,7 @@ struct CompilationOptions {
   bool register_intel_jit_listener{false};
   bool use_groupby_buffer_desc{false};
   compiler::CodegenTraitsDescriptor codegen_traits_desc{};
+  short dump_llvm_ir_after_each_pass{0};
 
   static CompilationOptions makeCpuOnly(const CompilationOptions& in) {
     return CompilationOptions{ExecutorDeviceType::CPU,
