@@ -49,6 +49,8 @@ const hdk::ir::Type* get_agg_type(hdk::ir::AggType agg_kind,
       }
     case hdk::ir::AggType::kSample:
       return arg_expr->type();
+    case hdk::ir::AggType::kTopK:
+      return ctx.arrayVarLen(arg_expr->type(), 4, false);
     default:
       CHECK(false);
   }

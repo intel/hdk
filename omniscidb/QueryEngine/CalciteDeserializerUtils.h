@@ -131,6 +131,9 @@ inline hdk::ir::AggType to_agg_kind(const std::string& agg_name) {
   if (agg_name == std::string("SINGLE_VALUE")) {
     return hdk::ir::AggType::kSingleValue;
   }
+  if (agg_name == std::string("TOP_K")) {
+    return hdk::ir::AggType::kTopK;
+  }
   throw std::runtime_error("Aggregate function " + agg_name + " not supported");
 }
 
