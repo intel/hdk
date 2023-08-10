@@ -798,6 +798,10 @@ TargetValue build_array_target_value(const hdk::ir::Type* array_type,
                                      std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
                                      const Data_Namespace::DataMgr* data_mgr) {
   CHECK(array_type->isArray());
+  // Zero size for fixed-length arrays means NULL value.
+  if (array_type->size() > 0 && !buff_sz) {
+    return ArrayTargetValue(boost::optional<std::vector<ScalarTargetValue>>{});
+  }
   auto elem_type = array_type->as<hdk::ir::ArrayBaseType>()->elemType();
   if (elem_type->isString() || elem_type->isExtDictionary()) {
     auto dict_id = elem_type->isExtDictionary()

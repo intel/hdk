@@ -458,10 +458,11 @@ inline void ColumnarResults::writeBackCell(const TargetValue& col_val,
       for (auto& elem_val : **arr_col_val) {
         write_scalar(&elem_val, offset++, elem_type);
       }
+    } else if (type->isFixedLenArray()) {
       // Put NULL sentinel value for fixed length array
-      if (type->isFixedLenArray() && (*arr_col_val)->size() == 0) {
-        write_arr_null_value(offset, elem_type);
-      }
+      auto elem_type = type->as<hdk::ir::ArrayBaseType>()->elemType();
+      auto offset = row_idx * type->as<hdk::ir::FixedLenArrayType>()->numElems();
+      write_arr_null_value(offset, elem_type);
     }
   }
 }
