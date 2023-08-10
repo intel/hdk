@@ -86,6 +86,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                                 const std::string& table_name,
                                 const TableOptions& options = TableOptions());
 
+  void refragmentTable(const std::string& table_name, const size_t new_frag_size);
+
   void appendArrowTable(std::shared_ptr<arrow::Table> at, const std::string& table_name);
   void appendArrowTable(std::shared_ptr<arrow::Table> at, int table_id);
 

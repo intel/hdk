@@ -289,6 +289,9 @@ cdef class ArrowStorage(Storage):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().importArrowTable(at, name, options.c_options)
 
+  def refragmentTable(self, name, fragment_size):
+    self.c_storage.get().refragmentTable(name, fragment_size)
+
   def appendArrowTable(self, table, name):
     cdef shared_ptr[CArrowTable] at = pyarrow_unwrap_table(table)
     self.c_storage.get().appendArrowTable(at, name)
