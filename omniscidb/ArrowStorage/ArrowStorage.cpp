@@ -675,6 +675,120 @@ TableInfoPtr ArrowStorage::importArrowTable(std::shared_ptr<arrow::Table> at,
   return importArrowTable(at, table_name, columns, options);
 }
 
+void ArrowStorage::refragmentTable(const std::string& table_name,
+                                   const size_t new_frag_size) {
+  auto tinfo = getTableInfo(db_id_, table_name);
+  if (!tinfo) {
+    throw std::runtime_error("Unknown table: "s + table_name);
+  }
+  if (!new_frag_size) {
+    throw std::runtime_error("Cannot refragment to fragment size 0");
+  }
+  mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
+  auto& table = *tables_.at(tinfo->table_id);
+  mapd_unique_lock<mapd_shared_mutex> table_lock(table.mutex);
+  data_lock.unlock();
+  if (new_frag_size == table.fragment_size) {
+    return;
+  }
+  const size_t new_frag_count =
+      table.row_count / new_frag_size + ((table.row_count % new_frag_size) != 0);
+  std::vector<DataFragment> new_fragments(new_frag_count);
+
+  for (size_t new_frag_idx = 0; new_frag_idx < new_frag_count - 1; new_frag_idx++) {
+    new_fragments[new_frag_idx].metadata.resize(table.col_data.size());
+    new_fragments[new_frag_idx].offset = new_frag_idx * new_frag_size;
+    new_fragments[new_frag_idx].row_count = new_frag_size;
+  }
+  new_fragments[new_frag_count - 1].metadata.resize(table.col_data.size());
+  new_fragments[new_frag_count - 1].offset = (new_frag_count - 1) * new_frag_size;
+  new_fragments[new_frag_count - 1].row_count = table.row_count % new_frag_size;
+  std::vector<bool> lazy_fetch_cols(table.col_data.size(), false);
+
+  if (config_->storage.enable_lazy_dict_materialization) {
+    VLOG(1) << "Refragmenting with lazy dictionary materialization enabled";
+    mapd_shared_lock<mapd_shared_mutex> dict_lock(dict_mutex_);
+    for (size_t col_idx = 0; col_idx < lazy_fetch_cols.size(); col_idx++) {
+      auto col_info = getColumnInfo(db_id_, tinfo->table_id, columnId(col_idx));
+      CHECK(col_info);
+      auto col_type = col_info->type;
+      auto col_arr = table.col_data[col_idx];
+      if (col_type->isExtDictionary() && col_arr->type()->id() == arrow::Type::STRING) {
+        auto dict_data =
+            dicts_.at(dynamic_cast<const hdk::ir::ExtDictionaryType*>(col_type)->dictId())
+                .get();
+        CHECK(dict_data);
+        if (!dict_data->is_materialized) {
+          lazy_fetch_cols[col_idx] = true;
+        }
+      }
+    }
+  }
+  tbb::parallel_for(tbb::blocked_range(0, (int)table.col_data.size()), [&](auto range) {
+    for (auto col_idx = range.begin(); col_idx != range.end(); col_idx++) {
+      auto col_info = getColumnInfo(db_id_, tinfo->table_id, columnId(col_idx));
+      auto col_type = col_info->type;
+      auto col_arr = table.col_data[col_idx];
+      auto elem_type =
+          col_type->isArray()
+              ? dynamic_cast<const hdk::ir::ArrayBaseType*>(col_type)->elemType()
+              : col_type;
+      bool compute_stats = !col_type->isString();
+      if (compute_stats) {
+        size_t elems_count = 1;
+        if (col_type->isFixedLenArray()) {
+          elems_count = col_type->size() / elem_type->size();
+        }
+        // Compute stats for each fragment.
+        tbb::parallel_for(
+            tbb::blocked_range(size_t(0), new_frag_count), [&](auto frag_range) {
+              for (size_t frag_idx = frag_range.begin(); frag_idx != frag_range.end();
+                   ++frag_idx) {
+                auto& frag = new_fragments[frag_idx];
+                size_t num_bytes;
+                if (col_type->isFixedLenArray()) {
+                  num_bytes = frag.row_count * col_type->size();
+                } else if (col_type->isVarLenArray()) {
+                  num_bytes =
+                      computeTotalStringsLength(col_arr, frag.offset, frag.row_count);
+                } else {
+                  num_bytes = frag.row_count * col_type->size();
+                }
+                auto meta = std::make_shared<ChunkMetadata>(
+                    col_info->type, num_bytes, frag.row_count);
+
+                if (!lazy_fetch_cols[col_idx]) {
+                  meta->fillChunkStats(computeStats(
+                      col_arr->Slice(frag.offset, frag.row_count * elems_count),
+                      col_type));
+                } else {
+                  int32_t min = 0;
+                  int32_t max = -1;
+                  meta->fillChunkStats(min, max, /*has_nulls=*/true);
+                }
+                frag.metadata[col_idx] = meta;
+              }
+            });  // each new fragment
+      } else {
+        bool has_nulls = false;
+        for (size_t frag_idx = 0; frag_idx < new_frag_count; ++frag_idx) {
+          auto& frag = new_fragments[frag_idx];
+          CHECK(col_type->isText());
+          auto meta = std::make_shared<ChunkMetadata>(
+              col_info->type,
+              computeTotalStringsLength(col_arr, frag.offset, frag.row_count),
+              frag.row_count);
+          meta->fillStringChunkStats(
+              col_arr->Slice(frag.offset, frag.row_count)->null_count());
+          has_nulls = has_nulls || meta->chunkStats().has_nulls;
+          frag.metadata[col_idx] = meta;
+        }
+      }
+    }
+  });
+  table.fragments = std::move(new_fragments);
+}
+
 void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at,
                                     const std::string& table_name) {
   auto tinfo = getTableInfo(db_id_, table_name);

@@ -133,6 +133,7 @@ cdef extern from "omniscidb/ArrowStorage/ArrowStorage.h":
     CTableInfoPtr createTable(const string&, const vector[CColumnDescription]&, const CTableOptions&) except +
 
     CTableInfoPtr importArrowTable(shared_ptr[CArrowTable], string&, CTableOptions&) except +;
+    void refragmentTable(const string&, const size_t) except +
     void appendArrowTable(shared_ptr[CArrowTable], const string&) except +
     CTableInfoPtr importCsvFile(string&, string&, CTableOptions&, CCsvParseOptions) except +
     CTableInfoPtr importCsvFileWithSchema "importCsvFile"(string&, string&, const vector[CColumnDescription]&, CTableOptions&, CCsvParseOptions) except +
