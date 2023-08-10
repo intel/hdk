@@ -1057,29 +1057,17 @@ size_t convert_rowwise(
         int32_t arr_size = 0;
         if (*array_value) {
           arr_size = static_cast<int32_t>((*array_value)->size());
-          // Fixed size array NULL value can be expressed as a zero-length vector.
-          // We should add a proper number of empty values for such case.
-          if (column.col_type->isFixedLenArray() && arr_size != num_elems) {
-            CHECK_EQ(arr_size, 0);
-            append_empty_values_and_validity(elem_type,
-                                             num_elems,
+          for (auto& elem_value : **array_value) {
+            append_scalar_value_and_validity(elem_value,
+                                             elem_type,
                                              device_type,
                                              value_seg[j],
                                              null_bitmap_seg[j],
                                              max_size);
-          } else {
-            for (auto& elem_value : **array_value) {
-              append_scalar_value_and_validity(elem_value,
-                                               elem_type,
-                                               device_type,
-                                               value_seg[j],
-                                               null_bitmap_seg[j],
-                                               max_size);
-            }
           }
         } else if (column.col_type->isFixedLenArray()) {
-          // Assume this is also a possible option for NULL fixed size array
-          // and handle appropriately.
+          // We got NULL fixed-length array and need to add a proper number of empty
+          // values.
           append_empty_values_and_validity(elem_type,
                                            num_elems,
                                            device_type,
@@ -1105,8 +1093,7 @@ size_t convert_rowwise(
             validity = std::make_shared<std::vector<uint8_t>>();
             validity->reserve(local_entry_count);
           }
-          int8_t is_valid =
-              *array_value && (!column.col_type->isFixedLenArray() || arr_size != 0);
+          int8_t is_valid = (bool)*array_value;
           validity->push_back(is_valid);
         }
       } else {

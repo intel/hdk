@@ -61,7 +61,8 @@ class TestSuite : public ::testing::Test {
   ExecutionResult runQuery(std::unique_ptr<QueryDag> dag) {
     auto ra_executor = RelAlgExecutor(getExecutor(), getStorage(), std::move(dag));
     auto eo = ExecutionOptions::fromConfig(config());
-    return ra_executor.executeRelAlgQuery(CompilationOptions(), eo, false);
+    return ra_executor.executeRelAlgQuery(
+        getCompilationOptions(ExecutorDeviceType::CPU), eo, false);
   }
 };
 
@@ -6731,12 +6732,17 @@ TEST_F(QueryBuilderTest, NoneEncodedStringInRes) {
 }
 
 TEST_F(QueryBuilderTest, VarlenArrayInRes) {
-  for (bool enable_columnar : {true, false}) {
+  std::vector<std::pair<bool, bool>> variants = {
+      {true, false}, {true, true}, {false, false}, {false, true}};
+  for (auto [enable_columnar, lazy_fetch] : variants) {
     auto orig_enable_columnar = config().rs.enable_columnar_output;
-    ScopeGuard guard([orig_enable_columnar]() {
+    auto orig_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+    ScopeGuard guard([&]() {
       config().rs.enable_columnar_output = orig_enable_columnar;
+      config().rs.enable_lazy_fetch = orig_enable_lazy_fetch;
     });
     config().rs.enable_columnar_output = enable_columnar;
+    config().rs.enable_lazy_fetch = lazy_fetch;
 
     QueryBuilder builder(ctx(), schema_mgr_, configPtr());
 
@@ -6791,12 +6797,17 @@ TEST_F(QueryBuilderTest, VarlenArrayInRes) {
 }
 
 TEST_F(QueryBuilderTest, FixedArrayInRes) {
-  for (bool enable_columnar : {true, false}) {
+  std::vector<std::pair<bool, bool>> variants = {
+      {true, false}, {true, true}, {false, false}, {false, true}};
+  for (auto [enable_columnar, lazy_fetch] : variants) {
     auto orig_enable_columnar = config().rs.enable_columnar_output;
-    ScopeGuard guard([orig_enable_columnar]() {
+    auto orig_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+    ScopeGuard guard([&]() {
       config().rs.enable_columnar_output = orig_enable_columnar;
+      config().rs.enable_lazy_fetch = orig_enable_lazy_fetch;
     });
     config().rs.enable_columnar_output = enable_columnar;
+    config().rs.enable_lazy_fetch = lazy_fetch;
 
     QueryBuilder builder(ctx(), schema_mgr_, configPtr());
 

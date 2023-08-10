@@ -147,6 +147,7 @@ class ArrowSQLRunnerImpl {
   CompilationOptions getCompilationOptions(ExecutorDeviceType device_type) {
     auto co = CompilationOptions::defaults(device_type, isGPUPlatformL0());
     co.hoist_literals = config_->exec.codegen.hoist_literals;
+    co.allow_lazy_fetch = config_->rs.enable_lazy_fetch;
     return co;
   }
 

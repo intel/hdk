@@ -1055,7 +1055,7 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
   }
 
   // Translate varlen value to its length. Return -1 for NULLs.
-  auto slot_val_to_length = [this, lazy_fetch, col_idx, type, target_info](
+  auto slot_val_to_length = [this, lazy_fetch, col_idx, type, target_info, arr_elem_size](
                                 size_t storage_idx,
                                 int64_t val,
                                 const int8_t* size_slot_ptr,
@@ -1096,11 +1096,13 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
     if (target_info.is_agg && target_info.agg_kind == hdk::ir::AggType::kTopK) {
       return getTopKHeapSize(reinterpret_cast<const int8_t*>(val),
                              target_info.agg_arg_type,
-                             std::abs(target_info.topk_param));
+                             std::abs(target_info.topk_param)) *
+             arr_elem_size;
     }
 
-    if (val)
-      return read_int_from_buff(size_slot_ptr, size_slot_sz);
+    if (val) {
+      return read_int_from_buff(size_slot_ptr, size_slot_sz) * arr_elem_size;
+    }
     return -1;
   };
 
@@ -1135,16 +1137,16 @@ size_t ResultSet::computeVarLenOffsets(size_t col_idx, int32_t* offsets) const {
     auto val = target_info.topk_inline_buffer
                    ? reinterpret_cast<int64_t>(elem_ptr)
                    : read_int_from_buff(elem_ptr, data_elem_size);
-    auto elem_length = slot_val_to_length(
+    auto array_length = slot_val_to_length(
         storage_lookup_result.storage_idx, val, size_ptr, size_elem_size);
-    if (elem_length < 0) {
+    if (array_length < 0) {
       if (type->isString()) {
         offsets[row_idx + 1] = offsets[row_idx];
       } else {
         offsets[row_idx + 1] = -std::abs(offsets[row_idx]);
       }
     } else {
-      offsets[row_idx + 1] = std::abs(offsets[row_idx]) + elem_length * arr_elem_size;
+      offsets[row_idx + 1] = std::abs(offsets[row_idx]) + array_length;
     }
 
     ++iter;
