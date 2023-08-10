@@ -61,8 +61,10 @@ class TestSuite : public ::testing::Test {
   ExecutionResult runQuery(std::unique_ptr<QueryDag> dag) {
     auto ra_executor = RelAlgExecutor(getExecutor(), getStorage(), std::move(dag));
     auto eo = ExecutionOptions::fromConfig(config());
-    return ra_executor.executeRelAlgQuery(
-        CompilationOptions::defaults(ExecutorDeviceType::CPU), eo, false);
+    auto co = CompilationOptions::defaults(ExecutorDeviceType::CPU);
+    // Work-around for https://github.com/intel-ai/hdk/issues/627
+    co.allow_lazy_fetch = false;
+    return ra_executor.executeRelAlgQuery(co, eo, false);
   }
 };
 
