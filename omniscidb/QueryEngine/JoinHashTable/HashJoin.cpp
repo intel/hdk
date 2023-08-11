@@ -191,8 +191,10 @@ HashJoinMatchingSet HashJoin::codegenMatchingSet(
       llvm::Type::getInt32PtrTy(executor->cgen_state_->context_,
                                 cgen_traits.getLocalAddrSpace()));
 
+  // TODO(llvm16): this is probably wrong
   auto rowid_ptr_i32 = executor->cgen_state_->ir_builder_.CreateGEP(
-      rowid_base_i32->getType()->getScalarType()->getPointerElementType(),
+      llvm::PointerType::get(executor->cgen_state_->context_,
+                             cgen_traits.getLocalAddrSpace()),
       rowid_base_i32,
       slot_lv);
   return {rowid_ptr_i32, row_count_lv, slot_lv};

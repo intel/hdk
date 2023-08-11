@@ -2038,7 +2038,7 @@ std::vector<llvm::Value*> generate_column_heads_load(const int num_columns,
   std::vector<llvm::Value*> col_heads;
   for (int col_id = 0; col_id <= max_col_local_id; ++col_id) {
     auto gep = llvm::dyn_cast<llvm::GEPOperator>(ir_builder.CreateGEP(
-        get_int_type(8, ctx),
+        llvm::PointerType::get(ctx, 0),
         byte_stream_arg,
         llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), col_id)));
     CHECK(gep);

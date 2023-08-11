@@ -1048,6 +1048,7 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
           JoinLoopDomain domain{{0}};
           domain.element_count = element_count;
           domain.values_buffer = values;
+          domain.values_buffer_is_array_of_arrays = true;
           return domain;
         },
         nullptr,

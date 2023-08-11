@@ -128,7 +128,7 @@ llvm::BasicBlock* JoinLoop::codegen(
         builder.CreateBr(head_bb);
         builder.SetInsertPoint(head_bb);
         llvm::Value* iteration_counter =
-            builder.CreateLoad(iteration_counter_ptr->getType()->getPointerElementType(),
+            builder.CreateLoad(get_int_type(64, context),
                                iteration_counter_ptr,
                                "ub_iter_counter_val_" + join_loop.name_);
         auto iteration_val = iteration_counter;
@@ -138,9 +138,7 @@ llvm::BasicBlock* JoinLoop::codegen(
         if (join_loop.kind_ == JoinLoopKind::Set ||
             join_loop.kind_ == JoinLoopKind::MultiSet) {
           CHECK(iteration_domain.values_buffer->getType()->isPointerTy());
-          const auto ptr_type =
-              static_cast<llvm::PointerType*>(iteration_domain.values_buffer->getType());
-          if (ptr_type->getPointerElementType()->isArrayTy()) {
+          if (iteration_domain.values_buffer_is_array_of_arrays) {
             iteration_val = builder.CreateGEP(
                 iteration_domain.values_buffer->getType()
                     ->getScalarType()
@@ -151,9 +149,7 @@ llvm::BasicBlock* JoinLoop::codegen(
                     iteration_counter},
                 "ub_iter_counter_" + join_loop.name_);
           } else {
-            iteration_val = builder.CreateGEP(iteration_domain.values_buffer->getType()
-                                                  ->getScalarType()
-                                                  ->getPointerElementType(),
+            iteration_val = builder.CreateGEP(get_int_type(32, context),
                                               iteration_domain.values_buffer,
                                               iteration_counter,
                                               "ub_iter_counter_" + join_loop.name_);

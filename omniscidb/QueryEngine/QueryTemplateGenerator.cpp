@@ -648,7 +648,6 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
         llvm::ConstantInt::get(i32_type, gpu_smem_context.getSharedMemorySize());
     // TODO(Saman): change this further, normal path should not go through this
     // TODO(adb): this could be directly assigned in row func args?
-    auto fcn_arg = func_init_shared_mem->getArg(0);
     result_buffer =
         llvm::CallInst::Create(func_init_shared_mem,
                                std::vector<llvm::Value*>{col_buffer, shared_mem_bytes_lv},
@@ -1000,10 +999,10 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
         auto col_idx = llvm::ConstantInt::get(i32_type, i);
         if (gpu_smem_context.isSharedMemoryUsed()) {
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
-              smem_output_buffer->getFunctionType(),
+              llvm::PointerType::get(mod->getContext(), 0),
               smem_output_buffer,
               col_idx,
-              "",
+              "smem_output_buffer_ptr",
               bb_exit);
           // TODO: generalize this once we want to support other types of aggregate
           // functions besides COUNT.
@@ -1018,21 +1017,38 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
           //            (2) need to make sure this sequence is correct w/r/t opague
           //            pointer types
           auto out_gep = llvm::GetElementPtrInst::CreateInBounds(
-              get_int_type(64, mod->getContext()), output_buffers, col_idx, "", bb_exit);
+              llvm::PointerType::get(mod->getContext(), 0),
+              output_buffers,
+              col_idx,
+              "output_col_buffers_ptr",
+              bb_exit);
           auto col_buffer = new llvm::LoadInst(
-              llvm::PointerType::get(mod->getContext(), /*AddressSpace=*/0),
+              /*get_int_type(64, mod->getContext())*/ llvm::PointerType::get(
+                  mod->getContext(), 0),
               out_gep,
-              "",
+              "output_col_buffer_ptr",
               false,
               bb_exit);
           col_buffer->setAlignment(LLVM_ALIGN(8));
           auto slot_idx = llvm::BinaryOperator::CreateAdd(
               group_buff_idx,
-              llvm::BinaryOperator::CreateMul(frag_idx, pos_step, "", bb_exit),
+              llvm::BinaryOperator::CreateMul(frag_idx, pos_step, "slot_idx", bb_exit),
               "",
               bb_exit);
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
-              col_buffer->getType(), col_buffer, slot_idx, "", bb_exit);
+              llvm::PointerType::get(mod->getContext(), 0),
+#if 1
+              col_buffer,
+#else
+              llvm::CastInst::CreatePointerCast(
+                  col_buffer,
+                  llvm::PointerType::get(mod->getContext(), 0),
+                  "col_buffer_ptr_cast",
+                  bb_exit),
+#endif
+              slot_idx,
+              "target_slot_ptr",
+              bb_exit);
           llvm::StoreInst* result_st =
               new llvm::StoreInst(result_vec[i], target_addr, false, bb_exit);
           result_st->setAlignment(LLVM_ALIGN(8));
@@ -1050,14 +1066,14 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
         // If there are more targets than threads we do not currently use shared memory
         // optimization. This can be relaxed if necessary
         for (size_t i = 0; i < aggr_col_count; i++) {
-          auto out_gep =
-              llvm::GetElementPtrInst::CreateInBounds(get_int_type(64, mod->getContext()),
-                                                      output_buffers,
-                                                      llvm::ConstantInt::get(i32_type, i),
-                                                      "",
-                                                      bb_exit);
+          auto out_gep = llvm::GetElementPtrInst::CreateInBounds(
+              llvm::PointerType::get(mod->getContext(), 0),
+              output_buffers,
+              llvm::ConstantInt::get(i32_type, i),
+              "gmem_output_buffers_ptr",
+              bb_exit);
           auto gmem_output_buffer =
-              new llvm::LoadInst(out_gep->getSourceElementType(),
+              new llvm::LoadInst(out_gep->getSourceElementType(),  // ptr
                                  out_gep,
                                  "gmem_output_buffer_" + std::to_string(i),
                                  false,
