@@ -601,12 +601,12 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     if (query_mem_desc.hasVarlenOutput()) {
       // make the varlen buffer the _first_ 8 byte value in the group by buffers double
       // ptr, and offset the group by buffers index by 8 bytes
-      // TODO(llvm16): should this be 32?
+      // TODO(llvm16): address space
       auto varlen_output_buffer_gep = llvm::GetElementPtrInst::Create(
-          get_int_type(64, mod->getContext()),
+          llvm::PointerType::get(mod->getContext(), 0),
           output_buffers,
           llvm::ConstantInt::get(llvm::Type::getInt32Ty(mod->getContext()), 0),
-          "",
+          "col_buffer_ptr",
           bb_entry);
       row_func_call_args->varlen_output_buffer =
           new llvm::LoadInst(varlen_output_buffer_gep->getSourceElementType(),
@@ -630,14 +630,12 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     CHECK(!pos_start_i64);
     pos_start_i64 = new llvm::SExtInst(pos_start, i64_type, "pos_start_i64", bb_entry);
     llvm::GetElementPtrInst* group_by_buffers_gep =
-        llvm::GetElementPtrInst::Create(get_int_type(64, mod->getContext()),
+        llvm::GetElementPtrInst::Create(llvm::PointerType::get(mod->getContext(), 0),
                                         output_buffers,
                                         group_buff_idx,
-                                        "",
+                                        "group_by_buffers_ptr",
                                         bb_entry);
-    // TODO(adb): use central constant for address space for load
-    // NOTE: address spaces must match for function arguments (no surprise)
-    col_buffer = new llvm::LoadInst(llvm::PointerType::get(mod->getContext(), 0),
+    col_buffer = new llvm::LoadInst(group_by_buffers_gep->getSourceElementType(),
                                     group_by_buffers_gep,
                                     "col_buffer",
                                     false,

@@ -777,11 +777,9 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction(const CompilationOpti
   size_t dim_idx = 0;
   for (const auto& groupby_expr : ra_exe_unit_.groupby_exprs) {
     auto* gep = key_hash_func_builder.CreateGEP(
-        key_buff_lv->getType()->getScalarType()->getPointerElementType(),
-        key_buff_lv,
-        LL_INT(dim_idx));
-    auto key_comp_lv =
-        key_hash_func_builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
+        get_int_type(64, executor_->cgen_state_->context_), key_buff_lv, LL_INT(dim_idx));
+    auto key_comp_lv = key_hash_func_builder.CreateLoad(
+        get_int_type(64, executor_->cgen_state_->context_), gep);
     auto col_range_info =
         get_expr_range_info(ra_exe_unit_, query_infos_, groupby_expr.get(), executor_);
     auto crt_term_lv =
@@ -941,11 +939,15 @@ bool RowFuncBuilder::codegenAggCalls(
   llvm::Value* out_row_idx{nullptr};
   if (query_mem_desc.didOutputColumnar() &&
       query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) {
+#if 1
+    output_buffer_byte_stream = std::get<0>(agg_out_ptr_w_idx);  // type should be ptr
+#else
     output_buffer_byte_stream = LL_BUILDER.CreateBitCast(
         std::get<0>(agg_out_ptr_w_idx),
         llvm::PointerType::get(
             llvm::Type::getInt8Ty(LL_CONTEXT),
             std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
+#endif
     output_buffer_byte_stream->setName("out_buff_b_stream");
     CHECK(std::get<1>(agg_out_ptr_w_idx));
     out_row_idx = LL_BUILDER.CreateZExt(std::get<1>(agg_out_ptr_w_idx),
@@ -1107,14 +1109,17 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
         byte_offset = LL_BUILDER.CreateAdd(out_per_col_byte_idx, LL_INT(col_off));
       }
       byte_offset->setName("out_byte_off_target_" + std::to_string(target_idx));
+      // TODO(llvm16): address space
       auto output_ptr = LL_BUILDER.CreateGEP(
-          output_buffer_byte_stream->getType()->getScalarType()->getPointerElementType(),
-          output_buffer_byte_stream,
-          byte_offset);
+          llvm::PointerType::get(LL_CONTEXT, 0), output_buffer_byte_stream, byte_offset);
+#if 1
+      agg_col_ptr = output_ptr;
+#else
       agg_col_ptr = LL_BUILDER.CreateBitCast(
           output_ptr,
           llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT),
                                  output_ptr->getType()->getPointerAddressSpace()));
+#endif
       agg_col_ptr->setName("out_ptr_target_" + std::to_string(target_idx));
     } else {
       size_t col_off = query_mem_desc.getColOffInBytes(agg_out_off);
@@ -1132,9 +1137,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
               get_int_type((chosen_bytes << 3), LL_CONTEXT),
               std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
       agg_col_ptr = LL_BUILDER.CreateGEP(
-          bit_cast->getType()->getScalarType()->getPointerElementType(),
-          bit_cast,
-          offset);
+          get_int_type((chosen_bytes << 3), LL_CONTEXT), bit_cast, offset, "agg_col_ptr");
     }
   } else {
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
@@ -1142,7 +1145,8 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     col_off /= chosen_bytes;
     agg_col_ptr = LL_BUILDER.CreateGEP(get_int_type((chosen_bytes << 3), LL_CONTEXT),
                                        std::get<0>(agg_out_ptr_w_idx),
-                                       LL_INT(col_off));
+                                       LL_INT(col_off),
+                                       "agg_col_ptr");
   }
   CHECK(agg_col_ptr);
   return agg_col_ptr;
@@ -1184,10 +1188,12 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
     LL_BUILDER.CreateStore(
         estimator_arg_comp_lv,
         LL_BUILDER.CreateGEP(
-            estimator_key_lv->getType()->getScalarType()->getPointerElementType(),
-            estimator_key_lv,
-            LL_INT(subkey_idx++)));
+            estimator_arg_comp_lv->getType(), estimator_key_lv, LL_INT(subkey_idx++)));
   }
+#if 1
+  const auto bitmap = &*ROW_FUNC->arg_begin();
+  const auto key_bytes = estimator_key_lv;
+#else
   const auto bitmap = LL_BUILDER.CreateBitCast(
       &*ROW_FUNC->arg_begin(),
       llvm::PointerType::get(
@@ -1197,6 +1203,8 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
       estimator_key_lv,
       llvm::PointerType::get(get_int_type(8, LL_CONTEXT),
                              estimator_key_lv->getType()->getPointerAddressSpace()));
+#endif
+
   const auto estimator_comp_bytes_lv =
       LL_INT(static_cast<int32_t>(estimator_arg.size() * sizeof(int64_t)));
   const auto bitmap_size_lv =
