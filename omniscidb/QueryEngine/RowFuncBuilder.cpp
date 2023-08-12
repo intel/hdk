@@ -1140,12 +1140,9 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
     CHECK_EQ(size_t(0), col_off % chosen_bytes);
     col_off /= chosen_bytes;
-    agg_col_ptr = LL_BUILDER.CreateGEP(
-        llvm::PointerType::get(
-            LL_CONTEXT,
-            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()),
-        std::get<0>(agg_out_ptr_w_idx),
-        LL_INT(col_off));
+    agg_col_ptr = LL_BUILDER.CreateGEP(get_int_type((chosen_bytes << 3), LL_CONTEXT),
+                                       std::get<0>(agg_out_ptr_w_idx),
+                                       LL_INT(col_off));
   }
   CHECK(agg_col_ptr);
   return agg_col_ptr;
