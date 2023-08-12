@@ -291,11 +291,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
 
   auto* int_to_ptr = cgen_state_->ir_builder_.CreateIntToPtr(
       cgen_state_->llInt(0), cgen_traits.localPointerType(to_return_lv->getType()));
-  // TODO(llvm16): address space
-  auto placeholder0 =
-      cgen_state_->ir_builder_.CreateLoad(get_int_type(32, cgen_state_->context_),
-                                          int_to_ptr,
-                                          "__placeholder__" + literal_name);
+  auto placeholder0 = cgen_state_->ir_builder_.CreateLoad(
+      to_return_lv->getType(), int_to_ptr, "__placeholder__" + literal_name);
 
   cgen_state_->row_func_hoisted_literals_[placeholder0] = {lit_off, 0};
 
@@ -325,21 +322,8 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstants(
       }
     }
   } catch (const std::range_error& e) {
-    // detect
-    // literal
-    // buffer
-    // overflow
-    // when
-    // trying to
-    // assign
-    // literal
-    // buf offset
-    // which is
-    // not in a
-    // valid
-    // range to
-    // checked_type
-    // variable
+    // detect literal buffer overflow when trying to assign literal buf offset which is
+    // not in a valid range to checked_type variable
     throw TooManyLiterals();
   }
   std::vector<llvm::Value*> hoisted_literal_loads;
