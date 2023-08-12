@@ -125,7 +125,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
   std::string literal_name = "literal_" + std::to_string(lit_off);
   auto lit_buff_query_func_lv = get_arg_by_name(cgen_state_->query_func_, "literals");
   const auto lit_buf_start = cgen_state_->query_func_entry_ir_builder_.CreateGEP(
-      llvm::PointerType::get(cgen_state_->context_, 0),
+      get_int_type(8, cgen_state_->context_),
       lit_buff_query_func_lv,
       cgen_state_->llInt(lit_off));
   if (type->isString() && !use_dict_encoding) {
