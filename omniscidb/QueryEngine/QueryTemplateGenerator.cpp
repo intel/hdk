@@ -601,6 +601,7 @@ class GroupByQueryTemplateGenerator : public QueryTemplateGenerator {
     if (query_mem_desc.hasVarlenOutput()) {
       // make the varlen buffer the _first_ 8 byte value in the group by buffers double
       // ptr, and offset the group by buffers index by 8 bytes
+      // TODO(llvm16): should this be 32?
       auto varlen_output_buffer_gep = llvm::GetElementPtrInst::Create(
           get_int_type(64, mod->getContext()),
           output_buffers,
@@ -924,11 +925,8 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
     row_process_params.insert(
         row_process_params.end(), result_ptr_vec.begin(), result_ptr_vec.end());
     if (is_estimate_query) {
-      row_process_params.push_back(new llvm::LoadInst(get_int_type(64, mod->getContext()),
-                                                      output_buffers,
-                                                      "max_matched",
-                                                      false,
-                                                      bb_forbody));
+      row_process_params.push_back(new llvm::LoadInst(
+          output_buffers->getType(), output_buffers, "max_matched", false, bb_forbody));
     }
     row_process_params.push_back(agg_init_val);
     row_process_params.push_back(pos);
