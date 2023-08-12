@@ -492,9 +492,7 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
       LL_BUILDER.CreateStore(
           group_expr_lv,
           LL_BUILDER.CreateGEP(
-              group_key->getType()->getScalarType()->getPointerElementType(),
-              group_key,
-              LL_INT(subkey_idx++)));
+              group_expr_lv->getType(), group_key, LL_INT(subkey_idx++)));
     }
   }
   if (query_mem_desc.getQueryDescriptionType() ==
