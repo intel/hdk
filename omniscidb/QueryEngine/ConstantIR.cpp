@@ -230,15 +230,13 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     auto* int_to_ptr0 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder0_type);
     auto placeholder0 = cgen_state_->ir_builder_.CreateLoad(
-        int_to_ptr0->getType()->getPointerElementType(),
-        int_to_ptr0,
-        "__placeholder__" + literal_name + "_start");
+        var_start->getType(), int_to_ptr0, "__placeholder__" + literal_name + "_start");
     llvm::PointerType* placeholder1_type =
         cgen_traits.localPointerType(var_start_address->getType());
     auto* int_to_ptr1 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder1_type);
     auto placeholder1 = cgen_state_->ir_builder_.CreateLoad(
-        int_to_ptr1->getType()->getPointerElementType(),
+        placeholder1_type,
         int_to_ptr1,
         "__placeholder__" + literal_name + "_start_address");
     llvm::PointerType* placeholder2_type =
@@ -246,9 +244,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     auto* int_to_ptr2 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder2_type);
     auto placeholder2 = cgen_state_->ir_builder_.CreateLoad(
-        int_to_ptr2->getType()->getPointerElementType(),
-        int_to_ptr2,
-        "__placeholder__" + literal_name + "_length");
+        placeholder2_type, int_to_ptr2, "__placeholder__" + literal_name + "_length");
 
     cgen_state_->row_func_hoisted_literals_[placeholder0] = {lit_off, 0};
     cgen_state_->row_func_hoisted_literals_[placeholder1] = {lit_off, 1};
@@ -268,7 +264,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     auto* int_to_ptr0 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder0_type);
     auto placeholder0 = cgen_state_->ir_builder_.CreateLoad(
-        int_to_ptr0->getType()->getPointerElementType(),
+        var_start_address->getType(),
         int_to_ptr0,
         "__placeholder__" + literal_name + "_start_address");
     llvm::PointerType* placeholder1_type =
@@ -276,9 +272,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsPlaceholders(
     auto* int_to_ptr1 =
         cgen_state_->ir_builder_.CreateIntToPtr(cgen_state_->llInt(0), placeholder1_type);
     auto placeholder1 = cgen_state_->ir_builder_.CreateLoad(
-        int_to_ptr1->getType()->getPointerElementType(),
-        int_to_ptr1,
-        "__placeholder__" + literal_name + "_length");
+        var_length->getType(), int_to_ptr1, "__placeholder__" + literal_name + "_length");
 
     cgen_state_->row_func_hoisted_literals_[placeholder0] = {lit_off, 0};
     cgen_state_->row_func_hoisted_literals_[placeholder1] = {lit_off, 1};
