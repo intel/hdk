@@ -128,17 +128,6 @@ define void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val) {
     ret void
 }
 
-; fixme
-define void @agg_sum_float_skip_val_shared(i32 addrspace(4)* %agg, float noundef %val, float noundef %skip_val) {
-    %no_skip = fcmp one float %val, %skip_val
-    br i1 %no_skip, label %.noskip, label %.skip
-.noskip:
-    call void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val)
-    br label %.skip
-.skip:
-    ret void
-}
-
 define void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val) {
 .entry:
     %orig = load atomic i64, i64 addrspace(4)* %agg unordered, align 8
@@ -154,16 +143,6 @@ define void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val) 
     %success = extractvalue {i64, i1} %val_success, 1
     br i1 %success, label %.exit, label %.loop
 .exit:
-    ret void
-}
-
-define void @agg_sum_double_skip_val_shared(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
-    %no_skip = fcmp one double %val, %skip_val
-    br i1 %no_skip, label %.noskip, label %.skip
-.noskip:
-    call void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val)
-    br label %.skip
-.skip:
     ret void
 }
 
