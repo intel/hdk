@@ -25,6 +25,9 @@ void sync_threadblock();
 int64_t get_thread_index();
 int64_t get_block_dim();
 
+int32_t agg_sum_int32_shared(GENERIC_ADDR_SPACE int32_t* agg, const int32_t val);
+int64_t agg_sum_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
+void agg_max_int32_shared(GENERIC_ADDR_SPACE int32_t* agg, const int32_t val);
 void agg_max_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 int64_t agg_count_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 uint32_t agg_count_int32_shared(GENERIC_ADDR_SPACE uint32_t* agg, const int32_t val);
@@ -91,6 +94,50 @@ void agg_max_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
                                     const double skip_val) {
   if (val != skip_val) {
     agg_max_double_shared(agg, val);
+  }
+}
+
+int32_t atomicSum32SkipVal(GENERIC_ADDR_SPACE int32_t* addr,
+                           const int32_t val,
+                           const int32_t skip_val) {
+  int32_t old = atomic_xchg_int_32(addr, 0);
+  int32_t old2 = agg_sum_int32_shared(addr, old == skip_val ? val : (val + old));
+  return old == skip_val ? old2 : (old2 + old);
+}
+
+int64_t atomicSum64SkipVal(GENERIC_ADDR_SPACE int64_t* addr,
+                           const int64_t val,
+                           const int64_t skip_val) {
+  int32_t old = atomic_xchg_int_64(addr, 0);
+  int32_t old2 = agg_sum_shared(addr, old == skip_val ? val : (val + old));
+  return old == skip_val ? old2 : (old2 + old);
+}
+
+int32_t agg_sum_int32_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
+                                      const int32_t val,
+                                      const int32_t skip_val) {
+  if (val != skip_val) {
+    const int32_t old = atomicSum32SkipVal(agg, val, skip_val);
+    return old;
+  }
+  return 0;
+}
+
+int64_t agg_sum_int64_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
+                                      const int64_t val,
+                                      const int64_t skip_val) {
+  if (val != skip_val) {
+    const int64_t old = atomicSum64SkipVal(agg, val, skip_val);
+    return old;
+  }
+  return 0;
+}
+
+void agg_max_int32_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
+                                   const int32_t val,
+                                   const int32_t skip_val) {
+  if (val != skip_val) {
+    agg_max_int32_shared(agg, val);
   }
 }
 
