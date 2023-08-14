@@ -27,11 +27,6 @@ inline int64_t hdk_double_as_int64_t(const double x) {
 inline double hdk_int64_t_as_double(const int64_t x) {
   return *reinterpret_cast<const double*>(&x);
 }
-
-template <class T>
-inline constexpr T hdk_min(const T lhs, const T rhs) {
-  return lhs < rhs ? lhs : rhs;
-}
 }  // namespace
 
 extern "C" {
@@ -51,6 +46,8 @@ int64_t get_thread_index();
 int64_t get_block_dim();
 
 int32_t agg_sum_int32_shared(GENERIC_ADDR_SPACE int32_t* agg, const int32_t val);
+void agg_sum_float_shared(GENERIC_ADDR_SPACE int32_t* agg, const float val);
+void agg_sum_double_shared(GENERIC_ADDR_SPACE int64_t* agg, const double val);
 int64_t agg_sum_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
 void agg_max_int32_shared(GENERIC_ADDR_SPACE int32_t* agg, const int32_t val);
 void agg_max_shared(GENERIC_ADDR_SPACE int64_t* agg, const int64_t val);
@@ -93,7 +90,7 @@ double atomic_min_float(GENERIC_ADDR_SPACE float* addr, const float val) {
     old = atomic_cas_int_32(
         address_as_ull,
         assumed,
-        hdk_float_as_int32_t(hdk_min(val, hdk_int32_t_as_float(assumed))));
+        hdk_float_as_int32_t(std::min(val, hdk_int32_t_as_float(assumed))));
   } while (assumed != old);
 
   return hdk_int32_t_as_float(old);
@@ -109,7 +106,7 @@ double atomic_min_double(GENERIC_ADDR_SPACE double* addr, const double val) {
     old = atomic_cas_int_64(
         address_as_ull,
         assumed,
-        hdk_double_as_int64_t(hdk_min(val, hdk_int64_t_as_double(assumed))));
+        hdk_double_as_int64_t(std::min(val, hdk_int64_t_as_double(assumed))));
   } while (assumed != old);
 
   return hdk_int64_t_as_double(old);
@@ -123,7 +120,7 @@ void atomicMinFltSkipVal(GENERIC_ADDR_SPACE int32_t* addr,
   agg_min_float_shared(addr,
                        old == hdk_float_as_int32_t(skip_val)
                            ? val
-                           : hdk_min(hdk_int32_t_as_float(old), val));
+                           : std::min(hdk_int32_t_as_float(old), val));
 }
 
 void atomicMinDblSkipVal(GENERIC_ADDR_SPACE int64_t* addr,
@@ -134,7 +131,7 @@ void atomicMinDblSkipVal(GENERIC_ADDR_SPACE int64_t* addr,
   agg_min_double_shared(addr,
                         old == hdk_double_as_int64_t(skip_val)
                             ? val
-                            : hdk_min(hdk_int64_t_as_double(old), val));
+                            : std::min(hdk_int64_t_as_double(old), val));
 }
 
 void agg_min_float_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
@@ -163,16 +160,26 @@ void agg_max_double_shared(GENERIC_ADDR_SPACE int64_t* agg, const double val) {
 void agg_max_float_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
                                    const float val,
                                    const float skip_val) {
-  if (val != skip_val) {
-    agg_max_float_shared(agg, val);
+  if (hdk_float_as_int32_t(val) != hdk_float_as_int32_t(skip_val)) {
+    const int32_t flt_max = hdk_float_as_int32_t(-HDK_FLT_MAX);
+    int32_t old = atomic_xchg_int_32(agg, flt_max);
+    agg_max_float_shared(agg,
+                         old == hdk_float_as_int32_t(skip_val)
+                             ? val
+                             : std::max(hdk_int32_t_as_float(old), val));
   }
 }
 
 void agg_max_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
                                     const double val,
                                     const double skip_val) {
-  if (val != skip_val) {
-    agg_max_double_shared(agg, val);
+  if (hdk_double_as_int64_t(val) != hdk_double_as_int64_t(skip_val)) {
+    const int64_t dbl_max = hdk_double_as_int64_t(-HDK_DBL_MAX);
+    int64_t old = atomic_xchg_int_64(agg, dbl_max);
+    agg_max_double_shared(agg,
+                          old == hdk_double_as_int64_t(skip_val)
+                              ? val
+                              : std::max(hdk_int64_t_as_double(old), val));
   }
 }
 
@@ -200,6 +207,25 @@ int32_t agg_sum_int32_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
     return old;
   }
   return 0;
+}
+
+void agg_sum_float_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
+                                   const float val,
+                                   const float skip_val) {
+  if (hdk_float_as_int32_t(val) != hdk_float_as_int32_t(skip_val)) {
+    int32_t old = atomic_xchg_int_32(agg, hdk_float_as_int32_t(0.f));
+    agg_sum_float_shared(agg, old == hdk_float_as_int32_t(skip_val) ? val : (val + old));
+  }
+}
+
+void agg_sum_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
+                                    const double val,
+                                    const double skip_val) {
+  if (hdk_double_as_int64_t(val) != hdk_double_as_int64_t(skip_val)) {
+    int64_t old = atomic_xchg_int_64(agg, hdk_double_as_int64_t(0.));
+    agg_sum_double_shared(agg,
+                          old == hdk_double_as_int64_t(skip_val) ? val : (val + old));
+  }
 }
 
 int64_t agg_sum_int64_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
