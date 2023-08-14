@@ -309,6 +309,11 @@ define i32 @atomic_xchg_int_32(i32 addrspace(4)* %p, i32 %val) {
     ret i32 %old
 }
 
+define void @agg_max_int32_shared(i32 addrspace(4)* %agg, i32 noundef %val) {
+    %old = atomicrmw max i32 addrspace(4)* %agg, i32 %val monotonic
+    ret void
+}
+
 define void @agg_max_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
     %old = atomicrmw max i64 addrspace(4)* %agg, i64 %val monotonic
     ret void
@@ -330,6 +335,7 @@ define void @agg_min_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
 }
 
 declare i64 @llvm.smin.i64(i64, i64)
+declare i32 @llvm.smin.i32(i32, i32)
 
 define void @agg_min_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
     %no_skip = icmp ne i64 %val, %skip_val
@@ -344,6 +350,24 @@ define void @agg_min_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i
     %st = select i1 %isnull, i64 %val, i64 %min
     %old = call i64 @atomic_cas_int_64(i64 addrspace(4)* %agg, i64 %loaded, i64 %st)
     %success = icmp eq i64 %old, %loaded
+    br i1 %success, label %.skip, label %.loop
+.skip:
+    ret void
+}
+
+define void @agg_min_int32_skip_val_shared(i32 addrspace(4)* %agg, i32 noundef %val, i32 noundef %skip_val) {
+    %no_skip = icmp ne i32 %val, %skip_val
+    br i1 %no_skip, label %.noskip, label %.skip
+.noskip:
+    %orig = load atomic i32, i32 addrspace(4)* %agg unordered, align 8
+    br label %.loop
+.loop:
+    %loaded = phi i32 [ %orig, %.noskip ], [ %old, %.loop ]
+    %isnull = icmp eq i32 %loaded, %skip_val
+    %min = call i32 @llvm.smin.i32(i32 %loaded, i32 %val)
+    %st = select i1 %isnull, i32 %val, i32 %min
+    %old = call i32 @atomic_cas_int_32(i32 addrspace(4)* %agg, i32 %loaded, i32 %st)
+    %success = icmp eq i32 %old, %loaded
     br i1 %success, label %.skip, label %.loop
 .skip:
     ret void
