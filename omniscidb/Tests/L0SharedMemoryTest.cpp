@@ -266,19 +266,99 @@ void perform_test_and_verify_results(TestInputData input) {
   ASSERT_EQ(cmp_result, 0);
 }
 
-TEST(Smoke, Simple) {
-  TestInputData input;
-  input.setDeviceId(0)
-      .setNumInputBuffers(1)
-      .setTargetInfos(generate_custom_agg_target_infos(
-          {1}, {hdk::ir::AggType::kCount}, {int32_type}, {int32_type}))
-      .setAggWidth(4)
-      .setMinEntry(0)
-      .setMaxEntry(10)
-      .setStepSize(2)
-      .setKeylessHash(true)
-      .setTargetIndexForKey(0);
-  perform_test_and_verify_results(input);
+TEST(Smoke, Count) {
+  std::vector<const hdk::ir::Type*> variants = {
+      int32_type, int64_type, float_type, double_type};
+  for (auto* type : variants) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(1)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {1}, {hdk::ir::AggType::kCount}, {type}, {type}))
+        .setAggWidth(type->size())
+        .setMinEntry(0)
+        .setMaxEntry(10)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
+
+TEST(Smoke, Min) {
+  std::vector<const hdk::ir::Type*> variants = {
+      int32_type, int64_type, float_type, double_type};
+  for (auto* type : variants) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {1}, {hdk::ir::AggType::kMin}, {type}, {type}))
+        .setAggWidth(type->size())
+        .setMinEntry(0)
+        .setMaxEntry(10)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
+
+TEST(Smoke, Max) {
+  std::vector<const hdk::ir::Type*> variants = {
+      int32_type, int64_type, float_type, double_type};
+  for (auto* type : variants) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {1}, {hdk::ir::AggType::kMax}, {type}, {type}))
+        .setAggWidth(type->size())
+        .setMinEntry(0)
+        .setMaxEntry(10)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
+
+TEST(Smoke, Sum) {
+  std::vector<const hdk::ir::Type*> variants = {
+      int32_type, int64_type, float_type, double_type};
+  for (auto* type : variants) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {1}, {hdk::ir::AggType::kSum}, {type}, {type}))
+        .setAggWidth(type->size())
+        .setMinEntry(0)
+        .setMaxEntry(10)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
+}
+
+TEST(Smoke, Avg) {
+  std::vector<const hdk::ir::Type*> variants = {
+      int32_type, int64_type, float_type, double_type};
+  for (auto* type : variants) {
+    TestInputData input;
+    input.setDeviceId(0)
+        .setNumInputBuffers(4)
+        .setTargetInfos(generate_custom_agg_target_infos(
+            {1}, {hdk::ir::AggType::kAvg}, {type}, {type}))
+        .setAggWidth(8)  // type->size()?
+        .setMinEntry(0)
+        .setMaxEntry(10)
+        .setStepSize(2)
+        .setKeylessHash(true)
+        .setTargetIndexForKey(0);
+    perform_test_and_verify_results(input);
+  }
 }
 
 TEST(SingleColumn, VariableEntries_CountQuery_4B_Group) {
@@ -418,12 +498,11 @@ TEST(SingleColumn, VariableSteps_FixedEntries_4) {
 }
 
 TEST(SingleColumn, VariableNumBuffers) {
-  GTEST_SKIP();
   TestInputData input;
   input.setDeviceId(0)
       .setAggWidth(8)
       .setMinEntry(0)
-      .setMaxEntry(266)
+      .setMaxEntry(255)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
