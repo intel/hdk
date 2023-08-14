@@ -167,20 +167,6 @@ define void @agg_sum_double_skip_val_shared(i64 addrspace(4)* %agg, double nound
     ret void
 }
 
-define i64 @agg_sum_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, i64 noundef %skip_val) {
-    %no_skip = icmp ne i64 %val, %skip_val
-    br i1 %no_skip, label %.noskip, label %.skip
-.noskip:
-    %old = atomicrmw xchg i64 addrspace(4)* %agg, i64 0 monotonic
-    %isempty = icmp eq i64 %old, -9223372036854775808
-    %sel = select i1 %isempty, i64 0, i64 %old
-    %new_val = add nsw i64 %val, %sel
-    %old2 = atomicrmw add i64 addrspace(4)* %agg, i64 %new_val monotonic
-    ret i64 %old2
-.skip:
-    ret i64 0
-}
-
 define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
 .entry:
     %orig = load atomic i32, i32 addrspace(4)* %addr unordered, align 8
