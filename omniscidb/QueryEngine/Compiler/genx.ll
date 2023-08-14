@@ -128,6 +128,7 @@ define void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val) {
     ret void
 }
 
+; fixme
 define void @agg_sum_float_skip_val_shared(i32 addrspace(4)* %agg, float noundef %val, float noundef %skip_val) {
     %no_skip = fcmp one float %val, %skip_val
     br i1 %no_skip, label %.noskip, label %.skip
@@ -193,45 +194,6 @@ define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
     br i1 %success, label %.exit, label %.loop
 .exit:
     ret void
-}
-
-define double @atomic_min_float(float addrspace(4)* %addr, float noundef %val) {
-.entry:
-    %orig = load float, float addrspace(4)* %addr, align 8
-    br label %.loop
-.loop:
-    %loaded = phi float [ %orig, %.entry], [ %old.cst, %.loop ]
-    %isless = fcmp olt float %val, %loaded
-    %min = select i1 %isless, float %val, float %loaded
-    %min.cst = bitcast float %min to i32
-    %loaded.cst = bitcast float %loaded to i32
-    %addr.cst = bitcast float addrspace(4)* %addr to i32 addrspace(4)*
-    %old = call i32 @atomic_cas_int_32(i32 addrspace(4)* %addr.cst, i32 %loaded.cst, i32 %min.cst)
-    %old.cst = bitcast i32 %old to float
-    %success = icmp eq i32 %old, %loaded.cst
-    br i1 %success, label %.exit, label %.loop
-.exit:
-    %res = fpext float %old.cst to double
-    ret double %res
-}
-
-define double @atomic_min_double(double addrspace(4)* %addr, double noundef %val) {
-.entry:
-    %orig = load double, double addrspace(4)* %addr, align 8
-    br label %.loop
-.loop:
-    %loaded = phi double [ %orig, %.entry], [ %old.cst, %.loop ]
-    %isless = fcmp olt double %val, %loaded
-    %min = select i1 %isless, double %val, double %loaded
-    %min.cst = bitcast double %min to i64
-    %loaded.cst = bitcast double %loaded to i64
-    %addr.cst = bitcast double addrspace(4)* %addr to i64 addrspace(4)*
-    %old = call i64 @atomic_cas_int_64(i64 addrspace(4)* %addr.cst, i64 %loaded.cst, i64 %min.cst)
-    %old.cst = bitcast i64 %old to double
-    %success = icmp eq i64 %old, %loaded.cst
-    br i1 %success, label %.exit, label %.loop
-.exit:
-    ret double %old.cst
 }
 
 define double @atomic_max_float(float addrspace(4)* %addr, float noundef %val) {
