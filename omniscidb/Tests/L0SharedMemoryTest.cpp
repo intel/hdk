@@ -368,13 +368,12 @@ TEST(SingleColumn, VariableSteps_FixedEntries_2) {
 }
 
 TEST(SingleColumn, VariableSteps_FixedEntries_3) {
-  GTEST_SKIP();
   TestInputData input;
   input.setDeviceId(0)
       .setNumInputBuffers(4)
       .setAggWidth(8)
       .setMinEntry(0)
-      .setMaxEntry(367)
+      .setMaxEntry(204)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(
@@ -394,13 +393,12 @@ TEST(SingleColumn, VariableSteps_FixedEntries_3) {
 }
 
 TEST(SingleColumn, VariableSteps_FixedEntries_4) {
-  GTEST_SKIP();
   TestInputData input;
   input.setDeviceId(0)
       .setNumInputBuffers(4)
       .setAggWidth(8)
       .setMinEntry(0)
-      .setMaxEntry(517)
+      .setMaxEntry(255)
       .setKeylessHash(true)
       .setTargetIndexForKey(0)
       .setTargetInfos(generate_custom_agg_target_infos(

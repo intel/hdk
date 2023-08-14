@@ -187,8 +187,8 @@ int32_t atomicSum32SkipVal(GENERIC_ADDR_SPACE int32_t* addr,
 int64_t atomicSum64SkipVal(GENERIC_ADDR_SPACE int64_t* addr,
                            const int64_t val,
                            const int64_t skip_val) {
-  int32_t old = atomic_xchg_int_64(addr, 0);
-  int32_t old2 = agg_sum_shared(addr, old == skip_val ? val : (val + old));
+  int64_t old = atomic_xchg_int_64(addr, 0);
+  int64_t old2 = agg_sum_shared(addr, old == skip_val ? val : (val + old));
   return old == skip_val ? old2 : (old2 + old);
 }
 
@@ -205,6 +205,16 @@ int32_t agg_sum_int32_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
 int64_t agg_sum_int64_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
                                       const int64_t val,
                                       const int64_t skip_val) {
+  if (val != skip_val) {
+    const int64_t old = atomicSum64SkipVal(agg, val, skip_val);
+    return old;
+  }
+  return 0;
+}
+
+int64_t agg_sum_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
+                                const int64_t val,
+                                const int64_t skip_val) {
   if (val != skip_val) {
     const int64_t old = atomicSum64SkipVal(agg, val, skip_val);
     return old;
