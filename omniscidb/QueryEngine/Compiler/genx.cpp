@@ -218,13 +218,25 @@ void agg_sum_float_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
   }
 }
 
+void agg_sum_double_shared(GENERIC_ADDR_SPACE int64_t* agg, const double val) {
+  int64_t old = *agg, assumed;
+
+  do {
+    assumed = old;
+    old = atomic_cas_int_64(
+        agg, assumed, hdk_double_as_int64_t(val + hdk_int64_t_as_double(assumed)));
+  } while (assumed != old);
+}
+
 void agg_sum_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
                                     const double val,
                                     const double skip_val) {
   if (hdk_double_as_int64_t(val) != hdk_double_as_int64_t(skip_val)) {
     int64_t old = atomic_xchg_int_64(agg, hdk_double_as_int64_t(0.));
     agg_sum_double_shared(agg,
-                          old == hdk_double_as_int64_t(skip_val) ? val : (val + old));
+                          old == hdk_double_as_int64_t(skip_val)
+                              ? val
+                              : (val + hdk_int64_t_as_double(old)));
   }
 }
 

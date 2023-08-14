@@ -128,24 +128,6 @@ define void @agg_sum_float_shared(i32 addrspace(4)* %agg, float noundef %val) {
     ret void
 }
 
-define void @agg_sum_double_shared(i64 addrspace(4)* %agg, double noundef %val) {
-.entry:
-    %orig = load atomic i64, i64 addrspace(4)* %agg unordered, align 8
-    %cst = bitcast i64 %orig to double
-    br label %.loop
-.loop:
-    %cmp = phi i64 [ %orig, %.entry ], [ %loaded, %.loop ]
-    %cmp_cst = bitcast i64 %cmp to double
-    %new_val = fadd double %cmp_cst, %val
-    %new_val_cst = bitcast double %new_val to i64
-    %val_success = cmpxchg i64 addrspace(4)* %agg, i64 %cmp, i64 %new_val_cst acq_rel monotonic
-    %loaded = extractvalue {i64, i1} %val_success, 0
-    %success = extractvalue {i64, i1} %val_success, 1
-    br i1 %success, label %.exit, label %.loop
-.exit:
-    ret void
-}
-
 define void @atomic_or(i32 addrspace(4)* %addr, i32 noundef %val) {
 .entry:
     %orig = load atomic i32, i32 addrspace(4)* %addr unordered, align 8
