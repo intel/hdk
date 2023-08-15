@@ -253,7 +253,7 @@ struct CgenState {
     CHECK(func_type);
     if (has_struct_return) {
       const auto arg_ti = func_type->getParamType(0);
-      CHECK(arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy());
+      CHECK(arg_ti->isPointerTy());
       auto attr_list = func->getAttributes();
 #if LLVM_VERSION_MAJOR > 13
       llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(0));
@@ -266,6 +266,7 @@ struct CgenState {
     const size_t arg_start = has_struct_return ? 1 : 0;
     for (size_t i = arg_start; i < func->arg_size(); i++) {
       const auto arg_ti = func_type->getParamType(i);
+      // TODO(llvm16): what is the LLVM 16 type for array_append arguments?
       if (arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy()) {
         auto attr_list = func->getAttributes();
 #if LLVM_VERSION_MAJOR > 13
