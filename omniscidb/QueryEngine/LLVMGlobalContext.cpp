@@ -29,6 +29,7 @@ std::once_flag context_init_flag;
 llvm::orc::ThreadSafeContext& getGlobalLLVMThreadSafeContext() {
   std::call_once(context_init_flag, []() {
     auto global_context = std::make_unique<llvm::LLVMContext>();
+    global_context->enableOpaquePointers();
     g_global_context = llvm::orc::ThreadSafeContext(std::move(global_context));
   });
   return g_global_context;
