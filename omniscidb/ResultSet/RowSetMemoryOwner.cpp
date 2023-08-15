@@ -7,7 +7,11 @@
 
 #include "RowSetMemoryOwner.h"
 
+#include "Shared/approx_quantile.h"
+
 EXTERN extern bool g_cache_string_hash;
+EXTERN extern size_t g_approx_quantile_buffer;
+EXTERN extern size_t g_approx_quantile_centroids;
 
 StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
     const int dict_id_in,
@@ -29,4 +33,16 @@ StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
         std::make_shared<StringDictionaryProxy>(tsd, literal_dict_ref.dictId, 0);
   }
   return lit_str_dict_proxy_.get();
+}
+
+quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  return t_digests_
+      .emplace_back(std::make_unique<quantile::TDigest>(
+          q, this, g_approx_quantile_buffer, g_approx_quantile_centroids))
+      .get();
+}
+
+int8_t* RowSetMemoryOwner::topKBuffer(size_t size) {
+  return allocate(size);
 }

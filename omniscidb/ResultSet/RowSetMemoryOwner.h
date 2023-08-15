@@ -29,7 +29,7 @@
 #include "DataMgr/DataMgr.h"
 #include "DataProvider/DataProvider.h"
 #include "Logger/Logger.h"
-#include "Shared/quantile.h"
+#include "Shared/approx_quantile.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 #include "ThirdParty/robin_hood.h"
 

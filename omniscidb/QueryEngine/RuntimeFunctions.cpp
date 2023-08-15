@@ -27,8 +27,8 @@
 #include "MurmurHash.h"
 #include "Shared/BufferCompaction.h"
 #include "Shared/TypePunning.h"
+#include "Shared/approx_quantile.h"
 #include "Shared/funcannotations.h"
-#include "Shared/quantile.h"
 
 #include <algorithm>
 #include <atomic>

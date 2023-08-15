@@ -27,8 +27,8 @@
 
 #include "ResultSet/CountDistinct.h"
 #include "Shared/InlineNullValues.h"
+#include "Shared/approx_quantile.h"
 #include "Shared/likely.h"
-#include "Shared/quantile.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/IR/Function.h>
