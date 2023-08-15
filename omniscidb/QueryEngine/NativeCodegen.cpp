@@ -632,8 +632,7 @@ llvm::Function* create_row_function(const size_t in_col_count,
   row_process_arg_types.push_back(llvm::Type::getInt64Ty(context));
 
   // fragment row offset argument
-  row_process_arg_types.push_back(
-      traits.localPointerType(llvm::Type::getInt64Ty(context)));
+  row_process_arg_types.push_back(traits.localOpaquePointerType(context));
 
   // number of rows for each scan
   row_process_arg_types.push_back(
