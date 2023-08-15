@@ -17,7 +17,6 @@
 #ifndef INLINENULLVALUES_H
 #define INLINENULLVALUES_H
 
-#include "../Logger/Logger.h"
 #include "funcannotations.h"
 
 #ifndef _MSC_VER
@@ -75,14 +74,7 @@ constexpr inline int64_t max_valid_int_value() {
 }
 
 template <typename T>
-constexpr inline T inline_fp_null_value() {
-#if !(defined(__CUDACC__) || defined(NO_BOOST))
-  LOG(FATAL) << "Only float or double overloads should be called.";
-#else
-  LOG(FATAL);
-#endif
-  return T{};
-}
+constexpr inline T inline_fp_null_value() = delete;
 
 template <>
 constexpr inline float inline_fp_null_value<float>() {
@@ -95,14 +87,7 @@ constexpr inline double inline_fp_null_value<double>() {
 }
 
 template <typename T>
-DEVICE T inline_fp_null_array_value() {
-#if !(defined(__CUDACC__) || defined(NO_BOOST))
-  LOG(FATAL) << "Only float or double overloads should be called.";
-#else
-  assert(false);
-#endif
-  return T{};
-}
+DEVICE T inline_fp_null_array_value() = delete;
 
 template <>
 DEVICE inline float inline_fp_null_array_value<float>() {
@@ -147,8 +132,8 @@ inline int64_t inline_int_null_value(const TYPE* type) {
 
 template <typename TYPE>
 inline int64_t inline_fixed_encoding_null_value(const TYPE* type) {
-  CHECK(type->isBoolean() || type->isInteger() || type->isDecimal() ||
-        type->isDateTime() || type->isExtDictionary());
+  assert(type->isBoolean() || type->isInteger() || type->isDecimal() ||
+         type->isDateTime() || type->isExtDictionary());
 
   if (type->isExtDictionary()) {
     switch (type->size()) {
@@ -159,12 +144,7 @@ inline int64_t inline_fixed_encoding_null_value(const TYPE* type) {
       case 4:
         return inline_int_null_value<int32_t>();
       default:
-#ifndef __CUDACC__
-        CHECK(false) << "Unexpected type size: " << type->toString() << " "
-                     << type->size();
-#else
-        CHECK(false);
-#endif
+        abort();
     }
   }
 
@@ -178,11 +158,7 @@ inline int64_t inline_fixed_encoding_null_value(const TYPE* type) {
     case 8:
       return inline_int_null_value<int64_t>();
     default:
-#ifndef __CUDACC__
-      CHECK(false) << "Unexpected type size: " << type->toString() << " " << type->size();
-#else
-      CHECK(false);
-#endif
+      abort();
   }
   return 0;
 }
@@ -198,68 +174,6 @@ inline double inline_fp_null_value(const TYPE* type) {
 }
 
 #endif  // NO_BOOST
-
-#include <type_traits>
-
-namespace serialize_detail {
-template <int overload>
-struct IntType;
-template <>
-struct IntType<1> {
-  using type = uint8_t;
-};
-template <>
-struct IntType<2> {
-  using type = uint16_t;
-};
-template <>
-struct IntType<4> {
-  using type = uint32_t;
-};
-template <>
-struct IntType<8> {
-  using type = uint64_t;
-};
-}  // namespace serialize_detail
-
-template <typename T, bool array = false>
-CONSTEXPR DEVICE inline typename serialize_detail::IntType<sizeof(T)>::type
-serialized_null_value() {
-  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
-  T nv = 0;
-  if CONSTEXPR (std::is_floating_point<T>::value) {
-    if CONSTEXPR (array) {
-      nv = inline_fp_null_array_value<T>();
-    } else {
-      nv = inline_fp_null_value<T>();
-    }
-  } else if CONSTEXPR (std::is_integral<T>::value) {
-    if CONSTEXPR (array) {
-      nv = inline_int_null_array_value<T>();
-    } else {
-      nv = inline_int_null_value<T>();
-    }
-  }
-#if !(defined(__CUDACC__) || defined(NO_BOOST))
-  else {
-    CHECK(false) << "Serializing null values of floating point or integral types only is "
-                    "supported.";
-  }
-#endif
-  return *(TT*)(&nv);
-}
-
-template <typename T, bool array = false>
-CONSTEXPR DEVICE inline bool is_null(const T& value) {
-  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
-  return serialized_null_value<T, array>() == *(TT*)(&value);
-}
-
-template <typename T, bool array = false>
-CONSTEXPR DEVICE inline void set_null(T& value) {
-  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
-  *(TT*)(&value) = serialized_null_value<T, array>();
-}
 
 template <typename V,
           std::enable_if_t<!std::is_same<V, bool>::value && std::is_integral<V>::value,
@@ -293,6 +207,54 @@ CONSTEXPR DEVICE inline int8_t inline_null_array_value() {
 template <typename V, std::enable_if_t<std::is_floating_point<V>::value, int> = 0>
 CONSTEXPR DEVICE inline V inline_null_array_value() {
   return inline_fp_null_array_value<V>();
+}
+
+#include <type_traits>
+
+namespace serialize_detail {
+template <int overload>
+struct IntType;
+template <>
+struct IntType<1> {
+  using type = uint8_t;
+};
+template <>
+struct IntType<2> {
+  using type = uint16_t;
+};
+template <>
+struct IntType<4> {
+  using type = uint32_t;
+};
+template <>
+struct IntType<8> {
+  using type = uint64_t;
+};
+}  // namespace serialize_detail
+
+template <typename T, bool array = false>
+CONSTEXPR DEVICE inline typename serialize_detail::IntType<sizeof(T)>::type
+serialized_null_value() {
+  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
+  T nv = 0;
+  if CONSTEXPR (array) {
+    nv = inline_null_array_value<T>();
+  } else {
+    nv = inline_null_value<T>();
+  }
+  return *(TT*)(&nv);
+}
+
+template <typename T, bool array = false>
+CONSTEXPR DEVICE inline bool is_null(const T& value) {
+  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
+  return serialized_null_value<T, array>() == *(TT*)(&value);
+}
+
+template <typename T, bool array = false>
+CONSTEXPR DEVICE inline void set_null(T& value) {
+  using TT = typename serialize_detail::IntType<sizeof(T)>::type;
+  *(TT*)(&value) = serialized_null_value<T, array>();
 }
 
 #endif
