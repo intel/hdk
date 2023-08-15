@@ -235,11 +235,7 @@ template <typename T>
 class NoneEncoderUpdateStatsTest : public EncoderUpdateStatsTest {
  protected:
   void runTest() {
-    std::vector<T> data = {-1,
-                           2,
-                           3,
-                           (std::is_integral<T>::value ? inline_int_null_value<T>()
-                                                       : inline_fp_null_value<T>())};
+    std::vector<T> data = {-1, 2, 3, inline_null_value<T>()};
     createEncoder(NoneEncoderTraits<T>::getSqlType());
     updateWithData(data);
     assertExpectedStats<T>(-1, 3, true);

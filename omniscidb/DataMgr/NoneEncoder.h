@@ -28,8 +28,7 @@
 
 template <typename T>
 T none_encoded_null_value() {
-  return std::is_integral<T>::value ? inline_int_null_value<T>()
-                                    : inline_fp_null_value<T>();
+  return inline_null_value<T>();
 }
 
 template <typename T>
