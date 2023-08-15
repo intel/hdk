@@ -15,7 +15,7 @@
  */
 
 #include "Shared/Intervals.h"
-#include "Shared/quantile.h"
+#include "Shared/approx_quantile.h"
 #include "Tests/TestHelpers.h"
 
 #include <gtest/gtest.h>

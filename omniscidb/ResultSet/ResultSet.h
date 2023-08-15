@@ -31,7 +31,7 @@
 #include "ResultSet/ResultSetBufferAccessors.h"
 #include "ResultSet/ResultSetStorage.h"
 #include "ResultSet/TargetValue.h"
-#include "Shared/quantile.h"
+#include "Shared/approx_quantile.h"
 
 #include <boost/optional/optional_io.hpp>
 

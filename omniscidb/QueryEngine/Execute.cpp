@@ -86,8 +86,6 @@ using namespace std::string_literals;
 extern std::unique_ptr<llvm::Module> udf_gpu_module;
 extern std::unique_ptr<llvm::Module> udf_cpu_module;
 EXTERN extern bool g_is_test_env;
-EXTERN extern size_t g_approx_quantile_buffer;
-EXTERN extern size_t g_approx_quantile_centroids;
 
 int const Executor::max_gpu_count;
 
@@ -499,18 +497,6 @@ const StringDictionaryProxy::IdMap* RowSetMemoryOwner::getOrAddStringProxyTransl
   } else {
     return addStringProxyUnionTranslationMap(source_proxy, dest_proxy);
   }
-}
-
-quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  return t_digests_
-      .emplace_back(std::make_unique<quantile::TDigest>(
-          q, this, g_approx_quantile_buffer, g_approx_quantile_centroids))
-      .get();
-}
-
-int8_t* RowSetMemoryOwner::topKBuffer(size_t size) {
-  return allocate(size);
 }
 
 bool Executor::isCPUOnly() const {
