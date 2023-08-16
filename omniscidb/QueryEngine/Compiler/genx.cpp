@@ -214,7 +214,9 @@ void agg_sum_float_skip_val_shared(GENERIC_ADDR_SPACE int32_t* agg,
                                    const float skip_val) {
   if (hdk_float_as_int32_t(val) != hdk_float_as_int32_t(skip_val)) {
     int32_t old = atomic_xchg_int_32(agg, hdk_float_as_int32_t(0.f));
-    agg_sum_float_shared(agg, old == hdk_float_as_int32_t(skip_val) ? val : (val + old));
+    agg_sum_float_shared(
+        agg,
+        old == hdk_float_as_int32_t(skip_val) ? val : (val + hdk_int32_t_as_float(old)));
   }
 }
 
@@ -279,6 +281,24 @@ const GENERIC_ADDR_SPACE int64_t* init_shared_mem(
   }
   sync_threadblock();
   return shared_groups_buffer;
+}
+
+int64_t agg_count_double_skip_val_shared(GENERIC_ADDR_SPACE int64_t* agg,
+                                         const double val,
+                                         const double skip_val) {
+  if (hdk_double_as_int64_t(val) != hdk_double_as_int64_t(skip_val)) {
+    return agg_count_double_shared(agg, val);
+  }
+  return *agg;
+}
+
+uint32_t agg_count_float_skip_val_shared(GENERIC_ADDR_SPACE uint32_t* agg,
+                                         const float val,
+                                         const float skip_val) {
+  if (hdk_float_as_int32_t(val) != hdk_float_as_int32_t(skip_val)) {
+    return agg_count_float_shared(agg, val);
+  }
+  return *agg;
 }
 
 void agg_count_distinct_bitmap_gpu(GENERIC_ADDR_SPACE int64_t* agg,
