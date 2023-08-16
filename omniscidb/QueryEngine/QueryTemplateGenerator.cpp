@@ -357,13 +357,21 @@ class QueryTemplateGenerator {
         PAS = llvm::AttributeList::get(mod->getContext(), 10U, B);
       }
 
-      // NOTE(adb): This attribute is missing in the query template. Why?
+// NOTE(adb): This attribute is missing in the query template. Why?
+#if LLVM_VERSION_MAJOR > 14
       Attrs.push_back(PAS);
+      {
+        ATTR_BUILDER(mod->getContext());
+        B.addUWTableAttr(llvm::UWTableKind::Default);
+        PAS = llvm::AttributeList::get(mod->getContext(), ~0U, B);
+      }
+#else
       {
         ATTR_BUILDER(mod->getContext());
         B.addAttribute(llvm::Attribute::UWTable);
         PAS = llvm::AttributeList::get(mod->getContext(), ~0U, B);
       }
+#endif
 
       Attrs.push_back(PAS);
 
