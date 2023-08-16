@@ -530,17 +530,15 @@ TEST_F(GroupByAggTest, GroupByCount) {
 }
 
 TEST_F(GroupByAggTest, GroupBySum) {
-  GTEST_SKIP();
   c("SELECT SUM(x) FROM small_tests GROUP BY z;", g_dt);
   c("SELECT SUM(x + y) FROM small_tests GROUP BY z;", g_dt);
 }
 
 TEST_F(GroupByAggTest, AggHaving) {
-  GTEST_SKIP();
   c("SELECT COUNT(*) FROM test WHERE x < y GROUP BY x HAVING 0=1;", g_dt);
   c("SELECT COUNT(*) FROM test WHERE x < y GROUP BY x HAVING 1=1;", g_dt);
   c("SELECT x, COUNT(*) AS n FROM test GROUP BY x, ufd ORDER BY x, n;", g_dt);
-  c("SELECT MIN(x), MAX(x) FROM test WHERE real_str LIKE '%nope%';", g_dt);
+  // c("SELECT MIN(x), MAX(x) FROM test WHERE real_str LIKE '%nope%';", g_dt);
   c("SELECT COUNT(*) FROM test WHERE (x > 7 AND y / (x - 7) < 44);", g_dt);
   c("SELECT x, AVG(ff) AS val FROM test GROUP BY x ORDER BY val;", g_dt);
   c("SELECT x, MAX(fn) as val FROM test WHERE fn IS NOT NULL GROUP BY x ORDER BY val;",
@@ -566,11 +564,10 @@ TEST_F(GroupByTest, WithFilter) {
 }
 
 TEST_F(GroupByTest, WithOrdering) {
-  GTEST_SKIP();
   c("SELECT x, dd, COUNT(*) FROM test GROUP BY x, dd ORDER BY x, dd;", g_dt);
-  c("SELECT 'literal_string' AS key0 FROM test GROUP BY key0;", g_dt);
-  c("SELECT str, MIN(y) FROM test WHERE y IS NOT NULL GROUP BY str ORDER BY str DESC;",
-    g_dt);
+  // c("SELECT 'literal_string' AS key0 FROM test GROUP BY key0;", g_dt);
+  // c("SELECT str, MIN(y) FROM test WHERE y IS NOT NULL GROUP BY str ORDER BY str DESC;",
+  // g_dt);
   c("SELECT x, AVG(u), COUNT(*) AS n FROM test GROUP BY x ORDER BY n DESC;", g_dt);
   c("SELECT f, ss FROM test GROUP BY f, ss ORDER BY f DESC;", g_dt);
   c("SELECT fx, COUNT(*) n FROM test GROUP BY fx ORDER BY n DESC, fx IS NULL DESC;",
@@ -684,7 +681,6 @@ TEST_F(BasicTest, Time) {
 }
 
 TEST_F(BasicTest, Time2) {
-  GTEST_SKIP();
   ASSERT_EQ(
       static_cast<int64_t>(g_num_rows + g_num_rows / 2),
       v<int64_t>(run_simple_agg(
@@ -920,7 +916,7 @@ TEST_F(BasicTest, SumAndAverage) {
   c("SELECT AVG(w) FROM test;", g_dt);
   c("SELECT AVG(z) FROM test;", g_dt);
   c("SELECT SUM(CAST(x AS FLOAT)) FROM test GROUP BY y;", g_dt);
-  // c("SELECT AVG(CAST(x AS FLOAT)) FROM test GROUP BY y;", g_dt);
+  c("SELECT AVG(CAST(x AS FLOAT)) FROM test GROUP BY y;", g_dt);
   c("SELECT count(*) FROM test GROUP BY x;", g_dt);
   c("SELECT count(ff) FROM test GROUP BY x;", g_dt);
   c("SELECT x, AVG(ff) AS val FROM test GROUP BY x;", g_dt);

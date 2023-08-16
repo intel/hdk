@@ -87,18 +87,6 @@ define i64 @agg_count_skip_val_shared(i64 addrspace(4)* %agg, i64 noundef %val, 
     ret i64 0
 }
 
-define i64 @agg_count_double_skip_val_shared(i64 addrspace(4)* %agg, double noundef %val, double noundef %skip_val) {
-    %no_skip = fcmp one double %val, %skip_val
-    br i1 %no_skip, label %.noskip, label %.skip
-.noskip:
-    %val_cst = bitcast double %val to i64
-    %res = call i64 @agg_count_shared(i64 addrspace(4)* %agg, i64 %val_cst)
-    ret i64 %res
-.skip:
-    %orig = load i64, i64 addrspace(4)* %agg
-    ret i64 %orig
-}
-
 ;; TODO: may cause a CPU fallback on codegen
 define i64 @agg_sum_shared(i64 addrspace(4)* %agg, i64 noundef %val) {
     %old = atomicrmw add i64 addrspace(4)* %agg, i64 %val monotonic
