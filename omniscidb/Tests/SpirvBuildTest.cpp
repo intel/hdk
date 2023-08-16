@@ -23,6 +23,10 @@ TEST(SPIRVBuildTest, TranslateSimple) {
   using namespace llvm;
   // See source at https://github.com/kurapov-peter/L0Snippets
   LLVMContext ctx;
+#if LLVM_VERSION_MAJOR > 14
+  // temporarily disable opaque pointers
+  ctx.setOpaquePointers(false);
+#endif
   std::unique_ptr<Module> module = std::make_unique<Module>("code_generated", ctx);
   module->setTargetTriple("spir-unknown-unknown");
   IRBuilder<> builder(ctx);
