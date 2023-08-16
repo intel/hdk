@@ -92,6 +92,9 @@ class CodegenTraits {
   llvm::PointerType* smemPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, smem_addr_space_);
   }
+  llvm::PointerType* smemOpaquePointerType(llvm::LLVMContext& ctx) const {
+    return llvm::PointerType::get(ctx, smem_addr_space_);
+  }
   llvm::PointerType* globalPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, global_addr_space_);
   }
