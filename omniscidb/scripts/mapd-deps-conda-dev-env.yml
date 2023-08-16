@@ -20,7 +20,7 @@ dependencies:
   - arrow-cpp  11.0
   - pyarrow    11.0
   - pandas     1.5.3
-  - llvmdev     14.*
+  - llvmdev     15.*
   - openjdk     17.*
   - cmake
   - tbb-devel
@@ -29,7 +29,7 @@ dependencies:
   - fmt
   - maven
   - boost-cpp
-  - clangdev   14.*
+  - clangdev   15.*
   - llvm
   - double-conversion
   - snappy
@@ -46,7 +46,8 @@ dependencies:
   # when cuda is enabled, install also
   # - arrow-cpp=11.0=*cuda
   - binutils
-  - llvm-spirv 14.0.*
+  - llvm-spirv 15.0.*
+  - libllvmspirv 15.0.*
   - folly 2022.11.07.00
   - sqlite 3.40.0
   - python 3.9.*

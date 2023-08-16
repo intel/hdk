@@ -18,7 +18,7 @@ dependencies:
   - arrow-cpp  11.0
   - pyarrow    11.0
   - pandas     1.5.3
-  - llvmdev     14.*
+  - llvmdev     15.*
   - openjdk     17.*
   - tbb-devel
   - cython
@@ -26,7 +26,7 @@ dependencies:
   - fmt
   - maven
   - boost-cpp
-  - clangdev   14.*
+  - clangdev   15.*
   - llvm
   - double-conversion
   - snappy
