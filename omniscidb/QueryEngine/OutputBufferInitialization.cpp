@@ -116,7 +116,7 @@ int64_t get_agg_initial_val(hdk::ir::AggType agg,
   CHECK(!(type->isString() || type->isExtDictionary()) ||
         (agg == hdk::ir::AggType::kSingleValue || agg == hdk::ir::AggType::kSample));
   const auto byte_width =
-      enable_compaction
+      enable_compaction && type->size() > 0
           ? compact_byte_width(static_cast<unsigned>(get_bit_width(type) >> 3),
                                unsigned(min_byte_width_to_compact))
           : sizeof(int64_t);
