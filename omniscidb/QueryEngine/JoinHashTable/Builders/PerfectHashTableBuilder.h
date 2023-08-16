@@ -17,6 +17,7 @@
 #pragma once
 
 #include "QueryEngine/JoinHashTable/PerfectHashTable.h"
+#include "SOME_PATH/l0_physops/hash_table/PerfectHashTable/PerfectHashTableBuilder.h"
 
 #include "Shared/scope.h"
 
@@ -30,7 +31,7 @@ class PerfectJoinHashTableBuilder {
                             const int device_id,
                             const int device_count,
                             const Executor* executor) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     const size_t total_count =
         layout == HashType::OneToOne
             ? hash_entry_info.getNormalizedHashEntryCount()
@@ -48,7 +49,7 @@ class PerfectJoinHashTableBuilder {
 #endif  // HAVE_CUDA
   }
 
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   void initHashTableOnGpu(const ChunkKey& chunk_key,
                           const JoinColumn& join_column,
                           const ExpressionRange& col_range,
@@ -69,8 +70,13 @@ class PerfectJoinHashTableBuilder {
       buffer_provider->free(gpu_hash_table_err_buff);
     };
     CHECK(gpu_hash_table_err_buff);
-    auto dev_err_buff =
-        reinterpret_cast<CUdeviceptr>(gpu_hash_table_err_buff->getMemoryPtr());
+    #ifdef HAVE_CUDA
+      auto dev_err_buff =
+          reinterpret_cast<CUdeviceptr>(gpu_hash_table_err_buff->getMemoryPtr());
+    #else
+      auto dev_err_buff =
+          reinterpret_cast<int8_t*>(gpu_hash_table_err_buff->getMemoryPtr());
+    #endif
     int err{0};
     buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(dev_err_buff),
                                   reinterpret_cast<const int8_t*>(&err),
@@ -79,10 +85,16 @@ class PerfectJoinHashTableBuilder {
 
     CHECK(hash_table_);
     auto gpu_hash_table_buff = hash_table_->getGpuBuffer();
-
+    #ifdef HAVE_CUDA
     init_hash_join_buff_on_device(reinterpret_cast<int32_t*>(gpu_hash_table_buff),
                                   hash_entry_info.getNormalizedHashEntryCount(),
                                   hash_join_invalid_val);
+    #else
+    init_hash_join_buff_on_l0(reinterpret_cast<int32_t*>(gpu_hash_table_buff),
+                                  hash_entry_info.getNormalizedHashEntryCount(),
+                                  hash_join_invalid_val);
+    #endif
+
     if (chunk_key.empty()) {
       return;
     }
@@ -101,6 +113,7 @@ class PerfectJoinHashTableBuilder {
                                  get_join_column_type_kind(type)};
     auto use_bucketization = inner_col->type()->isDate();
     if (layout == HashType::OneToOne) {
+      #ifdef HAVE_CUDA
       fill_hash_join_buff_on_device_bucketized(
           reinterpret_cast<int32_t*>(gpu_hash_table_buff),
           hash_join_invalid_val,
@@ -109,22 +122,54 @@ class PerfectJoinHashTableBuilder {
           join_column,
           type_info,
           hash_entry_info.bucket_normalization);
+      #else
+        fill_hash_join_buff_bucketized_on_l0(
+          reinterpret_cast<int32_t*>(gpu_hash_table_buff),
+          hash_join_invalid_val,
+          for_semi_anti_join(join_type),
+          join_column,
+          type_info,
+          NULL,
+          0,
+          hash_entry_info.bucket_normalization,
+          reinterpret_cast<int*>(dev_err_buff));
+      #endif
+
     } else {
       if (use_bucketization) {
+        #ifdef HAVE_CUDA
         fill_one_to_many_hash_table_on_device_bucketized(
             reinterpret_cast<int32_t*>(gpu_hash_table_buff),
             hash_entry_info,
             hash_join_invalid_val,
             join_column,
             type_info);
+      #else
+        fill_one_to_many_hash_table_on_l0_bucketized(
+            reinterpret_cast<int32_t*>(gpu_hash_table_buff),
+            hash_entry_info,
+            hash_join_invalid_val,
+            join_column,
+            type_info);
+      #endif
+
       } else {
+        #ifdef HAVE_CUDA
         fill_one_to_many_hash_table_on_device(
             reinterpret_cast<int32_t*>(gpu_hash_table_buff),
             hash_entry_info,
             hash_join_invalid_val,
             join_column,
             type_info);
+      #else
+        fill_one_to_many_hash_table_on_l0(
+            reinterpret_cast<int32_t*>(gpu_hash_table_buff),
+            hash_entry_info,
+            hash_join_invalid_val,
+            join_column,
+            type_info);
       }
+      #endif
     }
     buffer_provider->copyFromDevice(reinterpret_cast<int8_t*>(&err),
                                     reinterpret_cast<int8_t*>(dev_err_buff),

@@ -363,13 +363,17 @@ int64_t HashJoin::getJoinHashBuffer(const ExecutorDeviceType device_type,
   }
   CHECK(hash_tables_for_device_[device_id]);
   auto hash_table = hash_tables_for_device_[device_id].get();
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   if (device_type == ExecutorDeviceType::CPU) {
     return reinterpret_cast<int64_t>(hash_table->getCpuBuffer());
   } else {
     CHECK(hash_table);
     const auto gpu_buff = hash_table->getGpuBuffer();
+#ifdef HAVE_CUDA
     return reinterpret_cast<CUdeviceptr>(gpu_buff);
+#else
+    return reinterpret_cast<int64_t>(gpu_buff);
+#endif
   }
 #else
   CHECK(device_type == ExecutorDeviceType::CPU);

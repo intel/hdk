@@ -21,6 +21,7 @@
 #include "QueryEngine/JoinHashTable/BaselineJoinHashTable.h"
 #include "QueryEngine/JoinHashTable/Runtime/HashJoinKeyHandlers.h"
 #include "QueryEngine/JoinHashTable/Runtime/JoinHashTableGpuUtils.h"
+#include "SOME_PATH/l0_physops/hash_table/BaselineHashTable/BaselineHashTableBuilder.h"
 #include "Shared/thread_count.h"
 
 template <typename SIZE,
@@ -355,7 +356,7 @@ class BaselineJoinHashTableBuilder {
                             const size_t emitted_keys_count,
                             const int device_id,
                             const Executor* executor) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     const auto entry_size =
         (key_component_count + (layout == HashType::OneToOne ? 1 : 0)) *
         key_component_width;
@@ -402,7 +403,7 @@ class BaselineJoinHashTableBuilder {
                          const Executor* executor) {
     auto timer = DEBUG_TIMER(__func__);
     int err = 0;
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     allocateDeviceMemory(layout,
                          key_component_width,
                          key_component_count,
@@ -417,7 +418,12 @@ class BaselineJoinHashTableBuilder {
     }
     auto buffer_provider = executor->getBufferProvider();
     GpuAllocator allocator(buffer_provider, device_id);
+#ifdef HAVE_CUDA
     auto dev_err_buff = reinterpret_cast<CUdeviceptr>(allocator.alloc(sizeof(int)));
+#else
+    auto dev_err_buff = reinterpret_cast<int8_t*>(allocator.alloc(sizeof(int)));
+#endif
+
     buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(dev_err_buff),
                                   reinterpret_cast<const int8_t*>(&err),
                                   sizeof(err),
@@ -431,24 +437,41 @@ class BaselineJoinHashTableBuilder {
     const auto key_handler_gpu = transfer_flat_object_to_gpu(*key_handler, allocator);
     switch (key_component_width) {
       case 4:
+#ifdef HAVE_CUDA
         init_baseline_hash_join_buff_on_device_32(gpu_hash_table_buff,
                                                   keyspace_entry_count,
                                                   key_component_count,
                                                   layout == HashType::OneToOne,
                                                   -1);
+#else
+        init_baseline_hash_join_buff_on_l0<int32_t>(gpu_hash_table_buff,
+                                              keyspace_entry_count,
+                                              key_component_count,
+                                              layout == HashType::OneToOne,
+                                              -1);
+#endif
         break;
       case 8:
+#ifdef HAVE_CUDA
         init_baseline_hash_join_buff_on_device_64(gpu_hash_table_buff,
                                                   keyspace_entry_count,
                                                   key_component_count,
                                                   layout == HashType::OneToOne,
                                                   -1);
+#else
+        init_baseline_hash_join_buff_on_l0<int64_t>(gpu_hash_table_buff,
+                                                  keyspace_entry_count,
+                                                  key_component_count,
+                                                  layout == HashType::OneToOne,
+                                                  -1);
+#endif
         break;
       default:
         UNREACHABLE();
     }
     switch (key_component_width) {
       case 4: {
+#ifdef HAVE_CUDA
         fill_baseline_hash_join_buff_on_device<int32_t>(
             gpu_hash_table_buff,
             keyspace_entry_count,
@@ -459,6 +482,17 @@ class BaselineJoinHashTableBuilder {
             reinterpret_cast<int*>(dev_err_buff),
             key_handler_gpu,
             join_columns.front().num_elems);
+#else
+        fill_baseline_hash_join_buff_on_l0<int32_t>(gpu_hash_table_buff,
+                                              keyspace_entry_count,
+                                              -1,
+                                              for_semi_join,
+                                              key_component_count,
+                                              layout == HashType::OneToOne,
+                                              reinterpret_cast<int*>(dev_err_buff),
+                                              key_handler_gpu,
+                                              join_columns.front().num_elems);
+#endif
         buffer_provider->copyFromDevice(reinterpret_cast<int8_t*>(&err),
                                         reinterpret_cast<const int8_t*>(dev_err_buff),
                                         sizeof(err),
@@ -466,6 +500,7 @@ class BaselineJoinHashTableBuilder {
         break;
       }
       case 8: {
+#ifdef HAVE_CUDA
         fill_baseline_hash_join_buff_on_device<int64_t>(
             gpu_hash_table_buff,
             keyspace_entry_count,
@@ -476,6 +511,18 @@ class BaselineJoinHashTableBuilder {
             reinterpret_cast<int*>(dev_err_buff),
             key_handler_gpu,
             join_columns.front().num_elems);
+#else
+        fill_baseline_hash_join_buff_on_l0<int64_t>(
+            gpu_hash_table_buff,
+            keyspace_entry_count,
+            -1,
+            for_semi_join,
+            key_component_count,
+            layout == HashType::OneToOne,
+            reinterpret_cast<int*>(dev_err_buff),
+            key_handler_gpu,
+            join_columns.front().num_elems);
+#endif
         buffer_provider->copyFromDevice(reinterpret_cast<int8_t*>(&err),
                                         reinterpret_cast<const int8_t*>(dev_err_buff),
                                         sizeof(err),
@@ -492,11 +539,17 @@ class BaselineJoinHashTableBuilder {
       const auto entry_size = key_component_count * key_component_width;
       auto one_to_many_buff = reinterpret_cast<int32_t*>(
           gpu_hash_table_buff + keyspace_entry_count * entry_size);
+#ifdef HAVE_CUDA
       init_hash_join_buff_on_device(one_to_many_buff, keyspace_entry_count, -1);
+#else
+      init_hash_join_buff_on_l0(one_to_many_buff, keyspace_entry_count, -1);
+#endif
+
       setHashLayout(layout);
       switch (key_component_width) {
         case 4: {
           const auto composite_key_dict = reinterpret_cast<int32_t*>(gpu_hash_table_buff);
+#ifdef HAVE_CUDA
           fill_one_to_many_baseline_hash_table_on_device<int32_t>(
               one_to_many_buff,
               composite_key_dict,
@@ -505,11 +558,19 @@ class BaselineJoinHashTableBuilder {
               key_component_count,
               key_handler_gpu,
               join_columns.front().num_elems);
-
+#else
+          fill_one_to_many_baseline_hash_table_on_l0<int32_t>(one_to_many_buff,
+                                                        composite_key_dict,
+                                                        keyspace_entry_count,
+                                                        -1,
+                                                        key_handler_gpu,
+                                                        join_columns.front().num_elems);
+#endif
           break;
         }
         case 8: {
           const auto composite_key_dict = reinterpret_cast<int64_t*>(gpu_hash_table_buff);
+#ifdef HAVE_CUDA
           fill_one_to_many_baseline_hash_table_on_device<int64_t>(
               one_to_many_buff,
               composite_key_dict,
@@ -518,7 +579,14 @@ class BaselineJoinHashTableBuilder {
               key_component_count,
               key_handler_gpu,
               join_columns.front().num_elems);
-
+#else
+          fill_one_to_many_baseline_hash_table_on_l0<int64_t>(one_to_many_buff,
+                                                        composite_key_dict,
+                                                        keyspace_entry_count,
+                                                        -1,
+                                                        key_handler_gpu,
+                                                        join_columns.front().num_elems);
+#endif
           break;
         }
         default:

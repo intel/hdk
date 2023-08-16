@@ -64,4 +64,21 @@ DEVICE const GENERIC_ADDR_SPACE int64_t* init_shared_mem_nop(
     const int32_t groups_buffer_size) {
   return groups_buffer;
 }
+
+DEVICE ALWAYS_INLINE int64_t
+baseline_hash_join_idx_32(GENERIC_ADDR_SPACE const int8_t* hash_buff,
+                          GENERIC_ADDR_SPACE const int8_t* key,
+                          const size_t key_bytes,
+                          const size_t entry_count) {
+  return baseline_hash_join_idx_impl<int32_t>(hash_buff, key, key_bytes, entry_count);
+}
+
+NEVER_INLINE DEVICE int64_t
+get_composite_key_index_32(GENERIC_ADDR_SPACE const int32_t* key,
+                           const size_t key_component_count,
+                           GENERIC_ADDR_SPACE const int32_t* composite_key_dict,
+                           const size_t entry_count) {
+  return get_composite_key_index_impl(
+      key, key_component_count, composite_key_dict, entry_count);
+}
 }

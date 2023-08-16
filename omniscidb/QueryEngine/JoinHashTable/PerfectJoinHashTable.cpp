@@ -529,7 +529,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
     return 0;
   }
 
-#ifndef HAVE_CUDA
+#if !defined(HAVE_CUDA) && !defined(HAVE_L0)
   CHECK_EQ(Data_Namespace::CPU_LEVEL, effective_memory_level);
 #endif
   int err{0};
@@ -636,7 +636,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
     // Transfer the hash table on the GPU if we've only built it on CPU
     // but the query runs on GPU (join on dictionary encoded columns).
     if (memory_level_ == Data_Namespace::GPU_LEVEL) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
       auto buffer_provider = executor_->getBufferProvider();
       auto type = inner_col->type();
       CHECK(type->isString() || type->isExtDictionary());
@@ -674,7 +674,7 @@ int PerfectJoinHashTable::initHashTableForDevice(
       hash_tables_for_device_[device_id] = hash_table;
     }
   } else {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     PerfectJoinHashTableBuilder builder;
     CHECK_EQ(Data_Namespace::GPU_LEVEL, effective_memory_level);
     builder.allocateDeviceMemory(join_column,
@@ -895,7 +895,7 @@ std::string PerfectJoinHashTable::toString(const ExecutorDeviceType device_type,
   auto buffer = getJoinHashBuffer(device_type, device_id);
   auto buffer_size = getJoinHashBufferSize(device_type, device_id);
   auto hash_table = getHashTableForDevice(device_id);
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   auto buffer_provider = executor_->getBufferProvider();
   std::unique_ptr<int8_t[]> buffer_copy;
   if (device_type == ExecutorDeviceType::GPU) {
@@ -932,7 +932,7 @@ std::set<DecodedJoinHashBufferEntry> PerfectJoinHashTable::toSet(
   auto buffer = getJoinHashBuffer(device_type, device_id);
   auto buffer_size = getJoinHashBufferSize(device_type, device_id);
   auto hash_table = getHashTableForDevice(device_id);
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   auto buffer_provider = executor_->getBufferProvider();
   std::unique_ptr<int8_t[]> buffer_copy;
   if (device_type == ExecutorDeviceType::GPU) {

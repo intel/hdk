@@ -620,6 +620,19 @@ if(TIME_LIMITED_BUILD)
 endif()
 
 
+find_library(libhash_table
+         NAMES 
+         hash_table
+         PATHS 
+         SOMEPATH/l0_physops/build/hash_table
+)
+
+if ( NOT libhash_table )
+        message( WARNING "hash_table library NOT FOUND - the respective targets won't be build")
+else()
+        message( STATUS "hash_table library : ${libhash_table}")
+endif( NOT libhash_table )
+
 add_subdirectory(SqliteConnector)
 
 add_subdirectory(StringDictionary)

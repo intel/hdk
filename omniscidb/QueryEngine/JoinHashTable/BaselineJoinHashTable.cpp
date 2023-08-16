@@ -165,7 +165,7 @@ std::string BaselineJoinHashTable::toString(const ExecutorDeviceType device_type
   auto hash_table = hash_tables_for_device_[device_id];
   CHECK(hash_table);
   auto buffer_size = hash_table->getHashTableBufferSize(device_type);
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   auto buffer_provider = executor_->getBufferProvider();
   std::unique_ptr<int8_t[]> buffer_copy;
   if (device_type == ExecutorDeviceType::GPU) {
@@ -204,7 +204,7 @@ std::set<DecodedJoinHashBufferEntry> BaselineJoinHashTable::toSet(
   auto hash_table = getHashTableForDevice(device_id);
   CHECK(hash_table);
   auto buffer_size = hash_table->getHashTableBufferSize(device_type);
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   auto buffer_provider = executor_->getBufferProvider();
   std::unique_ptr<int8_t[]> buffer_copy;
   if (device_type == ExecutorDeviceType::GPU) {
@@ -375,7 +375,7 @@ std::pair<size_t, size_t> BaselineJoinHashTable::approximateTupleCount(
     }
     return std::make_pair(hll_size(hll_result, count_distinct_desc.bitmap_sz_bits), 0);
   }
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
   auto buffer_provider = executor_->getBufferProvider();
   std::vector<std::vector<uint8_t>> host_hll_buffers(device_count_);
   for (auto& host_hll_buffer : host_hll_buffers) {
@@ -409,11 +409,19 @@ std::pair<size_t, size_t> BaselineJoinHashTable::approximateTupleCount(
                                 nullptr);
           const auto key_handler_gpu =
               transfer_flat_object_to_gpu(key_handler, allocator);
+#ifdef HAVE_CUDA
           approximate_distinct_tuples_on_device(
               reinterpret_cast<uint8_t*>(device_hll_buffer),
               count_distinct_desc.bitmap_sz_bits,
               key_handler_gpu,
               columns_for_device.join_columns[0].num_elems);
+#else
+          approximate_distinct_tuples_on_l0(reinterpret_cast<uint8_t*>(device_hll_buffer),
+                                            nullptr,
+                                            count_distinct_desc.bitmap_sz_bits,
+                                            columns_for_device.join_columns[0].num_elems,
+                                            key_handler_gpu);
+#endif
 
           auto& host_hll_buffer = host_hll_buffers[device_id];
           buffer_provider->copyFromDevice(reinterpret_cast<int8_t*>(&host_hll_buffer[0]),
@@ -675,7 +683,7 @@ int BaselineJoinHashTable::initHashTableForDevice(
     // but the query runs on GPU (join on dictionary encoded columns).
     // Don't transfer the buffer if there was an error since we'll bail anyway.
     if (memory_level_ == Data_Namespace::GPU_LEVEL && !err) {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
       BaselineJoinHashTableBuilder builder;
 
       builder.allocateDeviceMemory(hashtable_layout,
@@ -706,7 +714,7 @@ int BaselineJoinHashTable::initHashTableForDevice(
 #endif
     }
   } else {
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_L0)
     BaselineJoinHashTableBuilder builder;
 
     GpuAllocator allocator(executor_->getBufferProvider(), device_id);

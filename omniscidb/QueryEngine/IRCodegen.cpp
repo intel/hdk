@@ -830,10 +830,10 @@ std::shared_ptr<HashJoin> Executor::buildCurrentLevelHashTable(
     check_valid_join_qual(qual_bin_oper);
     JoinHashTableOrError hash_table_or_error;
     if (!current_level_hash_table) {
-      if (co.device_type == ExecutorDeviceType::GPU && getDataMgr()->getGpuMgr() &&
-          getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
-        throw QueryMustRunOnCpu();
-      }
+      // if (co.device_type == ExecutorDeviceType::GPU && getDataMgr()->getGpuMgr() &&
+      //     getDataMgr()->getGpuMgr()->getPlatform() == GpuMgrPlatform::L0) {
+      //   throw QueryMustRunOnCpu();
+      // }
       hash_table_or_error = buildHashTableForQualifier(
           qual_bin_oper,
           query_infos,
