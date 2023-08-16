@@ -454,7 +454,9 @@ std::unique_ptr<llvm::Module> read_llvm_module_from_bc_file(
   llvm::MemoryBuffer* buffer = buffer_or_error.get().get();
 
   auto owner = llvm::parseBitcodeFile(buffer->getMemBufferRef(), context);
-  CHECK(!owner.takeError());
+  if (auto err = owner.takeError()) {
+    CHECK(false) << llvm::toString(std::move(err));
+  }
   CHECK(owner->get());
   return std::move(owner.get());
 }
