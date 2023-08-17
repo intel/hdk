@@ -27,10 +27,6 @@ std::string SPIRVExecuteTest::generateSimpleSPIRV() {
   using namespace llvm;
   // See source at https://github.com/kurapov-peter/L0Snippets
   LLVMContext ctx;
-#if LLVM_VERSION_MAJOR > 14
-  // temporarily disable opaque pointers
-  ctx.setOpaquePointers(false);
-#endif
   std::unique_ptr<Module> module = std::make_unique<Module>("code_generated", ctx);
   module->setTargetTriple("spir-unknown-unknown");
   IRBuilder<> builder(ctx);
@@ -161,12 +157,7 @@ std::unique_ptr<llvm::Module> read_gen_module_from_bc(const std::string& bc_file
 std::string mangle_spirv_builtin(const llvm::Function& func) {
   CHECK(func.getName().startswith("__spirv_"));
   std::string new_name;
-#if LLVM_VERSION_MAJOR > 14
-  mangleOpenClBuiltin(
-      func.getName().str(), func.getArg(0)->getType(), /*pointer_types=*/{}, new_name);
-#else
   mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
-#endif
   return new_name;
 }
 }  // namespace

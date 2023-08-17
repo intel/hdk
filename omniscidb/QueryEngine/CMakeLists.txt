@@ -185,11 +185,6 @@ set(hdk_default_runtime_functions_module_dependencies
     GroupByRuntime.cpp
     TopKRuntime.cpp)
 
-list(APPEND DISABLE_OPAQUE_POINTERS_CMD "")
-if(${LLVM_PACKAGE_VERSION} VERSION_GREATER_EQUAL "15")
-    list(APPEND DISABLE_OPAQUE_POINTERS_CMD "-Xclang" "-no-opaque-pointers")
-endif()
-
 # Adds a custom command for producing llvm bitcode modules out of a .cpp source.
 # Any additional arguments are treated as clang args and bypassed as-is.
 function(precompile_llvm_module SOURCE_FILE SUFFIX)
@@ -200,7 +195,7 @@ function(precompile_llvm_module SOURCE_FILE SUFFIX)
         DEPENDS ${hdk_default_runtime_functions_module_dependencies} ${SOURCE_FILE}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         COMMAND ${llvm_clangpp_cmd}
-        ARGS -std=c++17 ${RT_OPT_FLAGS} ${ARGN} -c -emit-llvm ${DISABLE_OPAQUE_POINTERS_CMD}
+        ARGS -std=c++17 ${RT_OPT_FLAGS} ${ARGN} -c -emit-llvm
         ${CLANG_SDK_INC} ${CLANG_CRT_INC} ${MAPD_DEFINITIONS} -DEXECUTE_INCLUDE
         -o ${CMAKE_CURRENT_BINARY_DIR}/${result_module_name}
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../
@@ -277,7 +272,7 @@ add_custom_command(
         DEPENDS ExtensionFunctions.hpp ExtensionFunctionsArray.hpp ExtensionFunctionsTesting.hpp
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast.raw
         COMMAND ${llvm_clangpp_cmd}
-        ARGS -DNO_BOOST -std=c++17 -fsyntax-only -Xclang -ast-dump -fno-diagnostics-color -Wno-return-type-c-linkage ${DISABLE_OPAQUE_POINTERS_CMD}
+        ARGS -DNO_BOOST -std=c++17 -fsyntax-only -Xclang -ast-dump -fno-diagnostics-color -Wno-return-type-c-linkage
         -I ${CMAKE_CURRENT_SOURCE_DIR}/../ ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp > ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast.raw)
 
 add_custom_command(
