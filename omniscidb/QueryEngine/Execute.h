@@ -825,7 +825,6 @@ class Executor : public StringDictionaryProxyProvider {
   llvm::Value* castToFP(llvm::Value*,
                         const hdk::ir::Type* from_type,
                         const hdk::ir::Type* to_type);
-  llvm::Value* castToIntPtrTyIn(llvm::Value* val, const size_t bit_width);
 
   FragmentSkipStatus canSkipFragmentForFpQual(const hdk::ir::BinOper* comp_expr,
                                               const hdk::ir::ColumnVar* lhs_col,
