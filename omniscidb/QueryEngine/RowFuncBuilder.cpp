@@ -444,7 +444,7 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
         co.codegen_traits_desc.local_addr_space_) {
       group_key = LL_BUILDER.CreateAddrSpaceCast(
           group_key,
-          llvm::PointerType::get(group_key->getType()->getPointerElementType(),
+          llvm::PointerType::get(executor_->cgen_state_->context_,
                                  co.codegen_traits_desc.local_addr_space_),
           "group.key.cast");
     }
@@ -493,9 +493,7 @@ std::tuple<llvm::Value*, llvm::Value*> RowFuncBuilder::codegenGroupBy(
       LL_BUILDER.CreateStore(
           group_expr_lv,
           LL_BUILDER.CreateGEP(
-              group_key->getType()->getScalarType()->getPointerElementType(),
-              group_key,
-              LL_INT(subkey_idx++)));
+              group_expr_lv->getType(), group_key, LL_INT(subkey_idx++)));
     }
   }
   if (query_mem_desc.getQueryDescriptionType() ==
@@ -755,10 +753,10 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction(const CompilationOpti
   CHECK_GT(ra_exe_unit_.groupby_exprs.size(), size_t(1));
   compiler::CodegenTraits cgen_traits =
       compiler::CodegenTraits::get(co.codegen_traits_desc);
-  auto ft = llvm::FunctionType::get(get_int_type(32, LL_CONTEXT),
-                                    std::vector<llvm::Type*>{cgen_traits.localPointerType(
-                                        get_int_type(64, LL_CONTEXT))},
-                                    false);
+  auto ft = llvm::FunctionType::get(
+      get_int_type(32, LL_CONTEXT),
+      std::vector<llvm::Type*>{cgen_traits.localOpaquePtr(LL_CONTEXT)},
+      false);
   auto key_hash_func = llvm::Function::Create(ft,
                                               llvm::Function::ExternalLinkage,
                                               "perfect_key_hash",
@@ -1115,9 +1113,7 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       }
       byte_offset->setName("out_byte_off_target_" + std::to_string(target_idx));
       auto output_ptr = LL_BUILDER.CreateGEP(
-          output_buffer_byte_stream->getType()->getScalarType()->getPointerElementType(),
-          output_buffer_byte_stream,
-          byte_offset);
+          get_int_type(8, LL_CONTEXT), output_buffer_byte_stream, byte_offset);
       agg_col_ptr = LL_BUILDER.CreateBitCast(
           output_ptr,
           llvm::PointerType::get(get_int_type((chosen_bytes << 3), LL_CONTEXT),
@@ -1147,15 +1143,9 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
     CHECK_EQ(size_t(0), col_off % chosen_bytes);
     col_off /= chosen_bytes;
-    auto* bit_cast = LL_BUILDER.CreateBitCast(
-        std::get<0>(agg_out_ptr_w_idx),
-        llvm::PointerType::get(
-            get_int_type((chosen_bytes << 3), LL_CONTEXT),
-            std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
+    auto agg_out_ptr = std::get<0>(agg_out_ptr_w_idx);
     agg_col_ptr = LL_BUILDER.CreateGEP(
-        bit_cast->getType()->getScalarType()->getPointerElementType(),
-        bit_cast,
-        LL_INT(col_off));
+        get_int_type(chosen_bytes * 8, LL_CONTEXT), agg_out_ptr, LL_INT(col_off));
   }
   CHECK(agg_col_ptr);
   return agg_col_ptr;
@@ -1198,9 +1188,7 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
     LL_BUILDER.CreateStore(
         estimator_arg_comp_lv,
         LL_BUILDER.CreateGEP(
-            estimator_key_lv->getType()->getScalarType()->getPointerElementType(),
-            estimator_key_lv,
-            LL_INT(subkey_idx++)));
+            estimator_arg_comp_lv->getType(), estimator_key_lv, LL_INT(subkey_idx++)));
   }
   const auto bitmap = LL_BUILDER.CreateBitCast(
       &*ROW_FUNC->arg_begin(),
