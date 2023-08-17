@@ -21,7 +21,7 @@ dependencies:
   - pyarrow    11.0
   - pandas     1.5.3
   - llvmdev     15.*
-  - openjdk     17.*
+  - openjdk     20.*
   - cmake
   - tbb-devel
   - cython

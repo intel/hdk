@@ -93,7 +93,7 @@ outputs:
         - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
         - python
-        - openjdk 17.*
+        - openjdk 20.*
         - zlib
         - tbb
         - boost-cpp
