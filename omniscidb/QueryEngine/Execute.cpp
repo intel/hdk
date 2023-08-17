@@ -156,11 +156,6 @@ Executor::Executor(const ExecutorId executor_id,
     , temporary_tables_(nullptr)
     , input_table_info_cache_(this)
     , thread_id_(logger::thread_id()) {
-#if LLVM_VERSION_MAJOR > 14
-  // temporarily disable opaque pointers
-  context_->setOpaquePointers(false);
-#endif
-
   if (executor_id_ > INVALID_EXECUTOR_ID - 1) {
     throw std::runtime_error("Too many executors!");
   }
