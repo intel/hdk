@@ -156,7 +156,7 @@ class ChunkedArray {
       return chunk_offs_ <= other.chunk_offs_;
     }
 
-    T& operator*() {
+    T& operator*() const {
       auto data = reinterpret_cast<T*>((*chunks_)[chunk_idx_].data);
       return data[chunk_offs_];
     }
