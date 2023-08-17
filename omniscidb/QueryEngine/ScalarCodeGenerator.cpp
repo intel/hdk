@@ -116,8 +116,7 @@ ScalarCodeGenerator::CompiledExpression ScalarCodeGenerator::compile(
     std::vector<llvm::Value*> loaded_args = {wrapper_scalar_expr_func->arg_begin() + 1};
     for (size_t i = 2; i < wrapper_arg_types.size(); ++i) {
       auto* value = wrapper_scalar_expr_func->arg_begin() + i;
-      loaded_args.push_back(
-          b.CreateLoad(value->getType()->getPointerElementType(), value));
+      loaded_args.push_back(b.CreateLoad(arg_types[i - 1], value));
     }
     auto error_lv = b.CreateCall(scalar_expr_func, loaded_args);
     b.CreateStore(error_lv, wrapper_scalar_expr_func->arg_begin());
