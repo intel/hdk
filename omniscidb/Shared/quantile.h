@@ -234,7 +234,10 @@ class ChunkedArray {
     return res;
   }
 
-  void finalize() const {}
+  void clear() {
+    chunks_.clear();
+    cur_idx_ = 0;
+  }
 
  private:
   SimpleAllocator* allocator_;
@@ -252,12 +255,32 @@ class Quantile {
 
   template <typename ValueType>
   void add(ValueType val) {
+    // Shouldn't merge new data into finalized Quantile.
+    if (finalized_) {
+      abort();
+    }
     values_.push<ValueType>(val);
   }
 
+  // This method is used to compute current quantile value with specified quntile
+  // parameter and interpolation. We don't support multiple quantile values computed
+  // by a single object right now, so expect all calls to finalize and quantile methods
+  // of the same object always uyse the same q and interpolation values.
+  // finalize call with intermediate set to true doesn't actually finalizes the object
+  // and allow following values collection and finalize calls. It can be used in various
+  // debug scenarious to check the current object state, e.g. print intermediate ResultSet
+  // before its reduction. The first finalize call with intermediate set to false means
+  // we shouldn't add any more data or try to finalize it one more time.
   template <typename ValueType, typename ResultType>
-  void finalize(double q, ir::Interpolation interpolation) {
-    if (finalized_ || values_.empty()) {
+  void finalize(double q, ir::Interpolation interpolation, bool intermediate = false) {
+    if (finalized_) {
+      abort();
+    }
+
+    if (values_.empty()) {
+      finalized_ = !intermediate;
+      static_assert(sizeof(ResultType) <= sizeof(res_));
+      *reinterpret_cast<ResultType*>(&res_) = inline_null_value<ResultType>();
       return;
     }
 
@@ -303,7 +326,10 @@ class Quantile {
     static_assert(sizeof(ResultType) <= sizeof(res_));
     *reinterpret_cast<ResultType*>(&res_) = res;
 
-    finalized_ = true;
+    if (!intermediate) {
+      finalized_ = true;
+      values_.clear();
+    }
   }
 
   // Parameters are designed for future updates to compute multiple quantiles
@@ -313,23 +339,28 @@ class Quantile {
   // with a different set of parameters than this method.
   template <typename ValueType, typename ResultType>
   ResultType quantile(double q, hdk::ir::Interpolation interpolation) {
+    if (finalized_) {
+      return *reinterpret_cast<const ResultType*>(&res_);
+    }
+
     if (values_.empty()) {
       return inline_null_value<ResultType>();
     }
-    if (!finalized_) {
-      finalize<ValueType, ResultType>(q, interpolation);
-    }
+
+    // We are supposed to get hereonly for debug purposes when some intermediate
+    // result is accessed. So we don't perform actual finalization and simply
+    // compute the current quantile.
+    finalize<ValueType, ResultType>(q, interpolation, true);
     static_assert(sizeof(ResultType) <= sizeof(res_));
     return *reinterpret_cast<const ResultType*>(&res_);
   }
 
   void merge(Quantile& other) {
+    // Shouldn't merge new data into finalized Quantile.
+    if (finalized_) {
+      abort();
+    }
     values_.merge(other.values_);
-    // We are not supposed to compute quantile before reduction. But when debug
-    // log is enabled, we print row count for each computed ResultSet and rowCount
-    // call triggers quantile computation.
-    // TODO: make rowCount more efficient by avoiding TargetValue materialization.
-    finalized_ = false;
   }
 
   bool empty() const { return values_.empty(); }

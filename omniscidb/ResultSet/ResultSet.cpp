@@ -25,6 +25,7 @@
 
 #include "DataMgr/Allocators/GpuAllocator.h"
 #include "DataMgr/BufferMgr/BufferMgr.h"
+#include "ResultSet/QuantileAccessors.h"
 #include "ResultSet/ResultSet.h"
 #include "ResultSet/TopKAggAccessors.h"
 #include "Shared/InlineNullValues.h"
@@ -1239,6 +1240,118 @@ void ResultSet::initializeStorage() const {
   } else {
     storage_->initializeRowWise();
   }
+}
+
+void ResultSet::finalizeAggregates() {
+  auto timer = DEBUG_TIMER(__func__);
+  if (getQueryDescriptionType() == QueryDescriptionType::Projection) {
+    return;
+  }
+
+  // For columnar output holds slot indices, otherwise slot offsets.
+  std::vector<std::tuple<const TargetInfo*, size_t>> quantile_slots_to_finalize;
+  size_t cur_slot_idx = 0;
+  size_t cur_slot_offs = 0;
+  // Identify columns with aggregates requiring finalization.
+  for (size_t i = 0; i < targets_.size(); ++i) {
+    auto& tinfo = targets_[i];
+    // TODO: finalize TopK?
+    if (tinfo.is_agg && tinfo.agg_kind == hdk::ir::AggType::kQuantile) {
+      CHECK_EQ(query_mem_desc_.getPaddedSlotWidthBytes(cur_slot_idx), 8);
+      CHECK(lazy_fetch_info_.empty() || !lazy_fetch_info_[i].is_lazily_fetched);
+      if (query_mem_desc_.didOutputColumnar()) {
+        quantile_slots_to_finalize.emplace_back(std::make_tuple(&tinfo, cur_slot_idx));
+      } else {
+        quantile_slots_to_finalize.emplace_back(std::make_tuple(&tinfo, cur_slot_offs));
+      }
+    }
+    if (!query_mem_desc_.didOutputColumnar()) {
+      cur_slot_offs = advance_target_ptr_row_wise(cur_slot_offs,
+                                                  tinfo,
+                                                  cur_slot_idx,
+                                                  query_mem_desc_,
+                                                  separate_varlen_storage_valid_);
+    }
+    cur_slot_idx = advance_slot(cur_slot_idx, tinfo, separate_varlen_storage_valid_);
+  }
+
+  if (quantile_slots_to_finalize.empty()) {
+    return;
+  }
+
+  // This function is going to be called for each non-empty entry.
+  auto finalize = [&](const ResultSetStorage* storage, size_t entry_idx) {
+    for (auto& slot : quantile_slots_to_finalize) {
+      const int8_t* slot_ptr = nullptr;
+      if (query_mem_desc_.didOutputColumnar()) {
+        auto col_ptr =
+            storage->buff_ + storage->query_mem_desc_.getColOffInBytes(std::get<1>(slot));
+        slot_ptr = col_ptr + 8 * entry_idx;
+      } else {
+        auto keys_ptr = row_ptr_rowwise(storage->buff_, query_mem_desc_, entry_idx);
+        const auto key_bytes_with_padding =
+            align_to_int64(get_key_bytes_rowwise(query_mem_desc_));
+        slot_ptr = keys_ptr + key_bytes_with_padding + std::get<1>(slot);
+      }
+
+      auto quantile = *reinterpret_cast<hdk::quantile::Quantile* const*>(slot_ptr);
+      finalizeQuantile(quantile, *std::get<0>(slot));
+    }
+  };
+
+  // Finalization is usually called as a part of aggregation reduction.
+  // In this case we have a group-by buffer with unknown number of valid
+  // rows. So we can combine finalization with row count computation to
+  // avoid additional data scan later.
+  size_t row_count = 0;
+  // Quantile finalization can be quite costly, so do it in parallel if all
+  // entries are included into the result and we have enough entries.
+  // Otherwise use single-threaded iteration.
+  constexpr size_t min_task_size = 100;
+  if (getLimit() || getOffset() ||
+      getQueryDescriptionType() == QueryDescriptionType::NonGroupedAggregate ||
+      entryCount() <= min_task_size) {
+    ResultSetRowIterator iter(this);
+    ++iter;
+    while (iter.global_entry_idx_valid_) {
+      const auto storage_lookup_result = findStorage(iter.global_entry_idx_);
+      finalize(storage_lookup_result.storage_ptr,
+               storage_lookup_result.fixedup_entry_idx);
+      ++iter;
+      ++row_count;
+    }
+  } else {
+    row_count = tbb::parallel_reduce(
+        tbb::blocked_range((size_t)0, appended_storage_.size() + 1),
+        (size_t)0,
+        [&](auto& storage_range, size_t row_count_cnt1) {
+          for (auto storage_idx = storage_range.begin();
+               storage_idx != storage_range.end();
+               ++storage_idx) {
+            auto storage = getStorage(storage_idx);
+            auto entry_count = storage->getEntryCount();
+            row_count_cnt1 += tbb::parallel_reduce(
+                tbb::blocked_range((size_t)0, entry_count, min_task_size),
+                (size_t)0,
+                [&](auto& entry_range, size_t row_count_cnt2) {
+                  for (auto entry_idx = entry_range.begin();
+                       entry_idx != entry_range.end();
+                       ++entry_idx) {
+                    if (!storage->isEmptyEntry(entry_idx)) {
+                      ++row_count_cnt2;
+                      finalize(storage, entry_idx);
+                    }
+                  }
+                  return row_count_cnt2;
+                },
+                std::plus<size_t>());  // end iteration by entry
+          }
+          return row_count_cnt1;
+        },
+        std::plus<size_t>());  // end iteration by storage
+  }
+
+  setCachedRowCount(get_truncated_row_count(row_count, getLimit(), drop_first_));
 }
 
 // namespace result_set

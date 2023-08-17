@@ -1234,6 +1234,9 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
   const auto& first = results_per_device.front().first;
 
   if (results_per_device.size() == 1) {
+    // This finalization is optional but done here to have finalization time
+    // to be a part of reduction.
+    first->finalizeAggregates();
     return first;
   }
 
@@ -1326,6 +1329,10 @@ ResultSetPtr Executor::reduceMultiDeviceResultSets(
                                  this);
     }
   }
+  // This finalization is required because reduced results might reference
+  // memory owned by other ResultSets (Quantile aggregate). Finalize aggregates
+  // so that we can safely destroy original ResultSets.
+  reduced_results->finalizeAggregates();
   reduced_results->addCompilationQueueTime(compilation_queue_time);
   return reduced_results;
 }

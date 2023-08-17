@@ -633,6 +633,14 @@ class ResultSet {
 
   ResultSetPtr shallowCopy() const;
 
+  // Iterate through aggregates with delayed computaitons like Quantile
+  // and finalize their results. In some cases finalization is optional,
+  // e.g. TopK doesn't need to be finalized. But it also might be required.
+  // For instance, reduced Quantile aggregate references memory owned by
+  // other ResultSets and it has to be finalized before memory is
+  // deallocated.
+  void finalizeAggregates();
+
  private:
   ResultSet(const ResultSet& other);
 
