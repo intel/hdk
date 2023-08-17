@@ -93,15 +93,9 @@ class BaselineHashTable : public HashTable {
     return reinterpret_cast<int8_t*>(cpu_hash_table_buff_.get());
   }
 
-  HashType getLayout() const override {
-    return layout_;
-  }
-  size_t getEntryCount() const override {
-    return entry_count_;
-  }
-  size_t getEmittedKeysCount() const override {
-    return emitted_keys_count_;
-  }
+  HashType getLayout() const override { return layout_; }
+  size_t getEntryCount() const override { return entry_count_; }
+  size_t getEmittedKeysCount() const override { return emitted_keys_count_; }
 
  private:
   std::unique_ptr<int8_t[]> cpu_hash_table_buff_;
