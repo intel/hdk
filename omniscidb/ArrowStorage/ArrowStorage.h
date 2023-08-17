@@ -88,9 +88,9 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   TableInfoPtr importArrowTable(std::shared_ptr<arrow::Table> at,
                                 const std::string& table_name,
                                 const TableOptions& options = TableOptions());
-
-  void refragmentTable(const std::string& table_name, const size_t new_frag_size);
-
+  TableInfoPtr createRefragmentedView(const std::string& table_name,
+                                      const std::string& new_table_name,
+                                      const size_t new_frag_size);
   void appendArrowTable(std::shared_ptr<arrow::Table> at, const std::string& table_name);
   void appendArrowTable(std::shared_ptr<arrow::Table> at, int table_id);
 
@@ -240,7 +240,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                             Data_Namespace::AbstractBuffer* dest,
                             size_t elem_size,
                             size_t num_bytes) const;
-
+  void refragmentTable(TableData& table, const int table_id, const size_t new_frag_size);
   void materializeDictionary(DictionaryData* dict_data);
 
   int db_id_;
