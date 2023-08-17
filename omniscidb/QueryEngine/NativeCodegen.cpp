@@ -2040,12 +2040,12 @@ std::vector<llvm::Value*> generate_column_heads_load(const int num_columns,
 
   std::vector<llvm::Value*> col_heads;
   for (int col_id = 0; col_id <= max_col_local_id; ++col_id) {
-    auto* gep = ir_builder.CreateGEP(
-        byte_stream_arg->getType()->getScalarType()->getPointerElementType(),
+    auto gep = llvm::dyn_cast<llvm::GEPOperator>(ir_builder.CreateGEP(
+        llvm::PointerType::get(ctx, byte_stream_arg->getType()->getPointerAddressSpace()),
         byte_stream_arg,
-        llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), col_id));
-    col_heads.emplace_back(
-        ir_builder.CreateLoad(gep->getType()->getPointerElementType(), gep));
+        llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), col_id)));
+    CHECK(gep);
+    col_heads.emplace_back(ir_builder.CreateLoad(gep->getSourceElementType(), gep));
   }
   return col_heads;
 }
