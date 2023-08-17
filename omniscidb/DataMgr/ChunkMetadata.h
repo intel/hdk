@@ -223,9 +223,7 @@ class ChunkMetadata {
     return res;
   }
 
-  std::string toString() const {
-    return dump();
-  }
+  std::string toString() const { return dump(); }
 #endif
 
   template <typename T>

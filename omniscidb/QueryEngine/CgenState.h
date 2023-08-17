@@ -288,9 +288,7 @@ struct CgenState {
                         const std::vector<llvm::Value*>& args);
   llvm::Value* emitCall(const std::string& fname, const std::vector<llvm::Value*>& args);
 
-  size_t getLiteralBufferUsage(const int device_id) {
-    return literal_bytes_[device_id];
-  }
+  size_t getLiteralBufferUsage(const int device_id) { return literal_bytes_[device_id]; }
 
   llvm::Value* castToTypeIn(llvm::Value* val, const size_t bit_width);
 
@@ -317,9 +315,7 @@ struct CgenState {
         llvm::ConstantFP::get(llvm::Type::getDoubleTy(context_), v));
   }
 
-  llvm::ConstantInt* llBool(const bool v) const {
-    return ::ll_bool(v, context_);
-  }
+  llvm::ConstantInt* llBool(const bool v) const { return ::ll_bool(v, context_); }
 
   void emitErrorCheck(llvm::Value* condition, llvm::Value* errorCode, std::string label);
 
