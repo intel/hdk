@@ -622,15 +622,11 @@ void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
 
   auto buffer_abstraction = get_buffer_struct_type(
       cgen_state_, ext_func_name, param_num, buffer_buf->getType(), !!(buffer_null));
-  llvm::Value* alloc_mem = cgen_state_->ir_builder_.CreateAlloca(buffer_abstraction);
-  if (alloc_mem->getType()->getPointerAddressSpace() !=
-      codegen_traits_desc.local_addr_space_) {
-    alloc_mem = cgen_state_->ir_builder_.CreateAddrSpaceCast(
-        alloc_mem,
-        llvm::PointerType::get(alloc_mem->getType()->getPointerElementType(),
-                               codegen_traits_desc.local_addr_space_),
-        "alloc.mem.cast");
-  }
+  llvm::Value* alloc_mem =
+      cgen_state_->ir_builder_.CreateAlloca(buffer_abstraction,
+                                            codegen_traits_desc.local_addr_space_,
+                                            nullptr,
+                                            "buffer_arg_ptr");
   auto buffer_buf_ptr =
       cgen_state_->ir_builder_.CreateStructGEP(buffer_abstraction, alloc_mem, 0);
   cgen_state_->ir_builder_.CreateStore(buffer_buf, buffer_buf_ptr);
@@ -647,7 +643,8 @@ void CodeGenerator::codegenBufferArgs(const std::string& ext_func_name,
         cgen_state_->ir_builder_.CreateStructGEP(buffer_abstraction, alloc_mem, 2);
     cgen_state_->ir_builder_.CreateStore(buffer_null_extended, buffer_is_null_ptr);
   }
-  output_args.push_back(alloc_mem);
+  output_args.push_back(
+      cgen_state_->ir_builder_.CreateLoad(buffer_abstraction, alloc_mem));
 }
 
 namespace {
