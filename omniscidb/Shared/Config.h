@@ -177,7 +177,7 @@ struct CacheConfig {
 struct DebugConfig {
   std::string build_ra_cache = "";
   std::string use_ra_cache = "";
-  bool enable_automatic_ir_metadata = true;
+  bool enable_automatic_ir_metadata = false;
   bool enable_gpu_code_compilation_cache = true;
   std::string log_dir = "hdk_log";
   short dump_llvm_ir_after_each_pass{0};
