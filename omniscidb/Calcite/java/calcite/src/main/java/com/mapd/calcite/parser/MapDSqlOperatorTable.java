@@ -251,6 +251,17 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
             null,
             OperandTypes.or(OperandTypes.INTEGER, OperandTypes.BINARY),
             SqlFunctionCategory.NUMERIC));
+    opTab.addOperator(new SqlAggFunction("TOP_K",
+            null,
+            SqlKind.OTHER_FUNCTION,
+            ReturnTypes.ARG0_NULLABLE,
+            null,
+            OperandTypes.family(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
+            SqlFunctionCategory.SYSTEM,
+            false,
+            false,
+            Optionality.FORBIDDEN) {
+    });
     if (extSigs == null) {
       return;
     }
