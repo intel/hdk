@@ -553,47 +553,47 @@ void set_row_func_argnames(llvm::Function* row_func,
 
   if (agg_col_count) {
     for (size_t i = 0; i < agg_col_count; ++i) {
-      arg_it->setName("out");
+      arg_it->setName("out");  // i64*
       ++arg_it;
     }
   } else {
-    arg_it->setName("group_by_buff");
+    arg_it->setName("group_by_buff");  // i64*
     ++arg_it;
-    arg_it->setName("varlen_output_buff");
+    arg_it->setName("varlen_output_buff");  // i64*
     ++arg_it;
-    arg_it->setName("crt_matched");
+    arg_it->setName("crt_matched");  // i32*
     ++arg_it;
-    arg_it->setName("total_matched");
+    arg_it->setName("total_matched");  // i32*
     ++arg_it;
-    arg_it->setName("old_total_matched");
+    arg_it->setName("old_total_matched");  // i32*
     ++arg_it;
-    arg_it->setName("max_matched");
+    arg_it->setName("max_matched");  // i32
     ++arg_it;
   }
 
-  arg_it->setName("agg_init_val");
+  arg_it->setName("agg_init_val");  // i64*
   ++arg_it;
 
-  arg_it->setName("pos");
+  arg_it->setName("pos");  // i64
   ++arg_it;
 
-  arg_it->setName("frag_row_off");
+  arg_it->setName("frag_row_off");  // i64*
   ++arg_it;
 
-  arg_it->setName("num_rows_per_scan");
+  arg_it->setName("num_rows_per_scan");  // i64*
   ++arg_it;
 
   if (hoist_literals) {
-    arg_it->setName("literals");
+    arg_it->setName("literals");  // i8*
     ++arg_it;
   }
 
   for (size_t i = 0; i < in_col_count; ++i) {
-    arg_it->setName("col_buf" + std::to_string(i));
+    arg_it->setName("col_buf" + std::to_string(i));  // i8*
     ++arg_it;
   }
 
-  arg_it->setName("join_hash_tables");
+  arg_it->setName("join_hash_tables");  // i64*
 }
 
 llvm::Function* create_row_function(const size_t in_col_count,
@@ -2018,7 +2018,7 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
       auto loop_done_false = llvm::BasicBlock::Create(
           cgen_state_->context_, "loop_done_false", cgen_state_->row_func_);
       auto loop_done_flag = cgen_state_->ir_builder_.CreateLoad(
-          loop_done->getType()->getPointerElementType(), loop_done);
+          get_int_type(1, cgen_state_->context_), loop_done);
       cgen_state_->ir_builder_.CreateCondBr(
           loop_done_flag, loop_done_true, loop_done_false);
       cgen_state_->ir_builder_.SetInsertPoint(loop_done_true);
