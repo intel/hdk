@@ -1003,10 +1003,12 @@ class NonGroupedQueryTemplateGenerator : public QueryTemplateGenerator {
         auto col_idx = llvm::ConstantInt::get(i32_type, i);
         if (gpu_smem_context.isSharedMemoryUsed()) {
           auto target_addr = llvm::GetElementPtrInst::CreateInBounds(
-              smem_output_buffer->getType()->getPointerElementType(),
+              llvm::PointerType::get(
+                  mod->getContext(),
+                  smem_output_buffer->getType()->getPointerAddressSpace()),
               smem_output_buffer,
               col_idx,
-              "",
+              "smem_output_buffer_ptr",
               bb_exit);
           // TODO: generalize this once we want to support other types of aggregate
           // functions besides COUNT.
