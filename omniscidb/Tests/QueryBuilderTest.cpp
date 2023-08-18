@@ -6216,6 +6216,31 @@ TEST_F(QueryBuilderTest, Quantile_Exec_Fetch) {
   }
 }
 
+TEST_F(QueryBuilderTest, Quantile_Exec_Stddev) {
+  for (bool enable_columnar : {false, true}) {
+    auto orig_enable_columnar = config().rs.enable_columnar_output;
+    ScopeGuard guard([orig_enable_columnar]() {
+      config().rs.enable_columnar_output = orig_enable_columnar;
+    });
+    config().rs.enable_columnar_output = enable_columnar;
+
+    {
+      QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+      auto scan = builder.scan("test_quantile");
+      auto dag =
+          scan.agg({"id1"s}, {scan.ref("f32").quantile(0.5), scan.ref("f32").stdDev()})
+              .sort(0)
+              .finalize();
+      auto res = runQuery(std::move(dag));
+      compare_res_data(
+          res,
+          std::vector<int32_t>({1, 2, 3, 4}),
+          std::vector<float>({5.0, 2.0, 1.5, inline_null_value<float>()}),
+          std::vector<double>({2.73861, 1.0, 0.707107, inline_null_value<double>()}));
+    }
+  }
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));

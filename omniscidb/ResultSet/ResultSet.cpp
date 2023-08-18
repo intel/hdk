@@ -1193,6 +1193,7 @@ std::tuple<std::vector<bool>, size_t> ResultSet::getSupportedSingleSlotTargetBit
     if (single_slot_targets[target_idx] &&
         (is_distinct_target(target) ||
          target.agg_kind == hdk::ir::AggType::kApproxQuantile ||
+         target.agg_kind == hdk::ir::AggType::kQuantile ||
          (target.is_agg && target.agg_kind == hdk::ir::AggType::kSample &&
           target.type->isFp32()))) {
       single_slot_targets[target_idx] = false;
