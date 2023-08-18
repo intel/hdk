@@ -89,43 +89,25 @@ llvm::BasicBlock* JoinLoop::codegen(
         prev_exit_bb = prev_iter_advance_bb ? prev_iter_advance_bb : exit_bb;
         builder.SetInsertPoint(preheader_bb);
 
-        llvm::Value* iteration_counter_ptr = builder.CreateAlloca(
-            get_int_type(64, context), nullptr, "ub_iter_counter_ptr_" + join_loop.name_);
-        if (iteration_counter_ptr->getType()->getPointerAddressSpace() !=
-            co.codegen_traits_desc.local_addr_space_) {
-          iteration_counter_ptr = builder.CreateAddrSpaceCast(
-              iteration_counter_ptr,
-              llvm::PointerType::get(
-                  iteration_counter_ptr->getType()->getPointerElementType(),
-                  co.codegen_traits_desc.local_addr_space_),
-              "iteration.counter.ptr.cast");
-        }
+        llvm::Value* iteration_counter_ptr =
+            builder.CreateAlloca(get_int_type(64, context),
+                                 co.codegen_traits_desc.local_addr_space_,
+                                 nullptr,
+                                 "ub_iter_counter_ptr_" + join_loop.name_);
         llvm::Value* found_an_outer_match_ptr{nullptr};
         llvm::Value* current_condition_match_ptr{nullptr};
         if (join_loop.type_ == JoinType::LEFT) {
-          found_an_outer_match_ptr = builder.CreateAlloca(
-              get_int_type(1, context), nullptr, "found_an_outer_match");
-          if (found_an_outer_match_ptr->getType()->getPointerAddressSpace() !=
-              co.codegen_traits_desc.local_addr_space_) {
-            found_an_outer_match_ptr = builder.CreateAddrSpaceCast(
-                found_an_outer_match_ptr,
-                llvm::PointerType::get(
-                    found_an_outer_match_ptr->getType()->getPointerElementType(),
-                    co.codegen_traits_desc.local_addr_space_),
-                "found.an.outer.match.ptr.cast");
-          }
+          found_an_outer_match_ptr =
+              builder.CreateAlloca(get_int_type(1, context),
+                                   co.codegen_traits_desc.local_addr_space_,
+                                   nullptr,
+                                   "found_an_outer_match");
           builder.CreateStore(ll_bool(false, context), found_an_outer_match_ptr);
-          current_condition_match_ptr = builder.CreateAlloca(
-              get_int_type(1, context), nullptr, "outer_condition_current_match");
-          if (current_condition_match_ptr->getType()->getPointerAddressSpace() !=
-              co.codegen_traits_desc.local_addr_space_) {
-            current_condition_match_ptr = builder.CreateAddrSpaceCast(
-                current_condition_match_ptr,
-                llvm::PointerType::get(
-                    current_condition_match_ptr->getType()->getPointerElementType(),
-                    co.codegen_traits_desc.local_addr_space_),
-                "current.condition.match.ptr.cast");
-          }
+          current_condition_match_ptr =
+              builder.CreateAlloca(get_int_type(1, context),
+                                   co.codegen_traits_desc.local_addr_space_,
+                                   nullptr,
+                                   "outer_condition_current_match");
         }
         builder.CreateStore(ll_int(int64_t(0), context), iteration_counter_ptr);
         const auto iteration_domain = join_loop.iteration_domain_codegen_(iterators);
@@ -134,7 +116,7 @@ llvm::BasicBlock* JoinLoop::codegen(
         builder.CreateBr(head_bb);
         builder.SetInsertPoint(head_bb);
         llvm::Value* iteration_counter =
-            builder.CreateLoad(iteration_counter_ptr->getType()->getPointerElementType(),
+            builder.CreateLoad(get_int_type(64, context),
                                iteration_counter_ptr,
                                "ub_iter_counter_val_" + join_loop.name_);
         auto iteration_val = iteration_counter;
@@ -144,13 +126,11 @@ llvm::BasicBlock* JoinLoop::codegen(
         if (join_loop.kind_ == JoinLoopKind::Set ||
             join_loop.kind_ == JoinLoopKind::MultiSet) {
           CHECK(iteration_domain.values_buffer->getType()->isPointerTy());
-          const auto ptr_type =
-              static_cast<llvm::PointerType*>(iteration_domain.values_buffer->getType());
-          if (ptr_type->getPointerElementType()->isArrayTy()) {
+          if (iteration_domain.values_buffer_is_array_of_arrays) {
             iteration_val = builder.CreateGEP(
-                iteration_domain.values_buffer->getType()
-                    ->getScalarType()
-                    ->getPointerElementType(),
+                llvm::PointerType::get(
+                    context,
+                    iteration_domain.values_buffer->getType()->getPointerAddressSpace()),
                 iteration_domain.values_buffer,
                 std::vector<llvm::Value*>{
                     llvm::ConstantInt::get(get_int_type(64, context), 0),
@@ -357,11 +337,9 @@ std::pair<llvm::BasicBlock*, llvm::Value*> JoinLoop::evaluateOuterJoinCondition(
   // Do the iteration if the outer condition is true or it's the last iteration and no
   // matches have been found.
   const auto do_iteration = builder.CreateOr(
-      builder.CreateLoad(current_condition_match_ptr->getType()->getPointerElementType(),
-                         current_condition_match_ptr),
+      builder.CreateLoad(get_int_type(1, context), current_condition_match_ptr),
       builder.CreateAnd(no_matches_found, no_more_inner_rows));
   join_loop.found_outer_matches_(
-      builder.CreateLoad(current_condition_match_ptr->getType()->getPointerElementType(),
-                         current_condition_match_ptr));
+      builder.CreateLoad(get_int_type(1, context), current_condition_match_ptr));
   return {after_evaluate_outer_condition_bb, do_iteration};
 }

@@ -659,11 +659,9 @@ std::vector<JoinLoop> Executor::buildJoinLoops(
             JoinLoopDomain domain{{0}};
             auto* arg = get_arg_by_name(cgen_state_->row_func_, "num_rows_per_scan");
             const auto rows_per_scan_ptr = cgen_state_->ir_builder_.CreateGEP(
-                arg->getType()->getScalarType()->getPointerElementType(),
-                arg,
-                cgen_state_->llInt(int32_t(level_idx + 1)));
+                arg->getType(), arg, cgen_state_->llInt(int32_t(level_idx + 1)));
             domain.upper_bound = cgen_state_->ir_builder_.CreateLoad(
-                rows_per_scan_ptr->getType()->getPointerElementType(),
+                get_int_type(64, cgen_state_->context_),
                 rows_per_scan_ptr,
                 "num_rows_per_scan");
             return domain;
@@ -1048,6 +1046,7 @@ void Executor::codegenJoinLoops(const std::vector<JoinLoop>& join_loops,
           JoinLoopDomain domain{{0}};
           domain.element_count = element_count;
           domain.values_buffer = values;
+          domain.values_buffer_is_array_of_arrays = true;
           return domain;
         },
         nullptr,
