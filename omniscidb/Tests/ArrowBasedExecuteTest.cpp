@@ -9657,9 +9657,7 @@ TEST_F(Select, Joins_LeftJoinFiltered) {
   auto check_explain_result = [](const std::string& query,
                                  const ExecutorDeviceType dt,
                                  const bool enable_filter_hoisting) {
-    CompilationOptions co;
-    co.device_type = dt;
-    co.hoist_literals = true;
+    CompilationOptions co = getCompilationOptions(dt);
     ExecutionOptions eo = ExecutionOptions::fromConfig(config());
     eo.allow_loop_joins = false;
     eo.just_explain = true;
