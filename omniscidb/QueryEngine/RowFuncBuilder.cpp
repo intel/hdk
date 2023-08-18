@@ -1129,15 +1129,8 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
         agg_out_idx = executor_->cgen_state_->castToTypeIn(agg_out_idx, 64);
       }
       auto offset = LL_BUILDER.CreateAdd(agg_out_idx, LL_INT(col_off));
-      auto* bit_cast = LL_BUILDER.CreateBitCast(
-          std::get<0>(agg_out_ptr_w_idx),
-          llvm::PointerType::get(
-              get_int_type((chosen_bytes << 3), LL_CONTEXT),
-              std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
-      agg_col_ptr = LL_BUILDER.CreateGEP(
-          bit_cast->getType()->getScalarType()->getPointerElementType(),
-          bit_cast,
-          offset);
+      auto agg_out_ptr = std::get<0>(agg_out_ptr_w_idx);
+      agg_col_ptr = LL_BUILDER.CreateGEP(agg_out_ptr->getType(), agg_out_ptr, offset);
     }
   } else {
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
@@ -1385,14 +1378,14 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
         CHECK_EQ(size_t(1), target_lvs.size());
         CHECK(!agg_expr || agg_expr->aggType() == hdk::ir::AggType::kSample);
         const auto i32_ty = get_int_type(32, executor_->cgen_state_->context_);
-        const auto i8p_ty = cgen_traits.localPointerType(
-            get_int_type(8, executor_->cgen_state_->context_));
+        const auto ptr_type =
+            cgen_traits.localOpaquePtr(executor_->cgen_state_->context_);
 
         auto elem_type = target_type->as<hdk::ir::ArrayBaseType>()->elemType();
         return {
             executor_->cgen_state_->emitExternalCall(
                 "array_buff",
-                i8p_ty,
+                ptr_type,
                 {target_lvs.front(), code_generator.posArg(target_expr)}),
             executor_->cgen_state_->emitExternalCall(
                 "array_size",
@@ -1411,17 +1404,19 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
           CHECK_EQ(size_t(1), target_lvs.size());
           const auto prefix = get_buffer_name(target_type);
           CHECK(target_type->isArray() || target_type->isText());
-          const auto target_lv = LL_BUILDER.CreateLoad(
-              target_lvs[0]->getType()->getPointerElementType(), target_lvs[0]);
+          auto ptr_type = target_lvs[0]->getType();
+          CHECK(ptr_type->isPointerTy());
+          auto struct_type = llvm::StructType::get(
+              ptr_type, get_int_type(64, LL_CONTEXT), get_int_type(8, LL_CONTEXT));
+          const auto target_lv =
+              LL_BUILDER.CreateLoad(struct_type, target_lvs[0], "array_obj");
           // const auto target_lv_type = target_lvs[0]->getType();
           // CHECK(target_lv_type->isStructTy());
           // CHECK_EQ(target_lv_type->getNumContainedTypes(), 3u);
-          const auto i8p_ty = cgen_traits.localPointerType(
-              get_int_type(8, executor_->cgen_state_->context_));
-          const auto ptr = LL_BUILDER.CreatePointerCast(
-              LL_BUILDER.CreateExtractValue(target_lv, 0), i8p_ty);
-          const auto size = LL_BUILDER.CreateExtractValue(target_lv, 1);
-          const auto null_flag = LL_BUILDER.CreateExtractValue(target_lv, 2);
+          const auto ptr = LL_BUILDER.CreateExtractValue(target_lv, 0, "array_ptr");
+          const auto size = LL_BUILDER.CreateExtractValue(target_lv, 1, "array_size");
+          const auto null_flag =
+              LL_BUILDER.CreateExtractValue(target_lv, 2, "array_null_flag");
           const auto nullcheck_ok_bb =
               llvm::BasicBlock::Create(LL_CONTEXT, prefix + "_nullcheck_ok_bb", CUR_FUNC);
           const auto nullcheck_fail_bb = llvm::BasicBlock::Create(
@@ -1435,10 +1430,10 @@ std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* tar
           const auto ret_bb =
               llvm::BasicBlock::Create(LL_CONTEXT, prefix + "_return", CUR_FUNC);
           LL_BUILDER.SetInsertPoint(ret_bb);
-          auto result_phi = LL_BUILDER.CreatePHI(i8p_ty, 2, prefix + "_ptr_return");
+          auto result_phi = LL_BUILDER.CreatePHI(ptr_type, 2, prefix + "_ptr_return");
           result_phi->addIncoming(ptr, nullcheck_ok_bb);
           const auto null_arr_sentinel = LL_BUILDER.CreateIntToPtr(
-              executor_->cgen_state_->llInt(static_cast<int8_t>(0)), i8p_ty);
+              executor_->cgen_state_->llInt(static_cast<int8_t>(0)), ptr_type);
           result_phi->addIncoming(null_arr_sentinel, nullcheck_fail_bb);
           LL_BUILDER.SetInsertPoint(nullcheck_ok_bb);
           executor_->cgen_state_->emitExternalCall(

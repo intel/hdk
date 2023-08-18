@@ -214,14 +214,26 @@ struct CgenState {
   llvm::Value* emitExternalCall(
       const std::string& fname,
       llvm::Type* ret_type,
-      const std::vector<llvm::Value*> args,
+      const std::vector<llvm::Value*> args_in,
       const std::vector<llvm::Attribute::AttrKind>& fnattrs = {},
       const bool has_struct_return = false) {
+    auto args = args_in;
     std::vector<llvm::Type*> arg_types;
-    for (const auto arg : args) {
+    std::set<size_t> struct_args;
+    for (size_t i = 0; i < args.size(); i++) {
+      const auto arg = args[i];
       CHECK(arg);
-      arg_types.push_back(arg->getType());
+      if (arg->getType()->isStructTy()) {
+        CHECK(struct_args.insert(i).second);
+        auto arg_as_load = llvm::dyn_cast<llvm::LoadInst>(arg);
+        CHECK(arg_as_load);
+        arg_types.push_back(arg_as_load->getPointerOperand()->getType());
+        args[i] = arg_as_load->getPointerOperand();
+      } else {
+        arg_types.push_back(arg->getType());
+      }
     }
+    // TODO(adb): check ret type
     auto func_ty = llvm::FunctionType::get(ret_type, arg_types, false);
     llvm::AttributeList attrs;
     if (!fnattrs.empty()) {
@@ -253,27 +265,26 @@ struct CgenState {
     CHECK(func_type);
     if (has_struct_return) {
       const auto arg_ti = func_type->getParamType(0);
-      CHECK(arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy());
+      CHECK(arg_ti->isPointerTy());
       auto attr_list = func->getAttributes();
 #if LLVM_VERSION_MAJOR > 13
       llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(0));
 #else
       llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(0));
 #endif
-      arr_arg_builder.addAttribute(llvm::Attribute::StructRet);
+      arr_arg_builder.addStructRetAttr(args_in[0]->getType());
       func->addParamAttrs(0, arr_arg_builder);
     }
     const size_t arg_start = has_struct_return ? 1 : 0;
     for (size_t i = arg_start; i < func->arg_size(); i++) {
-      const auto arg_ti = func_type->getParamType(i);
-      if (arg_ti->isPointerTy() && arg_ti->getPointerElementType()->isStructTy()) {
+      if (struct_args.count(i) > 0) {
         auto attr_list = func->getAttributes();
 #if LLVM_VERSION_MAJOR > 13
         llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(i));
 #else
         llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(i));
 #endif
-        arr_arg_builder.addByValAttr(arg_ti->getPointerElementType());
+        arr_arg_builder.addByValAttr(args_in[i]->getType());
         func->addParamAttrs(i, arr_arg_builder);
       }
     }
@@ -288,7 +299,9 @@ struct CgenState {
                         const std::vector<llvm::Value*>& args);
   llvm::Value* emitCall(const std::string& fname, const std::vector<llvm::Value*>& args);
 
-  size_t getLiteralBufferUsage(const int device_id) { return literal_bytes_[device_id]; }
+  size_t getLiteralBufferUsage(const int device_id) {
+    return literal_bytes_[device_id];
+  }
 
   llvm::Value* castToTypeIn(llvm::Value* val, const size_t bit_width);
 
@@ -315,7 +328,9 @@ struct CgenState {
         llvm::ConstantFP::get(llvm::Type::getDoubleTy(context_), v));
   }
 
-  llvm::ConstantInt* llBool(const bool v) const { return ::ll_bool(v, context_); }
+  llvm::ConstantInt* llBool(const bool v) const {
+    return ::ll_bool(v, context_);
+  }
 
   void emitErrorCheck(llvm::Value* condition, llvm::Value* errorCode, std::string label);
 
