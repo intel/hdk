@@ -3790,7 +3790,7 @@ void Executor::preloadFragOffsets(const std::vector<InputDescriptor>& input_desc
     } else {
       if (frag_count > 1) {
         cgen_state_->frag_offsets_.push_back(cgen_state_->ir_builder_.CreateLoad(
-            frag_off_ptr->getType()->getPointerElementType(), frag_off_ptr));
+            get_int_type(64, cgen_state_->context_), frag_off_ptr));
       } else {
         cgen_state_->frag_offsets_.push_back(nullptr);
       }
