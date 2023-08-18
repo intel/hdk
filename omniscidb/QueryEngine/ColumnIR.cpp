@@ -362,11 +362,10 @@ std::vector<llvm::Value*> CodeGenerator::codegenOuterJoinNullPlaceholder(
   }
   const auto null_constant =
       hdk::ir::makeExpr<hdk::ir::Constant>(null_type, true, Datum{0});
-  const auto null_target_lvs =
-      codegen(null_constant.get(),
-              false,
-              CompilationOptions{
-                  ExecutorDeviceType::CPU, false, ExecutorOptLevel::Default, false});
+  // this looks incorrect, should we just use co instead?
+  CompilationOptions in_co =
+      CompilationOptions::makeCpuOnly(co).withHoistedLiterals(false);
+  const auto null_target_lvs = codegen(null_constant.get(), false, in_co);
   cgen_state_->ir_builder_.CreateBr(phi_bb);
   CHECK_EQ(orig_lvs.size(), null_target_lvs.size());
   cgen_state_->ir_builder_.SetInsertPoint(phi_bb);

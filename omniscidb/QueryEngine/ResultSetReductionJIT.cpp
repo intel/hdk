@@ -617,10 +617,7 @@ ResultSetReductionJIT::ResultSetReductionJIT(const QueryMemoryDescriptor& query_
 
 ReductionCode ResultSetReductionJIT::codegen() const {
   const auto hash_type = query_mem_desc_.getQueryDescriptionType();
-  CompilationOptions co{
-      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
-
-  co.codegen_traits_desc = co.getCgenTraitsDesc(ExecutorDeviceType::CPU);
+  CompilationOptions co = CompilationOptions::reductionDefaults();
 
   if (query_mem_desc_.didOutputColumnar() || !is_aggregate_query(hash_type)) {
     return {};
@@ -1354,8 +1351,7 @@ void ResultSetReductionJIT::finalizeReductionCode(
     const llvm::Function* ir_reduce_one_entry,
     const llvm::Function* ir_reduce_one_entry_idx,
     const CodeCacheKey& key) const {
-  CompilationOptions co{
-      ExecutorDeviceType::CPU, false, ExecutorOptLevel::ReductionJIT, false};
+  CompilationOptions co = CompilationOptions::reductionDefaults();
 #ifdef NDEBUG
   LOG(IR) << "Reduction Loop:\n"
           << serialize_llvm_object(reduction_code.llvm_reduce_loop);

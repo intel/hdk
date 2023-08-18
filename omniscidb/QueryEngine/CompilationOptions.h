@@ -62,6 +62,26 @@ struct CompilationOptions {
                               compiler::cpu_cgen_traits_desc};
   }
 
+  CompilationOptions withHoistedLiterals(bool hoist = true) {
+    CompilationOptions co = *this;
+    co.hoist_literals = hoist;
+    return co;
+  }
+
+  static CompilationOptions reductionDefaults() {
+    return CompilationOptions{
+        ExecutorDeviceType::CPU,
+        /*hoist_literals=*/false,
+        /*opt_level=*/ExecutorOptLevel::ReductionJIT,
+        /*with_dynamic_watchdog=*/false,
+        /*allow_lazy_fetch=*/true,
+        /*filter_on_delted_column=*/true,
+        /*explain_type=*/ExecutorExplainType::Default,
+        /*register_intel_jit_listener=*/false,
+        /*use_groupby_buffer_desc=*/false,
+        /*codegen_traits_desc=*/getCgenTraitsDesc(ExecutorDeviceType::CPU)};
+  }
+
   static compiler::CodegenTraitsDescriptor getCgenTraitsDesc(
       const ExecutorDeviceType device_type,
       const bool is_l0 = false) {
@@ -89,6 +109,9 @@ struct CompilationOptions {
         /*use_groupby_buffer_desc=*/false,
         /*codegen_traits_desc=*/getCgenTraitsDesc(device_type, is_l0)};
   }
+
+ private:
+  CompilationOptions() = default;
 };
 
 enum class ExecutorType { Native, Extern };
