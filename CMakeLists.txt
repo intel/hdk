@@ -137,6 +137,7 @@ include_directories(${SQLite3_INCLUDE_DIRS})
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(ENABLE_PYTHON "Build Python libraries" ON)
+option(ENABLE_SQL "Enable SQL support" ON)
 
 if(BUILD_SHARED_LIBS)
   add_definitions("-DENABLE_SHARED_LIBS")
@@ -487,7 +488,9 @@ add_custom_target(hdk_python_clean
 )
 
 add_dependencies(clean-all hdk_python_clean)
-add_dependencies(clean-all calcite_java_clean)
+if (ENABLE_SQL)
+  add_dependencies(clean-all calcite_java_clean)
+endif()
 
 
 option(ENABLE_TESTS "Build unit tests" ON)

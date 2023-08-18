@@ -138,6 +138,8 @@ if(BUILD_SHARED_LIBS)
   add_definitions("-DENABLE_SHARED_LIBS")
 endif()
 
+option(ENABLE_SQL "Enable SQL support" ON)
+
 # Required for macOS with Boost 1.71.0+
 # See https://gitlab.kitware.com/cmake/cmake/issues/19714
 if(APPLE)
