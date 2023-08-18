@@ -157,6 +157,15 @@ jobs:
       reset-cache: ${{ !!inputs.reset-cache }}
       runner: intel-ai.hdk.l0
 
+  test-l0-pvc-docker:
+    name: Gtests (Sanity)
+    needs: build-l0-docker
+    uses: ./.github/workflows/test-docker.yml
+    with:
+      name: l0
+      reset-cache: ${{ !!inputs.reset-cache }}
+      runner: intel-ai.hdk.pvc
+
   build-windows:
     name: Build
     uses: ./.github/workflows/build-windows.yml
