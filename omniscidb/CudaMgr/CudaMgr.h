@@ -151,6 +151,10 @@ class CudaMgr : public GpuMgr {
   bool isArchMaxwellOrLaterForAll() const;
   bool isArchVoltaOrGreaterForAll() const;
 
+  size_t getTotalMem(const int device_num) const {
+    return getDeviceProperties(device_num)->globalMem;
+  }
+
   uint32_t getMaxBlockSize() const override {
     return getAllDeviceProperties().front().maxThreadsPerBlock;
   }

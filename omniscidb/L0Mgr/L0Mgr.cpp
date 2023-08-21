@@ -419,6 +419,20 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   return device_properties.maxMemAllocSize;
 }
 
+size_t L0Manager::getTotalMem(const int device_num) const {
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+  uint32_t p_count{0};
+  L0_SAFE_CALL(zeDeviceGetMemoryProperties(
+      drivers_[0]->devices()[device_num]->device(), &p_count, nullptr));
+  CHECK_GT(p_count, 0u);
+  std::vector<ze_device_memory_properties_t> mem_properties;
+  mem_properties.resize(p_count);
+  L0_SAFE_CALL(zeDeviceGetMemoryProperties(
+      drivers_[0]->devices()[device_num]->device(), &p_count, mem_properties.data()));
+  return static_cast<size_t>(mem_properties[0].totalSize);
+}
+
 uint32_t L0Manager::getMaxBlockSize() const {
   CHECK_GT(drivers_[0]->devices().size(), size_t(0));
   unsigned sz = drivers_[0]->devices()[0]->maxGroupSize();
