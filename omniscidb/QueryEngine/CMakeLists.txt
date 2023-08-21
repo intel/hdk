@@ -73,6 +73,7 @@ set(query_engine_source_files
     OutputBufferInitialization.cpp
     QueryPhysicalInputsCollector.cpp
     PlanState.cpp
+    QuantileRuntime.cpp
     QueryRewrite.cpp
     QueryTemplateGenerator.cpp
     QueryExecutionContext.cpp
@@ -136,6 +137,7 @@ set(group_by_hash_test_files
         GroupByHashTest.cpp
         MurmurHash.cpp
         DynamicWatchdog.cpp
+        QuantileRuntime.cpp
         RuntimeFunctions.cpp
         )
 

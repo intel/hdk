@@ -11,6 +11,8 @@
 
 #include "IR/OpTypeEnums.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -260,18 +262,18 @@ class Quantile {
     size_t right_idx;
     switch (interpolation) {
       case ir::Interpolation::kLower:
-        left_idx = right_idx = floor(pos);
+        left_idx = right_idx = std::floor(pos);
         break;
       case ir::Interpolation::kHigher:
-        left_idx = right_idx = ceil(pos);
+        left_idx = right_idx = std::ceil(pos);
         break;
       case ir::Interpolation::kNearest:
-        left_idx = right_idx = round(pos);
+        left_idx = right_idx = std::round(pos);
         break;
       case ir::Interpolation::kMidpoint:
       case ir::Interpolation::kLinear:
-        left_idx = floor(pos);
-        right_idx = ceil(pos);
+        left_idx = std::floor(pos);
+        right_idx = std::ceil(pos);
         break;
     }
 

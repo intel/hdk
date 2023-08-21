@@ -19,7 +19,6 @@
 
 #ifndef __CUDACC__
 #include "QueryEngine/TopKAggRuntime.h"
-#include "Shared/quantile.h"
 #endif
 
 extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE uint32_t
@@ -413,16 +412,12 @@ DEF_AGG_TOPK_ALL(double, double)
 #undef DEF_AGG_TOPK_SKIP_VAL
 #undef DEF_AGG_TOPK
 
-template <typename ValueType>
-void agg_quantile_impl(int64_t* agg, ValueType val) {
-  auto* quantile = reinterpret_cast<hdk::quantile::Quantile*>(*agg);
-  quantile->add<ValueType>(val);
-}
-
-#define DEF_AGG_QUANTILE(val_type, suffix)                                   \
-  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_quantile_##suffix( \
-      int64_t* agg, val_type val) {                                          \
-    agg_quantile_impl<val_type>(agg, val);                                   \
+#define DEF_AGG_QUANTILE(val_type, suffix)                                        \
+  extern "C" RUNTIME_EXPORT DEVICE void agg_quantile_impl_##suffix(int64_t* agg,  \
+                                                                   val_type val); \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_quantile_##suffix(      \
+      int64_t* agg, val_type val) {                                               \
+    agg_quantile_impl_##suffix(agg, val);                                         \
   }
 
 #define DEF_AGG_QUANTILE_SKIP_VAL(val_type, suffix)                                     \
