@@ -118,6 +118,11 @@ size_t L0Manager::getMaxAllocationSize(const int device_num) const {
   return 0u;
 }
 
+size_t L0Manager::getTotalMem(const int device_num) const {
+  CHECK(false);
+  return 0u;
+}
+
 unsigned L0Manager::getMaxBlockSize() const {
   CHECK(false);
   return 0u;
