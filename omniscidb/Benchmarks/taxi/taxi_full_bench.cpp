@@ -13,11 +13,11 @@ boost::filesystem::path g_data_path;
 size_t num_threads = 15;
 size_t g_fragment_size = 160000000 / num_threads;
 bool g_use_parquet{false};
+bool g_use_hot_data{false};
 ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
 using namespace TestHelpers::ArrowSQLRunner;
 
-// #define USE_HOT_DATA
 #define PARALLEL_IMPORT_ENABLED
 
 // when we want to measure storage latencies, read the csv files before starting the
@@ -286,67 +286,66 @@ T v(const TargetValue& r) {
 
 static void table_count(benchmark::State& state) {
   for (auto _ : state) {
-#ifndef USE_HOT_DATA
-    createTaxiTable();
-    populateTaxiTable();
-#endif
+    if (!g_use_hot_data) {
+      createTaxiTable();
+      populateTaxiTable();
+    }
 
-    auto res = v<int64_t>(run_simple_agg("select count(*) from trips", g_device_type));
+    auto res = v<int64_t>(run_simple_agg("select count(*) from trips;", g_device_type));
     std::cout << "Number of loaded tuples: " << res << std::endl;
   }
 }
 
 static void taxi_q1(benchmark::State& state) {
   for (auto _ : state) {
-#ifndef USE_HOT_DATA
-    createTaxiTable();
-    populateTaxiTable();
-#endif
+    if (!g_use_hot_data) {
+      createTaxiTable();
+      populateTaxiTable();
+    }
 
-    run_multiple_agg("select cab_type, count(*) from trips group by cab_type",
+    run_multiple_agg("select cab_type, count(*) from trips group by cab_type;",
                      g_device_type);
   }
 }
 
 static void taxi_q2(benchmark::State& state) {
   for (auto _ : state) {
-#ifndef USE_HOT_DATA
-    createTaxiTable();
-    populateTaxiTable();
-#endif
+    if (!g_use_hot_data) {
+      createTaxiTable();
+      populateTaxiTable();
+    }
 
     run_multiple_agg(
-        "SELECT passenger_count, avg(total_amount) FROM trips GROUP BY passenger_count",
+        "SELECT passenger_count, avg(total_amount) FROM trips GROUP BY passenger_count;",
         g_device_type);
   }
 }
 
 static void taxi_q3(benchmark::State& state) {
   for (auto _ : state) {
-#ifndef USE_HOT_DATA
-    createTaxiTable();
-    populateTaxiTable();
-#endif
-
+    if (!g_use_hot_data) {
+      createTaxiTable();
+      populateTaxiTable();
+    }
     run_multiple_agg(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
-        "count(*) FROM trips GROUP BY passenger_count, pickup_year",
+        "count(*) FROM trips GROUP BY passenger_count, pickup_year;",
         g_device_type);
   }
 }
 
 static void taxi_q4(benchmark::State& state) {
   for (auto _ : state) {
-#ifndef USE_HOT_DATA
-    createTaxiTable();
-    populateTaxiTable();
-#endif
+    if (!g_use_hot_data) {
+      createTaxiTable();
+      populateTaxiTable();
+    }
 
     run_multiple_agg(
         "SELECT passenger_count, extract(year from pickup_datetime) AS pickup_year, "
         "cast(trip_distance as int) AS distance, count(*) AS the_count FROM trips GROUP "
         "BY passenger_count, pickup_year, distance ORDER BY pickup_year, the_count "
-        "desc",
+        "desc;",
         g_device_type);
   }
 }
@@ -406,6 +405,11 @@ int main(int argc, char* argv[]) {
                          ->implicit_value(ExecutorDeviceType::GPU)
                          ->default_value(ExecutorDeviceType::CPU),
                      "Device type to use.");
+  desc.add_options()("use-hot-data",
+                     po::value<bool>(&g_use_hot_data)
+                         ->implicit_value(true)
+                         ->default_value(g_use_hot_data),
+                     "Use prepopulated taxi data in queries.");
 
   desc.add_options()(
       "use-lazy-materialization",
@@ -434,14 +438,10 @@ int main(int argc, char* argv[]) {
   }
 
   try {
-#ifdef USE_HOT_DATA
     createTaxiTable();
-    populateTaxiTable();
-#else
-    if (g_use_parquet) {
+    if (!g_use_hot_data && g_use_parquet) {
       throw std::runtime_error("Cannot use parquet files in cold data mode yet.");
     }
-    createTaxiTable();
     auto table_info = getStorage()->getTableInfo(getStorage()->dbId(), "trips");
     if (!table_info) {
       throw std::runtime_error("Cannot find table \"trips\", creation failed?");
@@ -449,7 +449,9 @@ int main(int argc, char* argv[]) {
 
     auto col_infos = getStorage()->listColumns(table_info->db_id, table_info->table_id);
     g_taxi_data_files = readTaxiFilesCsv(col_infos);
-#endif
+    if (g_use_hot_data) {
+      loadTaxiArrowData();
+    }
     // warmup();
     ::benchmark::RunSpecifiedBenchmarks();
   } catch (const std::exception& e) {
