@@ -24,9 +24,10 @@ class ChunkedArray {
  public:
   struct Chunk {
     int8_t* data;
-    // Size holds number of elements, not bytes. Element size
-    // is determined on push.
-    size_t size;
+    // Max number of elements that can be stored in a chunk. Element type is determined on
+    // push when chunk is allocated. Elements of different types shouldn't be pushed into
+    // the same chunk.
+    size_t max_elems;
   };
 
   // Random access iterator to be used with std::nth_element.
@@ -49,15 +50,16 @@ class ChunkedArray {
       if (chunk_idx_ == other.chunk_idx_) {
         return chunk_offs_ - other.chunk_offs_;
       } else if (chunk_idx_ > other.chunk_idx_) {
-        auto res = (*chunks_)[other.chunk_idx_].size - other.chunk_offs_ + chunk_offs_;
+        auto res =
+            (*chunks_)[other.chunk_idx_].max_elems - other.chunk_offs_ + chunk_offs_;
         for (auto i = other.chunk_idx_ + 1; i < chunk_idx_; ++i) {
-          res += (*chunks_)[i].size;
+          res += (*chunks_)[i].max_elems;
         }
         return (int64_t)res;
       } else {
-        auto res = (*chunks_)[chunk_idx_].size - chunk_offs_ + other.chunk_offs_;
+        auto res = (*chunks_)[chunk_idx_].max_elems - chunk_offs_ + other.chunk_offs_;
         for (auto i = chunk_idx_ + 1; i < other.chunk_idx_; ++i) {
-          res += (*chunks_)[i].size;
+          res += (*chunks_)[i].max_elems;
         }
         return -(int64_t)res;
       }
@@ -68,7 +70,7 @@ class ChunkedArray {
         operator-=(-i);
       } else {
         while (true) {
-          int64_t rem = int64_t((*chunks_)[chunk_idx_].size - chunk_offs_);
+          int64_t rem = int64_t((*chunks_)[chunk_idx_].max_elems - chunk_offs_);
           if (rem > i) {
             chunk_offs_ += i;
             break;
@@ -95,7 +97,7 @@ class ChunkedArray {
         while ((int64_t)chunk_offs_ < i) {
           --chunk_idx_;
           i -= chunk_offs_;
-          chunk_offs_ = (*chunks_)[chunk_idx_].size;
+          chunk_offs_ = (*chunks_)[chunk_idx_].max_elems;
         }
         chunk_offs_ -= i;
       }
@@ -110,7 +112,7 @@ class ChunkedArray {
 
     Iterator& operator++() {
       ++chunk_offs_;
-      if (chunk_offs_ == (*chunks_)[chunk_idx_].size) {
+      if (chunk_offs_ == (*chunks_)[chunk_idx_].max_elems) {
         ++chunk_idx_;
         chunk_offs_ = 0;
       }
@@ -126,7 +128,7 @@ class ChunkedArray {
     Iterator& operator--() {
       if (!chunk_offs_) {
         --chunk_idx_;
-        chunk_offs_ = (*chunks_)[chunk_idx_].size;
+        chunk_offs_ = (*chunks_)[chunk_idx_].max_elems;
       }
       --chunk_offs_;
       return *this;
@@ -177,7 +179,7 @@ class ChunkedArray {
   template <typename T>
   void push(T value) {
     // Check if we need to allocate a new chunk.
-    if (chunks_.empty() || cur_idx_ == chunks_.back().size) {
+    if (chunks_.empty() || cur_idx_ == chunks_.back().max_elems) {
       // Allocator is most probably a RowSetMemoryOwner object. It is not supposed to be
       // used to allocate very small objects, so we start with 1 KB and double it each
       // time with 64KB limit.
@@ -195,7 +197,7 @@ class ChunkedArray {
       // We are not going to add values to the current last chunk anymore, so fix-up
       // its size for proper iteration.
       if (!chunks_.empty()) {
-        chunks_.back().size = cur_idx_;
+        chunks_.back().max_elems = cur_idx_;
       }
       chunks_.insert(chunks_.end(), other.chunks_.begin(), other.chunks_.end());
       cur_idx_ = other.cur_idx_;
@@ -212,7 +214,7 @@ class ChunkedArray {
     // Chunk offset in iterator is always expected to be less than chunk size. So, end
     // iterator for a full chunk is supposed to point the start of the next chunk.
     // Take care of it if all chunks are full.
-    if (!chunks_.empty() && cur_idx_ == chunks_.back().size) {
+    if (!chunks_.empty() && cur_idx_ == chunks_.back().max_elems) {
       return Iterator<T>(&chunks_, chunks_.size(), 0);
     }
     return Iterator<T>(&chunks_, chunks_.size() - 1, cur_idx_);
@@ -227,7 +229,7 @@ class ChunkedArray {
 
     size_t res = cur_idx_;
     for (size_t i = 0; i < chunks_.size() - 1; ++i) {
-      res += chunks_[i].size;
+      res += chunks_[i].max_elems;
     }
     return res;
   }
@@ -236,6 +238,8 @@ class ChunkedArray {
 
  private:
   SimpleAllocator* allocator_;
+  // All chunks except the last one should be full, i.e. they hold
+  // chunk.max_elems elements.
   std::vector<Chunk> chunks_;
   // Insertion position in the last chunk.
   size_t cur_idx_;
