@@ -32,7 +32,7 @@ std::string SPIRVExecuteTest::generateSimpleSPIRV() {
   ctx.setOpaquePointers(false);
 #endif
   std::unique_ptr<Module> module = std::make_unique<Module>("code_generated", ctx);
-  module->setTargetTriple("spir-unknown-unknown");
+  module->setTargetTriple("spir64-unknown-unknown");
   IRBuilder<> builder(ctx);
 
   std::vector<Type*> args{Type::getFloatPtrTy(ctx, 1), Type::getFloatPtrTy(ctx, 1)};
