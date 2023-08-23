@@ -412,17 +412,17 @@ DEF_AGG_TOPK_ALL(double, double)
 #undef DEF_AGG_TOPK_SKIP_VAL
 #undef DEF_AGG_TOPK
 
-#define DEF_AGG_QUANTILE(val_type, suffix)                                        \
-  extern "C" RUNTIME_EXPORT DEVICE void agg_quantile_impl_##suffix(int64_t* agg,  \
-                                                                   val_type val); \
-  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_quantile_##suffix(      \
-      int64_t* agg, val_type val) {                                               \
-    agg_quantile_impl_##suffix(agg, val);                                         \
+#define DEF_AGG_QUANTILE(val_type, suffix)                                   \
+  extern "C" RUNTIME_EXPORT DEVICE void agg_quantile_impl_##suffix(          \
+      GENERIC_ADDR_SPACE int64_t* agg, val_type val);                        \
+  extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_quantile_##suffix( \
+      GENERIC_ADDR_SPACE int64_t* agg, val_type val) {                       \
+    agg_quantile_impl_##suffix(agg, val);                                    \
   }
 
 #define DEF_AGG_QUANTILE_SKIP_VAL(val_type, suffix)                                     \
   extern "C" RUNTIME_EXPORT ALWAYS_INLINE DEVICE void agg_quantile_##suffix##_skip_val( \
-      int64_t* agg, val_type val, val_type skip_val) {                                  \
+      GENERIC_ADDR_SPACE int64_t* agg, val_type val, val_type skip_val) {               \
     if (val != skip_val) {                                                              \
       agg_quantile_##suffix(agg, val);                                                  \
     }                                                                                   \

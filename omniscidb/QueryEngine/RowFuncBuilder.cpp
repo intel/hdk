@@ -815,8 +815,9 @@ llvm::Value* RowFuncBuilder::convertNullIfAny(const hdk::ir::Type* arg_type,
     CHECK(agg_info.agg_kind == hdk::ir::AggType::kTopK);
     agg_type = agg_type->as<hdk::ir::ArrayBaseType>()->elemType();
   } else if (agg_info.agg_kind == hdk::ir::AggType::kQuantile) {
-    // Quantile collects orginal values and we don't care about the
-    // result type at the moment.
+    // Quantile aggregate slot doesn't hold the result but holds a pointer to the object
+    // that collects orginal values. The result type is used on aggregate finalization
+    // only and aggregate collection works with an argument type only.
     agg_type = arg_type;
   }
   const size_t chosen_bytes = agg_type->size();
