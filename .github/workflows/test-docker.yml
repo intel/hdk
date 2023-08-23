@@ -16,7 +16,7 @@ on:
         default: false
       runner:
         type: string
-        default: docker
+        default: cuda
 
 jobs:
   build:
