@@ -629,17 +629,12 @@ size_t ResultSet::rowCountImpl(const bool force_parallel) const {
   if (force_parallel || entryCount() >= auto_parallel_row_count_threshold) {
     return parallelRowCount();
   }
-  std::lock_guard<std::mutex> lock(row_iteration_mutex_);
-  moveToBegin();
   size_t row_count{0};
-  while (true) {
-    auto crt_row = getNextRowUnlocked(false, false);
-    if (crt_row.empty()) {
-      break;
-    }
+  auto iter = rowIterator(false, false);
+  while (iter.isValid()) {
     ++row_count;
+    ++iter;
   }
-  moveToBegin();
   return row_count;
 }
 
