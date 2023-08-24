@@ -75,6 +75,14 @@ class ColumnFetcher {
       const int device_id,
       DeviceAllocator* device_allocator) const;
 
+  const int8_t* getAllTableColumnFragmentsLinearizedOnDevice(
+      ColumnInfoPtr col_info,
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments,
+      const Data_Namespace::MemoryLevel memory_level,
+      const int device_id,
+      DeviceAllocator* device_allocator,
+      const size_t thread_idx) const;
+
   const int8_t* getAllTableColumnFragments(
       ColumnInfoPtr col_info,
       const std::map<TableRef, const TableFragments*>& all_tables_fragments,

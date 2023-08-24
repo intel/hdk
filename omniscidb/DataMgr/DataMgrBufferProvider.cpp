@@ -37,6 +37,8 @@ void DataMgrBufferProvider::copyToDevice(int8_t* device_ptr,
   CHECK(data_mgr_);
   const auto gpu_mgr = data_mgr_->getGpuMgr();
   CHECK(gpu_mgr);
+  LOG(INFO) << "[GPU COPY] to " << (void*)device_ptr << ", from " << (void*)(host_ptr)
+            << ", num_bytes=" << num_bytes;
   gpu_mgr->copyHostToDevice(device_ptr, host_ptr, num_bytes, device_id);
 }
 

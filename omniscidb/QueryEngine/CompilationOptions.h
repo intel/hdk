@@ -134,6 +134,7 @@ struct ExecutionOptions {
   unsigned pending_query_interrupt_freq;
   unsigned forced_gpu_proportion;
   unsigned forced_cpu_proportion;
+  bool multifrag_heterogeneous_execution;
   ExecutorType executor_type = ExecutorType::Native;
   std::vector<size_t> outer_fragment_indices{};
   bool multifrag_result = false;
@@ -162,7 +163,7 @@ struct ExecutionOptions {
     eo.preserve_order = false;
     eo.forced_gpu_proportion = config.exec.heterogeneous.forced_gpu_proportion;
     eo.forced_cpu_proportion = config.exec.heterogeneous.forced_cpu_proportion;
-
+    eo.multifrag_heterogeneous_execution = config.exec.heterogeneous.enable_multifrag_heterogeneous_execution;
     return eo;
   }
 

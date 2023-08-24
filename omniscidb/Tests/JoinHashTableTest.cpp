@@ -153,7 +153,7 @@ TEST(Build, PerfectOneToOne1) {
     createTable("table1", {{"nums1", ctx().int32()}});
     insertCsvValues("table1", "1\n8");
 
-    createTable("table2", {{"nums2", ctx().int32()}});
+    createTable("table2", {{"nums2", ctx().int32()}}, ArrowStorage::TableOptions(3));
     insertCsvValues("table2", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
 
     auto hash_table = buildPerfect("table1", "nums1", "table2", "nums2", executor.get());

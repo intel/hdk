@@ -45,9 +45,12 @@ void CpuBuffer::readData(int8_t* const dst,
                          const MemoryLevel dst_memory_level,
                          const int dst_device_id) {
   if (dst_memory_level == CPU_LEVEL) {
+    LOG(INFO) << "[CPU COPY]" << (void*)(mem_ + offset);
     memcpy(dst, mem_ + offset, num_bytes);
   } else if (dst_memory_level == GPU_LEVEL) {
     CHECK_GE(dst_device_id, 0);
+    LOG(INFO) << "[GPU COPY] to:" << (void*)dst << ", from " << (void*)(mem_ + offset)
+              << ", num_bytes = " << (void*)num_bytes;
     gpu_mgr_->copyHostToDevice(dst, mem_ + offset, num_bytes, dst_device_id);
   } else {
     LOG(FATAL) << "Unsupported buffer type";

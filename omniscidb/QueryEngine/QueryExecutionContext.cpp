@@ -736,10 +736,10 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
 }
 
 std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
-    const std::vector<std::vector<const int8_t*>>& col_buffers,
+    const std::vector<std::vector<const int8_t*>>& col_buffers, // {num_frags{num_cols}}, so element of this is collection of col pointers (fragment) and we gave num_fragment elems
     const std::vector<int8_t>& literal_buff,
-    const std::vector<std::vector<int64_t>>& num_rows,
-    const std::vector<std::vector<uint64_t>>& frag_offsets,
+    const std::vector<std::vector<int64_t>>& num_rows, // {num_frags{num_rows}}
+    const std::vector<std::vector<uint64_t>>& frag_offsets, // {num_frags{offsets}}
     const int32_t scan_limit,
     const std::vector<int64_t>& init_agg_vals,
     const std::vector<int32_t>& error_codes,
@@ -749,6 +749,7 @@ std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
     const int device_id,
     const bool hoist_literals,
     const bool is_group_by) const {
+  INJECT_TIMER(prepareKernelParams);
   CHECK(gpu_allocator_);
   std::vector<int8_t*> params(KERN_PARAM_COUNT, 0);
   const uint64_t num_fragments = static_cast<uint64_t>(col_buffers.size());
@@ -810,6 +811,7 @@ std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
                                   literal_buff.size(),
                                   device_id);
   }
+  LOG(INFO) << "CHECK EQ: " << num_rows.size() << " = " << col_buffers.size();
   CHECK_EQ(num_rows.size(), col_buffers.size());
   std::vector<int64_t> flatened_num_rows;
   for (auto& nums : num_rows) {

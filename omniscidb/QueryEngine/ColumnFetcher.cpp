@@ -231,6 +231,63 @@ const int8_t* ColumnFetcher::getOneTableColumnFragment(
   }
 }
 
+const int8_t* ColumnFetcher::getAllTableColumnFragmentsLinearizedOnDevice(
+  ColumnInfoPtr col_info,
+      const std::map<TableRef, const TableFragments*>& all_tables_fragments,
+      const Data_Namespace::MemoryLevel memory_level,
+      const int device_id,
+      DeviceAllocator* device_allocator,
+      const size_t thread_idx) const {
+  int db_id = col_info->db_id;
+  int table_id = col_info->table_id;
+  int col_id = col_info->column_id;
+  const auto fragments_it = all_tables_fragments.find({db_id, table_id});
+  CHECK(fragments_it != all_tables_fragments.end());
+  const auto fragments = fragments_it->second;
+  const auto frag_count = fragments->size();
+
+  size_t num_bytes{0};
+  std::vector<size_t> frag_offsets;
+  std::vector<const int8_t*> column_frag_buffers;
+  for (size_t frag_id = 0; frag_id < frag_count; ++frag_id){
+    if (executor_->getConfig().exec.interrupt.enable_non_kernel_time_query_interrupt && executor_->checkNonKernelTimeInterrupted()) {
+      throw QueryExecutionError(Executor::ERR_INTERRUPTED);
+    }
+    std::list<std::shared_ptr<Chunk_NS::Chunk>> chunk_holder;
+    std::list<ChunkIter> chunk_iter_holder;
+    const auto& fragment = (*fragments)[frag_id];
+    if (fragment.isEmptyPhysicalFragment()) {
+      continue;
+    }
+    auto chunk_meta_it = fragment.getChunkMetadataMap().find(col_id);
+    CHECK(chunk_meta_it != fragment.getChunkMetadataMap().end());
+    // To be replaced with getOneTableColumnFragmentTo(int8_t* dest, ..)
+    auto col_buffer = getOneTableColumnFragment(col_info,
+                                            static_cast<int>(frag_id),
+                                            all_tables_fragments,
+                                            chunk_holder,
+                                            chunk_iter_holder,
+                                            Data_Namespace::CPU_LEVEL,
+                                            int(0),
+                                            device_allocator);
+    column_frag_buffers.push_back(col_buffer);
+    frag_offsets.push_back(num_bytes);
+    num_bytes += chunk_meta_it->second->numBytes();
+  }
+  CHECK(device_allocator);
+
+  auto gpu_col_buffer = device_allocator->alloc(num_bytes);
+
+  CHECK_EQ(frag_offsets.size(), column_frag_buffers.size());
+  for (size_t col_frag_idx = 0; col_frag_idx < column_frag_buffers.size()-1; ++col_frag_idx){
+    LOG(INFO) << "[GPU COPY] Linearizing on device: to= " << (void*)(gpu_col_buffer + frag_offsets[col_frag_idx]) << ", from= " << (void*)column_frag_buffers[col_frag_idx] << ", num_bytes= " << frag_offsets[col_frag_idx+1] - frag_offsets[col_frag_idx];
+    device_allocator->copyToDevice(gpu_col_buffer + frag_offsets[col_frag_idx], column_frag_buffers[col_frag_idx], frag_offsets[col_frag_idx+1] - frag_offsets[col_frag_idx]);
+  }
+  LOG(INFO) << "[GPU COPY] Linearizing on device: to= " << (void*)(gpu_col_buffer + frag_offsets.back()) << ", from= " << (void*)column_frag_buffers.back() << ", num_bytes= " << num_bytes - frag_offsets.back();
+  device_allocator->copyToDevice(gpu_col_buffer + frag_offsets.back(), column_frag_buffers.back(), num_bytes - frag_offsets.back());
+  return gpu_col_buffer;
+}
+
 const int8_t* ColumnFetcher::getAllTableColumnFragments(
     ColumnInfoPtr col_info,
     const std::map<TableRef, const TableFragments*>& all_tables_fragments,

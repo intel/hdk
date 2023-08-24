@@ -80,6 +80,7 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
   }
 
   const auto num_bytes_for_row = executor->getNumBytesForFetchedRow(lhs_table_ids);
+  LOG(INFO) << "Enabled multifrag=" << enable_multifrag_kernels;
 
   if (ra_exe_unit.union_all) {
     buildFragmentPerKernelMapForUnion(ra_exe_unit,
@@ -290,6 +291,7 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
   // devices. The basic idea: the device is decided by the outer table in the
   // query (the first table in a join) and we need to broadcast the fragments
   // in the inner table to each device. Sharding will change this model.
+  LOG(INFO) << "Building multifrag kernel map";
   const auto& outer_table_desc = ra_exe_unit.input_descs.front();
   const auto outer_table_ref = outer_table_desc.getTableRef();
   auto it = selected_tables_fragments_.find(outer_table_ref);

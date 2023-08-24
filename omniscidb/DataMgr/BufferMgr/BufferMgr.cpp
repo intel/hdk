@@ -757,8 +757,10 @@ AbstractBuffer* BufferMgr::getBuffer(const ChunkKey& key, const size_t num_bytes
 
         // Check if we can zero-copy fetch requested chunk.
         if (auto token = getZeroCopyBufferMemory(key, num_bytes)) {
+          LOG(INFO) << "ZERO COPY!";
           res = createZeroCopyBuffer(key, std::move(token));
         } else {
+          LOG(INFO) << "NOT ZERO COPY!";
           // createChunk pins for us
           AbstractBuffer* buffer = createBuffer(key, page_size_, num_bytes);
           // This should put buffer in a BufferSegment.

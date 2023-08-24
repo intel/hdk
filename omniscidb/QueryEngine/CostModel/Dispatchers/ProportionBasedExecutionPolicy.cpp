@@ -38,7 +38,7 @@ SchedulingAssignment ProportionBasedExecutionPolicy::scheduleSingleFragment(
     size_t frag_id,
     size_t frag_num) const {
   unsigned scheduled_portion = 0;
-  for (auto& [device_type, portion] : proportion_) {
+  for (auto& [device_type, portion] : proportion_) { // We first try CPU, then GPU
     if (frag_id * total_parts_ < (portion + scheduled_portion) * frag_num) {
       auto memory_level = device_type == ExecutorDeviceType::GPU
                               ? Data_Namespace::GPU_LEVEL
