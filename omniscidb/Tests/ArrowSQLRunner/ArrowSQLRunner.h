@@ -82,9 +82,9 @@ ExecutionOptions getExecutionOptions(bool allow_loop_joins, bool just_explain = 
 
 CompilationOptions getCompilationOptions(ExecutorDeviceType device_type);
 
-std::shared_ptr<ResultSet> run_multiple_agg(const std::string& query_str,
-                                            const ExecutorDeviceType device_type,
-                                            const bool allow_loop_joins = true);
+hdk::ResultSetTableTokenPtr run_multiple_agg(const std::string& query_str,
+                                             const ExecutorDeviceType device_type,
+                                             const bool allow_loop_joins = true);
 
 TargetValue run_simple_agg(const std::string& query_str,
                            const ExecutorDeviceType device_type,

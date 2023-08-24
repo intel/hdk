@@ -148,15 +148,16 @@ std::pair<Datum, bool> datum_from_scalar_tv(const ScalarTargetValue* scalar_tv,
 
 hdk::ir::ExprPtr translateScalarSubqueryResult(
     std::shared_ptr<const ExecutionResult> result) {
-  auto row_set = result->getRows();
-  const size_t row_count = row_set->rowCount();
-  CHECK_EQ(size_t(1), row_set->colCount());
-  auto type = row_set->colType(0);
+  auto token = result->getToken();
+  const size_t row_count = token->rowCount();
+  CHECK_EQ(size_t(1), token->colCount());
+  auto type = token->colType(0);
   if (row_count > size_t(1)) {
     throw std::runtime_error("Scalar sub-query returned multiple rows");
   }
   if (row_count == size_t(0)) {
-    if (row_set->isValidationOnlyRes()) {
+    if (token->resultSet(0)->isValidationOnlyRes()) {
+      CHECK_EQ(token->resultSetCount(), (size_t)1);
       Datum d{0};
       return hdk::ir::makeExpr<hdk::ir::Constant>(type, /*is_null=*/false, d);
     } else {
@@ -165,8 +166,7 @@ hdk::ir::ExprPtr translateScalarSubqueryResult(
     }
   }
   CHECK_EQ(row_count, size_t(1));
-  row_set->moveToBegin();
-  auto first_row = row_set->getNextRow(false, false);
+  auto first_row = token->row(0, false, false);
   CHECK_EQ(first_row.size(), size_t(1));
   auto scalar_tv = boost::get<ScalarTargetValue>(&first_row[0]);
   if (type->isString() || type->isExtDictionary()) {

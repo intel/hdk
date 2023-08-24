@@ -269,13 +269,7 @@ void compare_arrow_table(std::shared_ptr<arrow::Table> at,
 }
 
 std::shared_ptr<arrow::Table> toArrow(const ExecutionResult& res) {
-  std::vector<std::string> col_names;
-  for (auto& target : res.getTargetsMeta()) {
-    col_names.push_back(target.get_resname());
-  }
-  auto converter =
-      std::make_unique<ArrowResultSetConverter>(res.getRows(), col_names, -1);
-  return converter->convertToArrowTable();
+  return res.getToken()->toArrow();
 }
 
 template <typename... Ts>

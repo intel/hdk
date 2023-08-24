@@ -51,6 +51,17 @@ void checkTypeConsistency(const int ref_col_type, const hdk::ir::Type* col_type)
   }
 }
 
+template <typename RESULT_SET>
+bool definitelyHasNoRows(const RESULT_SET* rs) {
+  return rs->definitelyHasNoRows();
+}
+
+template <>
+bool definitelyHasNoRows<hdk::ResultSetTableToken>(
+    const hdk::ResultSetTableToken* token) {
+  return token->rowCount() == (size_t)0;
+}
+
 template <class RESULT_SET>
 void compare_impl(SqliteConnector& connector,
                   bool use_row_iterator,
@@ -65,7 +76,7 @@ void compare_impl(SqliteConnector& connector,
   connector.query(sqlite_query_string);
   ASSERT_EQ(connector.getNumRows(), omnisci_results->rowCount()) << errmsg;
   const int num_rows{static_cast<int>(connector.getNumRows())};
-  if (omnisci_results->definitelyHasNoRows()) {
+  if (definitelyHasNoRows(omnisci_results)) {
     ASSERT_EQ(0, num_rows) << errmsg;
     return;
   }
@@ -76,8 +87,13 @@ void compare_impl(SqliteConnector& connector,
   const int num_cols{static_cast<int>(connector.getNumCols())};
   auto row_iterator = omnisci_results->rowIterator(true, true);
   for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
-    const auto crt_row =
-        use_row_iterator ? *row_iterator++ : omnisci_results->getNextRow(true, true);
+    std::vector<TargetValue> crt_row;
+    if constexpr (std::is_same_v<RESULT_SET, ArrowResultSet>) {
+      crt_row =
+          use_row_iterator ? *row_iterator++ : omnisci_results->getNextRow(true, true);
+    } else {
+      crt_row = *row_iterator++;
+    }
     CHECK(!crt_row.empty()) << errmsg;
     CHECK_EQ(static_cast<size_t>(num_cols), crt_row.size()) << errmsg;
     for (int col_idx = 0; col_idx < num_cols; ++col_idx) {
@@ -256,7 +272,7 @@ SQLiteComparator::~SQLiteComparator() {
   std::filesystem::remove_all(sqlite_db_dir_, err);
 }
 
-void SQLiteComparator::compare(ResultSetPtr omnisci_results,
+void SQLiteComparator::compare(hdk::ResultSetTableTokenPtr omnisci_results,
                                const std::string& query_string,
                                const ExecutorDeviceType device_type) {
   compare_impl(connector_,
@@ -281,9 +297,10 @@ void SQLiteComparator::compare_arrow_output(
 }
 
 // added to deal with time shift for now testing
-void SQLiteComparator::compare_timstamp_approx(ResultSetPtr omnisci_results,
-                                               const std::string& query_string,
-                                               const ExecutorDeviceType device_type) {
+void SQLiteComparator::compare_timstamp_approx(
+    hdk::ResultSetTableTokenPtr omnisci_results,
+    const std::string& query_string,
+    const ExecutorDeviceType device_type) {
   compare_impl(connector_,
                use_row_iterator_,
                omnisci_results.get(),

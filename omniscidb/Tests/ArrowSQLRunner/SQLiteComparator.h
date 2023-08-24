@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ResultSet/ArrowResultSet.h"
+#include "ResultSetRegistry/ResultSetTableToken.h"
 #include "Shared/sqltypes.h"
 #include "SqliteConnector/SqliteConnector.h"
 
@@ -36,7 +37,7 @@ class SQLiteComparator {
     connector_.batch_insert(table_name, insert_vals);
   }
 
-  void compare(ResultSetPtr omnisci_results,
+  void compare(hdk::ResultSetTableTokenPtr omnisci_results,
                const std::string& query_string,
                const ExecutorDeviceType device_type);
 
@@ -45,7 +46,7 @@ class SQLiteComparator {
                             const ExecutorDeviceType device_type);
 
   // added to deal with time shift for now testing
-  void compare_timstamp_approx(ResultSetPtr omnisci_results,
+  void compare_timstamp_approx(hdk::ResultSetTableTokenPtr omnisci_results,
                                const std::string& query_string,
                                const ExecutorDeviceType device_type);
 

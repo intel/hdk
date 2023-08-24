@@ -125,6 +125,8 @@ class ResultSetRowIterator {
     return crt_row_buff_idx_ - 1;
   }
 
+  bool isValid() const { return global_entry_idx_valid_; }
+
  private:
   const ResultSet* result_set_;
   size_t crt_row_buff_idx_;

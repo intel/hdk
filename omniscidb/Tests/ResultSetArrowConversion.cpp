@@ -223,14 +223,22 @@ void test_chunked_conversion(bool enable_columnar_output,
                              size_t fragment_size) {
   bool prev_enable_columnar_output = config().rs.enable_columnar_output;
   bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
 
-  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+  ScopeGuard reset = [prev_enable_columnar_output,
+                      prev_enable_lazy_fetch,
+                      prev_enable_multifrag_execution_result] {
     config().rs.enable_columnar_output = prev_enable_columnar_output;
     config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
   };
 
   config().rs.enable_columnar_output = enable_columnar_output;
   config().rs.enable_lazy_fetch = enable_lazy_fetch;
+  // We want to have multiple chunks in a single ResultSet for the test.
+  config().exec.enable_multifrag_execution_result = false;
   test_arrow_table_conversion_table6x4(fragment_size);
 }
 
@@ -683,6 +691,14 @@ TEST(ArrowTable, Chunked_Conversion4) {
 
 //  Projection operation test (column "d")
 TEST(ArrowTable, Chunked_SingleColumnConversion) {
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  ScopeGuard reset = [prev_enable_multifrag_execution_result] {
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
+  };
+  config().exec.enable_multifrag_execution_result = false;
+
   auto res = runSqlQuery("select 2*d from test_chunked;", ExecutorDeviceType::CPU, true);
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -714,14 +730,20 @@ TEST(ArrowTable, Chunked_GROUPBY1) {
 void JoinTest(bool enable_columnar_output, bool enable_lazy_fetch) {
   bool prev_enable_columnar_output = config().rs.enable_columnar_output;
   bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
-
-  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  ScopeGuard reset = [prev_enable_columnar_output,
+                      prev_enable_lazy_fetch,
+                      prev_enable_multifrag_execution_result] {
     config().rs.enable_columnar_output = prev_enable_columnar_output;
     config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
   };
 
   config().rs.enable_columnar_output = enable_columnar_output;
   config().rs.enable_lazy_fetch = enable_lazy_fetch;
+  config().exec.enable_multifrag_execution_result = false;
 
   auto res = runSqlQuery(
       "SELECT * FROM test_chunked INNER JOIN join_table ON test_chunked.i=join_table.i;",
@@ -757,6 +779,14 @@ TEST(ArrowTable, Chunked_JOIN4) {
 
 //  Tests with NULLs
 TEST(ArrowTable, Chunked_NULLS1) {
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  ScopeGuard reset = [prev_enable_multifrag_execution_result] {
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
+  };
+  config().exec.enable_multifrag_execution_result = false;
+
   auto res = runSqlQuery("select * from chunked_nulls;", ExecutorDeviceType::CPU, true);
   auto table = getArrowTable(res);
   ASSERT_NE(table, nullptr);
@@ -775,6 +805,14 @@ TEST(ArrowTable, Chunked_NULLS1) {
 }
 
 TEST(ArrowTable, Chunked_NULLS2) {
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  ScopeGuard reset = [prev_enable_multifrag_execution_result] {
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
+  };
+  config().exec.enable_multifrag_execution_result = false;
+
   auto res = runSqlQuery(
       "select 2*i,3*bi,4*d from chunked_nulls;", ExecutorDeviceType::CPU, true);
   auto table = getArrowTable(res);
@@ -798,14 +836,22 @@ TEST(ArrowTable, Chunked_NULLS2) {
 TEST(ArrowTable, LargeTables) {
   bool prev_enable_columnar_output = config().rs.enable_columnar_output;
   bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
 
-  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+  ScopeGuard reset = [prev_enable_columnar_output,
+                      prev_enable_lazy_fetch,
+                      prev_enable_multifrag_execution_result] {
     config().rs.enable_columnar_output = prev_enable_columnar_output;
     config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
   };
 
   config().rs.enable_columnar_output = true;
   config().rs.enable_lazy_fetch = false;
+  config().exec.enable_multifrag_execution_result = false;
+
   const size_t N = 500'000;
   test_single_column_table<int8_t>(N, 150);
   test_single_column_table<int16_t>(N, 150);
@@ -818,14 +864,22 @@ TEST(ArrowTable, LargeTables) {
 TEST(ArrowTable, LargeTablesRowWise) {
   bool prev_enable_columnar_output = config().rs.enable_columnar_output;
   bool prev_enable_lazy_fetch = config().rs.enable_lazy_fetch;
+  bool prev_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
 
-  ScopeGuard reset = [prev_enable_columnar_output, prev_enable_lazy_fetch] {
+  ScopeGuard reset = [prev_enable_columnar_output,
+                      prev_enable_lazy_fetch,
+                      prev_enable_multifrag_execution_result] {
     config().rs.enable_columnar_output = prev_enable_columnar_output;
     config().rs.enable_lazy_fetch = prev_enable_lazy_fetch;
+    config().exec.enable_multifrag_execution_result =
+        prev_enable_multifrag_execution_result;
   };
 
   config().rs.enable_columnar_output = false;
   config().rs.enable_lazy_fetch = false;
+  config().exec.enable_multifrag_execution_result = false;
+
   const size_t N = 500'000;
   test_single_column_table<int8_t>(N, 150);
   test_single_column_table<int16_t>(N, 150);

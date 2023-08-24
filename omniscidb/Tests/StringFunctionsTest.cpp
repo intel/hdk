@@ -74,8 +74,8 @@ void assert_value_equals(ScalarTargetValue& expected,
 
 void compare_result_set(
     const std::vector<std::vector<ScalarTargetValue>>& expected_result_set,
-    const std::shared_ptr<ResultSet>& actual_result_set) {
-  auto row_count = actual_result_set->rowCount(false);
+    const hdk::ResultSetTableTokenPtr& actual_result_set) {
+  auto row_count = actual_result_set->rowCount();
   ASSERT_EQ(expected_result_set.size(), row_count)
       << "Returned result set does not have the expected number of rows";
 
@@ -90,7 +90,7 @@ void compare_result_set(
   ;
 
   for (size_t r = 0; r < row_count; ++r) {
-    auto row = actual_result_set->getNextRow(true, true);
+    auto row = actual_result_set->row(r, true, true);
     for (size_t c = 0; c < column_count; c++) {
       auto column_value = boost::get<ScalarTargetValue>(row[c]);
       auto expected_column_value = expected_result_set[r][c];

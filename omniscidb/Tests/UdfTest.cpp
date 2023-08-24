@@ -295,12 +295,12 @@ TEST_F(UDFCompilerTest, UdfQuery) {
       const auto rows = run_multiple_agg(
           "SELECT array_ret_udf(pay_by_quarter, CAST(1.2 AS DOUBLE)) FROM sal_emp;", dt);
       ASSERT_EQ(rows->rowCount(), size_t(4));
-      check_row_result(rows->getNextRow(false, false),
+      check_row_result(rows->row(0, false, false),
                        std::vector<double>{6000, 7200, 8400, 9600});
-      check_row_result(rows->getNextRow(false, false),
+      check_row_result(rows->row(1, false, false),
                        std::vector<double>{3600, 4200, 4800, 5160});
-      check_row_result(rows->getNextRow(false, false), std::vector<double>{});
-      check_row_result(rows->getNextRow(false, false),
+      check_row_result(rows->row(2, false, false), std::vector<double>{});
+      check_row_result(rows->row(3, false, false),
                        std::vector<double>{8400,
                                            inline_fp_null_value<double>(),
                                            inline_fp_null_value<double>(),

@@ -72,13 +72,13 @@ TEST_F(ArrayExtOpsEnv, ArrayAppendInteger) {
                                                            const int64_t null_sentinel) {
       ASSERT_EQ(rows->rowCount(), size_t(6));
 
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{1, 2, 3});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{1});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{-1, 0});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{0});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(0, true, true), std::vector<int64_t>{1, 2, 3});
+      check_row_result(rows->row(1, true, true), std::vector<int64_t>{1});
+      check_row_result(rows->row(2, true, true), std::vector<int64_t>{-1, 0});
+      check_row_result(rows->row(3, true, true), std::vector<int64_t>{0});
+      check_row_result(rows->row(4, true, true),
                        std::vector<int64_t>{4, 5, null_sentinel});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{null_sentinel});
+      check_row_result(rows->row(5, true, true), std::vector<int64_t>{null_sentinel});
     };
 
     // i64
@@ -128,14 +128,13 @@ TEST_F(ArrayExtOpsEnv, ArrayAppendBool) {
                                                         const int64_t null_sentinel) {
       ASSERT_EQ(rows->rowCount(), size_t(6));
 
-      check_row_result(rows->getNextRow(true, true),
-                       std::vector<int64_t>{true, false, true});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{false});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{true, false});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{false});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(0, true, true), std::vector<int64_t>{true, false, true});
+      check_row_result(rows->row(1, true, true), std::vector<int64_t>{false});
+      check_row_result(rows->row(2, true, true), std::vector<int64_t>{true, false});
+      check_row_result(rows->row(3, true, true), std::vector<int64_t>{false});
+      check_row_result(rows->row(4, true, true),
                        std::vector<int64_t>{false, true, null_sentinel});
-      check_row_result(rows->getNextRow(true, true), std::vector<int64_t>{null_sentinel});
+      check_row_result(rows->row(5, true, true), std::vector<int64_t>{null_sentinel});
     };
 
     // bool
@@ -155,13 +154,13 @@ TEST_F(ArrayExtOpsEnv, ArrayAppendDouble) {
     auto check_entire_double_result = [&check_row_result](const auto& rows) {
       ASSERT_EQ(rows->rowCount(), size_t(6));
 
-      check_row_result(rows->getNextRow(true, true), std::vector<double>{1, 2, 3});
-      check_row_result(rows->getNextRow(true, true), std::vector<double>{1});
-      check_row_result(rows->getNextRow(true, true), std::vector<double>{-1, 0});
-      check_row_result(rows->getNextRow(true, true), std::vector<double>{0});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(0, true, true), std::vector<double>{1, 2, 3});
+      check_row_result(rows->row(1, true, true), std::vector<double>{1});
+      check_row_result(rows->row(2, true, true), std::vector<double>{-1, 0});
+      check_row_result(rows->row(3, true, true), std::vector<double>{0});
+      check_row_result(rows->row(4, true, true),
                        std::vector<double>{4, 5, inline_fp_null_value<double>()});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(5, true, true),
                        std::vector<double>{inline_fp_null_value<double>()});
     };
 
@@ -182,13 +181,13 @@ TEST_F(ArrayExtOpsEnv, ArrayAppendFloat) {
     auto check_entire_float_result = [&check_row_result](const auto& rows) {
       ASSERT_EQ(rows->rowCount(), size_t(6));
 
-      check_row_result(rows->getNextRow(true, true), std::vector<float>{1, 2, 3});
-      check_row_result(rows->getNextRow(true, true), std::vector<float>{1});
-      check_row_result(rows->getNextRow(true, true), std::vector<float>{-1, 0});
-      check_row_result(rows->getNextRow(true, true), std::vector<float>{0});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(0, true, true), std::vector<float>{1, 2, 3});
+      check_row_result(rows->row(1, true, true), std::vector<float>{1});
+      check_row_result(rows->row(2, true, true), std::vector<float>{-1, 0});
+      check_row_result(rows->row(3, true, true), std::vector<float>{0});
+      check_row_result(rows->row(4, true, true),
                        std::vector<float>{4, 5, inline_fp_null_value<float>()});
-      check_row_result(rows->getNextRow(true, true),
+      check_row_result(rows->row(5, true, true),
                        std::vector<float>{inline_fp_null_value<float>()});
     };
 
