@@ -1488,9 +1488,10 @@ class ExecuteTestBase {
     createVarlenLazyFetchTable();
   }
 
-  static void check_date_trunc_groups(const ResultSet& rows) {
+  static void check_date_trunc_groups(const hdk::ResultSetTableToken& rows) {
+    CHECK_EQ(rows.rowCount(), (size_t)3);
     {
-      const auto crt_row = rows.getNextRow(true, true);
+      const auto crt_row = rows.row(0, true, true);
       CHECK(!crt_row.empty());
       CHECK_EQ(size_t(3), crt_row.size());
       const auto sv0 = v<int64_t>(crt_row[0]);
@@ -1501,7 +1502,7 @@ class ExecuteTestBase {
       ASSERT_EQ(static_cast<int64_t>(g_num_rows), sv2);
     }
     {
-      const auto crt_row = rows.getNextRow(true, true);
+      const auto crt_row = rows.row(1, true, true);
       CHECK(!crt_row.empty());
       CHECK_EQ(size_t(3), crt_row.size());
       const auto sv0 = v<int64_t>(crt_row[0]);
@@ -1512,7 +1513,7 @@ class ExecuteTestBase {
       ASSERT_EQ(static_cast<int64_t>(g_num_rows) / 2, sv2);
     }
     {
-      const auto crt_row = rows.getNextRow(true, true);
+      const auto crt_row = rows.row(2, true, true);
       CHECK(!crt_row.empty());
       CHECK_EQ(size_t(3), crt_row.size());
       const auto sv0 = v<int64_t>(crt_row[0]);
@@ -1522,30 +1523,27 @@ class ExecuteTestBase {
       const auto sv2 = v<int64_t>(crt_row[2]);
       ASSERT_EQ(static_cast<int64_t>(g_num_rows) / 2, sv2);
     }
-    const auto crt_row = rows.getNextRow(true, true);
-    CHECK(crt_row.empty());
   }
 
-  static void check_one_date_trunc_group(const ResultSet& rows, const int64_t ref_ts) {
-    const auto crt_row = rows.getNextRow(true, true);
+  static void check_one_date_trunc_group(const hdk::ResultSetTableToken& rows,
+                                         const int64_t ref_ts) {
+    CHECK_EQ(rows.rowCount(), (size_t)1);
+    const auto crt_row = rows.row(0, true, true);
     ASSERT_EQ(size_t(1), crt_row.size());
     const auto actual_ts = v<int64_t>(crt_row[0]);
     ASSERT_EQ(ref_ts, actual_ts);
-    const auto empty_row = rows.getNextRow(true, true);
-    ASSERT_TRUE(empty_row.empty());
   }
 
-  static void check_one_date_trunc_group_with_agg(const ResultSet& rows,
+  static void check_one_date_trunc_group_with_agg(const hdk::ResultSetTableToken& rows,
                                                   const int64_t ref_ts,
                                                   const int64_t ref_agg) {
-    const auto crt_row = rows.getNextRow(true, true);
+    CHECK_EQ(rows.rowCount(), (size_t)1);
+    const auto crt_row = rows.row(0, true, true);
     ASSERT_EQ(size_t(2), crt_row.size());
     const auto actual_ts = v<int64_t>(crt_row[0]);
     ASSERT_EQ(ref_ts, actual_ts);
     const auto actual_agg = v<int64_t>(crt_row[1]);
     ASSERT_EQ(ref_agg, actual_agg);
-    const auto empty_row = rows.getNextRow(true, true);
-    ASSERT_TRUE(empty_row.empty());
   }
 
   // Example: "1969-12-31 23:59:59.999999" -> -1
@@ -2547,10 +2545,8 @@ TEST_F(Select, FilterShortCircuit) {
       std::string query(
           "SELECT COUNT(*) FROM test WHERE (MOD(x, 2) = 0) AND (str LIKE 's__') AND (x "
           "in (7));");
-      const auto result = run_multiple_agg(query, dt);
-      const auto row = result->getNextRow(true, true);
-      ASSERT_EQ(size_t(1), row.size());
-      ASSERT_EQ(int64_t(0), v<int64_t>(row[0]));
+      const auto result = run_simple_agg(query, dt);
+      ASSERT_EQ(int64_t(0), v<int64_t>(result));
     }
   }
 }
@@ -3822,51 +3818,51 @@ TEST_F(Select, ApproxMedianSort) {
       switch (t) {
         case 0:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) + 10)
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), int64_t(i) + 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), NULL_DOUBLE)
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) - 10)
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), int64_t(i) - 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), double(i) - 10)
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), double(i) - 10)
                 << query << "i=" << i;
           }
           break;
         case 1:
-          EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i))
+          EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), int64_t(i))
               << query << "i=" << i;
           if (i < 10) {
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), double(i))
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), double(i))
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), NULL_DOUBLE)
                 << query << "i=" << i;
           }
           break;
         case 2:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i) + 10)
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), int64_t(i) + 10)
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), NULL_DOUBLE)
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), 19 - int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), 19 - int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), 19 - double(i))
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), 19 - double(i))
                 << query << "i=" << i;
           }
           break;
         case 3:
           if (i < 10) {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), 9 - int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), 9 - int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), 9 - double(i))
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), 9 - double(i))
                 << query << "i=" << i;
           } else {
-            EXPECT_EQ(v<int64_t>(rows->getRowAt(i, 0, true, true)), int64_t(i))
+            EXPECT_EQ(v<int64_t>(rows->row(i, true, true)[0]), int64_t(i))
                 << query << "i=" << i;
-            EXPECT_EQ(v<double>(rows->getRowAt(i, 1, true, true)), NULL_DOUBLE)
+            EXPECT_EQ(v<double>(rows->row(i, true, true)[1]), NULL_DOUBLE)
                 << query << "i=" << i;
           }
           break;
@@ -3947,14 +3943,14 @@ TEST_F(Select, ApproxPercentileValidate) {
   eo.just_validate = true;
   // APPROX_MEDIAN
   char const* query = "SELECT APPROX_MEDIAN(x) FROM test;";
-  std::shared_ptr<ResultSet> rows = runSqlQuery(query, dt, std::move(eo)).getRows();
-  auto crt_row = rows->getNextRow(true, true);
+  auto rows = runSqlQuery(query, dt, std::move(eo)).getToken();
+  auto crt_row = rows->row(0, true, true);
   CHECK_EQ(1u, crt_row.size()) << query;
   EXPECT_EQ(NULL_DOUBLE, v<double>(crt_row[0]));
   // APPROX_PERCENTILE
   query = "SELECT APPROX_PERCENTILE(x,0.1) FROM test;";
-  rows = runSqlQuery(query, dt, std::move(eo)).getRows();
-  crt_row = rows->getNextRow(true, true);
+  rows = runSqlQuery(query, dt, std::move(eo)).getToken();
+  crt_row = rows->row(0, true, true);
   CHECK_EQ(1u, crt_row.size()) << query;
   EXPECT_EQ(NULL_DOUBLE, v<double>(crt_row[0]));
 }
@@ -4005,12 +4001,12 @@ TEST_F(Select, OrderBy) {
     CHECK_EQ(rows->rowCount(), std::min(size_t(5), static_cast<size_t>(g_num_rows)) + 0);
     CHECK_EQ(rows->colCount(), size_t(4));
     for (size_t row_idx = 0; row_idx < rows->rowCount(); ++row_idx) {
-      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 0, true, true)) == 8 ||
-                  v<int64_t>(rows->getRowAt(row_idx, 0, true, true)) == 7);
-      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 1, true, true)), 43);
-      ASSERT_EQ(v<int64_t>(rows->getRowAt(row_idx, 2, true, true)), 1104);
-      ASSERT_TRUE(v<int64_t>(rows->getRowAt(row_idx, 3, true, true)) == 344 ||
-                  v<int64_t>(rows->getRowAt(row_idx, 3, true, true)) == 301);
+      ASSERT_TRUE(v<int64_t>(rows->row(row_idx, true, true)[0]) == 8 ||
+                  v<int64_t>(rows->row(row_idx, true, true)[0]) == 7);
+      ASSERT_EQ(v<int64_t>(rows->row(row_idx, true, true)[1]), 43);
+      ASSERT_EQ(v<int64_t>(rows->row(row_idx, true, true)[2]), 1104);
+      ASSERT_TRUE(v<int64_t>(rows->row(row_idx, true, true)[3]) == 344 ||
+                  v<int64_t>(rows->row(row_idx, true, true)[3]) == 301);
     }
     c("SELECT x, COUNT(distinct y) AS n FROM test GROUP BY x ORDER BY n DESC;", dt);
     c("SELECT x x1, x, COUNT(*) AS val FROM test GROUP BY x HAVING val > 5 ORDER BY val "
@@ -4177,19 +4173,17 @@ TEST_F(Select, ComplexQueries) {
         dt);
     ASSERT_EQ(rows->rowCount(), size_t(2));
     {
-      auto crt_row = rows->getNextRow(true, true);
+      auto crt_row = rows->row(0, true, true);
       CHECK_EQ(size_t(2), crt_row.size());
       ASSERT_EQ(v<int64_t>(crt_row[0]), 50);
       ASSERT_EQ(v<int64_t>(crt_row[1]), -295);
     }
     {
-      auto crt_row = rows->getNextRow(true, true);
+      auto crt_row = rows->row(1, true, true);
       CHECK_EQ(size_t(2), crt_row.size());
       ASSERT_EQ(v<int64_t>(crt_row[0]), 49);
       ASSERT_EQ(v<int64_t>(crt_row[1]), -590);
     }
-    auto empty_row = rows->getNextRow(true, true);
-    CHECK(empty_row.empty());
   }
 }
 
@@ -6668,7 +6662,7 @@ TEST_F(Select, DateTruncate) {
                                  const std::vector<int64_t>& expected) {
       EXPECT_EQ(result->rowCount(), expected.size());
       for (size_t i = 0; i < expected.size(); i++) {
-        auto row = result->getNextRow(false, false);
+        auto row = result->row(i, false, false);
         EXPECT_EQ(row.size(), size_t(1));
         EXPECT_EQ(expected[i], v<int64_t>(row[0]));
       }
@@ -8105,7 +8099,7 @@ TEST_F(Select, LogicalValues) {
     {
       auto rows = run_multiple_agg("SELECT * FROM (VALUES(1, 2, 3)) as t(x, y, z);", dt);
       EXPECT_EQ(rows->rowCount(), size_t(1));
-      const auto row = rows->getNextRow(false, false);
+      const auto row = rows->row(0, false, false);
       EXPECT_EQ(1, v<int64_t>(row[0]));
       EXPECT_EQ(2, v<int64_t>(row[1]));
       EXPECT_EQ(3, v<int64_t>(row[2]));
@@ -8117,22 +8111,22 @@ TEST_F(Select, LogicalValues) {
           dt);
       EXPECT_EQ(rows->rowCount(), size_t(4));
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(0, false, false);
         EXPECT_EQ(1, v<int64_t>(row[0]));
         EXPECT_EQ(1, v<int64_t>(row[1]));
       }
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(1, false, false);
         EXPECT_EQ(2, v<int64_t>(row[0]));
         EXPECT_EQ(1, v<int64_t>(row[1]));
       }
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(2, false, false);
         EXPECT_EQ(3, v<int64_t>(row[0]));
         EXPECT_EQ(1, v<int64_t>(row[1]));
       }
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(3, false, false);
         EXPECT_EQ(inline_null_value<int32_t>(), v<int64_t>(row[0]));
         EXPECT_EQ(0, v<int64_t>(row[1]));
       }
@@ -8141,7 +8135,7 @@ TEST_F(Select, LogicalValues) {
       auto rows = run_multiple_agg(
           "SELECT SUM(x), AVG(y), MIN(z) FROM (VALUES(1, 2, 3)) as t(x, y, z);", dt);
       EXPECT_EQ(rows->rowCount(), size_t(1));
-      const auto row = rows->getNextRow(false, false);
+      const auto row = rows->row(0, false, false);
       EXPECT_EQ(1, v<int64_t>(row[0]));
       EXPECT_EQ(2, v<double>(row[1]));
       EXPECT_EQ(3, v<int64_t>(row[2]));
@@ -8150,13 +8144,13 @@ TEST_F(Select, LogicalValues) {
       auto rows = run_multiple_agg("SELECT * FROM (VALUES(1, 2, 3),(4, 5, 6));", dt);
       EXPECT_EQ(rows->rowCount(), size_t(2));
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(0, false, false);
         EXPECT_EQ(1, v<int64_t>(row[0]));
         EXPECT_EQ(2, v<int64_t>(row[1]));
         EXPECT_EQ(3, v<int64_t>(row[2]));
       }
       {
-        const auto row = rows->getNextRow(false, false);
+        const auto row = rows->row(1, false, false);
         EXPECT_EQ(4, v<int64_t>(row[0]));
         EXPECT_EQ(5, v<int64_t>(row[1]));
         EXPECT_EQ(6, v<int64_t>(row[2]));
@@ -8167,7 +8161,7 @@ TEST_F(Select, LogicalValues) {
           "SELECT SUM(x), AVG(y), MIN(z) FROM (VALUES(1, 2, 3),(4, 5, 6)) as t(x, y, z);",
           dt);
       EXPECT_EQ(rows->rowCount(), size_t(1));
-      const auto row = rows->getNextRow(false, false);
+      const auto row = rows->row(0, false, false);
       EXPECT_EQ(5, v<int64_t>(row[0]));
       ASSERT_NEAR(3.5, v<double>(row[1]), double(0.01));
       EXPECT_EQ(3, v<int64_t>(row[2]));
@@ -8181,9 +8175,9 @@ TEST_F(Select, LogicalValues) {
       auto co = getCompilationOptions(dt);
       co.hoist_literals = true;
       const auto query_explain_result = runSqlQuery("SELECT 1+2;", co, eo);
-      const auto explain_result = query_explain_result.getRows();
+      const auto explain_result = query_explain_result.getToken();
       EXPECT_EQ(size_t(1), explain_result->rowCount());
-      const auto crt_row = explain_result->getNextRow(true, true);
+      const auto crt_row = explain_result->row(0, true, true);
       EXPECT_EQ(size_t(1), crt_row.size());
       const auto explain_str = boost::get<std::string>(v<NullableString>(crt_row[0]));
       EXPECT_TRUE(explain_str.find("IR for the ") == 0);
@@ -8217,14 +8211,12 @@ TEST_F(Select, ArrayUnnest) {
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count + 2) * power10,
-                v<int64_t>(result_rows->getRowAt(0, 1, true, true)));
-      ASSERT_EQ(
-          1,
-          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
-      ASSERT_EQ(
-          power10,
-          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 1, true, true)));
+                v<int64_t>(result_rows->row(0, true, true)[1]));
+      ASSERT_EQ(1,
+                v<int64_t>(result_rows->row(g_array_test_row_count + 1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(result_rows->row(0, true, true)[0]));
+      ASSERT_EQ(power10,
+                v<int64_t>(result_rows->row(g_array_test_row_count + 1, true, true)[1]));
 
       auto fixed_result_rows =
           run_multiple_agg("SELECT COUNT(*), UNNEST(arr3_i" + std::to_string(int_width) +
@@ -8232,14 +8224,14 @@ TEST_F(Select, ArrayUnnest) {
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, fixed_result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count + 2) * power10,
-                v<int64_t>(fixed_result_rows->getRowAt(0, 1, true, true)));
-      ASSERT_EQ(1,
-                v<int64_t>(fixed_result_rows->getRowAt(
-                    g_array_test_row_count + 1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
-      ASSERT_EQ(power10,
-                v<int64_t>(fixed_result_rows->getRowAt(
-                    g_array_test_row_count + 1, 1, true, true)));
+                v<int64_t>(fixed_result_rows->row(0, true, true)[1]));
+      ASSERT_EQ(
+          1,
+          v<int64_t>(fixed_result_rows->row(g_array_test_row_count + 1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->row(0, true, true)[0]));
+      ASSERT_EQ(
+          power10,
+          v<int64_t>(fixed_result_rows->row(g_array_test_row_count + 1, true, true)[1]));
 
       power10 *= 10;
     }
@@ -8249,20 +8241,19 @@ TEST_F(Select, ArrayUnnest) {
                                ") AS a FROM array_test GROUP BY a ORDER BY a DESC;",
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
-      ASSERT_EQ(
-          1,
-          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
+      ASSERT_EQ(1,
+                v<int64_t>(result_rows->row(g_array_test_row_count + 1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(result_rows->row(0, true, true)[0]));
 
       auto fixed_result_rows =
           run_multiple_agg("SELECT COUNT(*), UNNEST(arr3_" + float_type +
                                ") AS a FROM array_test GROUP BY a ORDER BY a DESC;",
                            dt);
       ASSERT_EQ(g_array_test_row_count + 2, fixed_result_rows->rowCount());
-      ASSERT_EQ(1,
-                v<int64_t>(fixed_result_rows->getRowAt(
-                    g_array_test_row_count + 1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
+      ASSERT_EQ(
+          1,
+          v<int64_t>(fixed_result_rows->row(g_array_test_row_count + 1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->row(0, true, true)[0]));
     }
     {
       auto result_rows = run_multiple_agg(
@@ -8270,10 +8261,9 @@ TEST_F(Select, ArrayUnnest) {
           "DESC;",
           dt);
       ASSERT_EQ(g_array_test_row_count + 2, result_rows->rowCount());
-      ASSERT_EQ(
-          1,
-          v<int64_t>(result_rows->getRowAt(g_array_test_row_count + 1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
+      ASSERT_EQ(1,
+                v<int64_t>(result_rows->row(g_array_test_row_count + 1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(result_rows->row(0, true, true)[0]));
     }
     {
       auto result_rows = run_multiple_agg(
@@ -8282,11 +8272,11 @@ TEST_F(Select, ArrayUnnest) {
           dt);
       ASSERT_EQ(size_t(2), result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(result_rows->getRowAt(0, 0, true, true)));
+                v<int64_t>(result_rows->row(0, true, true)[0]));
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(result_rows->getRowAt(1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(result_rows->getRowAt(0, 1, true, true)));
-      ASSERT_EQ(0, v<int64_t>(result_rows->getRowAt(1, 1, true, true)));
+                v<int64_t>(result_rows->row(1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(result_rows->row(0, true, true)[1]));
+      ASSERT_EQ(0, v<int64_t>(result_rows->row(1, true, true)[1]));
 
       auto fixed_result_rows = run_multiple_agg(
           "SELECT COUNT(*), UNNEST(arr6_bool) AS a FROM array_test GROUP BY a ORDER BY a "
@@ -8294,11 +8284,11 @@ TEST_F(Select, ArrayUnnest) {
           dt);
       ASSERT_EQ(size_t(2), fixed_result_rows->rowCount());
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(fixed_result_rows->getRowAt(0, 0, true, true)));
+                v<int64_t>(fixed_result_rows->row(0, true, true)[0]));
       ASSERT_EQ(int64_t(g_array_test_row_count * 3),
-                v<int64_t>(fixed_result_rows->getRowAt(1, 0, true, true)));
-      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->getRowAt(0, 1, true, true)));
-      ASSERT_EQ(0, v<int64_t>(fixed_result_rows->getRowAt(1, 1, true, true)));
+                v<int64_t>(fixed_result_rows->row(1, true, true)[0]));
+      ASSERT_EQ(1, v<int64_t>(fixed_result_rows->row(0, true, true)[1]));
+      ASSERT_EQ(0, v<int64_t>(fixed_result_rows->row(1, true, true)[1]));
     }
 
     // unnest groupby, force estimator run
@@ -8389,7 +8379,7 @@ TEST_F(Select, ArrayCountDistinct) {
                            dt);
       ASSERT_EQ(g_array_test_row_count, result_rows->rowCount());
       for (size_t row_idx = 0; row_idx < g_array_test_row_count; ++row_idx) {
-        ASSERT_EQ(3, v<int64_t>(result_rows->getRowAt(row_idx, 0, true, true)));
+        ASSERT_EQ(3, v<int64_t>(result_rows->row(row_idx, true, true)[0]));
       }
 
       ASSERT_EQ(
@@ -8403,7 +8393,7 @@ TEST_F(Select, ArrayCountDistinct) {
                            dt);
       ASSERT_EQ(g_array_test_row_count, fixed_result_rows->rowCount());
       for (size_t row_idx = 0; row_idx < g_array_test_row_count; ++row_idx) {
-        ASSERT_EQ(3, v<int64_t>(fixed_result_rows->getRowAt(row_idx, 0, true, true)));
+        ASSERT_EQ(3, v<int64_t>(fixed_result_rows->row(row_idx, true, true)[0]));
       }
     }
     for (const std::string float_type : {"float", "double"}) {
@@ -8882,11 +8872,11 @@ TEST_F(Select, BigintGroupByColCompactionTest) {
     const auto result = run_multiple_agg(
         "SELECT * FROM bigint_groupby_col_compaction_test GROUP BY c ORDER BY c;", dt);
     ASSERT_EQ(size_t(3), result->rowCount());
-    const auto row1 = result->getNextRow(true, true);
+    const auto row1 = result->row(0, true, true);
     ASSERT_EQ(int64_t(-6336283200715718656), v<int64_t>(row1[0]));
-    const auto row2 = result->getNextRow(true, true);
+    const auto row2 = result->row(1, true, true);
     ASSERT_EQ(int64_t(-6312639302689611776), v<int64_t>(row2[0]));
-    const auto row3 = result->getNextRow(true, true);
+    const auto row3 = result->row(2, true, true);
     ASSERT_EQ(int64_t(-6312639302689603584), v<int64_t>(row3[0]));
   }
   dropTable("bigint_groupby_col_compaction_test");
@@ -9662,9 +9652,9 @@ TEST_F(Select, Joins_LeftJoinFiltered) {
     eo.allow_loop_joins = false;
     eo.just_explain = true;
     const auto query_explain_result = runSqlQuery(query, co, eo);
-    const auto explain_result = query_explain_result.getRows();
+    const auto explain_result = query_explain_result.getToken();
     EXPECT_EQ(size_t(1), explain_result->rowCount());
-    const auto crt_row = explain_result->getNextRow(true, true);
+    const auto crt_row = explain_result->row(0, true, true);
     EXPECT_EQ(size_t(1), crt_row.size());
     const auto explain_str = boost::get<std::string>(v<NullableString>(crt_row[0]));
     const auto n = explain_str.find("hoisted_left_join_filters_");
@@ -10706,7 +10696,7 @@ TEST_F(Select, Joins_Subqueries) {
         dt);
 
     ASSERT_EQ(size_t(1), result_rows->rowCount());
-    auto crt_row = result_rows->getNextRow(true, true);
+    auto crt_row = result_rows->row(0, true, true);
     ASSERT_EQ(size_t(2), crt_row.size());
     ASSERT_EQ("aa", boost::get<std::string>(v<NullableString>(crt_row[0])));
     ASSERT_EQ(1, v<int64_t>(crt_row[1]));
@@ -11042,7 +11032,7 @@ TEST_F(Select, RuntimeFunctions) {
       const auto func_type = result->colType(1);
       ASSERT_TRUE(func_type->nullable());
       for (size_t i = 0; i < g_num_rows; i++) {
-        auto crt_row = result->getNextRow(false, false);
+        auto crt_row = result->row(i, false, false);
         ASSERT_EQ(crt_row.size(), size_t(2));
         if (std::numeric_limits<float>::min() == v<float>(crt_row[0])) {
           ASSERT_EQ(std::numeric_limits<int8_t>::min(), v<int64_t>(crt_row[1]));
@@ -11116,6 +11106,14 @@ TEST_F(Select, DesugarTransform) {
 }
 
 TEST_F(Select, ArrowOutput) {
+  bool old_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  config().exec.enable_multifrag_execution_result = false;
+  ScopeGuard g([old_enable_multifrag_execution_result]() {
+    config().exec.enable_multifrag_execution_result =
+        old_enable_multifrag_execution_result;
+  });
+
   for (auto dt : testedDevices()) {
     c_arrow("SELECT str, COUNT(*) FROM test GROUP BY str ORDER BY str ASC;", dt);
     c_arrow("SELECT x, y, w, z, t, f, d, str, ofd, ofq FROM test ORDER BY x ASC, y ASC;",
@@ -11132,6 +11130,14 @@ TEST_F(Select, ArrowOutput) {
 }
 
 TEST_F(Select, ArrowDictionaries) {
+  bool old_enable_multifrag_execution_result =
+      config().exec.enable_multifrag_execution_result;
+  config().exec.enable_multifrag_execution_result = false;
+  ScopeGuard g([old_enable_multifrag_execution_result]() {
+    config().exec.enable_multifrag_execution_result =
+        old_enable_multifrag_execution_result;
+  });
+
   for (auto dt : testedDevices()) {
     // Projection - should be dense
     c_arrow(
@@ -14004,7 +14010,7 @@ TEST_F(Select, TimestampPrecision_EmptyFilters) {
           "22:23:15.000' AS TIMESTAMP(3))) GROUP BY 1 ORDER BY 1;",
           dt);
       ASSERT_EQ(rows->rowCount(), size_t(1));
-      auto count_row = rows->getNextRow(false, false);
+      auto count_row = rows->row(0, false, false);
       ASSERT_EQ(count_row.size(), size_t(2));
       ASSERT_EQ(5, v<int64_t>(count_row[1]));
     }
@@ -14173,15 +14179,16 @@ TEST_F(Select, CurrentUser) {
 }
 namespace {
 
-void validate_timestamp_agg(const ResultSet& row,
+void validate_timestamp_agg(const hdk::ResultSetTableToken& row,
                             const int64_t expected_ts,
                             const double expected_mean,
                             const int64_t expected_count) {
-  const auto crt_row = row.getNextRow(true, true);
   if (!expected_count) {
-    ASSERT_EQ(size_t(0), crt_row.size());
+    CHECK_EQ(row.rowCount(), (size_t)0);
     return;
   }
+  CHECK_EQ(row.rowCount(), (size_t)1);
+  const auto crt_row = row.row(0, true, true);
   ASSERT_EQ(size_t(3), crt_row.size());
   const auto actual_ts = v<int64_t>(crt_row[0]);
   ASSERT_EQ(actual_ts, expected_ts);
@@ -14189,8 +14196,6 @@ void validate_timestamp_agg(const ResultSet& row,
   ASSERT_EQ(actual_mean, expected_mean);
   const auto actual_count = v<int64_t>(crt_row[2]);
   ASSERT_EQ(actual_count, expected_count);
-  const auto nrow = row.getNextRow(true, true);
-  ASSERT_TRUE(nrow.empty());
 }
 
 }  // namespace
@@ -15629,93 +15634,87 @@ TEST_F(Select, Sample) {
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x > 8;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       const auto null_ptr = boost::get<void*>(&nullable_str);
       ASSERT_TRUE(null_ptr && !*null_ptr);
       ASSERT_EQ(0, v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x > 7;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       const auto str_ptr = boost::get<std::string>(&nullable_str);
       ASSERT_TRUE(str_ptr);
       ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
       ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x % 2 = 0;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       const auto str_ptr = boost::get<std::string>(&nullable_str);
       ASSERT_TRUE(str_ptr);
       ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
       ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x % 2 = 0;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       const auto str_ptr = boost::get<std::string>(&nullable_str);
       ASSERT_TRUE(str_ptr);
       ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
       ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(real_str), COUNT(*) FROM test WHERE x > 7 GROUP BY x;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       const auto str_ptr = boost::get<std::string>(&nullable_str);
       ASSERT_TRUE(str_ptr);
       ASSERT_EQ("real_bar", boost::get<std::string>(*str_ptr));
       ASSERT_EQ(static_cast<int64_t>(g_num_rows / 2), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     }
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(arr_i64), COUNT(*) FROM array_test WHERE x = 8;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       compare_array(crt_row[0], std::vector<int64_t>{200, 300, 400});
       ASSERT_EQ(static_cast<int64_t>(1), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(arr_i64), COUNT(*) FROM array_test WHERE x = 8 GROUP BY x;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       compare_array(crt_row[0], std::vector<int64_t>{200, 300, 400});
       ASSERT_EQ(static_cast<int64_t>(1), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     }
     {
       const auto rows = run_multiple_agg(
           "SELECT x, SAMPLE(arr_i64), SAMPLE(real_str), COUNT(*) FROM array_test "
           "WHERE x = 8 GROUP BY x;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(4), crt_row.size());
       compare_array(crt_row[1], std::vector<int64_t>{200, 300, 400});
       const auto nullable_str = v<NullableString>(crt_row[2]);
@@ -15723,29 +15722,25 @@ TEST_F(Select, Sample) {
       ASSERT_TRUE(str_ptr);
       ASSERT_EQ("real_str1", boost::get<std::string>(*str_ptr));
       ASSERT_EQ(static_cast<int64_t>(1), v<int64_t>(crt_row[3]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     }
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(arr3_i64), COUNT(*) FROM array_test WHERE x = 8;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       compare_array(crt_row[0], std::vector<int64_t>{200, 300, 400});
       ASSERT_EQ(static_cast<int64_t>(1), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     };
     {
       const auto rows = run_multiple_agg(
           "SELECT SAMPLE(arr3_i64), COUNT(*) FROM array_test WHERE x = 8 GROUP BY x;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(2), crt_row.size());
       compare_array(crt_row[0], std::vector<int64_t>{200, 300, 400});
       ASSERT_EQ(static_cast<int64_t>(1), v<int64_t>(crt_row[1]));
-      const auto empty_row = rows->getNextRow(true, true);
-      ASSERT_EQ(size_t(0), empty_row.size());
     }
     auto check_sample_rowid = [](const int64_t val) {
       const std::set<int64_t> valid_row_ids{15, 16, 17, 18, 19};
@@ -15757,7 +15752,8 @@ TEST_F(Select, Sample) {
           "SELECT AVG(d), AVG(f), str, SAMPLE(rowid) FROM test WHERE d > 2.4 GROUP "
           "BY str;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(4), crt_row.size());
       const auto d = v<double>(crt_row[0]);
       ASSERT_EQ(2.6, d);
@@ -15772,7 +15768,8 @@ TEST_F(Select, Sample) {
     };
     {
       const auto rows = run_multiple_agg("SELECT SAMPLE(str) FROM test WHERE x > 8;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      CHECK_EQ(rows->rowCount(), (size_t)1);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(1), crt_row.size());
       const auto nullable_str = v<NullableString>(crt_row[0]);
       ASSERT_FALSE(boost::get<void*>(nullable_str));
@@ -15781,7 +15778,7 @@ TEST_F(Select, Sample) {
       const auto rows = run_multiple_agg(
           "SELECT x, SAMPLE(fixed_str), SUM(t) FROM test GROUP BY x ORDER BY x DESC;",
           dt);
-      const auto first_row = rows->getNextRow(true, true);
+      const auto first_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), first_row.size());
       ASSERT_EQ(int64_t(8), v<int64_t>(first_row[0]));
       const auto nullable_str = v<NullableString>(first_row[1]);
@@ -15792,7 +15789,7 @@ TEST_F(Select, Sample) {
     {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(f) FROM test GROUP BY z ORDER BY z;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
@@ -15801,12 +15798,12 @@ TEST_F(Select, Sample) {
     {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(fn) FROM test GROUP BY z ORDER BY z;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
       ASSERT_NEAR(float(-101.2), v<float>(crt_row[2]), 0.01);
-      const auto null_row = rows->getNextRow(true, true);
+      const auto null_row = rows->row(1, true, true);
       ASSERT_EQ(size_t(3), null_row.size());
       ASSERT_EQ(int64_t(101), v<int64_t>(null_row[0]));
       ASSERT_EQ(int64_t(10), v<int64_t>(null_row[1]));
@@ -15815,7 +15812,7 @@ TEST_F(Select, Sample) {
     {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(d) FROM test GROUP BY z ORDER BY z;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
@@ -15824,12 +15821,12 @@ TEST_F(Select, Sample) {
     {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(dn) FROM test GROUP BY z ORDER BY z;", dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
       ASSERT_NEAR(double(-2002.4), v<double>(crt_row[2]), 0.01);
-      const auto null_row = rows->getNextRow(true, true);
+      const auto null_row = rows->row(1, true, true);
       ASSERT_EQ(size_t(3), null_row.size());
       ASSERT_EQ(int64_t(101), v<int64_t>(null_row[0]));
       ASSERT_EQ(int64_t(10), v<int64_t>(null_row[1]));
@@ -15839,7 +15836,7 @@ TEST_F(Select, Sample) {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(d), SAMPLE(f) FROM test GROUP BY z ORDER BY z;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(4), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
@@ -15850,13 +15847,13 @@ TEST_F(Select, Sample) {
       const auto rows = run_multiple_agg(
           "SELECT z, COUNT(*), SAMPLE(fn), SAMPLE(dn) FROM test GROUP BY z ORDER BY z;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(4), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
       ASSERT_NEAR(float(-101.2), v<float>(crt_row[2]), 0.01);
       ASSERT_NEAR(double(-2002.4), v<double>(crt_row[3]), 0.01);
-      const auto null_row = rows->getNextRow(true, true);
+      const auto null_row = rows->row(1, true, true);
       ASSERT_EQ(size_t(4), null_row.size());
       ASSERT_EQ(int64_t(101), v<int64_t>(null_row[0]));
       ASSERT_EQ(int64_t(10), v<int64_t>(null_row[1]));
@@ -15868,14 +15865,14 @@ TEST_F(Select, Sample) {
           "SELECT z, COUNT(*), SAMPLE(fn), SAMPLE(x), SAMPLE(dn) FROM test GROUP BY z "
           "ORDER BY z;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(5), crt_row.size());
       ASSERT_EQ(int64_t(-78), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(5), v<int64_t>(crt_row[1]));
       ASSERT_NEAR(float(-101.2), v<float>(crt_row[2]), 0.01);
       ASSERT_EQ(int64_t(8), v<int64_t>(crt_row[3]));
       ASSERT_NEAR(double(-2002.4), v<double>(crt_row[4]), 0.01);
-      const auto null_row = rows->getNextRow(true, true);
+      const auto null_row = rows->row(1, true, true);
       ASSERT_EQ(size_t(5), null_row.size());
       ASSERT_EQ(int64_t(101), v<int64_t>(null_row[0]));
       ASSERT_EQ(int64_t(10), v<int64_t>(null_row[1]));
@@ -16454,7 +16451,7 @@ TEST_F(Select, WindowFunctionAggregate) {
           table_name + " ORDER BY x LIMIT 1;";
       const auto rows = run_multiple_agg(query, dt);
       ASSERT_EQ(rows->rowCount(), size_t(1));
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(crt_row.size(), size_t(3));
       ASSERT_EQ(v<int64_t>(crt_row[0]), int64_t(1));
       ASSERT_EQ(v<int64_t>(crt_row[1]), int64_t(0));
@@ -16818,11 +16815,11 @@ TEST_F(Select, MultiStepColumnarization) {
           "as T "
           "GROUP BY T.x ORDER BY T.x;");
       const auto result = run_multiple_agg(query, dt);
-      const auto first_row = result->getNextRow(true, true);
+      const auto first_row = result->row(0, true, true);
       ASSERT_EQ(size_t(2), first_row.size());
       ASSERT_EQ(int64_t(7), v<int64_t>(first_row[0]));
       ASSERT_FLOAT_EQ(double(1.243038177490234), v<double>(first_row[1]));
-      const auto second_row = result->getNextRow(true, true);
+      const auto second_row = result->row(1, true, true);
       ASSERT_EQ(int64_t(8), v<int64_t>(second_row[0]));
       ASSERT_FLOAT_EQ(double(0.778151273727417), v<double>(second_row[1]));
     }
@@ -16844,7 +16841,7 @@ TEST_F(Select, MultiStepColumnarization) {
           "SELECT id, SAMPLE(small_int), SUM(big_int) / COUNT(tiny_int) FROM "
           "logical_size_test GROUP BY id ORDER BY id LIMIT 1 OFFSET 1;",
           dt);
-      const auto first_row = result->getNextRow(true, true);
+      const auto first_row = result->row(0, true, true);
       ASSERT_EQ(size_t(3), first_row.size());
       ASSERT_EQ(int64_t(5), v<int64_t>(first_row[0]));
       ASSERT_TRUE((int64_t(79) == v<int64_t>(first_row[1])) ||
@@ -16880,7 +16877,7 @@ TEST_F(Select, MultiStepColumnarization) {
           "SUM(x) + SUM(y), SAMPLE(t) FROM test GROUP BY month_, day_ ORDER BY month_, "
           "day_ LIMIT 1;");
       const auto result = run_multiple_agg(query, dt);
-      const auto first_row = result->getNextRow(true, true);
+      const auto first_row = result->row(0, true, true);
       ASSERT_EQ(size_t(5), first_row.size());
       ASSERT_EQ(int64_t(936144000), v<int64_t>(first_row[0]));
       ASSERT_EQ(int64_t(1418428800), v<int64_t>(first_row[1]));
@@ -16903,7 +16900,7 @@ TEST_F(Select, MultiStepColumnarization) {
           "SUM(t)) / AVG(z), SAMPLE(f) + SAMPLE(d) FROM test GROUP BY key0, key1, key2, "
           "key3, key4 ORDER BY key2 LIMIT 1;");
       const auto result = run_multiple_agg(query, dt);
-      const auto first_row = result->getNextRow(true, true);
+      const auto first_row = result->row(0, true, true);
       ASSERT_EQ(size_t(8), first_row.size());
       ASSERT_NEAR(float(7), v<float>(first_row[0]), 0.01);
       ASSERT_EQ(int64_t(931701773874533), v<int64_t>(first_row[1]));
@@ -16950,7 +16947,7 @@ TEST_F(Select, LogicalSizedColumns) {
           "SELECT id, SAMPLE(small_int), COUNT(*) FROM logical_size_test"
           " WHERE tiny_int < 0 GROUP BY id ORDER BY id;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(4), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(75), v<int64_t>(crt_row[1]));
@@ -16962,7 +16959,7 @@ TEST_F(Select, LogicalSizedColumns) {
           "SELECT id, SAMPLE(tiny_int), MAX(small_int_null) FROM logical_size_test "
           " WHERE small_int < 76 GROUP BY id ORDER BY id;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), crt_row.size());
       ASSERT_EQ(int64_t(4), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(-13), v<int64_t>(crt_row[1]));
@@ -16976,7 +16973,7 @@ TEST_F(Select, LogicalSizedColumns) {
           "SAMPLE(small_int_null), SAMPLE(float_not_null) FROM logical_size_test"
           " WHERE big_int < 3000 GROUP BY id ORDER BY id;",
           dt);
-      const auto crt_row = rows->getNextRow(true, true);
+      const auto crt_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(6), crt_row.size());
       ASSERT_EQ(int64_t(4), v<int64_t>(crt_row[0]));
       ASSERT_EQ(int64_t(75), v<int64_t>(crt_row[1]));
@@ -16991,13 +16988,13 @@ TEST_F(Select, LogicalSizedColumns) {
           "SELECT id, SAMPLE(tiny_int), SAMPLE(small_int) FROM logical_size_test"
           " WHERE double_not_null < 20.0 GROUP BY id ORDER BY id;",
           dt);
-      const auto first_row = rows->getNextRow(true, true);
+      const auto first_row = rows->row(0, true, true);
       ASSERT_EQ(size_t(3), first_row.size());
       ASSERT_EQ(int64_t(4), v<int64_t>(first_row[0]));
       ASSERT_TRUE(int64_t(20) == v<int64_t>(first_row[1]) ||
                   int64_t(16) == v<int64_t>(first_row[1]));
       ASSERT_EQ(int64_t(78), v<int64_t>(first_row[2]));
-      const auto second_row = rows->getNextRow(true, true);
+      const auto second_row = rows->row(1, true, true);
       ASSERT_EQ(size_t(3), second_row.size());
       ASSERT_EQ(int64_t(5), v<int64_t>(second_row[0]));
       ASSERT_EQ(int64_t(23), v<int64_t>(second_row[1]));
@@ -17481,7 +17478,7 @@ TEST_F(Select, VarlenLazyFetch) {
       const auto query(
           "SELECT t, real_str, array_i16 FROM varlen_table where rowid = 222;");
       auto result = run_multiple_agg(query, dt);
-      const auto first_row = result->getNextRow(true, true);
+      const auto first_row = result->row(0, true, true);
       ASSERT_EQ(size_t(3), first_row.size());
       ASSERT_EQ(int64_t(95), v<int64_t>(first_row[0]));
       ASSERT_EQ(boost::get<std::string>(v<NullableString>(first_row[1])), "number222");
@@ -17729,7 +17726,7 @@ TEST_F(ManyRowsTest, Projection) {
           R"(SELECT t, x, y from many_rows ORDER BY x ASC NULLS FIRST;)", dt);
       EXPECT_EQ(result->rowCount(), ManyRowsTest::row_count);
       for (size_t i = 0; i < ManyRowsTest::row_count; i++) {
-        auto row = result->getNextRow(false, false);
+        auto row = result->row(i, false, false);
         EXPECT_EQ(row.size(), size_t(3));
       }
     });

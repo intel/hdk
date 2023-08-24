@@ -106,7 +106,7 @@ void runSingleValueTestValidation(const hdk::ir::Type* colType, ExecutorDeviceTy
   {
     auto results = run_multiple_agg("SELECT SINGLE_VALUE(val) FROM test_facts;", dt);
     ASSERT_EQ(uint64_t(1), results->rowCount());
-    const auto select_crt_row = results->getNextRow(true, true);
+    const auto select_crt_row = results->row(0, true, true);
     auto val = getValue(select_crt_row[0]);
     ASSERT_EQ(1, val);
   }
@@ -115,13 +115,13 @@ void runSingleValueTestValidation(const hdk::ir::Type* colType, ExecutorDeviceTy
     auto results = run_multiple_agg(
         "SELECT id, SINGLE_VALUE(val) FROM test_facts GROUP BY id ORDER BY id;", dt);
     ASSERT_EQ(uint64_t(3), results->rowCount());
-    auto select_crt_row = results->getNextRow(true, true);
+    auto select_crt_row = results->row(0, true, true);
     ASSERT_EQ(1, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
-    select_crt_row = results->getNextRow(true, true);
+    select_crt_row = results->row(1, true, true);
     ASSERT_EQ(2, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
-    select_crt_row = results->getNextRow(true, true);
+    select_crt_row = results->row(2, true, true);
     ASSERT_EQ(3, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
   }
@@ -132,13 +132,13 @@ void runSingleValueTestValidation(const hdk::ir::Type* colType, ExecutorDeviceTy
         "GROUP BY id) ORDER BY id;",
         dt);
     ASSERT_EQ(uint64_t(3), results->rowCount());
-    auto select_crt_row = results->getNextRow(true, true);
+    auto select_crt_row = results->row(0, true, true);
     ASSERT_EQ(2, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
-    select_crt_row = results->getNextRow(true, true);
+    select_crt_row = results->row(1, true, true);
     ASSERT_EQ(3, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
-    select_crt_row = results->getNextRow(true, true);
+    select_crt_row = results->row(2, true, true);
     ASSERT_EQ(4, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
   }
@@ -188,10 +188,10 @@ void runSingleValueTest(const hdk::ir::Type* colType, ExecutorDeviceType dt) {
             "id;",
         dt);
     ASSERT_EQ(uint64_t(2), results->rowCount());
-    auto select_crt_row = results->getNextRow(true, true);
+    auto select_crt_row = results->row(0, true, true);
     ASSERT_EQ(2, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
-    select_crt_row = results->getNextRow(true, true);
+    select_crt_row = results->row(1, true, true);
     ASSERT_EQ(3, getValue(select_crt_row[0]));
     ASSERT_EQ(1, getValue(select_crt_row[1]));
   }
@@ -223,7 +223,7 @@ TEST(Select, Correlated) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -251,7 +251,7 @@ TEST(Select, CorrelatedWithDouble) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getDoubleValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -295,7 +295,7 @@ TEST(Select, CorrelatedWithInnerDuplicatesAndMinId) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -328,7 +328,7 @@ TEST(Select, DISABLED_CorrelatedWithInnerDuplicatesDescIdOrder) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -359,7 +359,7 @@ TEST(Select, CorrelatedWithInnerDuplicatesAndMaxId) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -393,7 +393,7 @@ TEST(Select, DISABLED_CorrelatedWithInnerDuplicatesAndAscIdOrder) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -421,7 +421,7 @@ TEST(Select, CorrelatedWithOuterSortAscending) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -450,7 +450,7 @@ TEST(Select, CorrelatedWithOuterSortDescending) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = factsCount - 1; i >= 0; i--) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(factsCount - 1 - i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -531,7 +531,7 @@ TEST(Select, CorrelatedWhere) {
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
   for (int i = 0; i < 5; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -553,8 +553,9 @@ TEST(Select, CorrelatedWhereNull) {
 
   auto INT_NULL_SENTINEL = inline_null_value<int32_t>();
 
+  size_t row_idx = 0;
   for (int i = lookupCount; i < factsCount; i++) {
-    const auto select_crt_row = results->getNextRow(true, false);
+    const auto select_crt_row = results->row(row_idx++, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     auto lookupId = getIntValue(select_crt_row[2]);
@@ -610,7 +611,7 @@ TEST(Select, JoinCorrelation) {
   auto results1 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   uint32_t numResultRows = results1->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row = results1->getNextRow(true, false);
+  const auto select_crt_row = results1->row(0, true, false);
   auto id = getIntValue(select_crt_row[0]);
   auto val = getIntValue(select_crt_row[1]);
   ASSERT_EQ(id, 4);
@@ -624,7 +625,7 @@ TEST(Select, JoinCorrelation) {
   ASSERT_EQ(static_cast<uint32_t>(12), numResultRows);
   bool correct = true;
   for (uint32_t i = 0; i < numResultRows; i++) {
-    const auto select_crt_row = results2->getNextRow(true, false);
+    const auto select_crt_row = results2->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     if (id == 4 && val == 4) {
@@ -641,7 +642,7 @@ TEST(Select, JoinCorrelation) {
   ASSERT_EQ(static_cast<uint32_t>(12), numResultRows);
   correct = true;
   for (uint32_t i = 0; i < numResultRows; i++) {
-    const auto select_crt_row = results3->getNextRow(true, false);
+    const auto select_crt_row = results3->row(i, true, false);
     auto id = getIntValue(select_crt_row[0]);
     auto val = getIntValue(select_crt_row[1]);
     if (id == 4 && val == 4) {
@@ -657,7 +658,7 @@ TEST(Select, JoinCorrelation) {
   auto results5 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results5->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row5 = results5->getNextRow(true, false);
+  const auto select_crt_row5 = results5->row(0, true, false);
   id = getIntValue(select_crt_row5[0]);
   val = getIntValue(select_crt_row5[1]);
   ASSERT_EQ(id, 4);
@@ -669,7 +670,7 @@ TEST(Select, JoinCorrelation) {
   auto results6 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results6->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row6 = results6->getNextRow(true, false);
+  const auto select_crt_row6 = results6->row(0, true, false);
   id = getIntValue(select_crt_row6[0]);
   val = getIntValue(select_crt_row6[1]);
   ASSERT_EQ(id, 4);
@@ -681,7 +682,7 @@ TEST(Select, JoinCorrelation) {
   auto results4 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results4->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row4 = results4->getNextRow(true, false);
+  const auto select_crt_row4 = results4->row(0, true, false);
   id = getIntValue(select_crt_row4[0]);
   val = getIntValue(select_crt_row4[1]);
   ASSERT_EQ(id, 4);
@@ -701,7 +702,7 @@ TEST(Select, JoinCorrelation_withMultipleExists) {
   auto results1 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   uint32_t numResultRows = results1->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row = results1->getNextRow(true, false);
+  const auto select_crt_row = results1->row(0, true, false);
   auto id = getIntValue(select_crt_row[0]);
   auto val = getIntValue(select_crt_row[1]);
   ASSERT_EQ(id, 4);
@@ -714,7 +715,7 @@ TEST(Select, JoinCorrelation_withMultipleExists) {
   auto results2 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results2->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row2 = results2->getNextRow(true, false);
+  const auto select_crt_row2 = results2->row(0, true, false);
   id = getIntValue(select_crt_row2[0]);
   val = getIntValue(select_crt_row2[1]);
   ASSERT_EQ(id, 4);
@@ -729,7 +730,7 @@ TEST(Select, JoinCorrelation_withMultipleExists) {
   auto results3 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results3->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row3 = results3->getNextRow(true, false);
+  const auto select_crt_row3 = results3->row(0, true, false);
   id = getIntValue(select_crt_row3[0]);
   val = getIntValue(select_crt_row3[1]);
   ASSERT_EQ(id, 4);
@@ -753,7 +754,7 @@ TEST(Select, JoinCorrelation_withMultipleExists) {
   auto results5 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   numResultRows = results5->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row5 = results5->getNextRow(true, false);
+  const auto select_crt_row5 = results5->row(0, true, false);
   id = getIntValue(select_crt_row5[0]);
   val = getIntValue(select_crt_row5[1]);
   ASSERT_EQ(id, 4);
@@ -780,7 +781,7 @@ TEST(Select, JoinCorrelation_InClause) {
   auto results1 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   uint32_t numResultRows = results1->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows);
-  const auto select_crt_row = results1->getNextRow(true, false);
+  const auto select_crt_row = results1->row(0, true, false);
   auto id = getIntValue(select_crt_row[0]);
   auto val = getIntValue(select_crt_row[1]);
   ASSERT_EQ(id, 4);
@@ -816,7 +817,7 @@ TEST(Select, JoinCorrelation_InClause) {
   auto results5 = run_multiple_agg(sql, ExecutorDeviceType::CPU);
   uint32_t numResultRows5 = results5->rowCount();
   ASSERT_EQ(static_cast<uint32_t>(1), numResultRows5);
-  const auto select_crt_row5 = results5->getNextRow(true, false);
+  const auto select_crt_row5 = results5->row(0, true, false);
   id = getIntValue(select_crt_row5[0]);
   val = getIntValue(select_crt_row5[1]);
   ASSERT_EQ(id, 4);

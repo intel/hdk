@@ -151,17 +151,17 @@ class ArrowSQLRunnerImpl {
     return co;
   }
 
-  std::shared_ptr<ResultSet> run_multiple_agg(const std::string& query_str,
-                                              const ExecutorDeviceType device_type,
-                                              const bool allow_loop_joins = true) {
-    return runSqlQuery(query_str, device_type, allow_loop_joins).getRows();
+  hdk::ResultSetTableTokenPtr run_multiple_agg(const std::string& query_str,
+                                               const ExecutorDeviceType device_type,
+                                               const bool allow_loop_joins = true) {
+    return runSqlQuery(query_str, device_type, allow_loop_joins).getToken();
   }
 
   TargetValue run_simple_agg(const std::string& query_str,
                              const ExecutorDeviceType device_type,
                              const bool allow_loop_joins = true) {
     auto rows = run_multiple_agg(query_str, device_type, allow_loop_joins);
-    auto crt_row = rows->getNextRow(true, true);
+    auto crt_row = rows->row(0, true, true);
     CHECK_EQ(size_t(1), crt_row.size()) << query_str;
     return crt_row[0];
   }
@@ -282,8 +282,9 @@ class ArrowSQLRunnerImpl {
                size_t min_result_size_for_bulk_dictionary_fetch,
                double max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch) {
     auto results = run_multiple_agg(query_string, device_type);
+    CHECK_EQ(results->resultSetCount(), (size_t)1);
     auto arrow_omnisci_results = result_set_arrow_loopback(
-        results,
+        results->resultSet(0),
         device_type,
         min_result_size_for_bulk_dictionary_fetch,
         max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
@@ -294,7 +295,7 @@ class ArrowSQLRunnerImpl {
     // corresponding dictionary (vs all the entries in the underlying OmniSci dictionary)
     check_arrow_dictionaries(
         arrow_omnisci_results.get(),
-        results,
+        results->resultSet(0),
         min_result_size_for_bulk_dictionary_fetch,
         max_dictionary_to_result_size_ratio_for_bulk_dictionary_fetch);
   }
@@ -475,9 +476,9 @@ CompilationOptions getCompilationOptions(ExecutorDeviceType device_type) {
   return ArrowSQLRunnerImpl::get()->getCompilationOptions(device_type);
 }
 
-std::shared_ptr<ResultSet> run_multiple_agg(const std::string& query_str,
-                                            const ExecutorDeviceType device_type,
-                                            const bool allow_loop_joins) {
+hdk::ResultSetTableTokenPtr run_multiple_agg(const std::string& query_str,
+                                             const ExecutorDeviceType device_type,
+                                             const bool allow_loop_joins) {
   return ArrowSQLRunnerImpl::get()->run_multiple_agg(
       query_str, device_type, allow_loop_joins);
 }

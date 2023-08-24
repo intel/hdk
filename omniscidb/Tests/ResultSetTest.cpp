@@ -3005,23 +3005,23 @@ TEST(ResultsetConversion, EnforceParallelColumnarConversion) {
 
   for (auto dt : testedDevices()) {
     // single-frag test
-    std::shared_ptr<ResultSet> res1 = run_multiple_agg(
+    auto res1 = run_multiple_agg(
         "SELECT COUNT(1) FROM (SELECT x FROM t_large WHERE x < 2) t, t_small r where t.x "
         "= r.x",
         dt,
         false);
     EXPECT_EQ(1, (int64_t)res1.get()->rowCount());
-    const auto crt_row1 = res1.get()->getNextRow(false, false);
+    const auto crt_row1 = res1.get()->row(0, false, false);
     EXPECT_EQ(answer, v<int64_t>(crt_row1[0]));
 
     // multi-frag test
-    std::shared_ptr<ResultSet> res2 = run_multiple_agg(
+    auto res2 = run_multiple_agg(
         "SELECT COUNT(1) FROM (SELECT x FROM t_large_multi_frag WHERE x < 2) t, t_small "
         "r where t.x = r.x",
         dt,
         false);
     EXPECT_EQ(1, (int64_t)res2.get()->rowCount());
-    const auto crt_row2 = res2.get()->getNextRow(false, false);
+    const auto crt_row2 = res2.get()->row(0, false, false);
     EXPECT_EQ(answer, v<int64_t>(crt_row1[0]));
   }
 }

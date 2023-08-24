@@ -107,7 +107,7 @@ struct ExecutionConfig {
   bool enable_interop = false;
   size_t parallel_linearization_threshold = 10'000;
   bool enable_multifrag_rs = true;
-  bool enable_multifrag_execution_result = false;
+  bool enable_multifrag_execution_result = true;
 
   size_t override_gpu_block_size = 0;
   size_t override_gpu_grid_size = 0;
