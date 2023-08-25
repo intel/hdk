@@ -333,6 +333,7 @@ void QueryFragmentDescriptor::buildMultifragKernelMap(
     if (device_type == ExecutorDeviceType::GPU) {
       checkDeviceMemoryUsage(fragment, device_id, num_bytes_for_row);
     }
+
     for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
       const auto db_id = ra_exe_unit.input_descs[j].getDatabaseId();
       const auto table_id = ra_exe_unit.input_descs[j].getTableId();

@@ -2797,66 +2797,109 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
 
   CHECK(!ra_exe_unit.input_descs.empty());
 
+  const bool use_multifrag_kernel = eo.allow_multifrag && is_agg;
+
   fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
                                              shared_context.getFragOffsets(),
                                              policy,
                                              available_cpus + available_gpus.size(),
-                                             false, /*multifrag policy unsupported yet*/
+                                             use_multifrag_kernel,
                                              this,
                                              co.codegen_traits_desc);
 
-  if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
-      (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
-       QueryDescriptionType::Projection) &&
-      table_infos.size() == 1) {
-    const auto max_frag_size = table_infos.front().info.getFragmentNumTuplesUpperBound();
-    if (max_frag_size < query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()) {
-      LOG(INFO) << "Lowering scan limit from "
-                << query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()
-                << " to match max fragment size " << max_frag_size
-                << " for kernel per fragment execution path.";
-      throw CompilationRetryNewScanLimit(max_frag_size);
+  if (use_multifrag_kernel) {
+    LOG(INFO) << "use_multifrag_kernel=" << use_multifrag_kernel;
+    size_t frag_list_idx{0};
+    auto multifrag_heterogeneous_kernel_dispatch =
+        [&ra_exe_unit,
+         &execution_kernels,
+         &column_fetcher,
+         &co,
+         &eo,
+         &frag_list_idx,
+         &query_comp_descs,
+         &query_mem_descs](const int device_id,
+                           const FragmentsList& frag_list,
+                           const int64_t rowid_lookup_key,
+                           const ExecutorDeviceType device_type) {
+          if (!frag_list.size()) {
+            return;
+          }
+          CHECK_GE(device_id, 0);
+
+          execution_kernels.emplace_back(std::make_unique<ExecutionKernel>(
+              ra_exe_unit,
+              device_type,
+              device_id,
+              co,
+              eo,
+              column_fetcher,
+              *query_comp_descs.at(device_type).get(),
+              *query_mem_descs.at(device_type).get(),
+              frag_list,
+              device_type == ExecutorDeviceType::CPU
+                  ? ExecutorDispatchMode::KernelPerFragment
+                  : ExecutorDispatchMode::MultifragmentKernel,
+              rowid_lookup_key));
+
+          ++frag_list_idx;
+        };
+    fragment_descriptor.assignFragsToMultiHeterogeneousDispatch(
+        multifrag_heterogeneous_kernel_dispatch, ra_exe_unit);
+  } else {
+    if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
+        (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
+         QueryDescriptionType::Projection) &&
+        table_infos.size() == 1) {
+      const auto max_frag_size =
+          table_infos.front().info.getFragmentNumTuplesUpperBound();
+      if (max_frag_size < query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()) {
+        LOG(INFO) << "Lowering scan limit from "
+                  << query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()
+                  << " to match max fragment size " << max_frag_size
+                  << " for kernel per fragment execution path.";
+        throw CompilationRetryNewScanLimit(max_frag_size);
+      }
     }
+
+    size_t frag_list_idx{0};
+    auto fragment_per_kernel_dispatch = [&ra_exe_unit,
+                                         &execution_kernels,
+                                         &column_fetcher,
+                                         &co,
+                                         &eo,
+                                         &frag_list_idx,
+                                         &query_comp_descs,
+                                         &query_mem_descs](
+                                            const int device_id,
+                                            const FragmentsList& frag_list,
+                                            const int64_t rowid_lookup_key,
+                                            const ExecutorDeviceType device_type) {
+      if (!frag_list.size()) {
+        return;
+      }
+      CHECK_GE(device_id, 0);
+      CHECK(query_comp_descs.count(device_type));
+      CHECK(query_mem_descs.count(device_type));
+
+      execution_kernels.emplace_back(
+          std::make_unique<ExecutionKernel>(ra_exe_unit,
+                                            device_type,
+                                            device_id,
+                                            co,
+                                            eo,
+                                            column_fetcher,
+                                            *query_comp_descs.at(device_type).get(),
+                                            *query_mem_descs.at(device_type).get(),
+                                            frag_list,
+                                            ExecutorDispatchMode::KernelPerFragment,
+                                            rowid_lookup_key));
+      ++frag_list_idx;
+    };
+
+    fragment_descriptor.assignFragsToKernelDispatch(fragment_per_kernel_dispatch,
+                                                    ra_exe_unit);
   }
-
-  size_t frag_list_idx{0};
-  auto fragment_per_kernel_dispatch = [&ra_exe_unit,
-                                       &execution_kernels,
-                                       &column_fetcher,
-                                       &co,
-                                       &eo,
-                                       &frag_list_idx,
-                                       &query_comp_descs,
-                                       &query_mem_descs](
-                                          const int device_id,
-                                          const FragmentsList& frag_list,
-                                          const int64_t rowid_lookup_key,
-                                          const ExecutorDeviceType device_type) {
-    if (!frag_list.size()) {
-      return;
-    }
-    CHECK_GE(device_id, 0);
-    CHECK(query_comp_descs.count(device_type));
-    CHECK(query_mem_descs.count(device_type));
-
-    execution_kernels.emplace_back(
-        std::make_unique<ExecutionKernel>(ra_exe_unit,
-                                          device_type,
-                                          device_id,
-                                          co,
-                                          eo,
-                                          column_fetcher,
-                                          *query_comp_descs.at(device_type).get(),
-                                          *query_mem_descs.at(device_type).get(),
-                                          frag_list,
-                                          ExecutorDispatchMode::KernelPerFragment,
-                                          rowid_lookup_key));
-    ++frag_list_idx;
-  };
-
-  fragment_descriptor.assignFragsToKernelDispatch(fragment_per_kernel_dispatch,
-                                                  ra_exe_unit);
-
   return execution_kernels;
 }
 
