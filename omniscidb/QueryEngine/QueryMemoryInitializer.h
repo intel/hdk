@@ -19,6 +19,7 @@
 #include "DataMgr/Allocators/DeviceAllocator.h"
 #include "ResultSet/QueryMemoryDescriptor.h"
 #include "ResultSet/ResultSet.h"
+#include "Shared/quantile.h"
 
 #include "HashTableDesc.h"
 
@@ -158,6 +159,10 @@ class QueryMemoryInitializer {
                                     int elem_count,
                                     size_t entry_count);
 
+  void allocateQuantiles(const QueryMemoryDescriptor& query_mem_desc,
+                         const Executor* executor,
+                         size_t entry_count);
+
   GpuGroupByBuffers prepareTopNHeapsDevBuffer(const QueryMemoryDescriptor& query_mem_desc,
                                               const int8_t* init_agg_vals_dev_ptr,
                                               const size_t n,
@@ -223,6 +228,7 @@ class QueryMemoryInitializer {
   int8_t* count_distinct_bitmap_host_mem_;
 
   std::vector<int8_t*> topk_buffers_;
+  std::vector<hdk::quantile::Quantile*> quantiles_;
 
   DeviceAllocator* device_allocator_{nullptr};
   std::vector<Data_Namespace::AbstractBuffer*> temporary_buffers_;
