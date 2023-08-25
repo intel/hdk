@@ -17,7 +17,7 @@ ExecutorDeviceType g_device_type{ExecutorDeviceType::GPU};
 
 using namespace TestHelpers::ArrowSQLRunner;
 
-// #define USE_HOT_DATA
+#define USE_HOT_DATA
 #define PARALLEL_IMPORT_ENABLED
 
 // when we want to measure storage latencies, read the csv files before starting the
@@ -41,7 +41,7 @@ static void createTaxiTableParquet() {
   getStorage()->dropTable("trips");
   ArrowStorage::TableOptions to{g_fragment_size};
   createTable("trips",
-              {{"trip_id", ctx().fp64()},
+              {{"trip_id", ctx().int64()},
                {"vendor_id", ctx().text()},
                {"pickup_datetime", ctx().timestamp(hdk::ir::TimeUnit::kMilli)},
                {"dropoff_datetime", ctx().timestamp(hdk::ir::TimeUnit::kMilli)},
@@ -98,9 +98,9 @@ static void createTaxiTableCsv() {
   getStorage()->dropTable("trips");
   ArrowStorage::TableOptions to{g_fragment_size};
   createTable("trips",
-              {{"trip_id", ctx().fp64()},
+              {{"trip_id", ctx().int64()},
                {"vendor_id", ctx().extDict(ctx().text(), 0)},
-               {"pickup_datetime", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
+               {"pickup_datetime", ctx().timestamp(hdk::ir::TimeUnit::kMilli)},
                {"dropoff_datetime", ctx().timestamp(hdk::ir::TimeUnit::kSecond)},
                {"store_and_fwd_flag", ctx().extDict(ctx().text(), 0)},
                {"rate_code_id", ctx().int16()},
@@ -108,7 +108,7 @@ static void createTaxiTableCsv() {
                {"pickup_latitude", ctx().fp64()},
                {"dropoff_longitude", ctx().fp64()},
                {"dropoff_latitude", ctx().fp64()},
-               {"passenger_count", ctx().int16()},
+               {"passenger_count", ctx().int64()},
                {"trip_distance", ctx().fp64()},
                {"fare_amount", ctx().fp64()},
                {"extra", ctx().fp64()},
@@ -119,7 +119,7 @@ static void createTaxiTableCsv() {
                {"improvement_surcharge", ctx().fp64()},
                {"total_amount", ctx().fp64()},
                {"payment_type", ctx().extDict(ctx().text(), 0)},
-               {"trip_type", ctx().int8()},
+               {"trip_type", ctx().fp64()},
                {"pickup", ctx().extDict(ctx().text(), 0)},
                {"dropoff", ctx().extDict(ctx().text(), 0)},
                {"cab_type", ctx().extDict(ctx().text(), 0)},  // grouped
@@ -129,26 +129,26 @@ static void createTaxiTableCsv() {
                {"max_temperature", ctx().int16()},
                {"min_temperature", ctx().int16()},
                {"average_wind_speed", ctx().fp64()},
-               {"pickup_nyct2010_gid", ctx().int64()},
+               {"pickup_nyct2010_gid", ctx().fp64()},
                {"pickup_ctlabel", ctx().fp64()},
-               {"pickup_borocode", ctx().int32()},
+               {"pickup_borocode", ctx().fp64()},
                {"pickup_boroname", ctx().extDict(ctx().text(), 0)},  // TODO: share dict
-               {"pickup_ct2010", ctx().int32()},
-               {"pickup_boroct2010", ctx().int32()},
+               {"pickup_ct2010", ctx().fp64()},
+               {"pickup_boroct2010", ctx().fp64()},
                {"pickup_cdeligibil", ctx().extDict(ctx().text(), 0)},
                {"pickup_ntacode", ctx().extDict(ctx().text(), 0)},
                {"pickup_ntaname", ctx().extDict(ctx().text(), 0)},
-               {"pickup_puma", ctx().int32()},
-               {"dropoff_nyct2010_gid", ctx().int64()},
+               {"pickup_puma", ctx().fp64()},
+               {"dropoff_nyct2010_gid", ctx().fp64()},
                {"dropoff_ctlabel", ctx().fp64()},
-               {"dropoff_borocode", ctx().int64()},
+               {"dropoff_borocode", ctx().fp64()},
                {"dropoff_boroname", ctx().extDict(ctx().text(), 0)},
-               {"dropoff_ct2010", ctx().int32()},
-               {"dropoff_boroct2010", ctx().int32()},
+               {"dropoff_ct2010", ctx().fp64()},
+               {"dropoff_boroct2010", ctx().fp64()},
                {"dropoff_cdeligibil", ctx().extDict(ctx().text(), 0)},
                {"dropoff_ntacode", ctx().extDict(ctx().text(), 0)},
                {"dropoff_ntaname", ctx().extDict(ctx().text(), 0)},
-               {"dropoff_puma", ctx().int32()}},
+               {"dropoff_puma", ctx().fp64()}},
               to);
 }
 
@@ -406,6 +406,11 @@ int main(int argc, char* argv[]) {
                          ->implicit_value(ExecutorDeviceType::GPU)
                          ->default_value(ExecutorDeviceType::CPU),
                      "Device type to use.");
+  desc.add_options()("enable-debug-timer",
+                     po::value<bool>(&g_enable_debug_timer)
+                         ->default_value(g_enable_debug_timer)
+                         ->implicit_value(true),
+                     "Enable debug timers in logger.");
 
   desc.add_options()(
       "use-lazy-materialization",
