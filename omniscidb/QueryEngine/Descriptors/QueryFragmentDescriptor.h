@@ -100,6 +100,56 @@ class QueryFragmentDescriptor {
     }
   }
 
+  template <typename DISPATCH_FCN>
+  void assignFragsToMultiHeterogeneousDispatch(
+      DISPATCH_FCN dispatcher_f,
+      const RelAlgExecutionUnit& ra_exe_unit) const {
+    std::unordered_map<int, size_t> cpu_execution_kernel_index;
+    size_t tuple_count = 0;
+
+    if (execution_kernels_per_device_.count(ExecutorDeviceType::CPU)) {
+      cpu_execution_kernel_index.reserve(
+          execution_kernels_per_device_.at(ExecutorDeviceType::CPU).size());
+      for (const auto& device_itr :
+           execution_kernels_per_device_.at(ExecutorDeviceType::CPU)) {
+        CHECK(
+            cpu_execution_kernel_index.insert(std::make_pair(device_itr.first, size_t(0)))
+                .second);
+      }
+    }
+
+    for (const auto& device_type_itr : execution_kernels_per_device_) {
+      if (device_type_itr.first == ExecutorDeviceType::GPU) {
+        for (const auto& device_itr : device_type_itr.second) {
+          const auto& execution_kernels = device_itr.second;
+          CHECK_EQ(execution_kernels.size(), size_t(1));
+          const auto& fragments_list = execution_kernels.front().fragments;
+          dispatcher_f(
+              device_itr.first, fragments_list, rowid_lookup_key_, device_type_itr.first);
+        }
+      } else {
+        bool dispatch_finished = false;
+        while (!dispatch_finished) {
+          dispatch_finished = true;
+          for (const auto& device_itr : device_type_itr.second) {
+            auto& kernel_idx = cpu_execution_kernel_index[device_itr.first];
+            if (kernel_idx < device_itr.second.size()) {
+              dispatch_finished = false;
+              const auto& execution_kernel = device_itr.second[kernel_idx++];
+              dispatcher_f(device_itr.first,
+                           execution_kernel.fragments,
+                           rowid_lookup_key_,
+                           device_type_itr.first);
+              if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Dispatch one fragment for each device. Iterate the device map and dispatch one kernel
    * for each device per iteration. This allows balanced dispatch as well as early
