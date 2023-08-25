@@ -216,24 +216,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     col_buffers_.push_back(const_cast<void*>(col_buffer));
   }
 
-  ~RowSetMemoryOwner() {
-    for (auto count_distinct_set : count_distinct_sets_) {
-      delete count_distinct_set;
-    }
-    for (auto group_by_buffer : group_by_buffers_) {
-      free(group_by_buffer);
-    }
-    for (auto varlen_buffer : varlen_buffers_) {
-      free(varlen_buffer);
-    }
-    for (auto varlen_input_buffer : varlen_input_buffers_) {
-      CHECK(varlen_input_buffer);
-      varlen_input_buffer->unPin();
-    }
-    for (auto col_buffer : col_buffers_) {
-      free(col_buffer);
-    }
-  }
+  ~RowSetMemoryOwner();
 
   std::shared_ptr<RowSetMemoryOwner> cloneStrDictDataOnly() {
     auto rtn = std::make_shared<RowSetMemoryOwner>(
@@ -244,11 +227,16 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   }
 
   quantile::TDigest* nullTDigest(double const q);
-  hdk::quantile::Quantile* quantile();
+  hdk::quantile::Quantile* quantiles(size_t count);
 
   int8_t* topKBuffer(size_t size);
 
  private:
+  int8_t* allocateNoLock(const size_t num_bytes) {
+    return reinterpret_cast<int8_t*>(
+        allocator_->allocate(std::max(num_bytes, (size_t)256)));
+  }
+
   struct CountDistinctBitmapBuffer {
     int8_t* ptr;
     const size_t size;
@@ -271,7 +259,9 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   std::vector<Data_Namespace::AbstractBuffer*> varlen_input_buffers_;
   std::vector<std::unique_ptr<quantile::TDigest>> t_digests_;
   std::unordered_map<const int8_t*, std::unique_ptr<AbstractDataToken>> data_tokens_;
-  std::vector<std::unique_ptr<hdk::quantile::Quantile>> quantiles_;
+  // A list of quantile arrays with their sizes. Arrays are allocated by arena and
+  // objects are constructed and destructed manually.
+  std::list<std::pair<hdk::quantile::Quantile*, size_t>> quantiles_;
 
   DataProvider* data_provider_;  // for metadata lookups
   size_t arena_block_size_;      // for cloning

@@ -14,6 +14,30 @@ EXTERN extern bool g_cache_string_hash;
 EXTERN extern size_t g_approx_quantile_buffer;
 EXTERN extern size_t g_approx_quantile_centroids;
 
+RowSetMemoryOwner::~RowSetMemoryOwner() {
+  for (auto count_distinct_set : count_distinct_sets_) {
+    delete count_distinct_set;
+  }
+  for (auto group_by_buffer : group_by_buffers_) {
+    free(group_by_buffer);
+  }
+  for (auto varlen_buffer : varlen_buffers_) {
+    free(varlen_buffer);
+  }
+  for (auto varlen_input_buffer : varlen_input_buffers_) {
+    CHECK(varlen_input_buffer);
+    varlen_input_buffer->unPin();
+  }
+  for (auto col_buffer : col_buffers_) {
+    free(col_buffer);
+  }
+  for (auto& pr : quantiles_) {
+    for (size_t i = 0; i < pr.second; ++i) {
+      pr.first[i].~Quantile();
+    }
+  }
+}
+
 StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
     const int dict_id_in,
     const int64_t generation) {
@@ -44,9 +68,18 @@ quantile::TDigest* RowSetMemoryOwner::nullTDigest(double const q) {
       .get();
 }
 
-hdk::quantile::Quantile* RowSetMemoryOwner::quantile() {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  return quantiles_.emplace_back(std::make_unique<hdk::quantile::Quantile>(this)).get();
+hdk::quantile::Quantile* RowSetMemoryOwner::quantiles(size_t count) {
+  hdk::quantile::Quantile* quantile_arr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    quantile_arr = reinterpret_cast<hdk::quantile::Quantile*>(
+        allocateNoLock(count * sizeof(hdk::quantile::Quantile)));
+    quantiles_.emplace_back(quantile_arr, count);
+  }
+  for (size_t i = 0; i < count; ++i) {
+    new (quantile_arr + i) hdk::quantile::Quantile(this);
+  }
+  return quantile_arr;
 }
 
 int8_t* RowSetMemoryOwner::topKBuffer(size_t size) {

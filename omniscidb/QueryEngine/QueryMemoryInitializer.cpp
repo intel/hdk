@@ -571,6 +571,10 @@ void QueryMemoryInitializer::initRowGroups(const QueryMemoryDescriptor& query_me
       allocateAndInitTopKBuffers(query_mem_desc_fixedup, executor, rows_count);
     }
 
+    if (std::any_of(quantile_params.begin(), quantile_params.end(), is_true)) {
+      allocateQuantiles(query_mem_desc_fixedup, executor, groups_buffer_entry_count);
+    }
+
     if (query_mem_desc.hasKeylessHash()) {
       CHECK(warp_size >= 1);
       CHECK(key_count == 1 || warp_size == 1);
@@ -709,7 +713,7 @@ void QueryMemoryInitializer::initColumnsPerRow(
         auto const q = quantile_params[col_idx]->second;
         init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
       } else {
-        init_val = reinterpret_cast<int64_t>(row_set_mem_owner_->quantile());
+        init_val = reinterpret_cast<int64_t>(quantiles_[col_idx] + entry_idx);
       }
       ++init_vec_idx;
     } else if (query_mem_desc.isGroupBy() && topk_params[col_idx]) {
@@ -872,7 +876,7 @@ QueryMemoryInitializer::allocateQuantiles(const QueryMemoryDescriptor& query_mem
               reinterpret_cast<int64_t>(row_set_mem_owner_->nullTDigest(q));
         } else {
           init_agg_vals_[agg_col_idx] =
-              reinterpret_cast<int64_t>(row_set_mem_owner_->quantile());
+              reinterpret_cast<int64_t>(row_set_mem_owner_->quantiles(1));
         }
       }
     }
@@ -941,6 +945,26 @@ void QueryMemoryInitializer::allocateAndInitTopKBuffers(
         auto k = std::abs(agg_expr->arg1()->as<hdk::ir::Constant>()->intVal());
         topk_buffers_[agg_col_idx] =
             allocateAndInitTopKBuffer(agg_expr->arg()->type(), k, entry_count);
+      }
+    }
+  }
+}
+
+void QueryMemoryInitializer::allocateQuantiles(
+    const QueryMemoryDescriptor& query_mem_desc,
+    const Executor* executor,
+    size_t entry_count) {
+  size_t const slot_count = query_mem_desc.getSlotCount();
+  size_t const ntargets = executor->plan_state_->target_exprs_.size();
+  CHECK_GE(slot_count, ntargets);
+  quantiles_.resize(slot_count, nullptr);
+  for (size_t target_idx = 0; target_idx < ntargets; ++target_idx) {
+    auto const target_expr = executor->plan_state_->target_exprs_[target_idx];
+    if (auto const agg_expr = dynamic_cast<const hdk::ir::AggExpr*>(target_expr)) {
+      if (agg_expr->aggType() == hdk::ir::AggType::kQuantile) {
+        size_t const agg_col_idx =
+            query_mem_desc.getSlotIndexForSingleSlotCol(target_idx);
+        quantiles_[agg_col_idx] = row_set_mem_owner_->quantiles(entry_count);
       }
     }
   }
