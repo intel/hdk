@@ -277,7 +277,7 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
         frag_off_ptr,
         cgen_state_->llInt(int32_t(col_var->rteIdx())));
     auto rowid_offset_lv = cgen_state_->ir_builder_.CreateLoad(
-        input_off_ptr->getType()->getPointerElementType(), input_off_ptr);
+        get_int_type(64, cgen_state_->context_), input_off_ptr);
     rowid_lv = cgen_state_->ir_builder_.CreateAdd(rowid_lv, rowid_offset_lv);
   }
   if (table_generation.start_rowid > 0) {
@@ -429,9 +429,8 @@ llvm::Value* CodeGenerator::posArg(const hdk::ir::Expr* expr) const {
     const auto hash_pos_it = cgen_state_->scan_idx_to_hash_pos_.find(col_var->rteIdx());
     CHECK(hash_pos_it != cgen_state_->scan_idx_to_hash_pos_.end());
     if (hash_pos_it->second->getType()->isPointerTy()) {
-      CHECK(hash_pos_it->second->getType()->getPointerElementType()->isIntegerTy(32));
       llvm::Value* result = cgen_state_->ir_builder_.CreateLoad(
-          hash_pos_it->second->getType()->getPointerElementType(), hash_pos_it->second);
+          get_int_type(32, cgen_state_->context_), hash_pos_it->second);
       result = cgen_state_->ir_builder_.CreateSExt(
           result, get_int_type(64, cgen_state_->context_));
       return result;
