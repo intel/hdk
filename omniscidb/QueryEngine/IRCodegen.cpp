@@ -659,11 +659,11 @@ std::vector<JoinLoop> Executor::buildJoinLoops(
             JoinLoopDomain domain{{0}};
             auto* arg = get_arg_by_name(cgen_state_->row_func_, "num_rows_per_scan");
             const auto rows_per_scan_ptr = cgen_state_->ir_builder_.CreateGEP(
-                arg->getType()->getScalarType()->getPointerElementType(),
+                get_int_type(64, cgen_state_->context_),
                 arg,
                 cgen_state_->llInt(int32_t(level_idx + 1)));
             domain.upper_bound = cgen_state_->ir_builder_.CreateLoad(
-                rows_per_scan_ptr->getType()->getPointerElementType(),
+                get_int_type(64, cgen_state_->context_),
                 rows_per_scan_ptr,
                 "num_rows_per_scan");
             return domain;
@@ -1274,8 +1274,7 @@ llvm::Value* Executor::arrayLoopCodegen(const hdk::ir::Expr* array_expr,
   cgen_state_->ir_builder_.CreateBr(array_loop_head);
   cgen_state_->ir_builder_.SetInsertPoint(array_loop_head);
   CHECK(array_len);
-  auto array_idx = cgen_state_->ir_builder_.CreateLoad(
-      array_idx_ptr->getType()->getPointerElementType(), array_idx_ptr);
+  auto array_idx = cgen_state_->ir_builder_.CreateLoad(ret_ty, array_idx_ptr);
   auto bound_check =
       cgen_state_->ir_builder_.CreateICmp(llvm::ICmpInst::ICMP_SLT, array_idx, array_len);
   auto array_loop_body = llvm::BasicBlock::Create(

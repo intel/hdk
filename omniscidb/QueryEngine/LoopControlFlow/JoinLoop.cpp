@@ -134,7 +134,7 @@ llvm::BasicBlock* JoinLoop::codegen(
         builder.CreateBr(head_bb);
         builder.SetInsertPoint(head_bb);
         llvm::Value* iteration_counter =
-            builder.CreateLoad(iteration_counter_ptr->getType()->getPointerElementType(),
+            builder.CreateLoad(get_int_type(64, context),
                                iteration_counter_ptr,
                                "ub_iter_counter_val_" + join_loop.name_);
         auto iteration_val = iteration_counter;
@@ -235,15 +235,15 @@ llvm::BasicBlock* JoinLoop::codegen(
         iterators.push_back(iteration_domain.slot_lookup_result);
         auto join_cond_match = builder.CreateICmpSGE(iteration_domain.slot_lookup_result,
                                                      ll_int<int64_t>(0, context));
+        auto condition_match_type = get_int_type(1, context);
         llvm::Value* remaining_cond_match = builder.CreateAlloca(
-            get_int_type(1, context), nullptr, "remaining_outer_cond_match");
+            condition_match_type, nullptr, "remaining_outer_cond_match");
         if (remaining_cond_match->getType()->getPointerAddressSpace() !=
             co.codegen_traits_desc.local_addr_space_) {
           remaining_cond_match = builder.CreateAddrSpaceCast(
               remaining_cond_match,
-              llvm::PointerType::get(
-                  remaining_cond_match->getType()->getPointerElementType(),
-                  co.codegen_traits_desc.local_addr_space_),
+              llvm::PointerType::get(condition_match_type,
+                                     co.codegen_traits_desc.local_addr_space_),
               "remaining.cond.match.cast");
         }
 
@@ -327,6 +327,7 @@ std::pair<llvm::BasicBlock*, llvm::Value*> JoinLoop::evaluateOuterJoinCondition(
   llvm::IRBuilder<>& builder = cgen_state->ir_builder_;
   auto& context = builder.getContext();
   const auto parent_func = builder.GetInsertBlock()->getParent();
+  auto match_ptr_element_type = get_int_type(1, context);
   builder.CreateStore(ll_bool(false, context), current_condition_match_ptr);
   const auto evaluate_outer_condition_bb = llvm::BasicBlock::Create(
       context, "eval_outer_cond_" + join_loop.name_, parent_func);
@@ -342,14 +343,12 @@ std::pair<llvm::BasicBlock*, llvm::Value*> JoinLoop::evaluateOuterJoinCondition(
   builder.CreateStore(current_condition_match, current_condition_match_ptr);
   const auto updated_condition_match = builder.CreateOr(
       current_condition_match,
-      builder.CreateLoad(found_an_outer_match_ptr->getType()->getPointerElementType(),
-                         found_an_outer_match_ptr));
+      builder.CreateLoad(match_ptr_element_type, found_an_outer_match_ptr));
   builder.CreateStore(updated_condition_match, found_an_outer_match_ptr);
   builder.CreateBr(after_evaluate_outer_condition_bb);
   builder.SetInsertPoint(after_evaluate_outer_condition_bb);
   const auto no_matches_found = builder.CreateNot(
-      builder.CreateLoad(found_an_outer_match_ptr->getType()->getPointerElementType(),
-                         found_an_outer_match_ptr));
+      builder.CreateLoad(match_ptr_element_type, found_an_outer_match_ptr));
   const auto no_more_inner_rows = builder.CreateICmpEQ(
       iteration_counter,
       join_loop.kind_ == JoinLoopKind::UpperBound ? iteration_domain.upper_bound
@@ -357,11 +356,9 @@ std::pair<llvm::BasicBlock*, llvm::Value*> JoinLoop::evaluateOuterJoinCondition(
   // Do the iteration if the outer condition is true or it's the last iteration and no
   // matches have been found.
   const auto do_iteration = builder.CreateOr(
-      builder.CreateLoad(current_condition_match_ptr->getType()->getPointerElementType(),
-                         current_condition_match_ptr),
+      builder.CreateLoad(match_ptr_element_type, current_condition_match_ptr),
       builder.CreateAnd(no_matches_found, no_more_inner_rows));
   join_loop.found_outer_matches_(
-      builder.CreateLoad(current_condition_match_ptr->getType()->getPointerElementType(),
-                         current_condition_match_ptr));
+      builder.CreateLoad(match_ptr_element_type, current_condition_match_ptr));
   return {after_evaluate_outer_condition_bb, do_iteration};
 }
