@@ -345,7 +345,8 @@ llvm::Value* Executor::codegenAggregateWindowState(const CompilationOptions& co)
   }
   if (window_func->kind() == hdk::ir::WindowFunctionKind::Count) {
     return cgen_state_->ir_builder_.CreateLoad(
-        aggregate_state->getType()->getPointerElementType(), aggregate_state);
+        get_int_type(window_func_type->size() * 8, cgen_state_->context_),
+        aggregate_state);
   }
   if (window_func_type->isFp32()) {
     return cgen_state_->emitCall("load_float", {aggregate_state});
@@ -353,6 +354,7 @@ llvm::Value* Executor::codegenAggregateWindowState(const CompilationOptions& co)
     return cgen_state_->emitCall("load_double", {aggregate_state});
   } else {
     return cgen_state_->ir_builder_.CreateLoad(
-        aggregate_state->getType()->getPointerElementType(), aggregate_state);
+        get_int_type(window_func_type->size() * 8, cgen_state_->context_),
+        aggregate_state);
   }
 }
