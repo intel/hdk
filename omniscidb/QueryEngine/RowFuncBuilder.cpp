@@ -176,7 +176,7 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
                                          llvm::AtomicOrdering::Monotonic);
         } else {
           old_total_matched_val = LL_BUILDER.CreateLoad(
-              total_matched_ptr->getType()->getPointerElementType(), total_matched_ptr);
+              get_int_type(32, executor_->cgen_state_->context_), total_matched_ptr);
           LL_BUILDER.CreateStore(LL_BUILDER.CreateAdd(old_total_matched_val, matched_cnt),
                                  total_matched_ptr);
         }
@@ -780,11 +780,10 @@ llvm::Function* RowFuncBuilder::codegenPerfectHashFunction(const CompilationOpti
   size_t dim_idx = 0;
   for (const auto& groupby_expr : ra_exe_unit_.groupby_exprs) {
     auto* gep = key_hash_func_builder.CreateGEP(
-        key_buff_lv->getType()->getScalarType()->getPointerElementType(),
-        key_buff_lv,
-        LL_INT(dim_idx));
-    auto key_comp_lv =
-        key_hash_func_builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
+        get_int_type(64, executor_->cgen_state_->context_), key_buff_lv, LL_INT(dim_idx));
+    // TODO: try gep->getSourceElementType() once LLVM is updated to v16
+    auto key_comp_lv = key_hash_func_builder.CreateLoad(
+        get_int_type(64, executor_->cgen_state_->context_), gep);
     auto col_range_info =
         get_expr_range_info(ra_exe_unit_, query_infos_, groupby_expr.get(), executor_);
     auto crt_term_lv =
