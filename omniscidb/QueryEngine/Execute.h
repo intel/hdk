@@ -485,29 +485,10 @@ class Executor : public StringDictionaryProxyProvider {
   std::unordered_map<int, const hdk::ir::BinOper*> getInnerTabIdToJoinCond() const;
 
   /**
-   * Determines execution dispatch mode and required fragments for a given query step,
-   * then creates kernels to execute the query and returns them for launch.
-   */
-  std::vector<std::unique_ptr<ExecutionKernel>> createKernels(
-      SharedKernelContext& shared_context,
-      const RelAlgExecutionUnit& ra_exe_unit,
-      ColumnFetcher& column_fetcher,
-      const std::vector<InputTableInfo>& table_infos,
-      const ExecutionOptions& eo,
-      const CompilationOptions& co,
-      const bool is_agg,
-      const bool allow_single_frag_table_opt,
-      const QueryCompilationDescriptor& query_comp_desc,
-      const QueryMemoryDescriptor& query_mem_desc,
-      policy::ExecutionPolicy* policy,
-      std::unordered_set<int>& available_gpus,
-      int& available_cpus);
-
-  /**
    * @brief Exprimental execution dispatch mode for heterogeneous kernel submission.
    *
    */
-  std::vector<std::unique_ptr<ExecutionKernel>> createHeterogeneousKernels(
+  std::vector<std::unique_ptr<ExecutionKernel>> createKernels(
       SharedKernelContext& shared_context,
       const RelAlgExecutionUnit& ra_exe_unit,
       ColumnFetcher& column_fetcher,

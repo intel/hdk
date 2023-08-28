@@ -78,51 +78,35 @@ class QueryFragmentDescriptor {
   void buildFragmentKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                               const std::vector<uint64_t>& frag_offsets,
                               const policy::ExecutionPolicy* policy,
-                              const int device_count,
-                              const bool enable_multifrag_kernels,
                               Executor* executor,
                               compiler::CodegenTraitsDescriptor cgen_traits_desc);
 
   /**
-   * Dispatch multi-fragment kernels. Currently GPU only. Each GPU should have only one
-   * kernel, with multiple fragments in its fragments list.
+   * Dispatch according to policy
    */
   template <typename DISPATCH_FCN>
-  void assignFragsToMultiDispatch(DISPATCH_FCN f) const {
-    for (const auto& device_type_itr : execution_kernels_per_device_) {
-      for (const auto& device_itr : device_type_itr.second) {
-        const auto& execution_kernels = device_itr.second;
-        CHECK_EQ(execution_kernels.size(), size_t(1));
-
-        const auto& fragments_list = execution_kernels.front().fragments;
-        f(device_itr.first, fragments_list, rowid_lookup_key_);
-      }
-    }
-  }
-
-  template <typename DISPATCH_FCN>
-  void assignFragsToMultiHeterogeneousDispatch(
-      DISPATCH_FCN dispatcher_f,
-      const RelAlgExecutionUnit& ra_exe_unit) const {
-    std::unordered_map<int, size_t> cpu_execution_kernel_index;
+  void dispatchKernelsToDevices(DISPATCH_FCN dispatcher_f,
+                                const RelAlgExecutionUnit& ra_exe_unit,
+                                policy::ExecutionPolicy* policy) const {
+    std::unordered_map<ExecutorDeviceType, std::unordered_map<int, size_t>>
+        execution_kernel_index;
     size_t tuple_count = 0;
-
-    if (execution_kernels_per_device_.count(ExecutorDeviceType::CPU)) {
-      cpu_execution_kernel_index.reserve(
-          execution_kernels_per_device_.at(ExecutorDeviceType::CPU).size());
-      for (const auto& device_itr :
-           execution_kernels_per_device_.at(ExecutorDeviceType::CPU)) {
-        CHECK(
-            cpu_execution_kernel_index.insert(std::make_pair(device_itr.first, size_t(0)))
-                .second);
+    for (const auto& device_type_itr : execution_kernels_per_device_) {
+      if (policy->devices_dispatch_modes.at(device_type_itr.first) ==
+          ExecutorDispatchMode::KernelPerFragment) {
+        for (const auto& device_itr : device_type_itr.second) {
+          CHECK(execution_kernel_index[device_type_itr.first]
+                    .insert(std::make_pair(device_itr.first, size_t(0)))
+                    .second);
+        }
       }
     }
 
     for (const auto& device_type_itr : execution_kernels_per_device_) {
-      if (device_type_itr.first == ExecutorDeviceType::GPU) {
+      if (policy->devices_dispatch_modes.at(device_type_itr.first) ==
+          ExecutorDispatchMode::MultifragmentKernel) {
         for (const auto& device_itr : device_type_itr.second) {
           const auto& execution_kernels = device_itr.second;
-          CHECK_EQ(execution_kernels.size(), size_t(1));
           const auto& fragments_list = execution_kernels.front().fragments;
           dispatcher_f(
               device_itr.first, fragments_list, rowid_lookup_key_, device_type_itr.first);
@@ -131,68 +115,24 @@ class QueryFragmentDescriptor {
         bool dispatch_finished = false;
         while (!dispatch_finished) {
           dispatch_finished = true;
-          for (const auto& device_itr : device_type_itr.second) {
-            auto& kernel_idx = cpu_execution_kernel_index[device_itr.first];
-            if (kernel_idx < device_itr.second.size()) {
-              dispatch_finished = false;
-              const auto& execution_kernel = device_itr.second[kernel_idx++];
-              dispatcher_f(device_itr.first,
-                           execution_kernel.fragments,
-                           rowid_lookup_key_,
-                           device_type_itr.first);
-              if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
-                return;
+          for (const auto& device_type_itr : execution_kernels_per_device_)
+            for (const auto& device_itr : device_type_itr.second) {
+              auto& kernel_idx =
+                  execution_kernel_index[device_type_itr.first][device_itr.first];
+              if (kernel_idx < device_itr.second.size()) {
+                dispatch_finished = false;
+                const auto& execution_kernel = device_itr.second[kernel_idx++];
+                dispatcher_f(device_itr.first,
+                             execution_kernel.fragments,
+                             rowid_lookup_key_,
+                             device_type_itr.first);
+                if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
+                  return;
+                }
               }
             }
-          }
         }
       }
-    }
-  }
-
-  /**
-   * Dispatch one fragment for each device. Iterate the device map and dispatch one kernel
-   * for each device per iteration. This allows balanced dispatch as well as early
-   * termination if the number of rows passing the kernel can be computed at dispatch time
-   * and the scan limit is reached.
-   */
-  template <typename DISPATCH_FCN>
-  void assignFragsToKernelDispatch(DISPATCH_FCN f,
-                                   const RelAlgExecutionUnit& ra_exe_unit) const {
-    if (execution_kernels_per_device_.empty()) {
-      return;
-    }
-
-    size_t tuple_count = 0;
-
-    std::map<ExecutorDeviceType, std::unordered_map<int, size_t>> execution_kernel_index;
-    for (const auto& device_type_itr : execution_kernels_per_device_) {
-      for (const auto& device_itr : device_type_itr.second) {
-        CHECK(execution_kernel_index[device_type_itr.first]
-                  .insert(std::make_pair(device_itr.first, size_t(0)))
-                  .second);
-      }
-    }
-
-    bool dispatch_finished = false;
-    while (!dispatch_finished) {
-      dispatch_finished = true;
-      for (const auto& device_type_itr : execution_kernels_per_device_)
-        for (const auto& device_itr : device_type_itr.second) {
-          auto& kernel_idx =
-              execution_kernel_index[device_type_itr.first][device_itr.first];
-          if (kernel_idx < device_itr.second.size()) {
-            dispatch_finished = false;
-            const auto& execution_kernel = device_itr.second[kernel_idx++];
-            f(device_itr.first,
-              execution_kernel.fragments,
-              rowid_lookup_key_,
-              device_type_itr.first);
-            if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
-              return;
-            }
-          }
-        }
     }
   }
 
@@ -218,7 +158,6 @@ class QueryFragmentDescriptor {
       const RelAlgExecutionUnit& ra_exe_unit,
       const std::vector<uint64_t>& frag_offsets,
       const policy::ExecutionPolicy* policy,
-      const int device_count,
       const size_t num_bytes_for_row,
       Executor* executor,
       compiler::CodegenTraitsDescriptor cgen_traits_desc);
@@ -226,7 +165,6 @@ class QueryFragmentDescriptor {
   void buildFragmentPerKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                  const std::vector<uint64_t>& frag_offsets,
                                  const policy::ExecutionPolicy* policy,
-                                 const int device_count,
                                  const size_t num_bytes_for_row,
                                  Executor* executor,
                                  compiler::CodegenTraitsDescriptor cgen_traits_desc);
@@ -234,7 +172,6 @@ class QueryFragmentDescriptor {
   void buildMultifragKernelMap(const RelAlgExecutionUnit& ra_exe_unit,
                                const std::vector<uint64_t>& frag_offsets,
                                const policy::ExecutionPolicy* policy,
-                               const int device_count,
                                const size_t num_bytes_for_row,
                                Executor* executor,
                                compiler::CodegenTraitsDescriptor cgen_traits_desc);
@@ -244,7 +181,6 @@ class QueryFragmentDescriptor {
                                       const InputDescriptor& table_desc,
                                       const std::vector<uint64_t>& frag_offsets,
                                       const policy::ExecutionPolicy* policy,
-                                      const int device_count,
                                       const size_t num_bytes_for_row,
                                       const std::optional<size_t> table_desc_offset,
                                       Executor* executor,

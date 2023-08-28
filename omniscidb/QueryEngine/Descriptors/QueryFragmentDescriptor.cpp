@@ -66,8 +66,6 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<uint64_t>& frag_offsets,
     const policy::ExecutionPolicy* policy,
-    const int device_count,
-    const bool enable_multifrag_kernels,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   // For joins, only consider the cardinality of the LHS
@@ -82,29 +80,11 @@ void QueryFragmentDescriptor::buildFragmentKernelMap(
   const auto num_bytes_for_row = executor->getNumBytesForFetchedRow(lhs_table_ids);
 
   if (ra_exe_unit.union_all) {
-    buildFragmentPerKernelMapForUnion(ra_exe_unit,
-                                      frag_offsets,
-                                      policy,
-                                      device_count,
-                                      num_bytes_for_row,
-                                      executor,
-                                      cgen_traits_desc);
-  } else if (enable_multifrag_kernels) {
-    buildMultifragKernelMap(ra_exe_unit,
-                            frag_offsets,
-                            policy,
-                            device_count,
-                            num_bytes_for_row,
-                            executor,
-                            cgen_traits_desc);
+    buildFragmentPerKernelMapForUnion(
+        ra_exe_unit, frag_offsets, policy, num_bytes_for_row, executor, cgen_traits_desc);
   } else {
-    buildFragmentPerKernelMap(ra_exe_unit,
-                              frag_offsets,
-                              policy,
-                              device_count,
-                              num_bytes_for_row,
-                              executor,
-                              cgen_traits_desc);
+    buildFragmentPerKernelMap(
+        ra_exe_unit, frag_offsets, policy, num_bytes_for_row, executor, cgen_traits_desc);
   }
 }
 
@@ -113,38 +93,40 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     const RelAlgExecutionUnit& ra_exe_unit,
     const InputDescriptor& table_desc,
     const std::vector<uint64_t>& frag_offsets,
-    const policy::ExecutionPolicy* policy,
-    const int device_count,
+    const policy::ExecutionPolicy* policy,  // only probed here
     const size_t num_bytes_for_row,
     const std::optional<size_t> table_desc_offset,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
-  for (size_t i = 0; i < fragments->size(); i++) {
+  const auto inner_table_id_to_join_condition = executor->getInnerTabIdToJoinCond();
+  LOG(INFO) << *policy;
+  for (size_t frag_id = 0; frag_id < fragments->size(); frag_id++) {
     if (!allowed_outer_fragment_indices_.empty()) {
       if (std::find(allowed_outer_fragment_indices_.begin(),
                     allowed_outer_fragment_indices_.end(),
-                    i) == allowed_outer_fragment_indices_.end()) {
+                    frag_id) == allowed_outer_fragment_indices_.end()) {
         continue;
       }
     }
 
-    const auto& fragment = (*fragments)[i];
-    const auto skip_frag = executor->skipFragment(table_desc,
-                                                  fragment,
-                                                  ra_exe_unit.simple_quals,
-                                                  frag_offsets,
-                                                  i,
-                                                  cgen_traits_desc);
+    const auto& fragment = (*fragments)[frag_id];
+    auto skip_frag = executor->skipFragment(table_desc,
+                                            fragment,
+                                            ra_exe_unit.simple_quals,
+                                            frag_offsets,
+                                            frag_id,
+                                            cgen_traits_desc);
+    if (skip_frag == std::pair<bool, int64_t>(false, -1)) {
+      skip_frag = executor->skipFragmentInnerJoins(
+          table_desc, ra_exe_unit, fragment, frag_offsets, frag_id, cgen_traits_desc);
+    }
     if (skip_frag.first) {
       continue;
     }
     rowid_lookup_key_ = std::max(rowid_lookup_key_, skip_frag.second);
 
     const auto [device_type, device_id] =
-        policy->scheduleSingleFragment(fragment, i, fragments->size());
-    const int chosen_device_count =
-        device_type == ExecutorDeviceType::CPU ? 1 : device_count;
-    CHECK_GT(chosen_device_count, 0);
+        policy->scheduleSingleFragment(fragment, frag_id, fragments->size());
 
     if (device_type == ExecutorDeviceType::GPU) {
       checkDeviceMemoryUsage(fragment, device_id, num_bytes_for_row);
@@ -159,41 +141,75 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
           executor->getTableFragmentIndices(ra_exe_unit,
                                             device_type,
                                             *table_desc_offset,
-                                            i,
+                                            frag_id,
                                             selected_tables_fragments_,
                                             executor->getInnerTabIdToJoinCond());
       const auto db_id = ra_exe_unit.input_descs[*table_desc_offset].getDatabaseId();
       const auto table_id = ra_exe_unit.input_descs[*table_desc_offset].getTableId();
       execution_kernel_desc.fragments.emplace_back(
           FragmentsPerTable{db_id, table_id, frag_ids});
-
     } else {
-      for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
+      for (size_t table_desc_idx = 0; table_desc_idx < ra_exe_unit.input_descs.size();
+           ++table_desc_idx) {
         const auto frag_ids =
             executor->getTableFragmentIndices(ra_exe_unit,
                                               device_type,
-                                              j,
-                                              i,
+                                              table_desc_idx,
+                                              frag_id,
                                               selected_tables_fragments_,
-                                              executor->getInnerTabIdToJoinCond());
-        const auto db_id = ra_exe_unit.input_descs[j].getDatabaseId();
-        const auto table_id = ra_exe_unit.input_descs[j].getTableId();
+                                              inner_table_id_to_join_condition);
+        const auto db_id = ra_exe_unit.input_descs[table_desc_idx].getDatabaseId();
+        const auto table_id = ra_exe_unit.input_descs[table_desc_idx].getTableId();
         auto table_frags_it = selected_tables_fragments_.find({db_id, table_id});
         CHECK(table_frags_it != selected_tables_fragments_.end());
+        if (policy->devices_dispatch_modes.at(device_type) ==
+            ExecutorDispatchMode::KernelPerFragment) {
+          execution_kernel_desc.fragments.emplace_back(
+              FragmentsPerTable{db_id, table_id, frag_ids});
+        } else {  // MultifragmentKernel
+          if (execution_kernels_per_device_[device_type].find(device_id) ==
+              execution_kernels_per_device_[device_type].end()) {
+            std::vector<ExecutionKernelDescriptor> kernel_descs{
+                ExecutionKernelDescriptor{device_id, FragmentsList{}, std::nullopt}};
+            CHECK(execution_kernels_per_device_[device_type]
+                      .insert(std::make_pair(device_id, kernel_descs))
+                      .second);
+          }
+          CHECK_EQ(execution_kernels_per_device_[device_type][device_id].size(),
+                   size_t(1));
+          auto& execution_kernel =
+              execution_kernels_per_device_[device_type][device_id].front();
 
-        execution_kernel_desc.fragments.emplace_back(
-            FragmentsPerTable{db_id, table_id, frag_ids});
+          auto& kernel_frag_list = execution_kernel.fragments;
+          if (kernel_frag_list.size() < table_desc_idx + 1) {
+            kernel_frag_list.emplace_back(FragmentsPerTable{db_id, table_id, frag_ids});
+          } else {
+            CHECK_EQ(kernel_frag_list[table_desc_idx].table_id, table_id);
+            auto& curr_frag_ids = kernel_frag_list[table_desc_idx].fragment_ids;
+            for (const int frag_id : frag_ids) {
+              if (std::find(curr_frag_ids.begin(), curr_frag_ids.end(), frag_id) ==
+                  curr_frag_ids.end()) {
+                curr_frag_ids.push_back(frag_id);
+              }
+            }
+          }
+        }
       }
     }
-
-    auto itr = execution_kernels_per_device_[device_type].find(device_id);
-    if (itr == execution_kernels_per_device_[device_type].end()) {
-      auto const pair = execution_kernels_per_device_[device_type].insert(std::make_pair(
-          device_id,
-          std::vector<ExecutionKernelDescriptor>{std::move(execution_kernel_desc)}));
-      CHECK(pair.second);
-    } else {
-      itr->second.emplace_back(std::move(execution_kernel_desc));
+    LOG(DEBUG1) << "Assigning frag_id=" << frag_id << "/" << fragments->size() - 1
+                << " to " << device_type << ", device_id=" << device_id;
+    if (policy->devices_dispatch_modes.at(device_type) ==
+        ExecutorDispatchMode::KernelPerFragment) {
+      auto itr = execution_kernels_per_device_[device_type].find(device_id);
+      if (itr == execution_kernels_per_device_[device_type].end()) {
+        CHECK(execution_kernels_per_device_[device_type]
+                  .insert(std::make_pair(device_id,
+                                         std::vector<ExecutionKernelDescriptor>{
+                                             std::move(execution_kernel_desc)}))
+                  .second);
+      } else {
+        itr->second.emplace_back(std::move(execution_kernel_desc));
+      }
     }
   }
 }
@@ -202,7 +218,6 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<uint64_t>& frag_offsets,
     const policy::ExecutionPolicy* policy,
-    const int device_count,
     const size_t num_bytes_for_row,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
@@ -218,7 +233,6 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
                                    table_desc,
                                    frag_offsets,
                                    policy,
-                                   device_count,
                                    num_bytes_for_row,
                                    j,
                                    executor,
@@ -255,7 +269,6 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
     const RelAlgExecutionUnit& ra_exe_unit,
     const std::vector<uint64_t>& frag_offsets,
     const policy::ExecutionPolicy* policy,
-    const int device_count,
     const size_t num_bytes_for_row,
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
@@ -271,113 +284,10 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMap(
                                  outer_table_desc,
                                  frag_offsets,
                                  policy,
-                                 device_count,
                                  num_bytes_for_row,
                                  std::nullopt,
                                  executor,
                                  cgen_traits_desc);
-}
-
-void QueryFragmentDescriptor::buildMultifragKernelMap(
-    const RelAlgExecutionUnit& ra_exe_unit,
-    const std::vector<uint64_t>& frag_offsets,
-    const policy::ExecutionPolicy* policy,
-    const int device_count,
-    const size_t num_bytes_for_row,
-    Executor* executor,
-    compiler::CodegenTraitsDescriptor cgen_traits_desc) {
-  // Allocate all the fragments of the tables involved in the query to available
-  // devices. The basic idea: the device is decided by the outer table in the
-  // query (the first table in a join) and we need to broadcast the fragments
-  // in the inner table to each device. Sharding will change this model.
-  const auto& outer_table_desc = ra_exe_unit.input_descs.front();
-  const auto outer_table_ref = outer_table_desc.getTableRef();
-  auto it = selected_tables_fragments_.find(outer_table_ref);
-  CHECK(it != selected_tables_fragments_.end());
-  const auto outer_fragments = it->second;
-  outer_fragments_size_ = outer_fragments->size();
-
-  const auto inner_table_id_to_join_condition = executor->getInnerTabIdToJoinCond();
-
-  for (size_t outer_frag_id = 0; outer_frag_id < outer_fragments->size();
-       ++outer_frag_id) {
-    if (!allowed_outer_fragment_indices_.empty()) {
-      if (std::find(allowed_outer_fragment_indices_.begin(),
-                    allowed_outer_fragment_indices_.end(),
-                    outer_frag_id) == allowed_outer_fragment_indices_.end()) {
-        continue;
-      }
-    }
-
-    const auto& fragment = (*outer_fragments)[outer_frag_id];
-    auto skip_frag = executor->skipFragment(outer_table_desc,
-                                            fragment,
-                                            ra_exe_unit.simple_quals,
-                                            frag_offsets,
-                                            outer_frag_id,
-                                            cgen_traits_desc);
-    if (skip_frag == std::pair<bool, int64_t>(false, -1)) {
-      skip_frag = executor->skipFragmentInnerJoins(outer_table_desc,
-                                                   ra_exe_unit,
-                                                   fragment,
-                                                   frag_offsets,
-                                                   outer_frag_id,
-                                                   cgen_traits_desc);
-    }
-    if (skip_frag.first) {
-      continue;
-    }
-    auto [device_type, device_id] =
-        policy->scheduleSingleFragment(fragment, outer_frag_id, outer_fragments_size_);
-
-    if (device_type == ExecutorDeviceType::GPU) {
-      checkDeviceMemoryUsage(fragment, device_id, num_bytes_for_row);
-    }
-
-    for (size_t j = 0; j < ra_exe_unit.input_descs.size(); ++j) {
-      const auto db_id = ra_exe_unit.input_descs[j].getDatabaseId();
-      const auto table_id = ra_exe_unit.input_descs[j].getTableId();
-      auto table_frags_it = selected_tables_fragments_.find({db_id, table_id});
-      CHECK(table_frags_it != selected_tables_fragments_.end());
-      const auto frag_ids =
-          executor->getTableFragmentIndices(ra_exe_unit,
-                                            device_type,
-                                            j,
-                                            outer_frag_id,
-                                            selected_tables_fragments_,
-                                            inner_table_id_to_join_condition);
-
-      if (execution_kernels_per_device_[device_type].find(device_id) ==
-          execution_kernels_per_device_[device_type].end()) {
-        std::vector<ExecutionKernelDescriptor> kernel_descs{
-            ExecutionKernelDescriptor{device_id, FragmentsList{}, std::nullopt}};
-        CHECK(execution_kernels_per_device_[device_type]
-                  .insert(std::make_pair(device_id, kernel_descs))
-                  .second);
-      }
-
-      // Multifrag kernels only have one execution kernel per device. Grab the execution
-      // kernel object and push back into its fragments list.
-      CHECK_EQ(execution_kernels_per_device_[device_type][device_id].size(), size_t(1));
-      auto& execution_kernel =
-          execution_kernels_per_device_[device_type][device_id].front();
-
-      auto& kernel_frag_list = execution_kernel.fragments;
-      if (kernel_frag_list.size() < j + 1) {
-        kernel_frag_list.emplace_back(FragmentsPerTable{db_id, table_id, frag_ids});
-      } else {
-        CHECK_EQ(kernel_frag_list[j].table_id, table_id);
-        auto& curr_frag_ids = kernel_frag_list[j].fragment_ids;
-        for (const int frag_id : frag_ids) {
-          if (std::find(curr_frag_ids.begin(), curr_frag_ids.end(), frag_id) ==
-              curr_frag_ids.end()) {
-            curr_frag_ids.push_back(frag_id);
-          }
-        }
-      }
-    }
-    rowid_lookup_key_ = std::max(rowid_lookup_key_, skip_frag.second);
-  }
 }
 
 namespace {

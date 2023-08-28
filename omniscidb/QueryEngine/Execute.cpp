@@ -2179,35 +2179,19 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
 
       try {
         std::vector<std::unique_ptr<ExecutionKernel>> kernels;
-        if (config_->exec.heterogeneous.enable_heterogeneous_execution) {
-          kernels = createHeterogeneousKernels(shared_context,
-                                               ra_exe_unit,
-                                               column_fetcher,
-                                               query_infos,
-                                               eo,
-                                               co,
-                                               is_agg,
-                                               allow_single_frag_table_opt,
-                                               query_comp_descs_owned,
-                                               query_mem_descs_owned,
-                                               exe_policy.get(),
-                                               available_gpus,
-                                               available_cpus);
-        } else {
-          kernels = createKernels(shared_context,
-                                  ra_exe_unit,
-                                  column_fetcher,
-                                  query_infos,
-                                  eo,
-                                  co,
-                                  is_agg,
-                                  allow_single_frag_table_opt,
-                                  *query_comp_descs_owned[fallback_device].get(),
-                                  *query_mem_descs_owned[fallback_device].get(),
-                                  exe_policy.get(),
-                                  available_gpus,
-                                  available_cpus);
-        }
+        kernels = createKernels(shared_context,
+                                ra_exe_unit,
+                                column_fetcher,
+                                query_infos,
+                                eo,
+                                co,
+                                is_agg,
+                                allow_single_frag_table_opt,
+                                query_comp_descs_owned,
+                                query_mem_descs_owned,
+                                exe_policy.get(),
+                                available_gpus,
+                                available_cpus);
         launchKernels(shared_context, std::move(kernels), fallback_device, co);
       } catch (QueryExecutionError& e) {
         if (eo.with_dynamic_watchdog && interrupted_.load() &&
@@ -2604,174 +2588,6 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     const CompilationOptions& co,
     const bool is_agg,
     const bool allow_single_frag_table_opt,
-    const QueryCompilationDescriptor& query_comp_desc,
-    const QueryMemoryDescriptor& query_mem_desc,
-    policy::ExecutionPolicy* policy,
-    std::unordered_set<int>& available_gpus,
-    int& available_cpus) {
-  std::vector<std::unique_ptr<ExecutionKernel>> execution_kernels;
-
-  QueryFragmentDescriptor fragment_descriptor(
-      ra_exe_unit,
-      table_infos,
-      query_comp_desc.getDeviceType() == ExecutorDeviceType::GPU
-          ? data_mgr_->getMemoryInfo(Data_Namespace::MemoryLevel::GPU_LEVEL)
-          : std::vector<Buffer_Namespace::MemoryInfo>{},
-      eo.gpu_input_mem_limit_percent,
-      eo.outer_fragment_indices);
-  CHECK(!ra_exe_unit.input_descs.empty());
-
-  const auto device_type = query_comp_desc.getDeviceType();
-  const bool uses_lazy_fetch =
-      plan_state_->allow_lazy_fetch_ &&
-      has_lazy_fetched_columns(getColLazyFetchInfo(ra_exe_unit.target_exprs));
-  bool use_multifrag_kernel = (device_type == ExecutorDeviceType::GPU) &&
-                              eo.allow_multifrag && (!uses_lazy_fetch || is_agg);
-  const auto device_count = deviceCount(device_type);
-  CHECK_GT(device_count, 0);
-  // Right now, we don't have any heuristics to determine the perfect number of kernels
-  // we want to execute on CPU and we simply create a kernel per fragment. But there
-  // are some extreme cases when output buffer significanly exceeds fragment size and
-  // then we have few problems:
-  //  1. Output buffer initialization and reduction time exceeds fragment processing
-  //     time, so it's more profitable to use a single thread for processing.
-  //  2. We might simply run out of memory due to many huge hash tables and even bigger
-  //     hash table created later for the reduction.
-  // We need more comprehensive processing costs and memory consumption evaluation here.
-  // For now, detect a simple groupby case when output hash table is bigger than input
-  // table. For this case we use a single multifragment kernel to force single-threaded
-  // execution with no reduction required.
-  if (device_type == ExecutorDeviceType::CPU && table_infos.size() == (size_t)1 &&
-      config_->exec.group_by.enable_cpu_multifrag_kernels &&
-      !ra_exe_unit.partitioned_aggregation &&
-      (query_mem_desc.getQueryDescriptionType() ==
-           QueryDescriptionType::GroupByPerfectHash ||
-       query_mem_desc.getQueryDescriptionType() ==
-           QueryDescriptionType::GroupByBaselineHash)) {
-    size_t input_size = table_infos.front().info.getNumTuples();
-    size_t buffer_size = query_mem_desc.getEntryCount();
-    constexpr size_t threshold_ratio = 2;
-    if (table_infos.front().info.fragments.size() > 1 &&
-        buffer_size * threshold_ratio >= input_size) {
-      LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
-                   "table (input_size is "
-                << input_size << " rows, output buffer is " << buffer_size
-                << " entries).";
-      use_multifrag_kernel = true;
-    }
-  }
-
-  fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
-                                             shared_context.getFragOffsets(),
-                                             policy,
-                                             device_count,
-                                             use_multifrag_kernel,
-                                             this,
-                                             co.codegen_traits_desc);
-  if (eo.with_watchdog && fragment_descriptor.shouldCheckWorkUnitWatchdog()) {
-    checkWorkUnitWatchdog(
-        ra_exe_unit, table_infos, *schema_provider_, device_type, device_count);
-  }
-
-  if (use_multifrag_kernel) {
-    VLOG(1) << "Creating multifrag execution kernels";
-    VLOG(1) << query_mem_desc.toString();
-
-    // NB: We should never be on this path when the query is retried because of running
-    // out of group by slots; also, for scan only queries on CPU we want the
-    // high-granularity, fragment by fragment execution instead. For scan only queries on
-    // GPU, we want the multifrag kernel path to save the overhead of allocating an output
-    // buffer per fragment.
-    auto multifrag_kernel_dispatch = [device_type,
-                                      &ra_exe_unit,
-                                      &execution_kernels,
-                                      &column_fetcher,
-                                      &co,
-                                      &eo,
-                                      &query_comp_desc,
-                                      &query_mem_desc](const int device_id,
-                                                       const FragmentsList& frag_list,
-                                                       const int64_t rowid_lookup_key) {
-      execution_kernels.emplace_back(
-          std::make_unique<ExecutionKernel>(ra_exe_unit,
-                                            device_type,
-                                            device_id,
-                                            co,
-                                            eo,
-                                            column_fetcher,
-                                            query_comp_desc,
-                                            query_mem_desc,
-                                            frag_list,
-                                            ExecutorDispatchMode::MultifragmentKernel,
-                                            rowid_lookup_key));
-    };
-    fragment_descriptor.assignFragsToMultiDispatch(multifrag_kernel_dispatch);
-  } else {
-    VLOG(1) << "Creating one execution kernel per fragment";
-    VLOG(1) << query_mem_desc.toString();
-
-    if (allow_single_frag_table_opt &&
-        (query_mem_desc.getQueryDescriptionType() == QueryDescriptionType::Projection) &&
-        table_infos.size() == 1) {
-      const auto max_frag_size =
-          table_infos.front().info.getFragmentNumTuplesUpperBound();
-      if (max_frag_size < query_mem_desc.getEntryCount()) {
-        LOG(INFO) << "Lowering scan limit from " << query_mem_desc.getEntryCount()
-                  << " to match max fragment size " << max_frag_size
-                  << " for kernel per fragment execution path.";
-        throw CompilationRetryNewScanLimit(max_frag_size);
-      }
-    }
-
-    size_t frag_list_idx{0};
-    auto fragment_per_kernel_dispatch = [&ra_exe_unit,
-                                         &execution_kernels,
-                                         &column_fetcher,
-                                         &co,
-                                         &eo,
-                                         &frag_list_idx,
-                                         &query_comp_desc,
-                                         &query_mem_desc](
-                                            const int device_id,
-                                            const FragmentsList& frag_list,
-                                            const int64_t rowid_lookup_key,
-                                            const ExecutorDeviceType device_type) {
-      if (!frag_list.size()) {
-        return;
-      }
-      CHECK_GE(device_id, 0);
-      execution_kernels.emplace_back(
-          std::make_unique<ExecutionKernel>(ra_exe_unit,
-                                            device_type,
-                                            device_id,
-                                            co,
-                                            eo,
-                                            column_fetcher,
-                                            query_comp_desc,
-                                            query_mem_desc,
-                                            frag_list,
-                                            ExecutorDispatchMode::KernelPerFragment,
-                                            rowid_lookup_key));
-      ++frag_list_idx;
-    };
-
-    fragment_descriptor.assignFragsToKernelDispatch(fragment_per_kernel_dispatch,
-                                                    ra_exe_unit);
-  }
-
-  return execution_kernels;
-}
-
-// TODO: unify with createKernels.
-std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKernels(
-    SharedKernelContext& shared_context,
-    const RelAlgExecutionUnit& ra_exe_unit,
-    ColumnFetcher& column_fetcher,
-    const std::vector<InputTableInfo>& table_infos,
-    const ExecutionOptions& eo,
-    const CompilationOptions& co,
-    const bool is_agg,
-    const bool allow_single_frag_table_opt,
     const std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>&
         query_comp_descs,
     const std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>&
@@ -2787,112 +2603,133 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createHeterogeneousKerne
       data_mgr_->getMemoryInfo(Data_Namespace::MemoryLevel::GPU_LEVEL),
       eo.gpu_input_mem_limit_percent,
       eo.outer_fragment_indices);
-
   CHECK(!ra_exe_unit.input_descs.empty());
+  const bool uses_lazy_fetch =
+      plan_state_->allow_lazy_fetch_ &&
+      has_lazy_fetched_columns(getColLazyFetchInfo(ra_exe_unit.target_exprs));
+  const int device_count = config_->exec.heterogeneous.enable_heterogeneous_execution
+                               ? available_cpus + available_gpus.size()
+                               : deviceCount(query_mem_descs.begin()->first);
+  CHECK_GT(device_count, 0);
+  for (const auto& intended_dt_itr :
+       query_comp_descs) {  // Decide on optimal dispatch mode per device type
+    // Keep in mind that the query intended for GPU may fallback to CPU!
+    // We will select dispatch modes based on conditions of actual devices, but we will
+    // modify the mode of the intended device. See usage of scheduleSingleFragment() and
+    // execution_kernels_per_device_.
+    const ExecutorDeviceType intended_dt = intended_dt_itr.first;
+    const ExecutorDeviceType actual_dt = intended_dt_itr.second->getDeviceType();
+    LOG(INFO) << "Query was inteded for " << intended_dt << ", will actually run on "
+              << actual_dt;
 
-  const bool use_multifrag_kernel = eo.allow_multifrag && is_agg;
-
-  fragment_descriptor.buildFragmentKernelMap(ra_exe_unit,
-                                             shared_context.getFragOffsets(),
-                                             policy,
-                                             available_cpus + available_gpus.size(),
-                                             use_multifrag_kernel,
-                                             this,
-                                             co.codegen_traits_desc);
-
-  if (use_multifrag_kernel) {
-    LOG(INFO) << "use_multifrag_kernel=" << use_multifrag_kernel;
-    size_t frag_list_idx{0};
-    auto multifrag_heterogeneous_kernel_dispatch =
-        [&ra_exe_unit,
-         &execution_kernels,
-         &column_fetcher,
-         &co,
-         &eo,
-         &frag_list_idx,
-         &query_comp_descs,
-         &query_mem_descs](const int device_id,
-                           const FragmentsList& frag_list,
-                           const int64_t rowid_lookup_key,
-                           const ExecutorDeviceType device_type) {
-          if (!frag_list.size()) {
-            return;
-          }
-          CHECK_GE(device_id, 0);
-
-          execution_kernels.emplace_back(std::make_unique<ExecutionKernel>(
-              ra_exe_unit,
-              device_type,
-              device_id,
-              co,
-              eo,
-              column_fetcher,
-              *query_comp_descs.at(device_type).get(),
-              *query_mem_descs.at(device_type).get(),
-              frag_list,
-              device_type == ExecutorDeviceType::CPU
-                  ? ExecutorDispatchMode::KernelPerFragment
-                  : ExecutorDispatchMode::MultifragmentKernel,
-              rowid_lookup_key));
-
-          ++frag_list_idx;
-        };
-    fragment_descriptor.assignFragsToMultiHeterogeneousDispatch(
-        multifrag_heterogeneous_kernel_dispatch, ra_exe_unit);
-  } else {
-    if (allow_single_frag_table_opt && query_mem_descs.count(ExecutorDeviceType::GPU) &&
-        (query_mem_descs.at(ExecutorDeviceType::GPU)->getQueryDescriptionType() ==
-         QueryDescriptionType::Projection) &&
-        table_infos.size() == 1) {
-      const auto max_frag_size =
-          table_infos.front().info.getFragmentNumTuplesUpperBound();
-      if (max_frag_size < query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()) {
-        LOG(INFO) << "Lowering scan limit from "
-                  << query_mem_descs.at(ExecutorDeviceType::GPU)->getEntryCount()
-                  << " to match max fragment size " << max_frag_size
-                  << " for kernel per fragment execution path.";
-        throw CompilationRetryNewScanLimit(max_frag_size);
+    if (actual_dt == ExecutorDeviceType::GPU && eo.allow_multifrag &&
+        (!uses_lazy_fetch || is_agg)) {
+      policy->devices_dispatch_modes.at(intended_dt) =
+          ExecutorDispatchMode::MultifragmentKernel;
+    } else if (actual_dt == ExecutorDeviceType::CPU && table_infos.size() == (size_t)1 &&
+               config_->exec.group_by.enable_cpu_multifrag_kernels &&
+               !ra_exe_unit.partitioned_aggregation &&
+               (query_mem_descs.at(intended_dt)->getQueryDescriptionType() ==
+                    QueryDescriptionType::GroupByPerfectHash ||
+                query_mem_descs.at(intended_dt)->getQueryDescriptionType() ==
+                    QueryDescriptionType::GroupByBaselineHash)) {
+      // Right now, we don't have any heuristics to determine the perfect number of
+      // kernels we want to execute on CPU and we simply create a kernel per fragment. But
+      // there are some extreme cases when output buffer significanly exceeds fragment
+      // size and then we have few problems:
+      //  1. Output buffer initialization and reduction time exceeds fragment processing
+      //     time, so it's more profitable to use a single thread for processing.
+      //  2. We might simply run out of memory due to many huge hash tables and even
+      //  bigger
+      //     hash table created later for the reduction.
+      // We need more comprehensive processing costs and memory consumption evaluation
+      // here. For now, detect a simple groupby case when output hash table is bigger than
+      // input table. For this case we use a single multifragment kernel to force
+      // single-threaded execution with no reduction required.
+      size_t input_size = table_infos.front().info.getNumTuples();
+      size_t buffer_size = query_mem_descs.at(intended_dt)->getEntryCount();
+      constexpr size_t threshold_ratio = 2;
+      if (table_infos.front().info.fragments.size() > 1 &&
+          buffer_size * threshold_ratio >= input_size) {
+        LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
+                     "table (input_size is "
+                  << input_size << " rows, output buffer is " << buffer_size
+                  << " entries).";
+        policy->devices_dispatch_modes.at(intended_dt) =
+            ExecutorDispatchMode::MultifragmentKernel;
       }
     }
-
-    size_t frag_list_idx{0};
-    auto fragment_per_kernel_dispatch = [&ra_exe_unit,
-                                         &execution_kernels,
-                                         &column_fetcher,
-                                         &co,
-                                         &eo,
-                                         &frag_list_idx,
-                                         &query_comp_descs,
-                                         &query_mem_descs](
-                                            const int device_id,
-                                            const FragmentsList& frag_list,
-                                            const int64_t rowid_lookup_key,
-                                            const ExecutorDeviceType device_type) {
-      if (!frag_list.size()) {
-        return;
-      }
-      CHECK_GE(device_id, 0);
-      CHECK(query_comp_descs.count(device_type));
-      CHECK(query_mem_descs.count(device_type));
-
-      execution_kernels.emplace_back(
-          std::make_unique<ExecutionKernel>(ra_exe_unit,
-                                            device_type,
-                                            device_id,
-                                            co,
-                                            eo,
-                                            column_fetcher,
-                                            *query_comp_descs.at(device_type).get(),
-                                            *query_mem_descs.at(device_type).get(),
-                                            frag_list,
-                                            ExecutorDispatchMode::KernelPerFragment,
-                                            rowid_lookup_key));
-      ++frag_list_idx;
-    };
-
-    fragment_descriptor.assignFragsToKernelDispatch(fragment_per_kernel_dispatch,
-                                                    ra_exe_unit);
   }
+
+  fragment_descriptor.buildFragmentKernelMap(
+      ra_exe_unit, shared_context.getFragOffsets(), policy, this, co.codegen_traits_desc);
+
+  if (!config_->exec.heterogeneous.enable_heterogeneous_execution && eo.with_watchdog &&
+      fragment_descriptor.shouldCheckWorkUnitWatchdog()) {
+    checkWorkUnitWatchdog(ra_exe_unit,
+                          table_infos,
+                          *schema_provider_,
+                          query_comp_descs.begin()->first,
+                          device_count);
+  }
+
+  for (const auto& intended_dt_itr : query_mem_descs) {
+    if (policy->devices_dispatch_modes.at(intended_dt_itr.first) ==
+        ExecutorDispatchMode::KernelPerFragment) {
+      VLOG(1) << "Creating one execution kernel per fragment";
+      VLOG(1) << intended_dt_itr.second->toString();
+      if (allow_single_frag_table_opt &&
+          (intended_dt_itr.second->getQueryDescriptionType() ==
+           QueryDescriptionType::Projection) &&
+          table_infos.size() == 1) {
+        const auto max_frag_size =
+            table_infos.front().info.getFragmentNumTuplesUpperBound();
+        if (max_frag_size < intended_dt_itr.second->getEntryCount()) {
+          LOG(INFO) << "Lowering scan limit from "
+                    << intended_dt_itr.second->getEntryCount()
+                    << " to match max fragment size " << max_frag_size
+                    << " for kernel per fragment execution path.";
+          throw CompilationRetryNewScanLimit(max_frag_size);
+        }
+      }
+    }
+  }
+
+  size_t frag_list_idx{0};
+  auto kernel_dispatch = [&ra_exe_unit,
+                          &execution_kernels,
+                          &column_fetcher,
+                          &co,
+                          &eo,
+                          &frag_list_idx,
+                          &query_comp_descs,
+                          &query_mem_descs,
+                          policy](const int device_id,
+                                  const FragmentsList& frag_list,
+                                  const int64_t rowid_lookup_key,
+                                  const ExecutorDeviceType device_type) {
+    if (!frag_list.size()) {
+      return;
+    }
+    CHECK_GE(device_id, 0);
+    CHECK(query_comp_descs.count(device_type));
+    CHECK(query_mem_descs.count(device_type));
+    execution_kernels.emplace_back(
+        std::make_unique<ExecutionKernel>(ra_exe_unit,
+                                          device_type,
+                                          device_id,
+                                          co,
+                                          eo,
+                                          column_fetcher,
+                                          *query_comp_descs.at(device_type).get(),
+                                          *query_mem_descs.at(device_type).get(),
+                                          frag_list,
+                                          policy->devices_dispatch_modes.at(device_type),
+                                          rowid_lookup_key));
+
+    ++frag_list_idx;
+  };
+  fragment_descriptor.dispatchKernelsToDevices(kernel_dispatch, ra_exe_unit, policy);
   return execution_kernels;
 }
 
