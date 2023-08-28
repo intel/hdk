@@ -17737,6 +17737,7 @@ int main(int argc, char** argv) {
   auto config = std::make_shared<Config>();
 
   g_is_test_env = true;
+  bool should_run_heterogen{false};
 
   std::cout << "Starting ExecuteTest" << std::endl;
 
@@ -17816,6 +17817,10 @@ int main(int argc, char** argv) {
                          ->implicit_value(true),
                      "Materialize all inner tables for joins.");
   desc.add_options()(
+      "heterogen-test",
+      po::value<bool>(&should_run_heterogen)->default_value(false)->implicit_value(true),
+      "Perform test on GPU & CPU, split data 50/50.");
+  desc.add_options()(
       "test-help",
       "Print all ExecuteTest specific options (for gtest options use `--help`).");
 
@@ -17850,6 +17855,12 @@ int main(int argc, char** argv) {
   config->exec.enable_interop = false;
 
   init(config);
+  if (should_run_heterogen) {
+    config->exec.heterogeneous.enable_heterogeneous_execution = true;
+    config->exec.heterogeneous.forced_heterogeneous_distribution = true;
+    config->exec.heterogeneous.forced_gpu_proportion = 50;
+    config->exec.heterogeneous.forced_cpu_proportion = 50;
+  }
 
   int err{0};
   try {

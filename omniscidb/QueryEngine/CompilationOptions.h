@@ -201,6 +201,7 @@ std::ostream& operator<<(std::ostream& os, const compiler::CallingConvDesc& desc
 std::ostream& operator<<(std::ostream& os, const compiler::CodegenTraitsDescriptor& desc);
 std::ostream& operator<<(std::ostream& os, const ExecutorExplainType& eet);
 std::ostream& operator<<(std::ostream& os, const CompilationOptions& co);
+std::ostream& operator<<(std::ostream& os, const ExecutorDispatchMode ddm);
 #endif
 
 #endif  // QUERYENGINE_COMPILATIONOPTIONS_H

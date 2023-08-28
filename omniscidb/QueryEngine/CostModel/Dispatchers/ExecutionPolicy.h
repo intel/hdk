@@ -37,10 +37,21 @@ class ExecutionPolicy {
   virtual std::string name() const = 0;
 
   virtual ~ExecutionPolicy() = default;
+
+  // Probe/modify modes during kernel building (do not iterate). These are the default
+  // modes.
+  std::unordered_map<ExecutorDeviceType, ExecutorDispatchMode> devices_dispatch_modes{
+      {ExecutorDeviceType::CPU, ExecutorDispatchMode::KernelPerFragment},
+      {ExecutorDeviceType::GPU, ExecutorDispatchMode::KernelPerFragment}};
 };
 
 inline std::ostream& operator<<(std::ostream& os, const ExecutionPolicy& policy) {
-  return os << policy.name();
+  os << policy.name() << "\n";
+  os << "Dispatching modes: \n";
+  for (const auto& device_disp_mode : policy.devices_dispatch_modes) {
+    os << device_disp_mode.first << " - " << device_disp_mode.second << "\n";
+  }
+  return os;
 }
 
 }  // namespace policy

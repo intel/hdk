@@ -71,6 +71,11 @@ std::ostream& operator<<(std::ostream& os, const compiler::CallingConvDesc& desc
   }
 }
 
+std::ostream& operator<<(std::ostream& os, const ExecutorDispatchMode ddm) {
+  constexpr char const* strings[]{"KernelPerFragment", "MultifragmentKernel"};
+  return os << strings[static_cast<int>(ddm)];
+}
+
 std::ostream& operator<<(std::ostream& os,
                          const compiler::CodegenTraitsDescriptor& desc) {
   os << "{local=" << desc.local_addr_space_ << ",global=" << desc.global_addr_space_
