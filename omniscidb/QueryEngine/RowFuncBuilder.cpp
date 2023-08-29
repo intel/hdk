@@ -1364,7 +1364,7 @@ llvm::Value* RowFuncBuilder::getAdditionalLiteral(const int32_t off) {
       LL_BUILDER.CreateGEP(bit_cast->getType()->getScalarType()->getPointerElementType(),
                            bit_cast,
                            LL_INT(off));
-  return LL_BUILDER.CreateLoad(gep->getType()->getPointerElementType(), gep);
+  return LL_BUILDER.CreateLoad(get_int_type(64, LL_CONTEXT), gep);
 }
 
 std::vector<llvm::Value*> RowFuncBuilder::codegenAggArg(const hdk::ir::Expr* target_expr,
