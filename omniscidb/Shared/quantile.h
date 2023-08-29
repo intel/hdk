@@ -11,6 +11,8 @@
 
 #include "IR/OpTypeEnums.h"
 
+#include <tbb/task_arena.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -30,6 +32,8 @@ class ChunkedArray {
     size_t max_elems;
   };
 
+  using ChunkVector = std::vector<Chunk>;
+
   // Random access iterator to be used with std::nth_element.
   template <typename T>
   class Iterator {
@@ -40,7 +44,7 @@ class ChunkedArray {
     typedef T& reference;
     typedef std::random_access_iterator_tag iterator_category;
 
-    Iterator(const std::vector<Chunk>* chunks, size_t chunk_idx, size_t chunk_offs)
+    Iterator(const ChunkVector* chunks, size_t chunk_idx, size_t chunk_offs)
         : chunks_(chunks), chunk_idx_(chunk_idx), chunk_offs_(chunk_offs) {}
 
     Iterator(const Iterator& other) = default;
@@ -166,7 +170,7 @@ class ChunkedArray {
     }
 
    private:
-    const std::vector<Chunk>* chunks_;
+    const ChunkVector* chunks_;
     // Current chunk index. Can be equal to size of chunks_ vector for `end` iterator.
     size_t chunk_idx_;
     // Offset in the current chunk. Should always be less than chunk size when the
@@ -180,11 +184,16 @@ class ChunkedArray {
   void push(T value) {
     // Check if we need to allocate a new chunk.
     if (chunks_.empty() || cur_idx_ == chunks_.back().max_elems) {
-      // Allocator is most probably a RowSetMemoryOwner object. It is not supposed to be
-      // used to allocate very small objects, so we start with 1 KB and double it each
-      // time with 64KB limit.
+      if (thread_idx_ < 0) {
+        thread_idx_ = tbb::this_task_arena::current_thread_index();
+      } else if (thread_idx_ != tbb::this_task_arena::current_thread_index()) {
+        // Pushing elements from different threads is not allowed bacause can cause
+        // memory corruption.
+        abort();
+      }
       size_t size_to_allocate = std::max((size_t)64, (size_t)1 << chunks_.size()) << 10;
-      Chunk chunk{allocator_->allocate(size_to_allocate), size_to_allocate / sizeof(T)};
+      Chunk chunk{allocator_->allocateSmallMtNoLock(size_to_allocate, thread_idx_),
+                  size_to_allocate / sizeof(T)};
       chunks_.emplace_back(chunk);
       cur_idx_ = 0;
     }
@@ -243,9 +252,13 @@ class ChunkedArray {
   SimpleAllocator* allocator_;
   // All chunks except the last one should be full, i.e. they hold
   // chunk.max_elems elements.
-  std::vector<Chunk> chunks_;
+  ChunkVector chunks_;
   // Insertion position in the last chunk.
   size_t cur_idx_;
+  // Thread index working with this quantile object. We assume elements are pushed
+  // by a single thread only. Index is determined on the first push. Merge can be
+  // done from different threads.
+  int thread_idx_ = -1;
 };
 
 class Quantile {

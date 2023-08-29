@@ -31,6 +31,7 @@
 #include "Logger/Logger.h"
 #include "Shared/approx_quantile.h"
 #include "Shared/quantile.h"
+#include "Shared/thread_count.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 #include "ThirdParty/robin_hood.h"
 
@@ -41,6 +42,19 @@ class ResultSet;
  * managed allocator object
  */
 class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
+ private:
+  struct ThreadMemPool {
+    ThreadMemPool() : data(nullptr), size(0) {}
+    ThreadMemPool(const ThreadMemPool& other) = default;
+    ThreadMemPool& operator=(const ThreadMemPool& other) = default;
+
+    int8_t* data;
+    size_t size;
+  };
+
+  constexpr static size_t SMALL_MEM_POOL_SIZE = 10 << 20;  // 10MB
+  constexpr static size_t MAX_IGNORED_FRAGMENT = 1 << 20;  // 1MB
+
  public:
   RowSetMemoryOwner(DataProvider* data_provider,
                     const size_t arena_block_size,
@@ -52,6 +66,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     // size up to 256 bytes to avoid such cache conflicts. This allows to significantly
     // reduce amount of allocated virtual memory which is important for ASAN runs.
     allocator_ = std::make_unique<Arena>(arena_block_size);
+    small_mem_pools_.resize(cpu_threads());
   }
 
   enum class StringTranslationType { SOURCE_INTERSECTION, SOURCE_UNION };
@@ -65,6 +80,35 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     // for such allocations.
     return reinterpret_cast<int8_t*>(
         allocator_->allocate(std::max(num_bytes, (size_t)256)));
+  }
+
+  int8_t* allocateSmallMtNoLock(size_t size, size_t thread_idx = 0) override {
+    if (size > SMALL_MEM_POOL_SIZE) {
+      return allocate(size);
+    }
+
+    // Round-up size to keep 8-byte alignment.
+    size = (size + 7) & (~7);
+
+    // Normally, we use TBB thread index and don't expect it to be greater than
+    // cpu_threads() but we don't respect g_cpu_threads_override currently for TBB.
+    if (thread_idx >= small_mem_pools_.size()) {
+      return allocate(size);
+    }
+
+    auto& pool = small_mem_pools_[thread_idx];
+    if (size > pool.size) {
+      if (pool.size > MAX_IGNORED_FRAGMENT) {
+        return allocate(size);
+      }
+      pool.data = allocate(SMALL_MEM_POOL_SIZE);
+      pool.size = SMALL_MEM_POOL_SIZE;
+    }
+
+    auto res = pool.data;
+    pool.data += size;
+    pool.size -= size;
+    return res;
   }
 
   int8_t* allocateCountDistinctBuffer(const size_t num_bytes,
@@ -266,6 +310,10 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   DataProvider* data_provider_;  // for metadata lookups
   size_t arena_block_size_;      // for cloning
   std::unique_ptr<Arena> allocator_;
+
+  // Small memory pools that get memory from the base arena and are used
+  // for lock-free allocation of small memory batches in execution kernels.
+  std::vector<ThreadMemPool> small_mem_pools_;
 
   mutable std::mutex state_mutex_;
 
