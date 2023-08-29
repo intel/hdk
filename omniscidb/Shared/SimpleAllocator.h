@@ -22,4 +22,12 @@ class SimpleAllocator {
 
  public:
   virtual int8_t* allocate(const size_t num_bytes, const size_t thread_idx = 0) = 0;
+  // This allocation method is supposed to be used by execution kernels for allocating
+  // small memory batches. Callers are responsible for not using the same thread_idx
+  // values from different threads. This enables lock-free thread local memory pools
+  // usage for better performance. Implementations are likely to fallback to a regular
+  // allocation for big memory chunks and for thread indexes exceeding cpu_count().
+  virtual int8_t* allocateSmallMtNoLock(size_t size, size_t thread_idx = 0) {
+    return allocate(size);
+  }
 };
