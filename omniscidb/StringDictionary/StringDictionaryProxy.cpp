@@ -637,11 +637,11 @@ size_t StringDictionaryProxy::transientLookupBulkParallelUnlocked(
   return num_strings_not_found;
 }
 
-StringDictionary* StringDictionaryProxy::getDictionary() const noexcept {
+StringDictionary* StringDictionaryProxy::getBaseDictionary() const noexcept {
   return string_dict_.get();
 }
 
-int64_t StringDictionaryProxy::getGeneration() const noexcept {
+int64_t StringDictionaryProxy::getBaseGeneration() const noexcept {
   return generation_;
 }
 
