@@ -851,7 +851,7 @@ const std::vector<std::string> ResultSet::getStringDictionaryPayloadCopy(
     const int dict_id) const {
   const auto sdp = row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
   CHECK(sdp);
-  return sdp->getDictionary()->copyStrings();
+  return sdp->getBaseDictionary()->copyStrings();
 }
 
 const std::pair<std::vector<int32_t>, std::vector<std::string>>
