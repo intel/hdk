@@ -46,8 +46,8 @@ class StringDictionaryProxy {
 
   // enum SetOp { kUnion = 0, kIntersection };
 
-  StringDictionary* getDictionary() const noexcept;
-  int64_t getGeneration() const noexcept;
+  StringDictionary* getBaseDictionary() const noexcept;
+  int64_t getBaseGeneration() const noexcept;
 
   /**
    * @brief Executes read-only lookup of a vector of strings and returns a vector of their

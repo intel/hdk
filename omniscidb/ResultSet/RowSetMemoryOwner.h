@@ -182,7 +182,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     std::lock_guard<std::mutex> lock(state_mutex_);
     auto it = str_dict_proxy_owned_.find(dict_id);
     if (it != str_dict_proxy_owned_.end()) {
-      CHECK_EQ(it->second->getDictionary(), str_dict.get());
+      CHECK_EQ(it->second->getBaseDictionary(), str_dict.get());
       it->second->updateGeneration(generation);
       return it->second.get();
     }
@@ -197,8 +197,8 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
       const StringDictionaryProxy* source_proxy,
       const StringDictionaryProxy* dest_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    const auto map_key = std::make_pair(source_proxy->getDictionary()->getDictId(),
-                                        dest_proxy->getDictionary()->getDictId());
+    const auto map_key = std::make_pair(source_proxy->getBaseDictionary()->getDictId(),
+                                        dest_proxy->getBaseDictionary()->getDictId());
     auto it = str_proxy_intersection_translation_maps_owned_.find(map_key);
     if (it == str_proxy_intersection_translation_maps_owned_.end()) {
       it = str_proxy_intersection_translation_maps_owned_
@@ -214,8 +214,8 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
       const StringDictionaryProxy* source_proxy,
       StringDictionaryProxy* dest_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    const auto map_key = std::make_pair(source_proxy->getDictionary()->getDictId(),
-                                        dest_proxy->getDictionary()->getDictId());
+    const auto map_key = std::make_pair(source_proxy->getBaseDictionary()->getDictId(),
+                                        dest_proxy->getBaseDictionary()->getDictId());
     auto it = str_proxy_union_translation_maps_owned_.find(map_key);
     if (it == str_proxy_union_translation_maps_owned_.end()) {
       it = str_proxy_union_translation_maps_owned_
