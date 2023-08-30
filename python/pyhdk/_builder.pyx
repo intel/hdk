@@ -470,6 +470,15 @@ cdef class QueryNode:
   def __getitem__(self, col):
     return self.ref(col)
 
+  def refragmented_view(self, fragment_size, new_table_name=None):
+    if not self.is_scan:
+      raise TypeError("Only table scan QueryNode can be refragmented")
+    res_name, exists = self._hdk._process_import_table_name(new_table_name)
+    if exists:
+      raise RuntimeError("New table name already exists")
+    self._hdk._storage.createRefragmentedView(self.table_name, res_name, fragment_size)
+    return self._hdk.scan(res_name)
+
   def proj(self, *args, exprs=None, **kwargs):
     cdef vector[CBuilderExpr] proj_exprs
 
