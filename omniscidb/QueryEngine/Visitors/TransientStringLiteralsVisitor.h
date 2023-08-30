@@ -57,7 +57,7 @@ class TransientStringLiteralsVisitor : public hdk::ir::ExprVisitor<void> {
     }
     auto uoper_dict_id = uoper_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     auto operand_dict_id = operand_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-    if (uoper_dict_id != sdp_->getDictId()) {
+    if (uoper_dict_id != sdp_->getDictionary()->getDictId()) {
       // If we are not casting to our dictionary (sdp_
       return;
     }

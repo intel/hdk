@@ -343,8 +343,8 @@ const StringDictionaryProxy::IdMap* HashJoin::translateInnerToOuterStrDictProxie
   const bool translate_dictionary =
       inner_outer_proxies.first && inner_outer_proxies.second;
   if (translate_dictionary) {
-    const auto inner_dict_id = inner_outer_proxies.first->getDictId();
-    const auto outer_dict_id = inner_outer_proxies.second->getDictId();
+    const auto inner_dict_id = inner_outer_proxies.first->getDictionary()->getDictId();
+    const auto outer_dict_id = inner_outer_proxies.second->getDictionary()->getDictId();
     CHECK_NE(inner_dict_id, outer_dict_id);
     return executor->getIntersectionStringProxyTranslationMap(
         inner_outer_proxies.first,
@@ -436,7 +436,8 @@ HashJoin::translateCompositeStrDictProxies(const CompositeKeyInfo& composite_key
       CHECK(inner_proxy);
       CHECK(outer_proxy);
 
-      CHECK_NE(inner_proxy->getDictId(), outer_proxy->getDictId());
+      CHECK_NE(inner_proxy->getDictionary()->getDictId(),
+               outer_proxy->getDictionary()->getDictId());
       proxy_translation_maps.emplace_back(
           executor->getIntersectionStringProxyTranslationMap(
               inner_proxy, outer_proxy, executor->getRowSetMemoryOwner()));

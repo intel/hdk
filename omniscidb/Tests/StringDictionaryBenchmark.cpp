@@ -133,7 +133,6 @@ std::shared_ptr<StringDictionaryProxy> create_str_proxy(const int32_t dict_id,
   auto string_dict = create_str_dict(dict_id, materialize_hashes);
   std::shared_ptr<StringDictionaryProxy> string_proxy =
       std::make_shared<StringDictionaryProxy>(string_dict,
-                                              dict_id, /* string_dict_id */
                                               string_dict->storageEntryCount());
   return string_proxy;
 }
@@ -145,7 +144,6 @@ std::shared_ptr<StringDictionaryProxy> create_and_populate_str_proxy(
   auto string_dict = create_and_populate_str_dict(dict_id, materialize_hashes, strings);
   std::shared_ptr<StringDictionaryProxy> string_proxy =
       std::make_shared<StringDictionaryProxy>(string_dict,
-                                              dict_id, /* string_dict_id */
                                               string_dict->storageEntryCount());
   return string_proxy;
 }

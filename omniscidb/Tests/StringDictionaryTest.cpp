@@ -269,8 +269,7 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
 
   // Now make proxy from dictionary
 
-  StringDictionaryProxy string_dict_proxy(
-      string_dict, 1 /* string_dict_id */, string_dict->storageEntryCount());
+  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
 
   {
     // First iteration is identical to first of the StringDictionary GetOrAddBulk test,
@@ -350,8 +349,7 @@ static std::shared_ptr<StringDictionary> create_and_fill_dictionary() {
 TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
   auto string_dict = create_and_fill_dictionary();
 
-  StringDictionaryProxy string_dict_proxy(
-      string_dict, 1 /* string_dict_id */, string_dict->storageEntryCount());
+  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
   {
     // First iteration is identical to first of the StringDictionary GetOrAddBulk test,
     // and results should be the same
@@ -403,8 +401,7 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
 TEST(StringDictionaryProxy, GetTransientBulk) {
   auto string_dict = create_and_fill_dictionary();
 
-  StringDictionaryProxy string_dict_proxy(
-      string_dict, 1 /* string_dict_id */, string_dict->storageEntryCount());
+  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
   {
     // First iteration is identical to first of the StryingDictionaryProxy
     // GetOrAddTransientBulk test, and results should be the same
@@ -475,11 +472,9 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
     // Should get back all INVALID_STR_IDs
     std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                1 /* string_dict_id */,
                                                 source_string_dict->storageEntryCount());
     std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                2 /* string_dict_id */,
                                                 dest_string_dict->storageEntryCount());
     const auto str_proxy_translation_map =
         source_string_dict_proxy->buildIntersectionTranslationMapToOtherProxy(
@@ -508,11 +503,9 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
 
     std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                1 /* string_dict_id */,
                                                 source_string_dict->storageEntryCount());
     std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                2 /* string_dict_id */,
                                                 dest_string_dict->storageEntryCount());
 
     constexpr int32_t num_source_proxy_transient_ids{64};
@@ -589,11 +582,9 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
     // destination proxy
     std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                1 /* string_dict_id */,
                                                 source_string_dict->storageEntryCount());
     std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
         std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                2 /* string_dict_id */,
                                                 dest_string_dict->storageEntryCount());
     const auto str_proxy_translation_map =
         source_string_dict_proxy->buildUnionTranslationMapToOtherProxy(
@@ -721,19 +712,17 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
       dest_sd, num_dest_persisted_entries, dest_persisted_start_val);
   ASSERT_EQ(dest_sd->storageEntryCount(), num_dest_persisted_entries);
 
-  StringDictionaryProxy source_sdp(
-      source_sd, 1 /* string_dict_id */, source_sd->storageEntryCount());
-  StringDictionaryProxy dest_sdp(
-      dest_sd, 2 /* string_dict_id */, dest_sd->storageEntryCount());
+  StringDictionaryProxy source_sdp(source_sd, source_sd->storageEntryCount());
+  StringDictionaryProxy dest_sdp(dest_sd, dest_sd->storageEntryCount());
   const auto transient_source_strings = add_strings_numeric_range(
       source_sdp, num_source_transient_entries, source_transient_start_val);
-  ASSERT_EQ(source_sdp.getDictId(), 1);
+  ASSERT_EQ(source_sdp.getDictionary()->getDictId(), 1);
   ASSERT_EQ(source_sdp.storageEntryCount(), num_source_persisted_entries);
   ASSERT_EQ(source_sdp.transientEntryCount(), num_source_transient_entries);
 
   const auto transient_dest_strings = add_strings_numeric_range(
       dest_sdp, num_dest_transient_entries, dest_transient_start_val);
-  ASSERT_EQ(dest_sdp.getDictId(), 2);
+  ASSERT_EQ(dest_sdp.getDictionary()->getDictId(), 2);
   ASSERT_EQ(dest_sdp.storageEntryCount(), num_dest_persisted_entries);
   ASSERT_EQ(dest_sdp.transientEntryCount(), num_dest_transient_entries);
 

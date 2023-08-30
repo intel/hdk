@@ -39,11 +39,7 @@ class StringDictionaryProxy {
  public:
   StringDictionaryProxy(StringDictionaryProxy const&) = delete;
   StringDictionaryProxy const& operator=(StringDictionaryProxy const&) = delete;
-  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd,
-                        const int32_t string_dict_id,
-                        const int64_t generation);
-
-  int32_t getDictId() const noexcept { return string_dict_id_; };
+  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd, const int64_t generation);
 
   bool operator==(StringDictionaryProxy const&) const;
   bool operator!=(StringDictionaryProxy const&) const;
@@ -237,7 +233,6 @@ class StringDictionaryProxy {
   IdMap buildIntersectionTranslationMapToOtherProxyUnlocked(
       const StringDictionaryProxy* dest_proxy) const;
   std::shared_ptr<StringDictionary> string_dict_;
-  const int32_t string_dict_id_;
   TransientMap transient_str_to_int_;
   // Holds pointers into transient_str_to_int_
   std::vector<std::string const*> transient_string_vec_;
