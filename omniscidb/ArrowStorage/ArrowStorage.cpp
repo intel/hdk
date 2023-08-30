@@ -633,12 +633,9 @@ TableInfoPtr ArrowStorage::importArrowTable(std::shared_ptr<arrow::Table> at,
 TableInfoPtr ArrowStorage::createRefragmentedView(const std::string& table_name,
                                                   const std::string& new_table_name,
                                                   const size_t new_frag_size) {
-  if (!new_frag_size) {
-    throw std::runtime_error("Cannot refragment to fragment size 0");
-  }
-
-  if (table_name.empty()) {
-    throw std::runtime_error("Cannot create table with empty name");
+  CHECK(new_frag_size);
+  if (new_table_name.empty() || table_name.empty()) {
+    throw std::runtime_error("Empty table names are not allowed");
   }
   TableInfoPtr res;
   int new_table_id;
@@ -701,8 +698,7 @@ void ArrowStorage::refragmentTable(TableData& table,
   if (!new_frag_size) {
     throw std::runtime_error("Cannot refragment to fragment size 0");
   }
-  const size_t new_frag_count =
-      std::ceil(static_cast<float>(table.row_count) / new_frag_size);
+  const size_t new_frag_count = (table.row_count + new_frag_size - 1) / new_frag_size;
   std::vector<DataFragment> new_fragments(new_frag_count);
 
   for (size_t new_frag_idx = 0; new_frag_idx < new_frag_count - 1; new_frag_idx++) {

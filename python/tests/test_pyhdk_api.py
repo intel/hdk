@@ -165,6 +165,27 @@ class TestBuilder(BaseTest):
             _ = hdk.scan(1)
         hdk.drop_table(table_name)
 
+    def test_refragment(self, exe_cfg):
+        # Initialize HDK components hidden from users
+        hdk = pyhdk.init()
+
+        # Import data
+        trips = hdk.import_csv(
+            "omniscidb/Tests/ArrowStorageDataFiles/taxi_sample_header.csv"
+        )
+
+        # Refragment a table
+        res = trips.refragmented_view(2, new_table_name="trips_2")
+        res1 = trips.refragmented_view(3)
+
+        assert res.is_scan
+        assert res1.is_scan
+        assert res.table_name == "trips_2"
+
+        hdk.drop_table(trips)
+        hdk.drop_table(res)
+        hdk.drop_table(res1)
+
     def test_drop_table(self, exe_cfg):
         hdk = pyhdk.init()
         table_name = "table_test_drop_table"
