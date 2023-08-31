@@ -69,10 +69,10 @@ class StringDictionaryProxy {
   * StringDictionary::INVALID_STR_ID for strings not found.
   */
 
-  std::vector<int32_t> getTransientBulk(const std::vector<std::string>& strings) const;
-  int32_t getOrAddTransient(const std::string& str);
+  std::vector<int32_t> getBulk(const std::vector<std::string>& strings) const;
+  int32_t getOrAdd(const std::string& str);
   // Not currently used
-  std::vector<int32_t> getOrAddTransientBulk(const std::vector<std::string>& strings);
+  std::vector<int32_t> getOrAddBulk(const std::vector<std::string>& strings);
   int32_t getIdOfString(const std::string& str) const;
   std::string getString(int32_t string_id) const;
   std::vector<std::string> getStrings(const std::vector<int32_t>& string_ids) const;

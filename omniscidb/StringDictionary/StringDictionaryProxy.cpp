@@ -52,7 +52,7 @@ int32_t truncate_to_generation(const int32_t id, const size_t generation) {
   return static_cast<size_t>(id) >= generation ? StringDictionary::INVALID_STR_ID : id;
 }
 
-std::vector<int32_t> StringDictionaryProxy::getTransientBulk(
+std::vector<int32_t> StringDictionaryProxy::getBulk(
     const std::vector<std::string>& strings) const {
   CHECK_GE(generation_, 0);
   std::vector<int32_t> string_ids(strings.size());
@@ -60,7 +60,7 @@ std::vector<int32_t> StringDictionaryProxy::getTransientBulk(
   return string_ids;
 }
 
-std::vector<int32_t> StringDictionaryProxy::getOrAddTransientBulk(
+std::vector<int32_t> StringDictionaryProxy::getOrAddBulk(
     const std::vector<std::string>& strings) {
   CHECK_GE(generation_, 0);
   const size_t num_strings = strings.size();
@@ -101,7 +101,7 @@ int32_t StringDictionaryProxy::getOrAddTransientUnlocked(String const& str) {
   return transient_id;
 }
 
-int32_t StringDictionaryProxy::getOrAddTransient(const std::string& str) {
+int32_t StringDictionaryProxy::getOrAdd(const std::string& str) {
   auto const string_id = getIdOfStringFromClient(str);
   if (string_id != StringDictionary::INVALID_STR_ID) {
     return string_id;
