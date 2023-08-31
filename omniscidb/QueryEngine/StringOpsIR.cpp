@@ -60,7 +60,7 @@ extern "C" RUNTIME_EXPORT int32_t lower_encoded(int32_t string_id,
   StringDictionaryProxy* string_dict_proxy =
       reinterpret_cast<StringDictionaryProxy*>(string_dict_proxy_address);
   auto str = string_dict_proxy->getString(string_id);
-  return string_dict_proxy->getOrAddTransient(boost::locale::to_lower(str));
+  return string_dict_proxy->getOrAdd(boost::locale::to_lower(str));
 }
 
 llvm::Value* CodeGenerator::codegen(const hdk::ir::CharLengthExpr* expr,
