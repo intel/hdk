@@ -297,6 +297,12 @@ public class MapDRelJsonReader {
     final Integer filterOperand = (Integer) jsonAggCall.get("filter");
     final RelDataType type =
             relJson.toType(cluster.getTypeFactory(), jsonAggCall.get("type"));
+
+    if ("QUANTILE".equalsIgnoreCase(aggregation.getName())) {
+      return new QuantileAggregateCall(aggregation, distinct, operands, type,
+              (String) jsonAggCall.getOrDefault("interpolation", "LINEAR"));
+    }
+
     final String name = (String) jsonAggCall.get("name");
     return AggregateCall.create(aggregation,
             distinct,

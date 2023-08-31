@@ -22,7 +22,6 @@ import com.mapd.parser.server.ExtensionFunction;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunction;
@@ -37,7 +36,6 @@ import org.apache.calcite.sql.fun.SqlArrayValueConstructor;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
@@ -230,7 +228,8 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
     opTab.addOperator(new ApproxCountDistinct());
     opTab.addOperator(new ApproxMedian());
     opTab.addOperator(new ApproxPercentile());
-    opTab.addOperator(new ApproxQuantile());
+    opTab.addOperator(new NumNumDoubleAggFunction("QUANTILE"));
+    opTab.addOperator(new NumNumDoubleAggFunction("APPROX_QUANTILE"));
     opTab.addOperator(new MapDAvg());
     opTab.addOperator(new Sample());
     opTab.addOperator(new LastSample());
@@ -1783,9 +1782,9 @@ public class MapDSqlOperatorTable extends ChainedSqlOperatorTable {
     }
   }
 
-  static class ApproxQuantile extends SqlAggFunction {
-    ApproxQuantile() {
-      super("APPROX_QUANTILE",
+  static class NumNumDoubleAggFunction extends SqlAggFunction {
+    NumNumDoubleAggFunction(String name) {
+      super(name,
               null,
               SqlKind.OTHER_FUNCTION,
               null,
