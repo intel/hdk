@@ -742,7 +742,7 @@ std::vector<int8_t> Executor::serializeLiterals(
                 ? getStringDictionaryProxy(p->second, row_set_mem_owner_, true)
                       ->getIdOfString(p->first)
                 : getStringDictionaryProxy(p->second, row_set_mem_owner_, true)
-                      ->getOrAddTransient(p->first);
+                      ->getOrAdd(p->first);
         memcpy(&serialized[off - lit_bytes], &str_id, lit_bytes);
         break;
       }

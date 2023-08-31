@@ -882,7 +882,7 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
                        0,
                        0);
   for (size_t i = 0; i < query_mem_desc.getEntryCount(); ++i) {
-    sdp->getOrAddTransient(std::to_string(i));
+    sdp->getOrAdd(std::to_string(i));
   }
   const auto storage = result_set.allocateStorage();
   EvenNumberGenerator generator;

@@ -282,8 +282,7 @@ BENCHMARK_DEFINE_F(StringDictionaryProxyFixture, GetOrAddTransientBulk_1M_Unique
 (benchmark::State& state) {
   const auto string_dict_proxy = create_str_proxy(1, true);
   for (auto _ : state) {
-    const auto string_ids =
-        string_dict_proxy->getOrAddTransientBulk(append_strings_10M_1M_10);
+    const auto string_ids = string_dict_proxy->getOrAddBulk(append_strings_10M_1M_10);
   }
 }
 
@@ -296,7 +295,7 @@ BENCHMARK_DEFINE_F(StringDictionaryProxyFixture, GetOrAddTransient_1M_Unique)
   for (auto _ : state) {
     for (size_t string_idx = 0; string_idx < num_strings; ++string_idx) {
       string_ids[string_idx] =
-          string_dict_proxy->getOrAddTransient(append_strings_10M_1M_10[string_idx]);
+          string_dict_proxy->getOrAdd(append_strings_10M_1M_10[string_idx]);
     }
   }
 }
@@ -308,7 +307,7 @@ BENCHMARK_DEFINE_F(StringDictionaryProxyFixture,
       create_and_populate_str_proxy(1, true, append_strings_10M_1M_10);
   for (auto _ : state) {
     const auto proxy_string_ids =
-        string_dict_proxy->getOrAddTransientBulk(append_strings_10M_1M_10_randomized);
+        string_dict_proxy->getOrAddBulk(append_strings_10M_1M_10_randomized);
   }
 }
 
@@ -320,8 +319,8 @@ BENCHMARK_DEFINE_F(StringDictionaryProxyFixture, GetOrAddTransient_AllPersisted_
   std::vector<int32_t> proxy_string_ids(num_strings);
   for (auto _ : state) {
     for (size_t string_idx = 0; string_idx < num_strings; ++string_idx) {
-      proxy_string_ids[string_idx] = string_proxy->getOrAddTransient(
-          append_strings_10M_1M_10_randomized[string_idx]);
+      proxy_string_ids[string_idx] =
+          string_proxy->getOrAdd(append_strings_10M_1M_10_randomized[string_idx]);
     }
   }
 }
@@ -360,7 +359,7 @@ BENCHMARK_DEFINE_F(
             append_strings_10M_10M_10_randomized_truncated_100.begin());
   auto dest_proxy = create_and_populate_str_proxy(
       2, true, append_strings_10M_10M_10_randomized_truncated_8M);
-  dest_proxy->getOrAddTransientBulk(append_strings_10M_10M_10_randomized_truncated_100);
+  dest_proxy->getOrAddBulk(append_strings_10M_10M_10_randomized_truncated_100);
   for (auto _ : state) {
     auto id_map =
         source_proxy->buildIntersectionTranslationMapToOtherProxy(dest_proxy.get());
@@ -390,7 +389,7 @@ BENCHMARK_DEFINE_F(
             append_strings_10M_10M_10_randomized_truncated_100.begin());
   auto dest_proxy = create_and_populate_str_proxy(
       2, true, append_strings_10M_10M_10_randomized_truncated_8M);
-  dest_proxy->getOrAddTransientBulk(append_strings_10M_10M_10_randomized_truncated_100);
+  dest_proxy->getOrAddBulk(append_strings_10M_10M_10_randomized_truncated_100);
   for (auto _ : state) {
     auto id_map = source_proxy->buildUnionTranslationMapToOtherProxy(dest_proxy.get());
     const size_t num_expected_untranslated_strings =

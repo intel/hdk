@@ -286,7 +286,7 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
     }
 
     for (size_t i = 0; i < g_op_count; ++i) {
-      string_ids[i] = string_dict_proxy.getOrAddTransient(strings[i]);
+      string_ids[i] = string_dict_proxy.getOrAdd(strings[i]);
     }
 
     for (int i = 0; i < g_op_count; ++i) {
@@ -312,7 +312,7 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
     }
 
     for (size_t i = 0; i < g_op_count; ++i) {
-      string_ids[i] = string_dict_proxy.getOrAddTransient(strings[i]);
+      string_ids[i] = string_dict_proxy.getOrAdd(strings[i]);
     }
 
     for (int i = 0; i < g_op_count; ++i) {
@@ -363,7 +363,7 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
       }
     }
 
-    const auto string_ids = string_dict_proxy.getOrAddTransientBulk(strings);
+    const auto string_ids = string_dict_proxy.getOrAddBulk(strings);
 
     for (int i = 0; i < g_op_count; ++i) {
       if (i % 2 == 0) {
@@ -386,7 +386,7 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
       }
     }
 
-    const auto string_ids = string_dict_proxy.getOrAddTransientBulk(strings);
+    const auto string_ids = string_dict_proxy.getOrAddBulk(strings);
 
     for (int i = 0; i < g_op_count; ++i) {
       if (i % 2 == 0) {
@@ -415,7 +415,7 @@ TEST(StringDictionaryProxy, GetTransientBulk) {
       }
     }
 
-    const auto string_ids = string_dict_proxy.getTransientBulk(strings);
+    const auto string_ids = string_dict_proxy.getBulk(strings);
 
     for (int i = 0; i < g_op_count; ++i) {
       if (i % 2 == 0) {
@@ -437,7 +437,7 @@ TEST(StringDictionaryProxy, GetTransientBulk) {
       }
     }
 
-    const auto string_ids = string_dict_proxy.getTransientBulk(strings);
+    const auto string_ids = string_dict_proxy.getBulk(strings);
 
     for (int i = 0; i < g_op_count; ++i) {
       if (i % 2 == 0) {
@@ -514,12 +514,12 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
     for (int i = proxy_transient_start;
          i < proxy_transient_start + num_source_proxy_transient_ids;
          ++i) {
-      source_string_dict_proxy->getOrAddTransient(std::to_string(i));
+      source_string_dict_proxy->getOrAdd(std::to_string(i));
     }
     for (int i = proxy_transient_start;
          i < proxy_transient_start + num_dest_proxy_transient_ids;
          ++i) {
-      dest_string_dict_proxy->getOrAddTransient(std::to_string(i));
+      dest_string_dict_proxy->getOrAdd(std::to_string(i));
     }
 
     const auto str_proxy_translation_map =
@@ -632,7 +632,7 @@ std::vector<std::string> add_strings_numeric_range(StringDictionaryProxy& sdp,
   for (int32_t int_val = start_val; int_val > end_val; --int_val) {
     strings[start_val - int_val] = std::to_string(int_val);
   }
-  sdp.getOrAddTransientBulk(strings);
+  sdp.getOrAddBulk(strings);
   return strings;
 }
 

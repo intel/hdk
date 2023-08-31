@@ -30,7 +30,7 @@ class TransientStringLiteralsVisitor : public hdk::ir::ExprVisitor<void> {
   void visitConstant(const hdk::ir::Constant* constant) override {
     if (constant->type()->isString() && !constant->isNull()) {
       CHECK(constant->value().stringval);
-      sdp_->getOrAddTransient(*constant->value().stringval);
+      sdp_->getOrAdd(*constant->value().stringval);
     }
   }
 
