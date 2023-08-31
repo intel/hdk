@@ -206,7 +206,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
       dict_like_arg_type->as<hdk::ir::ExtDictionaryType>()->dictId(),
       executor()->getRowSetMemoryOwner(),
       true);
-  if (sdp->storageEntryCount() > 200000000) {
+  if (sdp->entryCount() > 200000000) {
     return nullptr;
   }
   const auto& pattern_type = pattern->type();
@@ -324,7 +324,7 @@ llvm::Value* CodeGenerator::codegenDictStrCmp(const hdk::ir::ExprPtr lhs,
       executor()->getRowSetMemoryOwner(),
       true);
 
-  if (sdp->storageEntryCount() > 200000000) {
+  if (sdp->entryCount() > 200000000) {
     std::runtime_error("Cardinality for string dictionary is too high");
     return nullptr;
   }
@@ -413,7 +413,7 @@ llvm::Value* CodeGenerator::codegenDictRegexp(const hdk::ir::ExprPtr pattern_arg
   const auto dict_id = dict_regexp_arg_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   const auto sdp = executor()->getStringDictionaryProxy(
       dict_id, executor()->getRowSetMemoryOwner(), true);
-  if (sdp->storageEntryCount() > 15000000) {
+  if (sdp->entryCount() > 15000000) {
     return nullptr;
   }
   const auto& pattern_type = pattern->type();
