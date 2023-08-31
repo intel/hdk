@@ -242,6 +242,9 @@ public class MapDRelJson {
     map.put("type", toJson(node.getType()));
     map.put("distinct", node.isDistinct());
     map.put("operands", node.getArgList());
+    if (node instanceof QuantileAggregateCall) {
+      map.put("interpolation", ((QuantileAggregateCall) node).getInterpolation());
+    }
     return map;
   }
 
