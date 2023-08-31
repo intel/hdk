@@ -717,13 +717,15 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
   const auto transient_source_strings = add_strings_numeric_range(
       source_sdp, num_source_transient_entries, source_transient_start_val);
   ASSERT_EQ(source_sdp.getBaseDictionary()->getDictId(), 1);
-  ASSERT_EQ(source_sdp.storageEntryCount(), num_source_persisted_entries);
+  ASSERT_EQ(source_sdp.getBaseDictionary()->storageEntryCount(),
+            num_source_persisted_entries);
   ASSERT_EQ(source_sdp.transientEntryCount(), num_source_transient_entries);
 
   const auto transient_dest_strings = add_strings_numeric_range(
       dest_sdp, num_dest_transient_entries, dest_transient_start_val);
   ASSERT_EQ(dest_sdp.getBaseDictionary()->getDictId(), 2);
-  ASSERT_EQ(dest_sdp.storageEntryCount(), num_dest_persisted_entries);
+  ASSERT_EQ(dest_sdp.getBaseDictionary()->storageEntryCount(),
+            num_dest_persisted_entries);
   ASSERT_EQ(dest_sdp.transientEntryCount(), num_dest_transient_entries);
 
   const auto id_map = source_sdp.buildUnionTranslationMapToOtherProxy(&dest_sdp);

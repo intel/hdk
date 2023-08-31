@@ -146,17 +146,6 @@ class StringDictionaryProxy {
   IdMap buildUnionTranslationMapToOtherProxy(StringDictionaryProxy* dest_proxy) const;
 
   /**
-   * @brief Returns the number of string entries in the underlying string dictionary,
-   * at this proxy's generation_ if it is set/valid, otherwise just the current
-   * size of the dictionary
-   *
-   * @return size_t Number of entries in the string dictionary
-   * (at this proxy's generation if set)
-   *
-   */
-  size_t storageEntryCount() const;
-
-  /**
    * @brief Returns the number of transient string entries for this proxy,
    *
    * @return size_t Number of transient string entries for this proxy
@@ -211,6 +200,17 @@ class StringDictionaryProxy {
   void eachStringSerially(StringDictionary::StringCallback&) const;
 
  private:
+  /**
+   * @brief Returns the number of string entries in the underlying string dictionary,
+   * at this proxy's generation_ if it is set/valid, otherwise just the current
+   * size of the dictionary
+   *
+   * @return size_t Number of entries in the string dictionary
+   * (at this proxy's generation if set)
+   *
+   */
+  size_t storageEntryCount() const;
+
   std::string getStringUnlocked(const int32_t string_id) const;
   size_t transientEntryCountUnlocked() const;
   size_t entryCountUnlocked() const;

@@ -237,8 +237,12 @@ std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar,
     if (col_type->isExtDictionary()) {
       const int32_t dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       const auto sdp = getStringDictionaryProxy(dict_id);
-      oss << "idx:" << ((sdp->storageEntryCount()) ? current_scalar : "null") << ", str:"
-          << "\"" << sdp->getString(boost::get<int64_t>(current_scalar)) << "\"";
+      const auto string_id = boost::get<int64_t>(current_scalar);
+      oss << "idx:"
+          << ((string_id == inline_int_null_value<int32_t>()) ? "null"
+                                                              : std::to_string(string_id))
+          << ", str:"
+          << "\"" << sdp->getString(string_id) << "\"";
     } else {
       if ((col_type->isInt64() &&
            boost::get<int64_t>(current_scalar) == std::numeric_limits<int64_t>::min()) ||
