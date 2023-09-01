@@ -1339,6 +1339,73 @@ TEST_F(ArrowStorageTest, AppendCsv_Dict_SmallBlock_Multifrag) {
   Test_ImportCsv_Dict(false, true, parse_options, config_, 1);
 }
 
+TEST_F(ArrowStorageTest, AppendCsv_Dict_SmallBlock_Multifrag_Refragment) {
+  const bool shared_dict{false};
+  const bool read_twice{false};
+
+  const size_t index_size{4};
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.block_size = 50;
+
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 2;
+  TableInfoPtr tinfo;
+  auto dict1_type = ctx.extDict(ctx.text(), shared_dict ? -1 : 0, index_size);
+  tinfo = storage.importCsvFile(getFilePath("strings.csv"),
+                                "table1",
+                                {{"col1", dict1_type}, {"col2", dict1_type}},
+                                table_options,
+                                parse_options);
+  if (read_twice) {
+    storage.appendCsvFile(getFilePath("strings.csv"), "table1", parse_options);
+  }
+
+  if (shared_dict) {
+    auto col1_info = storage.getColumnInfo(*tinfo, "col1");
+    auto dict1 =
+        storage
+            .getDictMetadata(col1_info->type->as<hdk::ir::ExtDictionaryType>()->dictId())
+            ->stringDict;
+    CHECK_EQ(dict1->storageEntryCount(), (size_t)10);
+  } else {
+    auto col1_info = storage.getColumnInfo(*tinfo, "col1");
+    auto dict1 =
+        storage
+            .getDictMetadata(col1_info->type->as<hdk::ir::ExtDictionaryType>()->dictId())
+            ->stringDict;
+    CHECK_EQ(dict1->storageEntryCount(), (size_t)5);
+    auto col2_info = storage.getColumnInfo(*tinfo, "col2");
+    auto dict2 =
+        storage
+            .getDictMetadata(col2_info->type->as<hdk::ir::ExtDictionaryType>()->dictId())
+            ->stringDict;
+    CHECK_EQ(dict2->storageEntryCount(), (size_t)5);
+  }
+
+  std::vector<std::string> col1_expected = {"s1"s, "ss2"s, "sss3"s, "ssss4"s, "sssss5"s};
+  std::vector<std::string> col2_expected = {
+      "dd1"s, "dddd2"s, "dddddd3"s, "dddddddd4"s, "dddddddddd5"s};
+  if (read_twice) {
+    col1_expected = duplicate(col1_expected);
+    col2_expected = duplicate(col2_expected);
+  }
+  checkData(storage,
+            tinfo->table_id,
+            read_twice ? 10 : 5,
+            table_options.fragment_size,
+            col1_expected,
+            col2_expected);
+
+  TableInfoPtr refragmented_tinfo = storage.createRefragmentedView("table1", "table2", 4);
+  checkData(storage,
+            refragmented_tinfo->table_id,
+            read_twice ? 10 : 5,
+            4,
+            col1_expected,
+            col2_expected);
+}
+
 TEST_F(ArrowStorageTest, AppendCsv_SharedDict) {
   ArrowStorage::CsvParseOptions parse_options;
   Test_ImportCsv_Dict(true, true, parse_options, config_);
@@ -1640,6 +1707,38 @@ TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls) {
             tinfo->table_id,
             8,
             2,
+            std::vector<int8_t>({1, 1, 0, -128, -128, 1, 0, -128}),
+            std::vector<int8_t>({1, 0, 1, 1, 0, -128, -128, -128}));
+}
+
+TEST_F(ArrowStorageTest, AppendCsvData_BoolWithNulls_Refragment) {
+  ArrowStorage storage(TEST_SCHEMA_ID, "test", TEST_DB_ID, config_);
+  ArrowStorage::TableOptions table_options;
+  table_options.fragment_size = 2;
+  TableInfoPtr tinfo = storage.createTable(
+      "table1", {{"b1", ctx.boolean()}, {"b2", ctx.boolean()}}, table_options);
+  ArrowStorage::CsvParseOptions parse_options;
+  parse_options.header = false;
+  storage.appendCsvData("true,true", tinfo->table_id, parse_options);
+  storage.appendCsvData("true,false", tinfo->table_id, parse_options);
+  storage.appendCsvData("false,true", tinfo->table_id, parse_options);
+  storage.appendCsvData(",true", tinfo->table_id, parse_options);
+  storage.appendCsvData(",false", tinfo->table_id, parse_options);
+  storage.appendCsvData("true,", tinfo->table_id, parse_options);
+  storage.appendCsvData("false,", tinfo->table_id, parse_options);
+  storage.appendCsvData(",", tinfo->table_id, parse_options);
+  checkData(storage,
+            tinfo->table_id,
+            8,
+            2,
+            std::vector<int8_t>({1, 1, 0, -128, -128, 1, 0, -128}),
+            std::vector<int8_t>({1, 0, 1, 1, 0, -128, -128, -128}));
+
+  TableInfoPtr refragmented_tinfo = storage.createRefragmentedView("table1", "table2", 5);
+  checkData(storage,
+            refragmented_tinfo->table_id,
+            8,
+            5,
             std::vector<int8_t>({1, 1, 0, -128, -128, 1, 0, -128}),
             std::vector<int8_t>({1, 0, 1, 1, 0, -128, -128, -128}));
 }
