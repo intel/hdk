@@ -142,7 +142,6 @@ int fill_hash_join_buff_bucketized(int32_t* buff,
                                    const JoinColumn join_column,
                                    const JoinColumnTypeInfo type_info,
                                    const int32_t* sd_inner_to_outer_translation_map,
-                                   const int32_t min_inner_elem,
                                    const int32_t cpu_thread_idx,
                                    const int32_t cpu_thread_count,
                                    const int64_t bucket_normalization);
@@ -153,7 +152,6 @@ int fill_hash_join_buff(int32_t* buff,
                         const JoinColumn join_column,
                         const JoinColumnTypeInfo type_info,
                         const int32_t* sd_inner_to_outer_translation_map,
-                        const int32_t min_inner_elem,
                         const int32_t cpu_thread_idx,
                         const int32_t cpu_thread_count);
 
@@ -178,7 +176,6 @@ void fill_one_to_many_hash_table(int32_t* buff,
                                  const JoinColumn& join_column,
                                  const JoinColumnTypeInfo& type_info,
                                  const int32_t* sd_inner_to_outer_translation_map,
-                                 const int32_t min_inner_elem,
                                  const unsigned cpu_thread_count);
 
 void fill_one_to_many_hash_table_bucketized(
@@ -188,7 +185,6 @@ void fill_one_to_many_hash_table_bucketized(
     const JoinColumn& join_column,
     const JoinColumnTypeInfo& type_info,
     const int32_t* sd_inner_to_outer_translation_map,
-    const int32_t min_inner_elem,
     const unsigned cpu_thread_count);
 
 void fill_one_to_many_hash_table_on_device(int32_t* buff,
@@ -255,7 +251,6 @@ void fill_one_to_many_baseline_hash_table_32(
     const std::vector<JoinColumn>& join_column_per_key,
     const std::vector<JoinColumnTypeInfo>& type_info_per_key,
     const std::vector<const int32_t*>& sd_inner_to_outer_translation_maps,
-    const std::vector<int32_t>& sd_min_inner_elems,
     const int32_t cpu_thread_count);
 
 void fill_one_to_many_baseline_hash_table_64(
@@ -267,7 +262,6 @@ void fill_one_to_many_baseline_hash_table_64(
     const std::vector<JoinColumn>& join_column_per_key,
     const std::vector<JoinColumnTypeInfo>& type_info_per_key,
     const std::vector<const int32_t*>& sd_inner_to_outer_translation_maps,
-    const std::vector<int32_t>& sd_min_inner_elems,
     const int32_t cpu_thread_count);
 
 void fill_one_to_many_baseline_hash_table_on_device_32(

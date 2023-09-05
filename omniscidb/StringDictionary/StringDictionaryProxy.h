@@ -98,8 +98,6 @@ class StringDictionaryProxy {
     size_t numNonTransients() const { return dict_size_; }
     int32_t* data() { return vector_map_.data(); }
     int32_t const* data() const { return vector_map_.data(); }
-    int32_t domainStart() const { return 0; }
-    int32_t domainEnd() const { return vector_map_.size(); }
     // Next two methods are currently used by buildUnionTranslationMapToOtherProxy to
     // short circuit iteration over ids after intersection translation if all
     // ids translated. Currently the private num_untranslated_strings_ is initialized
