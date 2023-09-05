@@ -106,6 +106,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
                                      const QueryMemoryDescriptor& query_mem_desc,
                                      const int64_t v,
                                      const std::vector<TargetInfo>& target_infos,
+                                     const int64_t dict_generation,
                                      const bool empty,
                                      const bool null_val /* = false */) {
   size_t target_idx = 0;
@@ -134,7 +135,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
       if (target_info.type->isInteger()) {
         write_int(slot_ptr, vv, slot_bytes);
       } else if (target_info.type->isString() || target_info.type->isExtDictionary()) {
-        write_int(slot_ptr, -(vv + 2), slot_bytes);
+        write_int(slot_ptr, vv + dict_generation, slot_bytes);
       } else {
         CHECK(target_info.type->isFloatingPoint());
         write_fp(slot_ptr, vv, slot_bytes);
@@ -253,6 +254,7 @@ void fill_storage_buffer_perfect_hash_colwise(int8_t* buff,
                                               const std::vector<TargetInfo>& target_infos,
                                               const QueryMemoryDescriptor& query_mem_desc,
                                               NumberGenerator& generator,
+                                              const int64_t dict_generation,
                                               const size_t step) {
   const auto key_component_count = query_mem_desc.getKeyCount();
   CHECK(query_mem_desc.didOutputColumnar());
@@ -290,7 +292,7 @@ void fill_storage_buffer_perfect_hash_colwise(int8_t* buff,
         const auto gen_val = generator.getNextValue();
         const auto val =
             (target_info.type->isString() || target_info.type->isExtDictionary())
-                ? -(gen_val + 2)
+                ? (gen_val + dict_generation)
                 : gen_val;
         fill_one_entry_one_col(col_entry_ptr,
                                col_bytes,
@@ -328,6 +330,7 @@ void fill_storage_buffer_perfect_hash_rowwise(int8_t* buff,
                                               const std::vector<TargetInfo>& target_infos,
                                               const QueryMemoryDescriptor& query_mem_desc,
                                               NumberGenerator& generator,
+                                              const int64_t dict_generation,
                                               const size_t step) {
   const auto key_component_count = query_mem_desc.getKeyCount();
   CHECK(!query_mem_desc.didOutputColumnar());
@@ -341,7 +344,7 @@ void fill_storage_buffer_perfect_hash_rowwise(int8_t* buff,
       }
       auto entries_buff = reinterpret_cast<int8_t*>(key_buff_i64);
       key_buff = fill_one_entry_no_collisions(
-          entries_buff, query_mem_desc, v, target_infos, false);
+          entries_buff, query_mem_desc, v, target_infos, dict_generation, false);
     } else {
       auto key_buff_i64 = reinterpret_cast<int64_t*>(key_buff);
       for (size_t key_comp_idx = 0; key_comp_idx < key_component_count; ++key_comp_idx) {
@@ -349,7 +352,7 @@ void fill_storage_buffer_perfect_hash_rowwise(int8_t* buff,
       }
       auto entries_buff = reinterpret_cast<int8_t*>(key_buff_i64);
       key_buff = fill_one_entry_no_collisions(
-          entries_buff, query_mem_desc, 0xdeadbeef, target_infos, true);
+          entries_buff, query_mem_desc, 0xdeadbeef, target_infos, dict_generation, true);
     }
   }
 }
@@ -358,6 +361,7 @@ void fill_storage_buffer_baseline_colwise(int8_t* buff,
                                           const std::vector<TargetInfo>& target_infos,
                                           const QueryMemoryDescriptor& query_mem_desc,
                                           NumberGenerator& generator,
+                                          const int64_t dict_generation,
                                           const size_t step) {
   CHECK(query_mem_desc.didOutputColumnar());
   const auto key_component_count = query_mem_desc.getKeyCount();
@@ -387,7 +391,7 @@ void fill_storage_buffer_baseline_colwise(int8_t* buff,
     for (const auto& target_info : target_infos) {
       const auto val =
           (target_info.type->isString() || target_info.type->isExtDictionary())
-              ? -(gen_val + step)
+              ? (gen_val + step + dict_generation - 2)
               : gen_val;
       fill_one_entry_one_col(
           value_slots, val, target_info, query_mem_desc.getEntryCount());
@@ -403,6 +407,7 @@ void fill_storage_buffer_baseline_rowwise(int8_t* buff,
                                           const std::vector<TargetInfo>& target_infos,
                                           const QueryMemoryDescriptor& query_mem_desc,
                                           NumberGenerator& generator,
+                                          const int64_t dict_generation,
                                           const size_t step) {
   const auto key_component_count = query_mem_desc.getKeyCount();
   const auto i64_buff = reinterpret_cast<int64_t*>(buff);
@@ -433,7 +438,7 @@ void fill_storage_buffer_baseline_rowwise(int8_t* buff,
                                        sizeof(int64_t),
                                        key_component_count + target_slot_count);
     CHECK(value_slots);
-    fill_one_entry_baseline(value_slots, v, target_infos);
+    fill_one_entry_baseline(value_slots, v, target_infos, dict_generation);
   }
 }
 
@@ -441,25 +446,26 @@ void fill_storage_buffer(int8_t* buff,
                          const std::vector<TargetInfo>& target_infos,
                          const QueryMemoryDescriptor& query_mem_desc,
                          NumberGenerator& generator,
+                         const int64_t dict_generation,
                          const size_t step) {
   switch (query_mem_desc.getQueryDescriptionType()) {
     case QueryDescriptionType::GroupByPerfectHash: {
       if (query_mem_desc.didOutputColumnar()) {
         fill_storage_buffer_perfect_hash_colwise(
-            buff, target_infos, query_mem_desc, generator, step);
+            buff, target_infos, query_mem_desc, generator, dict_generation, step);
       } else {
         fill_storage_buffer_perfect_hash_rowwise(
-            buff, target_infos, query_mem_desc, generator, step);
+            buff, target_infos, query_mem_desc, generator, dict_generation, step);
       }
       break;
     }
     case QueryDescriptionType::GroupByBaselineHash: {
       if (query_mem_desc.didOutputColumnar()) {
         fill_storage_buffer_baseline_colwise(
-            buff, target_infos, query_mem_desc, generator, step);
+            buff, target_infos, query_mem_desc, generator, dict_generation, step);
       } else {
         fill_storage_buffer_baseline_rowwise(
-            buff, target_infos, query_mem_desc, generator, step);
+            buff, target_infos, query_mem_desc, generator, dict_generation, step);
       }
       break;
     }
@@ -609,6 +615,7 @@ QueryMemoryDescriptor baseline_hash_two_col_desc(
 void fill_one_entry_baseline(int64_t* value_slots,
                              const int64_t v,
                              const std::vector<TargetInfo>& target_infos,
+                             const int64_t dict_generation,
                              const bool empty /* = false */,
                              const bool null_val /* = false */) {
   size_t target_slot = 0;
@@ -648,7 +655,7 @@ void fill_one_entry_baseline(int64_t* value_slots,
         break;
       case hdk::ir::Type::kText:
       case hdk::ir::Type::kExtDictionary:
-        value_slots[target_slot] = -(vv + 2);
+        value_slots[target_slot] = vv + dict_generation;
         break;
       default:
         CHECK(false);

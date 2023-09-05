@@ -420,14 +420,14 @@ void ResultSetEmulator::rse_fill_storage_buffer_perfect_hash_rowwise(
                                         // exersized for null_val test
           rs_values[i] = -1;
           key_buff = fill_one_entry_no_collisions(
-              entries_buff, rs_query_mem_desc, v, rs_target_infos, false, true);
+              entries_buff, rs_query_mem_desc, v, rs_target_infos, 0, false, true);
         } else {
           key_buff = fill_one_entry_no_collisions(
-              entries_buff, rs_query_mem_desc, v, rs_target_infos, false, false);
+              entries_buff, rs_query_mem_desc, v, rs_target_infos, 0, false, false);
         }
       } else {
         key_buff = fill_one_entry_no_collisions(
-            entries_buff, rs_query_mem_desc, v, rs_target_infos, false);
+            entries_buff, rs_query_mem_desc, v, rs_target_infos, 0, false);
       }
     } else {
       auto key_buff_i64 = reinterpret_cast<int64_t*>(key_buff);
@@ -441,10 +441,10 @@ void ResultSetEmulator::rse_fill_storage_buffer_perfect_hash_rowwise(
           rs_values[i] = -1;
         }
         key_buff = fill_one_entry_no_collisions(
-            entries_buff, rs_query_mem_desc, 0xdeadbeef, rs_target_infos, true, true);
+            entries_buff, rs_query_mem_desc, 0xdeadbeef, rs_target_infos, 0, true, true);
       } else {
         key_buff = fill_one_entry_no_collisions(
-            entries_buff, rs_query_mem_desc, 0xdeadbeef, rs_target_infos, true);
+            entries_buff, rs_query_mem_desc, 0xdeadbeef, rs_target_infos, 0, true);
       }
     }
   }
@@ -562,10 +562,10 @@ void ResultSetEmulator::rse_fill_storage_buffer_baseline_rowwise(
       if ((rs_flow == 2) &&
           (i >= rs_entry_count - 4)) {  // null_val test-cases: last four rows
         rs_values[i] = -1;
-        fill_one_entry_baseline(value_slots, v, rs_target_infos, false, true);
+        fill_one_entry_baseline(value_slots, v, rs_target_infos, 0, false, true);
       } else {
         rs_values[i] = v;
-        fill_one_entry_baseline(value_slots, v, rs_target_infos, false, false);
+        fill_one_entry_baseline(value_slots, v, rs_target_infos, 0, false, false);
       }
     }
   }
@@ -886,8 +886,12 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
   }
   const auto storage = result_set.allocateStorage();
   EvenNumberGenerator generator;
-  fill_storage_buffer(
-      storage->getUnderlyingBuffer(), target_infos, query_mem_desc, generator, 2);
+  fill_storage_buffer(storage->getUnderlyingBuffer(),
+                      target_infos,
+                      query_mem_desc,
+                      generator,
+                      sdp->getBaseGeneration(),
+                      2);
   int64_t ref_val{0};
   while (true) {
     const auto row = result_set.getNextRow(true, false);
@@ -1010,7 +1014,7 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
   auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
-  row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
+  auto sdp = row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
   const auto rs1 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
@@ -1019,8 +1023,12 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
                                                0,
                                                0);
   storage1 = rs1->allocateStorage();
-  fill_storage_buffer(
-      storage1->getUnderlyingBuffer(), target_infos, query_mem_desc, generator1, step);
+  fill_storage_buffer(storage1->getUnderlyingBuffer(),
+                      target_infos,
+                      query_mem_desc,
+                      generator1,
+                      sdp->getBaseGeneration(),
+                      step);
   const auto rs2 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
@@ -1029,8 +1037,12 @@ void run_reduction(const std::vector<TargetInfo>& target_infos,
                                                0,
                                                0);
   storage2 = rs2->allocateStorage();
-  fill_storage_buffer(
-      storage2->getUnderlyingBuffer(), target_infos, query_mem_desc, generator2, step);
+  fill_storage_buffer(storage2->getUnderlyingBuffer(),
+                      target_infos,
+                      query_mem_desc,
+                      generator2,
+                      sdp->getBaseGeneration(),
+                      step);
   ResultSetManager rs_manager;
   std::vector<ResultSet*> storage_set{rs1.get(), rs2.get()};
   rs_manager.reduce(storage_set, config(), executor.get());
@@ -1048,7 +1060,7 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
   auto executor = Executor::getExecutor(getDataMgr());
   const auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
-  row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
+  auto sdp = row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
   const auto rs1 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
@@ -1057,8 +1069,12 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                                                0,
                                                0);
   storage1 = rs1->allocateStorage();
-  fill_storage_buffer(
-      storage1->getUnderlyingBuffer(), target_infos, query_mem_desc, generator1, step);
+  fill_storage_buffer(storage1->getUnderlyingBuffer(),
+                      target_infos,
+                      query_mem_desc,
+                      generator1,
+                      sdp->getBaseGeneration(),
+                      step);
   const auto rs2 = std::make_unique<ResultSet>(target_infos,
                                                ExecutorDeviceType::CPU,
                                                query_mem_desc,
@@ -1067,8 +1083,12 @@ void test_reduce(const std::vector<TargetInfo>& target_infos,
                                                0,
                                                0);
   storage2 = rs2->allocateStorage();
-  fill_storage_buffer(
-      storage2->getUnderlyingBuffer(), target_infos, query_mem_desc, generator2, step);
+  fill_storage_buffer(storage2->getUnderlyingBuffer(),
+                      target_infos,
+                      query_mem_desc,
+                      generator2,
+                      sdp->getBaseGeneration(),
+                      step);
   ResultSetManager rs_manager;
   std::vector<ResultSet*> storage_set{rs1.get(), rs2.get()};
   auto result_rs = rs_manager.reduce(storage_set, config(), executor.get());

@@ -163,6 +163,7 @@ std::vector<std::unique_ptr<ResultSet>> create_and_fill_input_result_sets(
                         target_infos,
                         query_mem_desc,
                         generators[i],
+                        0,
                         steps[i]);
   }
   return result_sets;

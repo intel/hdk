@@ -114,7 +114,7 @@ void fill_storage_buffer_baseline_sort_int(int8_t* buff,
                                        sizeof(K),
                                        row_size_quad);
     CHECK(value_slots);
-    fill_one_entry_baseline(value_slots, val, target_infos);
+    fill_one_entry_baseline(value_slots, val, target_infos, 0);
   }
 }
 
@@ -160,7 +160,8 @@ void fill_storage_buffer_baseline_sort_fp(int8_t* buff,
                                        sizeof(int64_t),
                                        key_component_count + target_slot_count);
     CHECK(value_slots);
-    fill_one_entry_baseline(value_slots, val, target_infos, false, val == null_pattern);
+    fill_one_entry_baseline(
+        value_slots, val, target_infos, 0, false, val == null_pattern);
   }
 }
 

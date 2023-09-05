@@ -95,6 +95,7 @@ void test_columnar_conversion(const std::vector<TargetInfo>& target_infos,
                       target_infos,
                       query_mem_desc,
                       generator,
+                      0,
                       non_empty_step_size);
 
   // Columnar Conversion:
