@@ -39,7 +39,8 @@ class StringDictionaryProxy {
  public:
   StringDictionaryProxy(StringDictionaryProxy const&) = delete;
   StringDictionaryProxy const& operator=(StringDictionaryProxy const&) = delete;
-  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd, const int64_t generation);
+  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd,
+                        const int64_t generation = -1);
 
   bool operator==(StringDictionaryProxy const&) const;
   bool operator!=(StringDictionaryProxy const&) const;
