@@ -192,9 +192,7 @@ HashJoinMatchingSet HashJoin::codegenMatchingSet(
                                 cgen_traits.getLocalAddrSpace()));
 
   auto rowid_ptr_i32 = executor->cgen_state_->ir_builder_.CreateGEP(
-      rowid_base_i32->getType()->getScalarType()->getPointerElementType(),
-      rowid_base_i32,
-      slot_lv);
+      get_int_type(32, executor->cgen_state_->context_), rowid_base_i32, slot_lv);
   return {rowid_ptr_i32, row_count_lv, slot_lv};
 }
 
@@ -210,14 +208,15 @@ llvm::Value* HashJoin::codegenHashTableLoad(const size_t table_idx, Executor* ex
     auto hash_tables_ptr =
         get_arg_by_name(executor->cgen_state_->row_func_, "join_hash_tables");
     auto hash_pptr =
-        table_idx > 0
-            ? executor->cgen_state_->ir_builder_.CreateGEP(
-                  hash_tables_ptr->getType()->getScalarType()->getPointerElementType(),
-                  hash_tables_ptr,
-                  executor->cgen_state_->llInt(static_cast<int64_t>(table_idx)))
-            : hash_tables_ptr;
+        table_idx > 0 ? executor->cgen_state_->ir_builder_.CreateGEP(
+                            llvm::PointerType::get(
+                                executor->cgen_state_->context_,
+                                hash_tables_ptr->getType()->getPointerAddressSpace()),
+                            hash_tables_ptr,
+                            executor->cgen_state_->llInt(static_cast<int64_t>(table_idx)))
+                      : hash_tables_ptr;
     hash_ptr = executor->cgen_state_->ir_builder_.CreateLoad(
-        hash_pptr->getType()->getPointerElementType(), hash_pptr);
+        get_int_type(64, executor->cgen_state_->context_), hash_pptr, "hash_tables_ptr");
   } else {
     hash_ptr = get_arg_by_name(executor->cgen_state_->row_func_, "join_hash_tables");
   }

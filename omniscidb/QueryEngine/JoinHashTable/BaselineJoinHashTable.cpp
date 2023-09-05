@@ -858,29 +858,25 @@ llvm::Value* BaselineJoinHashTable::codegenKey(const CompilationOptions& co) {
   llvm::Value* key_buff_lv{nullptr};
   switch (key_component_width) {
     case 4:
-      key_buff_lv =
-          LL_BUILDER.CreateAlloca(llvm::Type::getInt32Ty(LL_CONTEXT), key_size_lv);
+      key_buff_lv = LL_BUILDER.CreateAlloca(llvm::Type::getInt32Ty(LL_CONTEXT),
+                                            co.codegen_traits_desc.local_addr_space_,
+                                            key_size_lv,
+                                            "key_buff_32");
       break;
     case 8:
-      key_buff_lv =
-          LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT), key_size_lv);
+      key_buff_lv = LL_BUILDER.CreateAlloca(llvm::Type::getInt64Ty(LL_CONTEXT),
+                                            co.codegen_traits_desc.local_addr_space_,
+                                            key_size_lv,
+                                            "key_buff_64");
       break;
     default:
       CHECK(false);
-  }
-  if (key_buff_lv->getType()->getPointerAddressSpace() !=
-      co.codegen_traits_desc.local_addr_space_) {
-    key_buff_lv = LL_BUILDER.CreateAddrSpaceCast(
-        key_buff_lv,
-        llvm::PointerType::get(key_buff_lv->getType()->getPointerElementType(),
-                               co.codegen_traits_desc.local_addr_space_),
-        "key.buff.lv.cast");
   }
 
   CodeGenerator code_generator(executor_, co.codegen_traits_desc);
   for (size_t i = 0; i < getKeyComponentCount(); ++i) {
     const auto key_comp_dest_lv = LL_BUILDER.CreateGEP(
-        key_buff_lv->getType()->getScalarType()->getPointerElementType(),
+        get_int_type(key_component_width * 8, executor_->cgen_state_->context_),
         key_buff_lv,
         LL_INT(i));
     const auto& inner_outer_pair = inner_outer_pairs_[i];
