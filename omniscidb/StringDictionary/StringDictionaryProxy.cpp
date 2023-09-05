@@ -42,7 +42,13 @@ constexpr int32_t transient_id_ceil{-2};
 
 StringDictionaryProxy::StringDictionaryProxy(std::shared_ptr<StringDictionary> sd,
                                              const int64_t generation)
-    : string_dict_(sd), generation_(generation) {}
+    : string_dict_(sd), generation_(generation) {
+  if (generation_ < 0) {
+    generation_ = static_cast<int64_t>(sd->storageEntryCount());
+  } else {
+    CHECK_LE(generation_, static_cast<int64_t>(sd->storageEntryCount()));
+  }
+}
 
 int32_t truncate_to_generation(const int32_t id, const size_t generation) {
   if (id == StringDictionary::INVALID_STR_ID) {
@@ -453,8 +459,8 @@ std::pair<const char*, size_t> StringDictionaryProxy::getStringBytes(
 }
 
 size_t StringDictionaryProxy::storageEntryCount() const {
-  const size_t num_storage_entries{generation_ == -1 ? string_dict_->storageEntryCount()
-                                                     : generation_};
+  CHECK_GE(generation_, 0);
+  const size_t num_storage_entries = generation_;
   CHECK_LE(num_storage_entries, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
   return num_storage_entries;
 }
@@ -527,11 +533,7 @@ void StringDictionaryProxy::updateGeneration(const int64_t generation) noexcept 
   if (generation == -1) {
     return;
   }
-  if (generation_ != -1) {
-    CHECK_EQ(generation_, generation);
-    return;
-  }
-  generation_ = generation;
+  CHECK_EQ(generation_, generation);
 }
 
 size_t StringDictionaryProxy::getTransientBulkImpl(
