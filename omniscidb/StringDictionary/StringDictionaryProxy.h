@@ -180,10 +180,12 @@ class StringDictionaryProxy {
   // in the std::map when new strings are added, but will change in a std::vector.
   using TransientMap = std::map<std::string, int32_t, std::less<>>;
 
-  const std::vector<std::string const*>& getTransientVector() const {
-    return transient_string_vec_;
-  }
+  std::vector<std::string> copyStrings() const;
 
+  // Iterate over transient strings, then non-transients.
+  void eachStringSerially(StringDictionary::StringCallback&) const;
+
+ private:
   // INVALID_STR_ID = -1 is reserved for invalid string_ids.
   // Thus the greatest valid transient string_id is -2.
   static unsigned transientIdToIndex(int32_t const id) {
@@ -196,10 +198,6 @@ class StringDictionaryProxy {
     return static_cast<int32_t>(max_transient_string_id - index);
   }
 
-  // Iterate over transient strings, then non-transients.
-  void eachStringSerially(StringDictionary::StringCallback&) const;
-
- private:
   /**
    * @brief Returns the number of string entries in the underlying string dictionary,
    * at this proxy's generation_ if it is set/valid, otherwise just the current

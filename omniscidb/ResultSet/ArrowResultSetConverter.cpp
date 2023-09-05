@@ -1749,23 +1749,20 @@ void ArrowResultSetConverter::initializeColumnBuilder(
               << " for a result set with " << result_set_rows << " rows.";
       column_builder.string_remap_mode =
           ArrowStringRemapMode::ONLY_TRANSIENT_STRINGS_REMAPPED;
-      auto str_list = results_->getStringDictionaryPayloadCopy(dict_id);
+      auto str_list = sdp->copyStrings();
       ARROW_THROW_NOT_OK(str_array_builder.AppendValues(str_list));
 
-      // When we fetch the bulk dictionary, we need to also fetch
-      // the transient entries only contained in the proxy.
-      // These values are always negative (starting at -2), and so need
+      // Transient entries use negative indices (starting at -2), and so need
       // to be remapped to point to the corresponding entries in the Arrow
       // dictionary (they are placed at the end after the materialized
-      // string entries from StringDictionary)
-
-      int32_t crt_transient_id = static_cast<int32_t>(str_list.size());
-      auto const& transient_vecmap = sdp->getTransientVector();
-      for (unsigned index = 0; index < transient_vecmap.size(); ++index) {
-        ARROW_THROW_NOT_OK(str_array_builder.Append(*transient_vecmap[index]));
-        auto const old_id = StringDictionaryProxy::transientIndexToId(index);
-        CHECK(column_builder.string_remapping
-                  .insert(std::make_pair(old_id, crt_transient_id++))
+      // string entries from the base StringDictionary)
+      // TODO: remove when negative indices are avoided.
+      int32_t old_id = -2;
+      int32_t new_id = static_cast<int32_t>(sdp->getBaseGeneration());
+      CHECK_GE(new_id, 0);
+      auto transient_count = sdp->entryCount() - sdp->getBaseGeneration();
+      for (unsigned index = 0; index < transient_count; ++index) {
+        CHECK(column_builder.string_remapping.insert(std::make_pair(old_id--, new_id++))
                   .second);
       }
     } else {

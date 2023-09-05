@@ -513,8 +513,6 @@ class ResultSet {
     separate_varlen_storage_valid_ = val;
   }
 
-  const std::vector<std::string> getStringDictionaryPayloadCopy(const int dict_id) const;
-
   const std::pair<std::vector<int32_t>, std::vector<std::string>>
   getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const;
 
