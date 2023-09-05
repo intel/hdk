@@ -1130,7 +1130,8 @@ llvm::Value* RowFuncBuilder::codegenAggColumnPtr(
       }
       auto offset = LL_BUILDER.CreateAdd(agg_out_idx, LL_INT(col_off));
       auto agg_out_ptr = std::get<0>(agg_out_ptr_w_idx);
-      agg_col_ptr = LL_BUILDER.CreateGEP(agg_out_ptr->getType(), agg_out_ptr, offset);
+      agg_col_ptr = LL_BUILDER.CreateGEP(
+          get_int_type(chosen_bytes * 8, LL_CONTEXT), agg_out_ptr, offset);
     }
   } else {
     size_t col_off = query_mem_desc.getColOnlyOffInBytes(agg_out_off);
