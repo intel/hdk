@@ -41,8 +41,7 @@ struct GenericKeyHandler {
                     const JoinColumnTypeInfo* type_info_per_key
 #ifndef __CUDACC__
                     ,
-                    const int32_t* const* sd_inner_to_outer_translation_maps,
-                    const int32_t* sd_min_inner_elems
+                    const int32_t* const* sd_inner_to_outer_translation_maps
 #endif
                     )
       : key_component_count_(key_component_count)
@@ -51,14 +50,11 @@ struct GenericKeyHandler {
       , type_info_per_key_(type_info_per_key) {
 #ifndef __CUDACC__
     if (sd_inner_to_outer_translation_maps) {
-      CHECK(sd_min_inner_elems);
       sd_inner_to_outer_translation_maps_ = sd_inner_to_outer_translation_maps;
-      sd_min_inner_elems_ = sd_min_inner_elems;
     } else
 #endif
     {
       sd_inner_to_outer_translation_maps_ = nullptr;
-      sd_min_inner_elems_ = nullptr;
     }
   }
 
@@ -81,11 +77,9 @@ struct GenericKeyHandler {
       if (sd_inner_to_outer_translation_maps_) {
         const auto sd_inner_to_outer_translation_map =
             sd_inner_to_outer_translation_maps_[key_component_index];
-        const auto sd_min_inner_elem = sd_min_inner_elems_[key_component_index];
         if (sd_inner_to_outer_translation_map &&
             elem != join_column_iterator.type_info->null_val) {
-          const auto outer_id =
-              sd_inner_to_outer_translation_map[elem - sd_min_inner_elem];
+          const auto outer_id = sd_inner_to_outer_translation_map[elem];
           if (outer_id == StringDictionary::INVALID_STR_ID) {
             skip_entry = true;
             break;
@@ -104,11 +98,17 @@ struct GenericKeyHandler {
     return 0;
   }
 
-  DEVICE size_t get_number_of_columns() const { return key_component_count_; }
+  DEVICE size_t get_number_of_columns() const {
+    return key_component_count_;
+  }
 
-  DEVICE size_t get_key_component_count() const { return key_component_count_; }
+  DEVICE size_t get_key_component_count() const {
+    return key_component_count_;
+  }
 
-  DEVICE const JoinColumn* get_join_columns() const { return join_column_per_key_; }
+  DEVICE const JoinColumn* get_join_columns() const {
+    return join_column_per_key_;
+  }
 
   DEVICE const JoinColumnTypeInfo* get_join_column_type_infos() const {
     return type_info_per_key_;
@@ -119,7 +119,6 @@ struct GenericKeyHandler {
   const JoinColumn* join_column_per_key_;
   const JoinColumnTypeInfo* type_info_per_key_;
   const int32_t* const* sd_inner_to_outer_translation_maps_;
-  const int32_t* sd_min_inner_elems_;
 };
 
 #endif  // QUERYENGINE_HASHJOINKEYHANDLERS_H

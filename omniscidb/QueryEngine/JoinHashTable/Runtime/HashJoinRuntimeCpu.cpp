@@ -59,7 +59,6 @@ inline int apply_hash_table_elementwise_impl(
     size_t curr_chunk_row_offset,
     const JoinColumnTypeInfo& type_info,
     const int32_t* sd_inner_to_outer_translation_map,
-    const int32_t min_inner_elem,
     HASHTABLE_FILLING_FUNC hashtable_filling_func) {
   for (size_t elem_i = elems_range.begin(); elem_i != elems_range.end(); elem_i++) {
     int64_t elem = getElem<T, Elem>(chunk_mem_ptr, elem_i);
@@ -73,11 +72,8 @@ inline int apply_hash_table_elementwise_impl(
 
     if (sd_inner_to_outer_translation_map &&
         (!type_info.uses_bw_eq || elem != type_info.translated_null_val)) {
-      const auto outer_id = map_str_id_to_outer_dict(elem,
-                                                     min_inner_elem,
-                                                     type_info.min_val,
-                                                     type_info.max_val,
-                                                     sd_inner_to_outer_translation_map);
+      const auto outer_id = map_str_id_to_outer_dict(
+          elem, type_info.min_val, type_info.max_val, sd_inner_to_outer_translation_map);
       if (outer_id == StringDictionary::INVALID_STR_ID) {
         continue;
       }
@@ -97,7 +93,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
                                         size_t curr_chunk_row_offset,
                                         const JoinColumnTypeInfo& type_info,
                                         const int32_t* sd_inner_to_outer_translation_map,
-                                        const int32_t min_inner_elem,
                                         HASHTABLE_FILLING_FUNC hashtable_filling_func) {
   switch (type_info.elem_sz) {
     case 1:
@@ -107,7 +102,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case 2:
       return apply_hash_table_elementwise_impl<HASHTABLE_FILLING_FUNC, T, 2>(
@@ -116,7 +110,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case 4:
       return apply_hash_table_elementwise_impl<HASHTABLE_FILLING_FUNC, T, 4>(
@@ -125,7 +118,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case 8:
       return apply_hash_table_elementwise_impl<HASHTABLE_FILLING_FUNC, T, 8>(
@@ -134,7 +126,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     default:
       break;
@@ -150,7 +141,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
                                         size_t curr_chunk_row_offset,
                                         const JoinColumnTypeInfo& type_info,
                                         const int32_t* sd_inner_to_outer_translation_map,
-                                        const int32_t min_inner_elem,
                                         HASHTABLE_FILLING_FUNC hashtable_filling_func) {
   switch (type_info.column_type) {
     case SmallDate:
@@ -160,7 +150,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case Signed:
       return apply_hash_table_elementwise<HASHTABLE_FILLING_FUNC, Signed>(
@@ -169,7 +158,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case Unsigned:
       return apply_hash_table_elementwise<HASHTABLE_FILLING_FUNC, Unsigned>(
@@ -178,7 +166,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     case Double:
       return apply_hash_table_elementwise<HASHTABLE_FILLING_FUNC, Double>(
@@ -187,7 +174,6 @@ inline int apply_hash_table_elementwise(const tbb::blocked_range<size_t>& elems_
           curr_chunk_row_offset,
           type_info,
           sd_inner_to_outer_translation_map,
-          min_inner_elem,
           hashtable_filling_func);
     default:
       break;
@@ -205,7 +191,6 @@ DEVICE int SUFFIX(fill_hash_join_buff_bucketized_cpu)(
     const JoinColumn& join_column,
     const JoinColumnTypeInfo& type_info,
     const int32_t* sd_inner_to_outer_translation_map,
-    const int32_t min_inner_elem,
     const int64_t bucket_normalization) {
   auto filling_func = for_semi_join ? SUFFIX(fill_hashtable_for_semi_join)
                                     : SUFFIX(fill_one_to_one_hashtable);
@@ -249,7 +234,6 @@ DEVICE int SUFFIX(fill_hash_join_buff_bucketized_cpu)(
                                                         curr_chunk.row_id,
                                                         type_info,
                                                         sd_inner_to_outer_translation_map,
-                                                        min_inner_elem,
                                                         hashtable_filling_func);
                 if (ret != 0) {
                   int zero{0};

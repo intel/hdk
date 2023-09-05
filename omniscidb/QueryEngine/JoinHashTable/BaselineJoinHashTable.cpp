@@ -528,24 +528,19 @@ Data_Namespace::MemoryLevel BaselineJoinHashTable::getEffectiveMemoryLevel(
   return memory_level_;
 }
 
-StrProxyTranslationMapsPtrsAndOffsets decomposeStrDictTranslationMaps(
+StrProxyTranslationMapsPtrs decomposeStrDictTranslationMaps(
     const std::vector<const StringDictionaryProxy::IdMap*>& str_proxy_translation_maps) {
-  StrProxyTranslationMapsPtrsAndOffsets translation_map_ptrs_and_offsets;
+  StrProxyTranslationMapsPtrs translation_map_ptrs_and_offsets;
   // First element of pair is vector of int32_t* pointing to translation map "vector"
   // Second element of pair is vector of int32_t of min inner dictionary ids (offsets)
   const size_t num_translation_maps = str_proxy_translation_maps.size();
-  translation_map_ptrs_and_offsets.first.reserve(num_translation_maps);
-  translation_map_ptrs_and_offsets.second.reserve(num_translation_maps);
+  translation_map_ptrs_and_offsets.reserve(num_translation_maps);
   for (const auto& str_proxy_translation_map : str_proxy_translation_maps) {
     if (str_proxy_translation_map) {
-      translation_map_ptrs_and_offsets.first.emplace_back(
-          str_proxy_translation_map->data());
-      translation_map_ptrs_and_offsets.second.emplace_back(
-          str_proxy_translation_map->domainStart());
+      translation_map_ptrs_and_offsets.emplace_back(str_proxy_translation_map->data());
     } else {
       // dummy values
-      translation_map_ptrs_and_offsets.first.emplace_back(nullptr);
-      translation_map_ptrs_and_offsets.second.emplace_back(0);
+      translation_map_ptrs_and_offsets.emplace_back(nullptr);
     }
   }
   return translation_map_ptrs_and_offsets;
@@ -635,8 +630,7 @@ int BaselineJoinHashTable::initHashTableForDevice(
                               true,
                               &join_columns[0],
                               &join_column_types[0],
-                              &str_proxy_translation_map_ptrs_and_offsets.first[0],
-                              &str_proxy_translation_map_ptrs_and_offsets.second[0]);
+                              &str_proxy_translation_map_ptrs_and_offsets[0]);
         err = builder.initHashTableOnCpu(&key_handler,
                                          composite_key_info,
                                          join_columns,
