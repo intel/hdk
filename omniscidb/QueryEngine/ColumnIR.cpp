@@ -273,7 +273,7 @@ llvm::Value* CodeGenerator::codegenRowId(const hdk::ir::ColumnVar* col_var,
   } else if (col_var->rteIdx() > 0) {
     auto frag_off_ptr = get_arg_by_name(cgen_state_->row_func_, "frag_row_off");
     auto input_off_ptr = cgen_state_->ir_builder_.CreateGEP(
-        frag_off_ptr->getType()->getScalarType()->getPointerElementType(),
+        get_int_type(64, cgen_state_->context_),
         frag_off_ptr,
         cgen_state_->llInt(int32_t(col_var->rteIdx())));
     auto rowid_offset_lv = cgen_state_->ir_builder_.CreateLoad(
