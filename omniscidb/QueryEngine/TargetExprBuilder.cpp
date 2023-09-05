@@ -324,12 +324,13 @@ void TargetExprCodegen::codegenAggregate(
       executor->cgen_state_->emitExternalCall(
           "agg_count_distinct_array_" + numeric_type_name(elem_type),
           llvm::Type::getVoidTy(LL_CONTEXT),
-          {is_group_by ? LL_BUILDER.CreateGEP(std::get<0>(agg_out_ptr_w_idx)
-                                                  ->getType()
-                                                  ->getScalarType()
-                                                  ->getPointerElementType(),
-                                              std::get<0>(agg_out_ptr_w_idx),
-                                              LL_INT(col_off))
+          {is_group_by ? LL_BUILDER.CreateGEP(
+                             llvm::PointerType::get(LL_CONTEXT,
+                                                    std::get<0>(agg_out_ptr_w_idx)
+                                                        ->getType()
+                                                        ->getPointerAddressSpace()),
+                             std::get<0>(agg_out_ptr_w_idx),
+                             LL_INT(col_off))
                        : agg_out_vec[slot_index],
            target_lvs[target_lv_idx],
            code_generator.posArg(arg_expr),
