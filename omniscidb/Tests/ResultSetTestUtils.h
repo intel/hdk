@@ -83,6 +83,7 @@ int8_t* fill_one_entry_no_collisions(int8_t* buff,
                                      const QueryMemoryDescriptor& query_mem_desc,
                                      const int64_t v,
                                      const std::vector<TargetInfo>& target_infos,
+                                     const int64_t dict_generation,
                                      const bool empty,
                                      const bool null_val = false);
 
@@ -105,6 +106,7 @@ void fill_one_entry_one_col(int64_t* value_slot,
 void fill_one_entry_baseline(int64_t* value_slots,
                              const int64_t v,
                              const std::vector<TargetInfo>& target_infos,
+                             const int64_t dict_generation,
                              const bool empty = false,
                              const bool null_val = false);
 
@@ -136,6 +138,7 @@ void fill_storage_buffer(int8_t* buff,
                          const std::vector<TargetInfo>& target_infos,
                          const QueryMemoryDescriptor& query_mem_desc,
                          NumberGenerator& generator,
+                         const int64_t dict_generation,
                          const size_t step);
 
 QueryMemoryDescriptor perfect_hash_one_col_desc_small(
