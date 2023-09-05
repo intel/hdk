@@ -1751,20 +1751,6 @@ void ArrowResultSetConverter::initializeColumnBuilder(
           ArrowStringRemapMode::ONLY_TRANSIENT_STRINGS_REMAPPED;
       auto str_list = sdp->copyStrings();
       ARROW_THROW_NOT_OK(str_array_builder.AppendValues(str_list));
-
-      // Transient entries use negative indices (starting at -2), and so need
-      // to be remapped to point to the corresponding entries in the Arrow
-      // dictionary (they are placed at the end after the materialized
-      // string entries from the base StringDictionary)
-      // TODO: remove when negative indices are avoided.
-      int32_t old_id = -2;
-      int32_t new_id = static_cast<int32_t>(sdp->getBaseGeneration());
-      CHECK_GE(new_id, 0);
-      auto transient_count = sdp->entryCount() - sdp->getBaseGeneration();
-      for (unsigned index = 0; index < transient_count; ++index) {
-        CHECK(column_builder.string_remapping.insert(std::make_pair(old_id--, new_id++))
-                  .second);
-      }
     } else {
       // Pluck unique dictionary values from ResultSet column
       VLOG(1) << "Arrow dictionary creation: serializing unique result set dictionary "

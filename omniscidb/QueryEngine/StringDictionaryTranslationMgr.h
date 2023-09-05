@@ -68,7 +68,6 @@ class StringDictionaryTranslationMgr {
                            compiler::CodegenTraitsDescriptor codegen_traits_desc) const;
   bool isMapValid() const;
   const int32_t* data() const;
-  int32_t minSourceStringId() const;
 
  private:
   const int32_t source_string_dict_id_;

@@ -53,11 +53,10 @@ inline int64_t translate_str_id_to_outer_dict(const int64_t elem,
 };
 
 inline int64_t map_str_id_to_outer_dict(const int64_t inner_elem,
-                                        const int64_t min_inner_elem,
                                         const int64_t min_outer_elem,
                                         const int64_t max_outer_elem,
                                         const int32_t* inner_to_outer_translation_map) {
-  const auto outer_id = inner_to_outer_translation_map[inner_elem - min_inner_elem];
+  const auto outer_id = inner_to_outer_translation_map[inner_elem];
   if (outer_id > max_outer_elem || outer_id < min_outer_elem) {
     return StringDictionary::INVALID_STR_ID;
   }
@@ -73,5 +72,4 @@ int fill_hash_join_buff_bucketized_cpu(int32_t* cpu_hash_table_buff,
                                        const JoinColumn& join_column,
                                        const JoinColumnTypeInfo& type_info,
                                        const int32_t* sd_inner_to_outer_translation_map,
-                                       const int32_t min_inner_elem,
                                        const int64_t bucket_normalization);

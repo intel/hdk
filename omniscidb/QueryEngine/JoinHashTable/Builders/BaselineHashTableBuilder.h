@@ -178,18 +178,18 @@ class BaselineJoinHashTableBuilder {
  public:
   BaselineJoinHashTableBuilder() = default;
   template <class KEY_HANDLER>
-  int initHashTableOnCpu(KEY_HANDLER* key_handler,
-                         const CompositeKeyInfo& composite_key_info,
-                         const std::vector<JoinColumn>& join_columns,
-                         const std::vector<JoinColumnTypeInfo>& join_column_types,
-                         const StrProxyTranslationMapsPtrsAndOffsets&
-                             str_proxy_translation_maps_ptrs_and_offsets,
-                         const size_t keyspace_entry_count,
-                         const size_t keys_for_all_rows,
-                         const HashType layout,
-                         const JoinType join_type,
-                         const size_t key_component_width,
-                         const size_t key_component_count) {
+  int initHashTableOnCpu(
+      KEY_HANDLER* key_handler,
+      const CompositeKeyInfo& composite_key_info,
+      const std::vector<JoinColumn>& join_columns,
+      const std::vector<JoinColumnTypeInfo>& join_column_types,
+      const StrProxyTranslationMapsPtrs& str_proxy_translation_maps_ptrs_and_offsets,
+      const size_t keyspace_entry_count,
+      const size_t keys_for_all_rows,
+      const HashType layout,
+      const JoinType join_type,
+      const size_t key_component_width,
+      const size_t key_component_count) {
     auto timer = DEBUG_TIMER(__func__);
     const auto entry_size =
         (key_component_count + (layout == HashType::OneToOne ? 1 : 0)) *
@@ -321,8 +321,7 @@ class BaselineJoinHashTableBuilder {
               key_component_count,
               join_columns,
               join_column_types,
-              str_proxy_translation_maps_ptrs_and_offsets.first,
-              str_proxy_translation_maps_ptrs_and_offsets.second,
+              str_proxy_translation_maps_ptrs_and_offsets,
               thread_count);
           break;
         }
@@ -336,8 +335,7 @@ class BaselineJoinHashTableBuilder {
               key_component_count,
               join_columns,
               join_column_types,
-              str_proxy_translation_maps_ptrs_and_offsets.first,
-              str_proxy_translation_maps_ptrs_and_offsets.second,
+              str_proxy_translation_maps_ptrs_and_offsets,
               thread_count);
           break;
         }

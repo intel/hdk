@@ -195,8 +195,6 @@ class PerfectJoinHashTableBuilder {
             join_column,
             type_info,
             str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
-            str_proxy_translation_map ? str_proxy_translation_map->domainStart()
-                                      : 0,  // 0 is dummy value
             hash_entry_info.bucket_normalization);
         if (error) {
           // Too many hash entries, need to retry with a 1:many table
@@ -255,8 +253,6 @@ class PerfectJoinHashTableBuilder {
              col_range.getIntMax() + 1,
              get_join_column_type_kind(type)},
             str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
-            str_proxy_translation_map ? str_proxy_translation_map->domainStart()
-                                      : 0 /*dummy*/,
             thread_count);
       } else {
         fill_one_to_many_hash_table(
@@ -272,8 +268,6 @@ class PerfectJoinHashTableBuilder {
              col_range.getIntMax() + 1,
              get_join_column_type_kind(type)},
             str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
-            str_proxy_translation_map ? str_proxy_translation_map->domainStart()
-                                      : 0 /*dummy*/,
             thread_count);
       }
     }

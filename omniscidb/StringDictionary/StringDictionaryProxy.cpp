@@ -321,11 +321,10 @@ StringDictionaryProxy::IdMap StringDictionaryProxy::buildUnionTranslationMapToOt
           " transient entries, which is more than limit of " +
           std::to_string(max_allowed_transients) + " transients.");
     }
-    const int32_t map_domain_start = id_map.domainStart();
-    const int32_t map_domain_end = id_map.domainEnd();
     // Todo (todd): Add call to fetch string_views (local) or strings (distributed)
     // for all non-translated ids to avoid string-by-string fetch
-    for (int32_t source_string_id = map_domain_start; source_string_id < map_domain_end;
+    for (int32_t source_string_id = 0;
+         source_string_id < static_cast<int32_t>(id_map.size());
          ++source_string_id) {
       if (id_map[source_string_id] == StringDictionary::INVALID_STR_ID) {
         const auto source_string = getStringUnlocked(source_string_id);

@@ -143,8 +143,7 @@ llvm::Value* StringDictionaryTranslationMgr::codegenCast(
   llvm::Value* ret = cgen_state_ptr->emitCall(
       "map_string_dict_id",
       {input_str_id_lv,
-       cgen_state_ptr->castToTypeIn(translation_map_handle_lvs.front(), 64),
-       cgen_state_ptr->llInt(minSourceStringId())});
+       cgen_state_ptr->castToTypeIn(translation_map_handle_lvs.front(), 64)});
 
   if (nullcheck_codegen) {
     ret = nullcheck_codegen->finalize(cgen_state_ptr->inlineIntNull(decoded_input_type),
@@ -159,8 +158,4 @@ bool StringDictionaryTranslationMgr::isMapValid() const {
 
 const int32_t* StringDictionaryTranslationMgr::data() const {
   return isMapValid() ? host_translation_map_->data() : nullptr;
-}
-
-int32_t StringDictionaryTranslationMgr::minSourceStringId() const {
-  return isMapValid() ? host_translation_map_->domainStart() : 0;
 }

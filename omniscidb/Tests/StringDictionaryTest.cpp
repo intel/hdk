@@ -586,9 +586,8 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
     const auto& translated_ids = str_proxy_translation_map.getVectorMap();
     const size_t num_ids = translated_ids.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
-    const auto domain_start = str_proxy_translation_map.domainStart();
     for (size_t idx = 0; idx < num_ids; ++idx) {
-      const auto string_id = static_cast<int32_t>(idx) + domain_start;
+      const auto string_id = static_cast<int32_t>(idx);
       if (string_id == -1) {
         ASSERT_EQ(translated_ids[idx], StringDictionary::INVALID_STR_ID);
       } else {

@@ -43,8 +43,7 @@
 
 class Executor;
 
-using StrProxyTranslationMapsPtrsAndOffsets =
-    std::pair<std::vector<const int32_t*>, std::vector<int32_t>>;
+using StrProxyTranslationMapsPtrs = std::vector<const int32_t*>;
 
 // Representation for a hash table using the baseline layout: an open-addressing
 // hash with a fill rate of 50%. It is used for equi-joins on multiple columns and
