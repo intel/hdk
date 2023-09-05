@@ -146,20 +146,18 @@ llvm::BasicBlock* JoinLoop::codegen(
           CHECK(iteration_domain.values_buffer->getType()->isPointerTy());
           const auto ptr_type =
               static_cast<llvm::PointerType*>(iteration_domain.values_buffer->getType());
-          if (ptr_type->getPointerElementType()->isArrayTy()) {
+          if (iteration_domain.values_buffer_is_array) {
             iteration_val = builder.CreateGEP(
                 iteration_domain.values_buffer->getType()
                     ->getScalarType()
                     ->getPointerElementType(),
                 iteration_domain.values_buffer,
                 std::vector<llvm::Value*>{
-                    llvm::ConstantInt::get(get_int_type(64, context), 0),
+                    llvm::ConstantInt::get(get_int_type(32, context), 0),
                     iteration_counter},
                 "ub_iter_counter_" + join_loop.name_);
           } else {
-            iteration_val = builder.CreateGEP(iteration_domain.values_buffer->getType()
-                                                  ->getScalarType()
-                                                  ->getPointerElementType(),
+            iteration_val = builder.CreateGEP(get_int_type(32, context),
                                               iteration_domain.values_buffer,
                                               iteration_counter,
                                               "ub_iter_counter_" + join_loop.name_);
