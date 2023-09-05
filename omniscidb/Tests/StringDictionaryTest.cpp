@@ -319,7 +319,7 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
       if (i % 2 == 0) {
         ASSERT_EQ(std::to_string(string_ids[i]), strings[i]);
       } else {
-        ASSERT_EQ(string_ids[i], -2 - (i / 2));
+        ASSERT_EQ(string_ids[i], string_dict_proxy.getBaseGeneration() + (i / 2));
       }
     }
   }
@@ -392,7 +392,7 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
       if (i % 2 == 0) {
         ASSERT_EQ(std::to_string(string_ids[i]), strings[i]);
       } else {
-        ASSERT_EQ(string_ids[i], -2 - (i / 2));
+        ASSERT_EQ(string_ids[i], string_dict_proxy.getBaseGeneration() + (i / 2));
       }
     }
   }
@@ -481,7 +481,7 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
     const auto& translated_ids = str_proxy_translation_map.getVectorMap();
-    const size_t num_ids = translated_ids.size() - 1;  // Subtract 1 for INVALID_STR_ID
+    const size_t num_ids = translated_ids.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
     for (size_t idx = 0; idx < num_ids; ++idx) {
       ASSERT_EQ(translated_ids[idx], StringDictionary::INVALID_STR_ID);
@@ -527,18 +527,10 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
     const auto& translated_ids = str_proxy_translation_map.getVectorMap();
-    const size_t num_ids = translated_ids.size() - 1;  // Subtract 1 for INVALID_STR_ID
+    const size_t num_ids = translated_ids.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
-    const int32_t start_source_id =
-        source_string_dict_proxy->transientEntryCount() > 0
-            ? (source_string_dict_proxy->transientEntryCount() + 1) * -1
-            : 0;
-    for (int32_t idx = 0; idx < static_cast<int32_t>(num_ids); ++idx) {
-      const int32_t source_id = idx + start_source_id;
-      if (source_id == -1 || source_id == 0) {
-        continue;
-      }
-      const std::string source_string = source_string_dict_proxy->getString(source_id);
+    for (int32_t idx = 1; idx < static_cast<int32_t>(num_ids); ++idx) {
+      const std::string source_string = source_string_dict_proxy->getString(idx);
       const int32_t source_string_as_int = std::stoi(source_string);
       const bool should_be_missing =
           !((source_string_as_int >= 0 && source_string_as_int < num_dest_strings) ||
@@ -593,15 +585,13 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
     ASSERT_EQ(str_proxy_translation_map.numUntranslatedStrings(), strings.size());
     const auto& translated_ids = str_proxy_translation_map.getVectorMap();
     const size_t num_ids = translated_ids.size();
-    ASSERT_EQ(num_ids - 1UL /* for INVALID_STR_ID */,
-              source_string_dict_proxy->entryCount());
+    ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
     const auto domain_start = str_proxy_translation_map.domainStart();
     for (size_t idx = 0; idx < num_ids; ++idx) {
       const auto string_id = static_cast<int32_t>(idx) + domain_start;
       if (string_id == -1) {
         ASSERT_EQ(translated_ids[idx], StringDictionary::INVALID_STR_ID);
       } else {
-        ASSERT_LT(translated_ids[idx], StringDictionary::INVALID_STR_ID);
         ASSERT_EQ(dest_string_dict_proxy->getString(translated_ids[idx]),
                   strings[string_id]);
       }
@@ -626,11 +616,11 @@ std::vector<std::string> add_strings_numeric_range(std::shared_ptr<StringDiction
 std::vector<std::string> add_strings_numeric_range(StringDictionaryProxy& sdp,
                                                    const size_t num_vals,
                                                    const int32_t start_val) {
-  CHECK_LE(start_val, -2);
+  CHECK_GE(start_val, sdp.getBaseGeneration());
   std::vector<std::string> strings(num_vals);
-  const auto end_val = start_val - static_cast<int32_t>(num_vals);
-  for (int32_t int_val = start_val; int_val > end_val; --int_val) {
-    strings[start_val - int_val] = std::to_string(int_val);
+  const auto end_val = start_val + static_cast<int32_t>(num_vals);
+  for (int32_t int_val = start_val; int_val < end_val; ++int_val) {
+    strings[int_val - start_val] = std::to_string(-int_val);
   }
   sdp.getOrAddBulk(strings);
   return strings;
@@ -677,7 +667,7 @@ void verify_translation(const StringDictionaryProxy& source_proxy,
       ASSERT_EQ(persisted_source_str, dest_str);
     } else {
       if (is_union) {
-        ASSERT_LE(translated_id, -2);
+        ASSERT_GE(translated_id, dest_proxy.getBaseGeneration());
         const auto dest_str = dest_proxy.getString(translated_id);
         ASSERT_EQ(persisted_source_str, dest_str);
       } else {
@@ -702,8 +692,8 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
 
   constexpr size_t num_source_transient_entries{10};
   constexpr size_t num_dest_transient_entries{5};
-  constexpr int32_t source_transient_start_val{-2};
-  constexpr int32_t dest_transient_start_val{-9};
+  constexpr int32_t source_transient_start_val{12};
+  constexpr int32_t dest_transient_start_val{19};
   const auto persisted_source_strings = add_strings_numeric_range(
       source_sd, num_source_persisted_entries, source_persisted_start_val);
   ASSERT_EQ(source_sd->storageEntryCount(), num_source_persisted_entries);
@@ -738,9 +728,7 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
                                          num_dest_transient_entries,
                                          source_transient_start_val,
                                          dest_transient_start_val);
-  ASSERT_EQ(id_map.size(),
-            num_source_persisted_entries + num_source_transient_entries +
-                1UL /* slot for INVALID_STR_ID */);
+  ASSERT_EQ(id_map.size(), num_source_persisted_entries + num_source_transient_entries);
   ASSERT_EQ(id_map.numNonTransients(), num_source_persisted_entries);
   ASSERT_EQ(id_map.numTransients(), num_source_transient_entries);
   ASSERT_EQ(id_map.numUntranslatedStrings(), expected_num_untranslated_strings);

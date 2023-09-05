@@ -236,7 +236,9 @@ std::string ResultSet::getStrScalarVal(const ScalarTargetValue& current_scalar,
   } else {
     if (col_type->isExtDictionary()) {
       const int32_t dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-      const auto sdp = getStringDictionaryProxy(dict_id);
+      const auto sdp = data_mgr_ ? row_set_mem_owner_->getOrAddStringDictProxy(dict_id)
+                                 : row_set_mem_owner_->getStringDictProxy(
+                                       dict_id);  // unit tests bypass the DataMgr
       const auto string_id = boost::get<int64_t>(current_scalar);
       oss << "idx:"
           << ((string_id == inline_int_null_value<int32_t>()) ? "null"

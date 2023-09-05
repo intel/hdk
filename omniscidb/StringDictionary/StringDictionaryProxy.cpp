@@ -142,7 +142,7 @@ std::string StringDictionaryProxy::getString(int32_t string_id) const {
 }
 
 std::string StringDictionaryProxy::getStringUnlocked(const int32_t string_id) const {
-  if (string_id >= 0 && storageEntryCount() > 0) {
+  if (string_id < generation_) {
     return string_dict_->getString(string_id);
   }
   unsigned const string_index = transientIdToIndex(string_id);
@@ -157,10 +157,10 @@ std::vector<std::string> StringDictionaryProxy::getStrings(
     strings.reserve(string_ids.size());
     std::shared_lock<std::shared_mutex> read_lock(rw_mutex_);
     for (const auto string_id : string_ids) {
-      if (string_id >= 0) {
-        strings.emplace_back(string_dict_->getString(string_id));
-      } else if (inline_int_null_value<int32_t>() == string_id) {
+      if (inline_int_null_value<int32_t>() == string_id) {
         strings.emplace_back("");
+      } else if (string_id < generation_) {
+        strings.emplace_back(string_dict_->getString(string_id));
       } else {
         unsigned const string_index = transientIdToIndex(string_id);
         strings.emplace_back(*transient_string_vec_[string_index]);
@@ -195,7 +195,7 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
     std::vector<std::string> transient_lookup_strings(num_transient_entries);
     std::transform(transient_string_vec_.cbegin(),
                    transient_string_vec_.cend(),
-                   transient_lookup_strings.rbegin(),
+                   transient_lookup_strings.begin(),
                    [](std::string const* ptr) { return *ptr; });
 
     // This lookup may have a different snapshot of
@@ -208,14 +208,14 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
     // a vector of pointer-to-strings so we don't have to materialize
     // transient_string_vec_ into transient_lookup_strings.
 
-    num_transient_strings_not_translated =
-        dest_proxy->getTransientBulkImpl(transient_lookup_strings, id_map.data(), false);
+    num_transient_strings_not_translated = dest_proxy->getTransientBulkImpl(
+        transient_lookup_strings, id_map.transientData(), false);
   }
 
   // Now map strings in dictionary
   // We place non-transient strings after the transient strings
   // if they exist, otherwise at index 0
-  int32_t* translation_map_stored_entries_ptr = id_map.storageData();
+  int32_t* translation_map_stored_entries_ptr = id_map.data();
 
   auto dest_transient_lookup_callback = [dest_proxy, translation_map_stored_entries_ptr](
                                             const std::string_view& source_string,
@@ -239,8 +239,7 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
                       : 0UL;
 
   const size_t num_dest_entries = dest_proxy->entryCountUnlocked();
-  const size_t num_total_entries =
-      id_map.getVectorMap().size() - 1UL /* account for skipped entry -1 */;
+  const size_t num_total_entries = id_map.size();
   CHECK_GT(num_total_entries, 0UL);
   const size_t num_strings_not_translated =
       num_transient_strings_not_translated + num_persisted_strings_not_translated;
@@ -324,22 +323,12 @@ StringDictionaryProxy::IdMap StringDictionaryProxy::buildUnionTranslationMapToOt
     }
     const int32_t map_domain_start = id_map.domainStart();
     const int32_t map_domain_end = id_map.domainEnd();
-    // First iterate over transient strings and add to dest map
     // Todo (todd): Add call to fetch string_views (local) or strings (distributed)
     // for all non-translated ids to avoid string-by-string fetch
-    for (int32_t source_string_id = map_domain_start; source_string_id < -1;
+    for (int32_t source_string_id = map_domain_start; source_string_id < map_domain_end;
          ++source_string_id) {
       if (id_map[source_string_id] == StringDictionary::INVALID_STR_ID) {
         const auto source_string = getStringUnlocked(source_string_id);
-        const auto dest_string_id = dest_proxy->getOrAddTransientUnlocked(source_string);
-        id_map[source_string_id] = dest_string_id;
-      }
-    }
-    // Now iterate over stored strings
-    for (int32_t source_string_id = 0; source_string_id < map_domain_end;
-         ++source_string_id) {
-      if (id_map[source_string_id] == StringDictionary::INVALID_STR_ID) {
-        const auto source_string = string_dict_->getString(source_string_id);
         const auto dest_string_id = dest_proxy->getOrAddTransientUnlocked(source_string);
         id_map[source_string_id] = dest_string_id;
       }
@@ -449,7 +438,7 @@ std::vector<int32_t> StringDictionaryProxy::getRegexpLike(const std::string& pat
 
 std::pair<const char*, size_t> StringDictionaryProxy::getStringBytes(
     int32_t string_id) const noexcept {
-  if (string_id >= 0) {
+  if (string_id < generation_) {
     return string_dict_.get()->getStringBytes(string_id);
   }
   unsigned const string_index = transientIdToIndex(string_id);
@@ -525,7 +514,7 @@ class StringLocalCallback : public StringDictionary::StringCallback {
 };
 
 std::ostream& operator<<(std::ostream& os, StringDictionaryProxy::IdMap const& id_map) {
-  return os << "IdMap(offset_(" << id_map.offset_ << ") vector_map_"
+  return os << "IdMap(dict_size_(" << id_map.dict_size_ << ") vector_map_"
             << shared::printContainer(id_map.vector_map_) << ')';
 }
 

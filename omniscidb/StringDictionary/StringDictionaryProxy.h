@@ -39,7 +39,8 @@ class StringDictionaryProxy {
  public:
   StringDictionaryProxy(StringDictionaryProxy const&) = delete;
   StringDictionaryProxy const& operator=(StringDictionaryProxy const&) = delete;
-  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd, const int64_t generation = -1);
+  StringDictionaryProxy(std::shared_ptr<StringDictionary> sd,
+                        const int64_t generation = -1);
 
   bool operator==(StringDictionaryProxy const&) const;
   bool operator!=(StringDictionaryProxy const&) const;
@@ -79,27 +80,26 @@ class StringDictionaryProxy {
   std::pair<const char*, size_t> getStringBytes(int32_t string_id) const noexcept;
 
   class IdMap {
-    size_t const offset_;
+    const uint32_t dict_size_;
     std::vector<int32_t> vector_map_;
     int64_t num_untranslated_strings_{-1};
 
    public:
-    // +1 is added to skip string_id=-1 reserved for INVALID_STR_ID. id_map[-1]==-1.
     IdMap(uint32_t const tran_size, uint32_t const dict_size)
-        : offset_(tran_size + 1)
-        , vector_map_(offset_ + dict_size, StringDictionary::INVALID_STR_ID) {}
+        : dict_size_(dict_size)
+        , vector_map_(tran_size + dict_size, StringDictionary::INVALID_STR_ID) {}
     IdMap(IdMap const&) = delete;
     IdMap(IdMap&&) = default;
-    bool empty() const { return vector_map_.size() == 1; }
-    inline size_t getIndex(int32_t const id) const { return offset_ + id; }
+    bool empty() const { return vector_map_.empty(); }
+    inline size_t getIndex(int32_t const id) const { return id; }
     std::vector<int32_t> const& getVectorMap() const { return vector_map_; }
     size_t size() const { return vector_map_.size(); }
-    size_t numTransients() const { return offset_ - 1; }
-    size_t numNonTransients() const { return vector_map_.size() - offset_; }
+    size_t numTransients() const { return vector_map_.size() - dict_size_; }
+    size_t numNonTransients() const { return dict_size_; }
     int32_t* data() { return vector_map_.data(); }
     int32_t const* data() const { return vector_map_.data(); }
-    int32_t domainStart() const { return -static_cast<int32_t>(offset_); }
-    int32_t domainEnd() const { return static_cast<int32_t>(numNonTransients()); }
+    int32_t domainStart() const { return 0; }
+    int32_t domainEnd() const { return vector_map_.size(); }
     // Next two methods are currently used by buildUnionTranslationMapToOtherProxy to
     // short circuit iteration over ids after intersection translation if all
     // ids translated. Currently the private num_untranslated_strings_ is initialized
@@ -113,7 +113,7 @@ class StringDictionaryProxy {
     void setNumUntranslatedStrings(const size_t num_untranslated_strings) {
       num_untranslated_strings_ = static_cast<int64_t>(num_untranslated_strings);
     }
-    int32_t* storageData() { return vector_map_.data() + offset_; }
+    int32_t* transientData() { return vector_map_.data() + dict_size_; }
     int32_t& operator[](int32_t const id) { return vector_map_[getIndex(id)]; }
     int32_t operator[](int32_t const id) const { return vector_map_[getIndex(id)]; }
     friend std::ostream& operator<<(std::ostream&, IdMap const&);
@@ -186,17 +186,11 @@ class StringDictionaryProxy {
   void eachStringSerially(StringDictionary::StringCallback&) const;
 
  private:
-  // INVALID_STR_ID = -1 is reserved for invalid string_ids.
-  // Thus the greatest valid transient string_id is -2.
-  static unsigned transientIdToIndex(int32_t const id) {
-    constexpr int max_transient_string_id = -2;
-    return static_cast<unsigned>(max_transient_string_id - id);
+  unsigned transientIdToIndex(int32_t const id) const {
+    return static_cast<unsigned>(id - generation_);
   }
 
-  static int32_t transientIndexToId(unsigned const index) {
-    constexpr int max_transient_string_id = -2;
-    return static_cast<int32_t>(max_transient_string_id - index);
-  }
+  int32_t transientIndexToId(unsigned const index) const { return generation_ + index; }
 
   /**
    * @brief Returns the number of string entries in the underlying string dictionary,
