@@ -31,15 +31,15 @@ RUN apt-get update && apt-get install -y \
 # LLVM
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     apt-add-repository \
-        'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main' && \
+        'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main' && \
     apt-get update && apt-get install -y \
-        llvm-14 \
-        llvm-14-dev \
-        clang-14 \
-        libclang-14-dev \
+        llvm-15 \
+        llvm-15-dev \
+        clang-15 \
+        libclang-15-dev \
         --
 
-ENV PATH=/usr/lib/llvm-14/bin${PATH:+:${PATH}}
+ENV PATH=/usr/lib/llvm-15/bin${PATH:+:${PATH}}
 
 # Dependencies
 RUN apt-get update && apt-get install -y \
