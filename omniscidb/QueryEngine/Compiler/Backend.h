@@ -96,6 +96,9 @@ class CodegenTraits {
   llvm::PointerType* globalPointerType(llvm::Type* ElementType) const {
     return llvm::PointerType::get(ElementType, global_addr_space_);
   }
+  llvm::PointerType* globalOpaquePtr(llvm::LLVMContext& ctx) const {
+    return llvm::PointerType::get(ctx, global_addr_space_);
+  }
   llvm::CallingConv::ID callingConv() const { return conv_; }
   llvm::StringRef dataLayout() const {
     return llvm::StringRef(
