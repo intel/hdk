@@ -17,16 +17,10 @@
 #include "GpuSharedMemoryTestHelpers.h"
 
 void GpuReductionTester::codegenWrapperKernel() {
-  auto i8_type = llvm::Type::getInt8Ty(context_);
-  auto i64_type = llvm::Type::getInt64Ty(context_);
-  auto pi8_type = traits_.globalPointerType(i8_type);
-  auto pi64_type = traits_.localPointerType(i64_type);
-  auto ppi8_type = traits_.globalPointerType(pi8_type);
-
   std::vector<llvm::Type*> input_arguments;
-  input_arguments.push_back(ppi8_type);
-  input_arguments.push_back(i64_type);  // num input buffers
-  input_arguments.push_back(pi8_type);
+  input_arguments.push_back(traits_.globalOpaquePtr(context_));  // i8**
+  input_arguments.push_back(llvm::Type::getInt64Ty(context_));   // num input buffers
+  input_arguments.push_back(traits_.globalOpaquePtr(context_));  // i8*
 
   llvm::FunctionType* ft =
       llvm::FunctionType::get(llvm::Type::getVoidTy(context_), input_arguments, false);
@@ -59,13 +53,10 @@ void GpuReductionTester::codegenWrapperKernel() {
 
   // locate the corresponding input buffer:
   ir_builder.SetInsertPoint(bb_body);
-  auto input_buffer_gep = ir_builder.CreateGEP(
-      input_ptrs->getType()->getScalarType()->getPointerElementType(),
-      input_ptrs,
-      block_index);
-  auto input_buffer = ir_builder.CreateLoad(pi8_type, input_buffer_gep);
-  auto input_buffer_ptr =
-      ir_builder.CreatePointerCast(input_buffer, pi64_type, "input_buffer_ptr");
+  auto input_buffer_gep =
+      ir_builder.CreateGEP(traits_.globalOpaquePtr(context_), input_ptrs, block_index);
+  auto input_buffer =
+      ir_builder.CreateLoad(traits_.globalOpaquePtr(context_), input_buffer_gep);
   const auto buffer_size = ll_int(
       static_cast<int32_t>(query_mem_desc_.getBufferSizeBytes(ExecutorDeviceType::GPU)),
       context_);
@@ -74,17 +65,15 @@ void GpuReductionTester::codegenWrapperKernel() {
   auto init_shared_mem_func = getFunction("init_shared_mem");
   auto smem_input_buffer_ptr = ir_builder.CreateCall(init_shared_mem_func,
                                                      {
-                                                         input_buffer_ptr,
+                                                         input_buffer,
                                                          buffer_size,
                                                      },
                                                      "smem_input_buffer_ptr");
 
-  auto output_buffer_ptr =
-      ir_builder.CreatePointerCast(output_buffer, pi64_type, "output_buffer_ptr");
   // call the reduction function
   CHECK(reduction_func_);
   std::vector<llvm::Value*> reduction_args{
-      output_buffer_ptr, smem_input_buffer_ptr, buffer_size};
+      output_buffer, smem_input_buffer_ptr, buffer_size};
   ir_builder.CreateCall(reduction_func_, reduction_args);
   ir_builder.CreateBr(bb_exit);
 

@@ -225,43 +225,6 @@ void GpuSharedMemCodeBuilder::codegenReduction(const CompilationOptions& co) {
   llvm::ReturnInst::Create(context_, bb_exit);
 }
 
-namespace {
-// given a particular destination ptr to the beginning of an entry, this function creates
-// proper cast for a specific slot index.
-// it also assumes these pointers are within shared memory address space (3)
-llvm::Value* codegen_smem_dest_slot_ptr(llvm::LLVMContext& context,
-                                        const QueryMemoryDescriptor& query_mem_desc,
-                                        llvm::IRBuilder<>& ir_builder,
-                                        const size_t slot_idx,
-                                        const TargetInfo& target_info,
-                                        const compiler::CodegenTraits& traits,
-                                        llvm::Value* dest_byte_stream,
-                                        llvm::Value* byte_offset) {
-  const auto type = get_compact_type(target_info);
-  const auto slot_bytes = query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
-  auto ptr_type = [&context, &traits](const size_t slot_bytes,
-                                      const hdk::ir::Type* type) {
-    if (slot_bytes == sizeof(int32_t)) {
-      return traits.smemPointerType(llvm::Type::getInt32Ty(context));
-    } else {
-      CHECK(slot_bytes == sizeof(int64_t));
-      return traits.smemPointerType(llvm::Type::getInt64Ty(context));
-    }
-    UNREACHABLE() << "Invalid slot size encountered: " << std::to_string(slot_bytes);
-    return traits.smemPointerType(llvm::Type::getInt32Ty(context));
-  };
-
-  const auto casted_dest_slot_address = ir_builder.CreatePointerCast(
-      ir_builder.CreateGEP(
-          dest_byte_stream->getType()->getScalarType()->getPointerElementType(),
-          dest_byte_stream,
-          byte_offset),
-      ptr_type(slot_bytes, type),
-      "dest_slot_adr_" + std::to_string(slot_idx));
-  return casted_dest_slot_address;
-}
-}  // namespace
-
 /**
  * This function generates code to initialize the shared memory buffer, the way we
  * initialize the group by output buffer on the host. Similar to the reduction function,
@@ -318,14 +281,8 @@ void GpuSharedMemCodeBuilder::codegenInitialization() {
          slot_idx++) {
       const auto slot_size = fixup_query_mem_desc.getPaddedSlotWidthBytes(slot_idx);
 
-      auto casted_dest_slot_address = codegen_smem_dest_slot_ptr(context_,
-                                                                 fixup_query_mem_desc,
-                                                                 ir_builder,
-                                                                 slot_idx,
-                                                                 target_info,
-                                                                 traits_,
-                                                                 dest_byte_stream,
-                                                                 byte_offset_ll);
+      auto casted_dest_slot_address = ir_builder.CreateGEP(
+          get_int_type(8, context_), dest_byte_stream, byte_offset_ll);
 
       llvm::Value* init_value_ll = nullptr;
       if (slot_size == sizeof(int32_t)) {
