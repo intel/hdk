@@ -249,7 +249,62 @@ TEST(StringDictionary, BuildTranslationMap) {
   }
 }
 
-TEST(StringDictionaryProxy, GetOrAddTransient) {
+TEST(NestedStringDictionary, AddAndGet) {
+  std::vector<std::shared_ptr<StringDictionary>> dicts;
+  for (int dict_no = 0; dict_no < 10; ++dict_no) {
+    if (dict_no) {
+      dicts.emplace_back(
+          std::make_shared<StringDictionary>(dicts.back(), -1, g_cache_string_hash));
+    } else {
+      dicts.emplace_back(std::make_shared<StringDictionary>(DictRef{-1, dict_no + 1},
+                                                            g_cache_string_hash));
+    }
+
+    auto& dict = *dicts.back();
+    auto entries = dict.entryCount();
+    ASSERT_EQ(entries, (dicts.size() - 1) * 2);
+    for (int str_id = 0; str_id < static_cast<int>(dicts.size() * 2); ++str_id) {
+      auto str_val = std::to_string(str_id);
+      if (str_id < static_cast<int>(entries)) {
+        ASSERT_EQ(dict.getIdOfString(str_val), str_id);
+        ASSERT_EQ(dict.getString(str_id), str_val);
+      } else {
+        ASSERT_EQ(dict.getIdOfString(str_val), StringDictionary::INVALID_STR_ID);
+      }
+      ASSERT_EQ(dict.getOrAdd(str_val), str_id);
+      ASSERT_EQ(dict.getOrAdd(str_val), str_id);
+      ASSERT_EQ(dict.getIdOfString(str_val), str_id);
+      ASSERT_EQ(dict.getString(str_id), str_val);
+    }
+  }
+}
+
+TEST(NestedStringDictionary, AddAndGetModifiedBase) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict2->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict2->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict2->getOrAdd("str3"), 2);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getIdOfString("str4"s), StringDictionary::INVALID_STR_ID);
+  ASSERT_EQ(dict2->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getIdOfString("str4"s), 3);
+  auto dict3 = std::make_shared<StringDictionary>(dict2, 2, g_cache_string_hash);
+  ASSERT_EQ(dict3->getIdOfString("str1"s), 0);
+  ASSERT_EQ(dict3->getIdOfString("str2"s), 1);
+  ASSERT_EQ(dict3->getIdOfString("str3"s), StringDictionary::INVALID_STR_ID);
+  ASSERT_EQ(dict3->getIdOfString("str4"s), StringDictionary::INVALID_STR_ID);
+  ASSERT_EQ(dict3->getOrAdd("str3"), 2);
+  ASSERT_EQ(dict3->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict3->getIdOfString("str3"s), 2);
+  ASSERT_EQ(dict3->getIdOfString("str4"s), 3);
+}
+
+TEST(NestedStringDictionary, GetOrAddTransient) {
   const DictRef dict_ref(-1, 1);
   std::shared_ptr<StringDictionary> string_dict =
       std::make_shared<StringDictionary>(dict_ref, g_cache_string_hash);
@@ -269,7 +324,7 @@ TEST(StringDictionaryProxy, GetOrAddTransient) {
 
   // Now make proxy from dictionary
 
-  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
+  StringDictionary string_dict_proxy(string_dict, string_dict->entryCount());
 
   {
     // First iteration is identical to first of the StringDictionary GetOrAddBulk test,

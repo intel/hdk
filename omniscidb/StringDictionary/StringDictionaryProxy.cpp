@@ -44,9 +44,9 @@ StringDictionaryProxy::StringDictionaryProxy(std::shared_ptr<StringDictionary> s
                                              const int64_t generation)
     : string_dict_(sd), generation_(generation) {
   if (generation_ < 0) {
-    generation_ = static_cast<int64_t>(sd->storageEntryCount());
+    generation_ = static_cast<int64_t>(sd->entryCount());
   } else {
-    CHECK_LE(generation_, static_cast<int64_t>(sd->storageEntryCount()));
+    CHECK_LE(generation_, static_cast<int64_t>(sd->entryCount()));
   }
 }
 
