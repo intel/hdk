@@ -157,7 +157,12 @@ std::unique_ptr<llvm::Module> read_gen_module_from_bc(const std::string& bc_file
 std::string mangle_spirv_builtin(const llvm::Function& func) {
   CHECK(func.getName().startswith("__spirv_"));
   std::string new_name;
+#if LLVM_VERSION_MAJOR > 14
+  mangleOpenClBuiltin(
+      func.getName().str(), func.getArg(0)->getType(), /*pointer_types=*/{}, new_name);
+#else
   mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
+#endif
   return new_name;
 }
 }  // namespace
