@@ -78,10 +78,17 @@ class StringDictionary {
   StringDictionary(const DictRef& dict_ref,
                    const bool materializeHashes = false,
                    size_t initial_capacity = 256);
+  StringDictionary(std::shared_ptr<StringDictionary> base_dict,
+                   const int64_t generation = -1,
+                   const bool materializeHashes = false,
+                   size_t initial_capacity = 0);
   ~StringDictionary() noexcept;
 
   int32_t getDbId() const noexcept;
   int32_t getDictId() const noexcept;
+
+  StringDictionary* getBaseDictionary() const noexcept { return base_dict_.get(); }
+  int64_t getBaseGeneration() const noexcept { return base_generation_; }
 
   class StringCallback {
    public:
@@ -112,6 +119,7 @@ class StringDictionary {
   std::string getString(int32_t string_id) const;
   std::pair<char*, size_t> getStringBytes(int32_t string_id) const noexcept;
   size_t storageEntryCount() const;
+  size_t entryCount() const;
 
   std::vector<int32_t> getLike(const std::string& pattern,
                                const bool icase,
@@ -167,10 +175,13 @@ class StringDictionary {
   void hashStrings(const std::vector<String>& string_vec,
                    std::vector<uint32_t>& hashes) const noexcept;
 
+  template <class String>
+  int32_t getIdOfString(const String&, const uint32_t hash) const;
   int32_t getUnlocked(const std::string_view sv) const noexcept;
+  int32_t getUnlocked(const std::string_view sv, const uint32_t hash) const noexcept;
   std::string getStringUnlocked(int32_t string_id) const noexcept;
-  std::string getStringChecked(const int string_id) const noexcept;
-  std::pair<char*, size_t> getStringBytesChecked(const int string_id) const noexcept;
+  std::string getOwnedStringChecked(const int string_id) const noexcept;
+  std::pair<char*, size_t> getOwnedStringBytesChecked(const int string_id) const noexcept;
   template <class String>
   uint32_t computeBucket(
       const uint32_t hash,
@@ -211,7 +222,15 @@ class StringDictionary {
   void sortCache(std::vector<int32_t>& cache);
   void mergeSortedCache(std::vector<int32_t>& temp_sorted_cache);
 
+  int indexToId(int string_idx) const { return string_idx + base_generation_; }
+  int idToIndex(int string_id) const { return string_id - base_generation_; }
+
+  uint32_t hashById(int string_id) const { return hashByIndex(idToIndex(string_id)); }
+  uint32_t hashByIndex(int string_idx) const { return hash_cache_[string_idx]; }
+
   const DictRef dict_ref_;
+  const std::shared_ptr<StringDictionary> base_dict_;
+  const int64_t base_generation_;
   size_t str_count_;
   size_t collisions_;
   std::vector<int32_t> string_id_uint32_table_;

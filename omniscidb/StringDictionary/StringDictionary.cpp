@@ -89,9 +89,11 @@ StringDictionary::StringDictionary(const DictRef& dict_ref,
                                    const bool materializeHashes,
                                    size_t initial_capacity)
     : dict_ref_(dict_ref)
+    , base_generation_(0)
     , str_count_(0)
-    , string_id_uint32_table_(initial_capacity, INVALID_STR_ID)
-    , hash_cache_(initial_capacity)
+    // Search code assumes non-empty table.
+    , string_id_uint32_table_(std::max(initial_capacity, (size_t)2), INVALID_STR_ID)
+    , hash_cache_(std::max(initial_capacity, (size_t)2))
     , materialize_hashes_(materializeHashes)
     , offset_map_(nullptr)
     , payload_map_(nullptr)
@@ -102,6 +104,26 @@ StringDictionary::StringDictionary(const DictRef& dict_ref,
   // initial capacity must be a power of two for efficient bucket computation
   CHECK_EQ(size_t(0), (initial_capacity & (initial_capacity - 1)));
 }
+
+StringDictionary::StringDictionary(std::shared_ptr<StringDictionary> base_dict,
+                                   const int64_t generation,
+                                   const bool materializeHashes,
+                                   size_t initial_capacity)
+    : dict_ref_(-1, -1)
+    , base_dict_(base_dict)
+    , base_generation_(generation >= 0 ? generation
+                                       : static_cast<int64_t>(base_dict->entryCount()))
+    , str_count_(0)
+    // Search code assumes non-empty table.
+    , string_id_uint32_table_(std::max(initial_capacity, (size_t)2), INVALID_STR_ID)
+    , hash_cache_(std::max(initial_capacity, (size_t)2))
+    , materialize_hashes_(materializeHashes)
+    , offset_map_(nullptr)
+    , payload_map_(nullptr)
+    , offset_file_size_(0)
+    , payload_file_size_(0)
+    , payload_file_off_(0)
+    , strings_cache_(nullptr) {}
 
 namespace {
 class MapMaker : public StringDictionary::StringCallback {
@@ -122,6 +144,7 @@ class MapMaker : public StringDictionary::StringCallback {
 // Call serial_callback for each (string/_view, string_id). Must be called serially.
 void StringDictionary::eachStringSerially(int64_t const generation,
                                           StringCallback& serial_callback) const {
+  CHECK(!base_dict_) << "Not implemented";
   size_t const n = std::min(static_cast<size_t>(generation), str_count_);
   CHECK_LE(n, static_cast<size_t>(std::numeric_limits<int32_t>::max()) + 1);
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
@@ -154,6 +177,12 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
   }
   CHECK(str.size() <= MAX_STRLEN);
   const uint32_t hash = hash_string(str);
+  if (base_dict_) {
+    auto base_res = base_dict_->getIdOfString(str, hash);
+    if (base_res != INVALID_STR_ID && base_res < base_generation_) {
+      return base_res;
+    }
+  }
   {
     mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
     const uint32_t bucket = computeBucket(hash, str, string_id_uint32_table_);
@@ -174,7 +203,7 @@ int32_t StringDictionary::getOrAdd(const std::string_view& str) noexcept {
         << "Maximum number (" << str_count_
         << ") of Dictionary encoded Strings reached for this column";
     appendToStorage(str);
-    string_id_uint32_table_[bucket] = static_cast<int32_t>(str_count_);
+    string_id_uint32_table_[bucket] = indexToId(str_count_);
     if (materialize_hashes_) {
       hash_cache_[str_count_] = hash;
     }
@@ -269,6 +298,7 @@ template <class T, class String>
 size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
                                  T* encoded_vec,
                                  const int64_t generation) const {
+  CHECK(!base_dict_) << "Not implemented";
   constexpr int64_t target_strings_per_thread{1000};
   const int64_t num_lookup_strings = string_vec.size();
   if (num_lookup_strings == 0) {
@@ -358,6 +388,7 @@ template size_t StringDictionary::getBulk(const std::vector<std::string>& string
 template <class T, class String>
 void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
                                     T* output_string_ids) {
+  CHECK(!base_dict_) << "Not implemented";
   if (g_enable_stringdict_parallel) {
     getOrAddBulkParallel(input_strings, output_string_ids);
     return;
@@ -414,6 +445,7 @@ void StringDictionary::getOrAddBulk(const std::vector<String>& input_strings,
 template <class T, class String>
 void StringDictionary::getOrAddBulkParallel(const std::vector<String>& input_strings,
                                             T* output_string_ids) {
+  CHECK(!base_dict_) << "Not implemented";
   // Compute hashes of the input strings up front, and in parallel,
   // as the string hashing does not need to be behind the subsequent write_lock
   std::vector<uint32_t> input_strings_hashes(input_strings.size());
@@ -504,40 +536,75 @@ template void StringDictionary::getOrAddBulk(
 
 template <class String>
 int32_t StringDictionary::getIdOfString(const String& str) const {
-  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-  return getUnlocked(str);
+  return getIdOfString(str, hash_string(str));
 }
 
 template int32_t StringDictionary::getIdOfString(const std::string&) const;
 template int32_t StringDictionary::getIdOfString(const std::string_view&) const;
 
+template <class String>
+int32_t StringDictionary::getIdOfString(const String& str, const uint32_t hash) const {
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  return getUnlocked(str, hash);
+}
+
+template int32_t StringDictionary::getIdOfString(const std::string&,
+                                                 const uint32_t) const;
+template int32_t StringDictionary::getIdOfString(const std::string_view&,
+                                                 const uint32_t) const;
+
 int32_t StringDictionary::getUnlocked(const std::string_view sv) const noexcept {
-  const uint32_t hash = hash_string(sv);
+  return getUnlocked(sv, hash_string(sv));
+}
+
+int32_t StringDictionary::getUnlocked(const std::string_view sv,
+                                      const uint32_t hash) const noexcept {
+  if (base_dict_) {
+    auto base_res = base_dict_->getIdOfString(sv, hash);
+    if (base_res != INVALID_STR_ID && base_res < base_generation_) {
+      return base_res;
+    }
+  }
   auto str_id = string_id_uint32_table_[computeBucket(hash, sv, string_id_uint32_table_)];
   return str_id;
 }
 
 std::string StringDictionary::getString(int32_t string_id) const {
+  if (inline_int_null_value<int32_t>() == string_id) {
+    return "";
+  }
+  if (string_id < base_generation_) {
+    return base_dict_->getString(string_id);
+  }
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-  return getStringUnlocked(string_id);
+  return getOwnedStringChecked(string_id);
 }
 
 std::string StringDictionary::getStringUnlocked(int32_t string_id) const noexcept {
-  CHECK_LT(string_id, static_cast<int32_t>(str_count_));
-  return getStringChecked(string_id);
+  if (string_id < base_generation_) {
+    return base_dict_->getString(string_id);
+  }
+  return getOwnedStringChecked(string_id);
 }
 
 std::pair<char*, size_t> StringDictionary::getStringBytes(
     int32_t string_id) const noexcept {
+  if (string_id < base_generation_) {
+    return base_dict_->getStringBytes(string_id);
+  }
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
   CHECK_LE(0, string_id);
-  CHECK_LT(string_id, static_cast<int32_t>(str_count_));
-  return getStringBytesChecked(string_id);
+  return getOwnedStringBytesChecked(string_id);
 }
 
 size_t StringDictionary::storageEntryCount() const {
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
   return str_count_;
+}
+
+size_t StringDictionary::entryCount() const {
+  mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+  return str_count_ + base_generation_;
 }
 
 namespace {
@@ -571,6 +638,7 @@ std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
                                                const bool is_simple,
                                                const char escape,
                                                const size_t generation) const {
+  CHECK(!base_dict_) << "Not implemented";
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
   const auto cache_key = std::make_tuple(pattern, icase, is_simple, escape);
   const auto it = like_cache_.find(cache_key);
@@ -619,6 +687,7 @@ std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
 std::vector<int32_t> StringDictionary::getEquals(std::string pattern,
                                                  std::string comp_operator,
                                                  size_t generation) {
+  CHECK(!base_dict_) << "Not implemented";
   std::vector<int32_t> result;
   auto eq_id_itr = equal_cache_.find(pattern);
   int32_t eq_id = MAX_STRLEN + 1;
@@ -679,6 +748,7 @@ std::vector<int32_t> StringDictionary::getEquals(std::string pattern,
 std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
                                                   const std::string& comp_operator,
                                                   const size_t generation) {
+  CHECK(!base_dict_) << "Not implemented";
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
   std::vector<int32_t> ret;
   if (str_count_ == 0) {
@@ -837,6 +907,7 @@ bool is_regexp_like(const std::string& str,
 std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
                                                      const char escape,
                                                      const size_t generation) const {
+  CHECK(!base_dict_) << "Not implemented";
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
   const auto cache_key = std::make_pair(pattern, escape);
   const auto it = regex_cache_.find(cache_key);
@@ -879,6 +950,7 @@ std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
 }
 
 std::vector<std::string> StringDictionary::copyStrings() const {
+  CHECK(!base_dict_) << "Not implemented";
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
 
   if (strings_cache_) {
@@ -936,15 +1008,15 @@ void StringDictionary::increaseHashTableCapacity() noexcept {
     for (size_t i = 0; i != str_count_; ++i) {
       const uint32_t hash = hash_cache_[i];
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
-      new_str_ids[bucket] = i;
+      new_str_ids[bucket] = indexToId(i);
     }
     hash_cache_.resize(hash_cache_.size() * 2);
   } else {
     for (size_t i = 0; i != str_count_; ++i) {
-      const auto str = getStringChecked(i);
+      const auto str = getOwnedStringChecked(indexToId(i));
       const uint32_t hash = hash_string(str);
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
-      new_str_ids[bucket] = i;
+      new_str_ids[bucket] = indexToId(i);
     }
   }
   string_id_uint32_table_.swap(new_str_ids);
@@ -958,6 +1030,7 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
     const std::vector<String>& input_strings,
     const std::vector<size_t>& string_memory_ids,
     const std::vector<uint32_t>& input_strings_hashes) noexcept {
+  CHECK(!base_dict_) << "Not implemented";
   std::vector<int32_t> new_str_ids(string_id_uint32_table_.size() * 2, INVALID_STR_ID);
   if (materialize_hashes_) {
     for (size_t i = 0; i != str_count; ++i) {
@@ -968,7 +1041,7 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
     hash_cache_.resize(hash_cache_.size() * 2);
   } else {
     for (size_t storage_idx = 0; storage_idx != storage_high_water_mark; ++storage_idx) {
-      const auto storage_string = getStringChecked(storage_idx);
+      const auto storage_string = getOwnedStringChecked(storage_idx);
       const uint32_t hash = hash_string(storage_string);
       const uint32_t bucket = computeUniqueBucketWithHash(hash, new_str_ids);
       new_str_ids[bucket] = storage_idx;
@@ -983,13 +1056,13 @@ void StringDictionary::increaseHashTableCapacityFromStorageAndMemory(
   string_id_uint32_table_.swap(new_str_ids);
 }
 
-std::string StringDictionary::getStringChecked(const int string_id) const noexcept {
+std::string StringDictionary::getOwnedStringChecked(const int string_id) const noexcept {
   const auto str_canary = getStringFromStorage(string_id);
   CHECK(!str_canary.canary);
   return std::string(str_canary.c_str_ptr, str_canary.size);
 }
 
-std::pair<char*, size_t> StringDictionary::getStringBytesChecked(
+std::pair<char*, size_t> StringDictionary::getOwnedStringBytesChecked(
     const int string_id) const noexcept {
   const auto str_canary = getStringFromStorage(string_id);
   CHECK(!str_canary.canary);
@@ -1009,7 +1082,7 @@ uint32_t StringDictionary::computeBucket(
         INVALID_STR_ID) {  // In this case it means the slot is available for use
       break;
     }
-    if ((materialize_hashes_ && hash == hash_cache_[candidate_string_id]) ||
+    if ((materialize_hashes_ && hash == hashById(candidate_string_id)) ||
         !materialize_hashes_) {
       const auto candidate_string = getStringFromStorageFast(candidate_string_id);
       if (input_string.size() == candidate_string.size() &&
@@ -1034,6 +1107,7 @@ uint32_t StringDictionary::computeBucketFromStorageAndMemory(
     const size_t storage_high_water_mark,
     const std::vector<String>& input_strings,
     const std::vector<size_t>& string_memory_ids) const noexcept {
+  CHECK(!base_dict_) << "Not implemented";
   uint32_t bucket = input_string_hash & (string_id_uint32_table.size() - 1);
   while (true) {
     const int32_t candidate_string_id = string_id_uint32_table[bucket];
@@ -1153,14 +1227,13 @@ void StringDictionary::appendToStorageBulk(
 
 std::string_view StringDictionary::getStringFromStorageFast(
     const int string_id) const noexcept {
-  const StringIdxEntry* str_meta = offset_map_ + string_id;
+  const StringIdxEntry* str_meta = offset_map_ + idToIndex(string_id);
   return {payload_map_ + str_meta->off, str_meta->size};
 }
 
 StringDictionary::PayloadString StringDictionary::getStringFromStorage(
     const int string_id) const noexcept {
-  CHECK_GE(string_id, 0);
-  const StringIdxEntry* str_meta = offset_map_ + string_id;
+  const StringIdxEntry* str_meta = offset_map_ + idToIndex(string_id);
   if (str_meta->size == 0xffff) {
     // hit the canary
     return {nullptr, 0, true};
@@ -1213,6 +1286,7 @@ void StringDictionary::invalidateInvertedIndex() noexcept {
 }
 
 void StringDictionary::buildSortedCache() {
+  CHECK(!base_dict_) << "Not implemented";
   // This method is not thread-safe.
   const auto cur_cache_size = sorted_cache.size();
   std::vector<int32_t> temp_sorted_cache;
@@ -1224,6 +1298,7 @@ void StringDictionary::buildSortedCache() {
 }
 
 void StringDictionary::sortCache(std::vector<int32_t>& cache) {
+  CHECK(!base_dict_) << "Not implemented";
   // This method is not thread-safe.
 
   // this boost sort is creating some problems when we use UTF-8 encoded strings.
@@ -1237,6 +1312,7 @@ void StringDictionary::sortCache(std::vector<int32_t>& cache) {
 }
 
 void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache) {
+  CHECK(!base_dict_) << "Not implemented";
   // this method is not thread safe
   std::vector<int32_t> updated_cache(temp_sorted_cache.size() + sorted_cache.size());
   size_t t_idx = 0, s_idx = 0, idx = 0;
@@ -1266,6 +1342,8 @@ std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(
     const std::shared_ptr<StringDictionary> source_dict,
     const std::shared_ptr<StringDictionary> dest_dict,
     StringLookupCallback const& dest_transient_lookup_callback) {
+  CHECK(!source_dict->getBaseDictionary());
+  CHECK(!dest_dict->getBaseDictionary());
   auto timer = DEBUG_TIMER(__func__);
   const size_t num_source_strings = source_dict->storageEntryCount();
   const size_t num_dest_strings = dest_dict->storageEntryCount();
@@ -1290,6 +1368,8 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
     const int64_t dest_generation,
     const bool dest_has_transients,
     StringLookupCallback const& dest_transient_lookup_callback) {
+  CHECK(!source_dict->getBaseDictionary());
+  CHECK(!dest_dict->getBaseDictionary());
   auto timer = DEBUG_TIMER(__func__);
   CHECK_GE(source_generation, 0L);
   CHECK_GE(dest_generation, 0L);
