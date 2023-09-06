@@ -192,9 +192,7 @@ void TargetExprCodegen::codegen(
                 get_int_type((chosen_bytes << 3), LL_CONTEXT),
                 std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
         agg_col_ptr = LL_BUILDER.CreateGEP(
-            bit_cast->getType()->getScalarType()->getPointerElementType(),
-            bit_cast,
-            offset);
+            get_int_type((chosen_bytes << 3), LL_CONTEXT), bit_cast, offset);
       } else {
         col_off = query_mem_desc.getColOnlyOffInBytes(slot_index);
         CHECK_EQ(size_t(0), col_off % chosen_bytes);
@@ -205,9 +203,7 @@ void TargetExprCodegen::codegen(
                 get_int_type((chosen_bytes << 3), LL_CONTEXT),
                 std::get<0>(agg_out_ptr_w_idx)->getType()->getPointerAddressSpace()));
         agg_col_ptr = LL_BUILDER.CreateGEP(
-            bit_cast->getType()->getScalarType()->getPointerElementType(),
-            bit_cast,
-            LL_INT(col_off));
+            get_int_type((chosen_bytes << 3), LL_CONTEXT), bit_cast, LL_INT(col_off));
       }
     }
 
