@@ -1342,10 +1342,7 @@ llvm::Value* RowFuncBuilder::getAdditionalLiteral(const int32_t off) {
       lit_buff_lv,
       llvm::PointerType::get(get_int_type(64, LL_CONTEXT),
                              lit_buff_lv->getType()->getPointerAddressSpace()));
-  auto* gep =
-      LL_BUILDER.CreateGEP(bit_cast->getType()->getScalarType()->getPointerElementType(),
-                           bit_cast,
-                           LL_INT(off));
+  auto* gep = LL_BUILDER.CreateGEP(get_int_type(64, LL_CONTEXT), bit_cast, LL_INT(off));
   return LL_BUILDER.CreateLoad(get_int_type(64, LL_CONTEXT), gep);
 }
 
