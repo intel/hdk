@@ -4193,8 +4193,7 @@ StringDictionaryGenerations Executor::computeStringDictionaryGenerations(
       const int dict_id = col_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       const auto dd = data_mgr_->getDictMetadata(dict_id);
       CHECK(dd && dd->stringDict);
-      string_dictionary_generations.setGeneration(dict_id,
-                                                  dd->stringDict->storageEntryCount());
+      string_dictionary_generations.setGeneration(dict_id, dd->stringDict->entryCount());
     }
   }
   return string_dictionary_generations;
