@@ -179,6 +179,8 @@ class StringDictionary {
   int32_t getIdOfString(const String&, const uint32_t hash) const;
   int32_t getUnlocked(const std::string_view sv) const noexcept;
   int32_t getUnlocked(const std::string_view sv, const uint32_t hash) const noexcept;
+  int32_t getOwnedUnlocked(const std::string_view sv) const noexcept;
+  int32_t getOwnedUnlocked(const std::string_view sv, const uint32_t hash) const noexcept;
   std::string getStringUnlocked(int32_t string_id) const noexcept;
   std::string getOwnedStringChecked(const int string_id) const noexcept;
   std::pair<char*, size_t> getOwnedStringBytesChecked(const int string_id) const noexcept;
