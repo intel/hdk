@@ -136,7 +136,7 @@ class StringDictionary {
                                      const char escape,
                                      const size_t generation) const;
 
-  std::vector<std::string> copyStrings() const;
+  std::vector<std::string> copyStrings(int64_t generation = -1) const;
 
   static constexpr int32_t INVALID_STR_ID = -1;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
@@ -187,6 +187,9 @@ class StringDictionary {
   std::pair<char*, size_t> getOwnedStringBytesChecked(const int string_id) const noexcept;
   template <class T, class String>
   void getOrAddBulkParallel(const std::vector<String>& string_vec, T* encoded_vec);
+  void copyStrings(int64_t string_id_start,
+                   int64_t string_id_end,
+                   std::vector<std::string>& out_vec) const;
   template <class String>
   uint32_t computeBucket(
       const uint32_t hash,

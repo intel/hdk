@@ -1005,52 +1005,77 @@ std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
   return result;
 }
 
-std::vector<std::string> StringDictionary::copyStrings() const {
-  CHECK(!base_dict_) << "Not implemented";
-  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
-
-  if (strings_cache_) {
-    return *strings_cache_;
+std::vector<std::string> StringDictionary::copyStrings(int64_t generation) const {
+  generation = generation >= 0 ? std::min(generation, static_cast<int64_t>(entryCount()))
+                               : static_cast<int64_t>(entryCount());
+  if (!strings_cache_) {
+    strings_cache_ = std::make_shared<std::vector<std::string>>();
+    strings_cache_->reserve(entryCount());
+    copyStrings(0, entryCount(), *strings_cache_);
+  } else if (strings_cache_->size() < static_cast<size_t>(generation)) {
+    auto start = strings_cache_->size();
+    strings_cache_->reserve(entryCount());
+    copyStrings(start, entryCount(), *strings_cache_);
   }
 
-  strings_cache_ = std::make_shared<std::vector<std::string>>();
-  strings_cache_->reserve(str_count_);
-  const bool multithreaded = str_count_ > 10000;
-  const auto worker_count =
-      multithreaded ? static_cast<size_t>(cpu_threads()) : size_t(1);
-  CHECK_GT(worker_count, 0UL);
-  std::vector<std::vector<std::string>> worker_results(worker_count);
+  return std::vector<std::string>(strings_cache_->begin(),
+                                  strings_cache_->begin() + generation);
+}
+
+void StringDictionary::copyStrings(int64_t string_id_start,
+                                   int64_t string_id_end,
+                                   std::vector<std::string>& out_vec) const {
+  CHECK_GE(string_id_start, 0);
+  CHECK_LE(string_id_end, static_cast<int64_t>(entryCount()));
+
+  if (base_dict_ && string_id_start < base_generation_) {
+    base_dict_->copyStrings(
+        string_id_start, std::min(base_generation_, string_id_end), out_vec);
+  }
+
+  int64_t local_string_id_start = std::max(string_id_start, base_generation_);
+  int64_t local_string_id_end = string_id_end;
+  if (local_string_id_start >= local_string_id_end) {
+    return;
+  }
+
+  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
+  const bool multithreaded = (local_string_id_end - local_string_id_start) > 10000;
   auto copy = [this](std::vector<std::string>& str_list,
-                     const size_t start_id,
-                     const size_t end_id) {
+                     const int64_t start_id,
+                     const int64_t end_id) {
     CHECK_LE(start_id, end_id);
     str_list.reserve(end_id - start_id);
-    for (size_t string_id = start_id; string_id < end_id; ++string_id) {
+    for (int64_t string_id = start_id; string_id < end_id; ++string_id) {
       str_list.push_back(getStringUnlocked(string_id));
     }
   };
   if (multithreaded) {
+    const auto worker_count = cpu_threads();
+    CHECK_GT(worker_count, 0);
+    std::vector<std::vector<std::string>> worker_results(worker_count);
     std::vector<std::future<void>> workers;
-    const auto stride = (str_count_ + (worker_count - 1)) / worker_count;
-    for (size_t worker_idx = 0, start = 0, end = std::min(start + stride, str_count_);
-         worker_idx < worker_count && start < str_count_;
-         ++worker_idx, start += stride, end = std::min(start + stride, str_count_)) {
+    const auto stride =
+        (local_string_id_end - local_string_id_start + (worker_count - 1)) / worker_count;
+    for (int64_t worker_idx = 0,
+                 start = local_string_id_start,
+                 end = std::min(start + stride, local_string_id_end);
+         worker_idx < worker_count && start < local_string_id_end;
+         ++worker_idx,
+                 start += stride,
+                 end = std::min(start + stride, local_string_id_end)) {
       workers.push_back(std::async(
           std::launch::async, copy, std::ref(worker_results[worker_idx]), start, end));
     }
     for (auto& worker : workers) {
       worker.get();
     }
+    for (const auto& worker_result : worker_results) {
+      out_vec.insert(out_vec.end(), worker_result.begin(), worker_result.end());
+    }
   } else {
-    CHECK_EQ(worker_results.size(), size_t(1));
-    copy(worker_results[0], 0, str_count_);
+    copy(out_vec, local_string_id_start, local_string_id_end);
   }
-
-  for (const auto& worker_result : worker_results) {
-    strings_cache_->insert(
-        strings_cache_->end(), worker_result.begin(), worker_result.end());
-  }
-  return *strings_cache_;
 }
 
 bool StringDictionary::fillRateIsHigh(const size_t num_strings) const noexcept {
