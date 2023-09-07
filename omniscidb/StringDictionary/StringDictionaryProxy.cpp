@@ -645,7 +645,7 @@ bool StringDictionaryProxy::operator!=(StringDictionaryProxy const& rhs) const {
 }
 
 std::vector<std::string> StringDictionaryProxy::copyStrings() const {
-  auto res = string_dict_->copyStrings();
+  auto res = string_dict_->copyStrings(generation_);
   res.reserve(entryCount());
   for (auto str_ptr : transient_string_vec_) {
     res.emplace_back(*str_ptr);

@@ -679,6 +679,68 @@ TEST(NestedStringDictionary, EachStringSerially) {
   }
 }
 
+TEST(NestedStringDictionary, CopyStrings) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+
+  ASSERT_EQ(dict1->copyStrings(), std::vector<std::string>({"str1"s, "str2"s, "str3"s}));
+  ASSERT_EQ(dict1->copyStrings(10),
+            std::vector<std::string>({"str1"s, "str2"s, "str3"s}));
+  ASSERT_EQ(dict1->copyStrings(2), std::vector<std::string>({"str1"s, "str2"s}));
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  ASSERT_EQ(dict1->copyStrings(),
+            std::vector<std::string>({"str1"s, "str2"s, "str3"s, "str4"s}));
+  ASSERT_EQ(dict1->copyStrings(3), std::vector<std::string>({"str1"s, "str2"s, "str3"s}));
+
+  ASSERT_EQ(dict2->copyStrings(),
+            std::vector<std::string>({"str1"s, "str2"s, "str3"s, "str5"s, "str6"s}));
+  ASSERT_EQ(dict2->copyStrings(10),
+            std::vector<std::string>({"str1"s, "str2"s, "str3"s, "str5"s, "str6"s}));
+  ASSERT_EQ(dict2->copyStrings(4),
+            std::vector<std::string>({"str1"s, "str2"s, "str3"s, "str5"s}));
+  ASSERT_EQ(dict2->copyStrings(2), std::vector<std::string>({"str1"s, "str2"s}));
+
+  ASSERT_EQ(dict2->getOrAdd("str7"), 5);
+
+  ASSERT_EQ(
+      dict2->copyStrings(),
+      std::vector<std::string>({"str1"s, "str2"s, "str3"s, "str5"s, "str6"s, "str7"s}));
+}
+
+TEST(NestedStringDictionary, CopyStringsParallel) {
+  constexpr int STR_COUNT = 20'000;
+
+  std::vector<std::string> strings1;
+  std::vector<std::string> strings2;
+  for (int i = 0; i < STR_COUNT; ++i) {
+    strings1.push_back(std::to_string(i));
+    strings2.push_back(std::to_string(STR_COUNT + i));
+  }
+  strings2.insert(strings2.begin(), strings1.begin(), strings1.end());
+
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  dict1->getOrAddBulk(strings1);
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  dict2->getOrAddBulk(strings2);
+
+  ASSERT_EQ(dict1->copyStrings(), strings1);
+  ASSERT_EQ(dict2->copyStrings(), strings2);
+
+  dict1->getOrAddBulk(strings2);
+
+  ASSERT_EQ(dict1->copyStrings(), strings2);
+}
+
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);
