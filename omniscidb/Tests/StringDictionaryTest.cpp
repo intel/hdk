@@ -624,6 +624,61 @@ TEST(NestedStringDictionary, GetTransientBulk) {
   }
 }
 
+class CheckStringsCallback : public StringDictionary::StringCallback {
+ public:
+  CheckStringsCallback(std::set<std::string> expected) : expected_(expected) {}
+
+  void operator()(std::string const& str, int32_t const string_id) override {
+    ASSERT_TRUE(expected_.count(str));
+    expected_.erase(str);
+  }
+
+  void operator()(std::string_view const sv, int32_t const string_id) override {
+    this->operator()(std::string(sv), string_id);
+  }
+
+  bool empty() const { return expected_.empty(); }
+
+ private:
+  std::set<std::string> expected_;
+};
+
+TEST(NestedStringDictionary, EachStringSerially) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  {
+    CheckStringsCallback callback({"str1"s, "str2"s, "str3"s, "str4"});
+    dict1->eachStringSerially(callback);
+    ASSERT_TRUE(callback.empty());
+  }
+
+  {
+    CheckStringsCallback callback({"str1"s, "str2"s, "str3"s, "str5", "str6"s});
+    dict2->eachStringSerially(callback);
+    ASSERT_TRUE(callback.empty());
+  }
+
+  {
+    CheckStringsCallback callback({"str1"s, "str2"s, "str3"s, "str5"});
+    dict2->eachStringSerially(4, callback);
+    ASSERT_TRUE(callback.empty());
+  }
+
+  {
+    CheckStringsCallback callback({"str1"s, "str2"s});
+    dict2->eachStringSerially(2, callback);
+    ASSERT_TRUE(callback.empty());
+  }
+}
+
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);
