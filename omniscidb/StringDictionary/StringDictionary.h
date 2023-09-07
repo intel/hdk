@@ -99,6 +99,7 @@ class StringDictionary {
   // Each std::string const& (if isClient()) or std::string_view (if !isClient())
   // plus string_id is passed to the callback functor.
   void eachStringSerially(int64_t const generation, StringCallback&) const;
+  void eachStringSerially(StringCallback&) const;
   friend class ::StringLocalCallback;
 
   int32_t getOrAdd(const std::string_view& str) noexcept;

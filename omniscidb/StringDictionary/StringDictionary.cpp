@@ -144,13 +144,21 @@ class MapMaker : public StringDictionary::StringCallback {
 // Call serial_callback for each (string/_view, string_id). Must be called serially.
 void StringDictionary::eachStringSerially(int64_t const generation,
                                           StringCallback& serial_callback) const {
-  CHECK(!base_dict_) << "Not implemented";
-  size_t const n = std::min(static_cast<size_t>(generation), str_count_);
+  if (base_dict_) {
+    auto generation_for_base =
+        generation >= 0 ? std::min(generation, base_generation_) : base_generation_;
+    base_dict_->eachStringSerially(generation_for_base, serial_callback);
+  }
+  size_t const n = std::min(static_cast<size_t>(generation), entryCount());
   CHECK_LE(n, static_cast<size_t>(std::numeric_limits<int32_t>::max()) + 1);
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
-  for (unsigned id = 0; id < n; ++id) {
+  for (unsigned id = base_generation_; id < n; ++id) {
     serial_callback(getStringFromStorageFast(static_cast<int>(id)), id);
   }
+}
+
+void StringDictionary::eachStringSerially(StringCallback& serial_callback) const {
+  eachStringSerially(-1, serial_callback);
 }
 
 int32_t StringDictionary::getDbId() const noexcept {
