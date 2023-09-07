@@ -16,6 +16,7 @@
 
 #include "TestHelpers.h"
 
+#include "Shared/scope.h"
 #include "StringDictionary/StringDictionaryProxy.h"
 
 #include <cstdio>
@@ -30,6 +31,7 @@
 using namespace std::string_literals;
 
 EXTERN extern bool g_cache_string_hash;
+EXTERN extern bool g_enable_stringdict_parallel;
 
 TEST(StringDictionary, AddAndGet) {
   const DictRef dict_ref(-1, 1);
@@ -460,6 +462,44 @@ TEST(NestedStringDictionary, GetBulk) {
   }
 }
 
+TEST(NestedStringDictionary, GetOrAddBulk) {
+  std::shared_ptr<StringDictionary> dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str5"), 2);
+  ASSERT_EQ(dict1->getOrAdd("str7"), 3);
+  ASSERT_EQ(dict1->getOrAdd("str9"), 4);
+
+  bool old_enable_stringdict_parallel = g_enable_stringdict_parallel;
+  bool old_cache_string_hash = g_cache_string_hash;
+  ScopeGuard g([old_enable_stringdict_parallel, old_cache_string_hash]() {
+    g_enable_stringdict_parallel = old_enable_stringdict_parallel;
+    g_cache_string_hash = old_cache_string_hash;
+  });
+  for (bool enable_stringdict_parallel : {true, false}) {
+    for (bool cache_string_hash : {true, false}) {
+      g_enable_stringdict_parallel = enable_stringdict_parallel;
+      g_cache_string_hash = cache_string_hash;
+      StringDictionary dict2(dict1, 3, g_cache_string_hash);
+      std::vector<int> ids(10, -10);
+      // Only str1, str2, and str3 should be used from the base dict.
+      dict2.getOrAddBulk(std::vector<std::string>({"str1"s,
+                                                   "str2"s,
+                                                   "str3"s,
+                                                   "str4"s,
+                                                   "str5"s,
+                                                   "str6"s,
+                                                   "str7"s,
+                                                   "str8"s,
+                                                   "str9"s,
+                                                   "str10"s}),
+                         ids.data());
+      ASSERT_EQ(ids, std::vector<int>({0, 3, 1, 4, 2, 5, 6, 7, 8, 9}));
+    }
+  }
+}
+
 static std::shared_ptr<StringDictionary> create_and_fill_dictionary() {
   const DictRef dict_ref(-1, 1);
   std::shared_ptr<StringDictionary> string_dict =
@@ -481,10 +521,10 @@ static std::shared_ptr<StringDictionary> create_and_fill_dictionary() {
   return string_dict;
 }
 
-TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
+TEST(NestedStringDictionary, GetOrAddTransientBulk) {
   auto string_dict = create_and_fill_dictionary();
 
-  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
+  StringDictionary string_dict_proxy(string_dict, string_dict->entryCount());
   {
     // First iteration is identical to first of the StringDictionary GetOrAddBulk test,
     // and results should be the same
@@ -533,10 +573,10 @@ TEST(StringDictionaryProxy, GetOrAddTransientBulk) {
   }
 }
 
-TEST(StringDictionaryProxy, GetTransientBulk) {
+TEST(NestedStringDictionary, GetTransientBulk) {
   auto string_dict = create_and_fill_dictionary();
 
-  StringDictionaryProxy string_dict_proxy(string_dict, string_dict->storageEntryCount());
+  StringDictionary string_dict_proxy(string_dict, string_dict->entryCount());
   {
     // First iteration is identical to first of the StryingDictionaryProxy
     // GetOrAddTransientBulk test, and results should be the same

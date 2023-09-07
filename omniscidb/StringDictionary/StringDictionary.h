@@ -31,8 +31,6 @@
 
 #define USE_LEGACY_STR_DICT
 
-extern bool g_enable_stringdict_parallel;
-
 namespace legacy {
 class StringDictionary;
 }
@@ -112,8 +110,10 @@ class StringDictionary {
                  const int64_t generation) const;
   template <class T, class String>
   void getOrAddBulk(const std::vector<String>& string_vec, T* encoded_vec);
-  template <class T, class String>
-  void getOrAddBulkParallel(const std::vector<String>& string_vec, T* encoded_vec);
+  template <class String>
+  std::vector<int32_t> getOrAddBulk(const std::vector<String>& string_vec);
+  template <class String>
+  std::vector<int32_t> getBulk(const std::vector<String>& string_vec);
   template <class String>
   int32_t getIdOfString(const String&) const;
   std::string getString(int32_t string_id) const;
@@ -184,6 +184,8 @@ class StringDictionary {
   std::string getStringUnlocked(int32_t string_id) const noexcept;
   std::string getOwnedStringChecked(const int string_id) const noexcept;
   std::pair<char*, size_t> getOwnedStringBytesChecked(const int string_id) const noexcept;
+  template <class T, class String>
+  void getOrAddBulkParallel(const std::vector<String>& string_vec, T* encoded_vec);
   template <class String>
   uint32_t computeBucket(
       const uint32_t hash,
