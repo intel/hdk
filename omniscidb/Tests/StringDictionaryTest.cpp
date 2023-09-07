@@ -380,6 +380,86 @@ TEST(NestedStringDictionary, GetOrAddTransient) {
   }
 }
 
+TEST(NestedStringDictionary, GetBulk) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  {
+    std::vector<int> ids(5, -10);
+    auto missing = dict1->getBulk(
+        std::vector<std::string>{"str1"s, "str2"s, "str3"s, "str4"s, "str5"s},
+        ids.data(),
+        -1);
+    ASSERT_EQ(missing, (size_t)1);
+    ASSERT_EQ(ids, std::vector<int>({0, 1, 2, 3, StringDictionary::INVALID_STR_ID}));
+  }
+
+  {
+    std::vector<int> ids(5, -10);
+    auto missing = dict1->getBulk(
+        std::vector<std::string>{"str1"s, "str2"s, "str3"s, "str4"s, "str5"s},
+        ids.data(),
+        2);
+    ASSERT_EQ(missing, (size_t)3);
+    ASSERT_EQ(ids,
+              std::vector<int>({0,
+                                1,
+                                StringDictionary::INVALID_STR_ID,
+                                StringDictionary::INVALID_STR_ID,
+                                StringDictionary::INVALID_STR_ID}));
+  }
+
+  {
+    std::vector<int> ids(5, -10);
+    auto missing = dict2->getBulk(
+        std::vector<std::string>{"str1"s, "str2"s, "str3"s, "str4"s, "str6"s},
+        ids.data(),
+        -1);
+    ASSERT_EQ(missing, (size_t)1);
+    ASSERT_EQ(ids, std::vector<int>({0, 1, 2, StringDictionary::INVALID_STR_ID, 4}));
+  }
+
+  {
+    std::vector<int> ids(5, -10);
+    auto missing = dict2->getBulk(
+        std::vector<std::string>{"str1"s, "str2"s, "str3"s, "str5"s, "str6"s},
+        ids.data(),
+        4);
+    ASSERT_EQ(missing, (size_t)1);
+    ASSERT_EQ(ids, std::vector<int>({0, 1, 2, 3, StringDictionary::INVALID_STR_ID}));
+  }
+
+  {
+    std::vector<int> ids(5, -10);
+    auto missing = dict2->getBulk(
+        std::vector<std::string>{"str1"s, "str2"s, "str3"s, "str4"s, "str5"s},
+        ids.data(),
+        2);
+    ASSERT_EQ(missing, (size_t)3);
+    ASSERT_EQ(ids,
+              std::vector<int>({0,
+                                1,
+                                StringDictionary::INVALID_STR_ID,
+                                StringDictionary::INVALID_STR_ID,
+                                StringDictionary::INVALID_STR_ID}));
+  }
+
+  {
+    std::vector<int> ids(2, -10);
+    auto missing =
+        dict2->getBulk(std::vector<std::string>{"str1"s, "str2"s}, ids.data(), -1);
+    ASSERT_EQ(missing, (size_t)0);
+    ASSERT_EQ(ids, std::vector<int>({0, 1}));
+  }
+}
+
 static std::shared_ptr<StringDictionary> create_and_fill_dictionary() {
   const DictRef dict_ref(-1, 1);
   std::shared_ptr<StringDictionary> string_dict =
