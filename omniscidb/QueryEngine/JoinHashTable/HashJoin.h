@@ -259,14 +259,14 @@ class HashJoin {
       const std::vector<InnerOuter>& inner_outer_pairs,
       const Executor* executor);
 
-  static std::vector<const StringDictionaryProxy::IdMap*>
-  translateCompositeStrDictProxies(const CompositeKeyInfo& composite_key_info,
-                                   const Executor* executor);
+  static std::vector<const std::vector<int32_t>*> translateCompositeStrDictProxies(
+      const CompositeKeyInfo& composite_key_info,
+      const Executor* executor);
 
   static std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
   getStrDictProxies(const InnerOuter& cols, const Executor* executor);
 
-  static const StringDictionaryProxy::IdMap* translateInnerToOuterStrDictProxies(
+  static const std::vector<int32_t>* translateInnerToOuterStrDictProxies(
       const InnerOuter& cols,
       const Executor* executor);
 

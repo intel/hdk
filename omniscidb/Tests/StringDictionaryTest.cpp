@@ -1032,11 +1032,10 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
         source_string_dict_proxy->buildIntersectionTranslationMapToOtherProxy(
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
-    const auto& translated_ids = str_proxy_translation_map.getVectorMap();
-    const size_t num_ids = translated_ids.size();
+    const size_t num_ids = str_proxy_translation_map.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
     for (size_t idx = 0; idx < num_ids; ++idx) {
-      ASSERT_EQ(translated_ids[idx], StringDictionary::INVALID_STR_ID);
+      ASSERT_EQ(str_proxy_translation_map[idx], StringDictionary::INVALID_STR_ID);
     }
   }
 
@@ -1078,8 +1077,7 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
         source_string_dict_proxy->buildIntersectionTranslationMapToOtherProxy(
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
-    const auto& translated_ids = str_proxy_translation_map.getVectorMap();
-    const size_t num_ids = translated_ids.size();
+    const size_t num_ids = str_proxy_translation_map.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
     for (int32_t idx = 1; idx < static_cast<int32_t>(num_ids); ++idx) {
       const std::string source_string = source_string_dict_proxy->getString(idx);
@@ -1088,10 +1086,10 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
           !((source_string_as_int >= 0 && source_string_as_int < num_dest_strings) ||
             (source_string_as_int >= (g_op_count * 2) &&
              source_string_as_int < (g_op_count * 2 + num_dest_proxy_transient_ids)));
-      if (translated_ids[idx] != StringDictionary::INVALID_STR_ID) {
+      if (str_proxy_translation_map[idx] != StringDictionary::INVALID_STR_ID) {
         ASSERT_FALSE(should_be_missing);
         const std::string dest_string =
-            dest_string_dict_proxy->getString(translated_ids[idx]);
+            dest_string_dict_proxy->getString(str_proxy_translation_map[idx]);
         ASSERT_EQ(source_string, dest_string);
 
       } else {
@@ -1134,16 +1132,14 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
         source_string_dict_proxy->buildUnionTranslationMapToOtherProxy(
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
-    ASSERT_EQ(str_proxy_translation_map.numUntranslatedStrings(), strings.size());
-    const auto& translated_ids = str_proxy_translation_map.getVectorMap();
-    const size_t num_ids = translated_ids.size();
+    const size_t num_ids = str_proxy_translation_map.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
     for (size_t idx = 0; idx < num_ids; ++idx) {
       const auto string_id = static_cast<int32_t>(idx);
       if (string_id == -1) {
-        ASSERT_EQ(translated_ids[idx], StringDictionary::INVALID_STR_ID);
+        ASSERT_EQ(str_proxy_translation_map[idx], StringDictionary::INVALID_STR_ID);
       } else {
-        ASSERT_EQ(dest_string_dict_proxy->getString(translated_ids[idx]),
+        ASSERT_EQ(dest_string_dict_proxy->getString(str_proxy_translation_map[idx]),
                   strings[string_id]);
       }
     }
@@ -1177,23 +1173,9 @@ std::vector<std::string> add_strings_numeric_range(StringDictionaryProxy& sdp,
   return strings;
 }
 
-size_t calc_expected_untranslated_strings(const size_t num_source_entries,
-                                          const size_t num_dest_entries,
-                                          const int32_t source_start_val,
-                                          const int32_t dest_start_val) {
-  const int32_t source_abs_min = std::abs(source_start_val);  // 0
-  const int32_t source_abs_max =
-      std::abs(source_start_val) + static_cast<int32_t>(num_source_entries);  // 10
-  const int32_t dest_abs_min = std::abs(dest_start_val);                      // 7
-  const int32_t dest_abs_max =
-      std::abs(dest_start_val) + static_cast<int32_t>(num_dest_entries);  // 12
-  return static_cast<size_t>(std::max(dest_abs_min - source_abs_min, 0) +
-                             std::max(source_abs_max - dest_abs_max, 0));
-}
-
 void verify_translation(const StringDictionaryProxy& source_proxy,
                         const StringDictionaryProxy& dest_proxy,
-                        const StringDictionaryProxy::IdMap& id_map,
+                        const std::vector<int32_t>& id_map,
                         const std::vector<std::string>& persisted_source_strings,
                         const std::vector<std::string>& transient_source_strings,
                         const std::vector<std::string>& persisted_dest_strings,
@@ -1270,19 +1252,7 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
   ASSERT_EQ(dest_sdp.transientEntryCount(), num_dest_transient_entries);
 
   const auto id_map = source_sdp.buildUnionTranslationMapToOtherProxy(&dest_sdp);
-  const size_t expected_num_untranslated_strings =
-      calc_expected_untranslated_strings(num_source_persisted_entries,
-                                         num_dest_persisted_entries,
-                                         source_persisted_start_val,
-                                         dest_persisted_start_val) +
-      calc_expected_untranslated_strings(num_source_transient_entries,
-                                         num_dest_transient_entries,
-                                         source_transient_start_val,
-                                         dest_transient_start_val);
   ASSERT_EQ(id_map.size(), num_source_persisted_entries + num_source_transient_entries);
-  ASSERT_EQ(id_map.numNonTransients(), num_source_persisted_entries);
-  ASSERT_EQ(id_map.numTransients(), num_source_transient_entries);
-  ASSERT_EQ(id_map.numUntranslatedStrings(), expected_num_untranslated_strings);
 
   verify_translation(source_sdp,
                      dest_sdp,

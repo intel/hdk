@@ -335,7 +335,6 @@ BENCHMARK_DEFINE_F(StringDictionaryProxyFixture,
   for (auto _ : state) {
     auto id_map =
         source_proxy->buildIntersectionTranslationMapToOtherProxy(dest_proxy.get());
-    CHECK_EQ(id_map.numUntranslatedStrings(), 0UL);
   }
 }
 
@@ -365,7 +364,6 @@ BENCHMARK_DEFINE_F(
         source_proxy->buildIntersectionTranslationMapToOtherProxy(dest_proxy.get());
     const size_t num_expected_untranslated_strings =
         num_elems - first_n_elems - last_n_elems;
-    CHECK_EQ(id_map.numUntranslatedStrings(), num_expected_untranslated_strings);
   }
 }
 
@@ -394,7 +392,6 @@ BENCHMARK_DEFINE_F(
     auto id_map = source_proxy->buildUnionTranslationMapToOtherProxy(dest_proxy.get());
     const size_t num_expected_untranslated_strings =
         num_elems - first_n_elems - last_n_elems;
-    CHECK_EQ(id_map.numUntranslatedStrings(), num_expected_untranslated_strings);
   }
 }
 

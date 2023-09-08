@@ -529,7 +529,7 @@ Data_Namespace::MemoryLevel BaselineJoinHashTable::getEffectiveMemoryLevel(
 }
 
 StrProxyTranslationMapsPtrs decomposeStrDictTranslationMaps(
-    const std::vector<const StringDictionaryProxy::IdMap*>& str_proxy_translation_maps) {
+    const std::vector<const std::vector<int32_t>*>& str_proxy_translation_maps) {
   StrProxyTranslationMapsPtrs translation_map_ptrs_and_offsets;
   // First element of pair is vector of int32_t* pointing to translation map "vector"
   // Second element of pair is vector of int32_t of min inner dictionary ids (offsets)
