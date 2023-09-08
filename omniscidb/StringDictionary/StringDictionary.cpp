@@ -750,40 +750,48 @@ std::vector<int32_t> StringDictionary::getLike(const std::string& pattern,
   return result;
 }
 
-std::vector<int32_t> StringDictionary::getEquals(std::string pattern,
-                                                 std::string comp_operator,
-                                                 size_t generation) {
-  CHECK(!base_dict_) << "Not implemented";
+std::vector<int32_t> StringDictionary::getEquals(const std::string& pattern,
+                                                 const std::string& comp_operator,
+                                                 int64_t generation) const {
+  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
   std::vector<int32_t> result;
+  if (base_dict_) {
+    result = base_dict_->getEquals(
+        pattern, comp_operator, std::min(generation, base_generation_));
+    if ((comp_operator == "=" && !result.empty()) || generation < base_generation_) {
+      return result;
+    }
+  }
+
   auto eq_id_itr = equal_cache_.find(pattern);
-  int32_t eq_id = MAX_STRLEN + 1;
-  int32_t cur_size = str_count_;
+  int32_t eq_id = -1;
   if (eq_id_itr != equal_cache_.end()) {
     auto eq_id = eq_id_itr->second;
     if (comp_operator == "=") {
-      result.push_back(eq_id);
+      if (eq_id < generation) {
+        result.push_back(eq_id);
+      }
     } else {
-      for (int32_t idx = 0; idx <= cur_size; idx++) {
-        if (idx == eq_id) {
-          continue;
+      for (int32_t id = base_generation_; id < generation; id++) {
+        if (id != eq_id) {
+          result.push_back(id);
         }
-        result.push_back(idx);
       }
     }
   } else {
     std::vector<std::thread> workers;
     int worker_count = cpu_threads();
     CHECK_GT(worker_count, 0);
-    std::vector<std::vector<int32_t>> worker_results(worker_count);
-    CHECK_LE(generation, str_count_);
     for (int worker_idx = 0; worker_idx < worker_count; ++worker_idx) {
       workers.emplace_back(
-          [&worker_results, &pattern, generation, worker_idx, worker_count, this]() {
-            for (size_t string_id = worker_idx; string_id < generation;
+          [&eq_id, &pattern, generation, worker_idx, worker_count, this]() {
+            for (int string_id = indexToId(worker_idx); string_id < generation;
                  string_id += worker_count) {
               const auto str = getStringUnlocked(string_id);
               if (str == pattern) {
-                worker_results[worker_idx].push_back(string_id);
+                // Only one thread can find matching string, so no additional sync.
+                eq_id = string_id;
+                break;
               }
             }
           });
@@ -791,21 +799,18 @@ std::vector<int32_t> StringDictionary::getEquals(std::string pattern,
     for (auto& worker : workers) {
       worker.join();
     }
-    for (const auto& worker_result : worker_results) {
-      result.insert(result.end(), worker_result.begin(), worker_result.end());
-    }
-    if (result.size() > 0) {
-      const auto it_ok = equal_cache_.insert(std::make_pair(pattern, result[0]));
+    if (eq_id >= 0) {
+      const auto it_ok = equal_cache_.insert(std::make_pair(pattern, eq_id));
       CHECK(it_ok.second);
-      eq_id = result[0];
     }
     if (comp_operator == "<>") {
-      for (int32_t idx = 0; idx <= cur_size; idx++) {
-        if (idx == eq_id) {
-          continue;
+      for (int32_t id = base_generation_; id < generation; id++) {
+        if (id != eq_id) {
+          result.push_back(id);
         }
-        result.push_back(idx);
       }
+    } else if (eq_id >= 0 && eq_id < generation) {
+      result.push_back(eq_id);
     }
   }
   return result;
@@ -813,20 +818,33 @@ std::vector<int32_t> StringDictionary::getEquals(std::string pattern,
 
 std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
                                                   const std::string& comp_operator,
-                                                  const size_t generation) {
-  CHECK(!base_dict_) << "Not implemented";
-  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
-  std::vector<int32_t> ret;
-  if (str_count_ == 0) {
-    return ret;
-  }
-  if (sorted_cache.size() < str_count_) {
-    if (comp_operator == "=" || comp_operator == "<>") {
+                                                  int64_t generation) const {
+  generation = generation >= 0 ? std::min(generation, static_cast<int64_t>(entryCount()))
+                               : static_cast<int64_t>(entryCount());
+  {
+    // The lock is used only to check cache.
+    mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
+    if ((sorted_cache.size() < str_count_) &&
+        (comp_operator == "=" || comp_operator == "<>")) {
+      read_lock.unlock();
       return getEquals(pattern, comp_operator, generation);
     }
+  }
 
+  mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
+  std::vector<int32_t> ret;
+  if (base_dict_) {
+    ret = base_dict_->getCompare(
+        pattern, comp_operator, std::min(generation, base_generation_));
+    if ((comp_operator == "=" && !ret.empty()) || generation < base_generation_) {
+      return ret;
+    }
+  }
+
+  if (sorted_cache.size() < str_count_) {
     buildSortedCache();
   }
+
   auto cache_index = compare_cache_.get(pattern);
 
   if (!cache_index) {
@@ -868,92 +886,72 @@ std::vector<int32_t> StringDictionary::getCompare(const std::string& pattern,
   // For < operator if the index that we have points to the element which is equal to
   // the pattern that we are searching for we simply get all the elements less than the
   // index. If the element pointed by the index is not equal to the pattern we are
-  // comparing with we also need to include that index in result vector, except when the
-  // index points to 0 and the pattern is lesser than the smallest value in the string
-  // dictionary.
+  // comparing with we also need to include that index in result vector.
 
   if (comp_operator == "<") {
     size_t idx = cache_index->index;
     if (cache_index->diff) {
       idx = cache_index->index + 1;
-      if (cache_index->index == 0 && cache_index->diff > 0) {
-        idx = cache_index->index;
+    }
+    for (size_t i = 0; i < idx; i++) {
+      if (sorted_cache[i] < generation) {
+        ret.push_back(sorted_cache[i]);
       }
     }
-    for (size_t i = 0; i < idx; i++) {
-      ret.push_back(sorted_cache[i]);
-    }
 
-    // For <= operator if the index that we have points to the element which is equal to
-    // the pattern that we are searching for we want to include the element pointed by
-    // the index in the result set. If the element pointed by the index is not equal to
-    // the pattern we are comparing with we just want to include all the ids with index
-    // less than the index that is cached, except when pattern that we are searching for
-    // is smaller than the smallest string in the dictionary.
-
+    // For <= operator we want to include the all elements less than the index and
+    // the index itself since it cannot be greater than the pattern.
   } else if (comp_operator == "<=") {
     size_t idx = cache_index->index + 1;
-    if (cache_index == 0 && cache_index->diff > 0) {
-      idx = cache_index->index;
-    }
     for (size_t i = 0; i < idx; i++) {
-      ret.push_back(sorted_cache[i]);
+      if (sorted_cache[i] < generation) {
+        ret.push_back(sorted_cache[i]);
+      }
     }
 
     // For > operator we want to get all the elements with index greater than the index
-    // that we have except, when the pattern we are searching for is lesser than the
-    // smallest string in the dictionary we also want to include the id of the index
-    // that we have.
-
   } else if (comp_operator == ">") {
     size_t idx = cache_index->index + 1;
-    if (cache_index->index == 0 && cache_index->diff > 0) {
-      idx = cache_index->index;
-    }
     for (size_t i = idx; i < sorted_cache.size(); i++) {
-      ret.push_back(sorted_cache[i]);
+      if (sorted_cache[i] < generation) {
+        ret.push_back(sorted_cache[i]);
+      }
     }
 
-    // For >= operator when the indexed element that we have points to element which is
-    // equal to the pattern we are searching for we want to include that in the result
-    // vector. If the index that we have does not point to the string which is equal to
-    // the pattern we are searching we don't want to include that id into the result
-    // vector except when the index is 0.
-
+    // For >= operator we want to get all the elements with index greater than the index.
+    // We also include the index if it matches the pattern
   } else if (comp_operator == ">=") {
     size_t idx = cache_index->index;
     if (cache_index->diff) {
       idx = cache_index->index + 1;
-      if (cache_index->index == 0 && cache_index->diff > 0) {
-        idx = cache_index->index;
-      }
     }
     for (size_t i = idx; i < sorted_cache.size(); i++) {
-      ret.push_back(sorted_cache[i]);
+      if (sorted_cache[i] < generation) {
+        ret.push_back(sorted_cache[i]);
+      }
     }
   } else if (comp_operator == "=") {
     if (!cache_index->diff) {
-      ret.push_back(sorted_cache[cache_index->index]);
+      if (sorted_cache[cache_index->index] < generation) {
+        ret.push_back(sorted_cache[cache_index->index]);
+      }
     }
 
     // For <> operator it is simple matter of not including id of string which is equal
     // to pattern we are searching for.
   } else if (comp_operator == "<>") {
     if (!cache_index->diff) {
-      size_t idx = cache_index->index;
-      for (size_t i = 0; i < idx; i++) {
-        ret.push_back(sorted_cache[i]);
-      }
-      ++idx;
-      for (size_t i = idx; i < sorted_cache.size(); i++) {
-        ret.push_back(sorted_cache[i]);
+      int eq_id = sorted_cache[cache_index->index];
+      for (int id = base_generation_; id < generation; ++id) {
+        if (id != eq_id) {
+          ret.push_back(id);
+        }
       }
     } else {
-      for (size_t i = 0; i < sorted_cache.size(); i++) {
-        ret.insert(ret.begin(), sorted_cache.begin(), sorted_cache.end());
+      for (int id = base_generation_; id < generation; ++id) {
+        ret.push_back(id);
       }
     }
-
   } else {
     std::runtime_error("Unsupported string comparison operator");
   }
@@ -1375,20 +1373,18 @@ void StringDictionary::invalidateInvertedIndex() noexcept {
   compare_cache_.invalidateInvertedIndex();
 }
 
-void StringDictionary::buildSortedCache() {
-  CHECK(!base_dict_) << "Not implemented";
+void StringDictionary::buildSortedCache() const {
   // This method is not thread-safe.
   const auto cur_cache_size = sorted_cache.size();
   std::vector<int32_t> temp_sorted_cache;
   for (size_t i = cur_cache_size; i < str_count_; i++) {
-    temp_sorted_cache.push_back(i);
+    temp_sorted_cache.push_back(indexToId(i));
   }
   sortCache(temp_sorted_cache);
   mergeSortedCache(temp_sorted_cache);
 }
 
-void StringDictionary::sortCache(std::vector<int32_t>& cache) {
-  CHECK(!base_dict_) << "Not implemented";
+void StringDictionary::sortCache(std::vector<int32_t>& cache) const {
   // This method is not thread-safe.
 
   // this boost sort is creating some problems when we use UTF-8 encoded strings.
@@ -1401,8 +1397,7 @@ void StringDictionary::sortCache(std::vector<int32_t>& cache) {
   });
 }
 
-void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache) {
-  CHECK(!base_dict_) << "Not implemented";
+void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache) const {
   // this method is not thread safe
   std::vector<int32_t> updated_cache(temp_sorted_cache.size() + sorted_cache.size());
   size_t t_idx = 0, s_idx = 0, idx = 0;
