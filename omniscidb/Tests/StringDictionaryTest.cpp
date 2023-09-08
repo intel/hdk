@@ -206,7 +206,7 @@ TEST(StringDictionary, BuildTranslationMap) {
   }
   source_string_dict->getOrAddBulk(strings, string_ids.data());
   auto dummy_callback = [](const std::string_view& source_string,
-                           const int32_t source_string_id) { return false; };
+                           const int32_t source_string_id) { return true; };
 
   {
     // First try to translate to empty dictionary.
@@ -912,6 +912,94 @@ TEST(NestedStringDictionary, GetRegexpLike) {
   ASSERT_EQ(dict2->getOrAdd("str7"), 5);
 
   ASSERT_EQ(dict2->getRegexpLike("str[12467]", '\\'), std::vector<int>({0, 1, 4, 5}));
+}
+
+TEST(NestedStringDictionary, BuildTranslationMap_EmptyDict) {
+  auto source1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  auto source2 = std::make_shared<StringDictionary>(source1, -1, g_cache_string_hash);
+
+  auto dest1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 2}, -1, g_cache_string_hash);
+  dest1->getOrAdd("str1");
+  auto dest2 = std::make_shared<StringDictionary>(dest1, -1, g_cache_string_hash);
+  dest2->getOrAdd("str2");
+
+  auto dummy_callback = [](const std::string_view& source_string,
+                           const int32_t source_string_id) { return true; };
+
+  ASSERT_EQ(StringDictionaryTranslator::buildDictionaryTranslationMap(
+                source2, dest2, dummy_callback),
+            std::vector<int>({}));
+
+  ASSERT_EQ(StringDictionaryTranslator::buildDictionaryTranslationMap(
+                dest2, source2, dummy_callback),
+            std::vector<int>(
+                {StringDictionary::INVALID_STR_ID, StringDictionary::INVALID_STR_ID}));
+}
+
+TEST(NestedStringDictionary, BuildTranslationMap) {
+  auto source1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(source1->getOrAdd("source1"), 0);
+  ASSERT_EQ(source1->getOrAdd("common1"), 1);
+  ASSERT_EQ(source1->getOrAdd("source2"), 2);
+  ASSERT_EQ(source1->getOrAdd("common2"), 3);
+  auto source2 = std::make_shared<StringDictionary>(source1, -1, g_cache_string_hash);
+  ASSERT_EQ(source2->getOrAdd("source3"), 4);
+  ASSERT_EQ(source2->getOrAdd("common3"), 5);
+  ASSERT_EQ(source2->getOrAdd("source4"), 6);
+  ASSERT_EQ(source2->getOrAdd("common4"), 7);
+  // Add some string that should be ignored on translation.
+  ASSERT_EQ(source1->getOrAdd("source4"), 4);
+  ASSERT_EQ(source1->getOrAdd("common4"), 5);
+  ASSERT_EQ(source1->getOrAdd("source3"), 6);
+  ASSERT_EQ(source1->getOrAdd("common3"), 7);
+
+  auto dest1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 2}, -1, g_cache_string_hash);
+  ASSERT_EQ(dest1->getOrAdd("common1"), 0);
+  ASSERT_EQ(dest1->getOrAdd("common2"), 1);
+  ASSERT_EQ(dest1->getOrAdd("dest1"), 2);
+  ASSERT_EQ(dest1->getOrAdd("dest2"), 3);
+  auto dest2 = std::make_shared<StringDictionary>(dest1, -1, g_cache_string_hash);
+  ASSERT_EQ(dest2->getOrAdd("dest3"), 4);
+  ASSERT_EQ(dest2->getOrAdd("dest4"), 5);
+  ASSERT_EQ(dest2->getOrAdd("common3"), 6);
+  ASSERT_EQ(dest2->getOrAdd("common4"), 7);
+  // Add some string that should be ignored on translation.
+  ASSERT_EQ(dest1->getOrAdd("common3"), 4);
+  ASSERT_EQ(dest1->getOrAdd("common4"), 5);
+  ASSERT_EQ(dest1->getOrAdd("dest3"), 6);
+  ASSERT_EQ(dest1->getOrAdd("dest4"), 7);
+
+  auto dummy_callback = [](const std::string_view& source_string,
+                           const int32_t source_string_id) { return true; };
+
+  CHECK_EQ(dest2->getIdOfString(std::string("common3")), 6);
+  CHECK_EQ(dest2->getIdOfString(std::string("common4")), 7);
+
+  ASSERT_EQ(StringDictionaryTranslator::buildDictionaryTranslationMap(
+                source2, dest2, dummy_callback),
+            std::vector<int>({StringDictionary::INVALID_STR_ID,
+                              0,
+                              StringDictionary::INVALID_STR_ID,
+                              1,
+                              StringDictionary::INVALID_STR_ID,
+                              6,
+                              StringDictionary::INVALID_STR_ID,
+                              7}));
+
+  ASSERT_EQ(StringDictionaryTranslator::buildDictionaryTranslationMap(
+                dest2, source2, dummy_callback),
+            std::vector<int>({1,
+                              3,
+                              StringDictionary::INVALID_STR_ID,
+                              StringDictionary::INVALID_STR_ID,
+                              StringDictionary::INVALID_STR_ID,
+                              StringDictionary::INVALID_STR_ID,
+                              5,
+                              7}));
 }
 
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
