@@ -461,7 +461,7 @@ StringDictionaryProxy* Executor::getStringDictionaryProxy(
   return row_set_mem_owner->getOrAddStringDictProxy(dict_id_in, generation);
 }
 
-const StringDictionaryProxy::IdMap* Executor::getStringProxyTranslationMap(
+const std::vector<int32_t>* Executor::getStringProxyTranslationMap(
     const int source_dict_id,
     const int dest_dict_id,
     const RowSetMemoryOwner::StringTranslationType translation_type,
@@ -478,7 +478,7 @@ const StringDictionaryProxy::IdMap* Executor::getStringProxyTranslationMap(
       source_dict_id, source_generation, dest_dict_id, dest_generation, translation_type);
 }
 
-const StringDictionaryProxy::IdMap* Executor::getIntersectionStringProxyTranslationMap(
+const std::vector<int32_t>* Executor::getIntersectionStringProxyTranslationMap(
     const StringDictionaryProxy* source_proxy,
     const StringDictionaryProxy* dest_proxy,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) const {
@@ -489,7 +489,7 @@ const StringDictionaryProxy::IdMap* Executor::getIntersectionStringProxyTranslat
                                                                      dest_proxy);
 }
 
-const StringDictionaryProxy::IdMap* RowSetMemoryOwner::getOrAddStringProxyTranslationMap(
+const std::vector<int32_t>* RowSetMemoryOwner::getOrAddStringProxyTranslationMap(
     const int source_dict_id_in,
     const int64_t source_generation,
     const int dest_dict_id_in,

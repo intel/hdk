@@ -252,7 +252,7 @@ class PerfectJoinHashTable : public HashJoin {
   HashType hash_type_;
   std::mutex cpu_hash_table_buff_mutex_;
   std::mutex str_proxy_translation_mutex_;
-  const StringDictionaryProxy::IdMap* str_proxy_translation_map_{nullptr};
+  const std::vector<int32_t>* str_proxy_translation_map_{nullptr};
   ExpressionRange col_range_;
   ExpressionRange rhs_source_col_range_;
   Executor* executor_;

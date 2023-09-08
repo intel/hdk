@@ -494,11 +494,11 @@ StringDictionaryProxy* ResultSet::getStringDictionaryProxy(int const dict_id) co
 }
 
 class ResultSet::CellCallback {
-  StringDictionaryProxy::IdMap const id_map_;
+  std::vector<int32_t> const id_map_;
   int64_t const null_int_;
 
  public:
-  CellCallback(StringDictionaryProxy::IdMap&& id_map, int64_t const null_int)
+  CellCallback(std::vector<int32_t>&& id_map, int64_t const null_int)
       : id_map_(std::move(id_map)), null_int_(null_int) {}
   void operator()(int8_t const* const cell_ptr) const {
     using StringId = int32_t;

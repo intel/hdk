@@ -79,69 +79,19 @@ class StringDictionaryProxy {
   std::vector<std::string> getStrings(const std::vector<int32_t>& string_ids) const;
   std::pair<const char*, size_t> getStringBytes(int32_t string_id) const noexcept;
 
-  class IdMap {
-    const uint32_t dict_size_;
-    std::vector<int32_t> vector_map_;
-    int64_t num_untranslated_strings_{-1};
-
-   public:
-    IdMap(uint32_t const tran_size, uint32_t const dict_size)
-        : dict_size_(dict_size)
-        , vector_map_(tran_size + dict_size, StringDictionary::INVALID_STR_ID) {}
-    IdMap(IdMap const&) = delete;
-    IdMap(IdMap&&) = default;
-    bool empty() const { return vector_map_.empty(); }
-    inline size_t getIndex(int32_t const id) const { return id; }
-    std::vector<int32_t> const& getVectorMap() const { return vector_map_; }
-    size_t size() const { return vector_map_.size(); }
-    size_t numTransients() const { return vector_map_.size() - dict_size_; }
-    size_t numNonTransients() const { return dict_size_; }
-    int32_t* data() { return vector_map_.data(); }
-    int32_t const* data() const { return vector_map_.data(); }
-    // Next two methods are currently used by buildUnionTranslationMapToOtherProxy to
-    // short circuit iteration over ids after intersection translation if all
-    // ids translated. Currently the private num_untranslated_strings_ is initialized
-    // to a -1 sentinel to signify that the value has not been calculated, which we
-    // CHECK against in the getter numUntranslatedStrings() method
-    // to represent that the num_untranslated_strings_ field has been uninitialized
-    size_t numUntranslatedStrings() const {
-      CHECK_GE(num_untranslated_strings_, 0L);
-      return static_cast<size_t>(num_untranslated_strings_);
-    }
-    void setNumUntranslatedStrings(const size_t num_untranslated_strings) {
-      num_untranslated_strings_ = static_cast<int64_t>(num_untranslated_strings);
-    }
-    int32_t* transientData() { return vector_map_.data() + dict_size_; }
-    int32_t& operator[](int32_t const id) { return vector_map_[getIndex(id)]; }
-    int32_t operator[](int32_t const id) const { return vector_map_[getIndex(id)]; }
-    friend std::ostream& operator<<(std::ostream&, IdMap const&);
-  };
-
-  IdMap initIdMap() const { return IdMap(transient_string_vec_.size(), generation_); }
-
   /**
    * @brief Builds a vectorized string_id translation map from this proxy to dest_proxy
    *
    * @param dest_proxy StringDictionaryProxy that we are to map this proxy's string ids to
    *
-   * @return An IdMap which encapsulates a std::vector<int32_t> of string ids
-   * for both transient and non-transient strings, mapping to their translated string_ids.
-   * offset_ is defined to be the number of transient entries + 1.
-   * The ordering of values in the vector_map_ is:
-   *  * the transient ids (there are offset_-1 of these)
-   *  * INVALID_STR_ID (=-1)
-   *  * the non-transient string ids
-   * For example if there are 3 transient entries in this proxy and 20 in the underlying
-   * string dictionary, then vector_map_ will be of size() == 24 and offset_=3+1.
-   * The formula to translate ids is new_id = vector_map_[offset_ + old_id].
-   * It is always the case that vector_map_[offset_-1]==-1 so that INVALID_STR_ID
-   * maps to INVALID_STR_ID.
-   *
+   * @return A std::vector<int32_t> of string ids for both transient and non-transient
+   * strings, mapping to their translated string_ids.
    */
-  IdMap buildIntersectionTranslationMapToOtherProxy(
+  std::vector<int32_t> buildIntersectionTranslationMapToOtherProxy(
       const StringDictionaryProxy* dest_proxy) const;
 
-  IdMap buildUnionTranslationMapToOtherProxy(StringDictionaryProxy* dest_proxy) const;
+  std::vector<int32_t> buildUnionTranslationMapToOtherProxy(
+      StringDictionaryProxy* dest_proxy) const;
 
   /**
    * @brief Returns the number of transient string entries for this proxy,
@@ -220,8 +170,9 @@ class StringDictionaryProxy {
   size_t transientLookupBulkParallelUnlocked(const std::vector<String>& lookup_strings,
                                              int32_t* string_ids) const;
 
-  IdMap buildIntersectionTranslationMapToOtherProxyUnlocked(
-      const StringDictionaryProxy* dest_proxy) const;
+  std::vector<int32_t> buildIntersectionTranslationMapToOtherProxyUnlocked(
+      const StringDictionaryProxy* dest_proxy,
+      size_t& num_strings_not_translated) const;
   std::shared_ptr<StringDictionary> string_dict_;
   TransientMap transient_str_to_int_;
   // Holds pointers into transient_str_to_int_

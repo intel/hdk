@@ -178,18 +178,19 @@ int32_t StringDictionaryProxy::lookupTransientStringUnlocked(
                                            : it->second;
 }
 
-StringDictionaryProxy::IdMap
+std::vector<int32_t>
 StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
-    const StringDictionaryProxy* dest_proxy) const {
+    const StringDictionaryProxy* dest_proxy,
+    size_t& num_strings_not_translated) const {
   auto timer = DEBUG_TIMER(__func__);
-  IdMap id_map = initIdMap();
-
+  std::vector<int32_t> id_map(transient_string_vec_.size() + generation_,
+                              StringDictionary::INVALID_STR_ID);
   if (id_map.empty()) {
     return id_map;
   }
 
   // First map transient strings, store at front of vector map
-  const size_t num_transient_entries = id_map.numTransients();
+  const size_t num_transient_entries = transient_string_vec_.size();
   size_t num_transient_strings_not_translated = 0UL;
   if (num_transient_entries) {
     std::vector<std::string> transient_lookup_strings(num_transient_entries);
@@ -209,7 +210,7 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
     // transient_string_vec_ into transient_lookup_strings.
 
     num_transient_strings_not_translated = dest_proxy->getTransientBulkImpl(
-        transient_lookup_strings, id_map.transientData(), false);
+        transient_lookup_strings, id_map.data() + generation_, false);
   }
 
   // Now map strings in dictionary
@@ -241,10 +242,9 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxyUnlocked(
   const size_t num_dest_entries = dest_proxy->entryCountUnlocked();
   const size_t num_total_entries = id_map.size();
   CHECK_GT(num_total_entries, 0UL);
-  const size_t num_strings_not_translated =
+  num_strings_not_translated =
       num_transient_strings_not_translated + num_persisted_strings_not_translated;
   CHECK_LE(num_strings_not_translated, num_total_entries);
-  id_map.setNumUntranslatedStrings(num_strings_not_translated);
   const size_t num_entries_translated = num_total_entries - num_strings_not_translated;
   const float match_pct =
       100.0 * static_cast<float>(num_entries_translated) / num_total_entries;
@@ -277,8 +277,7 @@ void order_translation_locks(const int32_t source_dict_id,
   }
 }
 
-StringDictionaryProxy::IdMap
-StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxy(
+std::vector<int32_t> StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxy(
     const StringDictionaryProxy* dest_proxy) const {
   const auto source_dict_id = string_dict_->getDictId();
   const auto dest_dict_id = dest_proxy->string_dict_->getDictId();
@@ -288,10 +287,12 @@ StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxy(
                                                             std::defer_lock);
   order_translation_locks(
       source_dict_id, dest_dict_id, source_proxy_read_lock, dest_proxy_write_lock);
-  return buildIntersectionTranslationMapToOtherProxyUnlocked(dest_proxy);
+  size_t num_strings_not_translated;
+  return buildIntersectionTranslationMapToOtherProxyUnlocked(dest_proxy,
+                                                             num_strings_not_translated);
 }
 
-StringDictionaryProxy::IdMap StringDictionaryProxy::buildUnionTranslationMapToOtherProxy(
+std::vector<int32_t> StringDictionaryProxy::buildUnionTranslationMapToOtherProxy(
     StringDictionaryProxy* dest_proxy) const {
   auto timer = DEBUG_TIMER(__func__);
 
@@ -303,11 +304,12 @@ StringDictionaryProxy::IdMap StringDictionaryProxy::buildUnionTranslationMapToOt
   order_translation_locks(
       source_dict_id, dest_dict_id, source_proxy_read_lock, dest_proxy_write_lock);
 
-  auto id_map = buildIntersectionTranslationMapToOtherProxyUnlocked(dest_proxy);
+  size_t num_untranslated_strings;
+  auto id_map = buildIntersectionTranslationMapToOtherProxyUnlocked(
+      dest_proxy, num_untranslated_strings);
   if (id_map.empty()) {
     return id_map;
   }
-  const auto num_untranslated_strings = id_map.numUntranslatedStrings();
   if (num_untranslated_strings > 0) {
     const size_t total_post_translation_dest_transients =
         num_untranslated_strings + dest_proxy->transientEntryCountUnlocked();
@@ -496,10 +498,10 @@ void StringDictionaryProxy::eachStringSerially(
 //  * Store the old_id -> new_id translation into the id_map_.
 class StringLocalCallback : public StringDictionary::StringCallback {
   StringDictionaryProxy* sdp_;
-  StringDictionaryProxy::IdMap& id_map_;
+  std::vector<int32_t>& id_map_;
 
  public:
-  StringLocalCallback(StringDictionaryProxy* sdp, StringDictionaryProxy::IdMap& id_map)
+  StringLocalCallback(StringDictionaryProxy* sdp, std::vector<int32_t>& id_map)
       : sdp_(sdp), id_map_(id_map) {}
   void operator()(std::string const& str, int32_t const string_id) override {
     operator()(std::string_view(str), string_id);
@@ -511,11 +513,6 @@ class StringLocalCallback : public StringDictionary::StringCallback {
                           : new_id;
   }
 };
-
-std::ostream& operator<<(std::ostream& os, StringDictionaryProxy::IdMap const& id_map) {
-  return os << "IdMap(dict_size_(" << id_map.dict_size_ << ") vector_map_"
-            << shared::printContainer(id_map.vector_map_) << ')';
-}
 
 void StringDictionaryProxy::updateGeneration(const int64_t generation) noexcept {
   if (generation == -1) {
