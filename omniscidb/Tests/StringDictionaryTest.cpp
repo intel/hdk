@@ -740,6 +740,37 @@ TEST(NestedStringDictionary, CopyStringsParallel) {
   ASSERT_EQ(dict1->copyStrings(), strings2);
 }
 
+TEST(NestedStringDictionary, IsLike) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+
+  ASSERT_EQ(dict1->getLike("str%", true, false, '\\'), std::vector<int>({0, 1, 2}));
+  ASSERT_EQ(dict1->getLike("str%", true, false, '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict1->getLike("str[124]", true, false, '\\'), std::vector<int>({0, 1}));
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  ASSERT_EQ(dict1->getLike("str%", true, false, '\\'), std::vector<int>({0, 1, 2, 3}));
+  ASSERT_EQ(dict1->getLike("str%", true, false, '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict1->getLike("str[124]", true, false, '\\'), std::vector<int>({0, 1, 3}));
+
+  ASSERT_EQ(dict2->getLike("str%", true, false, '\\'), std::vector<int>({0, 1, 2, 3, 4}));
+  ASSERT_EQ(dict2->getLike("str%", true, false, '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict2->getLike("str[12467]", true, false, '\\'), std::vector<int>({0, 1, 4}));
+
+  ASSERT_EQ(dict1->getOrAdd("str6"), 4);
+  ASSERT_EQ(dict2->getOrAdd("str7"), 5);
+
+  ASSERT_EQ(dict2->getLike("str[12467]", true, false, '\\'),
+            std::vector<int>({0, 1, 4, 5}));
+}
+
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);

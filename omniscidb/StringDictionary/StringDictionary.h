@@ -128,7 +128,7 @@ class StringDictionary {
                                const bool icase,
                                const bool is_simple,
                                const char escape,
-                               const size_t generation) const;
+                               int64_t generation = -1) const;
 
   std::vector<int32_t> getCompare(const std::string& pattern,
                                   const std::string& comp_operator,
@@ -253,7 +253,8 @@ class StringDictionary {
   size_t payload_file_size_;
   size_t payload_file_off_;
   mutable mapd_shared_mutex rw_mutex_;
-  mutable std::map<std::tuple<std::string, bool, bool, char>, std::vector<int32_t>>
+  mutable std::map<std::tuple<std::string, bool, bool, char, int64_t>,
+                   std::vector<int32_t>>
       like_cache_;
   mutable std::map<std::pair<std::string, char>, std::vector<int32_t>> regex_cache_;
   mutable std::map<std::string, int32_t> equal_cache_;
