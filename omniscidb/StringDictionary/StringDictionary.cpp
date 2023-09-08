@@ -60,20 +60,19 @@ uint32_t hash_string(const std::string_view str) {
   return str_hash;
 }
 
-struct ThreadInfo {
-  int64_t num_threads{0};
-  int64_t num_elems_per_thread;
-
-  ThreadInfo(const int64_t max_thread_count,
-             const int64_t num_elems,
-             const int64_t target_elems_per_thread) {
-    num_threads =
-        std::min(std::max(max_thread_count, int64_t(1)),
-                 ((num_elems + target_elems_per_thread - 1) / target_elems_per_thread));
-    num_elems_per_thread =
-        std::max((num_elems + num_threads - 1) / num_threads, int64_t(1));
-  }
-};
+template <typename T>
+void fillInvalidStringIdsParallel(int64_t start, int64_t end, T* out_vec) {
+  tbb::parallel_for(tbb::blocked_range<int64_t>(
+                        start, end, ((size_t)256 / sizeof(T)) << 10 /* 256KB chunks*/),
+                    [out_vec](const tbb::blocked_range<int64_t>& r) {
+                      const int64_t start_idx = r.begin();
+                      const int64_t end_idx = r.end();
+                      for (int64_t string_idx = start_idx; string_idx < end_idx;
+                           ++string_idx) {
+                        out_vec[string_idx] = StringDictionary::INVALID_STR_ID;
+                      }
+                    });
+}
 
 }  // namespace
 
@@ -327,16 +326,7 @@ size_t StringDictionary::getBulk(const std::vector<String>& string_vec,
   if (skip_owned_string) {
     // Need to fill the resulting vector if it wasn't done by the base dictionary.
     if (!base_dict_) {
-      tbb::parallel_for(tbb::blocked_range<int64_t>(
-                            0, num_lookup_strings, (size_t)64 << 10 /* 256KB chunks*/),
-                        [&](const tbb::blocked_range<int64_t>& r) {
-                          const int64_t start_idx = r.begin();
-                          const int64_t end_idx = r.end();
-                          for (int64_t string_idx = start_idx; string_idx < end_idx;
-                               ++string_idx) {
-                            encoded_vec[string_idx] = StringDictionary::INVALID_STR_ID;
-                          }
-                        });
+      fillInvalidStringIdsParallel(0, num_lookup_strings, encoded_vec);
     }
     return base_num_strings_not_found;
   }
@@ -1437,11 +1427,9 @@ std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(
     const std::shared_ptr<StringDictionary> source_dict,
     const std::shared_ptr<StringDictionary> dest_dict,
     StringLookupCallback const& dest_transient_lookup_callback) {
-  CHECK(!source_dict->getBaseDictionary());
-  CHECK(!dest_dict->getBaseDictionary());
   auto timer = DEBUG_TIMER(__func__);
-  const size_t num_source_strings = source_dict->storageEntryCount();
-  const size_t num_dest_strings = dest_dict->storageEntryCount();
+  const size_t num_source_strings = source_dict->entryCount();
+  const size_t num_dest_strings = dest_dict->entryCount();
   std::vector<int32_t> translated_ids(num_source_strings);
   StringDictionaryTranslator::buildDictionaryTranslationMap(
       source_dict.get(),
@@ -1463,8 +1451,6 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
     const int64_t dest_generation,
     const bool dest_has_transients,
     StringLookupCallback const& dest_transient_lookup_callback) {
-  CHECK(!source_dict->getBaseDictionary());
-  CHECK(!dest_dict->getBaseDictionary());
   auto timer = DEBUG_TIMER(__func__);
   CHECK_GE(source_generation, 0L);
   CHECK_GE(dest_generation, 0L);
@@ -1476,15 +1462,10 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
     return 0;
   }
 
-  const int32_t dest_db_id = dest_dict->getDbId();
-  const int32_t dest_dict_id = dest_dict->getDictId();
-  if (source_dict->getDbId() == dest_db_id && source_dict->getDictId() == dest_dict_id) {
+  if (source_dict == dest_dict) {
     throw std::runtime_error("Cannot translate between a string dictionary and itself.");
   }
-  const bool this_dict_is_locked_first =
-      source_dict->getDbId() < dest_db_id ||
-      (source_dict->getDbId() == dest_db_id && source_dict->getDictId() < dest_dict_id);
-
+  const bool this_dict_is_locked_first = source_dict < dest_dict;
   mapd_shared_lock<mapd_shared_mutex> first_read_lock(
       this_dict_is_locked_first ? source_dict->rw_mutex_ : dest_dict->rw_mutex_);
   mapd_shared_lock<mapd_shared_mutex> second_read_lock(
@@ -1495,101 +1476,72 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
   // generation arguments, if valid (i.e. >= 0), otherwise just the
   // size of each dictionary
 
-  CHECK_LE(num_source_strings, static_cast<int64_t>(source_dict->str_count_));
-  CHECK_LE(num_dest_strings, static_cast<int64_t>(dest_dict->str_count_));
-  const bool dest_dictionary_is_empty = (num_dest_strings == 0);
+  CHECK_LE(num_source_strings, static_cast<int64_t>(source_dict->entryCount()));
+  CHECK_LE(num_dest_strings, static_cast<int64_t>(dest_dict->entryCount()));
 
-  constexpr int64_t target_strings_per_thread{1000};
-  const ThreadInfo thread_info(
-      std::thread::hardware_concurrency(), num_source_strings, target_strings_per_thread);
-  CHECK_GE(thread_info.num_threads, 1L);
-  CHECK_GE(thread_info.num_elems_per_thread, 1L);
+  // Destination distionary is empty so simply fill the output vector with
+  // invalid IDs.
+  if (!num_dest_strings) {
+    fillInvalidStringIdsParallel(0, num_source_strings, translated_ids);
+    return num_source_strings;
+  }
 
-  // We use a tbb::task_arena to cap the number of threads, has been
-  // in other contexts been shown to exhibit better performance when low
-  // numbers of threads are needed than just letting tbb figure the number of threads,
-  // but should benchmark in this specific context
+  if (source_dict->base_dict_) {
+    buildDictionaryTranslationMap(
+        source_dict->base_dict_.get(),
+        dest_dict,
+        translated_ids,
+        std::min(source_generation, source_dict->base_generation_),
+        dest_generation,
+        dest_has_transients,
+        dest_transient_lookup_callback);
+  }
 
-  tbb::task_arena limited_arena(thread_info.num_threads);
-  std::vector<size_t> num_strings_not_translated_per_thread(thread_info.num_threads, 0UL);
-  limited_arena.execute([&] {
-    CHECK_LE(tbb::this_task_arena::max_concurrency(), thread_info.num_threads);
-    if (dest_dictionary_is_empty) {
-      tbb::parallel_for(
-          tbb::blocked_range<int32_t>(
-              0,
-              num_source_strings,
-              thread_info.num_elems_per_thread /* tbb grain_size */),
-          [&](const tbb::blocked_range<int32_t>& r) {
-            const int32_t start_idx = r.begin();
-            const int32_t end_idx = r.end();
-            for (int32_t string_idx = start_idx; string_idx != end_idx; ++string_idx) {
-              translated_ids[string_idx] = source_dict->INVALID_STR_ID;
-            }
-          },
-          tbb::simple_partitioner());
-      num_strings_not_translated_per_thread[0] += num_source_strings;
-    } else {
-      // The below logic, by executing low-level private variable accesses on both
-      // dictionaries, is less clean than a previous variant that simply called
-      // `getStringViews` from the source dictionary and then called `getBulk` on the
-      // destination dictionary, but this version gets significantly better performance
-      // (~2X), likely due to eliminating the overhead of writing out the string views and
-      // then reading them back in (along with the associated cache misses)
-      tbb::parallel_for(
-          tbb::blocked_range<int32_t>(
-              0,
-              num_source_strings,
-              thread_info.num_elems_per_thread /* tbb grain_size */),
-          [&](const tbb::blocked_range<int32_t>& r) {
-            const int32_t start_idx = r.begin();
-            const int32_t end_idx = r.end();
-            size_t num_strings_not_translated = 0;
-            for (int32_t source_string_id = start_idx; source_string_id != end_idx;
-                 ++source_string_id) {
-              const std::string_view source_str =
-                  source_dict->getStringFromStorageFast(source_string_id);
-          // Get the hash from this/the source dictionary's cache, as the function
-          // will be the same for the dest_dict, sparing us having to recompute it
+  constexpr int64_t target_strings_per_task{1000};
+
+  // The below logic, by executing low-level private variable accesses on both
+  // dictionaries, is less clean than a previous variant that simply called
+  // `getStringViews` from the source dictionary and then called `getBulk` on the
+  // destination dictionary, but this version gets significantly better performance
+  // (~2X), likely due to eliminating the overhead of writing out the string views and
+  // then reading them back in (along with the associated cache misses)
+  auto total_num_strings_not_translated = tbb::parallel_reduce(
+      tbb::blocked_range<int32_t>(source_dict->base_generation_,
+                                  num_source_strings,
+                                  target_strings_per_task /* tbb grain_size */),
+      (size_t)0,
+      [&](const tbb::blocked_range<int32_t>& r, size_t num_strings_not_translated) {
+        const int32_t start_idx = r.begin();
+        const int32_t end_idx = r.end();
+        for (int32_t source_string_id = start_idx; source_string_id != end_idx;
+             ++source_string_id) {
+          const std::string_view source_str =
+              source_dict->getStringFromStorageFast(source_string_id);
+      // Get the hash from this/the source dictionary's cache, as the function
+      // will be the same for the dest_dict, sparing us having to recompute it
 
 #ifndef USE_LEGACY_STR_DICT
-              const auto translated_string_id = dest_dict->getIdOfString(source_str);
+          const auto translated_string_id = dest_dict->getIdOfString(source_str);
 #else
-              // Todo(todd): Remove option to turn string hash cache off or at least
-              // make a constexpr to avoid these branches when we expect it to be always
-              // on going forward
-              const uint32_t hash = source_dict->materialize_hashes_
-                                        ? source_dict->hash_cache_[source_string_id]
-                                        : hash_string(source_str);
-              uint32_t hash_bucket = dest_dict->computeBucket(
-                  hash, source_str, dest_dict->string_id_uint32_table_);
-              const auto translated_string_id =
-                  dest_dict->string_id_uint32_table_[hash_bucket];
-              translated_ids[source_string_id] = translated_string_id;
+          const auto translated_string_id =
+              source_dict->materialize_hashes_
+                  ? dest_dict->getUnlocked(source_str,
+                                           source_dict->hashById(source_string_id))
+                  : dest_dict->getUnlocked(source_str);
 #endif
-
-              if (translated_string_id == StringDictionary::INVALID_STR_ID ||
-                  translated_string_id >= num_dest_strings) {
-                if (dest_has_transients) {
-                  num_strings_not_translated +=
-                      dest_transient_lookup_callback(source_str, source_string_id);
-                } else {
-                  num_strings_not_translated++;
-                }
-                continue;
-              }
+          if (translated_string_id >= 0 && translated_string_id < num_dest_strings) {
+            translated_ids[source_string_id] = translated_string_id;
+          } else {
+            if (!dest_has_transients ||
+                dest_transient_lookup_callback(source_str, source_string_id)) {
+              translated_ids[source_string_id] = StringDictionary::INVALID_STR_ID;
+              num_strings_not_translated++;
             }
-            const size_t tbb_thread_idx = tbb::this_task_arena::current_thread_index();
-            num_strings_not_translated_per_thread[tbb_thread_idx] +=
-                num_strings_not_translated;
-          },
-          tbb::simple_partitioner());
-    }
-  });
-  size_t total_num_strings_not_translated = 0;
-  for (int64_t thread_idx = 0; thread_idx < thread_info.num_threads; ++thread_idx) {
-    total_num_strings_not_translated += num_strings_not_translated_per_thread[thread_idx];
-  }
+          }
+        }
+        return num_strings_not_translated;
+      },
+      std::plus<size_t>());
   return total_num_strings_not_translated;
 }
 
