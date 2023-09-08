@@ -970,20 +970,30 @@ bool is_regexp_like(const std::string& str,
 
 std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
                                                      const char escape,
-                                                     const size_t generation) const {
-  CHECK(!base_dict_) << "Not implemented";
+                                                     int64_t generation) const {
+  generation = generation >= 0 ? std::min(generation, static_cast<int64_t>(entryCount()))
+                               : static_cast<int64_t>(entryCount());
+
   mapd_lock_guard<mapd_shared_mutex> write_lock(rw_mutex_);
-  const auto cache_key = std::make_pair(pattern, escape);
+  const auto cache_key = std::make_tuple(pattern, escape, generation);
   const auto it = regex_cache_.find(cache_key);
   if (it != regex_cache_.end()) {
     return it->second;
   }
+
   std::vector<int32_t> result;
+  if (base_dict_) {
+    result = base_dict_->getRegexpLike(
+        pattern, escape, std::min(generation, base_generation_));
+    if (generation < base_generation_) {
+      return result;
+    }
+  }
+
   std::vector<std::thread> workers;
   int worker_count = cpu_threads();
   CHECK_GT(worker_count, 0);
   std::vector<std::vector<int32_t>> worker_results(worker_count);
-  CHECK_LE(generation, str_count_);
   for (int worker_idx = 0; worker_idx < worker_count; ++worker_idx) {
     workers.emplace_back([&worker_results,
                           &pattern,
@@ -992,7 +1002,7 @@ std::vector<int32_t> StringDictionary::getRegexpLike(const std::string& pattern,
                           worker_idx,
                           worker_count,
                           this]() {
-      for (size_t string_id = worker_idx; string_id < generation;
+      for (int string_id = indexToId(worker_idx); string_id < generation;
            string_id += worker_count) {
         const auto str = getStringUnlocked(string_id);
         if (is_regexp_like(str, pattern, escape)) {
