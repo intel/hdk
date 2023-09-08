@@ -884,6 +884,36 @@ TEST(NestedStringDictionary, GetCompare) {
   sortAndCompare(dict2->getCompare("str6", "<>", 1), {0});
 }
 
+TEST(NestedStringDictionary, GetRegexpLike) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+
+  ASSERT_EQ(dict1->getRegexpLike("str.", '\\'), std::vector<int>({0, 1, 2}));
+  ASSERT_EQ(dict1->getRegexpLike("str.", '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict1->getRegexpLike("str[124]", '\\'), std::vector<int>({0, 1}));
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  ASSERT_EQ(dict1->getRegexpLike("str.", '\\'), std::vector<int>({0, 1, 2, 3}));
+  ASSERT_EQ(dict1->getRegexpLike("str.", '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict1->getRegexpLike("str[124]", '\\'), std::vector<int>({0, 1, 3}));
+
+  ASSERT_EQ(dict2->getRegexpLike("str.", '\\'), std::vector<int>({0, 1, 2, 3, 4}));
+  ASSERT_EQ(dict2->getRegexpLike("str.", '\\', 2), std::vector<int>({0, 1}));
+  ASSERT_EQ(dict2->getRegexpLike("str[12467]", '\\'), std::vector<int>({0, 1, 4}));
+
+  ASSERT_EQ(dict1->getOrAdd("str6"), 4);
+  ASSERT_EQ(dict2->getOrAdd("str7"), 5);
+
+  ASSERT_EQ(dict2->getRegexpLike("str[12467]", '\\'), std::vector<int>({0, 1, 4, 5}));
+}
+
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);
