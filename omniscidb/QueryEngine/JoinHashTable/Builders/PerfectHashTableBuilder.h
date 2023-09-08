@@ -142,17 +142,16 @@ class PerfectJoinHashTableBuilder {
   }
 #endif
 
-  void initOneToOneHashTableOnCpu(
-      const JoinColumn& join_column,
-      const ExpressionRange& col_range,
-      const bool is_bitwise_eq,
-      const InnerOuter& cols,
-      const StringDictionaryProxy::IdMap* str_proxy_translation_map,
-      const JoinType join_type,
-      const HashType hash_type,
-      const HashEntryInfo hash_entry_info,
-      const int32_t hash_join_invalid_val,
-      const Executor* executor) {
+  void initOneToOneHashTableOnCpu(const JoinColumn& join_column,
+                                  const ExpressionRange& col_range,
+                                  const bool is_bitwise_eq,
+                                  const InnerOuter& cols,
+                                  const std::vector<int32_t>* str_proxy_translation_map,
+                                  const JoinType join_type,
+                                  const HashType hash_type,
+                                  const HashEntryInfo hash_entry_info,
+                                  const int32_t hash_join_invalid_val,
+                                  const Executor* executor) {
     auto timer = DEBUG_TIMER(__func__);
     const auto inner_col = cols.first;
     CHECK(inner_col);
@@ -210,7 +209,7 @@ class PerfectJoinHashTableBuilder {
       const ExpressionRange& col_range,
       const bool is_bitwise_eq,
       const std::pair<const hdk::ir::ColumnVar*, const hdk::ir::Expr*>& cols,
-      const StringDictionaryProxy::IdMap* str_proxy_translation_map,
+      const std::vector<int32_t>* str_proxy_translation_map,
       const HashEntryInfo hash_entry_info,
       const int32_t hash_join_invalid_val,
       const Executor* executor) {

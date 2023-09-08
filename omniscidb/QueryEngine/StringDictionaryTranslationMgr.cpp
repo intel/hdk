@@ -80,7 +80,7 @@ void StringDictionaryTranslationMgr::buildTranslationMap() {
 void StringDictionaryTranslationMgr::createKernelBuffers() {
 #ifdef HAVE_CUDA
   if (memory_level_ == Data_Namespace::GPU_LEVEL) {
-    const size_t translation_map_size_bytes{host_translation_map_->getVectorMap().size() *
+    const size_t translation_map_size_bytes{host_translation_map_->size() *
                                             sizeof(int32_t)};
     for (int device_id = 0; device_id < device_count_; ++device_id) {
       device_buffers_.emplace_back(GpuAllocator::allocGpuAbstractBuffer(

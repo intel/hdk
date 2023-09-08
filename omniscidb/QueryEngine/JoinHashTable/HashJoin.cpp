@@ -336,7 +336,7 @@ HashJoin::getStrDictProxies(const InnerOuter& cols, const Executor* executor) {
   return inner_outer_str_dict_proxies;
 }
 
-const StringDictionaryProxy::IdMap* HashJoin::translateInnerToOuterStrDictProxies(
+const std::vector<int32_t>* HashJoin::translateInnerToOuterStrDictProxies(
     const InnerOuter& cols,
     const Executor* executor) {
   const auto inner_outer_proxies = HashJoin::getStrDictProxies(cols, executor);
@@ -418,14 +418,14 @@ CompositeKeyInfo HashJoin::getCompositeKeyInfo(
   return {sd_inner_proxy_per_key, sd_outer_proxy_per_key, cache_key_chunks};
 }
 
-std::vector<const StringDictionaryProxy::IdMap*>
-HashJoin::translateCompositeStrDictProxies(const CompositeKeyInfo& composite_key_info,
-                                           const Executor* executor) {
+std::vector<const std::vector<int32_t>*> HashJoin::translateCompositeStrDictProxies(
+    const CompositeKeyInfo& composite_key_info,
+    const Executor* executor) {
   const auto& inner_proxies = composite_key_info.sd_inner_proxy_per_key;
   const auto& outer_proxies = composite_key_info.sd_outer_proxy_per_key;
   const size_t num_proxies = inner_proxies.size();
   CHECK_EQ(num_proxies, outer_proxies.size());
-  std::vector<const StringDictionaryProxy::IdMap*> proxy_translation_maps;
+  std::vector<const std::vector<int32_t>*> proxy_translation_maps;
   proxy_translation_maps.reserve(num_proxies);
   for (size_t proxy_pair_idx = 0; proxy_pair_idx < num_proxies; ++proxy_pair_idx) {
     const bool translate_proxies =

@@ -238,7 +238,7 @@ class BaselineJoinHashTable : public HashJoin {
   ColumnCacheMap& column_cache_;
   std::mutex cpu_hash_table_buff_mutex_;
   std::mutex str_proxy_translation_mutex_;
-  std::vector<const StringDictionaryProxy::IdMap*> str_proxy_translation_maps_;
+  std::vector<const std::vector<int32_t>*> str_proxy_translation_maps_;
 
   std::vector<InnerOuter> inner_outer_pairs_;
   const int device_count_;
