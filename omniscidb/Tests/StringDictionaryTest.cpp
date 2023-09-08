@@ -771,6 +771,118 @@ TEST(NestedStringDictionary, IsLike) {
             std::vector<int>({0, 1, 4, 5}));
 }
 
+void sortAndCompare(std::vector<int> actual, const std::vector<int>& expected) {
+  std::sort(actual.begin(), actual.end(), std::less<int>());
+  ASSERT_EQ(actual, expected);
+}
+
+TEST(NestedStringDictionary, GetEquals) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+
+  sortAndCompare(dict1->getCompare("str1", "="), {0});
+  sortAndCompare(dict1->getCompare("str2", "="), {1});
+  sortAndCompare(dict1->getCompare("str5", "="), {});
+  sortAndCompare(dict1->getCompare("str2", "<>"), {0, 2});
+  sortAndCompare(dict1->getCompare("str2", "=", 1), {});
+  sortAndCompare(dict1->getCompare("str2", "<>", 1), {0});
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+
+  sortAndCompare(dict1->getCompare("str4", "="), {3});
+  sortAndCompare(dict1->getCompare("str4", "=", 3), {});
+  sortAndCompare(dict1->getCompare("str2", "<>"), {0, 2, 3});
+  sortAndCompare(dict1->getCompare("str2", "<>", 3), {0, 2});
+
+  sortAndCompare(dict2->getCompare("str4", "="), {});
+  sortAndCompare(dict2->getCompare("str5", "="), {3});
+  sortAndCompare(dict2->getCompare("str5", "=", 3), {});
+  sortAndCompare(dict2->getCompare("str5", "<>"), {0, 1, 2, 4});
+  sortAndCompare(dict2->getCompare("str5", "<>", 3), {0, 1, 2});
+
+  ASSERT_EQ(dict2->getOrAdd("str7"), 5);
+
+  sortAndCompare(dict2->getCompare("str5", "<>"), {0, 1, 2, 4, 5});
+  sortAndCompare(dict2->getCompare("str7", "="), {5});
+}
+
+TEST(NestedStringDictionary, GetCompare) {
+  auto dict1 =
+      std::make_shared<StringDictionary>(DictRef{-1, 1}, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str1"), 0);
+  ASSERT_EQ(dict1->getOrAdd("str2"), 1);
+  ASSERT_EQ(dict1->getOrAdd("str3"), 2);
+
+  sortAndCompare(dict1->getCompare("str2", "<"), {0});
+  sortAndCompare(dict1->getCompare("str2", "<="), {0, 1});
+  sortAndCompare(dict1->getCompare("str2", "<=", 1), {0});
+  sortAndCompare(dict1->getCompare("str2", ">"), {2});
+  sortAndCompare(dict1->getCompare("str2", ">="), {1, 2});
+  sortAndCompare(dict1->getCompare("str2", ">=", 2), {1});
+  sortAndCompare(dict1->getCompare("str2", "="), {1});
+  sortAndCompare(dict1->getCompare("str2", "<>"), {0, 2});
+
+  sortAndCompare(dict1->getCompare("str11", "<"), {0});
+  sortAndCompare(dict1->getCompare("str11", "<="), {0});
+  sortAndCompare(dict1->getCompare("str11", ">"), {1, 2});
+  sortAndCompare(dict1->getCompare("str11", ">="), {1, 2});
+  sortAndCompare(dict1->getCompare("str11", "<>"), {0, 1, 2});
+  sortAndCompare(dict1->getCompare("str11", "="), {});
+
+  sortAndCompare(dict1->getCompare("str0", "<"), {});
+  sortAndCompare(dict1->getCompare("str0", "<="), {});
+  sortAndCompare(dict1->getCompare("str0", ">"), {0, 1, 2});
+  sortAndCompare(dict1->getCompare("str0", ">="), {0, 1, 2});
+  sortAndCompare(dict1->getCompare("str0", "="), {});
+  sortAndCompare(dict1->getCompare("str0", "<>"), {0, 1, 2});
+
+  sortAndCompare(dict1->getCompare("str4", "<"), {0, 1, 2});
+  sortAndCompare(dict1->getCompare("str4", "<="), {0, 1, 2});
+  sortAndCompare(dict1->getCompare("str4", ">"), {});
+  sortAndCompare(dict1->getCompare("str4", ">="), {});
+  sortAndCompare(dict1->getCompare("str4", "="), {});
+  sortAndCompare(dict1->getCompare("str4", "<>"), {0, 1, 2});
+
+  auto dict2 = std::make_shared<StringDictionary>(dict1, -1, g_cache_string_hash);
+  ASSERT_EQ(dict1->getOrAdd("str4"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str5"), 3);
+  ASSERT_EQ(dict2->getOrAdd("str6"), 4);
+  ASSERT_EQ(dict2->getOrAdd("str7"), 5);
+
+  sortAndCompare(dict1->getCompare("str2", "<"), {0});
+  sortAndCompare(dict1->getCompare("str2", "<="), {0, 1});
+  sortAndCompare(dict1->getCompare("str2", ">"), {2, 3});
+  sortAndCompare(dict1->getCompare("str2", ">="), {1, 2, 3});
+  sortAndCompare(dict1->getCompare("str2", "="), {1});
+  sortAndCompare(dict1->getCompare("str2", "<>"), {0, 2, 3});
+
+  sortAndCompare(dict2->getCompare("str6", "<"), {0, 1, 2, 3});
+  sortAndCompare(dict2->getCompare("str6", "<", 3), {0, 1, 2});
+  sortAndCompare(dict2->getCompare("str6", "<", 1), {0});
+  sortAndCompare(dict2->getCompare("str6", "<="), {0, 1, 2, 3, 4});
+  sortAndCompare(dict2->getCompare("str6", "<=", 3), {0, 1, 2});
+  sortAndCompare(dict2->getCompare("str6", "<=", 1), {0});
+  sortAndCompare(dict2->getCompare("str6", ">"), {5});
+  sortAndCompare(dict2->getCompare("str6", ">", 3), {});
+  sortAndCompare(dict2->getCompare("str6", ">", 1), {});
+  sortAndCompare(dict2->getCompare("str6", ">="), {4, 5});
+  sortAndCompare(dict2->getCompare("str6", ">=", 3), {});
+  sortAndCompare(dict2->getCompare("str6", ">=", 1), {});
+  sortAndCompare(dict2->getCompare("str6", ">=", 5), {4});
+  sortAndCompare(dict2->getCompare("str6", "="), {4});
+  sortAndCompare(dict2->getCompare("str6", "=", 3), {});
+  sortAndCompare(dict2->getCompare("str6", "=", 1), {});
+  sortAndCompare(dict2->getCompare("str6", "<>"), {0, 1, 2, 3, 5});
+  sortAndCompare(dict2->getCompare("str6", "<>", 3), {0, 1, 2});
+  sortAndCompare(dict2->getCompare("str6", "<>", 1), {0});
+}
+
 TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);
