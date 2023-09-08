@@ -136,7 +136,7 @@ class StringDictionary {
 
   std::vector<int32_t> getRegexpLike(const std::string& pattern,
                                      const char escape,
-                                     const size_t generation) const;
+                                     int64_t generation = -1) const;
 
   std::vector<std::string> copyStrings(int64_t generation = -1) const;
 
@@ -256,7 +256,8 @@ class StringDictionary {
   mutable std::map<std::tuple<std::string, bool, bool, char, int64_t>,
                    std::vector<int32_t>>
       like_cache_;
-  mutable std::map<std::pair<std::string, char>, std::vector<int32_t>> regex_cache_;
+  mutable std::map<std::tuple<std::string, char, int64_t>, std::vector<int32_t>>
+      regex_cache_;
   mutable std::map<std::string, int32_t> equal_cache_;
   mutable DictionaryCache<std::string, compare_cache_value_t> compare_cache_;
   mutable std::shared_ptr<std::vector<std::string>> strings_cache_;
