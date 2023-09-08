@@ -130,7 +130,7 @@ class StringDictionary {
 
   std::vector<int32_t> getCompare(const std::string& pattern,
                                   const std::string& comp_operator,
-                                  const size_t generation);
+                                  int64_t generation = -1) const;
 
   std::vector<int32_t> getRegexpLike(const std::string& pattern,
                                      const char escape,
@@ -223,12 +223,12 @@ class StringDictionary {
                           size_t& mem_size,
                           const size_t min_capacity_requested = 0) noexcept;
   void invalidateInvertedIndex() noexcept;
-  std::vector<int32_t> getEquals(std::string pattern,
-                                 std::string comp_operator,
-                                 size_t generation);
-  void buildSortedCache();
-  void sortCache(std::vector<int32_t>& cache);
-  void mergeSortedCache(std::vector<int32_t>& temp_sorted_cache);
+  std::vector<int32_t> getEquals(const std::string& pattern,
+                                 const std::string& comp_operator,
+                                 int64_t generation) const;
+  void buildSortedCache() const;
+  void sortCache(std::vector<int32_t>& cache) const;
+  void mergeSortedCache(std::vector<int32_t>& temp_sorted_cache) const;
 
   int indexToId(int string_idx) const { return string_idx + base_generation_; }
   int idToIndex(int string_id) const { return string_id - base_generation_; }
@@ -243,7 +243,7 @@ class StringDictionary {
   size_t collisions_;
   std::vector<int32_t> string_id_uint32_table_;
   std::vector<uint32_t> hash_cache_;
-  std::vector<int32_t> sorted_cache;
+  mutable std::vector<int32_t> sorted_cache;
   bool materialize_hashes_;
   StringIdxEntry* offset_map_;
   char* payload_map_;
