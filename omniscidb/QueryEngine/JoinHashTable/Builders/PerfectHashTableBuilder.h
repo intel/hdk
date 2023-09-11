@@ -17,6 +17,7 @@
 #pragma once
 
 #include "QueryEngine/JoinHashTable/PerfectHashTable.h"
+#include "QueryEngine/JoinHashTable/Runtime/HashJoinRuntimeCpu.h"
 
 #include "Shared/scope.h"
 
@@ -166,8 +167,6 @@ class PerfectJoinHashTableBuilder {
                                            0);
 
     auto cpu_hash_table_buff = reinterpret_cast<int32_t*>(hash_table_->getCpuBuffer());
-    const int thread_count = cpu_threads();
-    std::vector<std::thread> init_cpu_buff_threads;
 
     {
       auto timer_init = DEBUG_TIMER("CPU One-To-One Perfect-Hash: init_hash_join_buff");
@@ -176,53 +175,35 @@ class PerfectJoinHashTableBuilder {
                           hash_join_invalid_val);
     }
     const bool for_semi_join = for_semi_anti_join(join_type);
-    std::atomic<int> err{0};
     {
       auto timer_fill =
-          DEBUG_TIMER("CPU One-To-One Perfect-Hash: fill_hash_join_buff_bucketized");
-      for (int thread_idx = 0; thread_idx < thread_count; ++thread_idx) {
-        init_cpu_buff_threads.emplace_back([hash_join_invalid_val,
-                                            &join_column,
-                                            str_proxy_translation_map,
-                                            thread_idx,
-                                            thread_count,
-                                            type,
-                                            &err,
-                                            &col_range,
-                                            &is_bitwise_eq,
-                                            &for_semi_join,
-                                            cpu_hash_table_buff,
-                                            hash_entry_info] {
-          int partial_err = fill_hash_join_buff_bucketized(
-              cpu_hash_table_buff,
-              hash_join_invalid_val,
-              for_semi_join,
-              join_column,
-              {static_cast<size_t>(type->size()),
-               col_range.getIntMin(),
-               col_range.getIntMax(),
-               inline_fixed_encoding_null_value(type),
-               is_bitwise_eq,
-               col_range.getIntMax() + 1,
-               get_join_column_type_kind(type)},
-              str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
-              str_proxy_translation_map ? str_proxy_translation_map->domainStart()
-                                        : 0,  // 0 is dummy value
-              thread_idx,
-              thread_count,
-              hash_entry_info.bucket_normalization);
-          int zero{0};
-          err.compare_exchange_strong(zero, partial_err);
-        });
+          DEBUG_TIMER("CPU One-To-One Perfect-Hash: fill_hash_join_buff_bucketized_cpu");
+
+      {
+        JoinColumnTypeInfo type_info{static_cast<size_t>(type->size()),
+                                     col_range.getIntMin(),
+                                     col_range.getIntMax(),
+                                     inline_fixed_encoding_null_value(type),
+                                     is_bitwise_eq,
+                                     col_range.getIntMax() + 1,
+                                     get_join_column_type_kind(type)};
+
+        int error = fill_hash_join_buff_bucketized_cpu(
+            cpu_hash_table_buff,
+            hash_join_invalid_val,
+            for_semi_join,
+            join_column,
+            type_info,
+            str_proxy_translation_map ? str_proxy_translation_map->data() : nullptr,
+            str_proxy_translation_map ? str_proxy_translation_map->domainStart()
+                                      : 0,  // 0 is dummy value
+            hash_entry_info.bucket_normalization);
+        if (error) {
+          // Too many hash entries, need to retry with a 1:many table
+          hash_table_ = nullptr;  // clear the hash table buffer
+          throw NeedsOneToManyHash();
+        }
       }
-      for (auto& t : init_cpu_buff_threads) {
-        t.join();
-      }
-    }
-    if (err) {
-      // Too many hash entries, need to retry with a 1:many table
-      hash_table_ = nullptr;  // clear the hash table buffer
-      throw NeedsOneToManyHash();
     }
   }
 
