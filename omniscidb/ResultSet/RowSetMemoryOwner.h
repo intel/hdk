@@ -218,8 +218,7 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     auto it = str_proxy_union_translation_maps_owned_.find(map_key);
     if (it == str_proxy_union_translation_maps_owned_.end()) {
       it = str_proxy_union_translation_maps_owned_
-               .emplace(map_key,
-                        source_proxy->buildUnionTranslationMapToOtherProxy(dest_proxy))
+               .emplace(map_key, source_proxy->buildUnionTranslationMap(dest_proxy))
                .first;
     }
     return &it->second;

@@ -385,9 +385,7 @@ BENCHMARK_DEFINE_F(
       2, true, append_strings_10M_10M_10_randomized_truncated_8M);
   dest_proxy->getOrAddBulk(append_strings_10M_10M_10_randomized_truncated_100);
   for (auto _ : state) {
-    auto id_map = source_proxy->buildUnionTranslationMapToOtherProxy(dest_proxy.get());
-    const size_t num_expected_untranslated_strings =
-        num_elems - first_n_elems - last_n_elems;
+    auto id_map = source_proxy->buildUnionTranslationMap(dest_proxy.get());
   }
 }
 
