@@ -1421,6 +1421,23 @@ void StringDictionary::mergeSortedCache(std::vector<int32_t>& temp_sorted_cache)
   sorted_cache.swap(updated_cache);
 }
 
+std::vector<int32_t> StringDictionary::buildIntersectionTranslationMap(
+    const StringDictionary* dest) const {
+  auto dummy_callback = [](const std::string_view& source_string,
+                           const int32_t source_string_id) { return true; };
+  const size_t num_source_strings = entryCount();
+  const size_t num_dest_strings = dest->entryCount();
+  std::vector<int32_t> translated_ids(num_source_strings);
+  StringDictionaryTranslator::buildDictionaryTranslationMap(this,
+                                                            dest,
+                                                            translated_ids.data(),
+                                                            num_source_strings,
+                                                            num_dest_strings,
+                                                            false,
+                                                            dummy_callback);
+  return translated_ids;
+}
+
 }  // namespace legacy
 
 std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(

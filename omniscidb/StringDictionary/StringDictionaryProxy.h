@@ -87,7 +87,7 @@ class StringDictionaryProxy {
    * @return A std::vector<int32_t> of string ids for both transient and non-transient
    * strings, mapping to their translated string_ids.
    */
-  std::vector<int32_t> buildIntersectionTranslationMapToOtherProxy(
+  std::vector<int32_t> buildIntersectionTranslationMap(
       const StringDictionaryProxy* dest_proxy) const;
 
   std::vector<int32_t> buildUnionTranslationMapToOtherProxy(

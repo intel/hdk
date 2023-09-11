@@ -1001,7 +1001,7 @@ TEST(NestedStringDictionary, BuildTranslationMap) {
                               7}));
 }
 
-TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
+TEST(NestedStringDictionary, BuildIntersectionTranslationMap) {
   // Use existing dictionary from GetBulk
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
@@ -1022,14 +1022,14 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
   {
     // First try to translate to empty dictionary.
     // Should get back all INVALID_STR_IDs
-    std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                source_string_dict->storageEntryCount());
-    std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                dest_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> source_string_dict_proxy =
+        std::make_shared<StringDictionary>(source_string_dict,
+                                           source_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> dest_string_dict_proxy =
+        std::make_shared<StringDictionary>(dest_string_dict,
+                                           dest_string_dict->storageEntryCount());
     const auto str_proxy_translation_map =
-        source_string_dict_proxy->buildIntersectionTranslationMapToOtherProxy(
+        source_string_dict_proxy->buildIntersectionTranslationMap(
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
     const size_t num_ids = str_proxy_translation_map.size();
@@ -1052,12 +1052,12 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
     }
     dest_string_dict->getOrAddBulk(dest_strings, dest_string_ids.data());
 
-    std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                source_string_dict->storageEntryCount());
-    std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                dest_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> source_string_dict_proxy =
+        std::make_shared<StringDictionary>(source_string_dict,
+                                           source_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> dest_string_dict_proxy =
+        std::make_shared<StringDictionary>(dest_string_dict,
+                                           dest_string_dict->storageEntryCount());
 
     constexpr int32_t num_source_proxy_transient_ids{64};
     constexpr int32_t num_dest_proxy_transient_ids{32};
@@ -1074,7 +1074,7 @@ TEST(StringDictionaryProxy, BuildIntersectionTranslationMapToOtherProxy) {
     }
 
     const auto str_proxy_translation_map =
-        source_string_dict_proxy->buildIntersectionTranslationMapToOtherProxy(
+        source_string_dict_proxy->buildIntersectionTranslationMap(
             dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
     const size_t num_ids = str_proxy_translation_map.size();

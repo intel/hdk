@@ -140,6 +140,9 @@ class StringDictionary {
 
   std::vector<std::string> copyStrings(int64_t generation = -1) const;
 
+  std::vector<int32_t> buildIntersectionTranslationMap(
+      const StringDictionary* dest) const;
+
   static constexpr int32_t INVALID_STR_ID = -1;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
   static constexpr size_t MAX_STRCOUNT = (1U << 31) - 1;
