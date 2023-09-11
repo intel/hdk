@@ -90,8 +90,7 @@ class StringDictionaryProxy {
   std::vector<int32_t> buildIntersectionTranslationMap(
       const StringDictionaryProxy* dest_proxy) const;
 
-  std::vector<int32_t> buildUnionTranslationMapToOtherProxy(
-      StringDictionaryProxy* dest_proxy) const;
+  std::vector<int32_t> buildUnionTranslationMap(StringDictionaryProxy* dest_proxy) const;
 
   /**
    * @brief Returns the number of transient string entries for this proxy,

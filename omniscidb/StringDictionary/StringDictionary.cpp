@@ -1438,6 +1438,37 @@ std::vector<int32_t> StringDictionary::buildIntersectionTranslationMap(
   return translated_ids;
 }
 
+std::vector<int32_t> StringDictionary::buildUnionTranslationMap(
+    StringDictionary* dest) const {
+  auto dummy_callback = [](const std::string_view& source_string,
+                           const int32_t source_string_id) { return true; };
+  const size_t num_source_strings = entryCount();
+  const size_t num_dest_strings = dest->entryCount();
+  std::vector<int32_t> translated_ids(num_source_strings);
+  auto num_untranslated_strings =
+      StringDictionaryTranslator::buildDictionaryTranslationMap(this,
+                                                                dest,
+                                                                translated_ids.data(),
+                                                                num_source_strings,
+                                                                num_dest_strings,
+                                                                false,
+                                                                dummy_callback);
+  if (num_untranslated_strings > 0) {
+    // Todo (todd): Add call to fetch string_views (local) or strings (distributed)
+    // for all non-translated ids to avoid string-by-string fetch
+    for (int32_t source_string_id = 0;
+         source_string_id < static_cast<int32_t>(translated_ids.size());
+         ++source_string_id) {
+      if (translated_ids[source_string_id] == StringDictionary::INVALID_STR_ID) {
+        const auto source_string = getStringUnlocked(source_string_id);
+        const auto dest_string_id = dest->getOrAdd(source_string);
+        translated_ids[source_string_id] = dest_string_id;
+      }
+    }
+  }
+  return translated_ids;
+}
+
 }  // namespace legacy
 
 std::vector<int32_t> StringDictionaryTranslator::buildDictionaryTranslationMap(
@@ -1503,8 +1534,9 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
     return num_source_strings;
   }
 
+  size_t base_num_strings_not_translated = 0;
   if (source_dict->base_dict_) {
-    buildDictionaryTranslationMap(
+    base_num_strings_not_translated = buildDictionaryTranslationMap(
         source_dict->base_dict_.get(),
         dest_dict,
         translated_ids,
@@ -1526,7 +1558,7 @@ size_t StringDictionaryTranslator::buildDictionaryTranslationMap(
       tbb::blocked_range<int32_t>(source_dict->base_generation_,
                                   num_source_strings,
                                   target_strings_per_task /* tbb grain_size */),
-      (size_t)0,
+      base_num_strings_not_translated,
       [&](const tbb::blocked_range<int32_t>& r, size_t num_strings_not_translated) {
         const int32_t start_idx = r.begin();
         const int32_t end_idx = r.end();
