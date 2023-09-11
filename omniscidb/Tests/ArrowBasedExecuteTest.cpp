@@ -17458,8 +17458,6 @@ TEST_F(Select, StringFromEliminatedColumn) {
         "  GROUP BY plane_model"
         ") ORDER BY plane_model;";
     c(select, dt);
-    // Previously triggered:
-    // StringDictionaryProxy.cpp:68 Check failed: generation_ >= 0 (-1 >= 0)
     c("SELECT str FROM ("
       " SELECT str, COUNT(str IN (SELECT str FROM test WHERE ss = 'fish')) AS mycolumn"
       " FROM test"

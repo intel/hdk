@@ -32,7 +32,7 @@
 #include "Shared/approx_quantile.h"
 #include "Shared/quantile.h"
 #include "Shared/thread_count.h"
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 #include "ThirdParty/robin_hood.h"
 
 class ResultSet;
@@ -176,26 +176,25 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     return &arrays_.back();
   }
 
-  StringDictionaryProxy* addStringDict(std::shared_ptr<StringDictionary> str_dict,
-                                       const int dict_id,
-                                       const int64_t generation) {
+  StringDictionary* addStringDict(std::shared_ptr<StringDictionary> str_dict,
+                                  const int dict_id,
+                                  const int64_t generation) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     auto it = str_dict_proxy_owned_.find(dict_id);
     if (it != str_dict_proxy_owned_.end()) {
       CHECK_EQ(it->second->getBaseDictionary(), str_dict.get());
-      it->second->updateGeneration(generation);
+      CHECK(generation < 0 || it->second->getBaseGeneration() == generation);
       return it->second.get();
     }
     it = str_dict_proxy_owned_
-             .emplace(dict_id,
-                      std::make_shared<StringDictionaryProxy>(str_dict, generation))
+             .emplace(dict_id, std::make_shared<StringDictionary>(str_dict, generation))
              .first;
     return it->second.get();
   }
 
   const std::vector<int32_t>* addStringProxyIntersectionTranslationMap(
-      const StringDictionaryProxy* source_proxy,
-      const StringDictionaryProxy* dest_proxy) {
+      const StringDictionary* source_proxy,
+      const StringDictionary* dest_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     const auto map_key = std::make_pair(source_proxy->getBaseDictionary()->getDictId(),
                                         dest_proxy->getBaseDictionary()->getDictId());
@@ -210,8 +209,8 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   }
 
   const std::vector<int32_t>* addStringProxyUnionTranslationMap(
-      const StringDictionaryProxy* source_proxy,
-      StringDictionaryProxy* dest_proxy) {
+      const StringDictionary* source_proxy,
+      StringDictionary* dest_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     const auto map_key = std::make_pair(source_proxy->getBaseDictionary()->getDictId(),
                                         dest_proxy->getBaseDictionary()->getDictId());
@@ -224,23 +223,22 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
     return &it->second;
   }
 
-  StringDictionaryProxy* getStringDictProxy(const int dict_id) const {
+  StringDictionary* getStringDictProxy(const int dict_id) const {
     std::lock_guard<std::mutex> lock(state_mutex_);
     auto it = str_dict_proxy_owned_.find(dict_id);
     CHECK(it != str_dict_proxy_owned_.end());
     return it->second.get();
   }
 
-  StringDictionaryProxy* getOrAddStringDictProxy(const int dict_id_in,
-                                                 const int64_t generation = -1);
+  StringDictionary* getOrAddStringDictProxy(const int dict_id_in,
+                                            const int64_t generation = -1);
 
-  void addLiteralStringDictProxy(
-      std::shared_ptr<StringDictionaryProxy> lit_str_dict_proxy) {
+  void addLiteralStringDictProxy(std::shared_ptr<StringDictionary> lit_str_dict_proxy) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     lit_str_dict_proxy_ = lit_str_dict_proxy;
   }
 
-  StringDictionaryProxy* getLiteralStringDictProxy() const {
+  StringDictionary* getLiteralStringDictProxy() const {
     std::lock_guard<std::mutex> lock(state_mutex_);
     return lit_str_dict_proxy_.get();
   }
@@ -290,12 +288,12 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
   std::vector<void*> varlen_buffers_;
   std::list<std::string> strings_;
   std::list<std::vector<int64_t>> arrays_;
-  std::unordered_map<int, std::shared_ptr<StringDictionaryProxy>> str_dict_proxy_owned_;
+  std::unordered_map<int, std::shared_ptr<StringDictionary>> str_dict_proxy_owned_;
   std::map<std::pair<int, int>, std::vector<int32_t>>
       str_proxy_intersection_translation_maps_owned_;
   std::map<std::pair<int, int>, std::vector<int32_t>>
       str_proxy_union_translation_maps_owned_;
-  std::shared_ptr<StringDictionaryProxy> lit_str_dict_proxy_;
+  std::shared_ptr<StringDictionary> lit_str_dict_proxy_;
   std::vector<void*> col_buffers_;
   std::vector<Data_Namespace::AbstractBuffer*> varlen_input_buffers_;
   std::vector<std::unique_ptr<quantile::TDigest>> t_digests_;

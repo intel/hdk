@@ -32,6 +32,7 @@
 #include "ResultSet/ResultSetStorage.h"
 #include "ResultSet/TargetValue.h"
 #include "Shared/approx_quantile.h"
+#include "StringDictionary/StringDictionary.h"
 
 #include <boost/optional/optional_io.hpp>
 
@@ -93,7 +94,6 @@ struct OrderEntry;
 }  // namespace hdk::ir
 
 class RowSetMemoryOwner;
-class StringDictionaryProxy;
 class ResultSet;
 
 class ResultSetRowIterator {
@@ -516,7 +516,7 @@ class ResultSet {
   const std::pair<std::vector<int32_t>, std::vector<std::string>>
   getUniqueStringsForDictEncodedTargetCol(const size_t col_idx) const;
 
-  StringDictionaryProxy* getStringDictionaryProxy(int const dict_id) const;
+  StringDictionary* getStringDictionaryProxy(int const dict_id) const;
 
   template <typename ENTRY_TYPE, QueryDescriptionType QUERY_TYPE, bool COLUMNAR_FORMAT>
   ENTRY_TYPE getEntryAt(const size_t row_idx,

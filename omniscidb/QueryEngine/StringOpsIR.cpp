@@ -38,8 +38,7 @@ extern "C" RUNTIME_EXPORT uint64_t string_decompress(const int32_t string_id,
   if (string_id == NULL_INT) {
     return 0;
   }
-  auto string_dict_proxy =
-      reinterpret_cast<const StringDictionaryProxy*>(string_dict_handle);
+  auto string_dict_proxy = reinterpret_cast<const StringDictionary*>(string_dict_handle);
   auto string_bytes = string_dict_proxy->getStringBytes(string_id);
   CHECK(string_bytes.first);
   return (reinterpret_cast<uint64_t>(string_bytes.first) & 0xffffffffffff) |
@@ -50,15 +49,14 @@ extern "C" RUNTIME_EXPORT int32_t string_compress(const int64_t ptr_and_len,
                                                   const int64_t string_dict_handle) {
   std::string raw_str(reinterpret_cast<char*>(extract_str_ptr_noinline(ptr_and_len)),
                       extract_str_len_noinline(ptr_and_len));
-  auto string_dict_proxy =
-      reinterpret_cast<const StringDictionaryProxy*>(string_dict_handle);
+  auto string_dict_proxy = reinterpret_cast<const StringDictionary*>(string_dict_handle);
   return string_dict_proxy->getIdOfString(raw_str);
 }
 
 extern "C" RUNTIME_EXPORT int32_t lower_encoded(int32_t string_id,
                                                 int64_t string_dict_proxy_address) {
-  StringDictionaryProxy* string_dict_proxy =
-      reinterpret_cast<StringDictionaryProxy*>(string_dict_proxy_address);
+  StringDictionary* string_dict_proxy =
+      reinterpret_cast<StringDictionary*>(string_dict_proxy_address);
   auto str = string_dict_proxy->getString(string_id);
   return string_dict_proxy->getOrAdd(boost::locale::to_lower(str));
 }
@@ -224,7 +222,7 @@ llvm::Value* CodeGenerator::codegenDictLike(const hdk::ir::ExprPtr like_arg,
 
 namespace {
 
-std::vector<int32_t> get_compared_ids(const StringDictionaryProxy* dict,
+std::vector<int32_t> get_compared_ids(const StringDictionary* dict,
                                       hdk::ir::OpType compare_operator,
                                       const std::string& pattern) {
   std::vector<int> ret;

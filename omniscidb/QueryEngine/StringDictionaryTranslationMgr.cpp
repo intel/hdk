@@ -32,7 +32,7 @@
 #include "Analyzer/Analyzer.h"
 #include "RuntimeFunctions.h"
 #include "Shared/checked_alloc.h"
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 
 #include <tbb/parallel_for.h>
 

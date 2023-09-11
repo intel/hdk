@@ -490,10 +490,9 @@ bool exprs_share_one_and_same_rte_idx(const hdk::ir::ExprPtr& lhs_expr,
   return collector.result().size() == 1ULL;
 }
 
-const hdk::ir::Type* get_str_dict_cast_type(
-    const hdk::ir::Type* lhs_type,
-    const hdk::ir::Type* rhs_type,
-    const StringDictionaryProxyProvider* executor) {
+const hdk::ir::Type* get_str_dict_cast_type(const hdk::ir::Type* lhs_type,
+                                            const hdk::ir::Type* rhs_type,
+                                            const StringDictionaryProvider* executor) {
   CHECK(lhs_type->isExtDictionary());
   CHECK(rhs_type->isExtDictionary());
   const auto lhs_dict_id = lhs_type->as<hdk::ir::ExtDictionaryType>()->dictId();
@@ -512,14 +511,14 @@ const hdk::ir::Type* get_str_dict_cast_type(
   }
   // If here then neither lhs or rhs type was transient, we should see which
   // type has the largest dictionary and make that the destination type
-  const auto lhs_sdp = executor->getStringDictionaryProxy(lhs_dict_id, true);
-  const auto rhs_sdp = executor->getStringDictionaryProxy(rhs_dict_id, true);
+  const auto lhs_sdp = executor->getStringDictionary(lhs_dict_id, true);
+  const auto rhs_sdp = executor->getStringDictionary(rhs_dict_id, true);
   return lhs_sdp->entryCount() >= rhs_sdp->entryCount() ? lhs_type : rhs_type;
 }
 
 const hdk::ir::Type* common_string_type(const hdk::ir::Type* type1,
                                         const hdk::ir::Type* type2,
-                                        const StringDictionaryProxyProvider* executor) {
+                                        const StringDictionaryProvider* executor) {
   auto& ctx = type1->ctx();
   const hdk::ir::Type* common_type;
   auto nullable = type1->nullable() || type2->nullable();
@@ -550,7 +549,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
                                    hdk::ir::Qualifier qual,
                                    hdk::ir::ExprPtr left_expr,
                                    hdk::ir::ExprPtr right_expr,
-                                   const StringDictionaryProxyProvider* executor) {
+                                   const StringDictionaryProvider* executor) {
   if ((left_expr->type()->isDate() &&
        left_expr->type()->as<hdk::ir::DateType>()->unit() == hdk::ir::TimeUnit::kDay) ||
       (right_expr->type()->isDate() &&
@@ -669,7 +668,7 @@ hdk::ir::ExprPtr normalizeOperExpr(const hdk::ir::OpType optype,
 hdk::ir::ExprPtr normalizeCaseExpr(
     const std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>>& expr_pair_list,
     const hdk::ir::ExprPtr else_e_in,
-    const StringDictionaryProxyProvider* executor) {
+    const StringDictionaryProvider* executor) {
   std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>> cast_expr_pair_list =
       expr_pair_list;
   const hdk::ir::Type* type = nullptr;

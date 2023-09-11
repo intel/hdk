@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "Shared/funcannotations.h"
+#define STRINGDICTIONARY_EXPORT RUNTIME_EXPORT
+
+#include "StringDictionary/StringDictionary.h"
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>

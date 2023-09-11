@@ -22,7 +22,7 @@
 
 class TransientStringLiteralsVisitor : public hdk::ir::ExprVisitor<void> {
  public:
-  TransientStringLiteralsVisitor(StringDictionaryProxy* sdp, Executor* executor)
+  TransientStringLiteralsVisitor(StringDictionary* sdp, Executor* executor)
       : sdp_(sdp), executor_(executor) {
     CHECK(sdp);
   }
@@ -79,7 +79,7 @@ class TransientStringLiteralsVisitor : public hdk::ir::ExprVisitor<void> {
   }
 
  protected:
-  StringDictionaryProxy* sdp_;
+  StringDictionary* sdp_;
   Executor* executor_;
 };
 

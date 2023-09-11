@@ -459,8 +459,8 @@ void fill_dictionary_encoded_in_vals(
     std::atomic<size_t>& total_in_vals_count,
     const ResultSet* values_rowset,
     const std::pair<int64_t, int64_t> values_rowset_slice,
-    const StringDictionaryProxy* source_dict,
-    const StringDictionaryProxy* dest_dict,
+    const StringDictionary* source_dict,
+    const StringDictionary* dest_dict,
     const int64_t needle_null_val,
     bool enable_watchdog) {
   CHECK(in_vals.empty());

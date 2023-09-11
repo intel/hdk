@@ -38,7 +38,7 @@ int64_t StringDictionaryGenerations::getGeneration(const uint32_t id) const {
     return 0;
   }
   // This happens when the query didn't need to do any translation from string
-  // to id. Return an invalid generation and StringDictionaryProxy will assert
+  // to id. Return an invalid generation and StringDictionary will assert
   // the methods which require a generation (the ones which go from string to id)
   // are called on it if it has an invalid generation, only the id from string
   // direction is allowed in such cases. Once a query finishes its effective

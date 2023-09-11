@@ -8,7 +8,6 @@
 
 #include "Logger/Logger.h"
 #include "StringDictionary/StringDictionary.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -40,10 +39,8 @@ inline int64_t translate_str_id_to_outer_dict(const int64_t elem,
                                               const void* sd_inner_proxy,
                                               const void* sd_outer_proxy) {
   CHECK(sd_outer_proxy);
-  const auto sd_inner_dict_proxy =
-      static_cast<const StringDictionaryProxy*>(sd_inner_proxy);
-  const auto sd_outer_dict_proxy =
-      static_cast<const StringDictionaryProxy*>(sd_outer_proxy);
+  const auto sd_inner_dict_proxy = static_cast<const StringDictionary*>(sd_inner_proxy);
+  const auto sd_outer_dict_proxy = static_cast<const StringDictionary*>(sd_outer_proxy);
   const auto elem_str = sd_inner_dict_proxy->getString(elem);
   const auto outer_id = sd_outer_dict_proxy->getIdOfString(elem_str);
   if (outer_id > max_elem || outer_id < min_elem) {

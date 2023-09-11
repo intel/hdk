@@ -20,6 +20,7 @@
 #include "../Shared/mapd_shared_mutex.h"
 #include "DictRef.h"
 #include "DictionaryCache.hpp"
+#include "Logger/Logger.h"
 
 #include <functional>
 #include <future>
@@ -30,6 +31,10 @@
 #include <vector>
 
 #define USE_LEGACY_STR_DICT
+
+#ifndef STRINGDICTIONARY_EXPORT
+#define STRINGDICTIONARY_EXPORT EXTERN
+#endif
 
 extern bool g_enable_stringdict_parallel;
 
@@ -410,5 +415,11 @@ class StringDictionary {
 };
 
 }  // namespace fast
+
+class StringDictionaryProvider {
+ public:
+  virtual StringDictionary* getStringDictionary(const int dict_id,
+                                                const bool with_generation) const = 0;
+};
 
 #endif  // STRINGDICTIONARY_STRINGDICTIONARY_H

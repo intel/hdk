@@ -22,7 +22,7 @@
 #include "Shared/DateConverters.h"
 #include "Shared/thread_count.h"
 #include "Shared/toString.h"
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 
 //  arrow headers
 #include "arrow/api.h"
