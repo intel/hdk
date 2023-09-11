@@ -307,23 +307,24 @@ std::shared_ptr<HashJoin> HashJoin::getInstance(
   return join_hash_table;
 }
 
-std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
-HashJoin::getStrDictProxies(const InnerOuter& cols, const Executor* executor) {
+std::pair<const StringDictionary*, const StringDictionary*> HashJoin::getStrDictProxies(
+    const InnerOuter& cols,
+    const Executor* executor) {
   const auto inner_col = cols.first;
   CHECK(inner_col);
   auto inner_type = inner_col->type();
   const auto outer_col = dynamic_cast<const hdk::ir::ColumnVar*>(cols.second);
-  std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
+  std::pair<const StringDictionary*, const StringDictionary*>
       inner_outer_str_dict_proxies{nullptr, nullptr};
   if (inner_type->isExtDictionary() && outer_col) {
     CHECK(outer_col->type()->isExtDictionary());
     auto inner_dict_id = inner_type->as<hdk::ir::ExtDictionaryType>()->dictId();
     auto outer_dict_id = outer_col->type()->as<hdk::ir::ExtDictionaryType>()->dictId();
     inner_outer_str_dict_proxies.first =
-        executor->getStringDictionaryProxy(inner_dict_id, true);
+        executor->getStringDictionary(inner_dict_id, true);
     CHECK(inner_outer_str_dict_proxies.first);
     inner_outer_str_dict_proxies.second =
-        executor->getStringDictionaryProxy(outer_dict_id, true);
+        executor->getStringDictionary(outer_dict_id, true);
     CHECK(inner_outer_str_dict_proxies.second);
     if (*inner_outer_str_dict_proxies.first == *inner_outer_str_dict_proxies.second) {
       // Dictionaries are the same - don't need to translate
@@ -431,9 +432,9 @@ std::vector<const std::vector<int32_t>*> HashJoin::translateCompositeStrDictProx
         inner_proxies[proxy_pair_idx] && outer_proxies[proxy_pair_idx];
     if (translate_proxies) {
       const auto inner_proxy =
-          reinterpret_cast<const StringDictionaryProxy*>(inner_proxies[proxy_pair_idx]);
+          reinterpret_cast<const StringDictionary*>(inner_proxies[proxy_pair_idx]);
       const auto outer_proxy =
-          reinterpret_cast<const StringDictionaryProxy*>(outer_proxies[proxy_pair_idx]);
+          reinterpret_cast<const StringDictionary*>(outer_proxies[proxy_pair_idx]);
       CHECK(inner_proxy);
       CHECK(outer_proxy);
 

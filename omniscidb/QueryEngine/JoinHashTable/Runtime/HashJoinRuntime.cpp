@@ -32,7 +32,6 @@
 #include "QueryEngine/RuntimeFunctions.h"
 #include "Shared/likely.h"
 #include "StringDictionary/StringDictionary.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 
 #ifndef _MSC_VER
 #include <x86intrin.h>

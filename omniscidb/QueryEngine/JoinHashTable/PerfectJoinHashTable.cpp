@@ -266,11 +266,9 @@ bool needs_dictionary_translation(const hdk::ir::ColumnVar* inner_col,
 
   auto inner_dict_id = inner_type->as<hdk::ir::ExtDictionaryType>()->dictId();
   auto outer_dict_id = outer_type->as<hdk::ir::ExtDictionaryType>()->dictId();
-  const auto inner_str_dict_proxy =
-      executor->getStringDictionaryProxy(inner_dict_id, true);
+  const auto inner_str_dict_proxy = executor->getStringDictionary(inner_dict_id, true);
   CHECK(inner_str_dict_proxy);
-  const auto outer_str_dict_proxy =
-      executor->getStringDictionaryProxy(outer_dict_id, true);
+  const auto outer_str_dict_proxy = executor->getStringDictionary(outer_dict_id, true);
   CHECK(outer_str_dict_proxy);
 
   return *inner_str_dict_proxy != *outer_str_dict_proxy;

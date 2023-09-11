@@ -779,7 +779,7 @@ TargetValue build_string_array_target_value(
         values.emplace_back(NullableString(nullptr));
       } else {
         if (dict_id == 0) {
-          StringDictionaryProxy* sdp = row_set_mem_owner->getLiteralStringDictProxy();
+          StringDictionary* sdp = row_set_mem_owner->getLiteralStringDictProxy();
           values.emplace_back(sdp->getString(string_id));
         } else {
           values.emplace_back(NullableString(
@@ -1364,7 +1364,7 @@ TargetValue ResultSet::makeTargetValue(const int8_t* ptr,
           NULL_INT) {  // TODO(alex): this isn't nice, fix it
         return NullableString(nullptr);
       }
-      StringDictionaryProxy* sdp{nullptr};
+      StringDictionary* sdp{nullptr};
       auto dict_id = chosen_type->as<hdk::ir::ExtDictionaryType>()->dictId();
       if (!dict_id) {
         sdp = row_set_mem_owner_->getLiteralStringDictProxy();

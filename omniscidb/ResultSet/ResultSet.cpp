@@ -489,7 +489,7 @@ std::string ResultSet::colName(size_t col_idx) const {
   }
 }
 
-StringDictionaryProxy* ResultSet::getStringDictionaryProxy(int const dict_id) const {
+StringDictionary* ResultSet::getStringDictionaryProxy(int const dict_id) const {
   return row_set_mem_owner_->getOrAddStringDictProxy(dict_id);
 }
 

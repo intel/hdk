@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 #include "TestHelpers.h"
 
 #include <benchmark/benchmark.h>
@@ -128,23 +128,21 @@ std::shared_ptr<StringDictionary> create_and_populate_str_dict(
   return string_dict;
 }
 
-std::shared_ptr<StringDictionaryProxy> create_str_proxy(const int32_t dict_id,
-                                                        const bool materialize_hashes) {
+std::shared_ptr<StringDictionary> create_str_proxy(const int32_t dict_id,
+                                                   const bool materialize_hashes) {
   auto string_dict = create_str_dict(dict_id, materialize_hashes);
-  std::shared_ptr<StringDictionaryProxy> string_proxy =
-      std::make_shared<StringDictionaryProxy>(string_dict,
-                                              string_dict->storageEntryCount());
+  std::shared_ptr<StringDictionary> string_proxy =
+      std::make_shared<StringDictionary>(string_dict, string_dict->storageEntryCount());
   return string_proxy;
 }
 
-std::shared_ptr<StringDictionaryProxy> create_and_populate_str_proxy(
+std::shared_ptr<StringDictionary> create_and_populate_str_proxy(
     const int32_t dict_id,
     const bool materialize_hashes,
     const std::vector<std::string>& strings) {
   auto string_dict = create_and_populate_str_dict(dict_id, materialize_hashes, strings);
-  std::shared_ptr<StringDictionaryProxy> string_proxy =
-      std::make_shared<StringDictionaryProxy>(string_dict,
-                                              string_dict->storageEntryCount());
+  std::shared_ptr<StringDictionary> string_proxy =
+      std::make_shared<StringDictionary>(string_dict, string_dict->storageEntryCount());
   return string_proxy;
 }
 

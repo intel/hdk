@@ -872,7 +872,7 @@ void test_iterate(const std::vector<TargetInfo>& target_infos,
                   const QueryMemoryDescriptor& query_mem_desc) {
   auto row_set_mem_owner = std::make_shared<RowSetMemoryOwner>(
       g_data_provider.get(), Executor::getArenaBlockSize());
-  StringDictionaryProxy* sdp =
+  StringDictionary* sdp =
       row_set_mem_owner->addStringDict(g_sd, 1, g_sd->storageEntryCount());
   ResultSet result_set(target_infos,
                        ExecutorDeviceType::CPU,

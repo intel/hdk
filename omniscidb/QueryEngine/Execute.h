@@ -77,7 +77,6 @@
 #include "Shared/toString.h"
 #include "StringDictionary/LruCache.hpp"
 #include "StringDictionary/StringDictionary.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 
 #include "CostModel/CostModel.h"
 
@@ -227,7 +226,7 @@ struct StreamExecutionContext {
       : ra_exe_unit(ra_exe_unit), co(co), eo(eo) {}
 };
 
-class Executor : public StringDictionaryProxyProvider {
+class Executor : public StringDictionaryProvider {
   static_assert(sizeof(float) == 4 && sizeof(double) == 8,
                 "Host hardware not supported, unexpected size of float / double.");
   static_assert(sizeof(time_t) == 8,
@@ -292,14 +291,13 @@ class Executor : public StringDictionaryProxyProvider {
   /**
    * Returns a string dictionary proxy using the currently active row set memory owner.
    */
-  virtual StringDictionaryProxy* getStringDictionaryProxy(
-      const int dict_id,
-      const bool with_generation) const {
+  virtual StringDictionary* getStringDictionary(const int dict_id,
+                                                const bool with_generation) const {
     CHECK(row_set_mem_owner_);
     return getStringDictionaryProxy(dict_id, row_set_mem_owner_, with_generation);
   }
 
-  StringDictionaryProxy* getStringDictionaryProxy(
+  StringDictionary* getStringDictionaryProxy(
       const int dictId,
       const std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
       const bool with_generation) const;
@@ -312,8 +310,8 @@ class Executor : public StringDictionaryProxyProvider {
       const bool with_generation) const;
 
   const std::vector<int32_t>* getIntersectionStringProxyTranslationMap(
-      const StringDictionaryProxy* source_proxy,
-      const StringDictionaryProxy* dest_proxy,
+      const StringDictionary* source_proxy,
+      const StringDictionary* dest_proxy,
       std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) const;
 
   bool isCPUOnly() const;

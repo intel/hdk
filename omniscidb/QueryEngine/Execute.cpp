@@ -444,7 +444,7 @@ size_t Executor::getArenaBlockSize() {
   return g_is_test_env ? 100000000 : (1UL << 32) + kArenaBlockOverhead;
 }
 
-StringDictionaryProxy* Executor::getStringDictionaryProxy(
+StringDictionary* Executor::getStringDictionaryProxy(
     const int dict_id_in,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner,
     const bool with_generation) const {
@@ -474,8 +474,8 @@ const std::vector<int32_t>* Executor::getStringProxyTranslationMap(
 }
 
 const std::vector<int32_t>* Executor::getIntersectionStringProxyTranslationMap(
-    const StringDictionaryProxy* source_proxy,
-    const StringDictionaryProxy* dest_proxy,
+    const StringDictionary* source_proxy,
+    const StringDictionary* dest_proxy,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) const {
   CHECK(row_set_mem_owner);
   std::lock_guard<std::mutex> lock(
