@@ -201,11 +201,10 @@ class RowSetMemoryOwner final : public SimpleAllocator, boost::noncopyable {
                                         dest_proxy->getBaseDictionary()->getDictId());
     auto it = str_proxy_intersection_translation_maps_owned_.find(map_key);
     if (it == str_proxy_intersection_translation_maps_owned_.end()) {
-      it = str_proxy_intersection_translation_maps_owned_
-               .emplace(
-                   map_key,
-                   source_proxy->buildIntersectionTranslationMapToOtherProxy(dest_proxy))
-               .first;
+      it =
+          str_proxy_intersection_translation_maps_owned_
+              .emplace(map_key, source_proxy->buildIntersectionTranslationMap(dest_proxy))
+              .first;
     }
     return &it->second;
   }

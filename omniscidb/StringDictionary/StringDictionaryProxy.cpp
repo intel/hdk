@@ -277,7 +277,7 @@ void order_translation_locks(const int32_t source_dict_id,
   }
 }
 
-std::vector<int32_t> StringDictionaryProxy::buildIntersectionTranslationMapToOtherProxy(
+std::vector<int32_t> StringDictionaryProxy::buildIntersectionTranslationMap(
     const StringDictionaryProxy* dest_proxy) const {
   const auto source_dict_id = string_dict_->getDictId();
   const auto dest_dict_id = dest_proxy->string_dict_->getDictId();
