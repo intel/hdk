@@ -292,7 +292,7 @@ std::vector<int32_t> StringDictionaryProxy::buildIntersectionTranslationMap(
                                                              num_strings_not_translated);
 }
 
-std::vector<int32_t> StringDictionaryProxy::buildUnionTranslationMapToOtherProxy(
+std::vector<int32_t> StringDictionaryProxy::buildUnionTranslationMap(
     StringDictionaryProxy* dest_proxy) const {
   auto timer = DEBUG_TIMER(__func__);
 

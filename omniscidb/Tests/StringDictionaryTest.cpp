@@ -1099,7 +1099,7 @@ TEST(NestedStringDictionary, BuildIntersectionTranslationMap) {
   }
 }
 
-TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
+TEST(NestedStringDictionary, BuildUnionTranslationMap_Empty) {
   // Todo(todd): Migrate this and intersection translation tests to use
   // approach and methods in BuildUnionTranslationMapToPartialOverlapProxy
   const DictRef dict_ref1(-1, 1);
@@ -1122,15 +1122,14 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToEmptyProxy) {
     // First try to union translate to empty dictionary.
     // All strings should end up as transient entries in
     // destination proxy
-    std::shared_ptr<StringDictionaryProxy> source_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(source_string_dict,
-                                                source_string_dict->storageEntryCount());
-    std::shared_ptr<StringDictionaryProxy> dest_string_dict_proxy =
-        std::make_shared<StringDictionaryProxy>(dest_string_dict,
-                                                dest_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> source_string_dict_proxy =
+        std::make_shared<StringDictionary>(source_string_dict,
+                                           source_string_dict->storageEntryCount());
+    std::shared_ptr<StringDictionary> dest_string_dict_proxy =
+        std::make_shared<StringDictionary>(dest_string_dict,
+                                           dest_string_dict->storageEntryCount());
     const auto str_proxy_translation_map =
-        source_string_dict_proxy->buildUnionTranslationMapToOtherProxy(
-            dest_string_dict_proxy.get());
+        source_string_dict_proxy->buildUnionTranslationMap(dest_string_dict_proxy.get());
     ASSERT_FALSE(str_proxy_translation_map.empty());
     const size_t num_ids = str_proxy_translation_map.size();
     ASSERT_EQ(num_ids, source_string_dict_proxy->entryCount());
@@ -1160,7 +1159,7 @@ std::vector<std::string> add_strings_numeric_range(std::shared_ptr<StringDiction
   return strings;
 }
 
-std::vector<std::string> add_strings_numeric_range(StringDictionaryProxy& sdp,
+std::vector<std::string> add_strings_numeric_range(StringDictionary& sdp,
                                                    const size_t num_vals,
                                                    const int32_t start_val) {
   CHECK_GE(start_val, sdp.getBaseGeneration());
@@ -1173,8 +1172,8 @@ std::vector<std::string> add_strings_numeric_range(StringDictionaryProxy& sdp,
   return strings;
 }
 
-void verify_translation(const StringDictionaryProxy& source_proxy,
-                        const StringDictionaryProxy& dest_proxy,
+void verify_translation(const StringDictionary& source_proxy,
+                        const StringDictionary& dest_proxy,
                         const std::vector<int32_t>& id_map,
                         const std::vector<std::string>& persisted_source_strings,
                         const std::vector<std::string>& transient_source_strings,
@@ -1210,7 +1209,7 @@ void verify_translation(const StringDictionaryProxy& source_proxy,
   }
 }
 
-TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
+TEST(NestedStringDictionary, BuildUnionTranslationMap_PartialOverlap) {
   const DictRef dict_ref1(-1, 1);
   const DictRef dict_ref2(-1, 2);
   std::shared_ptr<StringDictionary> source_sd =
@@ -1235,23 +1234,25 @@ TEST(StringDictionaryProxy, BuildUnionTranslationMapToPartialOverlapProxy) {
       dest_sd, num_dest_persisted_entries, dest_persisted_start_val);
   ASSERT_EQ(dest_sd->storageEntryCount(), num_dest_persisted_entries);
 
-  StringDictionaryProxy source_sdp(source_sd, source_sd->storageEntryCount());
-  StringDictionaryProxy dest_sdp(dest_sd, dest_sd->storageEntryCount());
+  StringDictionary source_sdp(source_sd, source_sd->storageEntryCount());
+  StringDictionary dest_sdp(dest_sd, dest_sd->storageEntryCount());
   const auto transient_source_strings = add_strings_numeric_range(
       source_sdp, num_source_transient_entries, source_transient_start_val);
   ASSERT_EQ(source_sdp.getBaseDictionary()->getDictId(), 1);
   ASSERT_EQ(source_sdp.getBaseDictionary()->storageEntryCount(),
             num_source_persisted_entries);
-  ASSERT_EQ(source_sdp.transientEntryCount(), num_source_transient_entries);
+  ASSERT_EQ(source_sdp.entryCount() - source_sdp.getBaseGeneration(),
+            num_source_transient_entries);
 
   const auto transient_dest_strings = add_strings_numeric_range(
       dest_sdp, num_dest_transient_entries, dest_transient_start_val);
   ASSERT_EQ(dest_sdp.getBaseDictionary()->getDictId(), 2);
   ASSERT_EQ(dest_sdp.getBaseDictionary()->storageEntryCount(),
             num_dest_persisted_entries);
-  ASSERT_EQ(dest_sdp.transientEntryCount(), num_dest_transient_entries);
+  ASSERT_EQ(dest_sdp.entryCount() - dest_sdp.getBaseGeneration(),
+            num_dest_transient_entries);
 
-  const auto id_map = source_sdp.buildUnionTranslationMapToOtherProxy(&dest_sdp);
+  const auto id_map = source_sdp.buildUnionTranslationMap(&dest_sdp);
   ASSERT_EQ(id_map.size(), num_source_persisted_entries + num_source_transient_entries);
 
   verify_translation(source_sdp,

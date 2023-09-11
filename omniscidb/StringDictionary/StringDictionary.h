@@ -142,6 +142,7 @@ class StringDictionary {
 
   std::vector<int32_t> buildIntersectionTranslationMap(
       const StringDictionary* dest) const;
+  std::vector<int32_t> buildUnionTranslationMap(StringDictionary* dest) const;
 
   static constexpr int32_t INVALID_STR_ID = -1;
   static constexpr size_t MAX_STRLEN = (1 << 15) - 1;
