@@ -125,6 +125,35 @@ StringDictionary::StringDictionary(std::shared_ptr<StringDictionary> base_dict,
     , payload_file_off_(0)
     , strings_cache_(nullptr) {}
 
+bool StringDictionary::operator==(StringDictionary const& rhs) const {
+  if (base_dict_ != rhs.base_dict_ || base_generation_ != rhs.base_generation_) {
+    return false;
+  }
+
+  const bool this_dict_is_locked_first = this < &rhs;
+  mapd_shared_lock<mapd_shared_mutex> first_read_lock(
+      this_dict_is_locked_first ? rw_mutex_ : rhs.rw_mutex_);
+  mapd_shared_lock<mapd_shared_mutex> second_read_lock(
+      this_dict_is_locked_first ? rhs.rw_mutex_ : rw_mutex_);
+
+  if (str_count_ != rhs.str_count_) {
+    return false;
+  }
+
+  for (auto str_id = base_generation_; str_id < static_cast<int64_t>(str_count_);
+       ++str_id) {
+    if (getOwnedStringChecked(str_id) != rhs.getOwnedStringChecked(str_id)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool StringDictionary::operator!=(StringDictionary const& rhs) const {
+  return !operator==(rhs);
+}
+
 namespace {
 class MapMaker : public StringDictionary::StringCallback {
   std::unordered_map<std::string, int32_t> map_;
@@ -626,6 +655,16 @@ std::string StringDictionary::getString(int32_t string_id) const {
   }
   mapd_shared_lock<mapd_shared_mutex> read_lock(rw_mutex_);
   return getOwnedStringChecked(string_id);
+}
+
+std::vector<std::string> StringDictionary::getStrings(
+    const std::vector<int32_t>& string_ids) const {
+  std::vector<std::string> strings;
+  strings.reserve(string_ids.size());
+  for (auto id : string_ids) {
+    strings.emplace_back(getString(id));
+  }
+  return strings;
 }
 
 std::string StringDictionary::getStringUnlocked(int32_t string_id) const noexcept {

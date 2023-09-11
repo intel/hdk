@@ -88,6 +88,9 @@ class StringDictionary {
   StringDictionary* getBaseDictionary() const noexcept { return base_dict_.get(); }
   int64_t getBaseGeneration() const noexcept { return base_generation_; }
 
+  bool operator==(StringDictionary const&) const;
+  bool operator!=(StringDictionary const&) const;
+
   class StringCallback {
    public:
     virtual ~StringCallback() = default;
@@ -117,6 +120,7 @@ class StringDictionary {
   template <class String>
   int32_t getIdOfString(const String&) const;
   std::string getString(int32_t string_id) const;
+  std::vector<std::string> getStrings(const std::vector<int32_t>& string_ids) const;
   std::pair<char*, size_t> getStringBytes(int32_t string_id) const noexcept;
   size_t storageEntryCount() const;
   size_t entryCount() const;
