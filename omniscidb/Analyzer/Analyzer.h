@@ -27,7 +27,7 @@
 #include "SchemaMgr/ColumnInfo.h"
 #include "Shared/sqldefs.h"
 #include "Shared/sqltypes.h"
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 
 #include <cstdint>
 #include <iostream>
@@ -54,17 +54,16 @@ hdk::ir::ExprPtr analyzeFixedPtValue(const int64_t numericval,
 
 hdk::ir::ExprPtr analyzeStringValue(const std::string& stringval);
 
-hdk::ir::ExprPtr normalizeOperExpr(
-    hdk::ir::OpType optype,
-    hdk::ir::Qualifier qual,
-    hdk::ir::ExprPtr left_expr,
-    hdk::ir::ExprPtr right_expr,
-    const StringDictionaryProxyProvider* executor = nullptr);
+hdk::ir::ExprPtr normalizeOperExpr(hdk::ir::OpType optype,
+                                   hdk::ir::Qualifier qual,
+                                   hdk::ir::ExprPtr left_expr,
+                                   hdk::ir::ExprPtr right_expr,
+                                   const StringDictionaryProvider* executor = nullptr);
 
 hdk::ir::ExprPtr normalizeCaseExpr(
     const std::list<std::pair<hdk::ir::ExprPtr, hdk::ir::ExprPtr>>&,
     const hdk::ir::ExprPtr,
-    const StringDictionaryProxyProvider* executor = nullptr);
+    const StringDictionaryProvider* executor = nullptr);
 
 hdk::ir::ExprPtr getLikeExpr(hdk::ir::ExprPtr arg_expr,
                              hdk::ir::ExprPtr like_expr,

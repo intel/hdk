@@ -153,7 +153,7 @@ struct DecodedString {
 template <class T>
 DecodedString decode_string(const int8_t* column,
                             const size_t cursor,
-                            StringDictionaryProxy* sdp) {
+                            StringDictionary* sdp) {
   const auto ids_column = reinterpret_cast<const T*>(column);
   const auto val = ids_column[cursor];
   DecodedString result{};

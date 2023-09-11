@@ -26,11 +26,9 @@
 #include <vector>
 #include "../DataMgr/MemoryLevel.h"
 #include "Compiler/CodegenTraitsDescriptor.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 
 #include <iostream>
 
-class StringDictionaryProxy;
 struct StringDictionaryProxyTranslationMgr;
 
 namespace Data_Namespace {

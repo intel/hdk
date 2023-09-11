@@ -62,7 +62,7 @@ template <>
 void AssertValueEqualsVisitor::operator()<NullableString>(
     const NullableString& expected,
     const NullableString& actual) const {
-  boost::apply_visitor(AssertValueEqualsVisitor(row, column), expected, actual);
+  EXPECT_EQ(getString(expected), getString(actual));
 }
 
 void assert_value_equals(ScalarTargetValue& expected,

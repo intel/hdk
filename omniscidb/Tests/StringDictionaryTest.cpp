@@ -17,7 +17,7 @@
 #include "TestHelpers.h"
 
 #include "Shared/scope.h"
-#include "StringDictionary/StringDictionaryProxy.h"
+#include "StringDictionary/StringDictionary.h"
 
 #include <cstdio>
 #include <cstdlib>

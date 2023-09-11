@@ -27,7 +27,6 @@
 #include "Logger/Logger.h"
 #include "QueryEngine/RuntimeFunctions.h"
 #include "StringDictionary/StringDictionary.h"
-#include "StringDictionary/StringDictionaryProxy.h"
 #endif
 
 #include <cmath>

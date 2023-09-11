@@ -263,8 +263,9 @@ class HashJoin {
       const CompositeKeyInfo& composite_key_info,
       const Executor* executor);
 
-  static std::pair<const StringDictionaryProxy*, const StringDictionaryProxy*>
-  getStrDictProxies(const InnerOuter& cols, const Executor* executor);
+  static std::pair<const StringDictionary*, const StringDictionary*> getStrDictProxies(
+      const InnerOuter& cols,
+      const Executor* executor);
 
   static const std::vector<int32_t>* translateInnerToOuterStrDictProxies(
       const InnerOuter& cols,

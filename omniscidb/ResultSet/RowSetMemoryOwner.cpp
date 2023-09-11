@@ -38,9 +38,8 @@ RowSetMemoryOwner::~RowSetMemoryOwner() {
   }
 }
 
-StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
-    const int dict_id_in,
-    const int64_t generation) {
+StringDictionary* RowSetMemoryOwner::getOrAddStringDictProxy(const int dict_id_in,
+                                                             const int64_t generation) {
   const int dict_id{dict_id_in < 0 ? REGULAR_DICT(dict_id_in) : dict_id_in};
   CHECK(data_provider_);
   const auto dd = data_provider_->getDictMetadata(dict_id);
@@ -54,7 +53,7 @@ StringDictionaryProxy* RowSetMemoryOwner::getOrAddStringDictProxy(
     DictRef literal_dict_ref(DictRef::invalidDbId, DictRef::literalsDictId);
     std::shared_ptr<StringDictionary> tsd =
         std::make_shared<StringDictionary>(literal_dict_ref, g_cache_string_hash);
-    lit_str_dict_proxy_ = std::make_shared<StringDictionaryProxy>(tsd, 0);
+    lit_str_dict_proxy_ = std::make_shared<StringDictionary>(tsd, 0);
   }
   return lit_str_dict_proxy_.get();
 }
