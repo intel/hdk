@@ -19,9 +19,11 @@
 namespace policy {
 
 ProportionBasedExecutionPolicy::ProportionBasedExecutionPolicy(
-    std::map<ExecutorDeviceType, unsigned>&& propotion) {
-  CHECK_GT(propotion.size(), 0u);
-  proportion_.merge(propotion);
+    std::map<ExecutorDeviceType, unsigned>&& proportion,
+    const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+    : ExecutionPolicy(devices_dispatch_modes) {
+  CHECK_GT(proportion.size(), 0u);
+  proportion_.merge(proportion);
   total_parts_ = std::accumulate(
       proportion_.begin(), proportion_.end(), 0u, [](unsigned acc, auto& cur) {
         return acc + cur.second;

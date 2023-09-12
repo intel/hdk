@@ -432,7 +432,8 @@ std::shared_ptr<const ExecutionResult> RelAlgExecutor::execute(
     try {
       executeStep(seq.step(i), co, fixed_eo, queue_time_ms);
     } catch (const QueryMustRunOnCpu&) {
-      CHECK(co.device_type == ExecutorDeviceType::GPU);
+      CHECK(config_.exec.heterogeneous.enable_heterogeneous_execution ||
+            co.device_type == ExecutorDeviceType::GPU);
       if (!config_.exec.heterogeneous.allow_query_step_cpu_retry) {
         throw;
       }

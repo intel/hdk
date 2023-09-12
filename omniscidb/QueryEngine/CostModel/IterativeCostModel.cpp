@@ -31,7 +31,9 @@ IterativeCostModel::IterativeCostModel()
 #endif
 
 std::unique_ptr<policy::ExecutionPolicy> IterativeCostModel::predict(
-    QueryInfo query_info) const {
+    QueryInfo query_info,
+    const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+    const {
   std::shared_lock<std::shared_mutex> l(latch_);
 
   unsigned cpu_prop = 1, gpu_prop = 0;
@@ -74,6 +76,7 @@ std::unique_ptr<policy::ExecutionPolicy> IterativeCostModel::predict(
   proportion[ExecutorDeviceType::GPU] = gpu_prop;
   proportion[ExecutorDeviceType::CPU] = cpu_prop;
 
-  return std::make_unique<policy::ProportionBasedExecutionPolicy>(std::move(proportion));
+  return std::make_unique<policy::ProportionBasedExecutionPolicy>(std::move(proportion),
+                                                                  devices_dispatch_modes);
 }
 }  // namespace costmodel

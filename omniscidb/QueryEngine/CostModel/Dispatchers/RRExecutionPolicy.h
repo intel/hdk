@@ -18,6 +18,10 @@
 namespace policy {
 class RoundRobinExecutionPolicy : public ExecutionPolicy {
  public:
+  RoundRobinExecutionPolicy(
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+      : ExecutionPolicy(devices_dispatch_modes){};
+
   SchedulingAssignment scheduleSingleFragment(const FragmentInfo&,
                                               size_t frag_id,
                                               size_t frag_num) const override;

@@ -24,7 +24,9 @@ namespace policy {
  */
 class ProportionBasedExecutionPolicy : public ExecutionPolicy {
  public:
-  ProportionBasedExecutionPolicy(std::map<ExecutorDeviceType, unsigned>&& proportion);
+  ProportionBasedExecutionPolicy(
+      std::map<ExecutorDeviceType, unsigned>&& proportion,
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes);
   SchedulingAssignment scheduleSingleFragment(const FragmentInfo&,
                                               size_t frag_id,
                                               size_t frag_num) const override;

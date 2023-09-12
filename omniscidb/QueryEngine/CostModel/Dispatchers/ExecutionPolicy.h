@@ -27,28 +27,45 @@ struct SchedulingAssignment {
 };
 
 class ExecutionPolicy {
+  std::map<ExecutorDeviceType, ExecutorDispatchMode> devices_dispatch_modes_;
+
  public:
+  ExecutionPolicy(
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+      : devices_dispatch_modes_(devices_dispatch_modes){};
   virtual SchedulingAssignment scheduleSingleFragment(const FragmentInfo&,
                                                       size_t frag_id,
                                                       size_t frag_num) const = 0;
-  virtual std::vector<ExecutorDeviceType> devices() const {
-    return {ExecutorDeviceType::CPU, ExecutorDeviceType::GPU};
+
+  virtual std::set<ExecutorDeviceType> devices() const {
+    std::set<ExecutorDeviceType> res;
+    for (const auto& dt_mode : devices_dispatch_modes_) {
+      res.insert(dt_mode.first);
+    }
+    return res;
+  }
+
+  virtual bool hasDevice(const ExecutorDeviceType dt) const {
+    return (devices_dispatch_modes_.count(dt) != 0);
+  }
+
+  virtual ExecutorDispatchMode getExecutionMode(const ExecutorDeviceType dt) const {
+    CHECK(hasDevice(dt));
+    return devices_dispatch_modes_.at(dt);
+  }
+
+  virtual std::map<ExecutorDeviceType, ExecutorDispatchMode> getExecutionModes() const {
+    return devices_dispatch_modes_;
   }
   virtual std::string name() const = 0;
 
   virtual ~ExecutionPolicy() = default;
-
-  // Probe/modify modes during kernel building (do not iterate). These are the default
-  // modes.
-  std::unordered_map<ExecutorDeviceType, ExecutorDispatchMode> devices_dispatch_modes{
-      {ExecutorDeviceType::CPU, ExecutorDispatchMode::KernelPerFragment},
-      {ExecutorDeviceType::GPU, ExecutorDispatchMode::KernelPerFragment}};
 };
 
 inline std::ostream& operator<<(std::ostream& os, const ExecutionPolicy& policy) {
   os << policy.name() << "\n";
   os << "Dispatching modes: \n";
-  for (const auto& device_disp_mode : policy.devices_dispatch_modes) {
+  for (const auto& device_disp_mode : policy.getExecutionModes()) {
     os << device_disp_mode.first << " - " << device_disp_mode.second << "\n";
   }
   return os;
