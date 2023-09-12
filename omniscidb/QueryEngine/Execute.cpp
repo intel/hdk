@@ -1931,84 +1931,6 @@ hdk::ResultSetTable Executor::finishStreamExecution(
   return result;
 }
 
-std::pair<std::unique_ptr<policy::ExecutionPolicy>, ExecutorDeviceType>
-Executor::getExecutionPolicyForTargets(const RelAlgExecutionUnit& ra_exe_unit,
-                                       const ExecutorDeviceType requested_device_type,
-                                       const std::vector<InputTableInfo>& query_infos,
-                                       size_t& max_groups_buffer_entry_guess,
-                                       const ExecutionOptions& eo) {
-  if (needFallbackOnCPU(ra_exe_unit, requested_device_type)) {
-    LOG(DEBUG1) << "Devices Restricted, falling back on CPU";
-    return {std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
-                ExecutorDeviceType::CPU),
-            ExecutorDeviceType::CPU};
-  }
-
-  CHECK(!query_infos.empty());
-  if (!max_groups_buffer_entry_guess) {
-    LOG(DEBUG1) << "The query has failed the first execution attempt because of running "
-                   "out of group by slots. Make the conservative choice: allocate "
-                   "fragment size slots and run on the CPU.";
-    max_groups_buffer_entry_guess = compute_buffer_entry_guess(query_infos);
-    return {std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
-                ExecutorDeviceType::CPU),
-            ExecutorDeviceType::CPU};
-  }
-
-  std::unique_ptr<policy::ExecutionPolicy> exe_policy;
-  auto cfg = config_->exec.heterogeneous;
-
-  if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
-      cfg.enable_heterogeneous_execution && !ra_exe_unit.templs.empty()) {
-    size_t bytes = 0;
-
-    // TODO(bagrorg): how can we get bytes estimation more correctly?
-    for (const auto& e : query_infos) {
-      auto t = e.info;
-      for (const auto& f : t.fragments) {
-        for (const auto& [k, v] : f.getChunkMetadataMapPhysical()) {
-          bytes += v->numBytes();
-        }
-      }
-    }
-
-    LOG(DEBUG1) << "Cost Model enabled, making prediction for templates "
-                << toString(ra_exe_unit.templs) << " for size " << bytes;
-
-    costmodel::QueryInfo qi = {ra_exe_unit.templs, bytes};
-
-    try {
-      exe_policy = ra_exe_unit.cost_model->predict(qi);
-      return {std::move(exe_policy), requested_device_type};
-    } catch (costmodel::CostModelException& e) {
-      LOG(DEBUG1) << "Cost model got an exception: " << e.what();
-    }
-  }
-
-  LOG(DEBUG1) << "Cost Model disabled, template is unknown or error occured: templs="
-              << toString(ra_exe_unit.templs) << " cost_model=" << ra_exe_unit.cost_model
-              << ", cost model in config: "
-              << (config_->exec.enable_cost_model ? "enabled" : "disabled")
-              << ", heterogeneous execution: "
-              << (cfg.enable_heterogeneous_execution ? "enabled" : "disabled");
-
-  if (cfg.enable_heterogeneous_execution) {
-    if (cfg.forced_heterogeneous_distribution) {
-      std::map<ExecutorDeviceType, unsigned> distribution{
-          {ExecutorDeviceType::CPU, eo.forced_cpu_proportion},
-          {ExecutorDeviceType::GPU, eo.forced_gpu_proportion}};
-      exe_policy = std::make_unique<policy::ProportionBasedExecutionPolicy>(
-          std::move(distribution));
-    } else {
-      exe_policy = std::make_unique<policy::RoundRobinExecutionPolicy>();
-    }
-  } else {
-    exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
-        requested_device_type);
-  }
-  return {std::move(exe_policy), requested_device_type};
-}
-
 // TODO: move this code to QueryMemoryInitializer
 void Executor::allocateShuffleBuffers(
     const std::vector<InputTableInfo>& query_infos,
@@ -2097,6 +2019,153 @@ void Executor::allocateShuffleBuffers(
   }
 }
 
+std::set<ExecutorDeviceType> Executor::getAvailableDeviceTypes() const {
+  std::set<ExecutorDeviceType> res{ExecutorDeviceType::CPU};
+  if (data_mgr_->gpusPresent()) {
+    res.insert(ExecutorDeviceType::GPU);
+  }
+  return res;
+}
+
+std::set<ExecutorDeviceType> Executor::getDeviceTypesForQuery(
+    const RelAlgExecutionUnit& ra_exe_unit,
+    const std::vector<InputTableInfo>& table_infos,
+    const ExecutorDeviceType requested_dt,
+    size_t& max_groups_buffer_entry_guess,
+    const ExecutionOptions& eo) {
+  if (needFallbackOnCPU(ra_exe_unit, requested_dt)) {
+    LOG(DEBUG1) << "Devices Restricted, falling back on CPU";
+    return {ExecutorDeviceType::CPU};
+  }
+
+  CHECK(!table_infos.empty());
+  if (!max_groups_buffer_entry_guess) {
+    LOG(DEBUG1) << "The query has failed the first execution attempt because of running "
+                   "out of group by slots. Make the conservative choice: allocate "
+                   "fragment size slots and run on the CPU.";
+    max_groups_buffer_entry_guess = compute_buffer_entry_guess(table_infos);
+    return {ExecutorDeviceType::CPU};
+  }
+
+  if (config_->exec.heterogeneous.enable_heterogeneous_execution) {
+    return getAvailableDeviceTypes();
+  } else {
+    return {requested_dt};
+  }
+}
+
+namespace {
+bool has_lazy_fetched_columns(const std::vector<ColumnLazyFetchInfo>& fetched_cols) {
+  for (const auto& col : fetched_cols) {
+    if (col.is_lazily_fetched) {
+      return true;
+    }
+  }
+  return false;
+}
+}  // namespace
+
+std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
+    const bool is_agg,
+    const std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>&
+        query_mem_descs,
+    const RelAlgExecutionUnit& ra_exe_unit,
+    const std::vector<InputTableInfo>& table_infos,
+    const ExecutionOptions& eo) {
+  std::unique_ptr<policy::ExecutionPolicy> exe_policy;
+  auto cfg = config_->exec.heterogeneous;
+
+  const bool uses_lazy_fetch =
+      plan_state_->allow_lazy_fetch_ &&
+      has_lazy_fetched_columns(getColLazyFetchInfo(ra_exe_unit.target_exprs));
+
+  std::map<ExecutorDeviceType, ExecutorDispatchMode> devices_dispatch_modes;
+
+  for (const auto& dt_query_desc : query_mem_descs) {
+    ExecutorDispatchMode dispatch_mode{ExecutorDispatchMode::KernelPerFragment};
+
+    if (dt_query_desc.first == ExecutorDeviceType::GPU && eo.allow_multifrag &&
+        ((!config_->exec.heterogeneous.enable_heterogeneous_execution &&
+          !uses_lazy_fetch) ||
+         is_agg)) {
+      dispatch_mode = ExecutorDispatchMode::MultifragmentKernel;
+    } else if (dt_query_desc.first == ExecutorDeviceType::CPU &&
+               table_infos.size() == (size_t)1 &&
+               config_->exec.group_by.enable_cpu_multifrag_kernels &&
+               !ra_exe_unit.partitioned_aggregation &&
+               (query_mem_descs.at(dt_query_desc.first)->getQueryDescriptionType() ==
+                    QueryDescriptionType::GroupByPerfectHash ||
+                query_mem_descs.at(dt_query_desc.first)->getQueryDescriptionType() ==
+                    QueryDescriptionType::GroupByBaselineHash)) {
+      // Right now, we don't have any heuristics to determine the perfect number of
+      // kernels we want to execute on CPU and we simply create a kernel per fragment. But
+      // there are some extreme cases when output buffer significanly exceeds fragment
+      // size and then we have few problems:
+      //  1. Output buffer initialization and reduction time exceeds fragment processing
+      //     time, so it's more profitable to use a single thread for processing.
+      //  2. We might simply run out of memory due to many huge hash tables and even
+      //  bigger
+      //     hash table created later for the reduction.
+      // We need more comprehensive processing costs and memory consumption evaluation
+      // here. For now, detect a simple groupby case when output hash table is bigger than
+      // input table. For this case we use a single multifragment kernel to force
+      // single-threaded execution with no reduction required.
+      size_t input_size = table_infos.front().info.getNumTuples();
+      size_t buffer_size = query_mem_descs.at(dt_query_desc.first)->getEntryCount();
+      constexpr size_t threshold_ratio = 2;
+      if (table_infos.front().info.fragments.size() > 1 &&
+          buffer_size * threshold_ratio >= input_size) {
+        LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
+                     "table (input_size is "
+                  << input_size << " rows, output buffer is " << buffer_size
+                  << " entries).";
+        dispatch_mode = ExecutorDispatchMode::MultifragmentKernel;
+      }
+    }
+    devices_dispatch_modes[dt_query_desc.first] = dispatch_mode;
+  }
+
+  if (devices_dispatch_modes.size() == 1) {  // One device -> fragmentID
+    exe_policy = std::make_unique<policy::FragmentIDAssignmentExecutionPolicy>(
+        devices_dispatch_modes.begin()->first, devices_dispatch_modes);
+  } else {
+    CHECK(cfg.enable_heterogeneous_execution);
+    if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
+        !ra_exe_unit.templs.empty()) {
+      size_t bytes = 0;
+      // TODO(bagrorg): how can we get bytes estimation more correctly?
+      for (const auto& e : table_infos) {
+        auto t = e.info;
+        for (const auto& f : t.fragments) {
+          for (const auto& [k, v] : f.getChunkMetadataMapPhysical()) {
+            bytes += v->numBytes();
+          }
+        }
+      }
+      LOG(DEBUG1) << "Cost Model enabled, making prediction for templates "
+                  << toString(ra_exe_unit.templs) << " for size " << bytes;
+
+      costmodel::QueryInfo qi = {ra_exe_unit.templs, bytes};
+      try {
+        exe_policy = ra_exe_unit.cost_model->predict(qi, devices_dispatch_modes);
+        return exe_policy;
+      } catch (costmodel::CostModelException& e) {
+        LOG(DEBUG1) << "Cost model got an exception: " << e.what();
+      }
+    } else if (cfg.forced_heterogeneous_distribution) {
+      std::map<ExecutorDeviceType, unsigned> distribution{
+          {ExecutorDeviceType::CPU, eo.forced_cpu_proportion},
+          {ExecutorDeviceType::GPU, eo.forced_gpu_proportion}};
+      exe_policy = std::make_unique<policy::ProportionBasedExecutionPolicy>(
+          std::move(distribution), devices_dispatch_modes);
+    } else {
+      exe_policy =
+          std::make_unique<policy::RoundRobinExecutionPolicy>(devices_dispatch_modes);
+    }
+  }
+  return exe_policy;
+}
+
 hdk::ResultSetTable Executor::executeWorkUnitImpl(
     size_t& max_groups_buffer_entry_guess,
     const bool is_agg,
@@ -2110,9 +2179,9 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     DataProvider* data_provider,
     ColumnCacheMap& column_cache) {
   INJECT_TIMER(Exec_executeWorkUnit);
-  auto [exe_policy, fallback_device] = getExecutionPolicyForTargets(
-      ra_exe_unit, co.device_type, query_infos, max_groups_buffer_entry_guess, eo);
-
+  auto device_types_for_query = getDeviceTypesForQuery(
+      ra_exe_unit, query_infos, co.device_type, max_groups_buffer_entry_guess, eo);
+  CHECK_GT(device_types_for_query.size(), size_t(0));
   int8_t crt_min_byte_width{MAX_BYTE_WIDTH_SUPPORTED};
   do {
     SharedKernelContext shared_context(query_infos);
@@ -2130,7 +2199,7 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
         query_comp_descs_owned;
     std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>
         query_mem_descs_owned;
-    for (auto dt : exe_policy->devices()) {
+    for (auto dt : device_types_for_query) {
       auto query_comp_desc_owned = std::make_unique<QueryCompilationDescriptor>();
       query_comp_desc_owned->setUseGroupByBufferDesc(co.use_groupby_buffer_desc);
       std::unique_ptr<QueryMemoryDescriptor> query_mem_desc_owned;
@@ -2167,11 +2236,15 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
         query_mem_desc_owned.reset(new QueryMemoryDescriptor(
             data_mgr_, config_, 0, QueryDescriptionType::Projection, false));
       }
-
-      query_comp_descs_owned.insert(std::make_pair(dt, std::move(query_comp_desc_owned)));
-      query_mem_descs_owned.insert(std::make_pair(dt, std::move(query_mem_desc_owned)));
+      const ExecutorDeviceType compiled_for_dt{query_comp_desc_owned->getDeviceType()};
+      query_comp_descs_owned[compiled_for_dt] = std::move(query_comp_desc_owned);
+      query_mem_descs_owned[compiled_for_dt] = std::move(query_mem_desc_owned);
     }
 
+    const auto exe_policy =
+        getExecutionPolicy(is_agg, query_mem_descs_owned, ra_exe_unit, query_infos, eo);
+    const ExecutorDeviceType fallback_device{
+        exe_policy->hasDevice(co.device_type) ? co.device_type : ExecutorDeviceType::CPU};
     if (eo.just_explain) {
       return {executeExplain(*query_comp_descs_owned.at(fallback_device))};
     }
@@ -2181,8 +2254,15 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
     }
 
     if (!eo.just_validate) {
-      int available_cpus = cpu_threads();
-      auto available_gpus = get_available_gpus(data_mgr_);
+      size_t devices_count{0};
+      for (const auto dt_mode : exe_policy->getExecutionModes()) {
+        if (dt_mode.first == ExecutorDeviceType::CPU) {
+          devices_count += cpu_threads();
+        } else {
+          devices_count += get_available_gpus(data_mgr_).size();
+        }
+      }
+      CHECK_GT(devices_count, size_t(0));
 
       try {
         std::vector<std::unique_ptr<ExecutionKernel>> kernels;
@@ -2192,13 +2272,11 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
                                 query_infos,
                                 eo,
                                 co,
-                                is_agg,
                                 allow_single_frag_table_opt,
                                 query_comp_descs_owned,
                                 query_mem_descs_owned,
                                 exe_policy.get(),
-                                available_gpus,
-                                available_cpus);
+                                devices_count);
         launchKernels(shared_context, std::move(kernels), fallback_device, co);
       } catch (QueryExecutionError& e) {
         if (eo.with_dynamic_watchdog && interrupted_.load() &&
@@ -2573,19 +2651,6 @@ std::unordered_map<int, const hdk::ir::BinOper*> Executor::getInnerTabIdToJoinCo
   return id_to_cond;
 }
 
-namespace {
-
-bool has_lazy_fetched_columns(const std::vector<ColumnLazyFetchInfo>& fetched_cols) {
-  for (const auto& col : fetched_cols) {
-    if (col.is_lazily_fetched) {
-      return true;
-    }
-  }
-  return false;
-}
-
-}  // namespace
-
 std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     SharedKernelContext& shared_context,
     const RelAlgExecutionUnit& ra_exe_unit,
@@ -2593,15 +2658,13 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
     const std::vector<InputTableInfo>& table_infos,
     const ExecutionOptions& eo,
     const CompilationOptions& co,
-    const bool is_agg,
     const bool allow_single_frag_table_opt,
     const std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>&
         query_comp_descs,
     const std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>&
         query_mem_descs,
-    policy::ExecutionPolicy* policy,
-    std::unordered_set<int>& available_gpus,
-    int& available_cpus) {
+    const policy::ExecutionPolicy* policy,
+    const size_t device_count) {
   std::vector<std::unique_ptr<ExecutionKernel>> execution_kernels;
 
   QueryFragmentDescriptor fragment_descriptor(
@@ -2611,62 +2674,6 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
       eo.gpu_input_mem_limit_percent,
       eo.outer_fragment_indices);
   CHECK(!ra_exe_unit.input_descs.empty());
-  const bool uses_lazy_fetch =
-      plan_state_->allow_lazy_fetch_ &&
-      has_lazy_fetched_columns(getColLazyFetchInfo(ra_exe_unit.target_exprs));
-  const int device_count = config_->exec.heterogeneous.enable_heterogeneous_execution
-                               ? available_cpus + available_gpus.size()
-                               : deviceCount(query_mem_descs.begin()->first);
-  CHECK_GT(device_count, 0);
-  for (const auto& intended_dt_itr :
-       query_comp_descs) {  // Decide on optimal dispatch mode per device type
-    // Keep in mind that the query intended for GPU may fallback to CPU!
-    // We will select dispatch modes based on conditions of actual devices, but we will
-    // modify the mode of the intended device. See usage of scheduleSingleFragment() and
-    // execution_kernels_per_device_.
-    const ExecutorDeviceType intended_dt = intended_dt_itr.first;
-    const ExecutorDeviceType actual_dt = intended_dt_itr.second->getDeviceType();
-    LOG(INFO) << "Query was inteded for " << intended_dt << ", will actually run on "
-              << actual_dt;
-
-    if (actual_dt == ExecutorDeviceType::GPU && eo.allow_multifrag &&
-        (!uses_lazy_fetch || is_agg)) {
-      policy->devices_dispatch_modes.at(intended_dt) =
-          ExecutorDispatchMode::MultifragmentKernel;
-    } else if (actual_dt == ExecutorDeviceType::CPU && table_infos.size() == (size_t)1 &&
-               config_->exec.group_by.enable_cpu_multifrag_kernels &&
-               !ra_exe_unit.partitioned_aggregation &&
-               (query_mem_descs.at(intended_dt)->getQueryDescriptionType() ==
-                    QueryDescriptionType::GroupByPerfectHash ||
-                query_mem_descs.at(intended_dt)->getQueryDescriptionType() ==
-                    QueryDescriptionType::GroupByBaselineHash)) {
-      // Right now, we don't have any heuristics to determine the perfect number of
-      // kernels we want to execute on CPU and we simply create a kernel per fragment. But
-      // there are some extreme cases when output buffer significanly exceeds fragment
-      // size and then we have few problems:
-      //  1. Output buffer initialization and reduction time exceeds fragment processing
-      //     time, so it's more profitable to use a single thread for processing.
-      //  2. We might simply run out of memory due to many huge hash tables and even
-      //  bigger
-      //     hash table created later for the reduction.
-      // We need more comprehensive processing costs and memory consumption evaluation
-      // here. For now, detect a simple groupby case when output hash table is bigger than
-      // input table. For this case we use a single multifragment kernel to force
-      // single-threaded execution with no reduction required.
-      size_t input_size = table_infos.front().info.getNumTuples();
-      size_t buffer_size = query_mem_descs.at(intended_dt)->getEntryCount();
-      constexpr size_t threshold_ratio = 2;
-      if (table_infos.front().info.fragments.size() > 1 &&
-          buffer_size * threshold_ratio >= input_size) {
-        LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
-                     "table (input_size is "
-                  << input_size << " rows, output buffer is " << buffer_size
-                  << " entries).";
-        policy->devices_dispatch_modes.at(intended_dt) =
-            ExecutorDispatchMode::MultifragmentKernel;
-      }
-    }
-  }
 
   fragment_descriptor.buildFragmentKernelMap(
       ra_exe_unit, shared_context.getFragOffsets(), policy, this, co.codegen_traits_desc);
@@ -2680,20 +2687,20 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
                           device_count);
   }
 
-  for (const auto& intended_dt_itr : query_mem_descs) {
-    if (policy->devices_dispatch_modes.at(intended_dt_itr.first) ==
+  for (const auto& dt_query_desc : query_mem_descs) {
+    if (policy->getExecutionMode(dt_query_desc.first) ==
         ExecutorDispatchMode::KernelPerFragment) {
-      VLOG(1) << "Creating one execution kernel per fragment";
-      VLOG(1) << intended_dt_itr.second->toString();
+      VLOG(1) << "Dispatching one execution kernel per fragment";
+      VLOG(1) << dt_query_desc.second->toString();
       if (allow_single_frag_table_opt &&
-          (intended_dt_itr.second->getQueryDescriptionType() ==
+          (dt_query_desc.second->getQueryDescriptionType() ==
            QueryDescriptionType::Projection) &&
           table_infos.size() == 1) {
         const auto max_frag_size =
             table_infos.front().info.getFragmentNumTuplesUpperBound();
-        if (max_frag_size < intended_dt_itr.second->getEntryCount()) {
+        if (max_frag_size < dt_query_desc.second->getEntryCount()) {
           LOG(INFO) << "Lowering scan limit from "
-                    << intended_dt_itr.second->getEntryCount()
+                    << dt_query_desc.second->getEntryCount()
                     << " to match max fragment size " << max_frag_size
                     << " for kernel per fragment execution path.";
           throw CompilationRetryNewScanLimit(max_frag_size);
@@ -2731,7 +2738,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
                                           *query_comp_descs.at(device_type).get(),
                                           *query_mem_descs.at(device_type).get(),
                                           frag_list,
-                                          policy->devices_dispatch_modes.at(device_type),
+                                          policy->getExecutionMode(device_type),
                                           rowid_lookup_key));
 
     ++frag_list_idx;

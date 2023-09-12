@@ -99,7 +99,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     Executor* executor,
     compiler::CodegenTraitsDescriptor cgen_traits_desc) {
   const auto inner_table_id_to_join_condition = executor->getInnerTabIdToJoinCond();
-  LOG(INFO) << *policy;
+  LOG(INFO) << "Building Kernel Fragment table with policy: " << *policy;
   for (size_t frag_id = 0; frag_id < fragments->size(); frag_id++) {
     if (!allowed_outer_fragment_indices_.empty()) {
       if (std::find(allowed_outer_fragment_indices_.begin(),
@@ -162,7 +162,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
         const auto table_id = ra_exe_unit.input_descs[table_desc_idx].getTableId();
         auto table_frags_it = selected_tables_fragments_.find({db_id, table_id});
         CHECK(table_frags_it != selected_tables_fragments_.end());
-        if (policy->devices_dispatch_modes.at(device_type) ==
+        if (policy->getExecutionMode(device_type) ==
             ExecutorDispatchMode::KernelPerFragment) {
           execution_kernel_desc.fragments.emplace_back(
               FragmentsPerTable{db_id, table_id, frag_ids});
@@ -198,7 +198,7 @@ void QueryFragmentDescriptor::buildFragmentPerKernelForTable(
     }
     LOG(DEBUG1) << "Assigning frag_id=" << frag_id << "/" << fragments->size() - 1
                 << " to " << device_type << ", device_id=" << device_id;
-    if (policy->devices_dispatch_modes.at(device_type) ==
+    if (policy->getExecutionMode(device_type) ==
         ExecutorDispatchMode::KernelPerFragment) {
       auto itr = execution_kernels_per_device_[device_type].find(device_id);
       if (itr == execution_kernels_per_device_[device_type].end()) {
@@ -237,31 +237,36 @@ void QueryFragmentDescriptor::buildFragmentPerKernelMapForUnion(
                                    j,
                                    executor,
                                    cgen_traits_desc);
-
-    std::vector<int> table_cpu_ids =
-        std::accumulate(execution_kernels_per_device_[ExecutorDeviceType::CPU][0].begin(),
-                        execution_kernels_per_device_[ExecutorDeviceType::CPU][0].end(),
-                        std::vector<int>(),
-                        [](auto&& vec, auto& exe_kern) {
-                          vec.push_back(exe_kern.fragments[0].table_id);
-                          return vec;
-                        });
-    std::vector<int> table_gpu_ids =
-        std::accumulate(execution_kernels_per_device_[ExecutorDeviceType::GPU][0].begin(),
-                        execution_kernels_per_device_[ExecutorDeviceType::GPU][0].end(),
-                        std::vector<int>(),
-                        [](auto&& vec, auto& exe_kern) {
-                          vec.push_back(exe_kern.fragments[0].table_id);
-                          return vec;
-                        });
-    VLOG(1) << "execution_kernels_per_device_[CPU].size()="
-            << execution_kernels_per_device_[ExecutorDeviceType::CPU].size()
-            << " execution_kernels_per_device_[CPU][0][*].fragments[0].table_id="
-            << shared::printContainer(table_cpu_ids);
-    VLOG(1) << "execution_kernels_per_device_[GPU].size()="
-            << execution_kernels_per_device_[ExecutorDeviceType::GPU].size()
-            << " execution_kernels_per_device_[GPU][0][*].fragments[0].table_id="
-            << shared::printContainer(table_gpu_ids);
+    if (policy->hasDevice(ExecutorDeviceType::CPU)) {
+      CHECK(execution_kernels_per_device_.count(ExecutorDeviceType::CPU));
+      std::vector<int> table_cpu_ids = std::accumulate(
+          execution_kernels_per_device_.at(ExecutorDeviceType::CPU)[0].begin(),
+          execution_kernels_per_device_.at(ExecutorDeviceType::CPU)[0].end(),
+          std::vector<int>(),
+          [](auto&& vec, auto& exe_kern) {
+            vec.push_back(exe_kern.fragments[0].table_id);
+            return vec;
+          });
+      VLOG(1) << "execution_kernels_per_device_[CPU].size()="
+              << execution_kernels_per_device_.at(ExecutorDeviceType::CPU).size()
+              << " execution_kernels_per_device_[CPU][0][*].fragments[0].table_id="
+              << shared::printContainer(table_cpu_ids);
+    }
+    if (policy->hasDevice(ExecutorDeviceType::GPU)) {
+      CHECK(execution_kernels_per_device_.count(ExecutorDeviceType::GPU));
+      std::vector<int> table_gpu_ids = std::accumulate(
+          execution_kernels_per_device_.at(ExecutorDeviceType::GPU)[0].begin(),
+          execution_kernels_per_device_.at(ExecutorDeviceType::GPU)[0].end(),
+          std::vector<int>(),
+          [](auto&& vec, auto& exe_kern) {
+            vec.push_back(exe_kern.fragments[0].table_id);
+            return vec;
+          });
+      VLOG(1) << "execution_kernels_per_device_[GPU].size()="
+              << execution_kernels_per_device_.at(ExecutorDeviceType::GPU).size()
+              << " execution_kernels_per_device_[GPU][0][*].fragments[0].table_id="
+              << shared::printContainer(table_gpu_ids);
+    }
   }
 }
 

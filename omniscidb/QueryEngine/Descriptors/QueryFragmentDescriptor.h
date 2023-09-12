@@ -87,12 +87,12 @@ class QueryFragmentDescriptor {
   template <typename DISPATCH_FCN>
   void dispatchKernelsToDevices(DISPATCH_FCN dispatcher_f,
                                 const RelAlgExecutionUnit& ra_exe_unit,
-                                policy::ExecutionPolicy* policy) const {
+                                const policy::ExecutionPolicy* policy) const {
     std::unordered_map<ExecutorDeviceType, std::unordered_map<int, size_t>>
         execution_kernel_index;
     size_t tuple_count = 0;
     for (const auto& device_type_itr : execution_kernels_per_device_) {
-      if (policy->devices_dispatch_modes.at(device_type_itr.first) ==
+      if (policy->getExecutionMode(device_type_itr.first) ==
           ExecutorDispatchMode::KernelPerFragment) {
         for (const auto& device_itr : device_type_itr.second) {
           CHECK(execution_kernel_index[device_type_itr.first]
@@ -103,7 +103,7 @@ class QueryFragmentDescriptor {
     }
 
     for (const auto& device_type_itr : execution_kernels_per_device_) {
-      if (policy->devices_dispatch_modes.at(device_type_itr.first) ==
+      if (policy->getExecutionMode(device_type_itr.first) ==
           ExecutorDispatchMode::MultifragmentKernel) {
         for (const auto& device_itr : device_type_itr.second) {
           const auto& execution_kernels = device_itr.second;
@@ -115,22 +115,21 @@ class QueryFragmentDescriptor {
         bool dispatch_finished = false;
         while (!dispatch_finished) {
           dispatch_finished = true;
-          for (const auto& device_type_itr : execution_kernels_per_device_)
-            for (const auto& device_itr : device_type_itr.second) {
-              auto& kernel_idx =
-                  execution_kernel_index[device_type_itr.first][device_itr.first];
-              if (kernel_idx < device_itr.second.size()) {
-                dispatch_finished = false;
-                const auto& execution_kernel = device_itr.second[kernel_idx++];
-                dispatcher_f(device_itr.first,
-                             execution_kernel.fragments,
-                             rowid_lookup_key_,
-                             device_type_itr.first);
-                if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
-                  return;
-                }
+          for (const auto& device_itr : device_type_itr.second) {
+            auto& kernel_idx =
+                execution_kernel_index[device_type_itr.first][device_itr.first];
+            if (kernel_idx < device_itr.second.size()) {
+              dispatch_finished = false;
+              const auto& execution_kernel = device_itr.second[kernel_idx++];
+              dispatcher_f(device_itr.first,
+                           execution_kernel.fragments,
+                           rowid_lookup_key_,
+                           device_type_itr.first);
+              if (terminateDispatchMaybe(tuple_count, ra_exe_unit, execution_kernel)) {
+                return;
               }
             }
+          }
         }
       }
     }

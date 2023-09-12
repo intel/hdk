@@ -18,11 +18,14 @@
 namespace policy {
 class FragmentIDAssignmentExecutionPolicy : public ExecutionPolicy {
  public:
-  FragmentIDAssignmentExecutionPolicy(ExecutorDeviceType dt) : dt_(dt){};
+  FragmentIDAssignmentExecutionPolicy(
+      ExecutorDeviceType dt,
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+      : ExecutionPolicy(devices_dispatch_modes), dt_(dt){};
   SchedulingAssignment scheduleSingleFragment(const FragmentInfo&,
                                               size_t frag_id,
                                               size_t frag_num) const override;
-  std::vector<ExecutorDeviceType> devices() const override;
+  std::set<ExecutorDeviceType> devices() const override;
   std::string name() const override { return "ExecutionPolicy::FragmentIDAssignment"; };
 
  private:

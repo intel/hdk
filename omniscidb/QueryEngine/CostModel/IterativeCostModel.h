@@ -24,7 +24,10 @@ class IterativeCostModel : public CostModel {
   IterativeCostModel();
   IterativeCostModel(CostModelConfig config) : CostModel(std::move(config)) {}
 
-  virtual std::unique_ptr<policy::ExecutionPolicy> predict(QueryInfo query_info) const;
+  virtual std::unique_ptr<policy::ExecutionPolicy> predict(
+      QueryInfo query_info,
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+      const;
 
  private:
   static constexpr size_t optimization_iterations_ = 1024;

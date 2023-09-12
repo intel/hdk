@@ -24,7 +24,7 @@ SchedulingAssignment FragmentIDAssignmentExecutionPolicy::scheduleSingleFragment
   int device_id = fragment.deviceIds[static_cast<int>(memory_level)];
   return {dt_, device_id};
 }
-std::vector<ExecutorDeviceType> FragmentIDAssignmentExecutionPolicy::devices() const {
+std::set<ExecutorDeviceType> FragmentIDAssignmentExecutionPolicy::devices() const {
   return {dt_};
 }
 }  // namespace policy

@@ -49,7 +49,9 @@ class CostModel {
 
   virtual void calibrate(const CaibrationConfig& conf);
   virtual std::unique_ptr<policy::ExecutionPolicy> predict(
-      QueryInfo query_info) const = 0;
+      QueryInfo query_info,
+      const std::map<ExecutorDeviceType, ExecutorDispatchMode>& devices_dispatch_modes)
+      const = 0;
 
  protected:
   struct DeviceExtrapolations {

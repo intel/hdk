@@ -473,6 +473,23 @@ class Executor : public StringDictionaryProxyProvider {
                                size_t& max_groups_buffer_entry_guess,
                                const ExecutionOptions& eo);
 
+  std::set<ExecutorDeviceType> getAvailableDeviceTypes() const;
+
+  std::set<ExecutorDeviceType> getDeviceTypesForQuery(
+      const RelAlgExecutionUnit& ra_exe_unit,
+      const std::vector<InputTableInfo>& table_infos,
+      const ExecutorDeviceType requested_dt,
+      size_t& max_groups_buffer_entry_guess,
+      const ExecutionOptions& eo);
+
+  std::unique_ptr<policy::ExecutionPolicy> getExecutionPolicy(
+      const bool is_agg,
+      const std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>&
+          query_mem_descs,
+      const RelAlgExecutionUnit& ra_exe_unit,
+      const std::vector<InputTableInfo>& table_infos,
+      const ExecutionOptions& eo);
+
   hdk::ResultSetTable collectAllDeviceResults(
       SharedKernelContext& shared_context,
       const RelAlgExecutionUnit& ra_exe_unit,
@@ -495,15 +512,13 @@ class Executor : public StringDictionaryProxyProvider {
       const std::vector<InputTableInfo>& table_infos,
       const ExecutionOptions& eo,
       const CompilationOptions& co,
-      const bool is_agg,
       const bool allow_single_frag_table_opt,
       const std::map<ExecutorDeviceType, std::unique_ptr<QueryCompilationDescriptor>>&
           query_comp_descs,
       const std::map<ExecutorDeviceType, std::unique_ptr<QueryMemoryDescriptor>>&
           query_mem_descs,
-      policy::ExecutionPolicy* policy,
-      std::unordered_set<int>& available_gpus,
-      int& available_cpus);
+      const policy::ExecutionPolicy* policy,
+      const size_t device_count);
 
   /**
    * Launches execution kernels created by `createKernels` asynchronously using a thread
