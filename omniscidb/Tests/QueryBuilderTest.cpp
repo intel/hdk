@@ -6241,6 +6241,19 @@ TEST_F(QueryBuilderTest, Quantile_Exec_Stddev) {
   }
 }
 
+TEST_F(QueryBuilderTest, Quantile_Exec_WithProj) {
+  QueryBuilder builder(ctx(), schema_mgr_, configPtr());
+  auto scan = builder.scan("test_quantile");
+  auto dag = scan.agg({"id1"s}, {scan.ref("f32").quantile(0.2, Interpolation::kLower)})
+                 .proj(std::vector<int>({0, 1}))
+                 .sort(0)
+                 .finalize();
+  auto res = runQuery(std::move(dag));
+  compare_res_data(res,
+                   std::vector<int32_t>({1, 2, 3, 4}),
+                   std::vector<float>({2.0, 1.0, 1.0, inline_null_value<float>()}));
+}
+
 TEST_F(QueryBuilderTest, SimpleProjection) {
   QueryBuilder builder(ctx(), schema_mgr_, configPtr());
   compare_test1_data(builder.scan("test1").proj({0, 1, 2, 3}));
