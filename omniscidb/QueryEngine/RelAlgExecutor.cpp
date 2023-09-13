@@ -669,8 +669,14 @@ hdk::ir::ExprPtr translate(const hdk::ir::Expr* expr,
     if (auto* agg = dynamic_cast<const hdk::ir::AggExpr*>(res.get())) {
       if (agg->arg()) {
         auto new_arg = set_transient_dict_maybe(agg->argShared());
-        res = hdk::ir::makeExpr<hdk::ir::AggExpr>(
-            agg->type(), agg->aggType(), new_arg, agg->isDistinct(), agg->arg1Shared());
+        if (new_arg != agg->argShared()) {
+          res = hdk::ir::makeExpr<hdk::ir::AggExpr>(agg->type(),
+                                                    agg->aggType(),
+                                                    new_arg,
+                                                    agg->isDistinct(),
+                                                    agg->arg1Shared(),
+                                                    agg->interpolation());
+        }
       }
     } else {
       res = set_transient_dict_maybe(res);
