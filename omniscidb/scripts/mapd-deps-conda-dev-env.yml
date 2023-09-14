@@ -37,7 +37,6 @@ dependencies:
   - libkml
   - libiconv
   - ncurses
-  - openssl
   - xz
   - bzip2
   - zlib
