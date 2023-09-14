@@ -29,9 +29,6 @@
 #include <string>
 #include <vector>
 
-#ifdef HAVE_AWS_S3
-#include <arrow/filesystem/filesystem.h>
-#endif  // HAVE_AWS_S3
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 
@@ -41,10 +38,6 @@
 namespace shared {
 
 using LocalFileComparator = std::function<bool(const std::string&, const std::string&)>;
-#ifdef HAVE_AWS_S3
-using ArrowFsComparator =
-    std::function<bool(const arrow::fs::FileInfo&, const arrow::fs::FileInfo&)>;
-#endif  // HAVE_AWS_S3
 
 inline const std::string FILE_SORT_ORDER_BY_KEY = "FILE_SORT_ORDER_BY";
 inline const std::string FILE_SORT_REGEX_KEY = "FILE_SORT_REGEX";
@@ -99,14 +92,6 @@ std::vector<std::string> local_glob_filter_sort_files(
     const std::optional<std::string>& filter_regex,
     const std::optional<std::string>& sort_by,
     const std::optional<std::string>& sort_regex);
-
-#ifdef HAVE_AWS_S3
-std::vector<arrow::fs::FileInfo> arrow_fs_filter_sort_files(
-    const std::vector<arrow::fs::FileInfo>& file_paths,
-    const std::optional<std::string>& filter_regex,
-    const std::optional<std::string>& sort_by,
-    const std::optional<std::string>& sort_regex);
-#endif  // HAVE_AWS_S3
 
 const std::function<bool(const std::string&, const std::string&)>
     common_regex_date_comp_ = [](const std::string& lhs, const std::string& rhs) -> bool {
@@ -211,49 +196,5 @@ class FileOrderLocal : public FileOrderBase<LocalFileComparator> {
                                           this->concatCaptureGroups(rhs));
        }}};
 };
-
-#ifdef HAVE_AWS_S3
-
-class FileOrderArrow : public FileOrderBase<ArrowFsComparator> {
- public:
-  FileOrderArrow(const std::optional<std::string>& sort_regex,
-                 const std::optional<std::string>& sort_by)
-      : FileOrderBase<ArrowFsComparator>(sort_regex, sort_by) {}
-
-  inline ArrowFsComparator getFileComparator() override {
-    auto comparator_pair = comparator_map_.find(getSortBy());
-    CHECK(comparator_pair != comparator_map_.end());
-    return comparator_pair->second;
-  }
-
- protected:
-  const std::map<std::string, ArrowFsComparator> comparator_map_{
-      {PATHNAME_ORDER_TYPE,
-       [](const arrow::fs::FileInfo& lhs, const arrow::fs::FileInfo& rhs) -> bool {
-         return lhs.path() < rhs.path();
-       }},
-      {DATE_MODIFIED_ORDER_TYPE,
-       [](const arrow::fs::FileInfo& lhs, const arrow::fs::FileInfo& rhs) -> bool {
-         return lhs.mtime() < rhs.mtime();
-       }},
-      {REGEX_ORDER_TYPE,
-       [this](const arrow::fs::FileInfo& lhs, const arrow::fs::FileInfo& rhs) -> bool {
-         auto lhs_name = lhs.path();
-         auto rhs_name = rhs.path();
-         return this->concatCaptureGroups(lhs_name) < this->concatCaptureGroups(rhs_name);
-       }},
-      {REGEX_DATE_ORDER_TYPE,
-       [this](const arrow::fs::FileInfo& lhs, const arrow::fs::FileInfo& rhs) -> bool {
-         return common_regex_date_comp_(this->concatCaptureGroups(lhs.path()),
-                                        this->concatCaptureGroups(rhs.path()));
-       }},
-      {REGEX_NUMBER_ORDER_TYPE,
-       [this](const arrow::fs::FileInfo& lhs, const arrow::fs::FileInfo& rhs) -> bool {
-         return common_regex_number_comp_(this->concatCaptureGroups(lhs.path()),
-                                          this->concatCaptureGroups(rhs.path()));
-       }}};
-};
-
-#endif  // HAVE_AWS_S3
 
 }  // namespace shared

@@ -24,6 +24,4 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/funcannotations.h
 add_library(Shared ${shared_source_files} "cleanup_global_namespace.h"
                    "boost_stacktrace.hpp")
 target_link_libraries(Shared OSDependent Logger ${Boost_LIBRARIES} TBB::tbb ${Folly_LIBRARIES})
-if("${MAPD_EDITION_LOWER}" STREQUAL "ee")
-  target_link_libraries(Shared ${OPENSSL_LIBRARIES})
-endif()
+

@@ -33,7 +33,6 @@ dependencies:
   - gflags
   - libiconv
   #- ncurses
-  - openssl
   - xz
   - bzip2
   - zlib

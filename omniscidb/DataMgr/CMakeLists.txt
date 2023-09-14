@@ -36,11 +36,6 @@ function(set_arrow_has_private_aws_sdk)
   endif()
 endfunction()
 
-if(ENABLE_AWS_S3)
-  list(APPEND datamgr_source_files OmniSciAwsSdk.cpp)
-  set_arrow_has_private_aws_sdk()
-endif()
-
 add_library(DataMgr ${datamgr_source_files})
 
 set(DataMgrLibs CudaMgr L0Mgr Shared SchemaMgr IR ${Boost_THREAD_LIBRARY} TBB::tbb ${CMAKE_DL_LIBS} ${CUDA_LIBRARIES})

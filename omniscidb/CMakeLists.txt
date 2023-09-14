@@ -117,7 +117,6 @@ if(PREFER_STATIC_LIBS)
   set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   set(Arrow_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_LIBS ON)
-  set(OPENSSL_USE_STATIC_LIBS ON)
   if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
   endif()
@@ -301,16 +300,6 @@ if(XCODE)
   endif()
   add_definitions("-DXCODE")
 endif()
-
-# fixme: hack works for Homebrew, might not work for Conda
-if(ENABLE_CONDA)
-  set(OPENSSL_ROOT_DIR "$ENV{CONDA_PREFIX}")
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
-  set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl/")
-endif()
-
-find_package(OpenSSL REQUIRED)
-include_directories(${OPENSSL_INCLUDE_DIR})
 
 if(MSVC)
   add_definitions(/bigobj)
@@ -535,17 +524,6 @@ if(WIN32)
 endif()
 add_subdirectory(ThirdParty/googlebenchmark)
 
-# aws-sdk
-option(ENABLE_AWS_S3 "Enable AWS S3 support" OFF)
-if(ENABLE_AWS_S3)
-  find_package(LibAwsS3)
-  if(NOT LibAwsS3_FOUND)
-    set(ENABLE_AWS_S3 OFF CACHE BOOL "Enable AWS S3 support" FORCE)
-  else()
-    add_definitions("-DHAVE_AWS_S3")
-  endif()
-endif()
-
 # Arrow
 find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
@@ -554,9 +532,6 @@ include_directories(${Arrow_INCLUDE_DIRS})
 find_package(Parquet REQUIRED)
 
 list(APPEND Arrow_LIBRARIES ${Snappy_LIBRARIES})
-if(ENABLE_AWS_S3)
-  list(INSERT Arrow_LIBRARIES 0 ${LibAwsS3_LIBRARIES})
-endif()
 if (ENABLE_CUDA)
   list(INSERT Arrow_LIBRARIES 0 ${Arrow_GPU_CUDA_LIBRARIES})
 endif()
@@ -578,12 +553,8 @@ endif()
 find_package(SQLite3 REQUIRED)
 include_directories(${SQLite3_INCLUDE_DIRS})
 
+# TODO: required? 
 find_package(CURL REQUIRED QUIET)
-if(CURL_FOUND)
-  if(ENABLE_AWS_S3)
-    set(CURL_LIBRARIES ${LibAwsS3_SUPPORT_LIBRARIES})
-  endif()
-endif()
 
 # PicoSHA2
 include_directories(ThirdParty/PicoSHA2)

@@ -126,47 +126,4 @@ std::vector<std::string> local_glob_filter_sort_files(
   return result_files;
 }
 
-#ifdef HAVE_AWS_S3
-namespace {
-
-std::vector<arrow::fs::FileInfo> arrow_fs_regex_file_filter(
-    const std::string& pattern,
-    const std::vector<arrow::fs::FileInfo>& file_info_list) {
-  boost::regex regex_pattern(pattern);
-  std::vector<arrow::fs::FileInfo> matched_file_info_list;
-  for (const auto& file_info : file_info_list) {
-    if (boost::regex_match(file_info.path(), regex_pattern)) {
-      matched_file_info_list.emplace_back(file_info);
-    }
-  }
-  if (matched_file_info_list.empty()) {
-    throw_no_filter_match(pattern);
-  }
-  return matched_file_info_list;
-}
-
-}  // namespace
-
-std::vector<arrow::fs::FileInfo> arrow_fs_filter_sort_files(
-    const std::vector<arrow::fs::FileInfo>& file_paths,
-    const std::optional<std::string>& filter_regex,
-    const std::optional<std::string>& sort_by,
-    const std::optional<std::string>& sort_regex) {
-  auto result_files = filter_regex.has_value()
-                          ? arrow_fs_regex_file_filter(filter_regex.value(), file_paths)
-                          : file_paths;
-  // initial lexicographical order ensures a determinisitc ordering for files not matching
-  // sort_regex
-  auto initial_file_order = FileOrderArrow(std::nullopt, PATHNAME_ORDER_TYPE);
-  auto lexi_comp = initial_file_order.getFileComparator();
-  std::stable_sort(result_files.begin(), result_files.end(), lexi_comp);
-
-  auto file_order = FileOrderArrow(sort_regex, sort_by);
-  auto comp = file_order.getFileComparator();
-  std::stable_sort(result_files.begin(), result_files.end(), comp);
-  return result_files;
-}
-
-#endif  // HAVE_AWS_S3
-
 }  // namespace shared
