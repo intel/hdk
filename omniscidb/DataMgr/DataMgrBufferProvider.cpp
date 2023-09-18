@@ -40,6 +40,37 @@ void DataMgrBufferProvider::copyToDevice(int8_t* device_ptr,
   gpu_mgr->copyHostToDevice(device_ptr, host_ptr, num_bytes, device_id);
 }
 
+void DataMgrBufferProvider::copyToDeviceAsync(int8_t* device_ptr,
+                                              const int8_t* host_ptr,
+                                              const size_t num_bytes,
+                                              const int device_id) const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  CHECK(gpu_mgr);
+  gpu_mgr->copyHostToDeviceAsync(device_ptr, host_ptr, num_bytes, device_id);
+}
+
+void DataMgrBufferProvider::copyToDeviceAsyncIfPossible(int8_t* device_ptr,
+                                                        const int8_t* host_ptr,
+                                                        const size_t num_bytes,
+                                                        const int device_id) const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  CHECK(gpu_mgr);
+  if (gpu_mgr->canLoadAsync()) {
+    gpu_mgr->copyHostToDeviceAsync(device_ptr, host_ptr, num_bytes, device_id);
+  } else {
+    gpu_mgr->copyHostToDevice(device_ptr, host_ptr, num_bytes, device_id);
+  }
+}
+
+void DataMgrBufferProvider::synchronizeStream(const int device_num) const {
+  CHECK(data_mgr_);
+  const auto gpu_mgr = data_mgr_->getGpuMgr();
+  CHECK(gpu_mgr);
+  gpu_mgr->synchronizeStream(device_num);
+}
+
 void DataMgrBufferProvider::copyFromDevice(int8_t* host_ptr,
                                            const int8_t* device_ptr,
                                            const size_t num_bytes,

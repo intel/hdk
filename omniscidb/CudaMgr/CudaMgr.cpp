@@ -62,6 +62,10 @@ CudaMgr::CudaMgr(const int num_gpus, const int start_gpu)
   initDeviceGroup();
   createDeviceContexts();
   printDeviceProperties();
+  for (int device_id = 0; device_id < device_count_; device_id++) {
+    setContext(device_id);
+    checkError(cuStreamCreate(&stream_, CU_STREAM_NON_BLOCKING));
+  }
 }
 
 void CudaMgr::initDeviceGroup() {
@@ -108,6 +112,18 @@ void CudaMgr::copyHostToDevice(int8_t* device_ptr,
       cuMemcpyHtoD(reinterpret_cast<CUdeviceptr>(device_ptr), host_ptr, num_bytes));
 }
 
+void CudaMgr::copyHostToDeviceAsync(int8_t* device_ptr,
+                                    const int8_t* host_ptr,
+                                    const size_t num_bytes,
+                                    const int device_num) {
+  setContext(device_num);
+  checkError(cuMemcpyHtoDAsync(
+      reinterpret_cast<CUdeviceptr>(device_ptr), host_ptr, num_bytes, stream_));
+}
+void CudaMgr::synchronizeStream(const int device_num) {
+  setContext(device_num);
+  checkError(cuStreamSynchronize(stream_));
+}
 void CudaMgr::copyDeviceToHost(int8_t* host_ptr,
                                const int8_t* device_ptr,
                                const size_t num_bytes,

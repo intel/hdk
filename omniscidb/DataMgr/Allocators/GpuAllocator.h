@@ -39,6 +39,8 @@ class GpuAllocator : public DeviceAllocator {
       const size_t num_bytes,
       const int device_id);
 
+  Data_Namespace::AbstractBuffer* allocGpuAbstractBuffer(const size_t num_bytes);
+
   int8_t* alloc(const size_t num_bytes) override;
 
   void free(Data_Namespace::AbstractBuffer* ab) const override;

@@ -46,6 +46,12 @@ Data_Namespace::AbstractBuffer* GpuAllocator::allocGpuAbstractBuffer(
   return ab;
 }
 
+Data_Namespace::AbstractBuffer* GpuAllocator::allocGpuAbstractBuffer(
+    const size_t num_bytes) {
+  CHECK(buffer_provider_);
+  return GpuAllocator::allocGpuAbstractBuffer(buffer_provider_, num_bytes, device_id_);
+}
+
 int8_t* GpuAllocator::alloc(const size_t num_bytes) {
   CHECK(buffer_provider_);
   owned_buffers_.emplace_back(
