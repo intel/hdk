@@ -125,7 +125,16 @@ class QueryExecutionContext : boost::noncopyable {
     KERN_PARAM_COUNT,
   };
 
-  std::vector<int8_t*> prepareKernelParams(
+  size_t getKernelParamsAllocSize(
+      const std::vector<std::vector<const int8_t*>>& col_buffers,
+      const std::vector<int32_t>& error_codes,
+      const size_t literals_sz,
+      const std::vector<std::vector<int64_t>>& num_rows,
+      const std::vector<std::vector<uint64_t>>& frag_offsets,
+      const size_t init_agg_vals_sz,
+      const size_t hash_table_count) const;
+
+  std::pair<std::vector<int8_t*>, Data_Namespace::AbstractBuffer*> prepareKernelParams(
       const std::vector<std::vector<const int8_t*>>& col_buffers,
       const std::vector<int8_t>& literal_buff,
       const std::vector<std::vector<int64_t>>& num_rows,

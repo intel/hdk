@@ -32,6 +32,14 @@ struct GpuMgr {
                                 const int8_t* host_ptr,
                                 const size_t num_bytes,
                                 const int device_num) = 0;
+
+  virtual void copyHostToDeviceAsync(int8_t* device_ptr,
+                                     const int8_t* host_ptr,
+                                     const size_t num_bytes,
+                                     const int device_num) = 0;
+
+  virtual void synchronizeStream(const int device_num) = 0;
+
   virtual void copyDeviceToHost(int8_t* host_ptr,
                                 const int8_t* device_ptr,
                                 const size_t num_bytes,
@@ -63,6 +71,8 @@ struct GpuMgr {
   virtual uint32_t getGridSize() const = 0;
   virtual uint32_t getMinEUNumForAllDevices() const = 0;
   virtual bool hasSharedMemoryAtomicsSupport() const = 0;
+  virtual bool canLoadAsync() const = 0;
+
   // TODO: hasFP64Support implementations do not account for different device capabilities
   virtual bool hasFP64Support() const { return true; };
   virtual size_t getMinSharedMemoryPerBlockForAllDevices() const = 0;

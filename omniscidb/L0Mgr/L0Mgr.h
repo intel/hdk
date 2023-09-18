@@ -199,7 +199,16 @@ void* allocate_device_mem(const size_t num_bytes, L0Device& device);
 class L0Manager : public GpuMgr {
  public:
   L0Manager();
-
+  void copyHostToDeviceAsync(int8_t* device_ptr,
+                             const int8_t* host_ptr,
+                             const size_t num_bytes,
+                             const int device_num) override {
+    CHECK(false);
+  }
+  void synchronizeStream(const int device_num) override {
+    LOG(WARNING)
+        << "L0 has no async data transfer enabled, synchronizeStream() has no effect";
+  }
   void copyHostToDevice(int8_t* device_ptr,
                         const int8_t* host_ptr,
                         const size_t num_bytes,
@@ -225,7 +234,7 @@ class L0Manager : public GpuMgr {
                     const unsigned char uc,
                     const size_t num_bytes,
                     const int device_num) override;
-
+  bool canLoadAsync() const override { return async_data_load_available; };
   void synchronizeDevices() const override;
   GpuMgrPlatform getPlatform() const override { return GpuMgrPlatform::L0; }
   int getDeviceCount() const override {
@@ -252,6 +261,7 @@ class L0Manager : public GpuMgr {
 
  private:
   std::vector<std::shared_ptr<L0Driver>> drivers_;
+  static constexpr bool async_data_load_available{false};
 };
 
 }  // namespace l0

@@ -95,6 +95,14 @@ class CudaMgr : public GpuMgr {
                         const int8_t* host_ptr,
                         const size_t num_bytes,
                         const int device_num) override;
+
+  void copyHostToDeviceAsync(int8_t* device_ptr,
+                             const int8_t* host_ptr,
+                             const size_t num_bytes,
+                             const int device_num) override;
+
+  void synchronizeStream(const int device_num) override;
+
   void copyDeviceToHost(int8_t* host_ptr,
                         const int8_t* device_ptr,
                         const size_t num_bytes,
@@ -116,6 +124,8 @@ class CudaMgr : public GpuMgr {
                     const unsigned char uc,
                     const size_t num_bytes,
                     const int device_num) override;
+
+  bool canLoadAsync() const override { return async_data_load_available; };
 
   size_t getMinSharedMemoryPerBlockForAllDevices() const override {
     return min_shared_memory_per_block_for_all_devices;
@@ -268,6 +278,7 @@ class CudaMgr : public GpuMgr {
   void checkError(CUresult cu_result) const;
 
   int gpu_driver_version_;
+  CUstream stream_;
 #endif
 
   int device_count_;
@@ -277,8 +288,8 @@ class CudaMgr : public GpuMgr {
   std::vector<DeviceProperties> device_properties_;
   omnisci::DeviceGroup device_group_;
   std::vector<CUcontext> device_contexts_;
-
   mutable std::mutex device_cleanup_mutex_;
+  static constexpr bool async_data_load_available{true};
 };
 
 }  // Namespace CudaMgr_Namespace

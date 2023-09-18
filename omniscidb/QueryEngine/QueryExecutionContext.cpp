@@ -289,19 +289,19 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
     kernel->initializeRuntimeInterrupter();
   }
 
-  auto kernel_params = prepareKernelParams(col_buffers,
-                                           literal_buff,
-                                           num_rows,
-                                           frag_offsets,
-                                           scan_limit,
-                                           init_agg_vals,
-                                           error_codes,
-                                           num_tables,
-                                           join_hash_tables,
-                                           buffer_provider,
-                                           device_id,
-                                           hoist_literals,
-                                           is_group_by);
+  auto [kernel_params, kernel_metadata_gpu_buf] = prepareKernelParams(col_buffers,
+                                                                      literal_buff,
+                                                                      num_rows,
+                                                                      frag_offsets,
+                                                                      scan_limit,
+                                                                      init_agg_vals,
+                                                                      error_codes,
+                                                                      num_tables,
+                                                                      join_hash_tables,
+                                                                      buffer_provider,
+                                                                      device_id,
+                                                                      hoist_literals,
+                                                                      is_group_by);
 
   CHECK_EQ(static_cast<size_t>(KERN_PARAM_COUNT), kernel_params.size());
 
@@ -544,7 +544,8 @@ std::vector<int64_t*> QueryExecutionContext::launchGpuCode(
     VLOG(1) << "Device " << std::to_string(device_id)
             << ": launchGpuCode: finish: " << std::to_string(finish_time) << " ms";
   }
-
+  gpu_allocator_->free(
+      reinterpret_cast<Data_Namespace::AbstractBuffer*>(kernel_metadata_gpu_buf));
   return out_vec;
 }
 
@@ -735,7 +736,57 @@ std::vector<int64_t*> QueryExecutionContext::launchCpuCode(
   return out_vec;
 }
 
-std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
+size_t QueryExecutionContext::getKernelParamsAllocSize(
+    const std::vector<std::vector<const int8_t*>>& col_buffers,
+    const std::vector<int32_t>& error_codes,
+    const size_t literals_sz,
+    const std::vector<std::vector<int64_t>>& num_rows,
+    const std::vector<std::vector<uint64_t>>& frag_offsets,
+    const size_t init_agg_vals_sz,
+    const size_t hash_table_count) const {
+  // Scalar vals: NUM_FRAGMENTS + INIT_AGG_VALS + MAX_MATCHED + TOTAL_MATCHED + NUM_TABLES
+  size_t total_alloc_size = sizeof(uint64_t) + sizeof(int64_t) + sizeof(int32_t) +
+                            sizeof(int32_t) + sizeof(uint32_t);
+  const uint64_t num_fragments = static_cast<uint64_t>(col_buffers.size());
+  const size_t col_count{num_fragments > 0 ? col_buffers.front().size() : 0};
+  if (col_count) {
+    total_alloc_size += col_buffers.size() * col_count * sizeof(int8_t*) +
+                        num_fragments * sizeof(int8_t*);
+  }
+
+  const size_t flatened_num_rows_sz = std::accumulate(
+      num_rows.begin(),
+      num_rows.end(),
+      0,
+      [](size_t sum, const std::vector<int64_t>& nums) { return sum + nums.size(); });
+
+  const size_t flatened_frag_offsets_sz =
+      std::accumulate(frag_offsets.begin(),
+                      frag_offsets.end(),
+                      0,
+                      [](size_t sum, const std::vector<uint64_t>& offsets) {
+                        return sum + offsets.size();
+                      });
+
+  total_alloc_size += sizeof(int64_t) * 2 + literals_sz;
+  total_alloc_size += sizeof(int64_t) * flatened_num_rows_sz;
+  total_alloc_size += sizeof(int64_t) * flatened_frag_offsets_sz;
+  total_alloc_size += sizeof(int64_t) * init_agg_vals_sz;
+  total_alloc_size += sizeof(error_codes[0]) * error_codes.size();
+  if (hash_table_count > 1) {
+    total_alloc_size += hash_table_count * sizeof(int64_t);
+  }
+  if (total_alloc_size % 8) {
+    total_alloc_size += (8 - (total_alloc_size % 8));
+  }
+  LOG(DEBUG1) << total_alloc_size << " bytes on GPU for kernel params";
+  return total_alloc_size;
+}
+
+// Allocates one buffer for parameters and fills in decreasing alignment of parameter
+// types.
+std::pair<std::vector<int8_t*>, Data_Namespace::AbstractBuffer*>
+QueryExecutionContext::prepareKernelParams(
     const std::vector<std::vector<const int8_t*>>& col_buffers,
     const std::vector<int8_t>& literal_buff,
     const std::vector<std::vector<int64_t>>& num_rows,
@@ -749,42 +800,13 @@ std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
     const int device_id,
     const bool hoist_literals,
     const bool is_group_by) const {
+  INJECT_TIMER(prepareKernelParams);
   CHECK(gpu_allocator_);
   std::vector<int8_t*> params(KERN_PARAM_COUNT, 0);
-  const uint64_t num_fragments = static_cast<uint64_t>(col_buffers.size());
-  const size_t col_count{num_fragments > 0 ? col_buffers.front().size() : 0};
-  if (col_count) {
-    std::vector<int8_t*> multifrag_col_dev_buffers;
-    for (auto frag_col_buffers : col_buffers) {
-      std::vector<const int8_t*> col_dev_buffers;
-      for (auto col_buffer : frag_col_buffers) {
-        col_dev_buffers.push_back(col_buffer);
-      }
-      auto col_buffers_dev_ptr = gpu_allocator_->alloc(col_count * sizeof(int8_t*));
-      buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(col_buffers_dev_ptr),
-                                    reinterpret_cast<const int8_t*>(&col_dev_buffers[0]),
-                                    col_count * sizeof(int8_t*),
-                                    device_id);
-      multifrag_col_dev_buffers.push_back(reinterpret_cast<int8_t*>(col_buffers_dev_ptr));
-    }
-    params[COL_BUFFERS] =
-        reinterpret_cast<int8_t*>(gpu_allocator_->alloc(num_fragments * sizeof(int8_t*)));
-    buffer_provider->copyToDevice(
-        reinterpret_cast<int8_t*>(params[COL_BUFFERS]),
-        reinterpret_cast<const int8_t*>(&multifrag_col_dev_buffers[0]),
-        num_fragments * sizeof(int8_t*),
-        device_id);
-  }
-  params[NUM_FRAGMENTS] =
-      reinterpret_cast<int8_t*>(gpu_allocator_->alloc(sizeof(uint64_t)));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[NUM_FRAGMENTS]),
-                                reinterpret_cast<const int8_t*>(&num_fragments),
-                                sizeof(uint64_t),
-                                device_id);
-  int8_t* literals_and_addr_mapping =
-      gpu_allocator_->alloc(literal_buff.size() + 2 * sizeof(int64_t));
-  CHECK_EQ(std::uintptr_t(0),
-           reinterpret_cast<std::uintptr_t>(literals_and_addr_mapping) % 8);
+
+  CHECK_EQ(num_rows.size(), col_buffers.size());
+  CHECK_EQ(frag_offsets.size(), col_buffers.size());
+
   std::vector<int64_t> additional_literal_bytes;
   const auto count_distinct_bitmap_mem = query_buffers_->getCountDistinctBitmapPtr();
   if (count_distinct_bitmap_mem) {
@@ -795,99 +817,93 @@ std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
         reinterpret_cast<int64_t>(count_distinct_bitmap_host_mem));
     additional_literal_bytes.push_back(static_cast<int64_t>(
         reinterpret_cast<std::uintptr_t>(count_distinct_bitmap_mem)));
-    buffer_provider->copyToDevice(
-        reinterpret_cast<int8_t*>(literals_and_addr_mapping),
-        reinterpret_cast<const int8_t*>(&additional_literal_bytes[0]),
-        additional_literal_bytes.size() * sizeof(additional_literal_bytes[0]),
-        device_id);
   }
-  params[LITERALS] = literals_and_addr_mapping + additional_literal_bytes.size() *
-                                                     sizeof(additional_literal_bytes[0]);
-  if (!literal_buff.empty()) {
-    CHECK(hoist_literals);
-    buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[LITERALS]),
-                                  reinterpret_cast<const int8_t*>(&literal_buff[0]),
-                                  literal_buff.size(),
-                                  device_id);
-  }
-  CHECK_EQ(num_rows.size(), col_buffers.size());
-  std::vector<int64_t> flatened_num_rows;
-  for (auto& nums : num_rows) {
-    CHECK_EQ(nums.size(), num_tables);
-    flatened_num_rows.insert(flatened_num_rows.end(), nums.begin(), nums.end());
-  }
-  params[NUM_ROWS] = reinterpret_cast<int8_t*>(
-      gpu_allocator_->alloc(sizeof(int64_t) * flatened_num_rows.size()));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[NUM_ROWS]),
-                                reinterpret_cast<const int8_t*>(&flatened_num_rows[0]),
-                                sizeof(int64_t) * flatened_num_rows.size(),
-                                device_id);
 
-  CHECK_EQ(frag_offsets.size(), col_buffers.size());
+  const int8_t* init_agg_vals_buf{nullptr};
+  size_t init_agg_vals_buf_sz{0};
+  std::vector<int64_t> compact_init_vals_vec;
+  if (is_group_by && !output_columnar_) {
+    init_agg_vals_buf_sz =
+        align_to_int64(query_mem_desc_.getColsSize()) / sizeof(int64_t);
+    compact_init_vals_vec =
+        compact_init_vals(init_agg_vals_buf_sz, init_agg_vals, query_mem_desc_);
+    init_agg_vals_buf = reinterpret_cast<const int8_t*>(compact_init_vals_vec.data());
+  } else {
+    init_agg_vals_buf = reinterpret_cast<const int8_t*>(init_agg_vals.data());
+    init_agg_vals_buf_sz = init_agg_vals.size();
+  }
+
+  const auto hash_table_count = join_hash_tables.size();
+
+  const size_t alloc_size{
+      getKernelParamsAllocSize(col_buffers,
+                               error_codes,
+                               literal_buff.size() + additional_literal_bytes.size(),
+                               num_rows,
+                               frag_offsets,
+                               init_agg_vals_buf_sz,
+                               hash_table_count)};
+
+  Data_Namespace::AbstractBuffer* kernel_metadata_gpu_buf =
+      gpu_allocator_->allocGpuAbstractBuffer(alloc_size);
+  int8_t* kernel_metadata_gpu_cursor{kernel_metadata_gpu_buf->getMemoryPtr()};
+  auto copy_to_gpu_mem = [device_id, buffer_provider, &kernel_metadata_gpu_cursor](
+                             const int8_t* from, const size_t size) {
+    buffer_provider->copyToDeviceAsyncIfPossible(
+        kernel_metadata_gpu_cursor, from, size, device_id);
+    int8_t* copied_to = kernel_metadata_gpu_cursor;
+    kernel_metadata_gpu_cursor += size;
+    return copied_to;
+  };
+
+  const uint64_t num_fragments = static_cast<uint64_t>(col_buffers.size());
+  const size_t col_count{num_fragments > 0 ? col_buffers.front().size() : 0};
+  if (col_count) {
+    std::vector<int8_t*> multifrag_col_dev_buffers;
+    std::vector<const int8_t*> flatened_col_buffers;
+    std::vector<size_t> col_buffs_offsets;
+    for (auto& buffers : col_buffers) {
+      flatened_col_buffers.insert(
+          flatened_col_buffers.end(), buffers.begin(), buffers.end());
+      col_buffs_offsets.push_back(
+          col_buffs_offsets.size() ? col_buffs_offsets.back() + buffers.size() : 0);
+    }
+    int8_t* col_buffers_dev_ptr =
+        copy_to_gpu_mem(reinterpret_cast<const int8_t*>(flatened_col_buffers.data()),
+                        flatened_col_buffers.size() * sizeof(int8_t*));
+    for (const size_t offset : col_buffs_offsets) {
+      multifrag_col_dev_buffers.push_back(
+          reinterpret_cast<int8_t*>(col_buffers_dev_ptr + offset * sizeof(int8_t*)));
+    }
+    params[COL_BUFFERS] =
+        copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&multifrag_col_dev_buffers[0]),
+                        num_fragments * sizeof(int8_t*));
+  }
+
+  params[NUM_FRAGMENTS] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&num_fragments), sizeof(uint64_t));
+  params[INIT_AGG_VALS] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(init_agg_vals_buf),
+                      init_agg_vals_buf_sz * sizeof(int64_t));
   std::vector<int64_t> flatened_frag_offsets;
   for (auto& offsets : frag_offsets) {
     CHECK_EQ(offsets.size(), num_tables);
     flatened_frag_offsets.insert(
         flatened_frag_offsets.end(), offsets.begin(), offsets.end());
   }
-  params[FRAG_ROW_OFFSETS] = reinterpret_cast<int8_t*>(
-      gpu_allocator_->alloc(sizeof(int64_t) * flatened_frag_offsets.size()));
-  buffer_provider->copyToDevice(
-      reinterpret_cast<int8_t*>(params[FRAG_ROW_OFFSETS]),
-      reinterpret_cast<const int8_t*>(&flatened_frag_offsets[0]),
-      sizeof(int64_t) * flatened_frag_offsets.size(),
-      device_id);
+  params[FRAG_ROW_OFFSETS] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&flatened_frag_offsets[0]),
+                      sizeof(int64_t) * flatened_frag_offsets.size());
 
-  // Note that this will be overwritten if we are setting the entry count during group by
-  // buffer allocation and initialization
-  const int32_t max_matched{scan_limit};
-  params[MAX_MATCHED] =
-      reinterpret_cast<int8_t*>(gpu_allocator_->alloc(sizeof(max_matched)));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[MAX_MATCHED]),
-                                reinterpret_cast<const int8_t*>(&max_matched),
-                                sizeof(max_matched),
-                                device_id);
-
-  int32_t total_matched{0};
-  params[TOTAL_MATCHED] =
-      reinterpret_cast<int8_t*>(gpu_allocator_->alloc(sizeof(total_matched)));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[TOTAL_MATCHED]),
-                                reinterpret_cast<const int8_t*>(&total_matched),
-                                sizeof(total_matched),
-                                device_id);
-
-  if (is_group_by && !output_columnar_) {
-    auto cmpt_sz = align_to_int64(query_mem_desc_.getColsSize()) / sizeof(int64_t);
-    auto cmpt_val_buff = compact_init_vals(cmpt_sz, init_agg_vals, query_mem_desc_);
-    params[INIT_AGG_VALS] =
-        reinterpret_cast<int8_t*>(gpu_allocator_->alloc(cmpt_sz * sizeof(int64_t)));
-    buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[INIT_AGG_VALS]),
-                                  reinterpret_cast<const int8_t*>(&cmpt_val_buff[0]),
-                                  cmpt_sz * sizeof(int64_t),
-                                  device_id);
-  } else {
-    params[INIT_AGG_VALS] = reinterpret_cast<int8_t*>(
-        gpu_allocator_->alloc(init_agg_vals.size() * sizeof(int64_t)));
-    buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[INIT_AGG_VALS]),
-                                  reinterpret_cast<const int8_t*>(&init_agg_vals[0]),
-                                  init_agg_vals.size() * sizeof(int64_t),
-                                  device_id);
+  std::vector<int64_t> flatened_num_rows;
+  for (auto& nums : num_rows) {
+    CHECK_EQ(nums.size(), num_tables);
+    flatened_num_rows.insert(flatened_num_rows.end(), nums.begin(), nums.end());
   }
+  params[NUM_ROWS] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(flatened_num_rows.data()),
+                      sizeof(int64_t) * flatened_num_rows.size());
 
-  params[ERROR_CODE] = reinterpret_cast<int8_t*>(
-      gpu_allocator_->alloc(error_codes.size() * sizeof(error_codes[0])));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[ERROR_CODE]),
-                                reinterpret_cast<const int8_t*>(&error_codes[0]),
-                                error_codes.size() * sizeof(error_codes[0]),
-                                device_id);
-
-  params[NUM_TABLES] = reinterpret_cast<int8_t*>(gpu_allocator_->alloc(sizeof(uint32_t)));
-  buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[NUM_TABLES]),
-                                reinterpret_cast<const int8_t*>(&num_tables),
-                                sizeof(uint32_t),
-                                device_id);
-
-  const auto hash_table_count = join_hash_tables.size();
   switch (hash_table_count) {
     case 0: {
       params[JOIN_HASH_TABLES] = 0;
@@ -897,16 +913,52 @@ std::vector<int8_t*> QueryExecutionContext::prepareKernelParams(
       params[JOIN_HASH_TABLES] = reinterpret_cast<int8_t*>(join_hash_tables[0]);
       break;
     default: {
-      params[JOIN_HASH_TABLES] = reinterpret_cast<int8_t*>(
-          gpu_allocator_->alloc(hash_table_count * sizeof(int64_t)));
-      buffer_provider->copyToDevice(reinterpret_cast<int8_t*>(params[JOIN_HASH_TABLES]),
-                                    reinterpret_cast<const int8_t*>(&join_hash_tables[0]),
-                                    hash_table_count * sizeof(int64_t),
-                                    device_id);
+      params[JOIN_HASH_TABLES] =
+          copy_to_gpu_mem(reinterpret_cast<const int8_t*>(join_hash_tables.data()),
+                          hash_table_count * sizeof(int64_t));
       break;
     }
   }
 
+  int8_t* literals_and_addr_mapping = kernel_metadata_gpu_cursor;
+  CHECK_EQ(std::uintptr_t(0),
+           reinterpret_cast<std::uintptr_t>(literals_and_addr_mapping) % 8);
+  if (count_distinct_bitmap_mem) {
+    copy_to_gpu_mem(
+        reinterpret_cast<const int8_t*>(&additional_literal_bytes[0]),
+        additional_literal_bytes.size() * sizeof(additional_literal_bytes[0]));
+  }
+  params[LITERALS] = literals_and_addr_mapping + additional_literal_bytes.size() *
+                                                     sizeof(additional_literal_bytes[0]);
+  if (!literal_buff.empty()) {
+    CHECK(hoist_literals);
+    copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&literal_buff[0]),
+                    literal_buff.size());
+  }
+
+  if (reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_cursor) % 4) {
+    kernel_metadata_gpu_cursor +=
+        (4 - (reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_cursor) % 4));
+  }
+  CHECK_EQ(std::uintptr_t(0),
+           reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_cursor) % 4);
+  // Note that this will be overwritten if we are setting the entry count during group by
+  // buffer allocation and initialization
+  const int32_t max_matched{scan_limit};
+  int32_t total_matched{0};
+
+  params[ERROR_CODE] = copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&error_codes[0]),
+                                       error_codes.size() * sizeof(error_codes[0]));
+  params[MAX_MATCHED] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&max_matched), sizeof(max_matched));
+  params[TOTAL_MATCHED] = copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&total_matched),
+                                          sizeof(total_matched));
+  params[NUM_TABLES] =
+      copy_to_gpu_mem(reinterpret_cast<const int8_t*>(&num_tables), sizeof(uint32_t));
+  CHECK_LE(reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_cursor),
+           reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_buf->getMemoryPtr() +
+                                            alloc_size));
   CHECK_EQ(nullptr, params[GROUPBY_BUF]);
-  return params;
+  buffer_provider->synchronizeStream(device_id);
+  return {params, kernel_metadata_gpu_buf};
 }
