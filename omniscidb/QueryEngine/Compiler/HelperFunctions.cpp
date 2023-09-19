@@ -17,8 +17,11 @@
 #include <llvm/Analysis/MemorySSA.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/StandardInstrumentations.h>
+#include <llvm/Support/Path.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/GlobalOpt.h>
@@ -37,9 +40,8 @@
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/Mem2Reg.h>
-#include "llvm/IR/PassManager.h"
-#include "llvm/Passes/StandardInstrumentations.h"
-#include "llvm/Support/Path.h"
+
+#include <optional>
 
 #include "QueryEngine/Compiler/Exceptions.h"
 #include "QueryEngine/Optimization/AnnotateInternalFunctionsPass.h"
@@ -188,7 +190,11 @@ void optimize_ir(llvm::Function* query_func,
 
   llvm::PassBuilder PB(nullptr,
                        llvm::PipelineTuningOptions(),
+#if LLVM_VERSION_MAJOR > 15
+                       std::nullopt,
+#else
                        llvm::None,
+#endif
                        (co.dump_llvm_ir_after_each_pass == 2) ? &PIC : nullptr);
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
