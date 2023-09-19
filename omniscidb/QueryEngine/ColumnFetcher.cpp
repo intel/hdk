@@ -146,8 +146,8 @@ JoinColumn ColumnFetcher::makeJoinColumn(
         data_provider,
         column_cache);
     if (col_buff != nullptr) {
+      join_chunk_array[num_chunks] = JoinChunk{col_buff, elem_count, num_elems};
       num_elems += elem_count;
-      join_chunk_array[num_chunks] = JoinChunk{col_buff, elem_count};
     } else {
       continue;
     }

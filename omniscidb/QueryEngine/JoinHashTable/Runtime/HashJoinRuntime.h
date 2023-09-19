@@ -101,6 +101,7 @@ struct JoinChunk {
   const int8_t*
       col_buff;  // actually from AbstractBuffer::getMemoryPtr() via Chunk_NS::Chunk
   size_t num_elems;
+  size_t row_id;
 };
 
 struct JoinColumn {
