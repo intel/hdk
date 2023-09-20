@@ -212,7 +212,11 @@ void optimize_ir(llvm::Function* query_func,
   llvm::ModulePassManager MPM;
   llvm::FunctionPassManager FPM;
   if (co.dump_llvm_ir_after_each_pass) {
+#if LLVM_VERSION_MAJOR > 15
+    llvm::StandardInstrumentations SI(llvm_module->getContext(), false);
+#else
     llvm::StandardInstrumentations SI(false);
+#endif
     SI.registerCallbacks(PIC);
     DUMP_MODULE(llvm_module, ir_dump_dir + "IR_UNOPT");
   }
