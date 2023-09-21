@@ -173,6 +173,9 @@ include_directories(${Boost_INCLUDE_DIR})
 find_package(TBB REQUIRED)
 add_definitions("-DTBB_PREVIEW_TASK_GROUP_EXTENSIONS=1")
 
+# Profiler
+set(PROFILER_LIBS "")
+
 # Cost Model
 option(ENABLE_DWARF_BENCH "Enable Dwarf Bench" OFF)
 if(ENABLE_DWARF_BENCH)
