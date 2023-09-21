@@ -11,7 +11,6 @@ on:
       cuda_compiler_version:
         type: string
 
-
     outputs:
       cache-suffix:
         value: ${{ jobs.build.outputs.cache-suffix }}
@@ -76,6 +75,10 @@ jobs:
 
       - name: Configure and build
         run: |
+          $vswhere = "$(${env:ProgramFiles(x86)})\Microsoft Visual Studio\Installer\vswhere.exe"
+          $path = & $vswhere -property installationPath
+          & $path\VC\Auxiliary\Build\vcvarsall.bat x64
+          $env:VSINSTALLDIR = $path
           & $env:CONDA\condabin\conda.bat info
           & $env:CONDA\condabin\conda.bat list -n omnisci-dev
           & $env:CONDA\condabin\conda.bat run --no-capture-output -n omnisci-dev omniscidb\scripts\conda\build.bat ${{ inputs.options }}
@@ -96,4 +99,3 @@ jobs:
             build/*.log
             build/CMakeCache.txt
             build/CMakeFiles/*.log
-
