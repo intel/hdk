@@ -930,24 +930,25 @@ const std::vector<const int8_t*>& ResultSet::getColumnFrag(const size_t storage_
                                                            const size_t col_logical_idx,
                                                            int64_t& global_idx) const {
   CHECK_LT(static_cast<size_t>(storage_idx), col_buffers_.size());
-  if (col_buffers_[storage_idx].size() > 1) {
+  if (col_buffers_[storage_idx]->size() > 1) {
     int64_t frag_id = 0;
     int64_t local_idx = global_idx;
-    if (consistent_frag_sizes_[storage_idx][col_logical_idx] != -1) {
-      frag_id = global_idx / consistent_frag_sizes_[storage_idx][col_logical_idx];
-      local_idx = global_idx % consistent_frag_sizes_[storage_idx][col_logical_idx];
+    const auto frag_size = (*(consistent_frag_sizes_[storage_idx]))[col_logical_idx];
+    if (frag_size != -1) {
+      frag_id = global_idx / frag_size;
+      local_idx = global_idx % frag_size;
     } else {
       std::tie(frag_id, local_idx) = get_frag_id_and_local_idx(
-          frag_offsets_[storage_idx], col_logical_idx, global_idx);
+          *(frag_offsets_[storage_idx]), col_logical_idx, global_idx);
       CHECK_LE(local_idx, global_idx);
     }
     CHECK_GE(frag_id, int64_t(0));
-    CHECK_LT(static_cast<size_t>(frag_id), col_buffers_[storage_idx].size());
+    CHECK_LT(static_cast<size_t>(frag_id), col_buffers_[storage_idx]->size());
     global_idx = local_idx;
-    return col_buffers_[storage_idx][frag_id];
+    return (*(col_buffers_[storage_idx]))[frag_id];
   } else {
-    CHECK_EQ(size_t(1), col_buffers_[storage_idx].size());
-    return col_buffers_[storage_idx][0];
+    CHECK_EQ(size_t(1), col_buffers_[storage_idx]->size());
+    return (*(col_buffers_[storage_idx]))[0];
   }
 }
 

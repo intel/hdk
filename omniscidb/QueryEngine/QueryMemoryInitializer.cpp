@@ -383,6 +383,12 @@ QueryMemoryInitializer::QueryMemoryInitializer(
     group_by_buffers_.push_back(varlen_output_buffer);
   }
 
+  ColBuffersPtr res_set_col_buf = std::make_shared<const ColBuffers>(col_buffers);
+  FragOffsetsPtr res_set_col_frag_offsets = std::make_shared<const FragOffsets>(
+      get_col_frag_offsets(ra_exe_unit.target_exprs, frag_offsets));
+  FragSizesPtr res_set_frag_sizes = std::make_shared<const FragSizes>(
+      get_consistent_frags_sizes(ra_exe_unit.target_exprs, consistent_frag_sizes));
+
   for (size_t i = 0; i < group_buffers_count; i += step) {
     auto group_by_buffer = alloc_group_by_buffer(
         actual_group_buffer_size, thread_idx_, row_set_mem_owner_.get());
@@ -419,19 +425,14 @@ QueryMemoryInitializer::QueryMemoryInitializer(
       group_by_buffers_.push_back(nullptr);
     }
 
-    const auto column_frag_offsets =
-        get_col_frag_offsets(ra_exe_unit.target_exprs, frag_offsets);
-    const auto column_frag_sizes =
-        get_consistent_frags_sizes(ra_exe_unit.target_exprs, consistent_frag_sizes);
-
     result_sets_.emplace_back(new ResultSet(
         target_exprs_to_infos(ra_exe_unit.target_exprs,
                               query_mem_desc,
                               executor->getConfig().exec.group_by.bigint_count),
         executor->getColLazyFetchInfo(ra_exe_unit.target_exprs),
-        col_buffers,
-        column_frag_offsets,
-        column_frag_sizes,
+        res_set_col_buf,
+        res_set_col_frag_offsets,
+        res_set_frag_sizes,
         device_type,
         device_id,
         ResultSet::fixupQueryMemoryDescriptor(query_mem_desc),
