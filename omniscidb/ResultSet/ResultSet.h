@@ -161,6 +161,13 @@ using Permutation = std::vector<PermutationIdx>;
 using PermutationView = VectorView<PermutationIdx>;
 using ResultSetPtr = std::shared_ptr<ResultSet>;
 
+using FragSizes = std::vector<int64_t>;
+using FragSizesPtr = std::shared_ptr<const FragSizes>;
+using ColBuffers = std::vector<std::vector<const int8_t*>>;
+using ColBuffersPtr = std::shared_ptr<const ColBuffers>;
+using FragOffsets = std::vector<std::vector<int64_t>>;
+using FragOffsetsPtr = std::shared_ptr<const FragOffsets>;
+
 class ResultSet {
  public:
   friend ResultSetBuilder;
@@ -176,9 +183,9 @@ class ResultSet {
 
   ResultSet(const std::vector<TargetInfo>& targets,
             const std::vector<ColumnLazyFetchInfo>& lazy_fetch_info,
-            const std::vector<std::vector<const int8_t*>>& col_buffers,
-            const std::vector<std::vector<int64_t>>& frag_offsets,
-            const std::vector<int64_t>& consistent_frag_sizes,
+            const ColBuffersPtr& col_buffers,
+            const FragOffsetsPtr& frag_offsets,
+            const FragSizesPtr& consistent_frag_sizes,
             const ExecutorDeviceType device_type,
             const int device_id,
             const QueryMemoryDescriptor& query_mem_desc,
@@ -802,9 +809,9 @@ class ResultSet {
   //   setting offset instead of ptr in group by buffer.
   std::vector<std::vector<int8_t>> literal_buffers_;
   const std::vector<ColumnLazyFetchInfo> lazy_fetch_info_;
-  std::vector<std::vector<std::vector<const int8_t*>>> col_buffers_;
-  std::vector<std::vector<std::vector<int64_t>>> frag_offsets_;
-  std::vector<std::vector<int64_t>> consistent_frag_sizes_;
+  std::vector<ColBuffersPtr> col_buffers_;
+  std::vector<FragOffsetsPtr> frag_offsets_;
+  std::vector<FragSizesPtr> consistent_frag_sizes_;
 
   const std::shared_ptr<const hdk::ir::Estimator> estimator_;
   Data_Namespace::AbstractBuffer* device_estimator_buffer_{nullptr};

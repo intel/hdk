@@ -124,9 +124,9 @@ ResultSetPtr QueryExecutionContext::groupBufferToDeinterleavedResults(
   auto deinterleaved_result_set =
       std::make_shared<ResultSet>(result_set->getTargetInfos(),
                                   std::vector<ColumnLazyFetchInfo>{},
-                                  std::vector<std::vector<const int8_t*>>{},
-                                  std::vector<std::vector<int64_t>>{},
-                                  std::vector<int64_t>{},
+                                  nullptr,
+                                  nullptr,
+                                  nullptr,
                                   ExecutorDeviceType::CPU,
                                   -1,
                                   deinterleaved_query_mem_desc,
