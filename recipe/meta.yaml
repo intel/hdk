@@ -1,6 +1,6 @@
-{% set version = "0.6.0" %}  # PEP 386
+{% set version = "0.8.0" %}  # PEP 386
 
-{% set number = "1" %}
+{% set number = "0" %}
 {% set cuda_enabled = cuda_compiler_version is not undefined and cuda_compiler_version == '11.0' %}
 {% set build_ext = "cuda" if cuda_enabled else "cpu" %}
 {% set build_string = "h{}_{}".format(PKG_HASH, number) %}
@@ -10,18 +10,18 @@
 {% set install_base = "opt/hdk" %}
 {% set arrow_version = "11.*" %}
 {% set arrow_proc_version = "3.*" %}
-{% set llvm_version = "14" %}
+{% set llvm_version = "15" %}
 
 package:
   name: hdk
   version: {{ version }}
 
 source:
-#  git_url: https://github.com/intel-ai/hdk
-#  git_branch: release/v{{ version }}
+  git_url: https://github.com/intel-ai/hdk
+  git_branch: main
 #  git_rev: 798103ac37f9badd540b4f4508ca180162eeb654
-  url: https://github.com/intel-ai/hdk/archive/refs/tags/v{{ version }}.tar.gz
-  sha256: 0396d5133666dee23fedb568acfbb49bfd8e36e149ed7e554a5bd9acda310a97
+#  url: https://github.com/intel-ai/hdk/archive/refs/tags/v{{ version }}.tar.gz
+#  sha256: 0314c7ad990b1f3072f9058e991915b5f1d6d3240aaf04ffe518d68087178675
 
 build:
   number: {{ number }}
@@ -63,10 +63,14 @@ outputs:
         - make  # [not win]
         - maven
         - vs2022_win-64  # [win]
+        - level-zero-devel  # [not win]
+        - pkg-config  # [not win]
+        - llvm-spirv {{ llvm_version }}  # [not win]
+        - libllvmspirv {{ llvm_version }}  # [not win]
       host:
         # If no version limit is specified for python then conda goes
         # crazy and is unable to create host env on windows.
-        - python >=3.8
+        - python {{ python }}
         - cython
         - numpy
         - tbb-devel
@@ -89,6 +93,7 @@ outputs:
         - llvm {{ llvm_version }}
         - arrow-cpp ={{ arrow_version }}=*{{ build_ext }}
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
+        - zlib
       run:
         - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
         - pyarrow ={{ arrow_version }}=*{{ build_ext }}
@@ -98,6 +103,8 @@ outputs:
         - tbb
         - boost-cpp
         - folly 2022.11.07.00  # [not win]
+        - llvm-spirv {{ llvm_version }}  # [not win]
+        - level-zero  # [not win]
 
       run_constrained:
         - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
