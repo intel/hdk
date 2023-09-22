@@ -302,6 +302,9 @@ if (ENABLE_CUDA)
 endif()
 
 # LLVM
+if (WIN32)
+  find_package(zstd REQUIRED)
+endif()
 find_package(LLVM CONFIG REQUIRED)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
