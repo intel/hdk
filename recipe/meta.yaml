@@ -1,4 +1,4 @@
-{% set version = "0.8.0" %}  # PEP 386
+{% set version = "0.9.0" %}  # PEP 386
 
 {% set number = "0" %}
 {% set cuda_enabled = cuda_compiler_version is not undefined and cuda_compiler_version == '11.0' %}
