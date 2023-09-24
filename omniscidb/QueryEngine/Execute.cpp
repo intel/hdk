@@ -78,6 +78,7 @@
 #include "Shared/misc.h"
 #include "Shared/scope.h"
 #include "ThirdParty/robin_hood.h"
+#include "QueryEngine/AnalyticalTemplatesExtractor.h"
 
 #include "CostModel/IterativeCostModel.h"
 
@@ -2132,6 +2133,10 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
     CHECK(cfg.enable_heterogeneous_execution);
     if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
         !ra_exe_unit.templs.empty()) {
+      AnalyticalTemplatesExtractor extractor;
+      std::vector<costmodel::AnalyticalTemplate> templates 
+        = extractor.extractTemplates(ra_exe_unit);
+
       size_t bytes = 0;
       // TODO(bagrorg): how can we get bytes estimation more correctly?
       for (const auto& e : table_infos) {
@@ -2143,9 +2148,9 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
         }
       }
       LOG(DEBUG1) << "Cost Model enabled, making prediction for templates "
-                  << toString(ra_exe_unit.templs) << " for size " << bytes;
+                  << toString(templates) << " for size " << bytes;
 
-      costmodel::QueryInfo qi = {ra_exe_unit.templs, bytes};
+      costmodel::QueryInfo qi = {templates, bytes};
       try {
         exe_policy = ra_exe_unit.cost_model->predict(qi, devices_dispatch_modes);
         return exe_policy;

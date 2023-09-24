@@ -124,7 +124,9 @@ set(query_engine_source_files
     Codec.h
     Execute.h
     NvidiaKernel.h
-    QueryTemplateGenerator.h)
+    QueryTemplateGenerator.h
+    
+    AnalyticalTemplatesExtractor.cpp)
 
 set(query_engine_cuda_source_files
     TopKSort.cu
