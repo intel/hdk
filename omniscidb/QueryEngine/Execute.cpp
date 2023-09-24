@@ -1730,8 +1730,7 @@ RelAlgExecutionUnit replace_scan_limit(const RelAlgExecutionUnit& ra_exe_unit_in
           ra_exe_unit_in.shuffle_fn,
           ra_exe_unit_in.partition_offsets_col,
           ra_exe_unit_in.partitioned_aggregation,
-          ra_exe_unit_in.cost_model,
-          ra_exe_unit_in.templs};
+          ra_exe_unit_in.cost_model};
 }
 
 }  // namespace

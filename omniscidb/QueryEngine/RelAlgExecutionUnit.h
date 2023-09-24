@@ -148,8 +148,7 @@ class RelAlgExecutionUnit {
       std::optional<hdk::ir::ShuffleFunction> shuffle_fn = {},
       hdk::ir::ExprPtr partition_offsets_col = nullptr,
       bool partitioned_aggregation = false,
-      std::shared_ptr<costmodel::CostModel> cost_model = nullptr,
-      std::vector<costmodel::AnalyticalTemplate> templs = {})
+      std::shared_ptr<costmodel::CostModel> cost_model = nullptr)
       : input_descs(std::move(input_descs))
       , input_col_descs(std::move(input_col_descs))
       , simple_quals(std::move(simple_quals))
@@ -167,8 +166,7 @@ class RelAlgExecutionUnit {
       , shuffle_fn(std::move(shuffle_fn))
       , partition_offsets_col(std::move(partition_offsets_col))
       , partitioned_aggregation(partitioned_aggregation)
-      , cost_model(std::move(cost_model))
-      , templs(std::move(templs)) {}
+      , cost_model(std::move(cost_model)) {}
 
   RelAlgExecutionUnit(std::vector<InputDescriptor> input_descs,
                       const SchemaProvider* schema_provider,
@@ -187,8 +185,7 @@ class RelAlgExecutionUnit {
                       std::optional<hdk::ir::ShuffleFunction> shuffle_fn = {},
                       hdk::ir::ExprPtr partition_offsets_col = nullptr,
                       bool partitioned_aggregation = false,
-                      std::shared_ptr<costmodel::CostModel> cost_model = nullptr,
-                      std::vector<costmodel::AnalyticalTemplate> templs = {})
+                      std::shared_ptr<costmodel::CostModel> cost_model = nullptr)
       : input_descs(std::move(input_descs))
       , simple_quals(std::move(simple_quals))
       , quals(std::move(quals))
@@ -205,8 +202,7 @@ class RelAlgExecutionUnit {
       , shuffle_fn(std::move(shuffle_fn))
       , partition_offsets_col(std::move(partition_offsets_col))
       , partitioned_aggregation(partitioned_aggregation)
-      , cost_model(std::move(cost_model))
-      , templs(std::move(templs)) {
+      , cost_model(std::move(cost_model)) {
     calcInputColDescs(schema_provider);
   }
 
@@ -236,7 +232,6 @@ class RelAlgExecutionUnit {
   bool partitioned_aggregation;
 
   std::shared_ptr<costmodel::CostModel> cost_model;
-  std::vector<costmodel::AnalyticalTemplate> templs;
 
   bool isShuffleCount() const { return shuffle_fn && !partition_offsets_col; }
   bool isShuffle() const { return shuffle_fn && partition_offsets_col; }

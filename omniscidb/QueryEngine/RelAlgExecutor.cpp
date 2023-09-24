@@ -1896,10 +1896,6 @@ RelAlgExecutor::WorkUnit RelAlgExecutor::createWorkUnit(const hdk::ir::Node* nod
   }
 
   target_exprs_owned_ = builder.releaseTargetExprsOwned();
-
-  templVisitor.visit(node);
-  std::vector<costmodel::AnalyticalTemplate> templates = templVisitor.getTemplates();
-  rewritten_exe_unit.templs = templates;
   rewritten_exe_unit.cost_model = executor_->getCostModel();
 
   return {rewritten_exe_unit,
