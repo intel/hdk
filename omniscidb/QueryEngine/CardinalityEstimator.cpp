@@ -119,8 +119,7 @@ RelAlgExecutionUnit create_count_all_execution_unit(
           ra_exe_unit.shuffle_fn,
           ra_exe_unit.partition_offsets_col,
           ra_exe_unit.partitioned_aggregation,
-          ra_exe_unit.cost_model,
-          {}};  // TODO(bagrorg): should we use costmodel here?
+          ra_exe_unit.cost_model};
 }
 
 ResultSetPtr reduce_estimator_results(
