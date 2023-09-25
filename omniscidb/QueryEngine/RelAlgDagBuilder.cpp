@@ -500,6 +500,12 @@ hdk::ir::ExprPtr makeUOper(hdk::ir::OpType op,
     case hdk::ir::OpType::kNot:
       return std::make_shared<hdk::ir::UOper>(
           ctx.boolean(arg->type()->nullable()), op, arg);
+    case hdk::ir::OpType::kBwNot:
+      if (!arg->type()->isInteger()) {
+        throw std::runtime_error(
+            "Only integer expressions are allowed for BW_NOT operation.");
+      }
+      return std::make_shared<hdk::ir::UOper>(arg->type(), op, arg);
     case hdk::ir::OpType::kIsNull:
       return std::make_shared<hdk::ir::UOper>(ctx.boolean(false), op, arg);
     case hdk::ir::OpType::kMinus: {
