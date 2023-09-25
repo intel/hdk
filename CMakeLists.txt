@@ -87,13 +87,18 @@ if(DEFINED ENV{CONDA_PREFIX})
 endif()
 
 string(TIMESTAMP HDK_BUILD_DATE "%Y%m%d")
-find_package(Git)
-execute_process(
-  COMMAND ${GIT_EXECUTABLE} rev-parse --short=10 HEAD
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE HDK_GIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+  find_package(Git)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short=10 HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE HDK_GIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
   )
+else()
+  set(HDK_GIT_HASH "source-release")
+endif()
 file(WRITE ${CMAKE_BINARY_DIR}/HDK_GIT_HASH.txt "${HDK_GIT_HASH}\n")
 file(STRINGS ${CMAKE_BINARY_DIR}/HDK_GIT_HASH.txt HDK_GIT_HASH)
 
@@ -302,6 +307,9 @@ if (ENABLE_CUDA)
 endif()
 
 # LLVM
+if (WIN32)
+  find_package(zstd REQUIRED)
+endif()
 find_package(LLVM CONFIG REQUIRED)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")

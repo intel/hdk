@@ -31,7 +31,8 @@ cmake -Wno-dev \
     -DCMAKE_PREFIX_PATH=$PREFIX \
     -DCMAKE_INSTALL_PREFIX=$PREFIX/$INSTALL_BASE \
     -DCMAKE_BUILD_TYPE=Release \
-    -B build -S .
+    -DENABLE_L0=on \
+    -DENABLE_AWS_S3=off -B build -S .
 
 cmake --build build --parallel $(nproc)
 cmake --install build --prefix $PREFIX/$INSTALL_BASE
