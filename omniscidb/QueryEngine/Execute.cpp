@@ -2130,12 +2130,11 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
         devices_dispatch_modes.begin()->first, devices_dispatch_modes);
   } else {
     CHECK(cfg.enable_heterogeneous_execution);
-    if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
-        !ra_exe_unit.templs.empty()) {
-      AnalyticalTemplatesExtractor extractor;
-      std::vector<costmodel::AnalyticalTemplate> templates 
-        = extractor.extractTemplates(ra_exe_unit);
 
+    AnalyticalTemplatesExtractor extractor;
+    std::vector<costmodel::AnalyticalTemplate> templates = extractor.extractTemplates(ra_exe_unit);
+    if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
+        !templates.empty()) {
       size_t bytes = 0;
       // TODO(bagrorg): how can we get bytes estimation more correctly?
       for (const auto& e : table_infos) {
