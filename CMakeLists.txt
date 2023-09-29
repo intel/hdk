@@ -127,6 +127,9 @@ if(ENABLE_FOLLY)
     set(FOLLY_LIBRARIES "")
     add_definitions("-DHAVE_FOLLY")
     find_package(gflags CONFIG REQUIRED)
+    set_target_properties(gflags_shared PROPERTIES
+        MAP_IMPORTED_CONFIG_DEBUG Release
+    )
     list(APPEND Folly_LIBRARIES Folly::folly)
     # TODO: use Folly::folly_deps?
     if(MSVC)
