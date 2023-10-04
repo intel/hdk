@@ -99,7 +99,7 @@ jobs:
       - name: Configure and build
         run: |
           conda info --env
-          conda run --no-capture-output -n omnisci-dev sh -vx omniscidb/scripts/conda/build.sh ${{ inputs.options }}
+          conda run --no-capture-output -n omnisci-dev sh omniscidb/scripts/conda/build.sh ${{ inputs.options }}
           tar -zcf /tmp/build.tgz .
 
       - name: Upload build and src files
