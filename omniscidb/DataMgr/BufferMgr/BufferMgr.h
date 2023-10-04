@@ -87,6 +87,68 @@ using namespace Data_Namespace;
 
 namespace Buffer_Namespace {
 
+class SlabFreeBufIndex {
+ public:
+  SlabFreeBufIndex(BufferList& list_to_index) : list_to_index_(list_to_index) {
+    for (BufferList::iterator it = list_to_index_.begin(); it != list_to_index_.end();
+         ++it) {
+      if (it->mem_status == MemStatus::FREE) {
+        insert(it);
+      }
+    }
+    CHECK_GT(free_buffs_.size(), 0);
+  }
+
+  BufferList::iterator getFreeBuff(const size_t num_requested_pages);
+
+  void insert(BufferList::iterator& slab_buffer_pos);
+
+  void remove(BufferList::iterator& slab_buffer_pos);
+
+  void verify() const;
+
+  const std::vector<BufferList::iterator>& getFreeBuffs() const { return free_buffs_; };
+  const BufferList& getListToIndex() const { return list_to_index_; };
+
+ private:
+  static bool iterator_cmp(const BufferList::iterator& lhs,
+                           const BufferList::iterator& rhs) {
+    return lhs->num_pages < rhs->num_pages;
+  }
+  static bool iterator_page_count_cmp_l(const BufferList::iterator& lhs,
+                                        const size_t num_pages) {
+    return lhs->num_pages < num_pages;
+  }
+  static bool iterator_page_count_cmp_u(const size_t num_pages,
+                                        const BufferList::iterator& lhs) {
+    return lhs->num_pages < num_pages;
+  }
+  std::vector<BufferList::iterator>::iterator findExact(
+      BufferList::iterator& slab_buffer_pos) {
+    auto index_pos = std::lower_bound(
+        free_buffs_.begin(), free_buffs_.end(), slab_buffer_pos, iterator_cmp);
+    while (index_pos != free_buffs_.end() && (*index_pos) != slab_buffer_pos &&
+           (*index_pos)->num_pages == slab_buffer_pos->num_pages) {
+      index_pos++;
+    }
+    CHECK(index_pos != free_buffs_.end());
+    CHECK((*index_pos) == slab_buffer_pos);
+    CHECK_EQ((*index_pos)->num_pages, slab_buffer_pos->num_pages);
+    return index_pos;
+  }
+  std::vector<BufferList::iterator> free_buffs_;
+  BufferList& list_to_index_;
+};
+
+struct Slab {
+  Slab(BufferList& buffers) : buffers_(buffers), free_buffs_index_(buffers_) {}
+  Slab(BufferList&& buffers)
+      : buffers_(std::move(buffers)), free_buffs_index_(buffers_) {}
+
+  BufferList buffers_;
+  SlabFreeBufIndex free_buffs_index_;
+};
+
 struct MemoryData {
   size_t slabNum;
   int32_t startPage;
@@ -141,7 +203,7 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   size_t getMaxSlabSize();
   size_t getPageSize();
   bool isAllocationCapped() override;
-  const std::vector<BufferList>& getSlabSegments();
+  const std::vector<BufferList> getSlabSegments();
 
   /// Creates a chunk with the specified key and page size.
   AbstractBuffer* createBuffer(const ChunkKey& key,
@@ -210,7 +272,7 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   const size_t page_size_;
   std::vector<int8_t*> slabs_;  /// vector of beginning memory addresses for each
                                 /// allocation of the buffer pool
-  std::vector<BufferList> slab_segments_;
+  std::list<Slab> slab_segments_;
 
  private:
   BufferMgr(const BufferMgr&);             // private copy constructor
@@ -257,6 +319,8 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   BufferList::iterator evict(BufferList::iterator& evict_start,
                              const size_t num_pages_requested,
                              const int slab_num);
+
+  Slab& getSlab(const size_t slab_num);
   /**
    * @brief Gets a buffer of required size and returns an iterator to it
    *

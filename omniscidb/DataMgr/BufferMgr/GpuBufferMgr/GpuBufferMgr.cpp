@@ -63,9 +63,7 @@ void GpuBufferMgr::addSlab(const size_t slab_size) {
     slabs_.resize(slabs_.size() - 1);
     throw FailedToCreateSlab(slab_size);
   }
-  slab_segments_.resize(slab_segments_.size() + 1);
-  slab_segments_[slab_segments_.size() - 1].push_back(
-      BufferSeg(0, slab_size / page_size_));
+  slab_segments_.emplace_back(BufferList{BufferSeg(0, slab_size / page_size_)});
 }
 
 void GpuBufferMgr::freeAllMem() {
