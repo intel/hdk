@@ -65,7 +65,7 @@ jobs:
       test: style
 
   test:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build
     uses: ./.github/workflows/test.yml
     with:
@@ -73,8 +73,17 @@ jobs:
       cache-suffix: ${{ needs.build.outputs.cache-suffix }}
       test: sanity
 
+  test-modin:
+    name: Python tests
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      name: 'gcc-cpu'
+      cache-suffix: ${{ needs.build.outputs.cache-suffix }}
+      test: modin
+
   test-l0:
-    name: CPU-only Gtests (Sanity)
+    name: CPU-only Gtests
     needs: build-l0
     uses: ./.github/workflows/test.yml
     with:
@@ -83,7 +92,7 @@ jobs:
       test: sanity_cpu
 
   test-clang:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build-clang
     uses: ./.github/workflows/test.yml
     with:
@@ -124,7 +133,7 @@ jobs:
       options: -DENABLE_PYTHON=off -DENABLE_CUDA=on -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
   test-cuda-docker:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build-cuda-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -133,7 +142,7 @@ jobs:
       reset-cache: ${{ !!inputs.reset-cache }}
 
   test-clang-docker:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build-clang-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -150,7 +159,7 @@ jobs:
 
   test-l0-docker:
     if: false
-    name: Gtests (Sanity) 
+    name: Gtests
     needs: build-l0-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -159,7 +168,7 @@ jobs:
       runner: intel-ai.hdk.l0
 
   test-l0-pvc-docker:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build-l0-docker
     uses: ./.github/workflows/test-docker.yml
     with:
@@ -175,17 +184,9 @@ jobs:
       options: -DCMAKE_BUILD_TYPE=Release -DENABLE_FOLLY=off -G "Visual Studio 17 2022"
 
   test-windows:
-    name: Gtests (Sanity)
+    name: Gtests
     needs: build-windows
     uses: ./.github/workflows/test-windows.yml
     with:
       cache-suffix: ${{ needs.build-windows.outputs.cache-suffix }}
       test: sanity
-
-  modin:
-    name: Integration HDK with Modin (Pytest)
-    uses: ./.github/workflows/modin.yml
-
-  pytest:
-    name: PyHDK (Pytest)
-    uses: ./.github/workflows/pytest.yml
