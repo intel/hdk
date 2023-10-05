@@ -270,7 +270,7 @@ SqlTypeNameSpec OmniSciGeospatialTypeName(Span s) :
             }
         )
         <LPAREN> geoType = OmniSciGeoType() [ <COMMA> coordinateSystem = IntLiteral() ] <RPAREN>
-        [ encoding = OmniSciEncodingOpt() ]
+        [ LOOKAHEAD(2) encoding = OmniSciEncodingOpt() ]
     )
     {
         return new OmniSciGeoTypeNameSpec(geoType, coordinateSystem, isGeography, encoding, s.end(this));
@@ -471,7 +471,7 @@ Pair<String, SqlNode> KVOption() :
     <EQ>
     { s = span(); }
     (
-        <NULL> {  value = SqlLiteral.createCharString("", s.end(this)); }
+        LOOKAHEAD(2) <NULL> {  value = SqlLiteral.createCharString("", s.end(this)); }
     |
         value = Literal()
     )
@@ -719,6 +719,7 @@ SqlNode WrappedOrderedQueryOrExpr(ExprContext exprContext) :
     final SqlNode query;
 }
 {
+    LOOKAHEAD(3)
         <LPAREN>
         query = OrderedQueryOrExpr(exprContext)
         <RPAREN>
@@ -1077,6 +1078,7 @@ SqlDdl SqlGrant(Span si) :
 {
     <GRANT> { s = span(); }
     (
+        LOOKAHEAD(3)
         nodeList = privilegeList()
         grant = SqlGrantPrivilege(s, nodeList)
         |
@@ -1105,6 +1107,7 @@ SqlDdl SqlRevoke(Span si) :
 {
     <REVOKE> { s = span(); }
     (
+        LOOKAHEAD(3)
         nodeList = privilegeList()
         revoke = SqlRevokePrivilege(s, nodeList)
         |
