@@ -516,7 +516,9 @@ hdk::ResultSetTableTokenPtr Executor::getTemporaryTable(int table_id) const {
   return get_temporary_table(temporary_tables_, table_id);
 }
 
-TableFragmentsInfo Executor::getTableInfo(const int db_id, const int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> Executor::getTableInfo(
+    const int db_id,
+    const int table_id) const {
   return input_table_info_cache_.getTableInfo(db_id, table_id);
 }
 
@@ -1458,9 +1460,9 @@ size_t compute_buffer_entry_guess(const std::vector<InputTableInfo>& query_infos
                                              void>>;
   checked_size_t max_groups_buffer_entry_guess = 1;
   for (const auto& query_info : query_infos) {
-    CHECK(!query_info.info.fragments.empty());
-    auto it = std::max_element(query_info.info.fragments.begin(),
-                               query_info.info.fragments.end(),
+    CHECK(!query_info.info->fragments.empty());
+    auto it = std::max_element(query_info.info->fragments.begin(),
+                               query_info.info->fragments.end(),
                                [](const FragmentInfo& f1, const FragmentInfo& f2) {
                                  return f1.getNumTuples() < f2.getNumTuples();
                                });
@@ -1504,7 +1506,7 @@ void checkWorkUnitWatchdog(const RelAlgExecutionUnit& ra_exe_unit,
     }
   }
   if (!ra_exe_unit.scan_limit && table_infos.size() == 1 &&
-      table_infos.front().info.getPhysicalNumTuples() < Executor::high_scan_limit) {
+      table_infos.front().info->getPhysicalNumTuples() < Executor::high_scan_limit) {
     // Allow a query with no scan limit to run on small tables
     return;
   }
@@ -1553,7 +1555,8 @@ bool is_trivial_loop_join(const std::vector<InputTableInfo>& query_infos,
     }
   }
   CHECK(inner_table_idx);
-  return query_infos[*inner_table_idx].info.getNumTuples() <= trivial_loop_join_threshold;
+  return query_infos[*inner_table_idx].info->getNumTuples() <=
+         trivial_loop_join_threshold;
 }
 
 namespace {
@@ -1859,7 +1862,7 @@ ResultSetPtr Executor::runOnBatch(std::shared_ptr<StreamExecutionContext> ctx,
 
     size_t num_tuples = 0;
     for (auto f_id : fragments[0].fragment_ids) {
-      auto fr = metadata.fragments[f_id];
+      auto fr = metadata->fragments[f_id];
       num_tuples = std::max(num_tuples, fr.getNumTuples());
     }
 
@@ -2105,10 +2108,10 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
       // here. For now, detect a simple groupby case when output hash table is bigger than
       // input table. For this case we use a single multifragment kernel to force
       // single-threaded execution with no reduction required.
-      size_t input_size = table_infos.front().info.getNumTuples();
+      size_t input_size = table_infos.front().info->getNumTuples();
       size_t buffer_size = query_mem_descs.at(dt_query_desc.first)->getEntryCount();
       constexpr size_t threshold_ratio = 2;
-      if (table_infos.front().info.fragments.size() > 1 &&
+      if (table_infos.front().info->fragments.size() > 1 &&
           buffer_size * threshold_ratio >= input_size) {
         LOG(INFO) << "Enabling multifrag kernels for CPU due to big output hash "
                      "table (input_size is "
@@ -2131,7 +2134,7 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
       // TODO(bagrorg): how can we get bytes estimation more correctly?
       for (const auto& e : table_infos) {
         auto t = e.info;
-        for (const auto& f : t.fragments) {
+        for (const auto& f : t->fragments) {
           for (const auto& [k, v] : f.getChunkMetadataMapPhysical()) {
             bytes += v->numBytes();
           }
@@ -2365,7 +2368,7 @@ void Executor::executeWorkUnitPerFragment(
   CHECK_EQ(size_t(1), ra_exe_unit.input_descs.size());
   const auto db_id = ra_exe_unit.input_descs[0].getDatabaseId();
   const auto table_id = ra_exe_unit.input_descs[0].getTableId();
-  const auto& outer_fragments = table_info.info.fragments;
+  const auto& outer_fragments = table_info.info->fragments;
 
   std::set<size_t> fragment_indexes;
   if (fragment_indexes_param.empty()) {
@@ -2692,7 +2695,7 @@ std::vector<std::unique_ptr<ExecutionKernel>> Executor::createKernels(
            QueryDescriptionType::Projection) &&
           table_infos.size() == 1) {
         const auto max_frag_size =
-            table_infos.front().info.getFragmentNumTuplesUpperBound();
+            table_infos.front().info->getFragmentNumTuplesUpperBound();
         if (max_frag_size < dt_query_desc.second->getEntryCount()) {
           LOG(INFO) << "Lowering scan limit from "
                     << dt_query_desc.second->getEntryCount()
@@ -3668,7 +3671,7 @@ void Executor::preloadFragOffsets(const std::vector<InputDescriptor>& input_desc
   auto frag_off_ptr = get_arg_by_name(cgen_state_->row_func_, "frag_row_off");
   for (size_t i = 0; i < ld_count; ++i) {
     CHECK_LT(i, query_infos.size());
-    const auto frag_count = query_infos[i].info.fragments.size();
+    const auto frag_count = query_infos[i].info->fragments.size();
     if (i > 0) {
       cgen_state_->frag_offsets_.push_back(nullptr);
     } else {
@@ -4171,11 +4174,12 @@ TableGenerations Executor::computeTableGenerations(
     std::unordered_set<std::pair<int, int>> phys_table_ids) {
   TableGenerations table_generations;
   for (auto [db_id, table_id] : phys_table_ids) {
-    const auto table_info = getTableInfo(db_id, table_id);
     table_generations.setGeneration(
         db_id,
         table_id,
-        TableGeneration{static_cast<int64_t>(table_info.getPhysicalNumTuples()), 0});
+        TableGeneration{
+            static_cast<int64_t>(getTableInfo(db_id, table_id)->getPhysicalNumTuples()),
+            0});
   }
   return table_generations;
 }

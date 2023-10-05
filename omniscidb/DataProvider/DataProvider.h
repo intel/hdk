@@ -41,7 +41,9 @@ class DataProvider {
   virtual std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
       const ColumnRef& col_ref) = 0;
 
-  virtual TableFragmentsInfo getTableMetadata(int db_id, int table_id) const = 0;
+  virtual std::shared_ptr<const TableFragmentsInfo> getTableMetadata(
+      int db_id,
+      int table_id) const = 0;
 
   virtual const DictDescriptor* getDictMetadata(int dict_id,
                                                 bool load_dict = true) const = 0;

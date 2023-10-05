@@ -133,7 +133,9 @@ const DictDescriptor* PersistentStorageMgr::getDictMetadata(int dict_id, bool lo
   return nullptr;
 }
 
-TableFragmentsInfo PersistentStorageMgr::getTableMetadata(int db_id, int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> PersistentStorageMgr::getTableMetadata(
+    int db_id,
+    int table_id) const {
   return getStorageMgrForTableKey({db_id, table_id})->getTableMetadata(db_id, table_id);
 }
 

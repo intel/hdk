@@ -883,8 +883,8 @@ void RelAlgExecutor::maybeCopyTableStatsFromInput(const hdk::ir::Node* node) {
   int input_db_id = input_token ? input_token->dbId() : input_scan->getDatabaseId();
   int input_table_id = input_token ? input_token->tableId() : input_scan->getTableId();
   auto input_meta = data_provider_->getTableMetadata(input_db_id, input_table_id);
-  if (input_meta.hasComputedTableStats()) {
-    auto& orig_stats = input_meta.getTableStats();
+  if (input_meta->hasComputedTableStats()) {
+    auto& orig_stats = input_meta->getTableStats();
     auto target_token = node->getResult()->getToken();
     TableStats stats;
     for (size_t i = 0; i < col_mapping.size(); ++i) {
@@ -1051,7 +1051,7 @@ void RelAlgExecutor::computeWindow(const RelAlgExecutionUnit& ra_exe_unit,
                                    const int64_t queue_time_ms) {
   auto query_infos = get_table_infos(ra_exe_unit.input_descs, executor_);
   CHECK_EQ(query_infos.size(), size_t(1));
-  if (query_infos.front().info.fragments.size() != 1) {
+  if (query_infos.front().info->fragments.size() != 1) {
     throw std::runtime_error(
         "Only single fragment tables supported for window functions for now");
   }
@@ -1108,7 +1108,7 @@ std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionConte
     const CompilationOptions& co,
     ColumnCacheMap& column_cache_map,
     std::shared_ptr<RowSetMemoryOwner> row_set_mem_owner) {
-  const size_t elem_count = query_infos.front().info.fragments.front().getNumTuples();
+  const size_t elem_count = query_infos.front().info->fragments.front().getNumTuples();
   const auto memory_level = co.device_type == ExecutorDeviceType::GPU
                                 ? MemoryLevel::GPU_LEVEL
                                 : MemoryLevel::CPU_LEVEL;
@@ -1150,7 +1150,7 @@ std::unique_ptr<WindowFunctionContext> RelAlgExecutor::createWindowFunctionConte
     std::tie(column, join_col_elem_count) =
         ColumnFetcher::getOneColumnFragment(executor_,
                                             *order_col,
-                                            query_infos.front().info.fragments.front(),
+                                            query_infos.front().info->fragments.front(),
                                             memory_level,
                                             0,
                                             nullptr,
@@ -1225,10 +1225,10 @@ namespace {
 size_t groups_approx_upper_bound(const std::vector<InputTableInfo>& table_infos) {
   CHECK(!table_infos.empty());
   const auto& first_table = table_infos.front();
-  size_t max_num_groups = first_table.info.getNumTuplesUpperBound();
+  size_t max_num_groups = first_table.info->getNumTuplesUpperBound();
   for (const auto& table_info : table_infos) {
-    if (table_info.info.getNumTuplesUpperBound() > max_num_groups) {
-      max_num_groups = table_info.info.getNumTuplesUpperBound();
+    if (table_info.info->getNumTuplesUpperBound() > max_num_groups) {
+      max_num_groups = table_info.info->getNumTuplesUpperBound();
     }
   }
   return std::max(max_num_groups, size_t(1));
@@ -1399,17 +1399,17 @@ void maybeRequestPartitionedAggregation(const RelAlgExecutionUnit& ra_exe_unit,
   auto table_meta =
       data_provider->getTableMetadata(ra_exe_unit.input_descs[0].getDatabaseId(),
                                       ra_exe_unit.input_descs[0].getTableId());
-  if (table_meta.getNumTuples() * 2 <
+  if (table_meta->getNumTuples() * 2 <
       estimated_buffer_entries * config.exec.group_by.partitioning_group_size_threshold) {
     LOG(INFO) << "Requesting partitioned aggregation (entries="
-              << estimated_buffer_entries << ", rows=" << table_meta.getNumTuples()
+              << estimated_buffer_entries << ", rows=" << table_meta->getNumTuples()
               << ")";
     throw RequestPartitionedAggregation(entry_size, estimated_buffer_entries);
   }
 
   VLOG(1) << "Drop partitioned aggregation option due to the small estimated number of "
              "groups. Input rows: "
-          << table_meta.getNumTuples()
+          << table_meta->getNumTuples()
           << " Estimated group count: " << (estimated_buffer_entries / 2)
           << " Threshold ratio: "
           << config.exec.group_by.partitioning_group_size_threshold;
@@ -1456,9 +1456,9 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;
   if (is_window_execution_unit(ra_exe_unit)) {
     CHECK_EQ(table_infos.size(), size_t(1));
-    CHECK_EQ(table_infos.front().info.fragments.size(), size_t(1));
+    CHECK_EQ(table_infos.front().info->fragments.size(), size_t(1));
     max_groups_buffer_entry_guess =
-        table_infos.front().info.fragments.front().getNumTuples();
+        table_infos.front().info->fragments.front().getNumTuples();
     ra_exe_unit.scan_limit = max_groups_buffer_entry_guess;
   } else if (compute_output_buffer_size(ra_exe_unit) && !isRowidLookup(work_unit)) {
     if (previous_count && !exe_unit_has_quals(ra_exe_unit)) {

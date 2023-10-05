@@ -103,7 +103,9 @@ class AbstractBufferMgr {
 
   virtual const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) = 0;
 
-  virtual TableFragmentsInfo getTableMetadata(int db_id, int table_id) const = 0;
+  virtual std::shared_ptr<const TableFragmentsInfo> getTableMetadata(
+      int db_id,
+      int table_id) const = 0;
 
   // Buffer API
   virtual AbstractBuffer* alloc(const size_t numBytes = 0) = 0;

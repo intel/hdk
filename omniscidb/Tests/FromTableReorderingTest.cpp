@@ -60,8 +60,8 @@ TEST(Ordering, Basic) {
 
     size_t number_of_join_tables{2};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(2);
-    viti[1].info.setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(1);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1};
@@ -81,8 +81,8 @@ TEST(Ordering, Basic) {
 
     size_t number_of_join_tables{2};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(1);
-    viti[1].info.setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{1, 0};
@@ -121,8 +121,8 @@ TEST(Ordering, Basic) {
 
     size_t number_of_join_tables{2};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(2);
-    viti[1].info.setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(1);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1};
@@ -142,8 +142,8 @@ TEST(Ordering, Basic) {
 
     size_t number_of_join_tables{2};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(1);
-    viti[1].info.setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1};
@@ -194,9 +194,9 @@ TEST(Ordering, Triple) {
 
     size_t number_of_join_tables{3};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(3);
-    viti[1].info.setPhysicalNumTuples(2);
-    viti[2].info.setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(3);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[2].info.get())->setPhysicalNumTuples(1);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1, 2};
@@ -221,9 +221,9 @@ TEST(Ordering, Triple) {
 
     size_t number_of_join_tables{3};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(1);
-    viti[1].info.setPhysicalNumTuples(2);
-    viti[2].info.setPhysicalNumTuples(3);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[2].info.get())->setPhysicalNumTuples(3);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{2, 1, 0};
@@ -272,9 +272,9 @@ TEST(Ordering, Triple) {
 
     size_t number_of_join_tables{3};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(3);
-    viti[1].info.setPhysicalNumTuples(2);
-    viti[2].info.setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(3);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[2].info.get())->setPhysicalNumTuples(1);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1, 2};
@@ -299,9 +299,9 @@ TEST(Ordering, Triple) {
 
     size_t number_of_join_tables{3};
     std::vector<InputTableInfo> viti(number_of_join_tables);
-    viti[0].info.setPhysicalNumTuples(1);
-    viti[1].info.setPhysicalNumTuples(2);
-    viti[2].info.setPhysicalNumTuples(3);
+    const_cast<TableFragmentsInfo*>(viti[0].info.get())->setPhysicalNumTuples(1);
+    const_cast<TableFragmentsInfo*>(viti[1].info.get())->setPhysicalNumTuples(2);
+    const_cast<TableFragmentsInfo*>(viti[2].info.get())->setPhysicalNumTuples(3);
 
     auto input_permutation = get_node_input_permutation(nesting_levels, viti, nullptr);
     decltype(input_permutation) expected_input_permutation{0, 1, 2};

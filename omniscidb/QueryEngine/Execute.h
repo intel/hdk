@@ -348,7 +348,8 @@ class Executor : public StringDictionaryProvider {
 
   const std::shared_ptr<RowSetMemoryOwner> getRowSetMemoryOwner() const;
 
-  TableFragmentsInfo getTableInfo(const int db_id, const int table_id) const;
+  std::shared_ptr<const TableFragmentsInfo> getTableInfo(const int db_id,
+                                                         const int table_id) const;
 
   const TableGeneration& getTableGeneration(int db_id, int table_id) const;
 

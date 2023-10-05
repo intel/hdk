@@ -155,7 +155,7 @@ std::shared_ptr<PerfectJoinHashTable> PerfectJoinHashTable::getInstance(
   if (bucketized_entry_count > executor->getConfig().exec.join.huge_join_hash_threshold) {
     const auto& query_info =
         get_inner_query_info(inner_col->dbId(), inner_col->tableId(), query_infos).info;
-    if (query_info.getNumTuplesUpperBound() * 100 <
+    if (query_info->getNumTuplesUpperBound() * 100 <
         executor->getConfig().exec.join.huge_join_hash_min_load *
             bucketized_entry_count) {
       throw TooManyHashEntries();
@@ -304,10 +304,10 @@ void PerfectJoinHashTable::reify() {
       qual_bin_oper_.get(), executor_->getSchemaProvider(), executor_->temporary_tables_);
   const auto inner_col = cols.first;
   const auto& query_info = getInnerQueryInfo(inner_col).info;
-  if (query_info.fragments.empty()) {
+  if (query_info->fragments.empty()) {
     return;
   }
-  if (query_info.getNumTuplesUpperBound() >
+  if (query_info->getNumTuplesUpperBound() >
       static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
     throw TooManyHashEntries();
   }
@@ -328,7 +328,7 @@ void PerfectJoinHashTable::reify() {
   }
 
   for (int device_id = 0; device_id < device_count_; ++device_id) {
-    fragments_per_device.emplace_back(query_info.fragments);
+    fragments_per_device.emplace_back(query_info->fragments);
     columns_per_device.emplace_back(
         fetchColumnsForDevice(fragments_per_device.back(),
                               device_id,
@@ -723,7 +723,7 @@ ChunkKey PerfectJoinHashTable::genChunkKey(const std::vector<FragmentInfo>& frag
     const auto outer_col = dynamic_cast<const hdk::ir::ColumnVar*>(outer_col_expr);
     CHECK(outer_col);
     const auto& outer_query_info = getInnerQueryInfo(outer_col).info;
-    for (auto& frag : outer_query_info.fragments) {
+    for (auto& frag : outer_query_info->fragments) {
       outer_elem_count = frag.getNumTuples();
     }
     chunk_key.push_back(outer_elem_count);

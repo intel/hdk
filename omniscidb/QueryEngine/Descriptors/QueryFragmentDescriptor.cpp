@@ -35,7 +35,7 @@ QueryFragmentDescriptor::QueryFragmentDescriptor(
   for (size_t table_idx = 0; table_idx < input_desc_count; ++table_idx) {
     const auto table_ref = ra_exe_unit.input_descs[table_idx].getTableRef();
     if (!selected_tables_fragments_.count(table_ref)) {
-      selected_tables_fragments_[table_ref] = &query_infos[table_idx].info.fragments;
+      selected_tables_fragments_[table_ref] = &query_infos[table_idx].info->fragments;
     }
   }
 
@@ -55,7 +55,7 @@ void QueryFragmentDescriptor::computeAllTablesFragments(
     int table_id = ra_exe_unit.input_descs[tab_idx].getTableId();
     TableRef table_ref{db_id, table_id};
     CHECK_EQ(query_infos[tab_idx].table_id, table_id);
-    const auto& fragments = query_infos[tab_idx].info.fragments;
+    const auto& fragments = query_infos[tab_idx].info->fragments;
     if (!all_tables_fragments.count(table_ref)) {
       all_tables_fragments.insert(std::make_pair(table_ref, &fragments));
     }

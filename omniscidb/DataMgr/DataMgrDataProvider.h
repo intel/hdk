@@ -38,7 +38,8 @@ class DataMgrDataProvider : public DataProvider {
   std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
       const ColumnRef& col_ref) override;
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id,
+                                                             int table_id) const override;
 
   const DictDescriptor* getDictMetadata(int dict_id,
                                         bool load_dict = true) const override;

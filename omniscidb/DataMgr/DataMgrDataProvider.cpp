@@ -35,7 +35,9 @@ DataMgrDataProvider::getZeroCopyColumnData(const ColumnRef& col_ref) {
   return data_mgr_->getZeroCopyColumnData(col_ref);
 }
 
-TableFragmentsInfo DataMgrDataProvider::getTableMetadata(int db_id, int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> DataMgrDataProvider::getTableMetadata(
+    int db_id,
+    int table_id) const {
   return data_mgr_->getTableMetadata(db_id, table_id);
 }
 

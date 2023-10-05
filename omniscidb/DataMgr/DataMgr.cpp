@@ -525,7 +525,8 @@ const DictDescriptor* DataMgr::getDictMetadata(int dict_id, bool load_dict) cons
   return getPersistentStorageMgr()->getDictMetadata(dict_id, load_dict);
 }
 
-TableFragmentsInfo DataMgr::getTableMetadata(int db_id, int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> DataMgr::getTableMetadata(int db_id,
+                                                                    int table_id) const {
   return getPersistentStorageMgr()->getTableMetadata(db_id, table_id);
 }
 

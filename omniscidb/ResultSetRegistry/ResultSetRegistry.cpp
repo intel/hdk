@@ -35,18 +35,18 @@ class ResultSetDataToken : public Data_Namespace::AbstractDataToken {
   size_t size_;
 };
 
-TableFragmentsInfo getEmptyTableMetadata(int table_id) {
-  TableFragmentsInfo res;
-  res.setPhysicalNumTuples(0);
+std::shared_ptr<const TableFragmentsInfo> getEmptyTableMetadata(int table_id) {
+  std::shared_ptr<TableFragmentsInfo> res = std::make_shared<TableFragmentsInfo>();
+  res->setPhysicalNumTuples(0);
 
   // Executor requires dummy empty fragment for empty tables
-  FragmentInfo& empty_frag = res.fragments.emplace_back();
+  FragmentInfo& empty_frag = res->fragments.emplace_back();
   empty_frag.fragmentId = 0;
   empty_frag.setPhysicalNumTuples(0);
   // Add ids for DISK_LEVEL, CPU_LEVEL, and GPU_LEVEL
   empty_frag.deviceIds.resize(3, 0);
   empty_frag.physicalTableId = table_id;
-  res.fragments.push_back(empty_frag);
+  res->fragments.push_back(empty_frag);
 
   return res;
 }
@@ -498,7 +498,9 @@ ResultSetRegistry::getZeroCopyBufferMemory(const ChunkKey& key, size_t num_bytes
              : nullptr;
 }
 
-TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> ResultSetRegistry::getTableMetadata(
+    int db_id,
+    int table_id) const {
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
   CHECK_EQ(db_id, db_id_);
   CHECK_EQ(tables_.count(table_id), (size_t)1);
@@ -510,12 +512,12 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
     return getEmptyTableMetadata(table_id);
   }
 
-  TableFragmentsInfo res;
-  res.setPhysicalNumTuples(table.row_count);
+  std::shared_ptr<TableFragmentsInfo> res = std::make_shared<TableFragmentsInfo>();
+  res->setPhysicalNumTuples(table.row_count);
   bool has_lazy_stats = false;
   for (size_t frag_idx = 0; frag_idx < table.fragments.size(); ++frag_idx) {
     auto& frag = table.fragments[frag_idx];
-    auto& frag_info = res.fragments.emplace_back();
+    auto& frag_info = res->fragments.emplace_back();
     frag_info.fragmentId = static_cast<int>(frag_idx + 1);
     frag_info.physicalTableId = table_id;
     frag_info.setPhysicalNumTuples(frag.row_count);
@@ -553,13 +555,13 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
 
   if (table.table_stats.empty()) {
     if (has_lazy_stats) {
-      res.setTableStatsMaterializeFn(
+      res->setTableStatsMaterializeFn(
           [this, table_id](TableStats& stats) { stats = this->getTableStats(table_id); });
     } else {
       // We can get here if all stats were materialized in the loop above.
       // In this case, build and assigne table stats.
       TableStats table_stats = buildTableStatsNoLock(table_id);
-      res.setTableStats(table_stats);
+      res->setTableStats(table_stats);
 
       table_lock.unlock();
       mapd_unique_lock<mapd_shared_mutex> table_write_lock(table.mutex);
@@ -568,7 +570,7 @@ TableFragmentsInfo ResultSetRegistry::getTableMetadata(int db_id, int table_id) 
       }
     }
   } else {
-    res.setTableStats(table.table_stats);
+    res->setTableStats(table.table_stats);
   }
 
   return res;
