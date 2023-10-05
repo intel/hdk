@@ -155,16 +155,16 @@ int main(int argc, char** argv) {
       auto eo =
           ArrowSQLRunner::getExecutionOptions(/*allow_loop_joins=*/false, just_explain);
       auto co = ArrowSQLRunner::getCompilationOptions(dt);
-      auto res = ArrowSQLRunner::runSqlQuery(
-          R"(SELECT str, count(*) FROM test GROUP BY str;)", co, eo);
+      auto res =
+          ArrowSQLRunner::runSqlQuery(R"(select m, m_3, m_6, m_9 FROM test; )", co, eo);
       if (just_explain) {
         std::cout << "Explanation for " << device_type_str << res.getExplanation()
                   << std::endl;
       } else {
-        auto rows = res.getRows();
+        auto rows = res.getToken();
         CHECK(rows);
         std::cout << "Result for " << device_type_str << "\n"
-                  << rows->contentToString() << std::endl;
+                  << rows->contentToString(/*header=*/true) << std::endl;
       }
     }
   } catch (const std::exception& e) {
