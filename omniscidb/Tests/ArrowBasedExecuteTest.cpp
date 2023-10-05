@@ -13169,8 +13169,13 @@ TEST_F(Select, TimestampPrecision_HighPrecision) {
               v<int64_t>(run_simple_agg("select count(*) from test where m_3 = m;", dt)));
     ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("select count(*) from test where m_3 < m;", dt)));
-    ASSERT_EQ(20,
+    // increasing precision should result in 0 rows passing the filter, since the lower
+    // precision value is appended with zeros in higher precision
+    ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("select count(*) from test where m = m_3;", dt)));
+    ASSERT_EQ(20,
+              v<int64_t>(run_simple_agg(
+                  "select count(*) from test where m = CAST(m_3 AS TIMESTAMP(0));", dt)));
     ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("select count(*) from test where m > m_3;", dt)));
     ASSERT_EQ(20,
@@ -13212,8 +13217,11 @@ TEST_F(Select, TimestampPrecision_HighPrecision) {
               v<int64_t>(run_simple_agg("select count(*) from test where m > m_6;", dt)));
     ASSERT_EQ(10,
               v<int64_t>(run_simple_agg("select count(*) from test where m < m_6;", dt)));
-    ASSERT_EQ(10,
+    ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("select count(*) from test where m = m_6;", dt)));
+    ASSERT_EQ(10,
+              v<int64_t>(run_simple_agg(
+                  "select count(*) from test where m = CAST(m_6 AS TIMESTAMP(0));", dt)));
 
     ASSERT_EQ(
         10, v<int64_t>(run_simple_agg("select count(*) from test where m_9 > m_3;", dt)));
@@ -13238,8 +13246,11 @@ TEST_F(Select, TimestampPrecision_HighPrecision) {
               v<int64_t>(run_simple_agg("select count(*) from test where m > m_9;", dt)));
     ASSERT_EQ(10,
               v<int64_t>(run_simple_agg("select count(*) from test where m < m_9;", dt)));
-    ASSERT_EQ(10,
+    ASSERT_EQ(0,
               v<int64_t>(run_simple_agg("select count(*) from test where m = m_9;", dt)));
+    ASSERT_EQ(10,
+              v<int64_t>(run_simple_agg(
+                  "select count(*) from test where m = CAST(m_9 AS TIMESTAMP(0));", dt)));
     ASSERT_EQ(
         15,
         v<int64_t>(run_simple_agg(
@@ -13401,21 +13412,18 @@ TEST_F(Select, TimestampPrecision_FunctionCompositions) {
     ASSERT_EQ(
         1,
         v<int64_t>(run_simple_agg(
-            "select dateadd('minute',1,dateadd('millisecond',1,cast(m_3 as "
-            "timestamp(0)))) = TIMESTAMP(3) '2014-12-13 22:24:15.456' from test limit 1;",
+            R"(select dateadd('minute',1,dateadd('millisecond',1,cast(m_3 as timestamp(0)))) = TIMESTAMP(0) '2014-12-13 22:24:15' from test limit 1;)",
             dt)));
     ASSERT_EQ(
         1,
         v<int64_t>(run_simple_agg(
-            "select dateadd('minute',1, dateadd('millisecond',111 , cast(m_6 as "
-            "timestamp(0)))) = TIMESTAMP(3) '1999-07-11 14:03:53.985' from test limit 1;",
+            R"(select dateadd('minute',1, dateadd('millisecond',111 , cast(m_6 as timestamp(0)))) = TIMESTAMP(3) '1999-07-11 14:03:53' from test limit 1;)",
             dt)));
-    ASSERT_EQ(1,
-              v<int64_t>(run_simple_agg(
-                  "select dateadd('year',1,dateadd('millisecond',220,cast(m_9 as "
-                  "timestamp(0)))) =  TIMESTAMP(3) '2007-04-26 03:49:04.827' from test "
-                  "limit 1;",
-                  dt)));
+    ASSERT_EQ(
+        1,
+        v<int64_t>(run_simple_agg(
+            R"(select dateadd('year',1,dateadd('millisecond',220,cast(m_9 as timestamp(0)))) =  TIMESTAMP(3) '2007-04-26 03:49:04' from test limit 1;)",
+            dt)));
     ASSERT_EQ(
         1,
         v<int64_t>(run_simple_agg(
@@ -13531,16 +13539,16 @@ TEST_F(Select, TimestampPrecision_FunctionsWithHighPrecisionsAndDates) {
                   "SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_9) = "
                   "TIMESTAMP(3) '2006-04-26 03:49:04.607435125';",
                   dt)));
-    ASSERT_EQ(10,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('nanosecond', m_6) = "
-                  "TIMESTAMP(9) '1999-07-11 14:02:53.874533123';",
-                  dt)));
-    ASSERT_EQ(10,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_6) = "
-                  "TIMESTAMP(9) '1999-07-11 14:02:53.874533123';",
-                  dt)));
+    ASSERT_EQ(
+        10,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('nanosecond', m_6) = TIMESTAMP(9) '1999-07-11 14:02:53.874533';)",
+            dt)));
+    ASSERT_EQ(
+        10,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_6) = TIMESTAMP(9) '1999-07-11 14:02:53.874533';)",
+            dt)));
     ASSERT_EQ(10,
               v<int64_t>(run_simple_agg(
                   "SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_6) = "
@@ -13556,37 +13564,38 @@ TEST_F(Select, TimestampPrecision_FunctionsWithHighPrecisionsAndDates) {
                   "SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_6) = "
                   "TIMESTAMP(3) '1999-07-11 14:02:53.874533123';",
                   dt)));
-    ASSERT_EQ(15,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('nanosecond', m_3) = "
-                  "TIMESTAMP(9) '2014-12-13 22:23:15.323533123';",
-                  dt)));
-    ASSERT_EQ(15,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_3) = "
-                  "TIMESTAMP(9) '2014-12-13 22:23:15.323533123';",
-                  dt)));
-    ASSERT_EQ(15,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_3) = "
-                  "TIMESTAMP(6) '2014-12-13 22:23:15.323533123';",
-                  dt)));
-    ASSERT_EQ(15,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_3) = "
-                  "TIMESTAMP(6) '2014-12-13 22:23:15.323533123';",
-                  dt)));
-    ASSERT_EQ(15,
-              v<int64_t>(run_simple_agg(
-                  "SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_3) = "
-                  "TIMESTAMP(3) '2014-12-13 22:23:15.323533123';",
-                  dt)));
+    // the underling column is millisecond, so the high precision timestamps are no-ops
+    // regardless of the date-trunc type.
+    ASSERT_EQ(
+        15,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('nanosecond', m_3) = TIMESTAMP(9) '2014-12-13 22:23:15.323';)",
+            dt)));
+    ASSERT_EQ(
+        15,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_3) = TIMESTAMP(9) '2014-12-13 22:23:15.323';)",
+            dt)));
+    ASSERT_EQ(
+        15,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('microsecond', m_3) = TIMESTAMP(6) '2014-12-13 22:23:15.323';)",
+            dt)));
+    ASSERT_EQ(
+        15,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_3) = TIMESTAMP(6) '2014-12-13 22:23:15.323';)",
+            dt)));
+    ASSERT_EQ(
+        15,
+        v<int64_t>(run_simple_agg(
+            R"(SELECT count(*) from test where PG_DATE_TRUNC('millisecond', m_3) = TIMESTAMP(3) '2014-12-13 22:23:15.323';)",
+            dt)));
 
     ASSERT_EQ(
         10,
         v<int64_t>(run_simple_agg(
-            "SELECT count(*) from test where cast(DATEADD('nanosecond', 101,  m_9) as "
-            "DATE) = cast(TIMESTAMP(9) '2006-04-26 03:49:04.607435226' as DATE);",
+            R"(SELECT count(*) from test where cast(DATEADD('nanosecond', 101,  m_9) as DATE) = cast(TIMESTAMP(9) '2006-04-26 03:49:04.607435226' as DATE);)",
             dt)));
     ASSERT_EQ(
         10,
@@ -17301,9 +17310,8 @@ TEST_F(Select, Interop) {
       std::string part2 = ", y ASC, r1 ASC, r2 ASC, r3 ASC;";
       c(part1 + " NULLS FIRST" + part2, part1 + part2, dt);
     }
-    c("SELECT CAST(('fake_' || SUBSTRING(real_str, 6)) LIKE '%_ba%' AS INT) b from test "
-      "ORDER BY b;",
-      "SELECT ('fake_' || SUBSTR(real_str, 6)) LIKE '%_ba%' b from test ORDER BY b;",
+    c(R"(SELECT ('fake_' || SUBSTRING(real_str, 6)) LIKE '%_ba%' b from test ORDER BY b;)",
+      R"(SELECT ('fake_' || SUBSTR(real_str, 6)) LIKE '%_ba%' b from test ORDER BY b;)",
       dt);
   }
   config().exec.enable_interop = false;
