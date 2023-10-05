@@ -346,28 +346,32 @@ std::shared_ptr<const TableFragmentsInfo> ArrowStorage::getTableMetadata(
   auto& table = *tables_.at(table_id);
   mapd_shared_lock<mapd_shared_mutex> table_lock(table.mutex);
   data_lock.unlock();
+  return table.metadata;
+}
 
+void ArrowStorage::setTableMetadata(TableData& table, const int table_id) const {
+  // Assumes lock is already taken
   if (table.fragments.empty()) {
-    return getEmptyTableMetadata(table_id);
-  }
-
-  std::shared_ptr<TableFragmentsInfo> res = std::make_shared<TableFragmentsInfo>();
-  res->setPhysicalNumTuples(table.row_count);
-  for (size_t frag_idx = 0; frag_idx < table.fragments.size(); ++frag_idx) {
-    auto& frag = table.fragments[frag_idx];
-    auto& frag_info = res->fragments.emplace_back();
-    frag_info.fragmentId = static_cast<int>(frag_idx + 1);
-    frag_info.physicalTableId = table_id;
-    frag_info.setPhysicalNumTuples(frag.row_count);
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
-    frag_info.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
-    for (size_t col_idx = 0; col_idx < frag.metadata.size(); ++col_idx) {
-      frag_info.setChunkMetadata(columnId(col_idx), frag.metadata[col_idx]);
+    table.metadata = getEmptyTableMetadata(table_id);
+  } else {
+    auto res = std::make_shared<TableFragmentsInfo>();
+    res->setPhysicalNumTuples(table.row_count);
+    for (size_t frag_idx = 0; frag_idx < table.fragments.size(); ++frag_idx) {
+      auto& frag = table.fragments[frag_idx];
+      auto& frag_info = res->fragments.emplace_back();
+      frag_info.fragmentId = static_cast<int>(frag_idx + 1);
+      frag_info.physicalTableId = table_id;
+      frag_info.setPhysicalNumTuples(frag.row_count);
+      frag_info.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
+      frag_info.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
+      frag_info.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
+      for (size_t col_idx = 0; col_idx < frag.metadata.size(); ++col_idx) {
+        frag_info.setChunkMetadata(columnId(col_idx), frag.metadata[col_idx]);
+      }
     }
+    res->setTableStats(table.table_stats);
+    table.metadata = res;
   }
-  res->setTableStats(table.table_stats);
-  return res;
 }
 
 std::shared_ptr<TableFragmentsInfo> ArrowStorage::getEmptyTableMetadata(
@@ -653,6 +657,7 @@ TableInfoPtr ArrowStorage::createTable(const std::string& table_name,
     auto& table = *iter->second;
     table.fragment_size = options.fragment_size;
     table.schema = schema;
+    table.metadata = getEmptyTableMetadata(table_id);
   }
 
   return res;
@@ -737,6 +742,7 @@ TableInfoPtr ArrowStorage::createRefragmentedView(const std::string& table_name,
   new_table.table_stats = original_table_data.table_stats;
 
   refragmentTable(new_table, new_table_id, new_frag_size);
+  setTableMetadata(new_table, new_table_id);
   return res;
 }
 
@@ -1125,6 +1131,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
   auto table_info = getTableInfo(db_id_, table_id);
   table_info->fragments = table.fragments.size();
   table_info->row_count = table.row_count;
+  setTableMetadata(table, table_id);
 }
 
 TableInfoPtr ArrowStorage::importCsvFile(const std::string& file_name,

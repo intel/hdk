@@ -170,6 +170,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
     std::vector<DataFragment> fragments;
     size_t row_count = 0;
     TableStats table_stats;
+    std::shared_ptr<const TableFragmentsInfo> metadata =
+        std::make_shared<TableFragmentsInfo>();
   };
 
   struct DictionaryData {
@@ -243,6 +245,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                             size_t num_bytes) const;
   void refragmentTable(TableData& table, const int table_id, const size_t new_frag_size);
   void materializeDictionary(DictionaryData* dict_data);
+  void setTableMetadata(TableData& table, const int table_id) const;
 
   int db_id_;
   int schema_id_;
