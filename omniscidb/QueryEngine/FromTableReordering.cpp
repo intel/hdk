@@ -235,8 +235,9 @@ std::vector<node_t> get_node_input_permutation(
   // Use the number of tuples in each table to break ties in BFS.
   const auto compare_node = [&table_infos](const node_t lhs_nest_level,
                                            const node_t rhs_nest_level) {
-    return table_infos[lhs_nest_level].info.getNumTuplesUpperBound() <
-           table_infos[rhs_nest_level].info.getNumTuplesUpperBound();
+    CHECK(table_infos[lhs_nest_level].info);
+    return table_infos[lhs_nest_level].info->getNumTuplesUpperBound() <
+           table_infos[rhs_nest_level].info->getNumTuplesUpperBound();
   };
   const auto compare_edge = [&compare_node](const TraversalEdge& lhs_edge,
                                             const TraversalEdge& rhs_edge) {

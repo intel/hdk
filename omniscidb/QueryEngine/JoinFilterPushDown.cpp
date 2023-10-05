@@ -80,7 +80,8 @@ FilterSelectivity RelAlgExecutor::getFilterSelectivity(
   hdk::ResultSetTable filtered_result;
   const auto table_infos = get_table_infos(input_descs, executor_);
   CHECK_EQ(size_t(1), table_infos.size());
-  const size_t total_rows_upper_bound = table_infos.front().info.getNumTuplesUpperBound();
+  const size_t total_rows_upper_bound =
+      table_infos.front().info->getNumTuplesUpperBound();
   try {
     ColumnCacheMap column_cache;
     filtered_result = executor_->executeWorkUnit(

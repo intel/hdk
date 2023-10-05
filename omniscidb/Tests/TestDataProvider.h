@@ -131,10 +131,11 @@ class TestDataProvider : public AbstractDataProvider {
                    numBytes);
   }
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override {
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id, int table_id)
+      const override {
     CHECK_EQ(db_id, db_id_);
     CHECK_EQ(tables_.count(table_id), (size_t)1);
-    return tables_.at(table_id).getTableInfo();
+    return std::make_shared<TableFragmentsInfo>(tables_.at(table_id).getTableInfo());
   }
 
   template <typename T>

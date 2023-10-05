@@ -19,27 +19,19 @@
 
 InputTableInfoCache::InputTableInfoCache(Executor* executor) : executor_(executor) {}
 
-namespace {
-
-TableFragmentsInfo copy_table_info(const TableFragmentsInfo& table_info) {
-  return table_info;
-}
-
-}  // namespace
-
-TableFragmentsInfo InputTableInfoCache::getTableInfo(int db_id, int table_id) {
+std::shared_ptr<const TableFragmentsInfo> InputTableInfoCache::getTableInfo(
+    int db_id,
+    int table_id) {
   const auto it = cache_.find({db_id, table_id});
   if (it != cache_.end()) {
-    const auto& table_info = it->second;
-    return copy_table_info(table_info);
+    return it->second;
   }
   const auto data_mgr = executor_->getDataMgr();
   CHECK(data_mgr);
-  auto table_info = data_mgr->getTableMetadata(db_id, table_id);
-  auto it_ok =
-      cache_.emplace(std::make_pair(db_id, table_id), copy_table_info(table_info));
+  auto it_ok = cache_.emplace(std::make_pair(db_id, table_id),
+                              data_mgr->getTableMetadata(db_id, table_id));
   CHECK(it_ok.second);
-  return copy_table_info(table_info);
+  return it_ok.first->second;
 }
 
 void InputTableInfoCache::clear() {
@@ -56,8 +48,7 @@ void collect_table_infos(std::vector<InputTableInfo>& table_infos,
     const auto cached_index_it = info_cache.find({db_id, table_id});
     if (cached_index_it != info_cache.end()) {
       CHECK_LT(cached_index_it->second, table_infos.size());
-      table_infos.push_back(
-          {db_id, table_id, copy_table_info(table_infos[cached_index_it->second].info)});
+      table_infos.push_back({db_id, table_id, table_infos[cached_index_it->second].info});
       continue;
     }
     table_infos.push_back({db_id, table_id, executor->getTableInfo(db_id, table_id)});
@@ -75,7 +66,7 @@ size_t get_frag_count_of_table(const int db_id, const int table_id, Executor* ex
     return size_t(1);
   } else {
     const auto table_info = executor->getTableInfo(db_id, table_id);
-    return table_info.fragments.size();
+    return table_info->fragments.size();
   }
 }
 

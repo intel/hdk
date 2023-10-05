@@ -501,13 +501,10 @@ std::vector<InputTableInfo> getSyntheticInputTableInfo(
   // NOTE(sy): This vector ordering seems to work for now, but maybe we need to
   // review how rte_idx is assigned for ColumnVars. See for example Analyzer.h
   // and RelAlgExecutor.cpp and rte_idx there.
-  std::vector<InputTableInfo> query_infos(phys_table_ids.size());
-  size_t i = 0;
+  std::vector<InputTableInfo> query_infos;
   for (auto [db_id, table_id] : phys_table_ids) {
-    query_infos[i].db_id = db_id;
-    query_infos[i].table_id = table_id;
-    query_infos[i].info = executor->getDataMgr()->getTableMetadata(db_id, table_id);
-    ++i;
+    query_infos.emplace_back(InputTableInfo{
+        db_id, table_id, executor->getDataMgr()->getTableMetadata(db_id, table_id)});
   }
 
   return query_infos;

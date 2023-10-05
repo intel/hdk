@@ -984,12 +984,12 @@ void Executor::createErrorCheckControlFlow(
             CHECK_LE(freq_control_knob, 1.0);
             if (!input_table_infos.empty()) {
               const auto& outer_table_info = *input_table_infos.begin();
-              auto num_outer_table_tuples = outer_table_info.info.getNumTuples();
+              auto num_outer_table_tuples = outer_table_info.info->getNumTuples();
               CHECK_GT(outer_table_info.table_id, 0);
-              auto num_frags = outer_table_info.info.fragments.size();
+              auto num_frags = outer_table_info.info->fragments.size();
               if (num_frags > 0) {
                 num_outer_table_tuples =
-                    outer_table_info.info.fragments.begin()->getNumTuples();
+                    outer_table_info.info->fragments.begin()->getNumTuples();
               }
               if (num_outer_table_tuples > 0) {
                 // gridSize * blockSize --> pos_step (idx of the next row per thread)

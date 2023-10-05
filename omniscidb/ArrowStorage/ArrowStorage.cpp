@@ -337,7 +337,9 @@ void ArrowStorage::fetchVarLenArrayData(const TableData& table,
   }
 }
 
-TableFragmentsInfo ArrowStorage::getTableMetadata(int db_id, int table_id) const {
+std::shared_ptr<const TableFragmentsInfo> ArrowStorage::getTableMetadata(
+    int db_id,
+    int table_id) const {
   mapd_shared_lock<mapd_shared_mutex> data_lock(data_mutex_);
   CHECK_EQ(db_id, db_id_);
   CHECK_EQ(tables_.count(table_id), (size_t)1);
@@ -349,11 +351,11 @@ TableFragmentsInfo ArrowStorage::getTableMetadata(int db_id, int table_id) const
     return getEmptyTableMetadata(table_id);
   }
 
-  TableFragmentsInfo res;
-  res.setPhysicalNumTuples(table.row_count);
+  std::shared_ptr<TableFragmentsInfo> res = std::make_shared<TableFragmentsInfo>();
+  res->setPhysicalNumTuples(table.row_count);
   for (size_t frag_idx = 0; frag_idx < table.fragments.size(); ++frag_idx) {
     auto& frag = table.fragments[frag_idx];
-    auto& frag_info = res.fragments.emplace_back();
+    auto& frag_info = res->fragments.emplace_back();
     frag_info.fragmentId = static_cast<int>(frag_idx + 1);
     frag_info.physicalTableId = table_id;
     frag_info.setPhysicalNumTuples(frag.row_count);
@@ -364,23 +366,24 @@ TableFragmentsInfo ArrowStorage::getTableMetadata(int db_id, int table_id) const
       frag_info.setChunkMetadata(columnId(col_idx), frag.metadata[col_idx]);
     }
   }
-  res.setTableStats(table.table_stats);
+  res->setTableStats(table.table_stats);
   return res;
 }
 
-TableFragmentsInfo ArrowStorage::getEmptyTableMetadata(int table_id) const {
-  TableFragmentsInfo res;
-  res.setPhysicalNumTuples(0);
+std::shared_ptr<TableFragmentsInfo> ArrowStorage::getEmptyTableMetadata(
+    int table_id) const {
+  std::shared_ptr<TableFragmentsInfo> res = std::make_shared<TableFragmentsInfo>();
+  res->setPhysicalNumTuples(0);
 
   // Executor requires dummy empty fragment for empty tables
-  FragmentInfo& empty_frag = res.fragments.emplace_back();
+  FragmentInfo& empty_frag = res->fragments.emplace_back();
   empty_frag.fragmentId = 0;
   empty_frag.setPhysicalNumTuples(0);
   empty_frag.deviceIds.push_back(0);  // Data_Namespace::DISK_LEVEL
   empty_frag.deviceIds.push_back(0);  // Data_Namespace::CPU_LEVEL
   empty_frag.deviceIds.push_back(0);  // Data_Namespace::GPU_LEVEL
   empty_frag.physicalTableId = table_id;
-  res.fragments.push_back(empty_frag);
+  res->fragments.push_back(empty_frag);
 
   return res;
 }
@@ -828,8 +831,6 @@ void ArrowStorage::refragmentTable(TableData& table,
                 meta->fillChunkStats(computeStats(
                     col_arr->Slice(frag.offset, frag.row_count * elems_count), col_type));
               } else {
-                int32_t min = 0;
-                int32_t max = -1;
                 meta->fillChunkStats(0, -1, /*has_nulls=*/true);
               }
               frag.metadata[col_idx] = meta;

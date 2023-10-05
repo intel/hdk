@@ -513,7 +513,7 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       }
       CHECK(ti_idx);
       const auto& query_info = query_infos[*ti_idx].info;
-      if (query_info.getNumTuples() == 0) {
+      if (query_info->getNumTuples() == 0) {
         // The column doesn't contain any values, synthesize an empty range.
         if (col_type->isFloatingPoint()) {
           return col_type->size() == 4 ? ExpressionRange::makeFloatRange(0, -1, false)
@@ -523,12 +523,12 @@ ExpressionRange getLeafColumnRange(const hdk::ir::ColumnVar* col_expr,
       }
       if (col_expr->isVirtual()) {
         CHECK(col_type->isInt64());
-        const int64_t num_tuples = query_info.getNumTuples();
+        const int64_t num_tuples = query_info->getNumTuples();
         return ExpressionRange::makeIntRange(
             0, std::max(num_tuples - 1, int64_t(0)), 0, has_nulls);
       }
 
-      auto& table_stats = query_info.getTableStats();
+      auto& table_stats = query_info->getTableStats();
       auto col_stats_it = table_stats.find(col_id);
       CHECK(col_stats_it != table_stats.end())
           << query_infos[*ti_idx].db_id << ":" << query_infos[*ti_idx].table_id << ":"

@@ -214,7 +214,8 @@ class DataMgr {
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) const;
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const;
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id,
+                                                             int table_id) const;
 
   BufferProvider* getBufferProvider() const { return buffer_provider_.get(); }
 

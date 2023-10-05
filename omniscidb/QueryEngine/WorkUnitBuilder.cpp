@@ -594,7 +594,7 @@ void WorkUnitBuilder::processUnion(const hdk::ir::LogicalUnion* logical_union) {
                       query_infos.cend(),
                       size_t(0),
                       [](auto max, auto const& query_info) {
-                        return std::max(max, query_info.info.getNumTuples());
+                        return std::max(max, query_info.info->getNumTuples());
                       });
 
   // We expect input ot be an execution point. In this case target

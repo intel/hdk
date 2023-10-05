@@ -73,7 +73,8 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
   std::unique_ptr<Data_Namespace::AbstractDataToken> getZeroCopyColumnData(
       const ColumnRef& col_ref) override;
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id,
+                                                             int table_id) const override;
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
 
@@ -217,7 +218,7 @@ class ArrowStorage : public SimpleSchemaProvider, public AbstractDataProvider {
                       std::shared_ptr<arrow::Schema> rhs);
   ChunkStats computeStats(std::shared_ptr<arrow::ChunkedArray> arr,
                           const hdk::ir::Type* type);
-  TableFragmentsInfo getEmptyTableMetadata(int table_id) const;
+  std::shared_ptr<TableFragmentsInfo> getEmptyTableMetadata(int table_id) const;
   void fetchFixedLenData(const TableData& table,
                          size_t frag_idx,
                          size_t col_idx,

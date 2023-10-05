@@ -55,7 +55,7 @@ int getDictId(const hdk::ir::Type* type) {
 
   std::cout << "  Fragments:" << std::endl;
   auto meta = storage.getTableMetadata(TEST_DB_ID, table_id);
-  for (auto& frag : meta.fragments) {
+  for (auto& frag : meta->fragments) {
     std::cout << "    Fragment #" << frag.fragmentId << " - " << frag.getNumTuples()
               << " row(s)" << std::endl;
     for (int col_id = 1; col_id < col_infos.back()->column_id; ++col_id) {
@@ -631,19 +631,19 @@ void checkData(ArrowStorage& storage,
   size_t frag_count = (row_count + fragment_size - 1) / fragment_size;
   auto meta = storage.getTableMetadata(TEST_DB_ID, table_id);
   auto cols = storage.listColumns(TEST_DB_ID, table_id);
-  CHECK_EQ(meta.getNumTuples(), row_count);
-  CHECK_EQ(meta.getPhysicalNumTuples(), row_count);
-  CHECK_EQ(meta.fragments.size(), frag_count);
+  CHECK_EQ(meta->getNumTuples(), row_count);
+  CHECK_EQ(meta->getPhysicalNumTuples(), row_count);
+  CHECK_EQ(meta->fragments.size(), frag_count);
   for (size_t frag_idx = 0; frag_idx < frag_count; ++frag_idx) {
     size_t start_row = frag_idx * fragment_size;
     size_t end_row = std::min(row_count, start_row + fragment_size);
     size_t frag_rows = end_row - start_row;
-    CHECK_EQ(meta.fragments[frag_idx].fragmentId, static_cast<int>(frag_idx + 1));
-    CHECK_EQ(meta.fragments[frag_idx].physicalTableId, table_id);
-    CHECK_EQ(meta.fragments[frag_idx].getNumTuples(), frag_rows);
-    CHECK_EQ(meta.fragments[frag_idx].getPhysicalNumTuples(), frag_rows);
+    CHECK_EQ(meta->fragments[frag_idx].fragmentId, static_cast<int>(frag_idx + 1));
+    CHECK_EQ(meta->fragments[frag_idx].physicalTableId, table_id);
+    CHECK_EQ(meta->fragments[frag_idx].getNumTuples(), frag_rows);
+    CHECK_EQ(meta->fragments[frag_idx].getPhysicalNumTuples(), frag_rows);
 
-    auto chunk_meta_map = meta.fragments[frag_idx].getChunkMetadataMap();
+    auto chunk_meta_map = meta->fragments[frag_idx].getChunkMetadataMap();
     CHECK_EQ(chunk_meta_map.size(), sizeof...(Ts));
     for (int i = 0; i < static_cast<int>(chunk_meta_map.size()); ++i) {
       CHECK_EQ(chunk_meta_map.count(cols[i]->column_id), (size_t)1);

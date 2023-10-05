@@ -180,9 +180,10 @@ class BufferMgr : public AbstractBufferMgr {  // implements
     return nullptr;
   }
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override {
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id, int table_id)
+      const override {
     UNREACHABLE();
-    return TableFragmentsInfo{};
+    return std::make_shared<TableFragmentsInfo>(TableFragmentsInfo{});
   }
 
   // Buffer API

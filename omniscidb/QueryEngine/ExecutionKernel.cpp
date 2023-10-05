@@ -94,11 +94,11 @@ bool need_to_hold_chunk(const std::list<std::shared_ptr<Chunk_NS::Chunk>>& chunk
 const std::vector<uint64_t>& SharedKernelContext::getFragOffsets() {
   std::lock_guard<std::mutex> lock(all_frag_row_offsets_mutex_);
   if (all_frag_row_offsets_.empty()) {
-    all_frag_row_offsets_.resize(query_infos_.front().info.fragments.size() + 1);
-    for (size_t i = 1; i <= query_infos_.front().info.fragments.size(); ++i) {
+    all_frag_row_offsets_.resize(query_infos_.front().info->fragments.size() + 1);
+    for (size_t i = 1; i <= query_infos_.front().info->fragments.size(); ++i) {
       all_frag_row_offsets_[i] =
           all_frag_row_offsets_[i - 1] +
-          query_infos_.front().info.fragments[i - 1].getNumTuples();
+          query_infos_.front().info->fragments[i - 1].getNumTuples();
     }
   }
   return all_frag_row_offsets_;
@@ -198,7 +198,7 @@ void ExecutionKernel::runImpl(Executor* executor,
         auto data_provider = column_fetcher.getDataProvider();
         CHECK(data_provider);
         auto table_meta = data_provider->getTableMetadata(qi.db_id, qi.table_id);
-        streaming_table_fragment = table_meta.fragments;
+        streaming_table_fragment = table_meta->fragments;
         all_tables_fragments[{qi.db_id, qi.table_id}] = &streaming_table_fragment;
       }
     }

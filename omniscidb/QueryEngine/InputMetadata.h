@@ -32,19 +32,20 @@ using TemporaryTables = std::unordered_map<int, hdk::ResultSetTableTokenPtr>;
 struct InputTableInfo {
   int db_id;
   int table_id;
-  TableFragmentsInfo info;
+  std::shared_ptr<const TableFragmentsInfo> info = std::make_shared<TableFragmentsInfo>();
 };
 
 class InputTableInfoCache {
  public:
   InputTableInfoCache(Executor* executor);
 
-  TableFragmentsInfo getTableInfo(int db_id, int table_id);
+  std::shared_ptr<const TableFragmentsInfo> getTableInfo(int db_id, int table_id);
 
   void clear();
 
  private:
-  std::unordered_map<std::pair<int, int>, TableFragmentsInfo> cache_;
+  std::unordered_map<std::pair<int, int>, std::shared_ptr<const TableFragmentsInfo>>
+      cache_;
   Executor* executor_;
 };
 

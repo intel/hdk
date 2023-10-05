@@ -56,7 +56,8 @@ class PersistentStorageMgr : public AbstractBufferMgr {
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true);
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id,
+                                                             int table_id) const override;
 
   void registerDataProvider(int schema_id, std::shared_ptr<AbstractBufferMgr>);
 

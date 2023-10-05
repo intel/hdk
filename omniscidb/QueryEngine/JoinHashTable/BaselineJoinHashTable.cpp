@@ -249,11 +249,11 @@ void BaselineJoinHashTable::reify(const HashType preferred_layout) {
 void BaselineJoinHashTable::reifyWithLayout(const HashType layout) {
   const auto& query_info =
       get_inner_query_info(getInnerDbId(), getInnerTableId(), query_infos_).info;
-  if (query_info.fragments.empty()) {
+  if (query_info->fragments.empty()) {
     return;
   }
 
-  const auto total_entries = 2 * query_info.getNumTuplesUpperBound();
+  const auto total_entries = 2 * query_info->getNumTuplesUpperBound();
   if (total_entries > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
     throw TooManyHashEntries();
   }
@@ -270,7 +270,7 @@ void BaselineJoinHashTable::reifyWithLayout(const HashType layout) {
   auto entries_per_device = total_entries;
 
   for (int device_id = 0; device_id < device_count_; ++device_id) {
-    const auto fragments = query_info.fragments;
+    const auto fragments = query_info->fragments;
     const auto columns_for_device =
         fetchColumnsForDevice(fragments,
                               device_id,
@@ -310,7 +310,7 @@ void BaselineJoinHashTable::reifyWithLayout(const HashType layout) {
   }
   std::vector<std::future<void>> init_threads;
   for (int device_id = 0; device_id < device_count_; ++device_id) {
-    const auto fragments = query_info.fragments;
+    const auto fragments = query_info->fragments;
     init_threads.push_back(std::async(std::launch::async,
                                       &BaselineJoinHashTable::reifyForDevice,
                                       this,

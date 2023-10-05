@@ -52,7 +52,8 @@ class ResultSetRegistry : public SimpleSchemaProvider,
       const ChunkKey& key,
       size_t num_bytes) override;
 
-  TableFragmentsInfo getTableMetadata(int db_id, int table_id) const override;
+  std::shared_ptr<const TableFragmentsInfo> getTableMetadata(int db_id,
+                                                             int table_id) const override;
 
   const DictDescriptor* getDictMetadata(int dict_id, bool load_dict = true) override;
 
