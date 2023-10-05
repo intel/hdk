@@ -306,12 +306,14 @@ public class MapDRelJsonReader {
     final String name = (String) jsonAggCall.get("name");
     return AggregateCall.create(aggregation,
             distinct,
-            false,
-            false,
+            /*approximate=*/false,
+            /*ignoreNulls=*/false,
             operands,
             filterOperand == null ? -1 : filterOperand,
-            null,
-            RelCollations.EMPTY,
+            /*distinctKeys=*/null,
+            /*collation=*/RelCollations.EMPTY,
+            /*groupCount=*/operands.size(),
+            /*input=*/relInput.getInput(),
             type,
             name);
   }

@@ -591,6 +591,12 @@ data: {
       dropStatementParserMethods: [
       ]
 
+      # List of methods for parsing extensions to "TRUNCATE" calls.
+      # Each must accept arguments "(SqlParserPos pos)".
+      # Example: "SqlTruncate".
+      truncateStatementParserMethods: [
+      ]
+
       # Binary operators tokens
       binaryOperatorsTokens: [
       ]
@@ -611,6 +617,10 @@ data: {
         "interruptQueryParser.ftl"
         "ddlParser.ftl"
       ]
+
+      # Custom identifier token.
+      # Example: "< IDENTIFIER: (<LETTER>|<DIGIT>)+ >".
+      customIdentifierToken: ""
 
       includePosixOperators: false
       includeParsingStringLiteralAsArrayLiteral: false
