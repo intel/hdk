@@ -48,7 +48,10 @@ void CpuBuffer::readData(int8_t* const dst,
     memcpy(dst, mem_ + offset, num_bytes);
   } else if (dst_memory_level == GPU_LEVEL) {
     CHECK_GE(dst_device_id, 0);
-    gpu_mgr_->copyHostToDevice(dst, mem_ + offset, num_bytes, dst_device_id);
+    auto timer1 = DEBUG_TIMER("pinning cuda");
+    gpu_mgr_->pinMemory(mem_ + offset, num_bytes, dst_device_id);
+    timer1.stop();
+    gpu_mgr_->copyHostToDeviceAsyncIfPossible(dst, mem_ + offset, num_bytes, dst_device_id);
   } else {
     LOG(FATAL) << "Unsupported buffer type";
   }

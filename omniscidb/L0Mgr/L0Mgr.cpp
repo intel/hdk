@@ -309,6 +309,14 @@ L0Kernel::~L0Kernel() {
   }
 }
 
+void L0Manager::copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                             const int8_t* host_ptr,
+                             const size_t num_bytes,
+                             const int device_num){
+  LOG(WARNING) << "L0 has no async data transfers available";
+  copyHostToDevice(device_ptr, host_ptr, num_bytes, device_num);
+}
+
 void L0Manager::copyHostToDevice(int8_t* device_ptr,
                                  const int8_t* host_ptr,
                                  const size_t num_bytes,

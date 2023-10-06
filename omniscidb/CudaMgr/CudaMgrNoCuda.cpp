@@ -43,6 +43,17 @@ void CudaMgr::copyHostToDeviceAsync(int8_t* device_ptr,
   CHECK(false);
 }
 
+void CudaMgr::copyHostToDeviceAsync(int8_t* device_ptr,
+                                    const int8_t* host_ptr,
+                                    const size_t num_bytes,
+                                    const int device_num) {
+  CHECK(false);
+}
+
+void CudaMgr::pinMemory(void* p, size_t bytesize, const int device_num){
+  CHECK(false);
+}
+
 void CudaMgr::synchronizeStream(const int device_num) {
   CHECK(false);
 }

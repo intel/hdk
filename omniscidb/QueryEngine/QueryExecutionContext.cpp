@@ -959,6 +959,8 @@ QueryExecutionContext::prepareKernelParams(
            reinterpret_cast<std::uintptr_t>(kernel_metadata_gpu_buf->getMemoryPtr() +
                                             alloc_size));
   CHECK_EQ(nullptr, params[GROUPBY_BUF]);
+  auto timer1 = DEBUG_TIMER("synchronizeStream");
   buffer_provider->synchronizeStream(device_id);
+  timer1.stop();
   return {params, kernel_metadata_gpu_buf};
 }

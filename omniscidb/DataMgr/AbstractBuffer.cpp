@@ -45,6 +45,7 @@ void AbstractBuffer::copyTo(AbstractBuffer* destination_buffer, const size_t num
   CHECK_GE(size(), num_bytes) << "Attempting to copy more bytes than a buffer contains";
   size_t chunk_size = (num_bytes == 0) ? size() : num_bytes;
   destination_buffer->reserve(chunk_size);
+  auto timer1 = DEBUG_TIMER("buffer_write");
   if (isUpdated()) {
     read(destination_buffer->getMemoryPtr(),
          chunk_size,
@@ -58,6 +59,7 @@ void AbstractBuffer::copyTo(AbstractBuffer* destination_buffer, const size_t num
          destination_buffer->getType(),
          destination_buffer->getDeviceId());
   }
+  timer1.stop();
   destination_buffer->setSize(chunk_size);
   destination_buffer->syncEncoder(this);
 }

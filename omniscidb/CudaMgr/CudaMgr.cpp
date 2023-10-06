@@ -112,14 +112,47 @@ void CudaMgr::copyHostToDevice(int8_t* device_ptr,
       cuMemcpyHtoD(reinterpret_cast<CUdeviceptr>(device_ptr), host_ptr, num_bytes));
 }
 
+void CudaMgr::copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                                    const int8_t* host_ptr,
+                                    const size_t num_bytes,
+                                    const int device_num) {
+  if(async_data_load_available){
+    copyHostToDeviceAsync(device_ptr,host_ptr,num_bytes, device_num);
+  }else{
+    copyHostToDevice(device_ptr,host_ptr,num_bytes, device_num);
+  }
+}
+
 void CudaMgr::copyHostToDeviceAsync(int8_t* device_ptr,
                                     const int8_t* host_ptr,
                                     const size_t num_bytes,
                                     const int device_num) {
   setContext(device_num);
+  auto timer1 = DEBUG_TIMER("async");
+  int attributeValue{1};
+    cuDeviceGetAttribute(&attributeValue, CU_DEVICE_ATTRIBUTE_PAGEABLE_MEMORY_ACCESS_USES_HOST_PAGE_TABLES, device_properties_[device_num].device);
+  CHECK(!attributeValue);
+  // On systems where CU_DEVICE_ATTRIBUTE_PAGEABLE_MEMORY_ACCESS_USES_HOST_PAGE_TABLES is true, cuMemHostRegister will not page-lock the memory range
   checkError(cuMemcpyHtoDAsync(
       reinterpret_cast<CUdeviceptr>(device_ptr), host_ptr, num_bytes, stream_));
+  timer1.stop();
 }
+
+
+/*
+  When a data transfer from pageable host memory to device memory 
+  is invoked, the CUDA driver must first allocate a 
+  temporary page-locked, or “pinned”, host array,
+  copy the host data to the pinned array, and then 
+  transfer the data from the pinned array to device memory.
+  Since our buffers are pinned anyways, we can simply register them.
+*/
+void CudaMgr::pinMemory(void* p, size_t bytesize, const int device_num){
+  setContext(device_num);
+  // https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEM.html#group__CUDA__MEM_1gf0a9fe11544326dabd743b7aa6b54223
+  checkError(cuMemHostRegister(p, bytesize, CU_MEMHOSTREGISTER_READ_ONLY ));
+}
+ 
 void CudaMgr::synchronizeStream(const int device_num) {
   setContext(device_num);
   checkError(cuStreamSynchronize(stream_));

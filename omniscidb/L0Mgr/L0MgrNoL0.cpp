@@ -63,6 +63,13 @@ void* allocate_device_mem(const size_t num_bytes, L0Device& device) {
 
 L0Manager::L0Manager() {}
 
+void L0Manager::copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                             const int8_t* host_ptr,
+                             const size_t num_bytes,
+                             const int device_num){
+  CHECK(false);
+}
+
 void L0Manager::copyHostToDevice(int8_t* device_ptr,
                                  const int8_t* host_ptr,
                                  const size_t num_bytes,

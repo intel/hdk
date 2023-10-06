@@ -96,6 +96,13 @@ class CudaMgr : public GpuMgr {
                         const size_t num_bytes,
                         const int device_num) override;
 
+  void copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                                     const int8_t* host_ptr,
+                                     const size_t num_bytes,
+                                     const int device_num) override;
+
+  void pinMemory(void* p, size_t bytesize, const int device_num) override;
+  
   void copyHostToDeviceAsync(int8_t* device_ptr,
                              const int8_t* host_ptr,
                              const size_t num_bytes,

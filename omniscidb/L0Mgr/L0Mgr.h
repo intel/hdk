@@ -205,10 +205,21 @@ class L0Manager : public GpuMgr {
                              const int device_num) override {
     CHECK(false);
   }
+
+  void copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                             const int8_t* host_ptr,
+                             const size_t num_bytes,
+                             const int device_num) override;
+
   void synchronizeStream(const int device_num) override {
     LOG(WARNING)
         << "L0 has no async data transfer enabled, synchronizeStream() has no effect";
   }
+
+  void pinMemory(void* p, size_t bytesize, const int device_num) override {
+    LOG(WARNING) << "L0 pinMemory() has no effect";
+  }
+
   void copyHostToDevice(int8_t* device_ptr,
                         const int8_t* host_ptr,
                         const size_t num_bytes,
