@@ -46,8 +46,10 @@ void checkTypeConsistency(const int ref_col_type, const hdk::ir::Type* col_type)
     CHECK_EQ(SQLITE_INTEGER, ref_col_type);
   } else if (col_type->isFloatingPoint() || col_type->isDecimal()) {
     CHECK(ref_col_type == SQLITE_FLOAT || ref_col_type == SQLITE_INTEGER);
+  } else if (col_type->isBoolean()) {
+    CHECK(ref_col_type == SQLITE_INTEGER || ref_col_type == SQLITE_TEXT);
   } else {
-    CHECK_EQ(SQLITE_TEXT, ref_col_type);
+    CHECK_EQ(SQLITE_TEXT, ref_col_type) << "HDK Type: " << col_type->toString();
   }
 }
 
