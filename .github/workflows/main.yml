@@ -149,7 +149,6 @@ jobs:
       options: -DENABLE_L0=on -DENABLE_CUDA=off -DENABLE_PYTHON=off 
 
   test-l0-docker:
-    if: false
     name: Gtests (Sanity) 
     needs: build-l0-docker
     uses: ./.github/workflows/test-docker.yml
