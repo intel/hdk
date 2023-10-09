@@ -1100,7 +1100,7 @@ void Executor::createErrorCheckControlFlow(
           error_code_arg_val = ir_builder.CreateAddrSpaceCast(
               error_code_arg,
               llvm::PointerType::get(
-                  error_code_arg->getType()->getPointerElementType(),
+                  cgen_state_->context_,
                   record_error_code_func->getArg(1)->getType()->getPointerAddressSpace()),
               "checkflow.error.cast");
         }
@@ -1945,7 +1945,7 @@ bool Executor::compileBody(const RelAlgExecutionUnit& ra_exe_unit,
           co.codegen_traits_desc.local_addr_space_) {
         loop_done = cgen_state_->ir_builder_.CreateAddrSpaceCast(
             loop_done,
-            llvm::PointerType::get(loop_done->getType()->getPointerElementType(),
+            llvm::PointerType::get(cgen_state_->context_,
                                    co.codegen_traits_desc.local_addr_space_),
             "loop.done.cast");
       }

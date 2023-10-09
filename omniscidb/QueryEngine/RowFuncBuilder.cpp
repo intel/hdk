@@ -1160,7 +1160,7 @@ void RowFuncBuilder::codegenEstimator(std::stack<llvm::BasicBlock*>& array_loops
       co.codegen_traits_desc.local_addr_space_) {
     estimator_key_lv = LL_BUILDER.CreateAddrSpaceCast(
         estimator_key_lv,
-        llvm::PointerType::get(estimator_key_lv->getType()->getPointerElementType(),
+        llvm::PointerType::get(executor_->cgen_state_->context_,
                                cgen_traits.getLocalAddrSpace()),
         "estimator.key.lv.cast");
   }

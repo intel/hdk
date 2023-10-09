@@ -1252,7 +1252,7 @@ llvm::Value* Executor::arrayLoopCodegen(const hdk::ir::Expr* array_expr,
       co.codegen_traits_desc.local_addr_space_) {
     array_idx_ptr = cgen_state_->ir_builder_.CreateAddrSpaceCast(
         array_idx_ptr,
-        llvm::PointerType::get(array_idx_ptr->getType()->getPointerElementType(),
+        llvm::PointerType::get(cgen_state_->context_,
                                co.codegen_traits_desc.local_addr_space_),
         "array.idx.ptrcast");
   }
