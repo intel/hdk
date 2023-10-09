@@ -346,7 +346,7 @@ llvm::Value* CodeGenerator::codegenFunctionOper(
         codegen_traits_desc.local_addr_space_) {
       buffer_ret = cgen_state_->ir_builder_.CreateAddrSpaceCast(
           buffer_ret,
-          llvm::PointerType::get(buffer_ret->getType()->getPointerElementType(),
+          llvm::PointerType::get(cgen_state_->context_,
                                  codegen_traits_desc.local_addr_space_),
           "buffer.ret.cast");
     }
@@ -411,7 +411,7 @@ CodeGenerator::beginArgsNullcheck(const hdk::ir::FunctionOper* function_oper,
           codegen_traits_desc.local_addr_space_) {
         null_array_alloca = cgen_state_->ir_builder_.CreateAddrSpaceCast(
             null_array_alloca,
-            llvm::PointerType::get(null_array_alloca->getType()->getPointerElementType(),
+            llvm::PointerType::get(cgen_state_->context_,
                                    codegen_traits_desc.local_addr_space_),
             "null.array.alloca.cast");
       }

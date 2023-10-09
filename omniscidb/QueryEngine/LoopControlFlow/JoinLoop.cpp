@@ -95,9 +95,7 @@ llvm::BasicBlock* JoinLoop::codegen(
             co.codegen_traits_desc.local_addr_space_) {
           iteration_counter_ptr = builder.CreateAddrSpaceCast(
               iteration_counter_ptr,
-              llvm::PointerType::get(
-                  iteration_counter_ptr->getType()->getPointerElementType(),
-                  co.codegen_traits_desc.local_addr_space_),
+              llvm::PointerType::get(context, co.codegen_traits_desc.local_addr_space_),
               "iteration.counter.ptr.cast");
         }
         llvm::Value* found_an_outer_match_ptr{nullptr};
@@ -109,9 +107,7 @@ llvm::BasicBlock* JoinLoop::codegen(
               co.codegen_traits_desc.local_addr_space_) {
             found_an_outer_match_ptr = builder.CreateAddrSpaceCast(
                 found_an_outer_match_ptr,
-                llvm::PointerType::get(
-                    found_an_outer_match_ptr->getType()->getPointerElementType(),
-                    co.codegen_traits_desc.local_addr_space_),
+                llvm::PointerType::get(context, co.codegen_traits_desc.local_addr_space_),
                 "found.an.outer.match.ptr.cast");
           }
           builder.CreateStore(ll_bool(false, context), found_an_outer_match_ptr);
@@ -121,9 +117,7 @@ llvm::BasicBlock* JoinLoop::codegen(
               co.codegen_traits_desc.local_addr_space_) {
             current_condition_match_ptr = builder.CreateAddrSpaceCast(
                 current_condition_match_ptr,
-                llvm::PointerType::get(
-                    current_condition_match_ptr->getType()->getPointerElementType(),
-                    co.codegen_traits_desc.local_addr_space_),
+                llvm::PointerType::get(context, co.codegen_traits_desc.local_addr_space_),
                 "current.condition.match.ptr.cast");
           }
         }
