@@ -27,7 +27,8 @@ TEST(SPIRVBuildTest, TranslateSimple) {
   module->setTargetTriple("spir-unknown-unknown");
   IRBuilder<> builder(ctx);
 
-  std::vector<Type*> args{Type::getFloatPtrTy(ctx, 1), Type::getFloatPtrTy(ctx, 1)};
+  std::vector<Type*> args{PointerType::get(ctx, 1),
+                          PointerType::get(ctx, 1)};  // float*, float*
   FunctionType* f_type = FunctionType::get(Type::getVoidTy(ctx), args, false);
   Function* f = Function::Create(
       f_type, GlobalValue::LinkageTypes::ExternalLinkage, "plus1", module.get());
@@ -49,11 +50,9 @@ TEST(SPIRVBuildTest, TranslateSimple) {
   Constant* onef = ConstantFP::get(ctx, APFloat(1.f));
   Value* idx = builder.CreateCall(get_global_idj, zero, "idx");
   auto argit = f->args().begin();
-  Value* firstElemSrc =
-      builder.CreateGEP(argit->getType()->getPointerElementType(), argit, idx, "src.idx");
+  Value* firstElemSrc = builder.CreateGEP(Type::getFloatTy(ctx), argit, idx, "src.idx");
   ++argit;
-  Value* firstElemDst =
-      builder.CreateGEP(argit->getType()->getPointerElementType(), argit, idx, "dst.idx");
+  Value* firstElemDst = builder.CreateGEP(Type::getFloatTy(ctx), argit, idx, "dst.idx");
   Value* ldSrc = builder.CreateLoad(Type::getFloatTy(ctx), firstElemSrc, "ld");
   Value* result = builder.CreateFAdd(ldSrc, onef, "foo");
   builder.CreateStore(result, firstElemDst);
