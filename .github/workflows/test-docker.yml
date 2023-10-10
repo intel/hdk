@@ -48,25 +48,29 @@ jobs:
         with:
           name: ${{ runner.os }}-asan-cache
 
-      - name: Unpack build files, create Dockerfile
+      - name: Unpack build files, create Dockerfile, build and start the container
         run: |
           tar -zxf build.tgz
+          set -vx
           cat docker/Dockerfile docker/Dockerfile.${{ inputs.name }} >Dockerfile
 
-      - name: Start the container
-        if: inputs.name != 'l0'
-        run:  |
-          set -vx
-          docker build . ${{ inputs.reset-cache && '--no-cache ' || '' }}--tag hdk-build.${{ inputs.name }}
-          docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl hdk-build.${{ inputs.name }}:latest
+          devices=$(find /dev -type c -name 'nvidia*' | awk '{ print " --device "$1":"$1 }')
+          test ! -d /dev/dri || {
+            ls -l /dev/dri
+            devices="$devices --device /dev/dri:/dev/dri"
+            getent group render | awk -F : '{ print "RUN groupadd -g "$3" render && usermod -a -G render ghrunner" }' >>Dockerfile
+          }
 
-      - name: Start L0 container
-        if: inputs.name == 'l0'
-        run:  |
-          set -vx
-          getent group render | awk -F : '{ print "RUN groupadd -g "$3" render && usermod -a -G render ghrunner" }' >>Dockerfile
-          docker build . ${{ inputs.reset-cache && '--no-cache' || '' }}--tag hdk-build.${{ inputs.name }}
-          docker run -id --name hdk-build.${{ inputs.name }} --network host --device /dev/dri:/dev/dri hdk-build.${{ inputs.name }}:latest
+          docker build . \
+            --build-arg http_proxy \
+            --build-arg https_proxy \
+            --build-arg no_proxy \
+            ${{ inputs.reset-cache && '--no-cache ' || ' ' }} --tag hdk-build.${{ inputs.name }}
+          docker run \
+            --env http_proxy \
+            --env https_proxy \
+            --env no_proxy \
+            -id --name hdk-build.${{ inputs.name }} --network host $devices hdk-build.${{ inputs.name }}:latest
 
       - name: Copy files into the container
         run: |
