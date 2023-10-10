@@ -108,6 +108,7 @@ jobs:
       name: conda
       build-name: asan
       reset-cache: ${{ !!inputs.reset-cache }}
+      runner: asan
 
   build-cuda-docker:
     name: Build
