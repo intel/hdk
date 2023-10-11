@@ -22,6 +22,78 @@ bool isCompoundAggregate(const AggExpr* agg) {
   return agg->aggType() == AggType::kStdDevSamp || agg->aggType() == AggType::kCorr;
 }
 
+void removeFromValidSortUsers(Node* node, std::map<NodePtr, std::set<Node*>>& users) {
+  for (size_t input_idx = 0; input_idx < node->inputCount(); ++input_idx) {
+    auto input = node->getAndOwnInput(input_idx);
+    if (input->is<Sort>()) {
+      users.at(input).erase(node);
+    } else if (!input->is<Aggregate>()) {
+      removeFromValidSortUsers(input.get(), users);
+    }
+  }
+}
+
+/**
+ * Find sort nodes whose result's order is going to be ignored later. It happens if the
+ * result is later aggregated or sorted again.
+ */
+void dropDeadSorts(QueryDag& dag) {
+  auto nodes = dag.getNodes();
+  std::list<NodePtr> node_list(nodes.begin(), nodes.end());
+  std::map<NodePtr, std::list<NodePtr>::iterator> sorts;
+  std::map<NodePtr, std::set<Node*>> valid_sort_users;
+  std::map<NodePtr, std::set<Node*>> all_sort_users;
+
+  // Collect sort nodes and their users.
+  for (auto node_itr = node_list.begin(); node_itr != node_list.end(); ++node_itr) {
+    const auto node = *node_itr;
+
+    // Store positions of all sort nodes to be able to remove them later from the nodes
+    // list.
+    if (node->is<Sort>()) {
+      sorts[node] = node_itr;
+      // Root node is always considered to have a valid user. We also cannot drop nodes
+      // with limit and/or offset specified.
+      if (dag.getRootNode() == node.get() || node->as<Sort>()->getLimit() ||
+          node->as<Sort>()->getOffset()) {
+        valid_sort_users[node].insert(nullptr);
+      }
+    }
+
+    for (size_t input_idx = 0; input_idx < node->inputCount(); ++input_idx) {
+      auto input = node->getAndOwnInput(input_idx);
+      if (input->is<Sort>()) {
+        all_sort_users[input].insert(node.get());
+        valid_sort_users[input].insert(node.get());
+      }
+    }
+  }
+
+  // Find sort and aggregate nodes and remove their inputs from valid sort users.
+  for (auto node : node_list) {
+    if (node->is<Aggregate>() || node->is<Sort>()) {
+      removeFromValidSortUsers(node.get(), valid_sort_users);
+    }
+  }
+
+  // Remove sorts with no valid users.
+  for (auto& pr : valid_sort_users) {
+    if (pr.second.empty()) {
+      auto sort = pr.first;
+      for (auto user : all_sort_users.at(sort)) {
+        user->replaceInput(sort, sort->getAndOwnInput(0));
+      }
+      node_list.erase(sorts.at(sort));
+    }
+  }
+
+  // Any applied transformation always decreases the number of nodes.
+  if (node_list.size() != nodes.size()) {
+    nodes.assign(node_list.begin(), node_list.end());
+    dag.setNodes(std::move(nodes));
+  }
+}
+
 /**
  * Base class holding interface for compound aggregate expansion.
  * Compound aggregate is expanded in three steps.
@@ -470,6 +542,7 @@ void addWindowFunctionPreProject(
 }  // namespace
 
 void canonicalizeQuery(QueryDag& dag) {
+  dropDeadSorts(dag);
   expandCompoundAggregates(dag);
   addWindowFunctionPreProject(dag);
 }
