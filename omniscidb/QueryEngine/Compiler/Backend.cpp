@@ -27,6 +27,7 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
@@ -592,7 +593,6 @@ auto insert_emtpy_abort_replacement(llvm::Module* m) {
 
 void CUDABackend::linkModuleWithLibdevice(const std::unique_ptr<llvm::Module>& ext,
                                           llvm::Module& llvm_module,
-                                          llvm::PassManagerBuilder& pass_manager_builder,
                                           const GPUTarget& gpu_target,
                                           llvm::TargetMachine* nvptx_target_machine) {
 #ifdef HAVE_CUDA
@@ -641,17 +641,13 @@ void CUDABackend::linkModuleWithLibdevice(const std::unique_ptr<llvm::Module>& e
     fn.addFnAttr("nvptx-f32ftz", "true");
   }
 
-  // add nvvm reflect pass replacing any NVVM conditionals with constants
-  nvptx_target_machine->adjustPassManager(pass_manager_builder);
-  llvm::legacy::FunctionPassManager FPM(&llvm_module);
-  pass_manager_builder.populateFunctionPassManager(FPM);
+  llvm::PassBuilder pass_builder(nvptx_target_machine);
+  llvm::ModuleAnalysisManager module_analysis_manager;
+  pass_builder.registerModuleAnalyses(module_analysis_manager);
+  llvm::ModulePassManager module_pass_manager;
+  CHECK(!pass_builder.parsePassPipeline(module_pass_manager, "NVVMReflect"));
 
-  // Run the NVVMReflectPass here rather than inside optimize_ir
-  FPM.doInitialization();
-  for (auto& F : llvm_module) {
-    FPM.run(F);
-  }
-  FPM.doFinalization();
+  module_pass_manager.run(llvm_module, module_analysis_manager);
 #endif
 }
 
@@ -688,18 +684,12 @@ std::shared_ptr<CudaCompilationContext> CUDABackend::generateNativeGPUCode(
     `gpu_target.cgen_state->module_` appears to be the same as `llvm_module`
    */
   CHECK(gpu_target.cgen_state->module_ == llvm_module);
-  llvm::PassManagerBuilder pass_manager_builder = llvm::PassManagerBuilder();
-
-  pass_manager_builder.OptLevel = 0;
-  llvm::legacy::PassManager module_pass_manager;
-  pass_manager_builder.populateModulePassManager(module_pass_manager);
 
   bool requires_libdevice = check_module_requires_libdevice(llvm_module);
 
   if (requires_libdevice) {
     linkModuleWithLibdevice(exts.at(ExtModuleKinds::rt_libdevice_module),
                             *llvm_module,
-                            pass_manager_builder,
                             gpu_target,
                             nvptx_target_machine);
   }
