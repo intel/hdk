@@ -22,7 +22,7 @@
 namespace Buffer_Namespace {
 
 GpuBuffer::GpuBuffer(BufferMgr* bm,
-                     BufferList::iterator seg_it,
+                     SegmentList::iterator seg_it,
                      const int device_id,
                      GpuMgr* gpu_mgr,
                      const size_t page_size,

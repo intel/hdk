@@ -1448,11 +1448,12 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
   }
   const auto body = work_unit.body;
   CHECK(body);
+  auto timer1 = DEBUG_TIMER("get_table_infos");
   const auto table_infos = get_table_infos(work_unit.exe_unit, executor_);
+  auto timer2 = DEBUG_TIMER("ALL");
 
   auto ra_exe_unit = decide_approx_count_distinct_implementation(
       work_unit.exe_unit, table_infos, executor_, co.device_type, target_exprs_owned_);
-
   auto max_groups_buffer_entry_guess = work_unit.max_groups_buffer_entry_guess;
   if (is_window_execution_unit(ra_exe_unit)) {
     CHECK_EQ(table_infos.size(), size_t(1));
@@ -1484,6 +1485,7 @@ ExecutionResult RelAlgExecutor::executeWorkUnit(
       eo.output_columnar_hint = true;
     }
   }
+  timer2.stop();
 
   ExecutionResult result;
   auto execute_and_handle_errors = [&](const auto max_groups_buffer_entry_guess_in,

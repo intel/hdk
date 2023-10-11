@@ -86,67 +86,51 @@ class TooBigForSlab : public OutOfMemory {
 using namespace Data_Namespace;
 
 namespace Buffer_Namespace {
-
-class SlabFreeBufIndex {
- public:
-  SlabFreeBufIndex(BufferList& list_to_index) : list_to_index_(list_to_index) {
-    for (BufferList::iterator it = list_to_index_.begin(); it != list_to_index_.end();
-         ++it) {
-      if (it->mem_status == MemStatus::FREE) {
-        insert(it);
-      }
-    }
-    CHECK_GT(free_buffs_.size(), 0);
-  }
-
-  BufferList::iterator getFreeBuff(const size_t num_requested_pages);
-
-  void insert(BufferList::iterator& slab_buffer_pos);
-
-  void remove(BufferList::iterator& slab_buffer_pos);
-
-  void verify() const;
-
-  const std::vector<BufferList::iterator>& getFreeBuffs() const { return free_buffs_; };
-  const BufferList& getListToIndex() const { return list_to_index_; };
-
+struct Slab {
  private:
-  static bool iterator_cmp(const BufferList::iterator& lhs,
-                           const BufferList::iterator& rhs) {
-    return lhs->num_pages < rhs->num_pages;
-  }
-  static bool iterator_page_count_cmp_l(const BufferList::iterator& lhs,
+  static bool iterator_page_count_cmp_l(const SegmentList::iterator& lhs,
                                         const size_t num_pages) {
     return lhs->num_pages < num_pages;
   }
-  static bool iterator_page_count_cmp_u(const size_t num_pages,
-                                        const BufferList::iterator& lhs) {
-    return lhs->num_pages < num_pages;
-  }
-  std::vector<BufferList::iterator>::iterator findExact(
-      BufferList::iterator& slab_buffer_pos) {
-    auto index_pos = std::lower_bound(
-        free_buffs_.begin(), free_buffs_.end(), slab_buffer_pos, iterator_cmp);
-    while (index_pos != free_buffs_.end() && (*index_pos) != slab_buffer_pos &&
-           (*index_pos)->num_pages == slab_buffer_pos->num_pages) {
-      index_pos++;
+  struct SegmentListIterCmp {
+    bool operator()(const SegmentList::iterator& lhs,
+                    const SegmentList::iterator& rhs) const {
+      if (lhs->num_pages < rhs->num_pages) {
+        return true;
+      }
+      if (lhs->num_pages > rhs->num_pages) {
+        return false;
+      }
+      return (lhs->start_page < rhs->start_page);
     }
-    CHECK(index_pos != free_buffs_.end());
-    CHECK((*index_pos) == slab_buffer_pos);
-    CHECK_EQ((*index_pos)->num_pages, slab_buffer_pos->num_pages);
-    return index_pos;
+  };
+
+  std::set<SegmentList::iterator, SegmentListIterCmp> free_segment_index_;
+  SegmentList segments_;
+
+ public:
+  Slab(const size_t page_count) : segments_(SegmentList{BufferSeg(0, page_count)}) {
+    free_segment_index_.insert(segments_.begin());
   }
-  std::vector<BufferList::iterator> free_buffs_;
-  BufferList& list_to_index_;
-};
 
-struct Slab {
-  Slab(BufferList& buffers) : buffers_(buffers), free_buffs_index_(buffers_) {}
-  Slab(BufferList&& buffers)
-      : buffers_(std::move(buffers)), free_buffs_index_(buffers_) {}
+  SegmentList::iterator getFreeSegment(const size_t num_requested_pages);
 
-  BufferList buffers_;
-  SlabFreeBufIndex free_buffs_index_;
+  SegmentList::iterator insert(SegmentList::iterator& slab_buffer_pos,
+                               BufferSeg& data_seg);
+
+  SegmentList::iterator remove(SegmentList::iterator slab_buffer_pos);
+
+  void index_insert(SegmentList::iterator& to_insert);
+  void index_remove(SegmentList::iterator& at);
+  void verify_index();
+
+  SegmentList::iterator begin() { return segments_.begin(); }
+  SegmentList::iterator end() { return segments_.end(); }
+
+  const std::set<SegmentList::iterator, SegmentListIterCmp>& getFreeSegments() const {
+    return free_segment_index_;
+  };
+  const SegmentList& getListToIndex() const { return segments_; };
 };
 
 struct MemoryData {
@@ -194,7 +178,7 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   void clearSlabs();
   std::string printMap();
   void printSegs();
-  std::string printSeg(BufferList::iterator& seg_it);
+  std::string printSeg(SegmentList::iterator& seg_it);
   std::string keyToString(const ChunkKey& key);
   size_t getInUseSize() override;
   size_t getMaxSize() override;
@@ -203,7 +187,6 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   size_t getMaxSlabSize();
   size_t getPageSize();
   bool isAllocationCapped() override;
-  const std::vector<BufferList> getSlabSegments();
 
   /// Creates a chunk with the specified key and page size.
   AbstractBuffer* createBuffer(const ChunkKey& key,
@@ -255,8 +238,8 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   size_t size();
   size_t getNumChunks() override;
 
-  BufferList::iterator reserveBuffer(BufferList::iterator& seg_it,
-                                     const size_t num_bytes);
+  SegmentList::iterator reserveBuffer(SegmentList::iterator& seg_it,
+                                      const size_t num_bytes);
   void getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunk_metadata_vec,
                                        const ChunkKey& key_prefix) override;
 
@@ -272,18 +255,18 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   const size_t page_size_;
   std::vector<int8_t*> slabs_;  /// vector of beginning memory addresses for each
                                 /// allocation of the buffer pool
-  std::list<Slab> slab_segments_;
+  std::vector<Slab> slab_segments_;
 
  private:
   BufferMgr(const BufferMgr&);             // private copy constructor
   BufferMgr& operator=(const BufferMgr&);  // private assignment
-  void removeSegment(BufferList::iterator& seg_it);
-  BufferList::iterator findFreeBufferInSlab(const size_t slab_num,
-                                            const size_t num_pages_requested);
+  void removeSegment(SegmentList::iterator& seg_it);
+  SegmentList::iterator findFreeSegmentInSlab(const size_t slab_num,
+                                              const size_t num_pages_requested);
   int getBufferId();
   virtual void addSlab(const size_t slab_size) = 0;
   virtual void freeAllMem() = 0;
-  virtual void allocateBuffer(BufferList::iterator seg_it,
+  virtual void allocateBuffer(SegmentList::iterator seg_it,
                               const size_t page_size,
                               const size_t num_bytes) = 0;
   virtual AbstractBuffer* allocateZeroCopyBuffer(
@@ -303,7 +286,7 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   // to this map should be synced throug chunk_index_mutex_.
   std::map<ChunkKey, std::shared_ptr<std::condition_variable>> in_progress_buffer_cvs_;
 
-  std::map<ChunkKey, BufferList::iterator> chunk_index_;
+  std::map<ChunkKey, SegmentList::iterator> chunk_index_;
   size_t max_buffer_pool_num_pages_;  // max number of pages for buffer pool
   size_t num_pages_allocated_;
   size_t min_num_pages_per_slab_;
@@ -314,13 +297,12 @@ class BufferMgr : public AbstractBufferMgr {  // implements
   int max_buffer_id_;
   unsigned int buffer_epoch_;
 
-  BufferList unsized_segs_;
+  SegmentList unsized_segs_;
 
-  BufferList::iterator evict(BufferList::iterator& evict_start,
-                             const size_t num_pages_requested,
-                             const int slab_num);
+  SegmentList::iterator evict(SegmentList::iterator& evict_start,
+                              const size_t num_pages_requested,
+                              const int slab_num);
 
-  Slab& getSlab(const size_t slab_num);
   /**
    * @brief Gets a buffer of required size and returns an iterator to it
    *
@@ -334,7 +316,7 @@ class BufferMgr : public AbstractBufferMgr {  // implements
    * USED if applicable
    *
    */
-  BufferList::iterator findFreeBuffer(size_t num_bytes);
+  SegmentList::iterator findFreeSegment(size_t num_bytes);
 };
 
 }  // namespace Buffer_Namespace

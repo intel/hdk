@@ -89,7 +89,7 @@ void TieredCpuBufferMgr::addSlab(const size_t slab_size) {
   }
   if (allocated_slab) {
     // We allocated a new slab, so add segments for it.
-    slab_segments_.emplace_back(BufferList{BufferSeg(0, slab_size / page_size_)});
+    slab_segments_.emplace_back(slab_size / page_size_);
     LOG(INFO) << "Allocated slab using " << tier_to_string(last_tier) << ".";
   } else {
     // None of the allocators allocated a slab, so revert to original size and throw.

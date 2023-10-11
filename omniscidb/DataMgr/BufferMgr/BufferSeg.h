@@ -68,5 +68,5 @@ struct BufferSeg {
       , last_touched(last_touched) {}
 };
 
-using BufferList = std::list<BufferSeg>;
+using SegmentList = std::list<BufferSeg>;
 }  // namespace Buffer_Namespace

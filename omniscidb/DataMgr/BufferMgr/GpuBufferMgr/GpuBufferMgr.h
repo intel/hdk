@@ -41,7 +41,7 @@ class GpuBufferMgr : public BufferMgr {
  private:
   void addSlab(const size_t slab_size) override;
   void freeAllMem() override;
-  void allocateBuffer(BufferList::iterator seg_it,
+  void allocateBuffer(SegmentList::iterator seg_it,
                       const size_t page_size,
                       const size_t initial_size) override;
   GpuMgr* gpu_mgr_;

@@ -63,7 +63,7 @@ void GpuBufferMgr::addSlab(const size_t slab_size) {
     slabs_.resize(slabs_.size() - 1);
     throw FailedToCreateSlab(slab_size);
   }
-  slab_segments_.emplace_back(BufferList{BufferSeg(0, slab_size / page_size_)});
+  slab_segments_.emplace_back(slab_size / page_size_);
 }
 
 void GpuBufferMgr::freeAllMem() {
@@ -72,7 +72,7 @@ void GpuBufferMgr::freeAllMem() {
   }
 }
 
-void GpuBufferMgr::allocateBuffer(BufferList::iterator seg_it,
+void GpuBufferMgr::allocateBuffer(SegmentList::iterator seg_it,
                                   const size_t page_size,
                                   const size_t initial_size) {
   new GpuBuffer(this,
