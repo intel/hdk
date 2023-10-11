@@ -65,7 +65,13 @@ class AnnotateInternalFunctionsPass
           fcn->addFnAttr(attr);
         }
       } else if (isReadOnlyFunction(fcn->getName())) {
-        fcn->addFnAttr(llvm::Attribute::ReadOnly);
+        for (size_t i = 0; i < fcn->arg_size(); i++) {
+          const auto arg = fcn->getArg(i);
+          CHECK(arg);
+          if (arg->getType()->isPointerTy()) {
+            fcn->addParamAttr(i, llvm::Attribute::ReadOnly);
+          }
+        }
       }
     }
 
