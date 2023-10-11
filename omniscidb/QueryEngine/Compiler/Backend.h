@@ -173,7 +173,6 @@ class CUDABackend : public Backend {
 
   static void linkModuleWithLibdevice(const std::unique_ptr<llvm::Module>& ext,
                                       llvm::Module& module,
-                                      llvm::PassManagerBuilder& pass_manager_builder,
                                       const GPUTarget& gpu_target,
                                       llvm::TargetMachine* nvptx_target_machine);
 
