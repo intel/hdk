@@ -982,8 +982,14 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
           elems_count = col_type->size() / elem_type->size();
         }
         // Compute stats for each fragment.
+        // We use a separate context here to make sure that all tasks of the inner
+        // algorithm are executed even if some outer task threw an exception. This is to
+        // simplify logic of the following access to the computed metadata which otherwise
+        // can be only partially computed.
+        tbb::task_group_context inner_context(tbb::task_group_context::isolated);
         tbb::parallel_for(
-            tbb::blocked_range(size_t(0), frag_count), [&](auto frag_range) {
+            tbb::blocked_range(size_t(0), frag_count),
+            [&](auto frag_range) {
               for (size_t frag_idx = frag_range.begin(); frag_idx != frag_range.end();
                    ++frag_idx) {
                 auto& frag = fragments[frag_idx];
@@ -1019,7 +1025,8 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
                 }
                 frag.metadata[col_idx] = meta;
               }
-            });  // each fragment
+            },
+            inner_context);  // each fragment
 
         // Merge fragment stats to the table stats.
         auto& column_stats = table_stats.at(col_info->column_id);
