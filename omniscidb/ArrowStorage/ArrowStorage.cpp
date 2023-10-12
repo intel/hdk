@@ -882,7 +882,6 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
       (static_cast<size_t>(at->num_rows()) + table.fragment_size - 1 - first_frag_size) /
           table.fragment_size +
       1;
-  size_t last_orig_frag_idx = fragments.empty() ? 0 : fragments.size() - 1;
   // Pre-allocate fragment infos and table stats for each column for the following
   // parallel data import.
   fragments.resize(frag_count);
@@ -982,9 +981,9 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
         if (col_type->isFixedLenArray()) {
           elems_count = col_type->size() / elem_type->size();
         }
-        // Compute stats for each added/modified fragment.
+        // Compute stats for each fragment.
         tbb::parallel_for(
-            tbb::blocked_range(last_orig_frag_idx, frag_count), [&](auto frag_range) {
+            tbb::blocked_range(size_t(0), frag_count), [&](auto frag_range) {
               for (size_t frag_idx = frag_range.begin(); frag_idx != frag_range.end();
                    ++frag_idx) {
                 auto& frag = fragments[frag_idx];
@@ -1022,21 +1021,17 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
               }
             });  // each fragment
 
-        // Merge added/mdodified fragment stats to the table stats.
+        // Merge fragment stats to the table stats.
         auto& column_stats = table_stats.at(col_info->column_id);
-        if (!last_orig_frag_idx) {
-          column_stats = fragments[0].metadata[col_idx]->chunkStats();
-        }
-        for (size_t frag_idx = last_orig_frag_idx ? last_orig_frag_idx : 1;
-             frag_idx < frag_count;
-             ++frag_idx) {
+        column_stats = fragments[0].metadata[col_idx]->chunkStats();
+        for (size_t frag_idx = 1; frag_idx < frag_count; ++frag_idx) {
           mergeStats(column_stats,
                      fragments[frag_idx].metadata[col_idx]->chunkStats(),
                      col_type);
         }
       } else {
         bool has_nulls = false;
-        for (size_t frag_idx = last_orig_frag_idx; frag_idx < frag_count; ++frag_idx) {
+        for (size_t frag_idx = 0; frag_idx < frag_count; ++frag_idx) {
           auto& frag = fragments[frag_idx];
           frag.offset =
               frag_idx ? ((frag_idx - 1) * table.fragment_size + first_frag_size) : 0;
@@ -1057,8 +1052,7 @@ void ArrowStorage::appendArrowTable(std::shared_ptr<arrow::Table> at, int table_
         }
 
         auto& column_stats = table_stats.at(col_info->column_id);
-        column_stats.has_nulls =
-            last_orig_frag_idx ? (has_nulls || column_stats.has_nulls) : has_nulls;
+        column_stats.has_nulls = has_nulls;
         column_stats.min.stringval = nullptr;
         column_stats.max.stringval = nullptr;
       }
