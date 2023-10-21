@@ -44,37 +44,6 @@ llvm::StructType* get_buffer_struct_type(CgenState* cgen_state,
                          cgen_state->context_,
                          {elem_type, llvm::Type::getInt64Ty(cgen_state->context_)},
                          false));
-  llvm::Function* udf_func = cgen_state->module_->getFunction(ext_func_name);
-  if (udf_func) {
-    // Compare expected array struct type with type from the function
-    // definition from the UDF module, but use the type from the
-    // module
-    llvm::FunctionType* udf_func_type = udf_func->getFunctionType();
-    CHECK_LE(param_num, udf_func_type->getNumParams());
-    llvm::Type* param_pointer_type = udf_func_type->getParamType(param_num);
-    CHECK(param_pointer_type->isPointerTy());
-    llvm::Type* param_type = param_pointer_type->getPointerElementType();
-    CHECK(param_type->isStructTy());
-    llvm::StructType* struct_type = llvm::cast<llvm::StructType>(param_type);
-    CHECK_GE(struct_type->getStructNumElements(),
-             generated_struct_type->getStructNumElements())
-        << serialize_llvm_object(struct_type);
-
-    const auto expected_elems = generated_struct_type->elements();
-    const auto current_elems = struct_type->elements();
-    for (size_t i = 0; i < expected_elems.size(); i++) {
-      CHECK_EQ(expected_elems[i], current_elems[i])
-          << "[" << ::toString(expected_elems[i]) << ", " << ::toString(current_elems[i])
-          << "]";
-    }
-
-    if (struct_type->isLiteral()) {
-      return struct_type;
-    }
-
-    llvm::StringRef struct_name = struct_type->getStructName();
-    return struct_type->getTypeByName(cgen_state->context_, struct_name);
-  }
   return generated_struct_type;
 }
 
