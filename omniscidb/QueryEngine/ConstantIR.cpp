@@ -154,11 +154,11 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
   } else if (type->isArray() && !use_dict_encoding) {
     auto off_and_len_ptr = cgen_state_->query_func_entry_ir_builder_.CreateBitCast(
         lit_buf_start,
-        llvm::PointerType::get(get_int_type(32, cgen_state_->context_),
+        llvm::PointerType::get(cgen_state_->context_,
                                lit_buf_start->getType()->getPointerAddressSpace()));
     // packed offset + length, 16 bits each
     auto off_and_len = cgen_state_->query_func_entry_ir_builder_.CreateLoad(
-        off_and_len_ptr->getType()->getPointerElementType(), off_and_len_ptr);
+        get_int_type(32, cgen_state_->context_), off_and_len_ptr);
     auto off_lv = cgen_state_->query_func_entry_ir_builder_.CreateLShr(
         cgen_state_->query_func_entry_ir_builder_.CreateAnd(
             off_and_len, cgen_state_->llInt(int32_t(0xffff0000))),
@@ -167,9 +167,7 @@ std::vector<llvm::Value*> CodeGenerator::codegenHoistedConstantsLoads(
         off_and_len, cgen_state_->llInt(int32_t(0x0000ffff)));
 
     auto var_start_address = cgen_state_->query_func_entry_ir_builder_.CreateGEP(
-        lit_buff_query_func_lv->getType()->getScalarType()->getPointerElementType(),
-        lit_buff_query_func_lv,
-        off_lv);
+        get_int_type(8, cgen_state_->context_), lit_buff_query_func_lv, off_lv);
     auto var_length = len_lv;
 
     var_start_address->setName(literal_name + "_start_address");
