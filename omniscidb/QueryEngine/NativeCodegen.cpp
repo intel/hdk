@@ -16,8 +16,8 @@
 
 #include "QueryEngine/Execute.h"
 
-#if LLVM_VERSION_MAJOR < 12
-static_assert(false, "LLVM Version >= 12 is required.");
+#if LLVM_VERSION_MAJOR < 15
+static_assert(false, "LLVM Version >= 15 is required.");
 #endif
 
 #include <llvm/Analysis/ScopedNoAliasAA.h>
@@ -70,15 +70,7 @@ static_assert(false, "LLVM Version >= 12 is required.");
 
 #include <boost/filesystem.hpp>
 
-#if LLVM_VERSION_MAJOR > 13
-
 #define LLVM_NUM_OPERANDS(x) x->arg_size()
-
-#else
-
-#define LLVM_NUM_OPERANDS(x) x->getNumArgOperands()
-
-#endif
 
 namespace {
 

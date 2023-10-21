@@ -267,11 +267,7 @@ struct CgenState {
       const auto arg_ti = func_type->getParamType(0);
       CHECK(arg_ti->isPointerTy());
       auto attr_list = func->getAttributes();
-#if LLVM_VERSION_MAJOR > 13
       llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(0));
-#else
-      llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(0));
-#endif
       arr_arg_builder.addStructRetAttr(args_in[0]->getType());
       func->addParamAttrs(0, arr_arg_builder);
     }
@@ -279,11 +275,7 @@ struct CgenState {
     for (size_t i = arg_start; i < func->arg_size(); i++) {
       if (struct_args.count(i) > 0) {
         auto attr_list = func->getAttributes();
-#if LLVM_VERSION_MAJOR > 13
         llvm::AttrBuilder arr_arg_builder(context_, attr_list.getParamAttrs(i));
-#else
-        llvm::AttrBuilder arr_arg_builder(attr_list.getParamAttributes(i));
-#endif
         arr_arg_builder.addByValAttr(args_in[i]->getType());
         func->addParamAttrs(i, arr_arg_builder);
       }

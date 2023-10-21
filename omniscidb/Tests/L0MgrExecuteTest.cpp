@@ -158,11 +158,9 @@ std::string mangle_spirv_builtin(const llvm::Function& func) {
   std::string new_name;
 #if LLVM_VERSION_MAJOR > 15
   llvm::mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
-#elif LLVM_VERSION_MAJOR > 14
+#else
   mangleOpenClBuiltin(
       func.getName().str(), func.getArg(0)->getType(), /*pointer_types=*/{}, new_name);
-#else
-  mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
 #endif
   return new_name;
 }

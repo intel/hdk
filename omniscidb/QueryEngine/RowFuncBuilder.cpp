@@ -170,9 +170,7 @@ bool RowFuncBuilder::codegen(llvm::Value* filter_result,
               LL_BUILDER.CreateAtomicRMW(llvm::AtomicRMWInst::Add,
                                          total_matched_ptr,
                                          matched_cnt,
-#if LLVM_VERSION_MAJOR > 12
                                          LLVM_ALIGN(8),
-#endif
                                          llvm::AtomicOrdering::Monotonic);
         } else {
           old_total_matched_val = LL_BUILDER.CreateLoad(

@@ -17,24 +17,14 @@
 #include "LLVMFunctionAttributesUtil.h"
 
 void mark_function_always_inline(llvm::Function* func, llvm::LLVMContext& context) {
-#if LLVM_VERSION_MAJOR > 13
   func->addAttributeAtIndex(llvm::AttributeList::AttrIndex::FunctionIndex,
                             llvm::Attribute::get(context, llvm::Attribute::AlwaysInline));
-#else
-  func->addAttribute(llvm::AttributeList::AttrIndex::FunctionIndex,
-                     llvm::Attribute::AlwaysInline);
-#endif
 }
 
 void mark_function_never_inline(llvm::Function* func, llvm::LLVMContext& context) {
   clear_function_attributes(func);
-#if LLVM_VERSION_MAJOR > 13
   func->addAttributeAtIndex(llvm::AttributeList::AttrIndex::FunctionIndex,
                             llvm::Attribute::get(context, llvm::Attribute::NoInline));
-#else
-  func->addAttribute(llvm::AttributeList::AttrIndex::FunctionIndex,
-                     llvm::Attribute::NoInline);
-#endif
 }
 
 void clear_function_attributes(llvm::Function* func) {

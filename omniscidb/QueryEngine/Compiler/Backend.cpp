@@ -21,12 +21,14 @@
 #include "QueryEngine/ExtensionFunctionsWhitelist.h"
 #include "QueryEngine/NvidiaKernel.h"
 
+#include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
@@ -35,13 +37,6 @@
 #include "LLVMSPIRVLib/LLVMSPIRVLib.h"
 #endif
 
-#include <llvm/ExecutionEngine/JITSymbol.h>
-
-#if LLVM_VERSION_MAJOR > 13
-#include <llvm/MC/TargetRegistry.h>
-#else
-#include <llvm/Support/TargetRegistry.h>
-#endif
 namespace compiler {
 
 static llvm::sys::Mutex g_ee_create_mutex;
@@ -119,13 +114,9 @@ std::shared_ptr<CpuCompilationContext> CPUBackend::generateNativeCPUCode(
     return msg;
   };
 
-#if LLVM_VERSION_MAJOR > 12
   auto self_epc = llvm::cantFail(llvm::orc::SelfExecutorProcessControl::Create());
   auto execution_session =
       std::make_unique<llvm::orc::ExecutionSession>(std::move(self_epc));
-#else
-  auto execution_session = std::make_unique<llvm::orc::ExecutionSession>();
-#endif
 
   auto target_machine_builder_or_error = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!target_machine_builder_or_error) {
