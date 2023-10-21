@@ -631,13 +631,8 @@ void UdfCompiler::generateAST(const std::string& file_name) const {
       arg_vector.begin(), arg_vector.end(), std::back_inserter(arg_vec2), convert);
 
   int num_args = arg_vec2.size();
-#if LLVM_VERSION_MAJOR > 12
   auto op = CommonOptionsParser::create(num_args, &arg_vec2[0], ToolingSampleCategory);
   ClangTool tool(op->getCompilations(), op->getSourcePathList());
-#else
-  CommonOptionsParser op(num_args, &arg_vec2[0], ToolingSampleCategory);
-  ClangTool tool(op.getCompilations(), op.getSourcePathList());
-#endif
 
   std::string out_name(file_name);
   std::string file_ext("ast");

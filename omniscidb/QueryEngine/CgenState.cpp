@@ -190,12 +190,8 @@ void CgenState::maybeCloneFunctionRecursive(llvm::Function* fn, bool is_l0) {
   }
 
   llvm::SmallVector<llvm::ReturnInst*, 8> Returns;  // Ignore returns cloned.
-#if LLVM_VERSION_MAJOR > 12
   llvm::CloneFunctionInto(
       fn, func_impl, vmap_, llvm::CloneFunctionChangeType::DifferentModule, Returns);
-#else
-  llvm::CloneFunctionInto(fn, func_impl, vmap_, /*ModuleLevelChanges=*/true, Returns);
-#endif
 
   for (auto it = llvm::inst_begin(fn), e = llvm::inst_end(fn); it != e; ++it) {
     if (llvm::isa<llvm::CallInst>(*it)) {

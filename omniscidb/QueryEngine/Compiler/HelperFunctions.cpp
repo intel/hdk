@@ -57,12 +57,9 @@ std::string mangle_spirv_builtin(const llvm::Function& func) {
   std::string new_name;
 #if LLVM_VERSION_MAJOR > 15
   llvm::mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
-
-#elif LLVM_VERSION_MAJOR > 14
+#else
   mangleOpenClBuiltin(
       func.getName().str(), func.getArg(0)->getType(), /*pointer_types=*/{}, new_name);
-#else
-  mangleOpenClBuiltin(func.getName().str(), func.getArg(0)->getType(), new_name);
 #endif
   return new_name;
 }
@@ -253,11 +250,7 @@ void optimize_ir(llvm::Function* query_func,
   FPM.addPass(llvm::GVNPass());
 
   FPM.addPass(llvm::DSEPass());  // DeadStoreEliminationPass
-#if LLVM_VERSION_MAJOR > 14
   LPM.addPass(llvm::LICMPass(llvm::LICMOptions()));
-#else
-  LPM.addPass(llvm::LICMPass());
-#endif
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM), /*UseMemorySSA=*/true));
 
   FPM.addPass(llvm::InstCombinePass());
@@ -304,12 +297,8 @@ void replace_function(llvm::Module* from, llvm::Module* to, const std::string& f
     vmap[&*j] = &*pos_fn_arg_it++;
   }
   llvm::SmallVector<llvm::ReturnInst*, 8> returns;
-#if LLVM_VERSION_MAJOR > 12
   llvm::CloneFunctionInto(
       target_fn, from_fn, vmap, llvm::CloneFunctionChangeType::DifferentModule, returns);
-#else
-  llvm::CloneFunctionInto(target_fn, from_fn, vmap, true, returns);
-#endif
 
   for (auto& BB : *target_fn) {
     for (llvm::BasicBlock::iterator bbi = BB.begin(); bbi != BB.end();) {

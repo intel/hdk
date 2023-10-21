@@ -24,11 +24,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Verifier.h>
 
-#if LLVM_VERSION_MAJOR > 13
 #define ATTR_BUILDER(ctx) llvm::AttrBuilder B(ctx);
-#else
-#define ATTR_BUILDER(ctx) llvm::AttrBuilder B;
-#endif
 
 namespace {
 
@@ -348,21 +344,13 @@ class QueryTemplateGenerator {
         PAS = llvm::AttributeList::get(mod->getContext(), 10U, B);
       }
 
-// NOTE(adb): This attribute is missing in the query template. Why?
-#if LLVM_VERSION_MAJOR > 14
+      // NOTE(adb): This attribute is missing in the query template. Why?
       Attrs.push_back(PAS);
       {
         ATTR_BUILDER(mod->getContext());
         B.addUWTableAttr(llvm::UWTableKind::Default);
         PAS = llvm::AttributeList::get(mod->getContext(), ~0U, B);
       }
-#else
-      {
-        ATTR_BUILDER(mod->getContext());
-        B.addAttribute(llvm::Attribute::UWTable);
-        PAS = llvm::AttributeList::get(mod->getContext(), ~0U, B);
-      }
-#endif
 
       Attrs.push_back(PAS);
 
