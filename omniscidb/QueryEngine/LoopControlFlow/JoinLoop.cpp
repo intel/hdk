@@ -138,24 +138,10 @@ llvm::BasicBlock* JoinLoop::codegen(
         if (join_loop.kind_ == JoinLoopKind::Set ||
             join_loop.kind_ == JoinLoopKind::MultiSet) {
           CHECK(iteration_domain.values_buffer->getType()->isPointerTy());
-          const auto ptr_type =
-              static_cast<llvm::PointerType*>(iteration_domain.values_buffer->getType());
-          if (iteration_domain.values_buffer_is_array) {
-            iteration_val = builder.CreateGEP(
-                iteration_domain.values_buffer->getType()
-                    ->getScalarType()
-                    ->getPointerElementType(),
-                iteration_domain.values_buffer,
-                std::vector<llvm::Value*>{
-                    llvm::ConstantInt::get(get_int_type(32, context), 0),
-                    iteration_counter},
-                "ub_iter_counter_" + join_loop.name_);
-          } else {
-            iteration_val = builder.CreateGEP(get_int_type(32, context),
-                                              iteration_domain.values_buffer,
-                                              iteration_counter,
-                                              "ub_iter_counter_" + join_loop.name_);
-          }
+          iteration_val = builder.CreateGEP(get_int_type(32, context),
+                                            iteration_domain.values_buffer,
+                                            iteration_counter,
+                                            "ub_iter_counter_" + join_loop.name_);
         }
         iterators.push_back(iteration_val);
         const auto have_more_inner_rows = builder.CreateICmpSLT(

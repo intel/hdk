@@ -47,7 +47,6 @@ struct JoinLoopDomain {
     llvm::Value* slot_lookup_result;  // for Singleton
   };
   llvm::Value* values_buffer;  // used for Set
-  bool values_buffer_is_array{false};
 };
 
 // Any join is logically a loop. Hash joins just limit the domain of iteration,
