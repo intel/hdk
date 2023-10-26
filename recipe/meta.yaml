@@ -1,6 +1,6 @@
 {% set version = "0.9.0" %}  # PEP 386
 
-{% set number = "0" %}
+{% set number = "2" %}
 {% set cuda_enabled = cuda_compiler_version is not undefined and cuda_compiler_version == '11.0' %}
 {% set build_ext = "cuda" if cuda_enabled else "cpu" %}
 {% set build_string = "h{}_{}".format(PKG_HASH, number) %}
@@ -8,9 +8,10 @@
 {% set py_build_string_ext = "py{}{}_{}".format(CONDA_PY, build_string, build_ext) %}
 {% set py_build_string = "py{}{}".format(CONDA_PY, build_string) %}
 {% set install_base = "opt/hdk" %}
-{% set arrow_version = "11.*" %}
-{% set arrow_proc_version = "3.*" %}
 {% set llvm_version = "16" %}
+
+# get smithy to play ball...
+{% set libarrow = "13" if libarrow is undefined else libarrow %}
 
 package:
   name: hdk
@@ -18,25 +19,30 @@ package:
 
 source:
   git_url: https://github.com/intel-ai/hdk
-  git_branch: main
+#  git_branch: release/v{{ version }}
 #  git_rev: 798103ac37f9badd540b4f4508ca180162eeb654
 #  url: https://github.com/intel-ai/hdk/archive/refs/tags/v{{ version }}.tar.gz
-#  sha256: 0314c7ad990b1f3072f9058e991915b5f1d6d3240aaf04ffe518d68087178675
+#  sha256: dc2e84db9536158f69de12e62d3d8d1ebcb45d4c3d35a42e54de771490a280ac
 
 build:
   number: {{ number }}
-  skip: True  # [cuda_compiler_version not in (undefined, "None", "11.0")]
-  skip: True  # [not linux64 and not win64]
+  skip: true  # [not (linux64 or win64)]
+  # hdk only support arrow >11
+  skip: true  # [libarrow == "10.0.1"]
 
 outputs:
 
   - name: pyhdk
     version: {{ version }}
-    script: build-hdk.sh  # [not win]
+    script: build-hdk.sh   # [not win]
     script: build-hdk.bat  # [win]
     build:
       string: {{ py_build_string_ext }}
-      skip: True  # [py not in (38, 39, 310, 311)]
+      # some weird header interaction, but only on windows, and only
+      # limited to oldest python with newest arrow --> skip it
+      {% if libarrow.split(".")[0]|int > 12 %}
+      skip: true  # [win and py==38]
+      {% endif %}
       missing_dso_whitelist:
         - '*/libcuda.*'  # [cuda_compiler_version not in (undefined, "None")]
         - '*/libjvm.so'
@@ -62,52 +68,42 @@ outputs:
         - llvmdev {{ llvm_version }}
         - make  # [not win]
         - maven
-        - vs2022_win-64  # [win]
         - level-zero-devel  # [not win]
         - pkg-config  # [not win]
         - llvm-spirv {{ llvm_version }}  # [not win]
         - libllvmspirv {{ llvm_version }}  # [not win]
       host:
-        # If no version limit is specified for python then conda goes
-        # crazy and is unable to create host env on windows.
-        - python {{ python }}
+        - python
         - cython
         - numpy
         - tbb-devel
+        - gflags  # [unix]
         - glog
         # Folly and fmt are mutially exclusive on linux but fmt is
         # requred on windows.
         - fmt  # [win]
-        - folly 2022.11.07.00  # [not win]
-        - libsqlite 3.40.0  # [not win]
-        - boost-cpp  # [not win]
-        # With boost-cpp 1.78.0 cmake on windows doesn't find boost
-        # libraries like boost::log which is necessary for linking
-        # pyhdk stuff, therefore cmake expression
-        # $<TARGET_FILE_DIR:${Boost_LOG_LIBRARY}> results in empty
-        # string which results in /LIBPATH: with empty argument which
-        # upsets MS linker and breaks pyhdk installation. On Linux
-        # folly version needs version 1.78.0 so this is currently
-        # windows specific.
-        - boost-cpp >1.78.0  # [win]
+        - folly >=2022.11.07.00  # [not win]
         - llvm {{ llvm_version }}
-        - arrow-cpp ={{ arrow_version }}=*{{ build_ext }}
-        - pyarrow ={{ arrow_version }}=*{{ build_ext }}
+        - libboost-devel
+        # one libarrow to pick up global pinning, one to select variant
+        - libarrow
+        - libarrow =*=*{{ build_ext }}
+        # same here; one for pinning, one for additionally specifying lower bound
+        - libsqlite
+        - libsqlite >=3.40
+        - pyarrow
         - zlib
       run:
-        - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
-        - pyarrow ={{ arrow_version }}=*{{ build_ext }}
+        - pyarrow =*=*{{ build_ext }}
         - python
-        - openjdk 20.*
+        - openjdk >=11
         - zlib
         - tbb
-        - boost-cpp
-        - folly 2022.11.07.00  # [not win]
+        - folly >=2022.11.07.00  # [not win]
         - llvm-spirv {{ llvm_version }}  # [not win]
         - level-zero  # [not win]
-
       run_constrained:
-        - arrow-cpp-proc {{ arrow_proc_version }} {{ build_ext }}
+        - apache-arrow-proc =*={{ build_ext }}
         - cudatoolkit >=11.0  # [cuda_compiler_version not in (undefined, "None")]
 
     test:
