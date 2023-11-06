@@ -43,6 +43,7 @@
 #include "OSDependent/omnisci_path.h"
 #include "QueryEngine/AggregateUtils.h"
 #include "QueryEngine/AggregatedColRange.h"
+#include "QueryEngine/AnalyticalTemplatesExtractor.h"
 #include "QueryEngine/CodeGenerator.h"
 #include "QueryEngine/ColumnFetcher.h"
 #include "QueryEngine/CostModel/Dispatchers/DefaultExecutionPolicy.h"
@@ -78,7 +79,6 @@
 #include "Shared/misc.h"
 #include "Shared/scope.h"
 #include "ThirdParty/robin_hood.h"
-#include "QueryEngine/AnalyticalTemplatesExtractor.h"
 
 #include "CostModel/IterativeCostModel.h"
 
@@ -2127,7 +2127,8 @@ std::unique_ptr<policy::ExecutionPolicy> Executor::getExecutionPolicy(
     CHECK(cfg.enable_heterogeneous_execution);
 
     AnalyticalTemplatesExtractor extractor;
-    std::vector<costmodel::AnalyticalTemplate> templates = extractor.extractTemplates(ra_exe_unit);
+    std::vector<costmodel::AnalyticalTemplate> templates =
+        extractor.extractTemplates(ra_exe_unit);
     if (config_->exec.enable_cost_model && ra_exe_unit.cost_model != nullptr &&
         !templates.empty()) {
       size_t bytes = 0;

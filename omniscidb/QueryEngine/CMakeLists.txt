@@ -120,13 +120,12 @@ set(query_engine_source_files
     DataRecycler/HashingSchemeRecycler.cpp
     Visitors/QueryPlanDagChecker.cpp
     WorkUnitBuilder.cpp
+    AnalyticalTemplatesExtractor.cpp
 
     Codec.h
     Execute.h
     NvidiaKernel.h
-    QueryTemplateGenerator.h
-    
-    AnalyticalTemplatesExtractor.cpp)
+    QueryTemplateGenerator.h)
 
 set(query_engine_cuda_source_files
     TopKSort.cu
