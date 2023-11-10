@@ -8,7 +8,7 @@
 {% set py_build_string_ext = "py{}{}_{}".format(CONDA_PY, build_string, build_ext) %}
 {% set py_build_string = "py{}{}".format(CONDA_PY, build_string) %}
 {% set install_base = "opt/hdk" %}
-{% set arrow_version = "11.*" %}
+{% set arrow_version = "13.*" %}
 {% set arrow_proc_version = "3.*" %}
 {% set llvm_version = "16" %}
 
