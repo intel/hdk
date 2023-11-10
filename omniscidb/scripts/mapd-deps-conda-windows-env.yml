@@ -15,8 +15,8 @@ channels:
 dependencies:
   - git
   - ccache
-  - arrow-cpp  11.0
-  - pyarrow    11.0
+  - arrow-cpp  13.0
+  - pyarrow    13.0
   - pandas     1.5.3
   - llvmdev     16.*
   - openjdk     20.*
