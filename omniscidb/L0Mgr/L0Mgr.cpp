@@ -139,8 +139,87 @@ void* allocate_device_mem(const size_t num_bytes, L0Device& device) {
   return mem;
 }
 
-L0Device::L0Device(const L0Driver& driver, ze_device_handle_t device)
+L0DataFetcher::L0DataFetcher(const L0Driver& driver, ze_device_handle_t device)
     : device_(device), driver_(driver) {
+  ze_command_queue_desc_t command_queue_fetch_desc = {
+      ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
+      nullptr,
+      0,
+      0,
+      0,
+      ZE_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
+      ZE_COMMAND_QUEUE_PRIORITY_NORMAL};
+  L0_SAFE_CALL(zeCommandQueueCreate(
+      driver.ctx(), device_, &command_queue_fetch_desc, &queue_handle_));
+  current_cl_bytes = {{}, 0};
+  L0_SAFE_CALL(
+      zeCommandListCreate(driver.ctx(), device_, &cl_desc, &current_cl_bytes.first));
+}
+
+L0DataFetcher::~L0DataFetcher() {
+  zeCommandQueueDestroy(queue_handle_);
+  zeCommandListDestroy(current_cl_bytes.first);
+  for (auto& dead_handle : graveyard) {
+    zeCommandListDestroy(dead_handle);
+  }
+  for (auto& cl_handle : recycled) {
+    zeCommandListDestroy(cl_handle);
+  }
+}
+
+void L0DataFetcher::recycleGraveyard() {
+  while (recycled.size() < GRAVEYARD_LIMIT && graveyard.size()) {
+    recycled.push_back(graveyard.front());
+    graveyard.pop_front();
+    L0_SAFE_CALL(zeCommandListReset(recycled.back()));
+  }
+  for (auto& dead_handle : graveyard) {
+    L0_SAFE_CALL(zeCommandListDestroy(recycled.back()));
+  }
+  graveyard.clear();
+}
+
+void L0DataFetcher::appendCopyCommand(void* dst,
+                                      const void* src,
+                                      const size_t num_bytes) {
+  std::unique_lock<std::mutex> cl_lock(current_cl_lock);
+  L0_SAFE_CALL(zeCommandListAppendMemoryCopy(
+      current_cl_bytes.first, dst, src, num_bytes, nullptr, 0, nullptr));
+  current_cl_bytes.second += num_bytes;
+  if (current_cl_bytes.second >= 128 * 1024 * 1024) {
+    ze_command_list_handle_t cl_h_copy = current_cl_bytes.first;
+    graveyard.push_back(current_cl_bytes.first);
+    current_cl_bytes = {{}, 0};
+    if (recycled.size()) {
+      current_cl_bytes.first = recycled.front();
+      recycled.pop_front();
+    } else {
+      L0_SAFE_CALL(
+          zeCommandListCreate(driver_.ctx(), device_, &cl_desc, &current_cl_bytes.first));
+    }
+    cl_lock.unlock();
+    L0_SAFE_CALL(zeCommandListClose(cl_h_copy));
+    L0_SAFE_CALL(
+        zeCommandQueueExecuteCommandLists(queue_handle_, 1, &cl_h_copy, nullptr));
+  }
+}
+
+void L0DataFetcher::sync() {
+  if (current_cl_bytes.second) {
+    L0_SAFE_CALL(zeCommandListClose(current_cl_bytes.first));
+    L0_SAFE_CALL(zeCommandQueueExecuteCommandLists(
+        queue_handle_, 1, &current_cl_bytes.first, nullptr));
+  }
+  L0_SAFE_CALL(
+      zeCommandQueueSynchronize(queue_handle_, std::numeric_limits<uint32_t>::max()));
+  L0_SAFE_CALL(zeCommandListReset(current_cl_bytes.first));
+  if (graveyard.size() > GRAVEYARD_LIMIT) {
+    recycleGraveyard();
+  }
+}
+
+L0Device::L0Device(const L0Driver& driver, ze_device_handle_t device)
+    : device_(device), driver_(driver), data_fetcher(driver, device) {
   ze_command_queue_handle_t queue_handle;
   ze_command_queue_desc_t command_queue_desc = {ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
                                                 nullptr,
@@ -219,7 +298,6 @@ std::shared_ptr<L0Module> L0Device::create_module(uint8_t* code,
   };
   ze_module_handle_t handle;
   ze_module_build_log_handle_t buildlog = nullptr;
-
   auto status = zeModuleCreate(ctx(), device_, &desc, &handle, &buildlog);
   if (log) {
     size_t logSize = 0;
@@ -327,6 +405,40 @@ void L0Manager::copyHostToDevice(int8_t* device_ptr,
 
   cl->copy(device_ptr, host_ptr, num_bytes);
   cl->submit(*queue);
+}
+
+void L0Manager::copyHostToDeviceAsync(int8_t* device_ptr,
+                                      const int8_t* host_ptr,
+                                      const size_t num_bytes,
+                                      const int device_num) {
+  if (!num_bytes)
+    return;
+  CHECK(host_ptr);
+  CHECK(device_ptr);
+  CHECK_GT(num_bytes, 0);
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+
+  auto& device = drivers()[0]->devices()[device_num];
+  device->data_fetcher.appendCopyCommand(device_ptr, host_ptr, num_bytes);
+}
+
+void L0Manager::copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                                                const int8_t* host_ptr,
+                                                const size_t num_bytes,
+                                                const int device_num) {
+  if constexpr (async_data_load_available) {
+    copyHostToDeviceAsync(device_ptr, host_ptr, num_bytes, device_num);
+  } else {
+    copyHostToDevice(device_ptr, host_ptr, num_bytes, device_num);
+  }
+}
+
+void L0Manager::synchronizeDeviceDataStream(const int device_num) {
+  CHECK_GE(device_num, 0);
+  CHECK_LT(device_num, drivers_[0]->devices().size());
+  auto& device = drivers()[0]->devices()[device_num];
+  device->data_fetcher.sync();
 }
 
 void L0Manager::copyDeviceToHost(int8_t* host_ptr,

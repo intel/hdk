@@ -16,7 +16,9 @@
 #pragma once
 
 #include <iostream>
+#include <list>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include "DataMgr/GpuMgr.h"
@@ -56,6 +58,35 @@ class L0Kernel;
 class L0CommandList;
 class L0CommandQueue;
 
+class L0DataFetcher {
+#ifdef HAVE_L0
+  static constexpr uint16_t GRAVEYARD_LIMIT{500};
+  ze_device_handle_t device_;
+  ze_command_queue_handle_t queue_handle_;
+  std::pair<ze_command_list_handle_t, uint64_t> current_cl_bytes;
+  std::list<ze_command_list_handle_t> graveyard;
+  std::list<ze_command_list_handle_t> recycled;
+  ze_command_list_desc_t cl_desc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC,
+                                    nullptr,
+                                    0,
+                                    ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT};
+  std::mutex current_cl_lock;
+#endif
+  const L0Driver& driver_;
+  void recycleGraveyard();
+
+ public:
+  void appendCopyCommand(void* dst, const void* src, const size_t num_bytes);
+  void sync();
+
+#ifdef HAVE_L0
+  L0DataFetcher(const L0Driver& driver, ze_device_handle_t device);
+  ~L0DataFetcher();
+#else
+  L0DataFetcher() = default;
+#endif
+};
+
 class L0Device {
  private:
 #ifdef HAVE_L0
@@ -68,6 +99,7 @@ class L0Device {
   std::shared_ptr<L0CommandQueue> command_queue_;
 
  public:
+  L0DataFetcher data_fetcher;
   std::shared_ptr<L0CommandQueue> command_queue() const;
   std::unique_ptr<L0CommandList> create_command_list() const;
 
@@ -169,7 +201,6 @@ class L0CommandList {
 
  public:
   void copy(void* dst, const void* src, const size_t num_bytes);
-
   template <typename... Args>
   void launch(L0Kernel& kernel, const GroupCount& gc, Args&&... args) {
 #ifdef HAVE_L0
@@ -202,13 +233,15 @@ class L0Manager : public GpuMgr {
   void copyHostToDeviceAsync(int8_t* device_ptr,
                              const int8_t* host_ptr,
                              const size_t num_bytes,
-                             const int device_num) override {
-    CHECK(false);
-  }
-  void synchronizeStream(const int device_num) override {
-    LOG(WARNING)
-        << "L0 has no async data transfer enabled, synchronizeStream() has no effect";
-  }
+                             const int device_num) override;
+
+  void copyHostToDeviceAsyncIfPossible(int8_t* device_ptr,
+                                       const int8_t* host_ptr,
+                                       const size_t num_bytes,
+                                       const int device_num) override;
+
+  void synchronizeDeviceDataStream(const int device_num) override;
+
   void copyHostToDevice(int8_t* device_ptr,
                         const int8_t* host_ptr,
                         const size_t num_bytes,
@@ -261,7 +294,7 @@ class L0Manager : public GpuMgr {
 
  private:
   std::vector<std::shared_ptr<L0Driver>> drivers_;
-  static constexpr bool async_data_load_available{false};
+  static constexpr bool async_data_load_available{true};
 };
 
 }  // namespace l0
