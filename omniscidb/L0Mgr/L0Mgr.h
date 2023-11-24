@@ -58,50 +58,64 @@ class L0Kernel;
 class L0CommandList;
 class L0CommandQueue;
 
-class L0DataFetcher {
-#ifdef HAVE_L0
-  static constexpr uint16_t GRAVEYARD_LIMIT{500};
-  ze_device_handle_t device_;
-  ze_command_queue_handle_t queue_handle_;
-  std::pair<ze_command_list_handle_t, uint64_t> current_cl_bytes;
-  std::list<ze_command_list_handle_t> graveyard;
-  std::list<ze_command_list_handle_t> recycled;
-  ze_command_list_desc_t cl_desc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC,
-                                    nullptr,
-                                    0,
-                                    ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT};
-  std::mutex current_cl_lock;
-#endif
-  const L0Driver& driver_;
-  void recycleGraveyard();
-
- public:
-  void appendCopyCommand(void* dst, const void* src, const size_t num_bytes);
-  void sync();
-
-#ifdef HAVE_L0
-  L0DataFetcher(const L0Driver& driver, ze_device_handle_t device);
-  ~L0DataFetcher();
-#else
-  L0DataFetcher() = default;
-#endif
-};
-
 class L0Device {
- private:
+ protected:
+  const L0Driver& driver_;
+  std::shared_ptr<L0CommandQueue> command_queue_;
 #ifdef HAVE_L0
   ze_device_handle_t device_;
   ze_device_properties_t props_;
   ze_device_compute_properties_t compute_props_;
 #endif
+ private:
+  /*
+    This component for data fetching to L0 devices is used for
+    more efficient asynchronous data transfers. It allows to amortize
+    the costs of data transfers which is especially useful in case of
+    many relatively small data transfers.
+  */
+  class L0DataFetcher {
+#ifdef HAVE_L0
+    static constexpr size_t GRAVEYARD_LIMIT{500};
+    static constexpr size_t CL_BYTES_LIMIT{128 * 1024 * 1024};
+    static constexpr ze_command_list_desc_t cl_desc_ = {
+        ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC,
+        nullptr,
+        0,
+        ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT};
+    struct CLBytesTracker {
+      ze_command_list_handle_t cl_handle_;
+      uint64_t bytes_;
+    };
+    CLBytesTracker cur_cl_bytes_;
+    ze_command_queue_handle_t queue_handle_;
+    std::list<ze_command_list_handle_t> graveyard_;
+    std::list<ze_command_list_handle_t> recycled_;
+    std::mutex cur_cl_lock_;
+#endif
+    L0Device& my_device_;
+    void recycleGraveyard();
+    void setCLRecycledOrNew();
 
-  const L0Driver& driver_;
-  std::shared_ptr<L0CommandQueue> command_queue_;
+   public:
+    void appendCopyCommand(void* dst, const void* src, const size_t num_bytes);
+    void sync();
+
+#ifdef HAVE_L0
+    L0DataFetcher(L0Device& device);
+    ~L0DataFetcher();
+#else
+    L0DataFetcher() = default;
+#endif
+  };
+  L0DataFetcher data_fetcher_;
 
  public:
-  L0DataFetcher data_fetcher;
   std::shared_ptr<L0CommandQueue> command_queue() const;
   std::unique_ptr<L0CommandList> create_command_list() const;
+
+  void transferToDevice(void* dst, const void* src, const size_t num_bytes);
+  void syncDataTransfers();
 
   std::shared_ptr<L0Module> create_module(uint8_t* code,
                                           size_t len,
