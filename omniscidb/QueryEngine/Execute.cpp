@@ -3020,7 +3020,11 @@ FetchResult Executor::fetchChunks(
       // determine if we need special treatment to linearlize multi-frag table
       // i.e., a column that is classified as varlen type, i.e., array
       // for now, we can support more types in this way
-      CHECK(!parallelized);  // otherwise recursive tbb parallel for with deadlocks
+
+      // If fetch_column_callback is called from parallel code region, we get deadlocks
+      // due to tbb nested parallel_for, the calls below are internally parallelized. We
+      // should land here when called from a sequential code region
+      CHECK(!parallelized);
       if (needLinearizeAllFragments(
               *col_id, ra_exe_unit, selected_fragments, memory_level)) {
         bool for_lazy_fetch = false;
@@ -3082,24 +3086,28 @@ FetchResult Executor::fetchChunks(
 
     // Try MT fetching for frags that do not need linearization
     limitedArena.execute([&]() {
-      tbb::parallel_for(0ul, selected_frag_ids_vec.size(), [&](const size_t idx) {
-        if (std::find(idx_frags_to_inearize.begin(), idx_frags_to_inearize.end(), idx) ==
-            idx_frags_to_inearize.end()) {
-          const auto& selected_frag_ids = selected_frag_ids_vec[idx];
-          std::vector<const int8_t*> frag_col_buffers(
-              plan_state_->global_to_local_col_ids_.size());
-          for (const auto& col_id : col_global_ids) {
-            CHECK(col_id);
-            if (!col_id->isVirtual() &&
-                fetch_column_callback(
-                    col_id, selected_frag_ids, frag_col_buffers, true)) {
-              empty_frags = true;  // not virtual, but empty frags
-              tbb::task::current_context()->cancel_group_execution();
+      tbb::parallel_for(
+          tbb::blocked_range<size_t>(0, selected_frag_ids_vec.size()), [&](auto r) {
+            for (size_t idx = r.begin(); idx != r.end(); ++idx) {
+              if (std::find(idx_frags_to_inearize.begin(),
+                            idx_frags_to_inearize.end(),
+                            idx) == idx_frags_to_inearize.end()) {
+                const auto& selected_frag_ids = selected_frag_ids_vec[idx];
+                std::vector<const int8_t*> frag_col_buffers(
+                    plan_state_->global_to_local_col_ids_.size());
+                for (const auto& col_id : col_global_ids) {
+                  CHECK(col_id);
+                  if (!col_id->isVirtual() &&
+                      fetch_column_callback(
+                          col_id, selected_frag_ids, frag_col_buffers, true)) {
+                    empty_frags = true;  // not virtual, but empty frags
+                    tbb::task::current_context()->cancel_group_execution();
+                  }
+                }
+                all_frag_col_buffers[idx] = frag_col_buffers;
+              }
             }
-          }
-          all_frag_col_buffers[idx] = frag_col_buffers;
-        }
-      });
+          });
     });
     if (empty_frags) {
       return {};
@@ -3134,6 +3142,8 @@ FetchResult Executor::fetchChunks(
       all_frag_col_buffers.push_back(frag_col_buffers);
     }
   }
+  // selected_frag_ids_vec here is just a vector representation of frag_ids_crossjoin
+  // we need it in this form to have a proper fragment order when doing MT fetching to GPU
   std::tie(all_num_rows, all_frag_offsets) = getRowCountAndOffsetForAllFrags(
       ra_exe_unit, selected_frag_ids_vec, ra_exe_unit.input_descs, all_tables_fragments);
   return {all_frag_col_buffers, all_num_rows, all_frag_offsets};
