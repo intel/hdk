@@ -199,14 +199,16 @@ def buildConfig(*, log_dir="hdk_log", **kwargs):
   config.c_config.get().debug.log_dir = log_dir
   return config
 
-def initLogger(*, debug_logs=False, log_dir="hdk_log", **kwargs):
+def initLogger(*, debug_logs=None, log_dir="hdk_log", **kwargs):
   argv0 = "PyHDK".encode('UTF-8')
   cdef char *cargv0 = argv0
   cdef string default_log_dir = log_dir
   cdef unique_ptr[CLogOptions] opts = make_unique[CLogOptions](cargv0, default_log_dir)
   cmd_str = "".join(' --%s %r' % arg for arg in kwargs.iteritems())
   cmd_str = cmd_str.replace("_", "-")
+  if isinstance(debug_logs, str):
+    cmd_str += ("--log-severity="+debug_logs)
   opts.get().parse_command_line(argv0, cmd_str)
-  if debug_logs:
+  if not isinstance(debug_logs, str) and debug_logs:
     opts.get().severity_ = CSeverity.DEBUG3
   CInitLogger(dereference(opts))

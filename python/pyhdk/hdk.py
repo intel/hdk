@@ -1585,6 +1585,24 @@ class QueryNodeAPI:
         """
         pass
 
+    def refragmented_view(self, fragment_size, refragmented_view_name=None):
+        """
+        Creates a refragmented view of an existing table.
+        Parameters
+        ----------
+        fragment_size : int
+            Specifies new fragment size of a table
+        refragmented_view_name: str
+            Can be used to give a custom name for a view
+
+        Returns
+        -------
+        QueryNode
+            A scan query node referencing refragmented view.
+
+        """
+        pass
+
     def agg(self, group_keys, *args, aggs=None, **kwargs):
         """
         Create an aggregation node with the current node as its input.
@@ -1592,7 +1610,7 @@ class QueryNodeAPI:
         Parameters
         ----------
         group_keys : int, str, QueryExpr or iterable
-            Group key used fro aggregation. Integer and string values can be used
+            Group key used for aggregation. Integer and string values can be used
             to reference input columns by its index or name. QueryExpr expressions
             can be used to simply reference input columns or build more complex
             group keys.
@@ -2388,7 +2406,7 @@ class HDK:
         elif isinstance(table_name, str):
             exists = self._storage.tableInfo(table_name) is not None
         elif table_name is None:
-            res_name = "tabe_" + uuid.uuid4().hex
+            res_name = "table_" + uuid.uuid4().hex
         else:
             raise TypeError(
                 f"Expected str or QueryNode for 'table_name' arg. Got: {type(table_name)}."
@@ -2499,6 +2517,41 @@ class HDK:
         res = ra_executor.execute(**query_opts)
         res.scan = self.scan(res.table_name)
         return res
+
+    def clear_gpu_mem(self):
+        """
+        Clears GPU memory of all previously transferred buffers.
+        """
+        self._executor.clearMemory(self._data_mgr, 2)
+
+    def refragmented_view(self, table, fragment_size, refragmented_view_name=None):
+        """
+        Creates a refragmented table view of an existing non-view table.
+        Parameters
+        ----------
+        table: str or
+            Name of the table to refragment
+        fragment_size : int
+            Specifies new fragment size of a table
+        refragmented_view_name: str, default: None
+            Can be used to give a custom name for a view
+
+        Returns
+        -------
+        QueryNode
+            A scan query node referencing refragmented view.
+
+        """
+
+        if isinstance(table, QueryNode) and table.is_scan:
+            return table.refragmented_view(fragment_size, refragmented_view_name)
+        if isinstance(table, str):
+            return self.scan(table).refragmented_view(
+                fragment_size, refragmented_view_name
+            )
+        raise TypeError(
+            f"Expected str or table scan QueryNode for a table name alias. Got: {type(table)}."
+        )
 
     def scan(self, table_name):
         """

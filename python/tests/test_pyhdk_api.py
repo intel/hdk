@@ -175,7 +175,7 @@ class TestBuilder(BaseTest):
         )
 
         # Refragment a table
-        res = trips.refragmented_view(2, new_table_name="trips_2")
+        res = trips.refragmented_view(2, refragmented_view_name="trips_2")
         res1 = trips.refragmented_view(3)
 
         assert res.is_scan
