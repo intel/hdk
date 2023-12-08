@@ -25,7 +25,7 @@
 namespace Buffer_Namespace {
 
 Buffer::Buffer(BufferMgr* bm,
-               BufferList::iterator seg_it,
+               SegmentList::iterator seg_it,
                const int device_id,
                const size_t page_size,
                const size_t num_bytes)

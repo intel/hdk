@@ -24,7 +24,7 @@ namespace Buffer_Namespace {
 class GpuBuffer : public Buffer {
  public:
   GpuBuffer(BufferMgr* bm,
-            BufferList::iterator seg_it,
+            SegmentList::iterator seg_it,
             const int device_id,
             GpuMgr* gpu_mgr,
             const size_t page_size = 512,

@@ -34,6 +34,80 @@ using namespace std;
 
 namespace Buffer_Namespace {
 
+SegmentList::iterator Slab::getFreeSegment(const size_t num_requested_pages) {
+  if (num_requested_pages > (*std::prev(free_segment_index_.end()))->num_pages) {
+    // If the largest buffer can't fit, then nothing will.
+    return segments_.end();
+  }
+  auto result = *std::lower_bound(free_segment_index_.begin(),
+                                  free_segment_index_.end(),
+                                  num_requested_pages,
+                                  iterator_page_count_cmp_l);
+  CHECK_EQ(result->mem_status, MemStatus::FREE);
+  return result;
+}
+
+SegmentList::iterator Slab::insert(SegmentList::iterator& at, BufferSeg& data_seg) {
+  auto my_segments_iter = segments_.insert(at, data_seg);
+  if (data_seg.mem_status == MemStatus::FREE) {
+    index_insert(my_segments_iter);
+  }
+  return my_segments_iter;
+}
+
+SegmentList::iterator Slab::remove(SegmentList::iterator to_erase) {
+  if (to_erase->mem_status == MemStatus::FREE) {
+    auto index_iter = free_segment_index_.find(to_erase);
+    CHECK(index_iter != free_segment_index_.end());
+    index_remove(to_erase);
+  }
+  return segments_.erase(to_erase);
+}
+
+void Slab::index_insert(SegmentList::iterator& to_insert) {
+  CHECK(to_insert->mem_status == MemStatus::FREE);
+  auto [_, success] = free_segment_index_.insert(to_insert);
+  CHECK(success);
+}
+
+void Slab::index_remove(SegmentList::iterator& to_erase) {
+  CHECK(to_erase->mem_status == MemStatus::FREE);
+  auto index_iter = free_segment_index_.find(to_erase);
+  CHECK(index_iter != free_segment_index_.end());
+  free_segment_index_.erase(index_iter);
+}
+
+void Slab::verify_index() {
+  bool failed{false};
+  for (SegmentList::iterator segment_it = segments_.begin();
+       segment_it != segments_.end();
+       ++segment_it) {
+    if (segment_it->mem_status == MemStatus::FREE) {
+      auto index_pos = free_segment_index_.find(segment_it);
+      if ((index_pos == free_segment_index_.end()) ||
+          ((*index_pos)->num_pages != segment_it->num_pages)) {
+        failed = true;
+      }
+    }
+  }
+  if (failed) {
+    LOG(INFO) << "Slab has:";
+    for (SegmentList::iterator segment_it = segments_.begin();
+         segment_it != segments_.end();
+         ++segment_it) {
+      if (segment_it->mem_status == MemStatus::FREE) {
+        LOG(INFO) << "start_page=" << segment_it->start_page
+                  << ", num_pages=" << segment_it->num_pages;
+      }
+    }
+    LOG(INFO) << "Index has:";
+    for (auto& x : free_segment_index_) {
+      LOG(INFO) << "start_page=" << x->start_page << ", num_pages=" << x->num_pages;
+    }
+  }
+  CHECK(!failed);
+}
+
 std::string BufferMgr::keyToString(const ChunkKey& key) {
   std::ostringstream oss;
 
@@ -126,7 +200,7 @@ AbstractBuffer* BufferMgr::createBuffer(const ChunkKey& chunk_key,
   }
 
   // chunk_page_size is just for recording dirty pages
-  BufferList::iterator seg_it;
+  SegmentList::iterator seg_it;
   {
     std::lock_guard<std::mutex> lock(chunk_index_mutex_);
     CHECK(chunk_index_.find(chunk_key) == chunk_index_.end());
@@ -165,9 +239,9 @@ AbstractBuffer* BufferMgr::createZeroCopyBuffer(
   return allocateZeroCopyBuffer(page_size_, std::move(token));
 }
 
-BufferList::iterator BufferMgr::evict(BufferList::iterator& evict_start,
-                                      const size_t num_pages_requested,
-                                      const int slab_num) {
+SegmentList::iterator BufferMgr::evict(SegmentList::iterator& evict_start,
+                                       const size_t num_pages_requested,
+                                       const int slab_num) {
   // It is assumed that caller holds a lock on sized_segs_mutex_.
   // We can assume here that buffer for evictStart either doesn't exist
   // (evictStart is first buffer) or was not free, so don't need ot merge
@@ -175,6 +249,7 @@ BufferList::iterator BufferMgr::evict(BufferList::iterator& evict_start,
   auto evict_it = evict_start;
   size_t num_pages = 0;
   size_t start_page = evict_start->start_page;
+  auto& slab = slab_segments_[slab_num];
   while (num_pages < num_pages_requested) {
     if (evict_it->mem_status == USED) {
       CHECK(evict_it->buffer->getPinCount() < 1);
@@ -188,59 +263,64 @@ BufferList::iterator BufferMgr::evict(BufferList::iterator& evict_start,
       // a memleak.
       delete evict_it->buffer;
     }
-    evict_it = slab_segments_[slab_num].erase(
-        evict_it);  // erase operations returns next iterator - safe if we ever move
-                    // to a vector (as opposed to erase(evict_it++)
+    evict_it =
+        slab.remove(evict_it);  // erase operations returns next iterator - safe if we
+                                // ever move to a vector (as opposed to erase(evict_it++)
   }
+
   BufferSeg data_seg(
       start_page, num_pages_requested, USED, buffer_epoch_++);  // until we can
   // data_seg.pinCount++;
   data_seg.slab_num = slab_num;
-  auto data_seg_it =
-      slab_segments_[slab_num].insert(evict_it, data_seg);  // Will insert before evict_it
+  auto data_seg_it = slab.insert(evict_it, data_seg);  // Will insert before evict_it
   if (num_pages_requested < num_pages) {
-    size_t excess_pages = num_pages - num_pages_requested;
-    if (evict_it != slab_segments_[slab_num].end() &&
+    const size_t excess_pages = num_pages - num_pages_requested;
+    if (evict_it != slab.end() &&
         evict_it->mem_status == FREE) {  // need to merge with current page
+      slab.index_remove(evict_it);
       evict_it->start_page = start_page + num_pages_requested;
       evict_it->num_pages += excess_pages;
+      slab.index_insert(evict_it);
     } else {  // need to insert a free seg before evict_it for excess_pages
       BufferSeg free_seg(start_page + num_pages_requested, excess_pages, FREE);
-      slab_segments_[slab_num].insert(evict_it, free_seg);
+      slab.insert(evict_it, free_seg);
     }
   }
   return data_seg_it;
 }
 
-BufferList::iterator BufferMgr::reserveBuffer(
-    BufferList::iterator& seg_it,
+SegmentList::iterator BufferMgr::reserveBuffer(
+    SegmentList::iterator& seg_it,
     const size_t num_bytes) {  // assumes buffer is already pinned
   std::unique_lock<std::mutex> sized_segs_lock(sized_segs_mutex_);
 
-  size_t num_pages_requested = (num_bytes + page_size_ - 1) / page_size_;
-  size_t num_pages_extra_needed = num_pages_requested - seg_it->num_pages;
+  const size_t num_pages_requested = (num_bytes + page_size_ - 1) / page_size_;
+  const size_t num_pages_extra_needed = num_pages_requested - seg_it->num_pages;
+  const int slab_num = seg_it->slab_num;
 
   if (num_pages_requested < seg_it->num_pages) {
     // We already have enough pages in existing segment
     return seg_it;
   }
   // First check for free segment after seg_it
-  int slab_num = seg_it->slab_num;
   if (slab_num >= 0) {  // not dummy page
-    BufferList::iterator next_it = std::next(seg_it);
-    if (next_it != slab_segments_[slab_num].end() && next_it->mem_status == FREE &&
+    SegmentList::iterator next_it = std::next(seg_it);
+    auto& slab = slab_segments_[slab_num];
+    if (next_it != slab.end() && next_it->mem_status == FREE &&
         next_it->num_pages >= num_pages_extra_needed) {
       // Then we can just use the next BufferSeg which happens to be free
-      size_t leftover_pages = next_it->num_pages - num_pages_extra_needed;
+      CHECK_NE(seg_it->mem_status, FREE);
+      slab.index_remove(next_it);
       seg_it->num_pages = num_pages_requested;
-      next_it->num_pages = leftover_pages;
+      next_it->num_pages = next_it->num_pages - num_pages_extra_needed;
       next_it->start_page = seg_it->start_page + seg_it->num_pages;
+      slab.index_insert(next_it);
       return seg_it;
     }
   }
   // If we're here then we couldn't keep buffer in existing slot
   // need to find new segment, copy data over, and then delete old
-  auto new_seg_it = findFreeBuffer(num_bytes);
+  auto new_seg_it = findFreeSegment(num_bytes);
 
   // Below should be in copy constructor for BufferSeg?
   new_seg_it->buffer = seg_it->buffer;
@@ -264,51 +344,42 @@ BufferList::iterator BufferMgr::reserveBuffer(
     std::lock_guard<std::mutex> lock(chunk_index_mutex_);
     chunk_index_[new_seg_it->chunk_key] = new_seg_it;
   }
-
   return new_seg_it;
 }
 
-BufferList::iterator BufferMgr::findFreeBufferInSlab(const size_t slab_num,
-                                                     const size_t num_pages_requested) {
+SegmentList::iterator BufferMgr::findFreeSegmentInSlab(const size_t slab_num,
+                                                       const size_t num_pages_requested) {
   // It is assumed that caller holds a lock on sized_segs_mutex_.
-  for (auto buffer_it = slab_segments_[slab_num].begin();
-       buffer_it != slab_segments_[slab_num].end();
-       ++buffer_it) {
-    if (buffer_it->mem_status == FREE && buffer_it->num_pages >= num_pages_requested) {
-      // startPage doesn't change
-      size_t excess_pages = buffer_it->num_pages - num_pages_requested;
-      buffer_it->num_pages = num_pages_requested;
-      buffer_it->mem_status = USED;
-      buffer_it->last_touched = buffer_epoch_++;
-      buffer_it->slab_num = slab_num;
-      if (excess_pages > 0) {
-        BufferSeg free_seg(
-            buffer_it->start_page + num_pages_requested, excess_pages, FREE);
-        auto temp_it = buffer_it;  // this should make a copy and not be a reference
-        // - as we do not want to increment buffer_it
-        temp_it++;
-        slab_segments_[slab_num].insert(temp_it, free_seg);
-      }
-      return buffer_it;
+  auto& slab = slab_segments_[slab_num];
+  auto found = slab.getFreeSegment(num_pages_requested);
+
+  if (found != slab.end()) {
+    slab.index_remove(found);
+    const size_t excess_pages = found->num_pages - num_pages_requested;
+    found->num_pages = num_pages_requested;
+    found->mem_status = USED;
+    found->last_touched = buffer_epoch_++;
+    found->slab_num = slab_num;
+    if (excess_pages > 0) {
+      BufferSeg free_seg(found->start_page + num_pages_requested, excess_pages, FREE);
+      auto it = std::next(found);
+      slab.insert(it, free_seg);
     }
   }
-  // If here then we did not find a free buffer of sufficient size in this slab,
-  // return the end iterator
-  return slab_segments_[slab_num].end();
+  return found;
 }
 
-BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
+SegmentList::iterator BufferMgr::findFreeSegment(const size_t num_bytes) {
   // It is assumed that caller holds a lock on sized_segs_mutex_.
-  size_t num_pages_requested = (num_bytes + page_size_ - 1) / page_size_;
+  const size_t num_pages_requested = (num_bytes + page_size_ - 1) / page_size_;
+  const size_t num_slabs = slab_segments_.size();
   if (num_pages_requested > max_num_pages_per_slab_) {
     throw TooBigForSlab(num_bytes);
   }
-
-  size_t num_slabs = slab_segments_.size();
-
   for (size_t slab_num = 0; slab_num != num_slabs; ++slab_num) {
-    auto seg_it = findFreeBufferInSlab(slab_num, num_pages_requested);
-    if (seg_it != slab_segments_[slab_num].end()) {
+    auto& slab = slab_segments_[slab_num];
+    auto seg_it = findFreeSegmentInSlab(slab_num, num_pages_requested);
+    if (seg_it != slab.end()) {
       return seg_it;
     }
   }
@@ -317,13 +388,13 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
   // First we see if we can add another slab
   while (!allocations_capped_ && num_pages_allocated_ < max_buffer_pool_num_pages_) {
     try {
-      size_t pagesLeft = max_buffer_pool_num_pages_ - num_pages_allocated_;
+      const size_t pagesLeft = max_buffer_pool_num_pages_ - num_pages_allocated_;
       if (pagesLeft < current_max_slab_page_size_) {
         current_max_slab_page_size_ = pagesLeft;
       }
       if (num_pages_requested <=
-          current_max_slab_page_size_) {  // don't try to allocate if the
-                                          // new slab won't be big enough
+          current_max_slab_page_size_) {  // don't try to allocate if the new slab won't
+                                          // be big enough
         auto alloc_ms = measure<>::execution(
             [&]() { addSlab(current_max_slab_page_size_ * page_size_); });
         LOG(INFO) << "ALLOCATION slab of " << current_max_slab_page_size_ << " pages ("
@@ -334,7 +405,7 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
       }
       // if here then addSlab succeeded
       num_pages_allocated_ += current_max_slab_page_size_;
-      return findFreeBufferInSlab(
+      return findFreeSegmentInSlab(
           num_slabs,
           num_pages_requested);  // has to succeed since we made sure to request a slab
                                  // big enough to accomodate request
@@ -374,8 +445,8 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
   // We're going for lowest score here, like golf
   // This is because score is the sum of the lastTouched score for all pages evicted.
   // Evicting fewer pages and older pages will lower the score
-  BufferList::iterator best_eviction_start = slab_segments_[0].end();
-  int best_eviction_start_slab = -1;
+  SegmentList::iterator best_eviction_start = slab_segments_.begin()->end();
+  int best_eviction_start_slab_num = -1;
   int slab_num = 0;
 
   for (auto slab_it = slab_segments_.begin(); slab_it != slab_segments_.end();
@@ -392,7 +463,7 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
       size_t score = 0;
       bool solution_found = false;
       auto evict_it = buffer_it;
-      for (; evict_it != slab_segments_[slab_num].end(); ++evict_it) {
+      for (; evict_it != slab_it->end(); ++evict_it) {
         // pinCount should never go up - only down because we have
         // global lock on buffer pool and pin count only increments
         // on getChunk
@@ -419,8 +490,8 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
       if (solution_found && score < min_score) {
         min_score = score;
         best_eviction_start = buffer_it;
-        best_eviction_start_slab = slab_num;
-      } else if (evict_it == slab_segments_[slab_num].end()) {
+        best_eviction_start_slab_num = slab_num;
+      } else if (evict_it == slab_it->end()) {
         // this means that every segment after this will fail as well, so our search has
         // proven futile
         // throw std::runtime_error ("Couldn't evict chunks to get free space");
@@ -432,7 +503,7 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
       //}
     }
   }
-  if (best_eviction_start == slab_segments_[0].end()) {
+  if (best_eviction_start == slab_segments_.begin()->end()) {
     LOG(ERROR) << "ALLOCATION failed to find " << num_bytes << "B throwing out of memory "
                << getStringMgrType() << ":" << device_id_;
     VLOG(2) << printSlabs();
@@ -441,10 +512,10 @@ BufferList::iterator BufferMgr::findFreeBuffer(size_t num_bytes) {
   LOG(INFO) << "ALLOCATION failed to find " << num_bytes << "B free. Forcing Eviction."
             << " Eviction start " << best_eviction_start->start_page
             << " Number pages requested " << num_pages_requested
-            << " Best Eviction Start Slab " << best_eviction_start_slab << " "
+            << " Best Eviction Start Slab " << best_eviction_start_slab_num << " "
             << getStringMgrType() << ":" << device_id_;
   best_eviction_start =
-      evict(best_eviction_start, num_pages_requested, best_eviction_start_slab);
+      evict(best_eviction_start, num_pages_requested, best_eviction_start_slab_num);
   return best_eviction_start;
 }
 
@@ -543,7 +614,7 @@ size_t BufferMgr::getInUseSize() {
   return in_use;
 }
 
-std::string BufferMgr::printSeg(BufferList::iterator& seg_it) {
+std::string BufferMgr::printSeg(SegmentList::iterator& seg_it) {
   std::ostringstream tss;
   tss << "SN: " << setfill(' ') << setw(2) << seg_it->slab_num;
   tss << " SP: " << setfill(' ') << setw(7) << seg_it->start_page;
@@ -664,7 +735,7 @@ void BufferMgr::deleteBuffersWithPrefix(const ChunkKey& key_prefix, const bool) 
   }
 }
 
-void BufferMgr::removeSegment(BufferList::iterator& seg_it) {
+void BufferMgr::removeSegment(SegmentList::iterator& seg_it) {
   // If seg_it is referencing some slab then caller of this method
   // should hold a lock for sized_segs_mutex_.
   // Note: does not delete buffer as this may be moved somewhere else
@@ -674,26 +745,31 @@ void BufferMgr::removeSegment(BufferList::iterator& seg_it) {
     std::lock_guard<std::mutex> unsized_segs_lock(unsized_segs_mutex_);
     unsized_segs_.erase(seg_it);
   } else {
-    if (seg_it != slab_segments_[slab_num].begin()) {
+    auto& slab = slab_segments_[slab_num];
+    if (seg_it->mem_status == FREE) {
+      slab.index_remove(seg_it);
+    }
+    if (seg_it != slab.begin()) {
       auto prev_it = std::prev(seg_it);
       // LOG(INFO) << "PrevIt: " << " " << getStringMgrType() << ":" << device_id_;
       // printSeg(prev_it);
       if (prev_it->mem_status == FREE) {
         seg_it->start_page = prev_it->start_page;
         seg_it->num_pages += prev_it->num_pages;
-        slab_segments_[slab_num].erase(prev_it);
+        slab.remove(prev_it);
       }
     }
     auto next_it = std::next(seg_it);
-    if (next_it != slab_segments_[slab_num].end()) {
+    if (next_it != slab.end()) {
       if (next_it->mem_status == FREE) {
         seg_it->num_pages += next_it->num_pages;
-        slab_segments_[slab_num].erase(next_it);
+        slab.remove(next_it);
       }
     }
     seg_it->mem_status = FREE;
     // seg_it->pinCount = 0;
-    seg_it->buffer = 0;
+    seg_it->buffer = nullptr;
+    slab.index_insert(seg_it);
   }
 }
 
@@ -856,10 +932,6 @@ void BufferMgr::getChunkMetadataVecForKeyPrefix(ChunkMetadataVector& chunk_metad
   LOG(FATAL) << "getChunkMetadataVecForPrefix not supported for BufferMgr.";
 }
 
-const std::vector<BufferList>& BufferMgr::getSlabSegments() {
-  return slab_segments_;
-}
-
 std::unique_ptr<AbstractDataToken> BufferMgr::getZeroCopyBufferMemory(const ChunkKey& key,
                                                                       size_t numBytes) {
   return parent_mgr_->getZeroCopyBufferMemory(key, numBytes);
@@ -878,7 +950,6 @@ MemoryInfo BufferMgr::getMemoryInfo() {
   mi.maxNumPages = getMaxSize() / mi.pageSize;
   mi.isAllocationCapped = isAllocationCapped();
   mi.numPageAllocated = getAllocated() / mi.pageSize;
-
   for (size_t slab_num = 0; slab_num < slab_segments_.size(); ++slab_num) {
     for (auto segment : slab_segments_[slab_num]) {
       MemoryData md;

@@ -63,7 +63,7 @@ class Buffer : public AbstractBuffer {
   */
 
   Buffer(BufferMgr* bm,
-         BufferList::iterator seg_it,
+         SegmentList::iterator seg_it,
          const int device_id,
          const size_t page_size = 512,
          const size_t num_bytes = 0);
@@ -178,7 +178,7 @@ class Buffer : public AbstractBuffer {
                          const int src_device_id = -1) = 0;
 
   BufferMgr* bm_;
-  BufferList::iterator seg_it_;
+  SegmentList::iterator seg_it_;
   size_t page_size_;  /// the size of each page in the buffer
   size_t num_pages_;
   int epoch_;  /// indicates when the buffer was last flushed

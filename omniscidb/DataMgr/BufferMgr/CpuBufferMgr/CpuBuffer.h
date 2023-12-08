@@ -23,7 +23,7 @@ namespace Buffer_Namespace {
 class CpuBuffer : public Buffer {
  public:
   CpuBuffer(BufferMgr* bm,
-            BufferList::iterator segment_iter,
+            SegmentList::iterator segment_iter,
             const int device_id,
             GpuMgr* gpu_mgr,
             const size_t page_size = 512,
