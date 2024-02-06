@@ -521,6 +521,10 @@ const int8_t* ColumnFetcher::linearizeColumnFragments(
     }
   }
   CHECK(res.first);  // check merged data buffer
+  // This buffers are associated with Chunk, that created by hands, not with
+  // Chunk::getChunk(...) method So it should be removed to do it we mark both buffers to
+  // delete on unpin in ColumnFetcher dtor. Pin means that none of chunks are uses this
+  // buffer.
   if (!type->isFixedLenArray()) {
     CHECK(res.second);  // check merged index buffer
   }
@@ -1060,35 +1064,4 @@ ChunkIter ColumnFetcher::prepareChunkIter(AbstractBuffer* merged_data_buf,
   merged_chunk_iter.elem_type_id = chunk_iter.elem_type_id;
   merged_chunk_iter.elem_type_size = chunk_iter.elem_type_size;
   return merged_chunk_iter;
-}
-
-void ColumnFetcher::freeLinearizedBuf() {
-  std::lock_guard<std::mutex> linearized_col_cache_guard(linearized_col_cache_mutex_);
-  auto buffer_provider = executor_->getBufferProvider();
-
-  if (!linearized_data_buf_cache_.empty()) {
-    for (auto& kv : linearized_data_buf_cache_) {
-      for (auto& kv2 : kv.second) {
-        buffer_provider->free(kv2.second);
-      }
-    }
-  }
-
-  if (!linearized_idx_buf_cache_.empty()) {
-    for (auto& kv : linearized_idx_buf_cache_) {
-      for (auto& kv2 : kv.second) {
-        buffer_provider->free(kv2.second);
-      }
-    }
-  }
-}
-
-void ColumnFetcher::freeTemporaryCpuLinearizedIdxBuf() {
-  std::lock_guard<std::mutex> linearized_col_cache_guard(linearized_col_cache_mutex_);
-  auto buffer_provider = executor_->getBufferProvider();
-  if (!linearlized_temporary_cpu_index_buf_cache_.empty()) {
-    for (auto& kv : linearlized_temporary_cpu_index_buf_cache_) {
-      buffer_provider->free(kv.second);
-    }
-  }
 }

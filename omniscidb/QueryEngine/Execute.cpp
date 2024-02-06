@@ -2188,10 +2188,6 @@ hdk::ResultSetTable Executor::executeWorkUnitImpl(
   do {
     SharedKernelContext shared_context(query_infos);
     ColumnFetcher column_fetcher(this, data_provider, column_cache);
-    ScopeGuard scope_guard = [&column_fetcher] {
-      column_fetcher.freeLinearizedBuf();
-      column_fetcher.freeTemporaryCpuLinearizedIdxBuf();
-    };
 
     if (ra_exe_unit.isShuffle()) {
       allocateShuffleBuffers(query_infos, ra_exe_unit, row_set_mem_owner, shared_context);

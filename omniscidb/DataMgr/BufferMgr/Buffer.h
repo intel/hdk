@@ -134,28 +134,14 @@ class Buffer : public AbstractBuffer {
     return (++pin_count_);
   }
 
-  inline int unPin() override {
-    std::lock_guard<std::mutex> pin_lock(pin_mutex_);
-    int res = (--pin_count_);
-    if (!res && delete_on_unpin_) {
-      delete this;
-    }
-    return res;
-  }
+  int unPin() override;
+
   inline int getPinCount() override {
     std::lock_guard<std::mutex> pin_lock(pin_mutex_);
     return (pin_count_);
   }
 
-  inline void deleteWhenUnpinned() override {
-    std::unique_lock<std::mutex> pin_lock(pin_mutex_);
-    if (pin_count_) {
-      delete_on_unpin_ = true;
-    } else {
-      pin_lock.unlock();
-      delete this;
-    }
-  }
+  void deleteWhenUnpinned() override;
 
   // Added for testing.
   int32_t getSlabNum() const { return seg_it_->slab_num; }
@@ -176,6 +162,8 @@ class Buffer : public AbstractBuffer {
                          const size_t offset = 0,
                          const MemoryLevel src_buffer_type = CPU_LEVEL,
                          const int src_device_id = -1) = 0;
+
+  void deleteSelf();
 
   BufferMgr* bm_;
   BufferList::iterator seg_it_;
