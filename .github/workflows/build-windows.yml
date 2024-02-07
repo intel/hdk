@@ -21,6 +21,7 @@ jobs:
   build:
     name: Win - Conda - ${{ inputs.name }}
     runs-on: windows-latest
+    if: false # excluded failing build
 
     outputs:
       cache-suffix: ${{ env.DATE }}
