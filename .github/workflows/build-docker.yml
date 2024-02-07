@@ -12,6 +12,8 @@ on:
         type: string
         default: -DENABLE_CUDA=off
 
+permissions: read-all
+
 jobs:
   build:
     name: Linux - Docker - ${{ inputs.name }}

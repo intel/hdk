@@ -11,6 +11,8 @@ on:
       test:
         type: string
 
+permissions: read-all
+
 jobs:
   test:
     name: Test (Win - Conda - ${{ inputs.name }})

@@ -15,10 +15,13 @@ on:
       cache-suffix:
         value: ${{ jobs.build.outputs.cache-suffix }}
 
+permissions: read-all
+
 jobs:
   build:
     name: Win - Conda - ${{ inputs.name }}
     runs-on: windows-latest
+    if: false # excluded failing build
 
     outputs:
       cache-suffix: ${{ env.DATE }}

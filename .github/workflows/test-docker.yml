@@ -18,10 +18,13 @@ on:
         type: string
         default: cuda
 
+permissions: read-all
+
 jobs:
   test:
     name: Test (Linux - Docker - ${{ inputs.name }}, runner=${{ inputs.runner }})
     runs-on: [self-hosted, linux, "${{ inputs.runner }}"]
+    if: false # skip self-hosted runs
     steps:
       - name: Clean
         run: |

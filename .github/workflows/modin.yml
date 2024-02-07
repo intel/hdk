@@ -6,6 +6,8 @@ on:
         type: string
         default: None
 
+permissions: read-all
+
 jobs:
   build:
     name: Build and Test (Linux - Conda - gcc-cpu)
