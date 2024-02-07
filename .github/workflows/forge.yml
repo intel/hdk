@@ -5,8 +5,10 @@ on:
       reset-cache:
         type: boolean
         default: true
-  schedule:
-    - cron: '51 3 * * *'
+#  schedule:
+#    - cron: '51 3 * * *'
+
+permissions: read-all
 
 jobs:
   build:

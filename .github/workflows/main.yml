@@ -9,8 +9,10 @@ on:
     branches: main
   pull_request:
     branches: main
-  schedule:
-    - cron: '51 2 * * *'
+#  schedule:
+#    - cron: '51 2 * * *'
+
+permissions: read-all
 
 jobs:
   build:

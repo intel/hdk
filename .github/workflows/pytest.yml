@@ -2,6 +2,8 @@ name: pyhdk pytest
 on:
   workflow_call:
 
+permissions: read-all
+
 jobs:
   build:
     name: Build and Test (Linux - Conda - gcc-cpu)
